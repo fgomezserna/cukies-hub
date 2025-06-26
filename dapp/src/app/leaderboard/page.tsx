@@ -1,15 +1,18 @@
 'use client';
 
+import React from 'react';
 import AppLayout from '@/components/layout/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { useAuth } from '@/providers/auth-provider';
+import { Crown, ShieldCheck } from 'lucide-react';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from '@/providers/auth-provider';
-import Link from 'next/link';
 
 const players = [
   { rank: 1, name: "SybilSlayerPro", rankChange: 2, score: 152340, avatar: "https://placehold.co/40x40.png", hint: "pro gamer" },
@@ -104,9 +107,70 @@ function LeaderboardView() {
 }
 
 export default function LeaderboardPage() {
+  const { user } = useAuth();
+  
   return (
     <AppLayout>
-      <LeaderboardView />
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">Leaderboard</h1>
+          <p className="text-muted-foreground">See who's on top of the game.</p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Players</CardTitle>
+            <CardDescription>
+              The best of the best. Can you beat them? 
+              {!user && <span className="text-primary font-semibold"> Connect your wallet to see your rank.</span>}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px] text-center">Rank</TableHead>
+                  <TableHead>Player</TableHead>
+                  <TableHead className="text-right">Best Score</TableHead>
+                  <TableHead className="text-right">Matches Played</TableHead>
+                  <TableHead className="text-right">Win Rate</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {players.map((player, index) => (
+                  <TableRow key={player.rank} className={user && user.username === player.name ? 'bg-primary/10' : ''}>
+                    <TableCell className="font-medium text-center">{player.rank}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={player.avatar} alt="Avatar" />
+                          <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="ml-4 space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            <Link href={`/profile/${player.name}`} className="hover:underline">
+                              {player.name}
+                            </Link>
+                            {player.rank === 1 && <Crown className="inline-block ml-2 h-4 w-4 text-yellow-400" />}
+                            {player.verified && <ShieldCheck className="inline-block ml-2 h-4 w-4 text-blue-500" />}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{player.hint}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{player.score.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{player.rankChange.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={player.rankChange > 0 ? 'default' : 'secondary'} className={player.rankChange > 0 ? 'bg-green-600/20 text-green-400 border-green-600/30' : ''}>
+                        {player.rankChange > 0 ? 'Up' : 'Down'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </AppLayout>
   )
 }

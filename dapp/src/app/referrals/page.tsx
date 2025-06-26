@@ -1,5 +1,6 @@
 'use client'
 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AppLayout from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,12 @@ import type { ChartConfig } from "@/components/ui/chart"
 import {
   ChartContainer,
 } from "@/components/ui/chart";
-import { useState, useEffect, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import Link from 'next/link';
 
-const referrals = [
+const referralsData = [
   { name: "CryptoKing", joined: "2024-07-25", points: 15000, avatar: "https://placehold.co/40x40.png", hint: "king crown" },
   { name: "DiamondHands", joined: "2024-07-22", points: 12500, avatar: "https://placehold.co/40x40.png", hint: "diamond hands" },
   { name: "PixelPioneer", joined: "2024-07-20", points: 10000, avatar: "https://placehold.co/40x40.png", hint: "pixel art" },
@@ -28,7 +28,7 @@ const referrals = [
 ];
 
 const directPoints = 1250;
-const totalReferralPoints = referrals.reduce((acc, referral) => acc + referral.points, 0);
+const totalReferralPoints = referralsData.reduce((acc, referral) => acc + referral.points, 0);
 const totalPoints = directPoints + totalReferralPoints;
 
 const chartData = [
@@ -53,17 +53,21 @@ const chartConfig = {
 
 function ReferralsView() {
   const { toast } = useToast();
-  const referralLink = "https://hyppieliquid.com/r/your-code-123";
+  const { user, isLoading: isAuthLoading } = useAuth();
+  
+  const referralLink = user?.referralCode ? `https://hyppieliquid.com/r/${user.referralCode}` : "https://hyppieliquid.com/r/your-code-123";
+
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const [isStarterQuestCompleted, setIsStarterQuestCompleted] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    const starterCompleted = localStorage.getItem('starterQuestCompleted') === 'true';
-    setIsStarterQuestCompleted(starterCompleted);
   }, []);
+
+  const isStarterQuestCompleted = useMemo(() => {
+    if (!user || !user.completedQuests) return false;
+    return user.completedQuests.some(cq => cq.quest.isStarter);
+  }, [user]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
@@ -124,7 +128,7 @@ function ReferralsView() {
                   </CardHeader>
                   <CardContent className="flex flex-col items-center justify-center p-6 pt-0">
                       <Users className="h-10 w-10 text-muted-foreground mb-2" />
-                      <span className="text-5xl font-bold text-primary">{referrals.length}</span>
+                      <span className="text-5xl font-bold text-primary">{referralsData.length}</span>
                   </CardContent>
               </Card>
           </div>
@@ -193,7 +197,7 @@ function ReferralsView() {
             <CardHeader>
               <CardTitle>Your Referrals</CardTitle>
               <CardDescription>
-                You've referred {referrals.length} friends. Keep it up!
+                You've referred {referralsData.length} friends. Keep it up!
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -206,7 +210,7 @@ function ReferralsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {referrals.map((referral) => (
+                  {referralsData.map((referral) => (
                     <TableRow key={referral.name}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -232,7 +236,7 @@ function ReferralsView() {
                 <Lock className="h-8 w-8 text-muted-foreground" />
                 <p className="mt-4 text-lg font-semibold">
                   {
-                    !user 
+                    !user
                       ? 'Connect your wallet'
                       : 'Feature Locked'
                   }

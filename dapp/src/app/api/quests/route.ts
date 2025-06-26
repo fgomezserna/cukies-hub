@@ -16,27 +16,34 @@ export async function GET(request: Request) {
     });
 
     if (!walletAddress) {
-      return NextResponse.json(quests);
+      return NextResponse.json(quests.map(q => ({
+        ...q,
+        tasks: q.tasks.map(t => ({...t, completed: false})),
+        isCompleted: false,
+        isLocked: !!q.isStarter, // Lock non-starter quests initially
+      })));
     }
 
-    const [user, userCompletedTasks] = await Promise.all([
-      prisma.user.findUnique({
-        where: { walletAddress },
-        include: { completedQuests: true },
-      }),
-      prisma.userCompletedTask.findMany({
-        where: { user: { walletAddress } },
-        select: { taskId: true },
-      }),
-    ]);
+    const user = await prisma.user.findUnique({
+      where: { walletAddress },
+      include: { 
+        completedQuests: true,
+        completedTasks: true,
+      },
+    });
 
     if (!user) {
-      // Return public quest data if user not found
-      return NextResponse.json(quests.map(q => ({...q, completedTasksCount: 0, isCompleted: false})));
+      // Return public quest data if user not found for some reason
+      return NextResponse.json(quests.map(q => ({
+        ...q,
+        tasks: q.tasks.map(t => ({...t, completed: false})),
+        isCompleted: false,
+        isLocked: !q.isStarter,
+      })));
     }
-
-    const completedTaskIds = new Set(userCompletedTasks.map(uct => uct.taskId));
-
+    
+    const completedTaskIds = new Set(user.completedTasks.map(uct => uct.taskId));
+    
     const starterQuest = quests.find(q => q.isStarter);
     const userHasCompletedStarterQuest = starterQuest 
       ? user.completedQuests.some(cq => cq.questId === starterQuest.id)
@@ -44,13 +51,17 @@ export async function GET(request: Request) {
 
     const questsWithUserData = quests.map(quest => {
         const isQuestCompleted = user.completedQuests.some(cq => cq.questId === quest.id);
-        const completedTasksCount = quest.tasks.filter(task => completedTaskIds.has(task.id)).length;
-        const isLocked = !!starterQuest && quest.id !== starterQuest.id && !userHasCompletedStarterQuest;
+        const isLocked = !!starterQuest && !quest.isStarter && !userHasCompletedStarterQuest;
         
+        const tasksWithStatus = quest.tasks.map(task => ({
+            ...task,
+            completed: completedTaskIds.has(task.id),
+        }));
+
         return {
             ...quest,
+            tasks: tasksWithStatus,
             isCompleted: isQuestCompleted,
-            completedTasksCount,
             isLocked,
         }
     })

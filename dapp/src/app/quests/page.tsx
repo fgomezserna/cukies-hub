@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import AppLayout from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle } from 'lucide-react';
 import DiscordIcon from '@/components/icons/discord';
 import XIcon from '@/components/icons/x-icon';
 import { Badge } from '@/components/ui/badge';
@@ -14,13 +14,37 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { Quest, Task } from '@prisma/client';
+import { User as UserType, Streak } from '@/types';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
-type QuestWithDetails = Quest & {
-  tasks: Task[];
+// Define Quest and Task types matching backend response
+type Task = {
+  id: string;
+  text: string;
+  completed: boolean;
+};
+
+type Quest = {
+  id: string;
+  title: string;
+  description: string;
+  xp: number;
+  isStarter: boolean;
   isCompleted: boolean;
-  completedTasksCount: number;
   isLocked: boolean;
+  icon: React.ElementType;
+  tasks: Task[];
+};
+
+const iconMap: { [key: string]: React.ElementType } = {
+  'get-started': Star,
+  'verifyEmail': Mail,
+  'profilePic': User,
+  'likeAndRt': XIcon,
+  'playGames': Gamepad2,
+  'scoreHigh': Gamepad2,
+  'followHyppie': XIcon,
 };
 
 const TaskItem = ({ text, completed, onVerify, disabled }: { text: string; completed: boolean; onVerify: () => void; disabled: boolean; }) => (
@@ -33,14 +57,14 @@ const TaskItem = ({ text, completed, onVerify, disabled }: { text: string; compl
   </div>
 );
 
-function UsernameTask({ task, onVerify, disabled }: { task: { id: string; text: string; completed: boolean }; onVerify: (taskId: string, username: string) => void, disabled: boolean }) {
+function UsernameTask({ task, onVerify, disabled }: { task: Task; onVerify: (taskId: string, username: string) => void; disabled: boolean; }) {
   const [username, setUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-
+  console.log("task", task);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
-      onVerify(task.id, username);
+      onVerify(task.id, username.trim());
       setIsEditing(false);
     }
   };
@@ -49,7 +73,7 @@ function UsernameTask({ task, onVerify, disabled }: { task: { id: string; text: 
     return (
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
         <CheckCircle2 className="h-5 w-5 text-primary" />
-        <span className="text-foreground">{task.text}</span>
+        <span className="text-foreground">{task.title}</span>
         <Button size="sm" variant="ghost" className="ml-auto" disabled>
           Verified
         </Button>
@@ -61,7 +85,7 @@ function UsernameTask({ task, onVerify, disabled }: { task: { id: string; text: 
     <div className="flex flex-col gap-3 p-3 rounded-md bg-muted/50 border border-transparent has-[input:focus]:border-primary/50 transition-colors">
         <div className="flex items-center gap-3">
             <Circle className="h-5 w-5 text-muted-foreground" />
-            <span className='flex-grow text-muted-foreground'>{task.text}</span>
+            <span className='flex-grow text-muted-foreground'>{task.title}</span>
             <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setIsEditing(!isEditing)} disabled={disabled}>
                 {isEditing ? 'Cancel' : 'Set Username'}
             </Button>
@@ -84,8 +108,9 @@ function UsernameTask({ task, onVerify, disabled }: { task: { id: string; text: 
   );
 }
 
-function ConnectAccountTask({ text, completed, onVerify, disabled }: { text: string; completed: boolean; onVerify: () => void; disabled: boolean; }) {
+function ConnectAccountTask({ text, completed, onVerify, disabled }: { text: string; completed: boolean; onVerify: () => void; disabled: boolean }) {
   const [isConnecting, setIsConnecting] = useState(false);
+
 
   const handleConnect = () => {
     setIsConnecting(true);
@@ -118,69 +143,90 @@ function ConnectAccountTask({ text, completed, onVerify, disabled }: { text: str
 }
 
 function QuestsView() {
-  const { user, isLoading: isAuthLoading, fetchUser } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
-  const [quests, setQuests] = useState<QuestWithDetails[]>([]);
+  const [quests, setQuests] = useState<Quest[]>([]);
   const [isLoadingQuests, setIsLoadingQuests] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
 
-  const fetchQuests = useCallback(async () => {
-    if (!user) {
-      setIsLoadingQuests(false);
-      return;
-    };
-    try {
-      setIsLoadingQuests(true);
-      const response = await fetch(`/api/quests?walletAddress=${user.walletAddress}`);
-      if (!response.ok) throw new Error('Failed to fetch quests');
-      const data = await response.json();
-      setQuests(data);
-    } catch (error) {
-      console.error(error);
-      toast({ title: 'Error', description: 'Could not load quests.', variant: 'destructive' });
-    } finally {
-      setIsLoadingQuests(false);
-    }
-  }, [user, toast]);
-
   useEffect(() => {
-    fetchQuests();
-  }, [fetchQuests]);
+    const fetchQuests = async () => {
+      setIsLoadingQuests(true);
+      try {
+        const url = user ? `/api/quests?walletAddress=${user.walletAddress}` : '/api/quests';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch quests');
+        let data = await response.json();
+        
+        // Map icons to the quests
+        data = data.map((q: Omit<Quest, 'icon'>) => ({ ...q, icon: iconMap[q.id] || Star }));
+        
+        setQuests(data);
+      } catch (error) {
+        console.error(error);
+        toast({
+          title: 'Error',
+          description: 'Could not load quests. Please try again later.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingQuests(false);
+      }
+    };
+
+    if (!isAuthLoading) {
+        fetchQuests();
+    }
+  }, [user, isAuthLoading, toast]);
 
   const starterQuest = useMemo(() => quests.find(q => q.isStarter), [quests]);
   
   const completedQuestsCount = useMemo(() => quests.filter(q => q.isCompleted).length, [quests]);
 
-  const completedStarterTasks = useMemo(() => starterQuest?.tasks.filter(t => (t as any).isCompleted).length ?? 0, [starterQuest]);
+  const completedStarterTasks = useMemo(() => starterQuest?.tasks.filter(t => t.completed).length ?? 0, [starterQuest]);
   const totalStarterTasks = useMemo(() => starterQuest?.tasks.length ?? 0, [starterQuest]);
   const isStarterTasksComplete = useMemo(() => completedStarterTasks === totalStarterTasks, [completedStarterTasks, totalStarterTasks]);
   const starterProgress = useMemo(() => totalStarterTasks > 0 ? (completedStarterTasks / totalStarterTasks) * 100 : 0, [completedStarterTasks, totalStarterTasks]);
 
-  const handleVerifyTask = async (questId: string, taskId: string, payload?: any) => {
-    try {
-      // In a real app, you would have a specific endpoint per task type
-      const response = await fetch(`/api/quests/tasks/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: user?.walletAddress, taskId, ...payload }),
-      });
-      if (!response.ok) throw new Error('Verification failed');
-      
-      const updatedQuest = await response.json();
+  useEffect(() => {
+    console.log("starterQuest", starterQuest);
+  }, [starterQuest]);
 
-      setQuests(prev => prev.map(q => q.id === questId ? updatedQuest : q));
+  const handleVerifyTask = async (questId: string, taskId: string, payload: { type: string, value?: any }) => {
+    console.log(`Verifying task ${taskId} for quest ${questId} with payload`, payload);
 
-      toast({
-        title: `Task Verified!`,
-        description: `Progress updated.`,
-      });
-    } catch (error: any) {
-        toast({ title: 'Error', description: error.message || 'Could not verify task.', variant: 'destructive' });
-    }
+    if (!user) return;
+
+    // TODO: Implement actual backend verification calls here
+    // For now, we'll optimistically update the UI as the backend is not ready
+
+    const quest = quests.find(q => q.id === questId);
+    const task = quest?.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Optimistic UI Update
+    setQuests(prevQuests => prevQuests.map(q => {
+        if (q.id === questId) {
+            return {
+                ...q,
+                tasks: q.tasks.map(t => t.id === taskId ? { ...t, completed: true } : t)
+            };
+        }
+        return q;
+    }));
+
+    toast({
+      title: `Task Verified!`,
+      description: `You completed: "${task.title}".`,
+    });
   };
   
   const handleClaimReward = async (questId: string) => {
     if (!user) return;
+
+    const questToClaim = quests.find(q => q.id === questId);
+    if (!questToClaim || questToClaim.isCompleted) return;
+    
     try {
       const response = await fetch('/api/quests/claim', {
         method: 'POST',
@@ -188,157 +234,159 @@ function QuestsView() {
         body: JSON.stringify({ walletAddress: user.walletAddress, questId }),
       });
 
-      if (!response.ok) {
-        const { error } = await response.json();
-        throw new Error(error || 'Failed to claim reward');
-      }
+      const result = await response.json();
 
-      const { xpGained } = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to claim reward.');
+      }
       
+      const refetchQuests = async () => {
+          const url = `/api/quests?walletAddress=${user.walletAddress}`;
+          const refetchResponse = await fetch(url);
+          let data = await refetchResponse.json();
+          data = data.map((q: Omit<Quest, 'icon'>) => ({ ...q, icon: iconMap[q.id] || Star }));
+          setQuests(data);
+      }
+      
+      await refetchQuests();
+
       toast({
         title: 'Quest Completed!',
-        description: `You've earned ${xpGained} XP.`,
+        description: `You've earned ${result.xpGained} XP. Your new total is ${result.newTotalXp} XP.`,
       });
-      
-      fetchQuests(); // Re-fetch all quests to update state
-      fetchUser(); // Re-fetch user to update XP
+
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        toast({
+            title: 'Claiming Error',
+            description: error.message,
+            variant: 'destructive',
+        });
     }
   };
 
   const displayedQuests = useMemo(() => {
-    const isStarterQuestCompleted = starterQuest?.isCompleted;
+    const isStarterQuestCompleted = starterQuest?.isCompleted ?? false;
     const questList = quests.filter(q => !q.isStarter || (q.isStarter && isStarterQuestCompleted));
     
     if (activeTab === 'all') {
       return questList;
     }
     return questList.filter(q => q.isCompleted === (activeTab === 'completed'));
-  }, [quests, activeTab, starterQuest?.isCompleted]);
-  
-  const isAnythingLocked = !user || (starterQuest && !starterQuest.isCompleted);
+  }, [quests, activeTab, starterQuest]);
 
-  if (isAuthLoading || isLoadingQuests) {
-    return (
-      <div className="flex justify-center items-center h-40">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const isLoading = isAuthLoading || isLoadingQuests;
+  const isLocked = !user;
 
-  if (!user) {
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-40 gap-4 text-center">
-        <p className="text-lg font-semibold">Wallet Not Connected</p>
-        <p className="text-muted-foreground">Please connect your wallet to view and complete quests.</p>
-      </div>
-    );
+        <div className="flex justify-center items-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    )
   }
 
   return (
-    <div className="space-y-8">
-      {starterQuest && !starterQuest.isCompleted && (
-        <Card className="bg-card/80 border-primary/50 border-2">
+    <div className="relative flex flex-col gap-6">
+      <div className={cn("flex flex-col gap-6", isLocked && 'blur-sm pointer-events-none')}>
+        <div>
+          <h1 className="text-3xl font-bold font-headline">Quests</h1>
+          <p className="text-muted-foreground">Complete quests to earn XP and climb the leaderboard.</p>
+        </div>
+
+        {starterQuest && !starterQuest.isCompleted && (
+          <Card className="bg-card/80 border-primary/50 border-2">
             <CardHeader>
-                <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 p-2 rounded-lg">
-                        <Star className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                        <CardTitle>{starterQuest.title}</CardTitle>
-                        <CardDescription>{starterQuest.description}</CardDescription>
-                    </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-md">
+                  <Star className="h-6 w-6 text-primary" />
                 </div>
+                <div>
+                  <CardTitle>{starterQuest.title}</CardTitle>
+                  <CardDescription>{starterQuest.description}</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
-                {starterQuest.tasks.map((task: any) => {
-                    if (task.id.includes('username')) {
-                        return <UsernameTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, username) => handleVerifyTask(starterQuest.id, taskId, { username })} />
-                    }
-                    if (task.id.includes('connect') || task.id.includes('join') || task.id.includes('follow')) {
-                        return <ConnectAccountTask key={task.id} text={task.title} completed={task.isCompleted} disabled={starterQuest.isLocked} onVerify={() => handleVerifyTask(starterQuest.id, task.id)} />
-                    }
-                    return <TaskItem key={task.id} text={task.title} completed={task.isCompleted} disabled={starterQuest.isLocked} onVerify={() => handleVerifyTask(starterQuest.id, task.id)} />
-                })}
+                {starterQuest.tasks.map((task) => {
+                  if (task.id.includes('username')) {
+                      return <UsernameTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, username) => handleVerifyTask(starterQuest.id, taskId, { type: 'username', value: username })} />
+                  }
+                  return <ConnectAccountTask key={task.id} text={task.title} completed={task.completed} disabled={starterQuest.isLocked} onVerify={() => handleVerifyTask(starterQuest.id, task.id, { type: 'social' })} />
+              })}
             </CardContent>
-            <CardFooter className="flex-col items-stretch gap-3">
-                <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span>{completedStarterTasks}/{totalStarterTasks}</span>
-                </div>
-                <Progress value={starterProgress} />
-                <Button onClick={() => handleClaimReward(starterQuest.id)} disabled={!isStarterTasksComplete || starterQuest.isCompleted}>
-                    {starterQuest.isCompleted ? 'Reward Claimed' : `Claim ${starterQuest.xp} XP`}
-                </Button>
-            </CardFooter>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Quests</CardTitle>
-              <CardDescription>Complete quests to earn XP and climb the leaderboard.</CardDescription>
-            </div>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="incomplete">Active</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <div className={isAnythingLocked ? 'blur-sm pointer-events-none' : ''}>
-              <Accordion type="single" collapsible className="w-full">
-                {displayedQuests.map((quest) => (
-                  <AccordionItem value={quest.id} key={quest.id}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center gap-4 w-full">
-                        <div className="p-2 rounded-lg bg-muted">
-                          <Coins className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div className="flex-grow text-left">
-                          <p className="font-semibold">{quest.title}</p>
-                          <p className="text-sm text-muted-foreground">{quest.description}</p>
-                        </div>
-                        <div className="flex items-center gap-4 pr-4">
-                          <Badge variant="outline" className="text-primary border-primary">{quest.xp} XP</Badge>
-                          {quest.isCompleted ? (
-                            <CheckCircle2 className="h-5 w-5 text-primary" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      {quest.tasks.map((task: any) => (
-                        <TaskItem key={task.id} text={task.title} completed={task.isCompleted} onVerify={() => handleVerifyTask(quest.id, task.id)} disabled={quest.isLocked || quest.isCompleted} />
-                      ))}
-                      <Button onClick={() => handleClaimReward(quest.id)} disabled={!quest.isCompleted || quest.isCompleted}>
-                        Claim Reward
-                      </Button>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
-            {isAnythingLocked && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/60 backdrop-blur-xs rounded-lg p-4 text-center">
-                <Lock className="h-8 w-8 text-muted-foreground" />
-                <p className="mt-2 text-sm font-semibold text-muted-foreground">
-                  Complete the "Get Started" quest to unlock
-                </p>
+            <CardFooter className="flex-col items-stretch gap-4">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Progress</span>
+                <span>{completedStarterTasks}/{totalStarterTasks}</span>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <Progress value={starterProgress} />
+             <Button onClick={() => handleClaimReward(starterQuest.id)} disabled={!isStarterTasksComplete || starterQuest.isCompleted}>
+                  {starterQuest.isCompleted ? 'Reward Claimed' : `Claim ${starterQuest.xp} XP`}
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="all">All Quests</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
+          <TabsContent value={activeTab} className="pt-4">
+            <div className="space-y-4">
+              {displayedQuests.length > 0 ? (
+                displayedQuests.map(quest => (
+                <Accordion type="single" collapsible key={quest.id} className="w-full" disabled={quest.isLocked}>
+                    <AccordionItem value={quest.id} className="border rounded-lg">
+                      <AccordionTrigger className="p-4 hover:no-underline data-[state=open]:border-b">
+                        <div className="flex items-center gap-4 flex-1">
+                            <div className="p-2 bg-muted rounded-md">
+                                {quest.isLocked ? <Lock className="h-6 w-6 text-muted-foreground" /> : <quest.icon className="h-6 w-6 text-muted-foreground" />}
+                            </div>
+                            <div className="text-left">
+                                <p className="font-semibold">{quest.title}</p>
+                                <p className="text-sm text-muted-foreground">{quest.description}</p>
+                            </div>
+                            <div className="ml-auto flex items-center gap-4">
+                                <Badge variant="secondary" className="font-mono text-base">
+                                    {quest.xp} XP
+                                </Badge>
+                                {quest.isCompleted && <CheckCircle2 className="h-6 w-6 text-primary" />}
+                            </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-4 space-y-4">
+                          {quest.tasks.map((task) => (
+                           <TaskItem key={task.id} text={task.title} completed={task.completed} onVerify={() => handleVerifyTask(quest.id, task.id, { type: 'generic' })} disabled={quest.isLocked || quest.isCompleted} />
+                          ))}
+                          <Button 
+                              onClick={() => handleClaimReward(quest.id)} 
+                              disabled={quest.tasks.some(t => !t.completed) || quest.isCompleted}
+                              className="w-full"
+                          >
+                              {quest.isCompleted ? 'Claimed' : `Claim ${quest.xp} XP`}
+                          </Button>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                ))
+              ) : (
+                  <div className="text-center py-12">
+                      <p className="text-muted-foreground">No quests in this category.</p>
+                  </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+      {isLocked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg p-4 text-center">
+            <Lock className="h-8 w-8 text-muted-foreground" />
+            <p className="mt-4 text-lg font-semibold">Wallet Not Connected</p>
+            <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view and complete quests.</p>
+        </div>
+      )}
     </div>
   );
 }

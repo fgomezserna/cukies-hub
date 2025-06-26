@@ -17,19 +17,33 @@ export async function POST(request: Request) {
       },
       include: {
         lastCheckIn: true,
-      }
+        completedQuests: {
+          include: {
+            quest: true,
+          },
+        },
+      },
     });
 
     if (!user) {
-      user = await prisma.user.create({
+      const newUser = await prisma.user.create({
         data: {
           walletAddress: lowercasedAddress,
-          // You can set initial values for other fields here if needed
-          // For example, setting the initial username to a portion of the wallet address
-          username: `user_${lowercasedAddress.slice(0, 6)}`
+          username: `user_${lowercasedAddress.slice(0, 6)}`,
+        },
+      });
+      // Now fetch the user with the same includes as above to ensure consistent object shape
+      user = await prisma.user.findUnique({
+        where: {
+            id: newUser.id,
         },
         include: {
-          lastCheckIn: true,
+            lastCheckIn: true,
+            completedQuests: {
+                include: {
+                    quest: true
+                }
+            }
         }
       });
     }

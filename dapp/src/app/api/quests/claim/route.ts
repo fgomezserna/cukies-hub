@@ -9,51 +9,47 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Wallet address and Quest ID are required' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { walletAddress } });
+    const user = await prisma.user.findUnique({
+      where: { walletAddress },
+      include: { completedQuests: true, completedTasks: true }
+    });
+    
+    if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
     const quest = await prisma.quest.findUnique({
       where: { id: questId },
       include: { tasks: true },
     });
 
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    if (!quest) return NextResponse.json({ error: 'Quest not found' }, { status: 404 });
-
-    // Lock check
-    const starterQuest = await prisma.quest.findFirst({
-      where: { isStarter: true },
-    });
-
-    if (starterQuest && starterQuest.id !== quest.id) {
-      const userHasCompletedStarterQuest = await prisma.userQuest.findUnique({
-        where: {
-          userId_questId: {
-            userId: user.id,
-            questId: starterQuest.id,
-          },
-        },
-      });
-      if (!userHasCompletedStarterQuest) {
-        return NextResponse.json({ error: 'Complete the starter quest first' }, { status: 403 });
-      }
+    if (!quest) {
+        return NextResponse.json({ error: 'Quest not found' }, { status: 404 });
     }
 
-    const existingClaim = await prisma.userQuest.findUnique({
-      where: { userId_questId: { userId: user.id, questId: quest.id } },
-    });
+    // Lock check
+    if (!quest.isStarter) {
+        const starterQuest = await prisma.quest.findFirst({ where: { isStarter: true } });
+        if (starterQuest) {
+            const hasCompletedStarter = user.completedQuests.some(cq => cq.questId === starterQuest.id);
+            if (!hasCompletedStarter) {
+                return NextResponse.json({ error: 'Complete the "Get Started" quest first to unlock others.' }, { status: 403 });
+            }
+        }
+    }
 
-    if (existingClaim) {
+    const isAlreadyClaimed = user.completedQuests.some(cq => cq.questId === quest.id);
+    if (isAlreadyClaimed) {
       return NextResponse.json({ error: 'Quest already claimed' }, { status: 400 });
     }
 
-    const completedTasksCount = await prisma.userCompletedTask.count({
-      where: {
-        userId: user.id,
-        task: { questId: quest.id },
-      },
-    });
+    const userCompletedTaskIds = new Set(user.completedTasks.map(t => t.taskId));
+    const questTaskIds = quest.tasks.map(t => t.id);
+    
+    const allTasksCompleted = questTaskIds.every(taskId => userCompletedTaskIds.has(taskId));
 
-    if (completedTasksCount < quest.tasks.length) {
-      return NextResponse.json({ error: 'Not all tasks are completed' }, { status: 400 });
+    if (!allTasksCompleted) {
+      return NextResponse.json({ error: 'Not all tasks for this quest are completed' }, { status: 400 });
     }
 
     const [, updatedUser] = await prisma.$transaction([

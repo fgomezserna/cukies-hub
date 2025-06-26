@@ -5,6 +5,25 @@ export type Streak = {
   lastCheckIn: string; // Date serialized as string
 }
 
+export type Quest = {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  xp: number;
+  isStarter: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type UserQuest = {
+  id: string;
+  userId: string;
+  questId: string;
+  completedAt: string;
+  quest: Quest;
+}
+
 // Update User type to include streak information
 export type User = {
   id: string;
@@ -22,4 +41,5 @@ export type User = {
   createdAt: string;
   updatedAt: string;
   lastCheckIn: Streak | null; // Added field
+  completedQuests: UserQuest[];
 } 

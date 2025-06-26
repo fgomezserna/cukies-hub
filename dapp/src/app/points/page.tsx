@@ -3,15 +3,16 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, Download, Gift, Lock, Search, Shield, Star, Loader2 } from 'lucide-react';
+import { ArrowDown, Download, Gift, Lock, Search, Shield, Star, Loader2, AlertTriangle, Coins } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useAuth } from '@/providers/auth-provider';
+import { cn } from '@/lib/utils';
 
 const basePointsHistory = [
   { reason: "Daily Login", points: "+10", date: "2024-07-29" },
@@ -67,7 +68,11 @@ function PointsView() {
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   
-  const [isStarterQuestCompleted, setIsStarterQuestCompleted] = useState(false);
+  const isStarterQuestCompleted = useMemo(() => {
+    if (!user) return false;
+    return user.completedQuests.some(cq => cq.quest.isStarter);
+    }, [user]);
+
   const [dailyStreak, setDailyStreak] = useState(0);
   const [canClaim, setCanClaim] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,10 +174,7 @@ function PointsView() {
   
   // Load state from localStorage on mount
   useEffect(() => {
-    const starterCompleted = localStorage.getItem('starterQuestCompleted') === 'true';
-    setIsStarterQuestCompleted(starterCompleted);
-
-    if (!starterCompleted) return;
+    if (!isStarterQuestCompleted) return;
 
     let currentStreak = parseInt(localStorage.getItem('dailyStreak') || '0', 10);
     const lastClaimTimestamp = localStorage.getItem('lastClaimTimestamp');
@@ -245,7 +247,10 @@ function PointsView() {
     return `You're on a ${dailyStreak} day streak! Claim your reward.`;
   }
 
-  if (isAuthLoading) {
+  const isLoading = isAuthLoading;
+  const isLocked = !user;
+
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-40">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -254,201 +259,242 @@ function PointsView() {
   }
 
   return (
-      <div className="flex flex-col gap-8">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold font-headline">Points</h1>
-        </div>
-
-        {/* Summary Card */}
-        <Card>
-          <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 items-center text-center md:text-left">
-            <div className="flex flex-col md:flex-row items-center gap-4 col-span-2 md:col-span-1 justify-center">
-              <Shield className="h-12 w-12 text-primary/50" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-muted-foreground">Tier</span>
-              <span className="font-bold text-lg flex items-center gap-2 justify-center md:justify-start"><Shield className="h-5 w-5 text-yellow-500" /> Bronze</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-muted-foreground">Position</span>
-              <span className="font-bold text-lg flex items-center gap-1 justify-center md:justify-start">
-                3557 
-                <span className="flex items-center text-destructive text-xs"><ArrowDown className="h-3 w-3" /> 431</span>
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-muted-foreground">Total Points</span>
-              <span className="font-bold text-lg text-primary">1,250</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Left Column: Points History & Leaderboard */}
-          <div className="lg:col-span-2 flex flex-col gap-8">
+    <div className="relative grid flex-1 gap-4 overflow-auto p-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={cn("grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8", isLocked && 'blur-sm pointer-events-none')}>
             <Card>
-              <CardHeader>
-                <CardTitle>Points History</CardTitle>
-                <CardDescription>Track your points earned and spent.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div ref={pointsContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-card z-10">
-                      <TableRow>
-                        <TableHead>Activity</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Points</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visiblePoints.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{item.reason}</TableCell>
-                          <TableCell className="text-muted-foreground">{item.date}</TableCell>
-                          <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
-                            {item.points}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {hasMorePoints && (
-                          <TableRow>
-                              <TableCell colSpan={3} className="text-center p-0">
-                                  <div ref={pointsObserver} className="flex justify-center items-center py-4">
-                                      {isLoadingPoints && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-                                  </div>
-                              </TableCell>
-                          </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                  <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                      <CardTitle>Leaderboard</CardTitle>
-                      <div className="relative w-full md:max-w-xs">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                              placeholder="Search by player..."
-                              className="pl-9"
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                          />
-                      </div>
-                  </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                  <div ref={leaderboardContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
-                    <Table>
-                        <TableHeader className="sticky top-0 bg-card z-10">
-                            <TableRow>
-                                <TableHead className="w-[80px] text-center">Rank</TableHead>
-                                <TableHead>Hyppie Player</TableHead>
-                                <TableHead className="text-right">Points (XP)</TableHead>
-                                <TableHead className="text-right">Referral Points</TableHead>
-                                <TableHead className="text-right">Total Points</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {playersToDisplay.map((player) => (
-                                <TableRow key={player.rank} className={player.name === 'You' ? 'bg-primary/10 hover:bg-primary/20' : ''}>
-                                    <TableCell className="font-medium text-lg text-center">{player.rank}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage src={player.avatar} data-ai-hint={player.hint} />
-                                                <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div className='flex items-center gap-2'>
-                                                {isAuthLoading ? (
-                                                  <span className="font-medium">{player.name}</span>
-                                                ) : (
-                                                  <Link href={`/profile/${player.name}`} className="font-medium hover:underline">
-                                                    {player.name}
-                                                  </Link>
-                                                )}
-                                                {player.rank <= 3 && <Badge variant="secondary" className="bg-transparent">{player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : '🥉'}</Badge>}
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">{player.points.toLocaleString('en-US')}</TableCell>
-                                    <TableCell className="text-right font-mono">{player.referralPoints.toLocaleString('en-US')}</TableCell>
-                                    <TableCell className="text-right font-mono text-primary font-bold">{player.totalPoints.toLocaleString('en-US')}</TableCell>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Points History</CardTitle>
+                        <CardDescription>Track your points earned and spent.</CardDescription>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div ref={pointsContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-card z-10">
+                                <TableRow>
+                                    <TableHead>Activity</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Points</TableHead>
                                 </TableRow>
-                            ))}
-                            {!searchTerm && hasMorePlayers && (
-                                  <TableRow>
-                                      <TableCell colSpan={5} className="text-center p-0">
-                                          <div ref={leaderboardObserver} className="flex justify-center items-center py-4">
-                                              {isLoadingPlayers && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-                                          </div>
-                                      </TableCell>
-                                  </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                  </div>
-              </CardContent>
+                            </TableHeader>
+                            <TableBody>
+                                {visiblePoints.map((item, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">{item.reason}</TableCell>
+                                        <TableCell className="text-muted-foreground">{item.date}</TableCell>
+                                        <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
+                                            {item.points}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {hasMorePoints && (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center p-0">
+                                            <div ref={pointsObserver} className="flex justify-center items-center py-4">
+                                                {isLoadingPoints && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
             </Card>
-          </div>
 
-          {/* Right Column: Cards */}
-          <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-8 flex flex-col gap-8">
-              <Card>
+            <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-primary" /> Daily Drop</CardTitle>
-                  <CardDescription>{getDailyDropDescription()}</CardDescription>
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                        <CardTitle>Leaderboard</CardTitle>
+                        <div className="relative w-full md:max-w-xs">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by player..."
+                                className="pl-9"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div ref={leaderboardContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-card z-10">
+                                <TableRow>
+                                    <TableHead className="w-[80px] text-center">Rank</TableHead>
+                                    <TableHead>Hyppie Player</TableHead>
+                                    <TableHead className="text-right">Points (XP)</TableHead>
+                                    <TableHead className="text-right">Referral Points</TableHead>
+                                    <TableHead className="text-right">Total Points</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {playersToDisplay.map((player) => (
+                                    <TableRow key={player.rank} className={player.name === 'You' ? 'bg-primary/10 hover:bg-primary/20' : ''}>
+                                        <TableCell className="font-medium text-lg text-center">{player.rank}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarImage src={player.avatar} data-ai-hint={player.hint} />
+                                                    <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <div className='flex items-center gap-2'>
+                                                    {isAuthLoading ? (
+                                                      <span className="font-medium">{player.name}</span>
+                                                    ) : (
+                                                      <Link href={`/profile/${player.name}`} className="font-medium hover:underline">
+                                                        {player.name}
+                                                      </Link>
+                                                    )}
+                                                    {player.rank <= 3 && <Badge variant="secondary" className="bg-transparent">{player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : '🥉'}</Badge>}
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">{player.points.toLocaleString('en-US')}</TableCell>
+                                        <TableCell className="text-right font-mono">{player.referralPoints.toLocaleString('en-US')}</TableCell>
+                                        <TableCell className="text-right font-mono text-primary font-bold">{player.totalPoints.toLocaleString('en-US')}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {!searchTerm && hasMorePlayers && (
+                                      <TableRow>
+                                          <TableCell colSpan={5} className="text-center p-0">
+                                              <div ref={leaderboardObserver} className="flex justify-center items-center py-4">
+                                                  {isLoadingPlayers && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                              </div>
+                                          </TableCell>
+                                      </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+        <div className={cn("grid auto-rows-max items-start gap-4 lg:gap-8", isLocked && 'blur-sm pointer-events-none')}>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Daily Drop</CardTitle>
+                    <CardDescription>{getDailyDropDescription()}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button onClick={handleClaim} disabled={buttonState.disabled} className="w-full">
-                    {buttonState.icon && <buttonState.icon className="mr-2 h-4 w-4" />}
-                    {buttonState.text}
-                  </Button>
+                    <Button onClick={handleClaim} disabled={buttonState.disabled} className="w-full">
+                        {buttonState.icon && <buttonState.icon className="mr-2 h-4 w-4" />}
+                        {buttonState.text}
+                    </Button>
                 </CardContent>
-              </Card>
-              
-              <Card className="relative overflow-hidden text-center bg-card/50">
-                <div className="absolute inset-0 bg-grid-accent opacity-5 animate-grid [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
+            </Card>
+            <Card>
                 <CardHeader>
-                  <div className="flex justify-center items-center gap-2 font-bold text-foreground">
-                    <Star className="h-5 w-5 text-primary" />
-                    <span>HyppieLiquid</span>
-                  </div>
+                    <CardTitle>Leaderboard</CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center gap-4">
-                   <Shield className="h-20 w-20 text-yellow-500" />
-                   <div className="flex flex-col">
-                    <span className="text-4xl font-bold text-primary">726.19</span>
-                    <span className="text-sm text-muted-foreground">Total Points</span>
-                   </div>
-                   <p className="text-sm text-muted-foreground max-w-xs">
-                      Achieved rank 3557 and chilling at <b className="font-bold text-foreground">Bronze</b> tier
-                   </p>
-                   <Button className="w-full">
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Image
-                  </Button>
+                <CardContent>
+                    {/* Additional content for leaderboard section */}
                 </CardContent>
-              </Card>
-            </div>
-          </div>
+            </Card>
         </div>
-      </div>
+        {isLocked && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg p-4 text-center z-10 col-span-full row-span-full">
+                <Lock className="h-8 w-8 text-muted-foreground" />
+                <p className="mt-4 text-lg font-semibold">Wallet Not Connected</p>
+                <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view your points and leaderboard.</p>
+            </div>
+        )}
+    </div>
   );
 }
 
-export default function PointsPage() {
-  return (
-    <AppLayout>
-      <PointsView />
-    </AppLayout>
-  );
+function PointsPage() {
+    const { user, isLoading } = useAuth();
+
+    if (isLoading) {
+        return (
+            <AppLayout>
+                <div className="flex justify-center items-center h-full">
+                    {/* You can add a spinner here */}
+                    <p>Loading...</p>
+                </div>
+            </AppLayout>
+        );
+    }
+    
+    if (!user) {
+        return (
+            <AppLayout>
+                 <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+                    <div className="flex flex-col items-center justify-center h-full gap-4 text-center rounded-lg border border-dashed shadow-sm py-12">
+                        <AlertTriangle className="h-12 w-12 text-destructive" />
+                        <h2 className="text-2xl font-bold">Wallet Not Connected</h2>
+                        <p className="text-muted-foreground">Please connect your wallet to view your points and rewards.</p>
+                    </div>
+                 </main>
+            </AppLayout>
+        )
+    }
+
+    return (
+        <AppLayout>
+            <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+                <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">
+                                Total XP
+                            </CardTitle>
+                            <Star className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{user.xp.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground">
+                                Keep playing to earn more!
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">
+                                Points to Claim
+                            </CardTitle>
+                            <Gift className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">1,250</div>
+                            <p className="text-xs text-muted-foreground">
+                                From recent achievements
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Your Rank</CardTitle>
+                            <Coins className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">#2,345</div>
+                            <p className="text-xs text-muted-foreground">
+                                Top 15% of all players
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Claim Rewards</CardTitle>
+                             <CardDescription>
+                                Exchange your XP for exclusive assets.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button size="sm" className="w-full">
+                                Claim Now
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+                {/* Additional sections for points history, etc. can go here */}
+            </main>
+        </AppLayout>
+    );
 }
+
+export default PointsPage;
