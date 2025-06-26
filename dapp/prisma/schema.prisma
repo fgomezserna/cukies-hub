@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  walletAddress     String  @unique
+  username          String? @unique
+  email             String? @unique
+  profilePictureUrl String?
+  xp                Int     @default(0)
+
+  // Socials
+  twitterHandle     String?
+  discordUsername   String?
+  telegramUsername  String?
+
+  // Quest progress
+  completedQuests UserQuest[]
+
+  // Daily Check-in
+  dailyCheckIns DailyCheckIn[]
+  lastCheckIn   Streak?
+
+  // Referrals
+  referralCode    String? @unique
+  referredById    String? @db.ObjectId
+  referredBy      User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  referrals       User[]  @relation("Referrals")
+  referralRewards Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation to tasks completed by the user
+  completedTasks UserCompletedTask[]
+}
+
+model Streak {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  days        Int      @default(0)
+  lastCheckIn DateTime
+}
+
+model DailyCheckIn {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String   @db.ObjectId
+  user     User     @relation(fields: [userId], references: [id])
+  date     DateTime @default(now())
+  xpGained Int
+}
+
+model Quest {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  imageUrl    String?
+  xp          Int
+  isStarter   Boolean? @default(false)
+
+  tasks       Task[]
+  completedBy UserQuest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id                    String  @id @default(auto()) @map("_id") @db.ObjectId
+  title                 String
+  description           String?
+  validationApiEndpoint String?
+
+  questId String @db.ObjectId
+  quest   Quest  @relation(fields: [questId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation to users who completed this task
+  completedBy UserCompletedTask[]
+}
+
+model UserQuest {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  questId     String   @db.ObjectId
+  quest       Quest    @relation(fields: [questId], references: [id])
+  completedAt DateTime @default(now())
+
+  @@unique([userId, questId])
+}
+
+// New model to track completion of individual tasks
+model UserCompletedTask {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String   @db.ObjectId
+  task      Task     @relation(fields: [taskId], references: [id])
+  completedAt DateTime @default(now())
+
+  @@unique([userId, taskId])
+}

@@ -1,0 +1,9 @@
+{
+  "name": "hyppie",
+  "private": true,
+  "scripts": {
+    "dapp": "pnpm --filter dapp",
+    "sybil-slayer": "pnpm --filter sybil-slayer"
+  },
+  "devDependencies": {}
+} 

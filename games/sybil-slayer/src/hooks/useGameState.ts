@@ -1,0 +1,2522 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
+import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect } from '@/types/game';
+import type { SoundType } from './useAudio';
+import {
+  GAME_DURATION_SECONDS, DIFFICULTY_INCREASE_INTERVAL_SECONDS,
+  TOKEN_RADIUS, TOKEN_BASE_SPEED, TOKEN_COLOR, TOKEN_BOOST_MULTIPLIER,
+  MEGA_NODE_BOOST_DURATION_MS, PURR_IMMUNITY_DURATION_MS, MAX_OBSTACLES, INITIAL_OBSTACLE_COUNT, OBSTACLE_SPAWN_RATE_INCREASE,
+  COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
+  CHECKPOINT_APPEAR_THRESHOLD, CHECKPOINT_TIME_BONUS_START, CHECKPOINT_TIME_BONUS_STEP, CHECKPOINT_TIME_BONUS_MIN,
+  HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_MULTIPLIER, VAUL_DURATION_MS, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
+  COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS,
+  HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS
+} from '../lib/constants';
+import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
+import { useGameTime } from './useGameTime';
+
+const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
+  id: 'token',
+  x: canvasWidth / 2,
+  y: canvasHeight / 2,
+  radius: TOKEN_RADIUS,
+  color: TOKEN_COLOR,
+  speed: TOKEN_BASE_SPEED,
+  velocity: { x: 0, y: 0 },
+  boostTimer: 0,
+  boostStartTime: undefined, // Inicialmente sin boost
+  immunityTimer: 0,
+  immunityStartTime: undefined, // Inicialmente sin inmunidad
+  glowTimer: 0,
+  glow: false,
+  direction: 'down',
+  frameIndex: 0,
+  frameTimer: 0,
+});
+
+const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: number = 1): GameState => ({
+  status: 'idle',
+  token: initialTokenState(canvasWidth, canvasHeight),
+  obstacles: [],
+  collectibles: [],
+  score: 0,
+  timer: GAME_DURATION_SECONDS,
+  gameStartTime: null,
+  level: level,
+  isFrenzyMode: false,
+  canvasSize: { width: canvasWidth, height: canvasHeight },
+  hearts: getInitialHeartsForLevel(level), // Corazones iniciales escalados
+  lastDamageTime: null, // Inicializar
+  lastDamageSource: null, // Inicializar el tipo de obstáculo que causó el último daño
+  gameOverReason: undefined,
+  scoreMultiplier: 1, // Multiplicador inicial normal
+  multiplierEndTime: null, // Sin multiplicador activo al inicio
+  multiplierTimeRemaining: 0, // Sin tiempo restante inicialmente
+  checkpointTimeBonus: 0, // Tiempo extra acumulado por checkpoints
+  timePenalties: 0, // Penalizaciones de tiempo acumuladas
+  // Sistema de rondas equilibradas para assets positivos
+  positiveAssetsRound: ['megaNode', 'heart', 'purr', 'vaul'], // Todos disponibles al inicio
+  currentRoundNumber: 1, // Empezar en ronda 1
+  // Sistema de garantía mínima de assets positivos
+  lastPositiveAssetTime: null, // Sin assets spawneados inicialmente
+  positiveAssetsIn30s: 0, // Contador inicial en 0
+  periodStartTime: null, // Se establecerá cuando empiece el juego
+  // Sistema de aparición progresiva de assets negativos (cada 10s)
+  negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
+  lastNegativeSpawnTime: null, // Sin spawns iniciales
+  hackerSpawned: false, // No se ha spawneado hacker aún
+  vaulCollectedCount: 0, // Inicializar contador de vaults recogidos
+  // Efectos visuales
+  visualEffects: [], // Sin efectos iniciales
+  // Efecto de robo de score por hacker
+  scoreStealEffect: null,
+});
+
+const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
+  return others.some(o => {
+    // Solo comprobar si ambos son bug, megaNode o checkpoint
+    const isSpecialA = ('type' in obj) && (obj.type === 'bug' || obj.type === 'megaNode' || obj.type === 'checkpoint');
+    const isSpecialB = ('type' in o) && (o.type === 'bug' || o.type === 'megaNode' || o.type === 'checkpoint');
+    if (isSpecialA && isSpecialB) {
+      const dx = obj.x - o.x;
+      const dy = obj.y - o.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      return dist < (obj.radius + o.radius + minDist);
+    }
+    return false;
+  });
+};
+
+// Añadir probabilidad de aparición de heart
+const HEART_SPAWN_CHANCE = 0.02; // 2% por frame, ajustable
+
+// --- FASE 1: ESCALADO DE ENEMIGOS ---
+// Funciones auxiliares para escalado lineal
+const getObstacleCountForLevel = (level: number) => {
+  return getObstacleCountByTypeAndLevel(level, 'bug') + 
+         getObstacleCountByTypeAndLevel(level, 'fee') + 
+         getObstacleCountByTypeAndLevel(level, 'hacker');
+};
+const getFeeSpeedForLevel = (level: number) => {
+  switch (level) {
+    case 1:
+      return FEE_SPEED; // Velocidad base
+    case 2:
+      return FEE_SPEED * 1.02; // Reducido: 2% más rápido (era 5%)
+    case 3:
+      return FEE_SPEED * 1.05; // Reducido: 5% más rápido (era 10%)
+    case 4:
+      return FEE_SPEED * 1.08; // Reducido: 8% más rápido (era 15%)
+    default:
+      return FEE_SPEED * 1.08; // Nivel 5+ igual que nivel 4
+  }
+};
+
+// Nueva función para generar velocidad aleatoria para cada fee individual con variaciones dramáticas
+const getRandomFeeSpeed = (level: number): number => {
+  const baseSpeed = getFeeSpeedForLevel(level);
+  
+  // Definir categorías de velocidad con probabilidades y rangos MUY EXAGERADOS
+  const random = Math.random();
+  let speedMultiplier: number;
+  let category: string;
+  
+  if (random < 0.3) {
+    // 30% - Fees MUY LENTOS (30% - 50% de velocidad base)
+    speedMultiplier = 0.3 + Math.random() * 0.2; // 0.3x a 0.5x
+    category = "MUY LENTO";
+  } else if (random < 0.7) {
+    // 40% - Fees NORMALES (80% - 120% de velocidad base)  
+    speedMultiplier = 0.8 + Math.random() * 0.4; // 0.8x a 1.2x
+    category = "NORMAL";
+  } else if (random < 0.9) {
+    // 20% - Fees VELOCES (150% - 200% de velocidad base)
+    speedMultiplier = 1.5 + Math.random() * 0.5; // 1.5x a 2.0x
+    category = "VELOZ";
+  } else {
+    // 10% - Fees SÚPER RÁPIDOS (250% - 350% de velocidad base)
+    speedMultiplier = 2.5 + Math.random() * 1.0; // 2.5x a 3.5x
+    category = "SÚPER RÁPIDO";
+  }
+  
+  const finalSpeed = baseSpeed * speedMultiplier;
+  
+  // Log para debugging con información de categoría
+  console.log(`[FEE ${category}] Velocidad: ${finalSpeed.toFixed(2)} (${(speedMultiplier * 100).toFixed(0)}% de la base) - Nivel ${level}`);
+  
+  return finalSpeed;
+};
+
+const getBugAngularVelocityForLevel = (level: number) => {
+  // Progresión más suave: de 0.05 base a incrementos de 0.01 por nivel
+  return BUG_ANGULAR_VELOCITY + (level - 1) * 0.01;
+};
+const getHackerSpeedForLevel = (level: number) => {
+  // Reducido: El hacker va 8% más rápido por cada nivel (era 15%)
+  return HACKER_BASE_SPEED * (1 + (level - 1) * 0.08);
+};
+const getHackerAccelerationForLevel = (level: number) => {
+  // La aceleración también aumenta 15% por nivel para perseguir coins más eficientemente
+  return HACKER_ACCELERATION * (1 + (level - 1) * 0.15);
+};
+
+// --- FASE 2: ESCALADO DE ENERGÍA ---
+const getInitialEnergyForLevel = (level: number) => Math.max(2, INITIAL_ENERGY_POINTS - (level - 1)); // Disminuye 1 por nivel, mínimo 2
+const getMaxEnergyForLevel = (level: number) => Math.max(3, MAX_ENERGY_POINTS - (level - 1) * 2); // Disminuye 2 por nivel, mínimo 3
+const getEnergyRespawnChanceForLevel = (level: number) => Math.max(0.1, 1 - (level - 1) * 0.1); // Probabilidad de respawn baja 10% por nivel, mínimo 10%
+
+// --- FASE 3: ESCALADO DE CHECKPOINTS ---
+const getCheckpointCooldownForLevel = (level: number) => 15 + (level - 1) * 5; // Cooldown en segundos, aumenta 5s por nivel
+let lastCheckpointTime = 0;
+
+// --- FASE 4: ESCALADO DE CORAZONES ---
+const getHeartSpawnChanceForLevel = (level: number) => Math.max(0.005, 0.02 - (level - 1) * 0.003); // Baja 0.3% por nivel, mínimo 0.5%
+const getInitialHeartsForLevel = (level: number) => Math.max(1, 3 - Math.floor((level - 1) / 2)); // Baja 1 cada 2 niveles, mínimo 1
+
+// --- FASE 5: ESCALADO DE PENALIZACIONES ---
+const getCollisionPenaltySecondsForLevel = (level: number) => COLLISION_PENALTY_SECONDS + (level - 1) * 2; // Penalización de tiempo sube 2s por nivel
+const getCollisionHeartLossForLevel = (level: number) => Math.min(3, 1 + Math.floor((level - 1) / 3)); // Pierde más corazones cada 3 niveles, máximo 3
+
+// Referencia para controlar el tiempo de congelamiento del token después de un impacto
+const TOKEN_FREEZE_TIME_MS = 500; // Tiempo en ms que el token queda congelado tras ser tocado
+
+// --- SISTEMA DE EFECTOS VISUALES ---
+// Crear efecto de explosión cuando fee recoge energy
+const createExplosionEffect = (x: number, y: number): VisualEffect => ({
+  id: generateId(),
+  type: 'explosion',
+  x,
+  y,
+  scale: 0.1, // Empezar pequeño
+  opacity: 1.0, // Empezar opaco
+  duration: 800, // 800ms de duración
+  elapsedTime: 0,
+  frameIndex: 0,
+  frameTimer: 0
+});
+
+// Crear efecto de explosión específico cuando hacker recoge energy (Explosion_(n))
+const createHackerExplosionEffect = (x: number, y: number): VisualEffect => ({
+  id: generateId(),
+  type: 'Explosion_(n)',
+  x,
+  y,
+  scale: 0.2, // Empezar un poco más grande que fee
+  opacity: 1.0, // Empezar opaco
+  duration: 800, // 800ms de duración
+  elapsedTime: 0,
+  frameIndex: 0,
+  frameTimer: 0
+});
+
+// Actualizar efectos visuales
+const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): VisualEffect[] => {
+  return effects
+    .map(effect => {
+      // Actualizar tiempo transcurrido
+      const newEffect = { ...effect };
+      newEffect.elapsedTime += deltaTime;
+      
+      // Calcular progreso (0-1)
+      const progress = Math.min(newEffect.elapsedTime / newEffect.duration, 1);
+      
+      if (newEffect.type === 'explosion') {
+        // Animación de explosión: crece rápido, luego se desvanece
+        if (progress < 0.3) {
+          // Fase 1: Crecimiento rápido (primeros 30%)
+          newEffect.scale = 0.1 + (progress / 0.3) * 1.4; // De 0.1 a 1.5
+          newEffect.opacity = 1.0;
+        } else if (progress < 0.7) {
+          // Fase 2: Mantener tamaño, empezar a desvanecer (30%-70%)
+          newEffect.scale = 1.5;
+          newEffect.opacity = 1.0 - ((progress - 0.3) / 0.4) * 0.4; // De 1.0 a 0.6
+        } else {
+          // Fase 3: Decrecer y desvanecer rápidamente (70%-100%)
+          const finalPhase = (progress - 0.7) / 0.3;
+          newEffect.scale = 1.5 - finalPhase * 0.8; // De 1.5 a 0.7
+          newEffect.opacity = 0.6 - finalPhase * 0.6; // De 0.6 a 0.0
+        }
+        
+        // Actualizar animación de sprites (simulada con frameIndex)
+        newEffect.frameTimer = (newEffect.frameTimer || 0) + deltaTime;
+        if (newEffect.frameTimer >= 50) { // Cambiar frame cada 50ms
+          newEffect.frameIndex = ((newEffect.frameIndex || 0) + 1) % 8; // 8 frames de explosión
+          newEffect.frameTimer = 0;
+        }
+      } else if (newEffect.type === 'Explosion_(n)') {
+        // Animación específica para hacker: más dramática e intensa
+        if (progress < 0.2) {
+          // Fase 1: Crecimiento explosivo inicial (primeros 20%)
+          newEffect.scale = 0.2 + (progress / 0.2) * 1.8; // De 0.2 a 2.0 (más grande)
+          newEffect.opacity = 1.0;
+        } else if (progress < 0.5) {
+          // Fase 2: Mantener tamaño máximo más tiempo (20%-50%)
+          newEffect.scale = 2.0;
+          newEffect.opacity = 1.0;
+        } else if (progress < 0.8) {
+          // Fase 3: Empezar a desvanecer pero mantener tamaño (50%-80%)
+          newEffect.scale = 2.0;
+          newEffect.opacity = 1.0 - ((progress - 0.5) / 0.3) * 0.5; // De 1.0 a 0.5
+        } else {
+          // Fase 4: Desvanecimiento y decrecimiento final (80%-100%)
+          const finalPhase = (progress - 0.8) / 0.2;
+          newEffect.scale = 2.0 - finalPhase * 1.2; // De 2.0 a 0.8
+          newEffect.opacity = 0.5 - finalPhase * 0.5; // De 0.5 a 0.0
+        }
+        
+        // Actualizar animación de sprites más rápida para hacker
+        newEffect.frameTimer = (newEffect.frameTimer || 0) + deltaTime;
+        if (newEffect.frameTimer >= 40) { // Más rápido: cambiar frame cada 40ms
+          newEffect.frameIndex = ((newEffect.frameIndex || 0) + 1) % 10; // 10 frames para hacker
+          newEffect.frameTimer = 0;
+        }
+      }
+      
+      return newEffect;
+    })
+    .filter(effect => effect.elapsedTime < effect.duration); // Remover efectos terminados
+};
+
+// --- SISTEMA DE RONDAS EQUILIBRADAS PARA ASSETS POSITIVOS ---
+// Función para obtener un asset disponible de la ronda actual
+const getNextPositiveAsset = (availableAssets: ('megaNode' | 'heart' | 'purr' | 'vaul')[]): ('megaNode' | 'heart' | 'purr' | 'vaul') | null => {
+  if (availableAssets.length === 0) {
+    return null; // No hay assets disponibles
+  }
+  
+  // Seleccionar aleatoriamente entre los assets disponibles
+  const randomIndex = Math.floor(Math.random() * availableAssets.length);
+  return availableAssets[randomIndex];
+};
+
+// Función para quitar un asset de la ronda actual
+const removeAssetFromRound = (availableAssets: ('megaNode' | 'heart' | 'purr' | 'vaul')[], assetType: ('megaNode' | 'heart' | 'purr' | 'vaul')): ('megaNode' | 'heart' | 'purr' | 'vaul')[] => {
+  return availableAssets.filter(asset => asset !== assetType);
+};
+
+// Función para resetear la ronda cuando se completa
+const resetPositiveAssetsRound = (): ('megaNode' | 'heart' | 'purr' | 'vaul')[] => {
+  return ['megaNode', 'heart', 'purr', 'vaul'];
+};
+
+// --- SISTEMA DE GARANTÍA MÍNIMA DE ASSETS POSITIVOS ---
+const MINIMUM_ASSETS_PER_30S = 2; // Mínimo 2 assets cada 30 segundos
+const PERIOD_DURATION_MS = 30000; // 30 segundos en millisegundos
+
+// Función para verificar si necesitamos forzar spawn de assets
+const shouldForcePositiveAssetSpawn = (currentTime: number, periodStartTime: number | null, positiveAssetsIn30s: number): boolean => {
+  if (!periodStartTime) return false;
+  
+  const timeInCurrentPeriod = currentTime - periodStartTime;
+  const timeRemainingInPeriod = PERIOD_DURATION_MS - timeInCurrentPeriod;
+  
+  // Si quedan menos de 10 segundos y no hemos cumplido el mínimo, forzar spawn
+  if (timeRemainingInPeriod <= 10000 && positiveAssetsIn30s < MINIMUM_ASSETS_PER_30S) {
+    return true;
+  }
+  
+  // Si quedan menos de 5 segundos y solo tenemos 1 asset, forzar spawn del segundo
+  if (timeRemainingInPeriod <= 5000 && positiveAssetsIn30s < MINIMUM_ASSETS_PER_30S) {
+    return true;
+  }
+  
+  return false;
+};
+
+// Función para calcular probabilidad dinámica basada en el progreso del período
+const getDynamicSpawnChance = (currentTime: number, periodStartTime: number | null, positiveAssetsIn30s: number): number => {
+  const BASE_CHANCE = 0.002; // Probabilidad base
+  
+  if (!periodStartTime) return BASE_CHANCE;
+  
+  const timeInCurrentPeriod = currentTime - periodStartTime;
+  const progressRatio = timeInCurrentPeriod / PERIOD_DURATION_MS; // 0.0 a 1.0
+  
+  // Si vamos retrasados respecto al objetivo, aumentar probabilidad
+  const expectedAssets = Math.floor(progressRatio * MINIMUM_ASSETS_PER_30S);
+  const deficit = Math.max(0, expectedAssets - positiveAssetsIn30s);
+  
+  // Aumentar probabilidad exponencialmente si vamos retrasados
+  const multiplier = 1 + (deficit * 2); // x1, x3, x5 según el déficit
+  
+  return Math.min(BASE_CHANCE * multiplier, 0.02); // Máximo 2% de probabilidad
+};
+
+// --- SISTEMA DE APARICIÓN PROGRESIVA DE ASSETS NEGATIVOS ---
+const NEGATIVE_SPAWN_INTERVAL_MS = 10000; // 10 segundos
+
+// Patrón de spawn: 1.fee -> 2.fee -> 3.fee -> 4.bug -> 5.hacker (si no existe) o bug
+const getNegativeSpawnPattern = (cycle: number, hackerExists: boolean): { type: ObstacleType; count: number } => {
+  const normalizedCycle = ((cycle - 1) % 5) + 1; // Ciclo 1-5 que se repite
+  
+  switch (normalizedCycle) {
+    case 1:
+      return { type: 'fee', count: 1 }; // 1 fee
+    case 2:
+      return { type: 'fee', count: 1 }; // 1 fee (cambiado de 2 a 1)
+    case 3:
+      return { type: 'fee', count: 1 }; // 1 fee (cambiado de 2 a 1)
+    case 4:
+      return { type: 'bug', count: 1 }; // 1 bug
+    case 5:
+      // Si ya existe hacker, spawn bug en su lugar. Si no existe, spawn 1 hacker
+      if (hackerExists) {
+        return { type: 'bug', count: 1 }; // 1 bug (reemplazo del hacker)
+      } else {
+        return { type: 'hacker', count: 1 }; // 1 hacker único
+      }
+    default:
+      return { type: 'fee', count: 1 }; // Fallback
+  }
+};
+
+// Función para verificar si es tiempo de hacer spawn progresivo
+const shouldSpawnNegativeAssets = (currentTime: number, lastSpawnTime: number | null, gameStartTime: number | null): boolean => {
+  if (!gameStartTime || !lastSpawnTime) {
+    // Primer spawn después de 10 segundos del inicio del juego
+    return gameStartTime !== null && (currentTime - gameStartTime >= NEGATIVE_SPAWN_INTERVAL_MS);
+  }
+  
+  // Spawns subsecuentes cada 10 segundos
+  return (currentTime - lastSpawnTime >= NEGATIVE_SPAWN_INTERVAL_MS);
+};
+
+// Función para crear obstáculos según el patrón
+const createObstaclesByPattern = (
+  pattern: { type: ObstacleType; count: number },
+  width: number,
+  height: number,
+  existingObstacles: Obstacle[],
+  token: Token,
+  level: number
+): Obstacle[] => {
+  const newObstacles: Obstacle[] = [];
+  
+  for (let i = 0; i < pattern.count; i++) {
+    let newObstacle: Obstacle;
+    let attempts = 0;
+    
+    do {
+      if (pattern.type === 'hacker') {
+        newObstacle = createSmartHacker(generateId(), width, height, token, level);
+      } else if (pattern.type === 'bug') {
+        newObstacle = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newObstacles], level);
+      } else { // fee
+        newObstacle = createObstacle(generateId(), 'fee', width, height);
+        // Asignar velocidad aleatoria para el nivel actual
+        if (newObstacle.velocity) {
+          const randomFeeSpeed = getRandomFeeSpeed(level);
+          const magnitude = Math.sqrt(newObstacle.velocity.x * newObstacle.velocity.x + newObstacle.velocity.y * newObstacle.velocity.y);
+          if (magnitude > 0) {
+            const normalizedX = newObstacle.velocity.x / magnitude;
+            const normalizedY = newObstacle.velocity.y / magnitude;
+            newObstacle.velocity = {
+              x: normalizedX * randomFeeSpeed,
+              y: normalizedY * randomFeeSpeed
+            };
+          }
+        }
+      }
+      attempts++;
+    } while (
+      distanceBetweenPoints(newObstacle, token) < TOKEN_RADIUS * 12 && 
+      attempts < 20
+    );
+    
+    // Solo añadir si está lo suficientemente lejos del token
+    if (distanceBetweenPoints(newObstacle, token) >= TOKEN_RADIUS * 10) {
+      newObstacles.push(newObstacle);
+    }
+  }
+  
+  return newObstacles;
+};
+
+// Función para generar bugs adicionales cuando sube el nivel
+const addBugsForLevelUp = (currentLevel: number, width: number, height: number, existingObstacles: Obstacle[], token: Token): Obstacle[] => {
+  // Calcular cuántos bugs adicionales según el nivel de forma más gradual
+  // Nivel 1->2: +1 bug, Nivel 2->3: +1 bug, Nivel 3->4: +2 bugs, etc.
+  const bugsToAdd = Math.floor((currentLevel - 1) * 0.5) + 1;
+  
+  console.log(`Adding ${bugsToAdd} strategic bugs for level ${currentLevel}`);
+  
+  const newBugs: Obstacle[] = [];
+  
+  for (let i = 0; i < bugsToAdd; i++) {
+    const bug = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newBugs], currentLevel);
+    
+    // Solo agregar si no está demasiado cerca del token (aumentada distancia mínima)
+    if (distanceBetweenPoints(bug, token) >= TOKEN_RADIUS * 10) {
+      newBugs.push(bug);
+    }
+  }
+  
+  return newBugs;
+};
+
+// Función auxiliar para incrementar la velocidad de los fees existentes
+const upgradeFeeSpeed = (obstacles: Obstacle[], level: number): Obstacle[] => {
+  return obstacles.map(obs => {
+    if (obs.type === 'fee') {
+      // Incrementar la velocidad en un 5% por cada nivel (reducido del 10%)
+      const speedMultiplier = 1 + (0.05 * (level - 1));
+      
+      // Asegurar que los fees siempre tengan velocidad
+      if (!obs.velocity) {
+        obs.velocity = { 
+          x: getRandomFloat(-1, 1) || (Math.random() > 0.5 ? 0.5 : -0.5), 
+          y: getRandomFloat(-1, 1) || (Math.random() > 0.5 ? 0.5 : -0.5) 
+        };
+      }
+      
+      // Incrementar la magnitud de la velocidad manteniendo la dirección
+      const currentSpeed = Math.sqrt(obs.velocity.x * obs.velocity.x + obs.velocity.y * obs.velocity.y);
+      if (currentSpeed > 0) {
+        const dirX = obs.velocity.x / currentSpeed;
+        const dirY = obs.velocity.y / currentSpeed;
+        
+        // Aplicar el nuevo factor de velocidad
+        const newSpeed = getFeeSpeedForLevel(level) * speedMultiplier;
+        
+        obs.velocity = {
+          x: dirX * newSpeed,
+          y: dirY * newSpeed
+        };
+      }
+    }
+    return obs;
+  });
+};
+
+// Modificar la getRandomObstacleType para mantener alineamiento con los valores fijos por nivel
+/**
+ * Returns a random obstacle type that respects the configured quantities per level
+ */
+const getObstacleTypeWithLevelAdjustment = (level: number): ObstacleType => {
+  // Esta función se asegura de que las probabilidades se alineen con las cantidades
+  // fijas establecidas en getObstacleCountByTypeAndLevel
+  if (level === 1) {
+    // Nivel 1: 50% fees, 50% bugs, 0% hackers
+    return Math.random() < 0.5 ? 'fee' : 'bug';
+  } else if (level === 2) {
+    // Nivel 2: ~37.5% fees, ~50% bugs, ~12.5% hackers (3:4:1 ratio)
+    const rand = Math.random();
+    if (rand < 0.375) return 'fee';
+    if (rand < 0.875) return 'bug';
+    return 'hacker';
+  } else if (level === 3) {
+    // Nivel 3: ~31% fees, ~46% bugs, ~23% hackers (4:6:3 ratio)
+    const rand = Math.random();
+    if (rand < 0.31) return 'fee';
+    if (rand < 0.77) return 'bug';
+    return 'hacker';
+  } else {
+    // Nivel 4+: ~29% fees, ~47% bugs, ~24% hackers (5:8:4 ratio)
+    const rand = Math.random();
+    if (rand < 0.29) return 'fee';
+    if (rand < 0.76) return 'bug';
+    return 'hacker';
+  }
+};
+
+// Mejorar la inteligencia de los hackers existentes de forma más gradual
+const upgradeHackers = (obstacles: Obstacle[], level: number): Obstacle[] => {
+  return obstacles.map(obs => {
+    if (obs.type === 'hacker') {
+      // Aumentar la velocidad base del hacker según el nivel: 3% por nivel (reducido del 5%)
+      const speedMultiplier = 1 + (level - 1) * 0.03; // 3% por nivel
+      
+      // Asegurar que los hackers siempre tengan una velocidad mínima
+      if (!obs.velocity) {
+        obs.velocity = { x: 0, y: 0 };
+      }
+      
+      // Aumentar el factor de velocidad con el nivel
+      obs.hackerSpeedFactor = getHackerSpeedForLevel(level) * speedMultiplier;
+      obs.hackerAccelFactor = getHackerAccelerationForLevel(level) * speedMultiplier;
+    }
+    return obs;
+  });
+};
+
+// Función para generar específicamente un hacker inteligente
+const createSmartHacker = (id: string, width: number, height: number, token: Token, level: number): Obstacle => {
+  // Decidir si el hacker aparece lejos o cerca de forma más gradual
+  const ambushProbability = Math.min(0.4, (level - 2) * 0.1); // 0% en nivel 2, aumenta 10% por nivel hasta 40%
+  const isAmbush = Math.random() < ambushProbability;
+  
+  let x, y;
+  if (isAmbush) {
+    // Emboscada: aparecer relativamente cerca del token pero fuera de vista
+    const angle = Math.random() * Math.PI * 2; // Ángulo aleatorio
+    const distance = Math.min(width, height) * 0.4; // Distancia moderada
+    x = token.x + Math.cos(angle) * distance;
+    y = token.y + Math.sin(angle) * distance;
+  } else {
+    // MEJORADO: Posición inteligente en el borde más lejano al token
+    // Definir las 4 esquinas del canvas
+    const corners = [
+      { x: HACKER_RADIUS, y: HACKER_RADIUS }, // Esquina superior izquierda
+      { x: width - HACKER_RADIUS, y: HACKER_RADIUS }, // Esquina superior derecha
+      { x: HACKER_RADIUS, y: height - HACKER_RADIUS }, // Esquina inferior izquierda
+      { x: width - HACKER_RADIUS, y: height - HACKER_RADIUS } // Esquina inferior derecha
+    ];
+    
+    // Calcular la distancia de cada esquina al token y encontrar la más lejana
+    let maxDistance = 0;
+    let bestCorner = corners[0];
+    
+    for (const corner of corners) {
+      const distance = Math.sqrt(
+        Math.pow(corner.x - token.x, 2) + 
+        Math.pow(corner.y - token.y, 2)
+      );
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        bestCorner = corner;
+      }
+    }
+    
+    // Agregar variación aleatoria cerca de la esquina más lejana
+    const randomOffset = 80; // Mayor variación para spawn inicial
+    const offsetX = getRandomFloat(-randomOffset, randomOffset);
+    const offsetY = getRandomFloat(-randomOffset, randomOffset);
+    
+    x = bestCorner.x + offsetX;
+    y = bestCorner.y + offsetY;
+  }
+  
+  // Ajustar coordenadas para que estén dentro de los límites
+  x = clamp(x, HACKER_RADIUS, width - HACKER_RADIUS);
+  y = clamp(y, HACKER_RADIUS, height - HACKER_RADIUS);
+  
+  // Velocidad y aceleración aumentadas con el nivel de forma más gradual
+  const speedMultiplier = 1 + (level - 1) * 0.05; // 5% por nivel en lugar de 50%
+  
+  return {
+    id,
+    type: 'hacker',
+    x,
+    y,
+    radius: HACKER_RADIUS,
+    color: `hsl(${getRandomInt(260, 290)} 100% 70%)`, // Tonos morados
+    velocity: { x: 0, y: 0 },
+    glow: false,
+    hackerSpeedFactor: getHackerSpeedForLevel(level) * speedMultiplier,
+    hackerAccelFactor: getHackerAccelerationForLevel(level) * speedMultiplier,
+    energyCollected: 0, // NUEVO: Inicializar contador de energy recogidas
+  };
+};
+
+// Función para obtener la cantidad exacta de obstáculos por nivel y tipo
+const getObstacleCountByTypeAndLevel = (level: number, type: ObstacleType): number => {
+  switch (level) {
+    case 1:
+      return type === 'bug' ? 2 : type === 'fee' ? 2 : 0; // 2 bugs, 2 fees, 0 hackers
+    case 2:
+      return type === 'bug' ? 4 : type === 'fee' ? 3 : 1; // 4 bugs, 3 fees, 1 hacker
+    case 3:
+      return type === 'bug' ? 6 : type === 'fee' ? 4 : 1; // 6 bugs, 4 fees, 1 hacker (era 3)
+    case 4:
+      return type === 'bug' ? 8 : type === 'fee' ? 5 : 1; // 8 bugs, 5 fees, 1 hacker (era 4)
+    default:
+      return type === 'bug' ? 8 : type === 'fee' ? 5 : 1; // Nivel 5+ igual que nivel 4, pero solo 1 hacker
+  }
+};
+
+export function useGameState(canvasWidth: number, canvasHeight: number, onEnergyCollected?: () => void, onDamage?: () => void, onPlaySound?: (soundType: SoundType) => void, onHackerEscape?: () => void) {
+  const [gameState, setGameState] = useState<GameState>(() => getInitialGameState(canvasWidth, canvasHeight));
+   // Ref to store the latest input state without causing re-renders on input change
+   const inputRef = useRef<{ direction: Vector2D; pauseToggled: boolean; startToggled: boolean }>({
+     direction: { x: 0, y: 0 },
+     pauseToggled: false,
+     startToggled: false,
+   });
+
+   // Contador de checkpoints recogidos
+   const checkpointCountRef = useRef<number>(0);
+
+   // Ref para invulnerabilidad tras daño
+   const tokenFrozenUntilRef = useRef<number>(0);
+
+   // Ref para invulnerabilidad inicial tras empezar partida
+   const gameStartInvulnRef = useRef<number>(0);
+
+   // Sistema de tiempo pausable
+   const { 
+     getGameTime, 
+     getElapsedSeconds, 
+     startGame: startGameTime, 
+     pauseGame: pauseGameTime, 
+     resumeGame: resumeGameTime, 
+     resetTime,
+     getAdjustedTimestamp
+   } = useGameTime();
+
+   // Update canvas size if props change
+   useEffect(() => {
+     setGameState(prev => ({
+       ...prev,
+       canvasSize: { width: canvasWidth, height: canvasHeight },
+       // Optionally reset positions if canvas size changes drastically mid-game?
+       // token: initialTokenState(canvasWidth, canvasHeight),
+     }));
+   }, [canvasWidth, canvasHeight]);
+
+  const resetGame = useCallback(() => {
+    console.log("Resetting game state");
+    
+    // Resetear referencias al resetear partida
+    checkpointCountRef.current = 0;
+    tokenFrozenUntilRef.current = 0;
+    gameStartInvulnRef.current = 0;
+    lastCheckpointTime = 0;
+    
+    // Resetear el sistema de tiempo
+    resetTime();
+    
+    setGameState(getInitialGameState(canvasWidth, canvasHeight));
+     // Ensure spawners run on reset if starting immediately
+     // initializeGameObjects(1, canvasWidth, canvasHeight); // Level 1
+  }, [canvasWidth, canvasHeight, resetTime]);
+
+
+ const initializeGameObjects = useCallback((level: number, width: number, height: number) => {
+     // Crear 1 fee inicial para que haya enemigo desde el primer segundo
+     const obstacles: Obstacle[] = [];
+     
+     // Crear un fee inicial
+     let initialFee: Obstacle;
+         let attempts = 0;
+         do {
+       initialFee = createObstacle(generateId(), 'fee', width, height);
+       // Asignar velocidad aleatoria para el nivel actual
+       if (initialFee.velocity) {
+         const randomFeeSpeed = getRandomFeeSpeed(level);
+         const magnitude = Math.sqrt(initialFee.velocity.x * initialFee.velocity.x + initialFee.velocity.y * initialFee.velocity.y);
+                 if (magnitude > 0) {
+           const normalizedX = initialFee.velocity.x / magnitude;
+           const normalizedY = initialFee.velocity.y / magnitude;
+           initialFee.velocity = {
+                         x: normalizedX * randomFeeSpeed,
+                         y: normalizedY * randomFeeSpeed
+                     };
+                 } else {
+           initialFee.velocity = {
+                         x: (Math.random() > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7,
+                         y: (Math.random() > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7
+                     };
+                 }
+             }
+             attempts++;
+     } while (
+       distanceBetweenPoints(initialFee, initialTokenState(width, height)) < TOKEN_RADIUS * 12 && 
+       attempts < 20
+     );
+     
+     // Solo añadir si está lo suficientemente lejos del token
+     if (distanceBetweenPoints(initialFee, initialTokenState(width, height)) >= TOKEN_RADIUS * 10) {
+       obstacles.push(initialFee);
+     }
+     
+     // COMENTADO: Creación de obstáculos adicionales reemplazada por sistema progresivo
+     /*
+     // Todo el código comentado anterior...
+     */
+
+     const collectibles: Collectible[] = [];
+     const initialEnergy = getInitialEnergyForLevel(level);
+     for (let i = 0; i < initialEnergy; i++) {
+         collectibles.push(createEnergyCollectible(generateId(), width, height));
+     }
+
+     console.log(`Juego inicializado con 1 fee inicial. Más enemigos aparecerán progresivamente cada 10s. Energía inicial: ${initialEnergy}`);
+     
+     return { obstacles, collectibles, level };
+ }, []);
+
+
+  const startGame = useCallback(() => {
+    if (gameState.status === 'idle' || gameState.status === 'gameOver') {
+      console.log("Starting countdown...");
+      
+      // Resetear referencias al empezar nueva partida
+      checkpointCountRef.current = 0;
+      tokenFrozenUntilRef.current = 0;
+      gameStartInvulnRef.current = 0;
+      lastCheckpointTime = 0;
+      
+      // Resetear e iniciar el sistema de tiempo
+      resetTime();
+      startGameTime();
+      
+      setGameState(prev => {
+        const countdownStartTime = getGameTime();
+        const { obstacles, collectibles } = initializeGameObjects(1, prev.canvasSize.width, prev.canvasSize.height); // Obtener datos
+        return {
+          ...prev, // Keep the newly initialized objects
+          status: 'countdown',
+          countdown: 3, // Empezar en 3
+          countdownStartTime,
+          timer: GAME_DURATION_SECONDS,
+          score: 0,
+          level: 1,
+          isFrenzyMode: false,
+          gameStartTime: null, // Se establecerá cuando termine el countdown usando getGameTime()
+          token: initialTokenState(prev.canvasSize.width, prev.canvasSize.height), // Ensure token is reset too
+          obstacles, // Usar los generados
+          collectibles, // Usar los generados
+          hearts: getInitialHeartsForLevel(1), // Reiniciar corazones
+          checkpointTimeBonus: 0, // Resetear bonus de checkpoints
+          timePenalties: 0, // Resetear penalizaciones de tiempo
+          scoreMultiplier: 1, // Resetear multiplicador
+          multiplierEndTime: null, // Resetear multiplicador de vaul
+          lastDamageTime: null, // Resetear último daño
+          lastDamageSource: null, // Resetear fuente de daño
+          // Sistema de rondas equilibradas para assets positivos
+          positiveAssetsRound: ['megaNode', 'heart', 'purr', 'vaul'], // Resetear ronda completa
+          currentRoundNumber: 1, // Empezar en ronda 1
+          // Sistema de garantía mínima de assets positivos
+          lastPositiveAssetTime: null, // Sin assets spawneados inicialmente
+          positiveAssetsIn30s: 0, // Contador inicial en 0
+          periodStartTime: null, // Se establecerá cuando empiece el juego
+          // Sistema de aparición progresiva de assets negativos (cada 10s)
+          negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
+          lastNegativeSpawnTime: null, // Sin spawns iniciales
+          hackerSpawned: false, // No se ha spawneado hacker aún
+          // Efectos visuales
+          visualEffects: [], // Sin efectos iniciales
+          // Efecto de robo de score por hacker
+          scoreStealEffect: null,
+        };
+      });
+    }
+  }, [gameState.status, initializeGameObjects, resetTime, startGameTime, getGameTime]);
+
+
+ const togglePause = useCallback(() => {
+     setGameState(prev => {
+         if (prev.status === 'playing') {
+             console.log("Pausing game");
+             pauseGameTime(); // Pausar el tiempo del juego
+             return { ...prev, status: 'paused' };
+         } else if (prev.status === 'paused') {
+             console.log("Resuming game");
+             resumeGameTime(); // Reanudar el tiempo del juego
+             return { ...prev, status: 'playing' };
+         }
+         return prev; // No change for other statuses
+     });
+ }, [pauseGameTime, resumeGameTime]);
+
+
+   // Function to be called by the input hook to update the internal ref
+   const updateInputRef = useCallback((newInputState: { direction: Vector2D; pauseToggled: boolean; startToggled: boolean }) => {
+      inputRef.current = newInputState;
+   }, []);
+
+
+  // The main game update logic
+  const updateGame = useCallback((deltaTime: number, isPaused?: boolean) => {
+      const { status } = gameState; // Get current status at the beginning of the update
+
+      // Handle status changes based on input first
+      if (inputRef.current.startToggled && (status === 'idle' || status === 'gameOver')) {
+        startGame();
+        inputRef.current.startToggled = false; // Consume the toggle
+        return; // Exit early as state is changing
+      }
+      if (inputRef.current.pauseToggled && (status === 'playing' || status === 'paused')) {
+        togglePause();
+        inputRef.current.pauseToggled = false; // Consume the toggle
+        // No early exit needed for pause/resume, just update status
+      }
+
+      // Handle countdown logic
+      if (gameState.status === 'countdown') {
+        setGameState(prev => {
+          const now = getGameTime();
+          const elapsed = now - (prev.countdownStartTime || now);
+          const currentCountdown = Math.max(0, 3 - Math.floor(elapsed / 1000));
+          
+          if (currentCountdown === 0 && elapsed >= 3000) {
+            // Countdown terminado, iniciar el juego
+            const gameStartTime = now;
+            gameStartInvulnRef.current = gameStartTime;
+            console.log("Countdown finished! Starting game...");
+            return {
+              ...prev,
+              status: 'playing',
+              gameStartTime,
+              countdown: undefined,
+              countdownStartTime: undefined,
+            };
+          } else {
+            // Actualizar countdown
+            return {
+              ...prev,
+              countdown: currentCountdown === 0 ? 0 : currentCountdown, // Mostrar 0 un momento antes de iniciar
+            };
+          }
+        });
+        return; // No procesar más lógica durante countdown
+      }
+
+      // Only run game logic if playing
+      if (gameState.status !== 'playing') { // Check the potentially updated status
+        return;
+      }
+
+    setGameState(prev => {
+      let lastDamageTime = prev.lastDamageTime;
+      let lastDamageSource = prev.lastDamageSource;
+      let multiplierEndTime = prev.multiplierEndTime;
+      let scoreStealEffect = prev.scoreStealEffect;
+      // --- Timer basado en tiempo pausable ---
+      // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
+      // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
+      const now = getGameTime();
+      let remainingTime;
+      
+      if (prev.gameStartTime) {
+        // Calcular tiempo transcurrido pausable desde que empezó el juego
+        const gameTimeElapsed = (now - prev.gameStartTime) / 1000; // en segundos
+        remainingTime = GAME_DURATION_SECONDS - gameTimeElapsed;
+        
+        // Aplicar bonificaciones de tiempo de checkpoints y restar penalizaciones
+        remainingTime += prev.checkpointTimeBonus - prev.timePenalties;
+      } else {
+        // Si no hay gameStartTime, usar el timer anterior (fallback)
+        remainingTime = prev.timer;
+      }
+      
+      // Debug temporal: Log para verificar que el tiempo se pausa correctamente
+      if (Math.random() < 0.01) { // Solo 1% de las veces para no spam
+        const gameTimeElapsed = prev.gameStartTime ? (now - prev.gameStartTime) / 1000 : 0;
+        console.log(`[TIMER DEBUG] Game time elapsed: ${gameTimeElapsed.toFixed(2)}s, remaining: ${remainingTime.toFixed(2)}s, checkpoints: +${prev.checkpointTimeBonus}s, penalties: -${prev.timePenalties}s`);
+      }
+      
+      // Calcular nivel basado en el tiempo transcurrido pausable desde el inicio del juego,
+      // no en el tiempo restante, para que los checkpoints no afecten el nivel
+      const gameTimeElapsed = prev.gameStartTime ? (now - prev.gameStartTime) / 1000 : 0;
+      const currentLevel = Math.min(4, Math.floor(gameTimeElapsed / DIFFICULTY_INCREASE_INTERVAL_SECONDS) + 1);
+      
+
+
+      // --- Update Token ---
+      const { direction } = inputRef.current;
+      let newToken = { ...prev.token };
+      
+      // Comprobar si el token está congelado por daño reciente
+      const isFrozen = now < getAdjustedTimestamp(tokenFrozenUntilRef.current);
+      
+      // Solo actualizar velocidad y posición si no está congelado
+      if (!isFrozen) {
+        newToken.velocity = { x: direction.x, y: direction.y };
+
+        // Calcular dirección del token (igual que fee)
+        if (direction.x !== 0 || direction.y !== 0) {
+          if (Math.abs(direction.x) > Math.abs(direction.y)) {
+            newToken.direction = direction.x > 0 ? 'right' : 'left';
+          } else {
+            newToken.direction = direction.y > 0 ? 'down' : 'up';
+          }
+        }
+
+        // Apply boost
+        const currentSpeed = newToken.boostTimer > 0 ? TOKEN_BASE_SPEED * TOKEN_BOOST_MULTIPLIER : TOKEN_BASE_SPEED;
+        newToken.x += newToken.velocity.x * currentSpeed * (deltaTime / (1000 / 60)); // Scale movement by deltaTime
+        newToken.y += newToken.velocity.y * currentSpeed * (deltaTime / (1000 / 60));
+
+        // Keep token within bounds
+        newToken.x = clamp(newToken.x, newToken.radius, prev.canvasSize.width - newToken.radius);
+        newToken.y = clamp(newToken.y, newToken.radius, prev.canvasSize.height - newToken.radius);
+      } else {
+        // Si está congelado, mantener la posición pero mostrar que está parado
+        newToken.velocity = { x: 0, y: 0 };
+        console.log(`[TOKEN] Congelado por daño (${((tokenFrozenUntilRef.current - now) / 1000).toFixed(1)}s restantes)`);
+      }
+
+      // Actualizar animación de sprites del token
+      if (newToken.frameTimer === undefined) {
+        newToken.frameTimer = 0;
+        newToken.frameIndex = 0;
+      }
+      newToken.frameTimer += deltaTime;
+      if (newToken.frameTimer >= 150) { // 150ms entre frames
+        newToken.frameIndex = ((newToken.frameIndex || 0) + 1) % 6; // 6 frames por dirección
+        newToken.frameTimer = 0;
+      }
+
+      // Update boost timer - CORREGIDO: usar tiempo pausable como todos los demás timers
+      if (newToken.boostTimer > 0 && newToken.boostStartTime) {
+          // Calcular tiempo transcurrido en tiempo pausable desde la activación
+          const pausableTimeElapsed = now - newToken.boostStartTime;
+          const timeRemaining = MEGA_NODE_BOOST_DURATION_MS - pausableTimeElapsed;
+          
+          if (timeRemaining <= 0) {
+              // El boost ha terminado
+              newToken.boostTimer = 0;
+              newToken.boostStartTime = undefined;
+              console.log("[MEGA_NODE] Boost terminado (tiempo pausable)");
+          } else {
+              // Actualizar el timer con el tiempo restante pausable
+              newToken.boostTimer = timeRemaining;
+              
+              // Log cada segundo para debugging
+              const secondsLeft = Math.ceil(timeRemaining / 1000);
+              const previousSecondsLeft = Math.ceil((timeRemaining + 50) / 1000); // Aproximar frame anterior
+              if (secondsLeft !== previousSecondsLeft) {
+                  console.log(`[MEGA_NODE] Boost activo: ${secondsLeft}s restantes (tiempo pausable)`);
+              }
+          }
+      } else if (newToken.boostTimer > 0 && !newToken.boostStartTime) {
+          // Fallback: si hay boostTimer pero no startTime, usar el método anterior
+          newToken.boostTimer -= deltaTime;
+          if (newToken.boostTimer <= 0) {
+              newToken.boostTimer = 0;
+              console.log("[MEGA_NODE] Boost terminado (fallback)");
+          }
+      }
+      
+      // Update immunity timer - CORREGIDO: usar tiempo pausable como todos los demás timers
+      if (newToken.immunityTimer > 0 && newToken.immunityStartTime) {
+          // Calcular tiempo transcurrido en tiempo pausable desde la activación
+          const pausableTimeElapsed = now - newToken.immunityStartTime;
+          const timeRemaining = PURR_IMMUNITY_DURATION_MS - pausableTimeElapsed;
+          
+          if (timeRemaining <= 0) {
+              // La inmunidad ha terminado
+              newToken.immunityTimer = 0;
+              newToken.immunityStartTime = undefined;
+              console.log("[PURR] Inmunidad terminada (tiempo pausable)");
+          } else {
+              // Actualizar el timer con el tiempo restante pausable
+              newToken.immunityTimer = timeRemaining;
+              
+              // Log cada segundo para debugging
+              const secondsLeft = Math.ceil(timeRemaining / 1000);
+              const previousSecondsLeft = Math.ceil((timeRemaining + 50) / 1000); // Aproximar frame anterior
+              if (secondsLeft !== previousSecondsLeft) {
+                  console.log(`[PURR] Inmunidad activa: ${secondsLeft}s restantes (tiempo pausable)`);
+              }
+          }
+      } else if (newToken.immunityTimer > 0 && !newToken.immunityStartTime) {
+          // Fallback: si hay immunityTimer pero no startTime, usar el método anterior
+          newToken.immunityTimer -= deltaTime;
+          if (newToken.immunityTimer <= 0) {
+              newToken.immunityTimer = 0;
+              console.log("[PURR] Inmunidad terminada (fallback)");
+          }
+      }
+      
+      // Update glow timer (para efectos visuales temporales)
+      if (newToken.glowTimer && newToken.glowTimer > 0) {
+          newToken.glowTimer -= deltaTime;
+          newToken.glow = true; // Mantener el brillo mientras el timer > 0
+          if (newToken.glowTimer <= 0) {
+              newToken.glowTimer = 0;
+              newToken.glow = false; // Desactivar brillo
+              console.log("Glow effect ended");
+          }
+      }
+
+      // --- Update Obstacles ---
+      let newObstacles = prev.obstacles.map(obs => {
+        let newObs = { ...obs };
+        switch (newObs.type) {
+          case 'fee':
+             if (!newObs.velocity) newObs.velocity = { x: getRandomFloat(-1, 1), y: getRandomFloat(-1, 1) };
+            
+            // Mover usando la velocidad individual del fee - LOS FEES ATRAVIESAN BUGS
+            newObs.x += newObs.velocity.x * (deltaTime / (1000 / 60));
+            newObs.y += newObs.velocity.y * (deltaTime / (1000 / 60));
+            
+             // Bounce off walls only (no collision with bugs)
+             if (newObs.x <= newObs.radius || newObs.x >= prev.canvasSize.width - newObs.radius) newObs.velocity.x *= -1;
+             if (newObs.y <= newObs.radius || newObs.y >= prev.canvasSize.height - newObs.radius) newObs.velocity.y *= -1;
+              newObs.x = clamp(newObs.x, newObs.radius, prev.canvasSize.width - newObs.radius);
+              newObs.y = clamp(newObs.y, newObs.radius, prev.canvasSize.height - newObs.radius);
+              
+              // Actualizar animación de sprites
+              if (newObs.frameTimer === undefined) {
+                newObs.frameTimer = 0;
+                newObs.frameIndex = 0;
+              }
+              
+              // Actualizar la dirección basada en el vector de velocidad
+              if (Math.abs(newObs.velocity.x) > Math.abs(newObs.velocity.y)) {
+                newObs.direction = newObs.velocity.x > 0 ? 'right' : 'left';
+              } else {
+                newObs.direction = newObs.velocity.y > 0 ? 'down' : 'up';
+              }
+              
+              // Actualizar timer de frames y cambiar frame si es necesario
+              newObs.frameTimer += deltaTime;
+              if (newObs.frameTimer >= 150) { // 150ms entre frames (ajustable)
+                newObs.frameIndex = ((newObs.frameIndex || 0) + 1) % 6; // 6 frames por dirección (actualizado de 4 a 6)
+                newObs.frameTimer = 0;
+              }
+            break;
+          case 'bug':
+            // PRUEBA: Temporalmente desactivada la rotación para probar si es causa de problemas de colisión
+            // if (newObs.rotation !== undefined && newObs.angularVelocity) {
+            //   // Escalar velocidad angular
+            //   const bugAngular = getBugAngularVelocityForLevel(currentLevel) * (newObs.angularVelocity > 0 ? 1 : -1);
+            //   newObs.rotation += bugAngular * (deltaTime / (1000 / 60));
+            // }
+            // Mantener la rotación fija en 0 para facilitar colisiones
+            newObs.rotation = 0;
+            break;
+          case 'hacker':
+             // Manejar estado de huida hacia los bordes
+             if (newObs.isRetreating) {
+               // Mover hacia el borde en la dirección de escape
+               if (newObs.retreatDirection && newObs.retreatSpeed) {
+                 const moveX = newObs.retreatDirection.x * newObs.retreatSpeed * (deltaTime / 16);
+                 const moveY = newObs.retreatDirection.y * newObs.retreatSpeed * (deltaTime / 16);
+                 
+                 newObs.x += moveX;
+                 newObs.y += moveY;
+                 newObs.velocity = {
+                   x: newObs.retreatDirection.x * newObs.retreatSpeed,
+                   y: newObs.retreatDirection.y * newObs.retreatSpeed
+                 };
+                 
+                 // Verificar si ha tocado algún borde del canvas
+                 const touchedBorder = 
+                   newObs.x <= newObs.radius || 
+                   newObs.x >= prev.canvasSize.width - newObs.radius ||
+                   newObs.y <= newObs.radius || 
+                   newObs.y >= prev.canvasSize.height - newObs.radius;
+                 
+                 if (touchedBorder) {
+                   // Ha tocado el borde - ahora desaparecer
+                   newObs.isRetreating = false;
+                   newObs.isBanished = true;
+                   newObs.banishTimer = HACKER_BANISH_DURATION_MS;
+                   
+                   // Limpiar propiedades de retroceso
+                   newObs.retreatDirection = undefined;
+                   newObs.retreatSpeed = undefined;
+                   newObs.retreatTimer = undefined;
+                   newObs.retreatCollisionPosition = undefined;
+                   
+                   console.log(`[HACKER] ¡Tocó el borde! Desapareciendo por ${HACKER_BANISH_DURATION_MS / 1000}s`);
+                 } else {
+                   console.log(`[HACKER] Huyendo hacia el borde... pos: (${newObs.x.toFixed(1)}, ${newObs.y.toFixed(1)})`);
+                 }
+               }
+               break; // Salir del case sin hacer más procesamiento mientras huye
+             }
+             
+             // NUEVO: Manejar estado de destierro temporal
+             if (newObs.isBanished) {
+               // Actualizar el timer de destierro
+               newObs.banishTimer = (newObs.banishTimer || 0) - deltaTime;
+               
+               if (newObs.banishTimer <= 0) {
+                 // El destierro ha terminado - reaparecer en posición aleatoria
+                 newObs.isBanished = false;
+                 newObs.banishTimer = 0;
+                 
+                 // MEJORADO: Reaparecer en la posición más lejana al token en el borde del canvas
+                 const tokenX = prev.token.x;
+                 const tokenY = prev.token.y;
+                 const canvasWidth = prev.canvasSize.width;
+                 const canvasHeight = prev.canvasSize.height;
+                 
+                 // Definir las 4 esquinas del canvas
+                 const corners = [
+                   { x: newObs.radius, y: newObs.radius }, // Esquina superior izquierda
+                   { x: canvasWidth - newObs.radius, y: newObs.radius }, // Esquina superior derecha
+                   { x: newObs.radius, y: canvasHeight - newObs.radius }, // Esquina inferior izquierda
+                   { x: canvasWidth - newObs.radius, y: canvasHeight - newObs.radius } // Esquina inferior derecha
+                 ];
+                 
+                 // Calcular la distancia de cada esquina al token y encontrar la más lejana
+                 let maxDistance = 0;
+                 let bestCorner = corners[0];
+                 
+                 for (const corner of corners) {
+                   const distance = Math.sqrt(
+                     Math.pow(corner.x - tokenX, 2) + 
+                     Math.pow(corner.y - tokenY, 2)
+                   );
+                   if (distance > maxDistance) {
+                     maxDistance = distance;
+                     bestCorner = corner;
+                   }
+                 }
+                 
+                 // Agregar un poco de variación aleatoria cerca de la esquina más lejana
+                 // para evitar que siempre aparezca en el mismo píxel exacto
+                 const randomOffset = 50; // 50px de variación
+                 const offsetX = getRandomFloat(-randomOffset, randomOffset);
+                 const offsetY = getRandomFloat(-randomOffset, randomOffset);
+                 
+                 newObs.x = clamp(
+                   bestCorner.x + offsetX, 
+                   newObs.radius, 
+                   canvasWidth - newObs.radius
+                 );
+                 newObs.y = clamp(
+                   bestCorner.y + offsetY, 
+                   newObs.radius, 
+                   canvasHeight - newObs.radius
+                 );
+                 
+                 // Reset propiedades de movimiento
+                 newObs.velocity = { x: 0, y: 0 };
+                 newObs.currentSpeed = 0.5;
+                 newObs.accelerationTimer = 0;
+                 newObs.isSlowingDown = false;
+                 newObs.slowdownTimer = 0;
+                 
+                 // Reset propiedades de retroceso
+                 newObs.isRetreating = false;
+                 newObs.retreatDirection = undefined;
+                 newObs.retreatSpeed = undefined;
+                 newObs.retreatTimer = undefined;
+                 newObs.retreatCollisionPosition = undefined;
+                 
+                 console.log(`[HACKER] Destierro terminado - reapareciendo en (${newObs.x.toFixed(1)}, ${newObs.y.toFixed(1)}) - distancia al token: ${maxDistance.toFixed(1)}px`);
+               } else {
+                 // Mantener al hacker fuera del canvas (posición invisible)
+                 newObs.x = -1000; // Fuera del canvas
+                 newObs.y = -1000;
+                 newObs.velocity = { x: 0, y: 0 };
+                 console.log(`[HACKER] Desterrado por ${(newObs.banishTimer / 1000).toFixed(1)}s más`);
+                 break; // Salir del case sin hacer más procesamiento
+               }
+             }
+             
+             // Manejar el estado de aturdimiento después del destierro
+             if (newObs.isStunned) {
+               // Actualizar el timer de aturdimiento
+               newObs.stunTimer = (newObs.stunTimer || 0) - deltaTime;
+               
+               if (newObs.stunTimer <= 0) {
+                 // El aturdimiento ha terminado
+                 newObs.isStunned = false;
+                 newObs.stunTimer = 0;
+                 console.log(`[HACKER] Aturdimiento terminado, volviendo a perseguir al token`);
+               } else {
+                 // Mantener al hacker inmóvil mientras está aturdido
+                 newObs.velocity = { x: 0, y: 0 };
+                 console.log(`[HACKER] Aturdido por ${(newObs.stunTimer / 1000).toFixed(1)}s más`);
+                 break; // Salir del case sin hacer más procesamiento
+               }
+             }
+             
+             // NUEVO COMPORTAMIENTO: el hacker persigue AL JUGADOR (token), no a las energy
+             // Buscar la posición del jugador como objetivo
+             let targetX = prev.token.x;
+             let targetY = prev.token.y;
+             let closestDistance = Math.sqrt(
+               Math.pow(targetX - newObs.x, 2) + 
+               Math.pow(targetY - newObs.y, 2)
+             );
+             
+             // Inicializar propiedades de pathfinding si no existen
+             if (newObs.lastPosition === undefined) {
+               newObs.lastPosition = { x: newObs.x, y: newObs.y };
+               newObs.stuckTimer = 0;
+               newObs.isPathfinding = false;
+             }
+             
+             // Detectar si está atrapado (se ha movido muy poco)
+             const movementDistance = Math.sqrt(
+               Math.pow(newObs.x - newObs.lastPosition!.x, 2) + 
+               Math.pow(newObs.y - newObs.lastPosition!.y, 2)
+             );
+             
+             if (movementDistance < 2.0) { // Si se ha movido menos de 2px
+               newObs.stuckTimer = (newObs.stuckTimer || 0) + deltaTime;
+             } else {
+               newObs.stuckTimer = 0;
+               newObs.lastPosition = { x: newObs.x, y: newObs.y };
+               newObs.isPathfinding = false; // Reset pathfinding si se está moviendo bien
+             }
+             
+             // MEJORADO: Detección más sensible de atascamiento (1.5 segundos en lugar de 2)
+             const isStuckLongTime = (newObs.stuckTimer || 0) > 1500;
+             
+             // NUEVO: Sistema de detección proactiva de bugs para rodearlos
+             // Verificar si hay bugs en el camino directo al token
+             const dx = targetX - newObs.x;
+             const dy = targetY - newObs.y;
+             const directChaseDir = normalizeVector({ x: dx, y: dy });
+             
+             // Detectar bugs en el camino directo (próximos 80px)
+             let bugInPath = null;
+             let bugDistance = Infinity;
+             const lookAheadDistance = 80; // Distancia de anticipación
+             
+             for (const otherObs of prev.obstacles) {
+               if (otherObs.type === 'bug' && otherObs.id !== newObs.id) {
+                 // Verificar si el bug está en la dirección hacia el token
+                 const bugDx = otherObs.x - newObs.x;
+                 const bugDy = otherObs.y - newObs.y;
+                 const bugDist = Math.sqrt(bugDx * bugDx + bugDy * bugDy);
+                 
+                 // Verificar si el bug está dentro del rango de anticipación
+                 if (bugDist <= lookAheadDistance) {
+                   // Verificar si está aproximadamente en la dirección del token (dot product)
+                   const bugDir = normalizeVector({ x: bugDx, y: bugDy });
+                   const dotProduct = directChaseDir.x * bugDir.x + directChaseDir.y * bugDir.y;
+                   
+                   // Si está en la dirección general (dot product > 0.3) y es el más cercano
+                   if (dotProduct > 0.3 && bugDist < bugDistance) {
+                     bugInPath = otherObs;
+                     bugDistance = bugDist;
+                   }
+                 }
+               }
+             }
+             
+             let chaseDir = directChaseDir;
+             
+             // Si hay un bug en el camino, calcular ruta de rodeo
+             if (bugInPath && !isStuckLongTime) {
+               console.log(`[HACKER] Bug detectado en el camino a ${bugDistance.toFixed(1)}px - calculando rodeo`);
+               
+               // Calcular vector perpendicular para rodear el bug
+               const bugDx = bugInPath.x - newObs.x;
+               const bugDy = bugInPath.y - newObs.y;
+               
+               // Dos direcciones perpendiculares posibles
+               const perpLeft = { x: -bugDy, y: bugDx };
+               const perpRight = { x: bugDy, y: -bugDx };
+               
+               // Normalizar las direcciones perpendiculares
+               const perpLeftNorm = normalizeVector(perpLeft);
+               const perpRightNorm = normalizeVector(perpRight);
+               
+               // Elegir la dirección perpendicular que nos acerque más al token
+               // Calcular hacia dónde nos llevaría cada dirección perpendicular
+               const leftTestX = newObs.x + perpLeftNorm.x * 60;
+               const leftTestY = newObs.y + perpLeftNorm.y * 60;
+               const rightTestX = newObs.x + perpRightNorm.x * 60;
+               const rightTestY = newObs.y + perpRightNorm.y * 60;
+               
+               const leftDistToToken = Math.sqrt((leftTestX - targetX) ** 2 + (leftTestY - targetY) ** 2);
+               const rightDistToToken = Math.sqrt((rightTestX - targetX) ** 2 + (rightTestY - targetY) ** 2);
+               
+               // Elegir la dirección que nos acerca más al token
+               const chosenPerp = leftDistToToken < rightDistToToken ? perpLeftNorm : perpRightNorm;
+               
+               // Combinar dirección hacia el token con rodeo perpendicular
+               // Más peso al rodeo cuando está muy cerca del bug
+               const avoidanceWeight = Math.max(0.3, Math.min(0.8, (lookAheadDistance - bugDistance) / lookAheadDistance));
+               const chaseWeight = 1 - avoidanceWeight;
+               
+               chaseDir = normalizeVector({
+                 x: directChaseDir.x * chaseWeight + chosenPerp.x * avoidanceWeight,
+                 y: directChaseDir.y * chaseWeight + chosenPerp.y * avoidanceWeight
+               });
+               
+               console.log(`[HACKER] Rodeando bug - peso evasión: ${avoidanceWeight.toFixed(2)}, peso persecución: ${chaseWeight.toFixed(2)}`);
+             }
+             
+             // Siempre perseguir al jugador (usando dirección calculada con/sin rodeo)
+             if (!isStuckLongTime) {
+               
+               // --- SISTEMA DE ACELERACIÓN PROGRESIVA CON RALENTIZACIÓN EN GIROS ---
+               
+               // Inicializar propiedades de aceleración si no existen
+               if (newObs.currentSpeed === undefined) {
+                 newObs.currentSpeed = 0.5; // Velocidad inicial muy baja
+                 newObs.accelerationTimer = 0;
+                 newObs.lastDirection = { x: 0, y: 0 };
+                 newObs.isSlowingDown = false;
+                 newObs.slowdownTimer = 0;
+               }
+               
+               // Detectar cambio de dirección significativo
+               const lastDir = newObs.lastDirection!;
+               const directionChange = Math.sqrt(
+                 Math.pow(chaseDir.x - lastDir.x, 2) + 
+                 Math.pow(chaseDir.y - lastDir.y, 2)
+               );
+               
+               // Si hay un cambio de dirección significativo (> 0.7), ralentizar
+               if (directionChange > 0.7 && !newObs.isSlowingDown && newObs.accelerationTimer! > 500) {
+                 newObs.isSlowingDown = true;
+                 newObs.slowdownTimer = 800; // 800ms de ralentización
+                 newObs.currentSpeed = newObs.currentSpeed! * 0.3; // Reducir velocidad al 30%
+                 console.log(`[HACKER] Cambio de dirección detectado (${directionChange.toFixed(2)}) - RALENTIZANDO por 800ms`);
+               }
+               
+               // Gestionar estado de ralentización
+               if (newObs.isSlowingDown) {
+                 newObs.slowdownTimer! -= deltaTime;
+                 if (newObs.slowdownTimer! <= 0) {
+                   newObs.isSlowingDown = false;
+                   newObs.accelerationTimer = 0; // Reset timer de aceleración
+                   console.log(`[HACKER] Ralentización terminada - empezando nueva aceleración`);
+                 }
+               } else {
+                 // Aceleración progresiva cuando no está ralentizando
+                 newObs.accelerationTimer! += deltaTime;
+                 
+                 // Velocidades base y máxima según nivel - REDUCIDAS PARA MEJOR JUGABILIDAD
+                 const baseSpeed = getHackerSpeedForLevel(currentLevel) * 0.4; // 40% de velocidad base (era 30%)
+                 const maxSpeed = getHackerSpeedForLevel(currentLevel) * (1 + (currentLevel - 1) * 0.1); // Velocidad máxima reducida (era 0.2)
+                 
+                 // Aceleración progresiva en 3 segundos
+                 const accelerationProgress = Math.min(1.0, newObs.accelerationTimer! / 3000); // 3 segundos para llegar a max
+                 const targetSpeed = baseSpeed + (maxSpeed - baseSpeed) * accelerationProgress;
+                 
+                 // Acelerar gradualmente hacia la velocidad objetivo
+                 const accelerationRate = 0.02 * (deltaTime / 16); // Suavizado de aceleración
+                 newObs.currentSpeed = newObs.currentSpeed! + (targetSpeed - newObs.currentSpeed!) * accelerationRate;
+               }
+               
+               // Aplicar velocidad con aceleración más cuando está lejos - REDUCIDO
+               const distanceMultiplier = Math.min(1.2, Math.max(0.7, closestDistance / 120)); // Entre 0.7x y 1.2x según distancia (era 0.8x-1.5x)
+               const finalSpeed = newObs.currentSpeed! * distanceMultiplier;
+               
+               // Actualizar velocidad
+               newObs.velocity = {
+                 x: chaseDir.x * finalSpeed,
+                 y: chaseDir.y * finalSpeed
+               };
+               
+               // Guardar dirección actual para próxima comparación
+               newObs.lastDirection = { x: chaseDir.x, y: chaseDir.y };
+               
+               console.log(`[HACKER] Nivel ${currentLevel} - Persiguiendo jugador a ${closestDistance.toFixed(1)}px, velocidad: ${finalSpeed.toFixed(2)} (accel: ${(newObs.accelerationTimer! / 1000).toFixed(1)}s, ralentizando: ${newObs.isSlowingDown})`);
+             } else if (isStuckLongTime) {
+               // Pathfinding forzado cuando está atrapado por mucho tiempo
+               console.log(`[HACKER] Atrapado por ${(newObs.stuckTimer! / 1000).toFixed(1)}s - activando escape forzado`);
+               
+               // Buscar la dirección con más espacio libre
+               const directions = [
+                 { x: 1, y: 0 },   // derecha
+                 { x: -1, y: 0 },  // izquierda
+                 { x: 0, y: 1 },   // abajo
+                 { x: 0, y: -1 },  // arriba
+                 { x: 0.707, y: 0.707 },   // diagonal abajo-derecha
+                 { x: -0.707, y: 0.707 },  // diagonal abajo-izquierda
+                 { x: 0.707, y: -0.707 },  // diagonal arriba-derecha
+                 { x: -0.707, y: -0.707 }  // diagonal arriba-izquierda
+               ];
+               
+               let bestDirection = { x: 1, y: 0 };
+               let maxFreeSpace = 0;
+               
+               for (const dir of directions) {
+                 // Calcular qué tan lejos puede moverse en esta dirección sin chocar
+                 let freeSpace = 0;
+                 const stepSize = 10;
+                 const maxSteps = 20;
+                 
+                 for (let step = 1; step <= maxSteps; step++) {
+                   const testX = newObs.x + dir.x * stepSize * step;
+                   const testY = newObs.y + dir.y * stepSize * step;
+                   
+                   // Verificar límites del canvas
+                   if (testX < newObs.radius || testX > prev.canvasSize.width - newObs.radius ||
+                       testY < newObs.radius || testY > prev.canvasSize.height - newObs.radius) {
+                     break;
+                   }
+                   
+                   // Verificar colisión con bugs
+                   let collision = false;
+                   for (const otherObs of prev.obstacles) {
+                     if (otherObs.type === 'bug' && otherObs.id !== newObs.id) {
+                       const dx = testX - otherObs.x;
+                       const dy = testY - otherObs.y;
+                       const distance = Math.sqrt(dx * dx + dy * dy);
+                       if (distance < newObs.radius + otherObs.radius + 15) {
+                         collision = true;
+                         break;
+                       }
+                     }
+                   }
+                   
+                   if (collision) break;
+                   freeSpace = stepSize * step;
+                 }
+                 
+                 if (freeSpace > maxFreeSpace) {
+                   maxFreeSpace = freeSpace;
+                   bestDirection = dir;
+                 }
+               }
+               
+               // Aplicar movimiento en la mejor dirección con velocidad alta
+               const escapeSpeed = getHackerSpeedForLevel(currentLevel) * 1.5;
+               newObs.velocity = {
+                 x: bestDirection.x * escapeSpeed,
+                 y: bestDirection.y * escapeSpeed
+               };
+               newObs.isPathfinding = true;
+               
+               // Reset sistema de aceleración cuando entra en pathfinding forzado
+               newObs.currentSpeed = escapeSpeed;
+               newObs.accelerationTimer = 0;
+               newObs.isSlowingDown = false;
+               newObs.slowdownTimer = 0;
+               newObs.lastDirection = { x: bestDirection.x, y: bestDirection.y };
+               
+               console.log(`[HACKER] Escape forzado - dirección: (${bestDirection.x.toFixed(2)}, ${bestDirection.y.toFixed(2)}), espacio libre: ${maxFreeSpace}px`);
+             }
+
+             // Calcular nueva posición del hacker
+             const newHackerX = newObs.x + (newObs.velocity?.x || 0) * (deltaTime / (1000 / 60));
+             const newHackerY = newObs.y + (newObs.velocity?.y || 0) * (deltaTime / (1000 / 60));
+             
+             // Verificar colisión con bugs antes de mover
+             let hackerCollided = false;
+             let blockedByBug = false;
+             let closestBug: Obstacle | null = null;
+             let closestBugDistance = Infinity;
+             
+             for (const otherObs of prev.obstacles) {
+               if (otherObs.type === 'bug' && otherObs.id !== newObs.id) {
+                 const dx = newHackerX - otherObs.x;
+                 const dy = newHackerY - otherObs.y;
+                 const distance = Math.sqrt(dx * dx + dy * dy);
+                 const minDistance = newObs.radius + otherObs.radius + 8; // Aumentado de 5 a 8px de margen
+                 
+                 if (distance < minDistance) {
+                   blockedByBug = true;
+                   if (distance < closestBugDistance) {
+                     closestBugDistance = distance;
+                     closestBug = otherObs;
+                   }
+                 }
+               }
+             }
+
+             // MEJORADO: Lógica inteligente de rebote que intenta rodear el bug
+             if (blockedByBug && closestBug) {
+               console.log(`[HACKER] Colisión inevitable con bug - aplicando maniobra evasiva inteligente`);
+               
+               // Calcular dirección para alejarse del bug
+               const dx = newHackerX - closestBug.x;
+               const dy = newHackerY - closestBug.y;
+               const awayFromBugAngle = Math.atan2(dy, dx);
+               
+               // Calcular dirección hacia el token
+               const toTokenAngle = Math.atan2(targetY - newObs.y, targetX - newObs.x);
+               
+               // Elegir la dirección perpendicular al bug que más se acerque al token
+               const perpLeft = awayFromBugAngle + Math.PI / 2;
+               const perpRight = awayFromBugAngle - Math.PI / 2;
+               
+               // Calcular qué dirección perpendicular nos acerca más al token
+               const leftDotProduct = Math.cos(perpLeft) * Math.cos(toTokenAngle) + Math.sin(perpLeft) * Math.sin(toTokenAngle);
+               const rightDotProduct = Math.cos(perpRight) * Math.cos(toTokenAngle) + Math.sin(perpRight) * Math.sin(toTokenAngle);
+               
+               // Elegir la mejor dirección perpendicular
+               const bestPerpAngle = leftDotProduct > rightDotProduct ? perpLeft : perpRight;
+               
+               // Combinar alejamiento del bug con dirección hacia el token
+               // 60% peso a rodeo, 40% peso a persecución del token
+               const avoidWeight = 0.6;
+               const chaseWeight = 0.4;
+               
+               const finalAngle = Math.atan2(
+                 Math.sin(bestPerpAngle) * avoidWeight + Math.sin(toTokenAngle) * chaseWeight,
+                 Math.cos(bestPerpAngle) * avoidWeight + Math.cos(toTokenAngle) * chaseWeight
+               );
+               
+               const currentSpeed = Math.sqrt((newObs.velocity?.x || 0) ** 2 + (newObs.velocity?.y || 0) ** 2);
+               const newSpeed = Math.max(currentSpeed * 0.9, getHackerSpeedForLevel(currentLevel) * 0.5);
+               
+               newObs.velocity = {
+                 x: Math.cos(finalAngle) * newSpeed,
+                 y: Math.sin(finalAngle) * newSpeed
+               };
+               
+               // Reset sistema de aceleración cuando rebota con bug
+               if (newObs.currentSpeed !== undefined) {
+                 newObs.isSlowingDown = true;
+                 newObs.slowdownTimer = 400; // Reducido de 600ms a 400ms
+                 newObs.currentSpeed = newObs.currentSpeed * 0.6; // Menos penalización: 60% en lugar de 40%
+                 newObs.lastDirection = { x: Math.cos(finalAngle), y: Math.sin(finalAngle) };
+                 console.log(`[HACKER] Maniobra evasiva aplicada - ángulo: ${(finalAngle * 180 / Math.PI).toFixed(1)}°`);
+               }
+               
+               // Separación física mejorada
+               const minDistance = newObs.radius + closestBug.radius + 12; // Aumentado de 8 a 12
+               const separationDistance = minDistance + 5; // Aumentado de 3 a 5
+               const separationX = (Math.cos(awayFromBugAngle) * separationDistance) + closestBug.x;
+               const separationY = (Math.sin(awayFromBugAngle) * separationDistance) + closestBug.y;
+               
+               newObs.x = clamp(separationX, newObs.radius, prev.canvasSize.width - newObs.radius);
+               newObs.y = clamp(separationY, newObs.radius, prev.canvasSize.height - newObs.radius);
+               
+               hackerCollided = true;
+               // NOTA: NO reproducir sonido aquí - esta es una colisión hacker vs bug, no hacker vs token
+             }
+             
+             // Solo mover si NO hubo colisión
+             if (!hackerCollided) {
+               newObs.x += (newObs.velocity?.x || 0) * (deltaTime / (1000 / 60));
+               newObs.y += (newObs.velocity?.y || 0) * (deltaTime / (1000 / 60));
+               
+               // Manejo inteligente de colisiones con los límites del canvas
+               let bounced = false;
+               
+               // Verificar colisión con límites horizontales
+               if (newObs.x <= newObs.radius) {
+                 newObs.x = newObs.radius;
+                 if (newObs.velocity && newObs.velocity.x < 0) {
+                   newObs.velocity.x = Math.abs(newObs.velocity.x); // Invertir dirección horizontal
+                   bounced = true;
+                 }
+               } else if (newObs.x >= prev.canvasSize.width - newObs.radius) {
+                 newObs.x = prev.canvasSize.width - newObs.radius;
+                 if (newObs.velocity && newObs.velocity.x > 0) {
+                   newObs.velocity.x = -Math.abs(newObs.velocity.x); // Invertir dirección horizontal
+                   bounced = true;
+                 }
+               }
+               
+               // Verificar colisión con límites verticales
+               if (newObs.y <= newObs.radius) {
+                 newObs.y = newObs.radius;
+                 if (newObs.velocity && newObs.velocity.y < 0) {
+                   newObs.velocity.y = Math.abs(newObs.velocity.y); // Invertir dirección vertical
+                   bounced = true;
+                 }
+               } else if (newObs.y >= prev.canvasSize.height - newObs.radius) {
+                 newObs.y = prev.canvasSize.height - newObs.radius;
+                 if (newObs.velocity && newObs.velocity.y > 0) {
+                   newObs.velocity.y = -Math.abs(newObs.velocity.y); // Invertir dirección vertical
+                   bounced = true;
+                 }
+               }
+               
+               // Si rebotó en un límite, agregar variación aleatoria para evitar patrones repetitivos
+               if (bounced) {
+                 const randomVariation = (Math.random() - 0.5) * 0.3; // ±15% de variación
+                 if (newObs.velocity) {
+                   newObs.velocity.x *= (1 + randomVariation);
+                   newObs.velocity.y *= (1 + randomVariation);
+                 }
+                 
+                 // Reset sistema de aceleración cuando rebota en límites (cambio de dirección forzado)
+                 if (newObs.currentSpeed !== undefined) {
+                   newObs.isSlowingDown = true;
+                   newObs.slowdownTimer = 500; // 500ms de ralentización por rebote en límite
+                   newObs.currentSpeed = newObs.currentSpeed * 0.5; // Reducir velocidad al 50%
+                   console.log(`[HACKER] Rebote en límite - RALENTIZANDO por 500ms`);
+                 }
+                 
+                 console.log(`[HACKER] Rebote en límite del canvas con variación: ${(randomVariation * 100).toFixed(1)}%`);
+               }
+             }
+             
+             // Actualizar animación de sprites
+             if (newObs.frameTimer === undefined) {
+               newObs.frameTimer = 0;
+               newObs.frameIndex = 0;
+             }
+             
+             // Actualizar dirección basada en velocidad
+             if (newObs.velocity) {
+               if (newObs.velocity.y < 0 && Math.abs(newObs.velocity.y) > Math.abs(newObs.velocity.x)) {
+                 newObs.direction = 'up';
+               } else {
+                 newObs.direction = newObs.velocity.x >= 0 ? 'right' : 'left';
+               }
+             }
+             
+             // Actualizar frames
+             newObs.frameTimer += deltaTime;
+             if (newObs.frameTimer >= 200) {
+               newObs.frameIndex = ((newObs.frameIndex || 0) + 1) % 5;
+               newObs.frameTimer = 0;
+             }
+             
+             // Gestionar frases del hacker
+             if (newObs.phraseState === undefined) {
+               newObs.phraseState = 'paused';
+               newObs.phraseTimer = 0;
+               newObs.phraseTimer = Math.random() * (HACKER_PHRASE_PAUSE_MS + HACKER_PHRASE_DURATION_MS);
+             }
+
+             if (newObs.phraseTimer !== undefined) {
+               newObs.phraseTimer += deltaTime;
+               
+               if (newObs.phraseState === 'showing' && newObs.phraseTimer >= HACKER_PHRASE_DURATION_MS) {
+                 newObs.phraseState = 'paused';
+                 newObs.phraseTimer = 0;
+                 newObs.currentPhrase = undefined;
+               } else if (newObs.phraseState === 'paused' && newObs.phraseTimer >= HACKER_PHRASE_PAUSE_MS) {
+                 newObs.phraseState = 'showing';
+                 newObs.phraseTimer = 0;
+                 
+                 let randomIndex;
+                 do {
+                   randomIndex = Math.floor(Math.random() * HACKER_PHRASES.length);
+                 } while (randomIndex === newObs.lastPhraseIndex && HACKER_PHRASES.length > 1);
+                 
+                 newObs.lastPhraseIndex = randomIndex;
+                 newObs.currentPhrase = HACKER_PHRASES[randomIndex];
+               }
+             }
+            break;
+        }
+        return newObs;
+      });
+
+       // --- Update Collectibles (e.g., slight movement or effects) ---
+       let newCollectibles = [...prev.collectibles];
+       let newVisualEffects = [...prev.visualEffects]; // Mover declaración aquí
+       
+       // Actualizar efectos visuales (pulsación)
+       newCollectibles = newCollectibles.map(collectible => {
+         if (collectible.pulseEffect) {
+           // Calcular nueva escala basada en dirección
+           const pulseSpeed = 0.003 * (deltaTime / 16); // Velocidad de pulsación
+           const minScale = 0.8; // Escala mínima
+           const maxScale = 1.2; // Escala máxima
+           
+           let newScale = (collectible.pulseScale || 1.0) + (collectible.pulseDirection || 1) * pulseSpeed;
+           
+           // Cambiar de dirección si alcanza los límites
+           if (newScale >= maxScale) {
+             newScale = maxScale;
+             collectible.pulseDirection = -1; // Comenzar a decrecer
+           } else if (newScale <= minScale) {
+             newScale = minScale;
+             collectible.pulseDirection = 1; // Comenzar a crecer
+           }
+           
+           collectible.pulseScale = newScale;
+         }
+         return collectible;
+       });
+
+       // Actualizar efectos visuales de explosión
+       newVisualEffects = updateVisualEffects(newVisualEffects, deltaTime);
+
+       // Actualizar efecto de aura roja del marcador de score
+       if (scoreStealEffect && scoreStealEffect.active) {
+         const timeSinceSteal = now - scoreStealEffect.startTime;
+         if (timeSinceSteal >= 3000) { // 3 segundos de duración
+           scoreStealEffect = null; // Desactivar el efecto
+           console.log('[SCORE STEAL] Efecto de aura roja terminado');
+         }
+       }
+
+      // --- Collision Detection ---
+      let scoreToAdd = 0;
+      let hearts = prev.hearts;
+      let scoreToSubtract = 0; // Para descontar puntos por Hacker
+      let vaulCollectedCount = prev.vaulCollectedCount || 0; // <-- Declarar aquí
+      let vaulBonusToAdd = 0; // Bonus directo de vaul (NO debe pasar por multiplicador)
+      let remainingCollectibles: Collectible[] = [];
+
+       // --- NEW: Fees y Hackers roban energía ---
+       // Comprobar colisión entre obstáculos y Energy
+       
+       for (const obstacle of newObstacles) {
+         // Saltar hackers desterrados - no pueden robar energía
+         if (obstacle.type === 'hacker' && obstacle.isBanished) {
+             continue;
+         }
+         
+         // Fees y Hackers pueden robar energía
+         if (obstacle.type === 'hacker' || obstacle.type === 'fee') {
+           // Radio de recolección (hackers tienen ventaja por nivel)
+           const collectionRadius = obstacle.type === 'hacker' 
+             ? obstacle.radius + (currentLevel - 1) * 5 // +5px por nivel para hackers
+             : obstacle.radius; // Radio normal para fees
+           
+           // Solo quedarse con los coleccionables que NO colisionan con hacker/fee
+           newCollectibles = newCollectibles.filter(collectible => {
+             if (collectible.type === 'energy') {
+               // Usar radio expandido para colisión
+               const distance = Math.sqrt(
+                 Math.pow(obstacle.x - collectible.x, 2) + 
+                 Math.pow(obstacle.y - collectible.y, 2)
+               );
+               
+               if (distance <= collectionRadius + collectible.radius) {
+                 // NUEVO: Crear efecto visual según el tipo de obstacle
+                 let explosionEffect: VisualEffect;
+                 if (obstacle.type === 'hacker') {
+                   explosionEffect = createHackerExplosionEffect(collectible.x, collectible.y);
+                   
+                   // NUEVO: Contar energy recogida por hacker
+                   obstacle.energyCollected = (obstacle.energyCollected || 0) + 1;
+                   console.log(`[HACKER] ¡Ha robado energía con EXPLOSION_(n)! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px)`);
+                   
+                   // NUEVO: Si recoge 5 energy, activar retroceso automático
+                   if (obstacle.energyCollected >= 5) {
+                     console.log(`[HACKER] ¡Ha recogido 5 energy! Iniciando retroceso automático hacia el borde...`);
+                     
+                     // NUEVO: Reproducir sonido especial cuando el hacker escapa por 5 energy
+                     onPlaySound?.('hacker_escape');
+                     
+                     // NUEVO: Notificar al container para activar animación lateral
+                     onHackerEscape?.();
+                     
+                     obstacle.isRetreating = true;
+                     obstacle.retreatCollisionPosition = { x: obstacle.x, y: obstacle.y };
+                     
+                     // Calcular dirección hacia el borde más cercano
+                     const distanceToLeft = obstacle.x;
+                     const distanceToRight = prev.canvasSize.width - obstacle.x;
+                     const distanceToTop = obstacle.y;
+                     const distanceToBottom = prev.canvasSize.height - obstacle.y;
+                     
+                     const minDistance = Math.min(distanceToLeft, distanceToRight, distanceToTop, distanceToBottom);
+                     
+                     let escapeDirection: Vector2D;
+                     if (minDistance === distanceToLeft) {
+                       escapeDirection = { x: -1, y: 0 }; // Huir hacia la izquierda
+                     } else if (minDistance === distanceToRight) {
+                       escapeDirection = { x: 1, y: 0 }; // Huir hacia la derecha
+                     } else if (minDistance === distanceToTop) {
+                       escapeDirection = { x: 0, y: -1 }; // Huir hacia arriba
+                     } else {
+                       escapeDirection = { x: 0, y: 1 }; // Huir hacia abajo
+                     }
+                     
+                     obstacle.retreatDirection = escapeDirection;
+                     obstacle.retreatSpeed = 6.0; // Velocidad rápida de huida
+                     obstacle.retreatTimer = -1; // Sin límite de tiempo, hasta que toque el borde
+                     
+                     console.log(`[HACKER] ¡Hacker huye por 5 energy recogidas! Dirección: (${escapeDirection.x}, ${escapeDirection.y})`);
+                   }
+                 } else {
+                   explosionEffect = createExplosionEffect(collectible.x, collectible.y);
+                   console.log(`[FEE] ¡Ha robado energía con explosión! (Nivel ${currentLevel}, radio: ${collectionRadius}px)`);
+                 }
+                 newVisualEffects.push(explosionEffect);
+                 
+                 // ELIMINADO: No ejecutar callback de energía para enemigos para evitar sonido de coin.mp3
+                 // if (onEnergyCollected) onEnergyCollected();
+                 return false; // Eliminar este coleccionable
+               }
+             }
+             return true; // Mantener este coleccionable
+           });
+         }
+       }
+
+       // Token vs Collectibles
+       let checkpointBonus = 0;
+       let timePenaltyAccumulator = 0;
+       
+       // Procesar cada collectible individualmente
+       for (const collectible of newCollectibles) {
+         const isColliding = checkCollision(newToken, collectible);
+         
+         // Lógica especial para vaul (sistema de barra de progreso acumulativa)
+         if (collectible.type === 'vaul') {
+           if (isColliding) {
+             // Token está tocando el vaul
+             if (!collectible.isBeingTouched) {
+               // Nuevo contacto iniciado
+               collectible.isBeingTouched = true;
+               collectible.contactStartTime = now; // Usar tiempo pausable del juego
+               // NUEVO: Pausar el timer de vida mientras se toca
+               collectible.lifetimePaused = true;
+               console.log(`[VAUL] Contacto iniciado - Timer pausado - Progreso actual: ${((collectible.activationProgress || 0) * 100).toFixed(1)}%`);
+             }
+             
+             // Calcular incremento de progreso basado en tiempo pausable real
+             // CORREGIDO: Usar el mismo sistema de tiempo pausable que el countdown y timer principal
+             if (collectible.contactStartTime) {
+               const elapsedContactTime = now - collectible.contactStartTime;
+               const sessionProgress = elapsedContactTime / VAUL_ACTIVATION_TIME_MS;
+               
+               // El progreso total es el progreso acumulado previo + el progreso de esta sesión
+               const previousProgress = collectible.activationProgress || 0;
+               collectible.activationProgress = Math.min(1, previousProgress + sessionProgress);
+             }
+             
+             // Verificar si se ha completado la activación
+             if ((collectible.activationProgress || 0) >= 1 && !collectible.isActivated) {
+               // ¡Vault activado!
+               console.log("Vault activated! Score multiplier x5 activated.");
+               onPlaySound?.('vaul_collect');
+               
+               // CORREGIDO: Actualizar la variable local para que afecte el estado final
+               // IMPORTANTE: Usar Date.now() para efectos visuales ya que game-container.tsx usa Date.now()
+               multiplierEndTime = Date.now() + VAUL_DURATION_MS;
+               
+               // NUEVO: Sumar bonus acumulativo de 50 puntos por cada vault recogido
+               // CORREGIDO: Este bonus NO debe pasar por el multiplicador
+               const newVaulCount = (prev.vaulCollectedCount || 0) + 1;
+               const bonusAmount = 50 * newVaulCount;
+               vaulBonusToAdd += bonusAmount;
+               console.log(`[VAUL] Bonus recogido: ${bonusAmount} puntos (${newVaulCount}° vaul) - SIN multiplicador`);
+               
+               // Marcar el vault como activado para que se elimine del filtrado posterior
+               collectible.isActivated = true;
+               // Actualizar el contador de vaults recogidos
+               vaulCollectedCount = newVaulCount;
+               continue;
+             }
+           } else {
+             // Token no está tocando el vaul - conservar progreso pero detener acumulación
+             if (collectible.isBeingTouched) {
+               // CORREGIDO: Guardar el progreso acumulado hasta ahora antes de perder contacto
+               if (collectible.contactStartTime) {
+                 const elapsedContactTime = now - collectible.contactStartTime;
+                 const sessionProgress = elapsedContactTime / VAUL_ACTIVATION_TIME_MS;
+                 const previousProgress = collectible.activationProgress || 0;
+                 collectible.activationProgress = Math.min(1, previousProgress + sessionProgress);
+               }
+               
+               console.log(`[VAUL] Contacto perdido - Progreso conservado: ${((collectible.activationProgress || 0) * 100).toFixed(1)}%`);
+               collectible.isBeingTouched = false;
+               collectible.contactStartTime = undefined;
+               // NUEVO: Reiniciar timer de vida (darle otros 10 segundos COMPLETOS)
+               collectible.lifetimePaused = false;
+               collectible.createdAt = now; // Reiniciar completamente el timer usando tiempo pausable
+               collectible.isBlinking = false;
+               console.log(`[VAUL] Timer reiniciado - Nuevos 10 segundos de vida`);
+             }
+           }
+           // El vaul siempre se mantiene (no se consume hasta activarse)
+           continue;
+         }
+         
+         // Lógica normal para otros collectibles
+         if (isColliding) {
+           if (collectible.type === 'checkpoint') {
+             let bonus = CHECKPOINT_TIME_BONUS_START - checkpointCountRef.current * CHECKPOINT_TIME_BONUS_STEP;
+             if (bonus < CHECKPOINT_TIME_BONUS_MIN) bonus = CHECKPOINT_TIME_BONUS_MIN;
+             checkpointBonus += bonus;
+             checkpointCountRef.current++;
+             
+             // Añadir efecto visual similar al mega node (solo visual, sin funcionalidad de boost)
+             console.log("Checkpoint collected! Visual effect activated.");
+             newToken.glow = true;
+             // Usar un temporizador de brillo (1 segundo) sin cambiar la velocidad
+             newToken.glowTimer = 1000; // 1 segundo de brillo
+             
+             continue;
+           }
+           if (collectible.type === 'energy') {
+             if (onEnergyCollected) onEnergyCollected();
+           }
+           if (collectible.type === 'heart') {
+             if (hearts < 3) {
+               hearts++;
+               console.log(`[HEART] ❤️ Corazón recogido! Reproduciendo life.mp3`);
+               console.log(`[HEART] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
+               onPlaySound?.('heart_collect');
+             }
+             continue; // No añadir el heart a los restantes
+           }
+           if (collectible.type === 'purr') {
+               console.log("Purr collected! Immunity activated.");
+               // ✅ CORREGIDO: Usar tiempo de juego pausable para la inmunidad del purr
+               newToken.immunityStartTime = now; // Tiempo de juego pausable (now = getGameTime())
+               newToken.immunityTimer = PURR_IMMUNITY_DURATION_MS; // Duración total
+               onPlaySound?.('purr_collect');
+           }
+           scoreToAdd += collectible.value;
+           if (collectible.type === 'megaNode') {
+               console.log("Mega Node collected! Boost activated.");
+               // ✅ CORREGIDO: Usar tiempo de juego pausable para el boost del mega_node
+               newToken.boostStartTime = now; // Tiempo de juego pausable (now = getGameTime())
+               newToken.boostTimer = MEGA_NODE_BOOST_DURATION_MS; // Duración total
+           }
+           if (collectible.type === 'energy'){
+                 remainingCollectibles.push(createEnergyCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height));
+            }
+         } 
+       }
+
+       // Filtramos los collectibles basados en el tiempo de vida y colisión
+                // Los Mega_node, Heart, Purr y Vaul desaparecen después de 10 segundos (COLLECTIBLE_LIFETIME_MS)
+         const currentTime = getGameTime();
+         remainingCollectibles = []; // Limpiamos la lista para evitar duplicación
+         for (const collectible of newCollectibles) {
+           // Si el jugador ha recogido este coleccionable, no lo añadimos de nuevo
+           if (checkCollision(newToken, collectible) && collectible.type !== 'vaul') {
+             // Si es energía, spawneamos una nueva en otro lugar
+             if (collectible.type === 'energy') {
+               remainingCollectibles.push(createEnergyCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height));
+             }
+             // Los otros tipos no se añaden si fueron recogidos
+             continue;
+           }
+           
+           // Comprobamos el tiempo de vida para Mega_node, Heart, Purr y Vaul
+           if (collectible.type === 'megaNode' || collectible.type === 'heart' || collectible.type === 'purr' || collectible.type === 'vaul') {
+             // Lógica especial para vaul que requiere tiempo de contacto para activarse
+             if (collectible.type === 'vaul') {
+               // Solo agregar si no ha sido activado
+               if (collectible.isActivated) {
+                 continue; // No añadir si ya fue activado
+               }
+               
+               // NUEVA LÓGICA: Si el vault está siendo tocado, NO verificar tiempo de vida
+               if (collectible.lifetimePaused) {
+                 // Timer pausado - mantener sin verificar tiempo
+                 collectible.isBlinking = false; // No parpadear mientras se toca
+                 remainingCollectibles.push(collectible);
+                 continue; // Saltar verificación de tiempo
+               }
+             }
+             
+             // Si tiene tiempo de creación y no ha pasado el tiempo límite
+             if (collectible.createdAt && (currentTime - collectible.createdAt < COLLECTIBLE_LIFETIME_MS)) {
+               // Calcular si debe parpadear (últimos 3 segundos)
+               const timeAlive = currentTime - collectible.createdAt;
+               const timeRemaining = COLLECTIBLE_LIFETIME_MS - timeAlive;
+               collectible.isBlinking = timeRemaining <= COLLECTIBLE_BLINK_WARNING_MS;
+               
+               // Log específico para vault cuando empieza a parpadear
+               if (collectible.type === 'vaul' && collectible.isBlinking && !collectible.lifetimePaused) {
+                 console.log(`[VAUL] ¡Empezando a parpadear! Tiempo restante: ${(timeRemaining / 1000).toFixed(1)}s`);
+               }
+               
+               remainingCollectibles.push(collectible);
+             } else if (!collectible.createdAt) {
+               // Si no tiene tiempo de creación (para compatibilidad con objetos existentes)
+               // le asignamos uno ahora
+               collectible.createdAt = currentTime;
+               collectible.isBlinking = false; // Recién creado, no debe parpadear
+               remainingCollectibles.push(collectible);
+             }
+             // Si ha expirado, no lo añadimos a los collectibles restantes
+           } else {
+             // Otros tipos de collectibles (energy, checkpoint) no tienen tiempo de vida
+             remainingCollectibles.push(collectible);
+           }
+       }
+
+
+       // Token vs Obstacles
+        let collidedObstacle = false;
+        for (const obstacle of newObstacles) {
+             // Saltar hackers desterrados o en retroceso - no pueden colisionar
+             if (obstacle.type === 'hacker' && (obstacle.isBanished || obstacle.isRetreating)) {
+                 continue;
+             }
+             
+             if (checkCollision(newToken, obstacle)) {
+                 // NUEVA LÓGICA SIMPLIFICADA DE COLISIÓN - Reescrita para bugs
+                 const now = getGameTime();
+                 
+                 // Registrar cada colisión detectada para depuración con más detalle
+                 console.log(`[COLISIÓN] ¡Detectada con ${obstacle.type}! Token: (${newToken.x.toFixed(1)}, ${newToken.y.toFixed(1)}) - ${obstacle.type}: (${obstacle.x.toFixed(1)}, ${obstacle.y.toFixed(1)})`);
+                 
+                 // Si es un bug, game over inmediato (a menos que tenga inmunidad de purr)
+                 if (obstacle.type === 'bug') {
+                     if (newToken.immunityTimer > 0) {
+                         console.log('[BUG] ¡Colisión con bug pero inmune por purr! No hay daño.');
+                         // NO continuar con la lógica de daño normal - salir del bucle de colisiones
+                         collidedObstacle = true;
+                         break;
+                     } else {
+                         console.log('[BUG] ¡Colisión con bug! Game over inmediato.');
+                         return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: 0, gameOverReason: 'bug' };
+                     }
+                 }
+                 
+                 // Control de invulnerabilidad para otros obstáculos
+                 const timeSinceLastDamage = prev.lastDamageTime ? now - prev.lastDamageTime : Infinity;
+                 console.log(`[DEBUG] Tiempo desde último daño: ${timeSinceLastDamage}ms (invulnerable si < 500ms)`);
+                 
+                 // El hacker ROBA 20% de las monedas del jugador
+                 if (obstacle.type === 'hacker') {
+                     // Verificar inmunidad de purr para hacker
+                     if (newToken.immunityTimer > 0) {
+                         console.log(`[HACKER] ¡Colisión con hacker pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No roba monedas.`);
+                     } else if (timeSinceLastDamage >= 500) { // Período de invulnerabilidad
+                         const scoreToSteal = Math.floor(prev.score * 0.2); // 20% del score actual
+                         scoreToSubtract = scoreToSteal;
+                         console.log(`[HACKER] ¡Colisión con hacker! Robó ${scoreToSteal} monedas (20% del score).`);
+                         console.log(`[HACKER] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
+                         
+                         // Activar efecto de aura roja en el marcador de score
+                         scoreStealEffect = {
+                           active: true,
+                           startTime: now
+                         };
+                         
+                         // CORREGIDO: Hacker huye hacia los límites del grid
+                         obstacle.isRetreating = true;
+                         obstacle.retreatCollisionPosition = { x: obstacle.x, y: obstacle.y };
+                         
+                         // Calcular dirección hacia el borde más cercano
+                         const distanceToLeft = obstacle.x;
+                         const distanceToRight = prev.canvasSize.width - obstacle.x;
+                         const distanceToTop = obstacle.y;
+                         const distanceToBottom = prev.canvasSize.height - obstacle.y;
+                         
+                         const minDistance = Math.min(distanceToLeft, distanceToRight, distanceToTop, distanceToBottom);
+                         
+                         let escapeDirection: Vector2D;
+                         if (minDistance === distanceToLeft) {
+                           escapeDirection = { x: -1, y: 0 }; // Huir hacia la izquierda
+                         } else if (minDistance === distanceToRight) {
+                           escapeDirection = { x: 1, y: 0 }; // Huir hacia la derecha
+                         } else if (minDistance === distanceToTop) {
+                           escapeDirection = { x: 0, y: -1 }; // Huir hacia arriba
+                         } else {
+                           escapeDirection = { x: 0, y: 1 }; // Huir hacia abajo
+                         }
+                         
+                         obstacle.retreatDirection = escapeDirection;
+                         obstacle.retreatSpeed = 6.0; // Velocidad rápida de huida
+                         obstacle.retreatTimer = -1; // Sin límite de tiempo, hasta que toque el borde
+                         
+                         console.log(`[HACKER] ¡Hacker huye hacia el borde! Dirección: (${escapeDirection.x}, ${escapeDirection.y})`);
+                         
+                         // Actualizar tiempo del último daño
+                         lastDamageTime = now;
+                         lastDamageSource = obstacle.type;
+                         
+                         // Sonido específico del hacker (voz de Trump) - ÚNICAMENTE cuando hacker toca al TOKEN
+                         console.log(`[HACKER] 🎵 Reproduciendo voz de Trump al robar monedas del TOKEN`);
+                         onPlaySound?.('hacker_collision');
+                     } else {
+                         console.log(`[HACKER] ¡Colisión con hacker en invulnerabilidad! No roba monedas.`);
+                     }
+                 } else if (timeSinceLastDamage >= 500) { // Período de invulnerabilidad para otros obstáculos
+                     // Verificar inmunidad de purr para fee
+                     if (obstacle.type === 'fee' && newToken.immunityTimer > 0) {
+                         console.log(`[FEE] ¡Colisión con fee pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No hay daño.`);
+                     } else {
+                         // FEE CAUSA DAÑO - LOG DETALLADO para fees
+                         if (obstacle.type === 'fee') {
+                             console.log(`[FEE] ¡FEE CAUSA DAÑO! Invulnerabilidad OK (${timeSinceLastDamage}ms >= 500ms), Sin inmunidad purr (${newToken.immunityTimer || 0}ms)`);
+                         }
+                         
+                         // Lógica de daño de vida - SOLO para fees y otros obstáculos (NO hacker)
+                         hearts--;
+                         console.log(`[CORAZONES] Quitado 1 corazón por ${obstacle.type.toUpperCase()}, quedan: ${hearts}`);
+                         
+                         // Activar efecto visual de daño
+                         if (onDamage) onDamage();
+                         
+                         // Actualizar tiempo del último daño y congelar al jugador
+                         lastDamageTime = now;
+                         lastDamageSource = obstacle.type;
+                         tokenFrozenUntilRef.current = now + TOKEN_FREEZE_TIME_MS;
+                         
+                         // Penalizaciones específicas por tipo - FEES NO QUITAN TIEMPO
+                         if (obstacle.type === 'fee') {
+                             // Fee: Solo quita corazones, SIN penalización de tiempo ni puntos
+                             console.log(`[FEE] Solo daño de corazón, sin penalización de tiempo`);
+                             
+                             // NUEVO: Rebote fuerte específico para fees cuando causan daño
+                             // Calcular dirección del fee alejándose del token
+                             const bounceAngle = Math.atan2(obstacle.y - newToken.y, obstacle.x - newToken.x);
+                             const bounceSpeed = 3.0; // Velocidad fuerte de rebote
+                             
+                             // Hacer que el fee rebote en dirección opuesta al token
+                             obstacle.velocity = {
+                                 x: Math.cos(bounceAngle) * bounceSpeed,
+                                 y: Math.sin(bounceAngle) * bounceSpeed
+                             };
+                             
+                             // Aplicar separación fuerte inmediata
+                             const strongSeparation = 25; // Separación más fuerte para fees
+                             obstacle.x += Math.cos(bounceAngle) * strongSeparation;
+                             obstacle.y += Math.sin(bounceAngle) * strongSeparation;
+                             
+                             // Mantener el fee dentro de los límites del canvas
+                             obstacle.x = clamp(obstacle.x, obstacle.radius, prev.canvasSize.width - obstacle.radius);
+                             obstacle.y = clamp(obstacle.y, obstacle.radius, prev.canvasSize.height - obstacle.radius);
+                             
+                             console.log(`[FEE] Rebote aplicado - nueva velocidad: (${obstacle.velocity.x.toFixed(2)}, ${obstacle.velocity.y.toFixed(2)})`);
+                         }
+                         else {
+                             // Otros tipos (por si se añaden más, excluyendo hacker y fee)
+                             const penalty = getCollisionPenaltySecondsForLevel(currentLevel);
+                             timePenaltyAccumulator += penalty;
+                             console.log(`[OTRO] Penalización de ${penalty}s`);
+                         }
+                     }
+                 } else {
+                     console.log(`[INVULNERABLE] Jugador en invulnerabilidad (${500 - timeSinceLastDamage}ms restantes)`);
+                 }
+                 
+                 // Siempre aplicar pushback aunque esté en invulnerabilidad
+                 // Pushback más fuerte para fees para evitar colisiones consecutivas
+                 let pushBack;
+                 if (obstacle.type === 'hacker') {
+                     pushBack = 5; // Pushback reducido para hacker (solo separación)
+                 } else if (obstacle.type === 'fee') {
+                     pushBack = 15; // Pushback más fuerte para fees
+                 } else {
+                     pushBack = 8; // Pushback normal para otros tipos
+                 }
+                 
+                 const angle = Math.atan2(newToken.y - obstacle.y, newToken.x - obstacle.x);
+                 newToken.x += Math.cos(angle) * pushBack;
+                 newToken.y += Math.sin(angle) * pushBack;
+                 newToken.x = clamp(newToken.x, newToken.radius, prev.canvasSize.width - newToken.radius);
+                 newToken.y = clamp(newToken.y, newToken.radius, prev.canvasSize.height - newToken.radius);
+                 
+                 collidedObstacle = true;
+                 break; // Solo manejar una colisión por frame
+             }
+        }
+
+      // Game over si se queda sin vidas
+      if (hearts <= 0) {
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: 0, gameOverReason: 'hearts' };
+      }
+
+      // Ya no necesitamos aplicar aquí porque se aplica en el cálculo de tiempo real arriba
+
+      if (remainingTime <= 0) {
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time' };
+      }
+
+      // --- Aparición de energía (respawn) ---
+      const maxEnergy = getMaxEnergyForLevel(currentLevel);
+      const energyCount = newCollectibles.filter(c => c.type === 'energy').length;
+      if (energyCount < maxEnergy && Math.random() < getEnergyRespawnChanceForLevel(currentLevel)) {
+        remainingCollectibles.push(createEnergyCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height));
+      }
+
+      // --- Lógica del multiplicador de vaul ---
+      let currentMultiplier = 1;
+      let multiplierTimeRemaining = 0;
+      
+      // Verificar si el multiplicador está activo (usar now para tiempo pausable)
+      if (multiplierEndTime && now < multiplierEndTime) {
+        currentMultiplier = VAUL_MULTIPLIER;
+        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - now) / 1000));
+      } else if (multiplierEndTime && now >= multiplierEndTime) {
+        // El multiplicador ha expirado
+        multiplierEndTime = null;
+        multiplierTimeRemaining = 0;
+      }
+      
+      // Aplicar el multiplicador SOLO a los puntos de energy (NO al bonus de vaul)
+      const finalScoreToAdd = scoreToAdd * currentMultiplier;
+      
+      // Log para depuración de multiplicador
+      if (currentMultiplier > 1 && scoreToAdd > 0) {
+        console.log(`[VAUL MULTIPLIER] Aplicando x${currentMultiplier} a ${scoreToAdd} puntos de energy = ${finalScoreToAdd} puntos`);
+      }
+
+       // --- Spawning Logic ---
+       // Spawn new obstacles if level increased
+       let obstaclesToSpawn = [...newObstacles];
+       
+       // NOTA: Sistema de spawn de obstáculos movido a aparición progresiva temporal (cada 10s)
+       // La lógica antigua de level-up está comentada ya que ahora usamos el patrón temporal
+       /*
+       if (currentLevel > prev.level) {
+           console.log(`Level Up: ${prev.level} -> ${currentLevel} (Tiempo transcurrido: ${(gameTimeElapsed).toFixed(1)}s)`);
+           
+           // Al subir de nivel, reemplazar todos los obstáculos con la cantidad correcta
+           // para el nuevo nivel en lugar de solo añadir más
+           
+           // Primero calcular cuántos obstáculos de cada tipo necesitamos
+           const bugsNeeded = getObstacleCountByTypeAndLevel(currentLevel, 'bug');
+           const feesNeeded = getObstacleCountByTypeAndLevel(currentLevel, 'fee');
+           const hackersNeeded = getObstacleCountByTypeAndLevel(currentLevel, 'hacker');
+           
+           // Contar cuántos de cada tipo tenemos actualmente
+           const currentBugs = obstaclesToSpawn.filter(o => o.type === 'bug').length;
+           const currentFees = obstaclesToSpawn.filter(o => o.type === 'fee').length;
+           const currentHackers = obstaclesToSpawn.filter(o => o.type === 'hacker').length;
+           
+           // Calcular cuántos de cada tipo necesitamos añadir
+           const bugsToAdd = Math.max(0, bugsNeeded - currentBugs);
+           const feesToAdd = Math.max(0, feesNeeded - currentFees);
+           const hackersToAdd = Math.max(0, hackersNeeded - currentHackers);
+           
+           console.log(`Nivel ${currentLevel}: Añadiendo ${bugsToAdd} bugs, ${feesToAdd} fees, y ${hackersToAdd} hackers`);
+           
+           // 1. Aumentar la velocidad de los fees existentes manteniendo variaciones aleatorias
+           obstaclesToSpawn = obstaclesToSpawn.map(obs => {
+               if (obs.type === 'fee') {
+                   // Asignar nueva velocidad aleatoria para el nuevo nivel
+                   const newRandomSpeed = getRandomFeeSpeed(currentLevel);
+                   // Normalizar el vector de velocidad y aplicar la nueva velocidad aleatoria
+                   const currentVelocity = obs.velocity || { x: getRandomFloat(-1, 1), y: getRandomFloat(-1, 1) };
+                   const magnitude = Math.sqrt(currentVelocity.x * currentVelocity.x + currentVelocity.y * currentVelocity.y);
+                   if (magnitude > 0) {
+                       const normalizedX = currentVelocity.x / magnitude;
+                       const normalizedY = currentVelocity.y / magnitude;
+                       obs.velocity = {
+                           x: normalizedX * newRandomSpeed,
+                           y: normalizedY * newRandomSpeed
+                       };
+                   } else {
+                       obs.velocity = {
+                           x: (Math.random() > 0.5 ? 1 : -1) * newRandomSpeed * 0.7,
+                           y: (Math.random() > 0.5 ? 1 : -1) * newRandomSpeed * 0.7
+                       };
+                   }
+                   console.log(`[FEE] Fee existente actualizado con nueva velocidad aleatoria: ${newRandomSpeed.toFixed(2)}`);
+               }
+               return obs;
+           });
+           
+           // 2. Añadir los nuevos bugs
+           for (let i = 0; i < bugsToAdd; i++) {
+               const bug = createStrategicBug(generateId(), prev.canvasSize.width, prev.canvasSize.height, [...prev.obstacles, ...addBugsForLevelUp(currentLevel, prev.canvasSize.width, prev.canvasSize.height, prev.obstacles, prev.token)], currentLevel);
+               if (distanceBetweenPoints(bug, prev.token) >= TOKEN_RADIUS * 10) {
+                   obstaclesToSpawn.push(bug);
+               } else {
+                   // Si está muy cerca del token, intentar de nuevo
+                   i--;
+               }
+           }
+           
+           // 3. Añadir los nuevos fees con velocidades aleatorias
+           for (let i = 0; i < feesToAdd; i++) {
+               let fee: Obstacle;
+               let attempts = 0;
+               do {
+                   fee = createObstacle(generateId(), 'fee', prev.canvasSize.width, prev.canvasSize.height);
+                   // Asignar velocidad aleatoria única para cada nuevo fee
+                   if (fee.velocity) {
+                       const randomFeeSpeed = getRandomFeeSpeed(currentLevel);
+                       const magnitude = Math.sqrt(fee.velocity.x * fee.velocity.x + fee.velocity.y * fee.velocity.y);
+                       if (magnitude > 0) {
+                           const normalizedX = fee.velocity.x / magnitude;
+                           const normalizedY = fee.velocity.y / magnitude;
+                           fee.velocity = {
+                               x: normalizedX * randomFeeSpeed,
+                               y: normalizedY * randomFeeSpeed
+                           };
+                       } else {
+                           fee.velocity = {
+                               x: (Math.random() > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7,
+                               y: (Math.random() > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7
+                           };
+                       }
+                       console.log(`[FEE] Nuevo fee añadido en level-up con velocidad: ${randomFeeSpeed.toFixed(2)}`);
+                   }
+                   attempts++;
+               } while (distanceBetweenPoints(fee, prev.token) < TOKEN_RADIUS * 10 && attempts < 20);
+               
+               if (distanceBetweenPoints(fee, prev.token) >= TOKEN_RADIUS * 8) {
+                   obstaclesToSpawn.push(fee);
+               }
+           }
+           
+           // 4. Añadir los nuevos hackers
+           for (let i = 0; i < hackersToAdd; i++) {
+               const hacker = createSmartHacker(generateId(), prev.canvasSize.width, prev.canvasSize.height, prev.token, currentLevel);
+               if (distanceBetweenPoints(hacker, prev.token) >= TOKEN_RADIUS * 10) {
+                   obstaclesToSpawn.push(hacker);
+               }
+           }
+       }
+       */
+
+        // --- SISTEMA DE APARICIÓN PROGRESIVA DE ASSETS NEGATIVOS ---
+        // En lugar de spawn basado en niveles, usar patrón temporal cada 10s
+        let newNegativeSpawnCycle = prev.negativeSpawnCycle;
+        let newLastNegativeSpawnTime = prev.lastNegativeSpawnTime;
+        let newHackerSpawned = prev.hackerSpawned;
+        
+        // Verificar si es tiempo de hacer spawn progresivo
+        if (shouldSpawnNegativeAssets(currentTime, newLastNegativeSpawnTime, prev.gameStartTime)) {
+          // Verificar si ya existe un hacker en el juego
+          const existingHacker = obstaclesToSpawn.find(obs => obs.type === 'hacker');
+          const hackerExists = existingHacker !== undefined || newHackerSpawned;
+          
+          // Obtener el patrón de spawn para el ciclo actual
+          const spawnPattern = getNegativeSpawnPattern(newNegativeSpawnCycle, hackerExists);
+          
+          // Crear los obstáculos según el patrón
+          const newObstaclesFromPattern = createObstaclesByPattern(
+            spawnPattern,
+            prev.canvasSize.width,
+            prev.canvasSize.height,
+            obstaclesToSpawn,
+            newToken,
+            currentLevel
+          );
+          
+          // Añadir los nuevos obstáculos
+          obstaclesToSpawn.push(...newObstaclesFromPattern);
+          
+          // Actualizar el tracking
+          newLastNegativeSpawnTime = currentTime;
+          if (spawnPattern.type === 'hacker') {
+            newHackerSpawned = true;
+          }
+          
+          // Log detallado del spawn
+          const timeFromStart = prev.gameStartTime ? (currentTime - prev.gameStartTime) / 1000 : 0;
+          console.log(`[SPAWN PROGRESIVO] Ciclo ${newNegativeSpawnCycle}: ${spawnPattern.count}x ${spawnPattern.type}(s) - Tiempo: ${timeFromStart.toFixed(1)}s - Total obstáculos: ${obstaclesToSpawn.length}`);
+          
+          // Avanzar al siguiente ciclo
+          newNegativeSpawnCycle++;
+        }
+
+        // --- SISTEMA DE RONDAS EQUILIBRADAS PARA ASSETS POSITIVOS ---
+        // En lugar de spawn individual, usar un sistema unificado
+        let newPositiveAssetsRound = [...prev.positiveAssetsRound];
+        let newRoundNumber = prev.currentRoundNumber;
+        let newLastPositiveAssetTime = prev.lastPositiveAssetTime;
+        let newPositiveAssetsIn30s = prev.positiveAssetsIn30s;
+        let newPeriodStartTime = prev.periodStartTime;
+        
+        // Inicializar período si es la primera vez
+        if (!newPeriodStartTime && prev.gameStartTime) {
+          newPeriodStartTime = currentTime;
+          console.log(`[GARANTÍA] Iniciando primer período de 30s de tracking de assets positivos`);
+        }
+        
+        // Verificar si necesitamos resetear el contador de período (cada 30s)
+        if (newPeriodStartTime && (currentTime - newPeriodStartTime >= PERIOD_DURATION_MS)) {
+          const assetsInCompletedPeriod = newPositiveAssetsIn30s;
+          newPeriodStartTime = currentTime;
+          newPositiveAssetsIn30s = 0;
+          console.log(`[GARANTÍA] Período completado - Assets spawneados: ${assetsInCompletedPeriod}/${MINIMUM_ASSETS_PER_30S} (nuevo período iniciado)`);
+        }
+        
+        // Verificar si ya existe alguno de estos collectibles
+        const hasMegaNode = remainingCollectibles.some(c => c.type === 'megaNode');
+        const hasHeart = remainingCollectibles.some(c => c.type === 'heart');
+        const hasPurr = remainingCollectibles.some(c => c.type === 'purr');
+        const hasVaul = remainingCollectibles.some(c => c.type === 'vaul');
+        
+        // Solo intentar spawn si no hay ningún asset positivo activo
+        const hasAnyPositiveAsset = hasMegaNode || hasHeart || hasPurr || hasVaul;
+        
+        if (!hasAnyPositiveAsset && newPositiveAssetsRound.length > 0) {
+          // Determinar si forzar spawn o usar probabilidad
+          const shouldForceSpawn = shouldForcePositiveAssetSpawn(currentTime, newPeriodStartTime, newPositiveAssetsIn30s);
+          const dynamicSpawnChance = getDynamicSpawnChance(currentTime, newPeriodStartTime, newPositiveAssetsIn30s);
+          
+          const shouldSpawn = shouldForceSpawn || Math.random() < dynamicSpawnChance;
+          
+          if (shouldSpawn) {
+            // Seleccionar el próximo asset de la ronda actual
+            const nextAsset = getNextPositiveAsset(newPositiveAssetsRound);
+            
+            if (nextAsset) {
+              // Crear el asset seleccionado
+              let newCollectible: Collectible | null = null;
+              
+              switch (nextAsset) {
+                case 'megaNode':
+                  newCollectible = safeSpawnCollectible(createMegaNodeCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+                  break;
+                case 'heart':
+                  // Solo crear heart si no tiene ya 3 corazones
+                  if (hearts < 3) {
+                    newCollectible = safeSpawnCollectible(createHeartCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+                  }
+                  break;
+                case 'purr':
+                  newCollectible = safeSpawnCollectible(createPurrCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+                  break;
+                case 'vaul':
+                  newCollectible = safeSpawnCollectible(createVaulCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+                  break;
+              }
+              
+              // Si se creó exitosamente, añadirlo y quitar de la ronda
+              if (newCollectible) {
+                remainingCollectibles.push(newCollectible);
+                newPositiveAssetsRound = removeAssetFromRound(newPositiveAssetsRound, nextAsset);
+                
+                // Actualizar tracking de garantía mínima
+                newLastPositiveAssetTime = currentTime;
+                newPositiveAssetsIn30s++;
+                
+                const spawnReason = shouldForceSpawn ? "FORZADO" : "PROBABILIDAD";
+                const timeInPeriod = newPeriodStartTime ? (currentTime - newPeriodStartTime) / 1000 : 0;
+                console.log(`[RONDA ${newRoundNumber}] Spawning ${nextAsset} (${spawnReason}) - Assets en período: ${newPositiveAssetsIn30s}/${MINIMUM_ASSETS_PER_30S} - Tiempo: ${timeInPeriod.toFixed(1)}s`);
+                
+                // Si se completó la ronda, resetear para la siguiente
+                if (newPositiveAssetsRound.length === 0) {
+                  newPositiveAssetsRound = resetPositiveAssetsRound();
+                  newRoundNumber++;
+                  console.log(`[RONDA COMPLETADA] Empezando ronda ${newRoundNumber} con todos los assets disponibles`);
+                }
+              } else {
+                // Si no se pudo crear (ej: heart cuando ya tiene 3), quitar de la ronda de todas formas
+                newPositiveAssetsRound = removeAssetFromRound(newPositiveAssetsRound, nextAsset);
+                console.log(`[RONDA ${newRoundNumber}] Asset ${nextAsset} no se pudo crear, saltando (assets restantes: ${newPositiveAssetsRound.length})`);
+                
+                // Si se completó la ronda, resetear
+                if (newPositiveAssetsRound.length === 0) {
+                  newPositiveAssetsRound = resetPositiveAssetsRound();
+                  newRoundNumber++;
+                  console.log(`[RONDA COMPLETADA] Empezando ronda ${newRoundNumber} con todos los assets disponibles`);
+                }
+              }
+            }
+          }
+        }
+
+      // --- Aparición de checkpoint ---
+      let checkpointCount = checkpointCountRef.current;
+      let hasCheckpoint = prev.collectibles.some(c => c.type === 'checkpoint');
+      const checkpointCooldown = getCheckpointCooldownForLevel(currentLevel);
+      const nowTime = getGameTime();
+      
+      // Debug: mostrar información sobre condiciones de checkpoint
+      if (remainingTime <= CHECKPOINT_APPEAR_THRESHOLD) {
+        console.log(`[CHECKPOINT DEBUG] Tiempo: ${remainingTime.toFixed(1)}s, Hay checkpoint: ${hasCheckpoint}, Cooldown: ${((nowTime - lastCheckpointTime) / 1000).toFixed(1)}s/${checkpointCooldown}s`);
+      }
+      
+      if (!hasCheckpoint && remainingTime <= CHECKPOINT_APPEAR_THRESHOLD) {
+        console.log(`[CHECKPOINT] ¡Creando checkpoint en tiempo ${remainingTime.toFixed(1)}s!`);
+        remainingCollectibles.push(safeSpawnCollectible(createCheckpointCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime)); // ✅ Pasar tiempo aunque no se use en checkpoint
+        lastCheckpointTime = nowTime;
+      }
+
+      // --- Final State Update ---
+      return {
+        ...prev,
+        token: newToken,
+        obstacles: obstaclesToSpawn,
+        collectibles: remainingCollectibles,
+        score: Math.max(0, prev.score + finalScoreToAdd + vaulBonusToAdd - scoreToSubtract), // Sumamos bonus de vaul SIN multiplicador
+        timer: remainingTime,
+        level: currentLevel,
+        isFrenzyMode: false,
+        hearts,
+        lastDamageTime,
+        lastDamageSource,
+        scoreMultiplier: currentMultiplier,
+        multiplierEndTime,
+        multiplierTimeRemaining,
+        checkpointTimeBonus: prev.checkpointTimeBonus + checkpointBonus,
+        timePenalties: prev.timePenalties + timePenaltyAccumulator,
+        // Sistema de rondas equilibradas para assets positivos
+        positiveAssetsRound: newPositiveAssetsRound,
+        currentRoundNumber: newRoundNumber,
+        // Sistema de garantía mínima de assets positivos
+        lastPositiveAssetTime: newLastPositiveAssetTime, // Sin assets spawneados inicialmente
+        positiveAssetsIn30s: newPositiveAssetsIn30s, // Contador inicial en 0
+        periodStartTime: newPeriodStartTime, // Se establecerá cuando empiece el juego
+        // Sistema de aparición progresiva de assets negativos
+        negativeSpawnCycle: newNegativeSpawnCycle,
+        lastNegativeSpawnTime: newLastNegativeSpawnTime,
+        hackerSpawned: newHackerSpawned,
+        visualEffects: newVisualEffects,
+        // Efecto de robo de score por hacker
+        scoreStealEffect,
+        vaulCollectedCount,
+      };
+    });
+  }, [gameState, startGame, togglePause, getGameTime]); // Dependencies
+
+  return { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame };
+}
+
+// Al crear megaNode o checkpoint, evitar solapamiento con bugs, megaNode y checkpoint
+function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameTime?: number) => Collectible, id: string, width: number, height: number, others: GameObject[], gameTime?: number): Collectible {
+  let collectible;
+  let attempts = 0;
+  do {
+    collectible = createFn(id, width, height, gameTime); // ✅ Pasar el tiempo de juego pausable
+    attempts++;
+  } while (isOverlapping(collectible, others, 8) && attempts < 20);
+  return collectible;
+}
+
