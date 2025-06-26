@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { isToday } from 'date-fns';
 import toast from 'react-hot-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CalendarCheck } from 'lucide-react';
 
 export function DailyCheckin() {
   const { user, fetchUser } = useAuth();
@@ -48,19 +48,30 @@ export function DailyCheckin() {
   const streak = user.lastCheckIn?.days ?? 0;
 
   return (
-    <Card>
+    <Card className="bg-background/80 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>Daily Check-in</CardTitle>
-        <CardDescription>Claim your daily XP and keep your streak going!</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <CalendarCheck className="h-5 w-5 text-primary" />
+          <span>Daily Check-in</span>
+        </CardTitle>
+        <CardDescription>
+          Claim your daily XP and keep your streak going!
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col items-center gap-4">
-        <div className="text-center">
-            <p className="text-5xl font-bold">{streak}</p>
-            <p className="text-sm text-muted-foreground">Day Streak</p>
+      <CardContent className="flex flex-col items-center gap-6 pt-2">
+        <div className="flex flex-col items-center justify-center rounded-full border-4 border-primary/20 bg-primary/10 h-32 w-32">
+          <p className="text-5xl font-bold tracking-tighter text-primary">
+            {streak}
+          </p>
+          <p className="text-sm font-medium text-primary/80">Day Streak</p>
         </div>
-        <Button onClick={handleCheckin} disabled={alreadyCheckedIn || isCheckingIn} className="w-full">
+        <Button
+          onClick={handleCheckin}
+          disabled={alreadyCheckedIn || isCheckingIn}
+          className="w-full"
+        >
           {isCheckingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {alreadyCheckedIn ? 'Come back tomorrow!' : 'Claim XP'}
+          {alreadyCheckedIn ? "You've already checked in" : "Claim Daily XP"}
         </Button>
       </CardContent>
     </Card>

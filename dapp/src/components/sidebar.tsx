@@ -1,34 +1,53 @@
-import Link from "next/link";
-import { User, Settings, LogOut } from 'lucide-react';
+import {
+  Home,
+  Gamepad2,
+  Trophy,
+  Users,
+  Settings,
+  Flame,
+} from "lucide-react";
+import { ClientLink } from "./client-link";
+
+const navItems = [
+  { href: "/", icon: Home, label: "Home" },
+  { href: "/games", icon: Gamepad2, label: "Games" },
+  { href: "/quests", icon: Trophy, label: "Quests" },
+  { href: "/referrals", icon: Users, label: "Referrals" },
+];
 
 export function Sidebar() {
   return (
-    <aside className="flex h-full w-64 flex-col border-r">
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/" className="text-lg font-bold">
-          Hyppie Gambling
-        </Link>
+    <aside className="hidden lg:flex h-full w-64 flex-col border-r border-border/50 bg-background/80 backdrop-blur-sm">
+      <div className="flex h-16 items-center border-b border-border/50 px-6">
+        <ClientLink
+          href="/"
+          className="flex items-center gap-2 text-lg font-bold"
+        >
+          <Flame className="h-6 w-6 text-primary" />
+          <span>Hyppie</span>
+        </ClientLink>
       </div>
-      <nav className="flex flex-col p-4 space-y-1">
-        <Link href="/games" className="rounded-md p-2 hover:bg-accent flex items-center">
-          Games
-        </Link>
-        <Link href="/quests" className="rounded-md p-2 hover:bg-accent flex items-center">
-          Quests
-        </Link>
-        <Link href="/referrals" className="rounded-md p-2 hover:bg-accent flex items-center">
-          Referrals
-        </Link>
-        <Link href="/leaderboard" className="rounded-md p-2 hover:bg-accent flex items-center">
-          Leaderboard
-        </Link>
+      <nav className="flex-1 space-y-2 p-4">
+        {navItems.map((item) => (
+          <ClientLink
+            key={item.href}
+            href={item.href}
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground transition-colors hover:text-primary hover:bg-accent"
+          >
+            <item.icon className="h-5 w-5" />
+            <span>{item.label}</span>
+          </ClientLink>
+        ))}
       </nav>
-      <div className="mt-auto p-4 border-t">
+      <div className="mt-auto border-t border-border/50 p-4">
         <nav className="space-y-1">
-          <Link href="/settings" className="rounded-md p-2 hover:bg-accent flex items-center">
-            <Settings className="mr-2 h-4 w-4" />
+          <ClientLink
+            href="/settings"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground transition-colors hover:text-primary hover:bg-accent"
+          >
+            <Settings className="h-5 w-5" />
             <span>Settings</span>
-          </Link>
+          </ClientLink>
         </nav>
       </div>
     </aside>
