@@ -10,7 +10,7 @@ export default function StatsCards() {
     const stats = [
         {
             title: 'My XP',
-            value: user?.xp.toLocaleString() ?? '---',
+            value: user?.xp.toLocaleString() ?? '--',
             icon: Star
         },
         {
