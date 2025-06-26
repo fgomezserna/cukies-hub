@@ -5,7 +5,7 @@
 /* Definición de la fuente Pixellari */
 @font-face {
   font-family: 'Pixellari';
-  src: url('/games/sybil-slayer/play/assets/ui/fonts/Pixellari.ttf') format('truetype');
+  src: url('/assets/ui/fonts/Pixellari.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;

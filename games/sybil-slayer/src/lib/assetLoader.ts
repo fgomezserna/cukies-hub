@@ -1,7 +1,5 @@
 // AssetLoader: Sistema de carga y gestión de imágenes para el juego
 
-const basePath = '/games/sybil-slayer';
-
 // Tipos para los assets
 export type AssetKey = 
   // Personajes
@@ -33,30 +31,30 @@ export type AssetKey =
 // Mapeo de claves a rutas de archivos
 const assetPaths: Record<AssetKey, string> = {
   // Personajes
-  token: `${basePath}/games/sybil-slayer/play/assets/characters/token.png`,
+  token: '/assets/characters/token.png',
   
   // Obstáculos
-  fee: `${basePath}/games/sybil-slayer/play/assets/obstacles/fee.png`,
-  bug: `${basePath}/games/sybil-slayer/play/assets/obstacles/bug.png`,
-  hacker: `${basePath}/games/sybil-slayer/play/assets/obstacles/trump.png`,
+  fee: '/assets/obstacles/fee.png',
+  bug: '/assets/obstacles/bug.png',
+  hacker: '/assets/obstacles/trump.png',
   
   // Coleccionables
-  // energy: '/games/sybil-slayer/play/assets/collectibles/energy.png', // ELIMINADO: Se usan sprites animados
-  megaNode: `${basePath}/games/sybil-slayer/play/assets/collectibles/mega_node.png`,
-  checkpoint: `${basePath}/games/sybil-slayer/play/assets/collectibles/checkpoint.png`,
-  heart: `${basePath}/games/sybil-slayer/play/assets/collectibles/heart.png`,
+  // energy: '/assets/collectibles/energy.png', // ELIMINADO: Se usan sprites animados
+  megaNode: '/assets/collectibles/mega_node.png',
+  checkpoint: '/assets/collectibles/checkpoint.png',
+  heart: '/assets/collectibles/heart.png',
   
   // Efectos
-  boost: `${basePath}/games/sybil-slayer/play/assets/effects/boost.png`,
-  glow: `${basePath}/games/sybil-slayer/play/assets/effects/glow.png`,
-  frenzy: `${basePath}/games/sybil-slayer/play/assets/effects/frenzy.png`,
+  boost: '/assets/effects/boost.png',
+  glow: '/assets/effects/glow.png',
+  frenzy: '/assets/effects/frenzy.png',
   
   // UI
-  gameOver: `${basePath}/games/sybil-slayer/play/assets/ui/game_over.png`,
-  paused: `${basePath}/games/sybil-slayer/play/assets/ui/paused.png`,
-  startScreen: `${basePath}/games/sybil-slayer/play/assets/ui/start_screen.png`,
-  scoreIcon: `${basePath}/games/sybil-slayer/play/assets/ui/score_icon.png`,
-  timerIcon: `${basePath}/games/sybil-slayer/play/assets/ui/timer_icon.png`,
+  gameOver: '/assets/ui/game_over.png',
+  paused: '/assets/ui/paused.png',
+  startScreen: '/assets/ui/start_screen.png',
+  scoreIcon: '/assets/ui/score_icon.png',
+  timerIcon: '/assets/ui/timer_icon.png',
 };
 
 // Clase AssetLoader

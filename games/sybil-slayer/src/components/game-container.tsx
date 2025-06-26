@@ -17,7 +17,6 @@ import { assetLoader } from '@/lib/assetLoader';
 const GameContainer: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const basePath = '/games/sybil-slayer';
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
   // Estado para notificar daño
@@ -139,15 +138,15 @@ const GameContainer: React.FC = () => {
     @keyframes pulse {
       0% {
         transform: scale(1);
-        filter: brightness(1) drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
+        filter: brightness(1) drop-shadow(0 0 10px rgba(138, 43, 226, 0.5));
       }
       50% {
         transform: scale(1.12);
-        filter: brightness(1.3) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+        filter: brightness(1.3) drop-shadow(0 0 20px rgba(138, 43, 226, 0.8));
       }
       100% {
         transform: scale(1.05);
-        filter: brightness(1.15) drop-shadow(0 0 15px rgba(255, 215, 0, 0.7));
+        filter: brightness(1.15) drop-shadow(0 0 15px rgba(138, 43, 226, 0.7));
       }
     }
   `;
@@ -810,26 +809,83 @@ const GameContainer: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [hackerAnimation, gameState.status]);
 
-  // Cargar imágenes de efectos especiales que no están en el assetLoader
+  // Cargar la imagen de jeff_goit
   useEffect(() => {
-    const loadSpecialImage = (src: string, ref: React.MutableRefObject<HTMLImageElement | null>, name: string) => {
-      const img = new window.Image();
-      img.onload = () => {
-        ref.current = img;
-        console.log(`✅ Imagen ${name} cargada`);
-      };
-      img.onerror = () => console.error(`❌ Error cargando ${name}`);
-      img.src = `${basePath}${src}`;
+    const jeffGoitImg = new window.Image();
+    jeffGoitImg.src = '/assets/collectibles/jeff_goit.png';
+    jeffGoitImg.onload = () => {
+      console.log('✅ Imagen jeff_goit.png cargada EXITOSAMENTE');
+      jeffGoitImgRef.current = jeffGoitImg;
     };
+    jeffGoitImg.onerror = () => {
+      console.error('❌ Error cargando jeff_goit.png');
+    };
+  }, []);
 
-    loadSpecialImage('/games/sybil-slayer/play/assets/collectibles/jeff_goit.png', jeffGoitImgRef, 'jeff_goit.png');
-    loadSpecialImage('/games/sybil-slayer/play/assets/collectibles/whalechadmode.png', whaleChadImgRef, 'whalechadmode.png');
-    loadSpecialImage('/games/sybil-slayer/play/assets/collectibles/meow.png', meowImgRef, 'meow.png');
-    loadSpecialImage('/games/sybil-slayer/play/assets/collectibles/unlisted.png', unlistedImgRef, 'unlisted.png');
-    loadSpecialImage('/games/sybil-slayer/play/assets/collectibles/giga_vault.png', gigaVaultImgRef, 'giga_vault.png');
-    loadSpecialImage('/games/sybil-slayer/play/assets/collectibles/pay_tariffs.png', hackerTrumpImgRef, 'pay_tariffs.png');
-    
-  }, [basePath]);
+  // Cargar la imagen de whalechadmode
+  useEffect(() => {
+    const whaleChadImg = new window.Image();
+    whaleChadImg.src = '/assets/collectibles/whalechadmode.png';
+    whaleChadImg.onload = () => {
+      console.log('✅ Imagen whalechadmode.png cargada EXITOSAMENTE');
+      whaleChadImgRef.current = whaleChadImg;
+    };
+    whaleChadImg.onerror = () => {
+      console.error('❌ Error cargando whalechadmode.png');
+    };
+  }, []);
+
+  // Cargar la imagen de meow
+  useEffect(() => {
+    const meowImg = new window.Image();
+    meowImg.src = '/assets/collectibles/meow.png';
+    meowImg.onload = () => {
+      console.log('✅ Imagen meow.png cargada EXITOSAMENTE');
+      meowImgRef.current = meowImg;
+    };
+    meowImg.onerror = () => {
+      console.error('❌ Error cargando meow.png');
+    };
+  }, []);
+
+  // Cargar la imagen de unlisted
+  useEffect(() => {
+    const unlistedImg = new window.Image();
+    unlistedImg.src = '/assets/collectibles/unlisted.png';
+    unlistedImg.onload = () => {
+      console.log('✅ Imagen unlisted.png cargada EXITOSAMENTE');
+      unlistedImgRef.current = unlistedImg;
+    };
+    unlistedImg.onerror = () => {
+      console.error('❌ Error cargando unlisted.png');
+    };
+  }, []);
+
+  // Cargar la imagen de giga vault
+  useEffect(() => {
+    const gigaVaultImg = new window.Image();
+    gigaVaultImg.src = '/assets/collectibles/giga_vault.png';
+    gigaVaultImg.onload = () => {
+      console.log('✅ Imagen giga_vault.png cargada EXITOSAMENTE');
+      gigaVaultImgRef.current = gigaVaultImg;
+    };
+    gigaVaultImg.onerror = () => {
+      console.error('❌ Error cargando giga_vault.png');
+    };
+  }, []);
+
+  // Cargar la imagen del hacker (pay tariffs)
+  useEffect(() => {
+    const hackerTrumpImg = new window.Image();
+    hackerTrumpImg.src = '/assets/collectibles/pay_tariffs.png';
+    hackerTrumpImg.onload = () => {
+      console.log('✅ Imagen pay_tariffs.png cargada EXITOSAMENTE');
+      hackerTrumpImgRef.current = hackerTrumpImg;
+    };
+    hackerTrumpImg.onerror = () => {
+      console.error('❌ Error cargando pay_tariffs.png');
+    };
+  }, []);
 
   // Justo antes del return principal del componente:
   if (!assetsLoaded) {
@@ -851,29 +907,33 @@ const GameContainer: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="relative flex flex-col items-center justify-center w-full h-full p-4 bg-black text-white font-pixellari overflow-hidden">
-      <style>{animationStyles}</style>
-      
-      {/* Fondo con nubes en movimiento */}
-      <div 
-        className="absolute inset-0 w-full h-full bg-repeat-x cloud-animation z-0"
-        style={{ backgroundImage: `url(${basePath}/games/sybil-slayer/play/assets/ui/game-container/clouds-background.png)`, backgroundSize: 'auto 100%' }}
-      />
-      
-      {/* Contenedor del juego con fondo principal */}
-      <div 
-        className="relative z-10"
-        style={{
-          width: canvasSize.width,
-          height: canvasSize.height,
-          backgroundImage: `url(${basePath}/games/sybil-slayer/play/assets/ui/game-container/background-playing.png)`,
-          backgroundSize: 'cover',
-          boxShadow: '0 0 20px 5px hsl(var(--primary) / 0.5)',
-          border: '2px solid hsl(var(--primary))',
-          borderRadius: '15px'
-        }}
-      >
-        {gameState.status === 'idle' ? (
+    <div className="relative w-full h-full flex flex-col items-center justify-center min-h-screen">
+      {/* Menú de bienvenida */}
+      {gameState.status === 'idle' ? (
+        <>
+          {/* Fondo animado igual que en el juego */}
+           {/* Fondo del juego */}
+           <div 
+            className="fixed inset-0 w-full h-full overflow-hidden -z-10"
+            style={{
+              backgroundImage: "url('/assets/ui/game-container/background-playing.png')",
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundAttachment: 'fixed',
+              backgroundRepeat: 'no-repeat'
+            }}
+          ></div>
+          
+          {/* Capa de nubes con animación */}
+          <div 
+            className="fixed top-0 left-0 w-full h-[400px] overflow-hidden -z-[9] cloud-animation"
+            style={{
+              backgroundImage: "url('/assets/ui/game-container/clouds-background.png')",
+              backgroundSize: '3300px 400px',
+              backgroundRepeat: 'repeat-x',
+              pointerEvents: 'none'
+            }}
+          ></div>
           <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm">
             <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
               SYBIL SLAYER
@@ -889,7 +949,7 @@ const GameContainer: React.FC = () => {
               aria-label="Start game"
             >
               <Image 
-                src={`${basePath}/games/sybil-slayer/play/assets/ui/buttons/play-button.png`}
+                src="/assets/ui/buttons/play-button.png"
                 alt="Play"
                 width={160}
                 height={60}
@@ -897,163 +957,697 @@ const GameContainer: React.FC = () => {
               />
             </button>
           </div>
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center relative">
-            {/* Score, Hearts y Timer */}
-            <div className="w-full flex justify-between mb-2 px-4 items-center absolute top-2 left-0 right-0">
-                {/* Score Box */}
-                <div className="relative">
-                    <Image 
-                        src={`${basePath}/games/sybil-slayer/play/assets/ui/buttons/box_letters.png`}
-                        alt="Score box"
-                        width={150}
-                        height={50}
-                        className="game-img"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                        <span style={{ color: gameState.scoreMultiplier > 1 ? '#FFD700' : '#00FFFF' }}>
-                            Score: {gameState.score}
-                        </span>
-                    </div>
+        </>
+      ) : gameState.status === 'countdown' ? (
+        /* ✅ CORREGIDO: Durante countdown, NO mostrar fondos para que solo se vea grid-background.png */
+        <div className="game-container mx-auto flex flex-col items-center p-4 md:p-8">
+          {/* Estilos para las animaciones */}
+          <style dangerouslySetInnerHTML={{ __html: animationStyles }} />
+          
+          {/* Sin fondos durante countdown - solo el grid del canvas será visible */}
+          
+          <div className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2">
+            {/* Score, Hearts y Timer con cajas */}
+            <div className="w-full flex justify-between mb-2 px-4 items-center">
+              <div className="relative">
+                <Image 
+                  src="/assets/ui/buttons/box_letters.png"
+                  alt="Score box"
+                  width={150}
+                  height={50}
+                  className="game-img"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
+                  <span className="text-primary">
+                    Score: {gameState.score}
+                  </span>
                 </div>
-                {/* Hearts Box */}
-                <div className="relative">
-                    <Image 
-                        src={`${basePath}/games/sybil-slayer/play/assets/ui/buttons/box_letters.png`}
-                        alt="Hearts box"
-                        width={150}
-                        height={50}
-                        className="game-img"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        {Array.from({ length: gameState.hearts }).map((_, i) => (
-                            <Image
-                                key={i}
-                                src={`${basePath}/games/sybil-slayer/play/assets/collectibles/heart.png`}
-                                alt="Heart"
-                                width={28}
-                                height={28}
-                                className="inline-block mr-1"
-                            />
-                        ))}
-                    </div>
-                </div>
-                {/* Time Box */}
-                <div className="relative">
-                    <Image 
-                        src={`${basePath}/games/sybil-slayer/play/assets/ui/buttons/box_letters.png`}
-                        alt="Time box"
-                        width={150}
-                        height={50}
-                        className="game-img"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                        <span className={gameState.timer <= 10 ? 'text-destructive' : 'text-primary'}>
-                            Time: {Math.ceil(gameState.timer)}
-                        </span>
-                    </div>
-                </div>
-            </div>
+              </div>
 
-            {/* Canvas del Juego */}
-            <div className="w-full h-full flex justify-center items-center">
+              {/* Caja de corazones centrada */}
+              <div className="relative">
+                <Image 
+                  src="/assets/ui/buttons/box_letters.png"
+                  alt="Hearts box"
+                  width={150}
+                  height={50}
+                  className="game-img"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-primary text-shadow">
+                  {Array.from({ length: gameState.hearts }).map((_, i) => (
+                    <Image
+                      key={i}
+                      src="/assets/collectibles/heart.png"
+                      alt="Heart"
+                      width={28}
+                      height={28}
+                      className="inline-block mr-1 align-middle"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative">
+                <Image 
+                  src="/assets/ui/buttons/box_letters.png"
+                  alt="Time box"
+                  width={150}
+                  height={50}
+                  className="game-img"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
+                  <span className="text-primary">
+                    Time: {Math.ceil(gameState.timer)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Canvas del juego */}
+            <div ref={containerRef} className="w-full flex justify-center items-center mb-4 relative">
+              
+              {/* Render canvas only when size is determined */}
               {canvasSize.width > 0 && canvasSize.height > 0 && (
-                  <GameCanvas
-                      gameState={gameState}
-                      width={canvasSize.width}
-                      height={canvasSize.height}
-                      energyCollectedFlag={energyCollectedFlag}
-                      damageFlag={damageFlag}
-                  />
+                <GameCanvas
+                  gameState={gameState}
+                  width={canvasSize.width}
+                  height={canvasSize.height}
+                  energyCollectedFlag={energyCollectedFlag}
+                  damageFlag={damageFlag}
+                />
               )}
             </div>
-
-            {/* Overlay de Pausa */}
-            {gameState.status === 'paused' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm z-30">
-                    <h2 className="text-3xl font-bold text-primary mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
-                    <p className="text-xl text-primary font-pixellari text-shadow">Press P to Resume</p>
-                </div>
-            )}
             
-            {/* Control Buttons */}
-            <div className="flex space-x-8 absolute bottom-4">
-              <button onClick={handleStartPauseClick} className="focus:outline-none game-button">
-                  <Image 
-                      src={gameState.status === 'playing' ? `${basePath}/games/sybil-slayer/play/assets/ui/buttons/pause-button.png` : `${basePath}/games/sybil-slayer/play/assets/ui/buttons/play-button.png`}
-                      alt={gameState.status === 'playing' ? "Pause" : "Play"} 
-                      width={120} 
-                      height={50}
-                      className="game-img"
-                  />
+            {/* Botones principales */}
+            <div className="flex space-x-8 mb-3 justify-center">
+              <button 
+                onClick={handleStartPauseClick} 
+                className="focus:outline-none game-button"
+                aria-label="Start"
+              >
+                <Image 
+                  src="/assets/ui/buttons/play-button.png"
+                  alt="Play" 
+                  width={120} 
+                  height={50}
+                  className="game-img"
+                />
               </button>
-              <button onClick={handleResetClick} className="focus:outline-none game-button">
-                  <Image 
-                      src={`${basePath}/games/sybil-slayer/play/assets/ui/buttons/reset-button.png`} 
-                      alt="Reset" 
-                      width={120} 
-                      height={50}
-                      className="game-img"
-                  />
+              <button 
+                onClick={handleResetClick} 
+                className="focus:outline-none game-button"
+                aria-label="Reset game"
+              >
+                <Image 
+                  src="/assets/ui/buttons/reset-button.png" 
+                  alt="Reset" 
+                  width={120} 
+                  height={50}
+                  className="game-img"
+                />
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* ✅ Estados normales (playing, paused, gameOver): mostrar fondos completos */
+        <div className="game-container mx-auto flex flex-col items-center p-4 md:p-8">
+          {/* Estilos para las animaciones */}
+          <style dangerouslySetInnerHTML={{ __html: animationStyles }} />
+          
+          {/* Fondo del juego */}
+          <div 
+            className="fixed inset-0 w-full h-full overflow-hidden -z-10"
+            style={{
+              backgroundImage: "url('/assets/ui/game-container/background-playing.png')",
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundAttachment: 'fixed',
+              backgroundRepeat: 'no-repeat'
+            }}
+          ></div>
+          
+          {/* Capa de nubes con animación */}
+          <div 
+            className="fixed top-0 left-0 w-full h-[400px] overflow-hidden -z-[9] cloud-animation"
+            style={{
+              backgroundImage: "url('/assets/ui/game-container/clouds-background.png')",
+              backgroundSize: '3300px 400px',
+              backgroundRepeat: 'repeat-x',
+              pointerEvents: 'none'
+            }}
+          ></div>
+          
+          <div className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2">
+            {/* Score, Hearts y Timer con cajas */}
+            <div className="w-full flex justify-between mb-2 px-4 items-center">
+              <div className="relative">
+                {/* Aura roja expansiva cuando el hacker roba score */}
+                {gameState.scoreStealEffect && gameState.scoreStealEffect.active && (
+                  <>
+                    {/* Múltiples capas de aura roja para efecto expansivo */}
+                    <div 
+                      className="absolute inset-0 rounded-lg"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(255, 0, 0, 0.3) 0%, rgba(255, 0, 0, 0.1) 50%, transparent 100%)',
+                        animation: 'redAuraExpand 3s ease-out forwards',
+                        transform: 'scale(1)',
+                        zIndex: -1
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-0 rounded-lg"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(255, 50, 50, 0.4) 0%, rgba(255, 50, 50, 0.15) 40%, transparent 80%)',
+                        animation: 'redAuraExpand 3s ease-out 0.2s forwards',
+                        transform: 'scale(1)',
+                        zIndex: -1
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-0 rounded-lg"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(255, 100, 100, 0.5) 0%, rgba(255, 100, 100, 0.2) 30%, transparent 70%)',
+                        animation: 'redAuraExpand 3s ease-out 0.4s forwards',
+                        transform: 'scale(1)',
+                        zIndex: -1
+                      }}
+                    />
+                  </>
+                )}
+                
+                <Image 
+                  src="/assets/ui/buttons/box_letters.png"
+                  alt="Score box"
+                  width={150}
+                  height={50}
+                  className="game-img"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
+                  <span 
+                    style={{
+                      color: gameState.scoreMultiplier > 1 ? '#FFD700' : '#00FFFF',
+                      textShadow: gameState.scoreMultiplier > 1 
+                        ? '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)' 
+                        : '2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      animation: gameState.scoreMultiplier > 1 ? 'pulse 1s infinite alternate' : 'none'
+                    }}
+                  >
+                    Score: {gameState.score}
+                  </span>
+                </div>
+                {/* Temporizador de multiplicador x5 - FUERA de la caja */}
+                {gameState.scoreMultiplier > 1 && gameState.multiplierEndTime && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: '160px', // Al lado derecho de la caja
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#FFD700',
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      fontFamily: 'Pixellari, monospace',
+                      textShadow: '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '2px solid #FFD700',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    x5 {gameState.multiplierTimeRemaining || 0}s
+                  </div>
+                )}
+              </div>
 
-      {/* Modal de información */}
+              {/* Caja de corazones centrada */}
+              <div className="relative">
+                <Image 
+                  src="/assets/ui/buttons/box_letters.png"
+                  alt="Hearts box"
+                  width={150}
+                  height={50}
+                  className="game-img"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-primary text-shadow">
+                  {Array.from({ length: gameState.hearts }).map((_, i) => (
+                    <Image
+                      key={i}
+                      src="/assets/collectibles/heart.png"
+                      alt="Heart"
+                      width={28}
+                      height={28}
+                      className="inline-block mr-1 align-middle"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative">
+                <Image 
+                  src="/assets/ui/buttons/box_letters.png"
+                  alt="Time box"
+                  width={150}
+                  height={50}
+                  className="game-img"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
+                  <span className={gameState.timer <= 10 ? 'text-destructive' : 'text-primary'}>
+                    Time: {Math.ceil(gameState.timer)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Canvas del juego - Ahora con mayor tamaño y menos margen */}
+            <div ref={containerRef} className="w-full flex justify-center items-center mb-4 relative">
+
+              {/* Animación de jeff_goit al lado izquierdo del grid */}
+              {jeffGoitAnimation && jeffGoitAnimation.active && (
+                <div 
+                  className="absolute" 
+                  style={{
+                    bottom: '20px',
+                    left: (() => {
+                      const containerWidth = canvasSize.width;
+                      const imageWidth = 250;
+                      const stopDistance = 100; // Aumentado de 20px a 100px para que no toque el grid
+                      
+                      if (jeffGoitAnimation.phase === 'entering') {
+                        // Entra desde -250px hasta la posición de parada
+                        const progress = (Date.now() - jeffGoitAnimation.start) / 800;
+                        const startPos = -imageWidth;
+                        const endPos = -stopDistance;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      } else if (jeffGoitAnimation.phase === 'visible') {
+                        // Se mantiene quieto en la posición de parada
+                        return `${-stopDistance}px`;
+                      } else {
+                        // Retrocede desde la posición de parada hacia fuera
+                        const progress = (Date.now() - jeffGoitAnimation.start) / 800;
+                        const startPos = -stopDistance;
+                        const endPos = -imageWidth;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      }
+                    })(),
+                    width: '250px',
+                    height: '250px',
+                    transition: 'none', // Removemos transition CSS para usar cálculo manual
+                    filter: 'drop-shadow(0 0 15px rgba(255, 215, 0, 0.8))'
+                  }}
+                >
+                  <img 
+                    src="/assets/collectibles/jeff_goit.png" 
+                    alt="¡Go it!" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      animation: jeffGoitAnimation.phase === 'visible' 
+                        ? 'pulse 0.8s infinite alternate'
+                        : 'none'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Animación de whalechadmode al lado derecho del grid */}
+              {whaleChadAnimation && whaleChadAnimation.active && (
+                <div 
+                  className="absolute" 
+                  style={{
+                    bottom: '20px',
+                    right: (() => {
+                      const containerWidth = canvasSize.width;
+                      const imageWidth = 250;
+                      const stopDistance = 140; // Aumentado de 100px a 140px para alejarlo del grid
+                      
+                      if (whaleChadAnimation.phase === 'entering') {
+                        // Entra desde fuera derecha hasta la posición de parada
+                        const progress = (Date.now() - whaleChadAnimation.start) / 800;
+                        const startPos = -imageWidth; // Comienza fuera de la pantalla por la derecha
+                        const endPos = -stopDistance; // Se detiene a 140px del grid
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      } else if (whaleChadAnimation.phase === 'visible') {
+                        // Se mantiene quieto en la posición de parada
+                        return `${-stopDistance}px`;
+                      } else {
+                        // Retrocede desde la posición de parada hacia fuera derecha
+                        const progress = (Date.now() - whaleChadAnimation.start) / 800;
+                        const startPos = -stopDistance;
+                        const endPos = -imageWidth;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      }
+                    })(),
+                    width: '250px',
+                    height: '250px',
+                    transition: 'none', // Removemos transition CSS para usar cálculo manual
+                    filter: 'drop-shadow(0 0 15px rgba(0, 191, 255, 0.8))' // Azul cyan para diferenciarlo de jeff
+                  }}
+                >
+                  <img 
+                    src="/assets/collectibles/whalechadmode.png" 
+                    alt="¡Whale Chad Mode!" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      animation: whaleChadAnimation.phase === 'visible' 
+                        ? 'pulse 0.8s infinite alternate'
+                        : 'none'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Animación de meow (purr effect) al lado derecho superior del grid */}
+              {meowAnimation && meowAnimation.active && (
+                <div 
+                  className="absolute" 
+                  style={{
+                    top: '20px', // Posicionado arriba para no solaparse con whale chad
+                    right: (() => {
+                      const imageWidth = 200; // Más pequeño que whale chad
+                      const stopDistance = 120; // Aumentado de 80px a 120px para alejarlo del grid
+                      
+                      if (meowAnimation.phase === 'entering') {
+                        // ✅ CORREGIDO: Usar 800ms como jeff_goit
+                        const progress = (Date.now() - meowAnimation.start) / 800;
+                        const startPos = -imageWidth;
+                        const endPos = -stopDistance;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      } else if (meowAnimation.phase === 'visible') {
+                        // Se mantiene quieto en la posición de parada
+                        return `${-stopDistance}px`;
+                      } else {
+                        // ✅ CORREGIDO: Usar 800ms como jeff_goit
+                        const progress = (Date.now() - meowAnimation.start) / 800;
+                        const startPos = -stopDistance;
+                        const endPos = -imageWidth;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      }
+                    })(),
+                    width: '200px',
+                    height: '200px',
+                    transition: 'none', // ✅ CORREGIDO: Removemos transition CSS
+                    filter: 'drop-shadow(0 0 15px rgba(138, 43, 226, 0.8))' // CORRECCIÓN: Violeta para el gato
+                  }}
+                >
+                  <img 
+                    src="/assets/collectibles/meow.png" 
+                    alt="¡Meow! Inmunidad activada" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      animation: meowAnimation.phase === 'visible' 
+                        ? 'pulse 0.6s infinite alternate'
+                        : 'none'
+                    }}
+                  />
+                  
+                  {/* Contador de inmunidad - CORRECCIÓN: Mostrar desde el inicio y más separado */}
+                  {(meowAnimation.phase === 'entering' || meowAnimation.phase === 'visible') && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        bottom: '-30px', // CORRECCIÓN: Más separado del PNG (era '10px')
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        color: '#8A2BE2', // CORRECCIÓN: Violeta para coincidir con el resplandor
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        fontFamily: 'Pixellari, monospace',
+                        textShadow: '0 0 10px rgba(138, 43, 226, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)', // CORRECCIÓN: Violeta
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '2px solid #8A2BE2', // CORRECCIÓN: Borde violeta
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {Math.ceil(gameState.token.immunityTimer / 1000)}s
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Animación de unlisted (fee damage effect) al lado izquierdo del grid */}
+              {unlistedAnimation && unlistedAnimation.active && (
+                <div 
+                  className="absolute" 
+                  style={{
+                    top: '20px', // Arriba del grid (posición similar a meow pero del lado izquierdo)
+                    left: (() => {
+                      const imageWidth = 250;
+                      const stopDistance = 100; // Misma distancia que jeff
+                      
+                      if (unlistedAnimation.phase === 'entering') {
+                        // Entra desde fuera izquierda
+                        const progress = (Date.now() - unlistedAnimation.start) / 800;
+                        const startPos = -imageWidth;
+                        const endPos = -stopDistance;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      } else if (unlistedAnimation.phase === 'visible') {
+                        return `${-stopDistance}px`;
+                      } else {
+                        // Retrocede hacia fuera izquierda
+                        const progress = (Date.now() - unlistedAnimation.start) / 800;
+                        const startPos = -stopDistance;
+                        const endPos = -imageWidth;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      }
+                    })(),
+                    width: '250px',
+                    height: '250px',
+                    transition: 'none',
+                    filter: 'drop-shadow(0 0 15px rgba(220, 20, 60, 0.8))' // Rojo carmesí para el daño
+                  }}
+                >
+                  <img 
+                    src="/assets/collectibles/unlisted.png" 
+                    alt="¡Unlisted! Daño recibido" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      animation: unlistedAnimation.phase === 'visible' 
+                        ? 'pulse 0.5s infinite alternate'
+                        : 'none'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Animación de giga_vault al lado izquierdo del grid - NUEVA */}
+              {gigaVaultAnimation && gigaVaultAnimation.active && (
+                <div 
+                  className="absolute" 
+                  style={{
+                    bottom: '300px', // Arriba de jeff_goit
+                    left: (() => {
+                      const imageWidth = 250;
+                      const stopDistance = 100; // Misma distancia que jeff
+                      
+                      if (gigaVaultAnimation.phase === 'entering') {
+                        // Entra desde fuera izquierda
+                        const progress = (Date.now() - gigaVaultAnimation.start) / 800;
+                        const startPos = -imageWidth;
+                        const endPos = -stopDistance;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      } else if (gigaVaultAnimation.phase === 'visible') {
+                        // Se mantiene quieto en la posición de parada
+                        return `${-stopDistance}px`;
+                      } else {
+                        // Retrocede hacia fuera izquierda
+                        const progress = (Date.now() - gigaVaultAnimation.start) / 800;
+                        const startPos = -stopDistance;
+                        const endPos = -imageWidth;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      }
+                    })(),
+                    width: '250px',
+                    height: '250px',
+                    transition: 'none',
+                    filter: 'drop-shadow(0 0 15px rgba(255, 215, 0, 0.8))' // Dorado como el vaul
+                  }}
+                >
+                  <img 
+                    src="/assets/collectibles/giga_vault.png" 
+                    alt="¡Giga Vault! Multiplicador x5!" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      animation: gigaVaultAnimation.phase === 'visible' 
+                        ? 'pulse 0.8s infinite alternate'
+                        : 'none'
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Animación del hacker (hacker collision effect) al lado derecho del grid */}
+              {hackerAnimation && hackerAnimation.active && (
+                <div 
+                  className="absolute" 
+                  style={{
+                    top: '50%', // Centrado verticalmente
+                    transform: 'translateY(-50%)',
+                    right: (() => {
+                      const imageWidth = 300; // Tamaño más grande para el hacker
+                      const stopDistance = 150; // Distancia de parada
+                      
+                      if (hackerAnimation.phase === 'entering') {
+                        // Entra desde fuera derecha hacia dentro
+                        const progress = (Date.now() - hackerAnimation.start) / 800;
+                        const startPos = -imageWidth;
+                        const endPos = -stopDistance;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      } else if (hackerAnimation.phase === 'visible') {
+                        // Se mantiene quieto en la posición de parada
+                        return `${-stopDistance}px`;
+                      } else {
+                        // Retrocede hacia fuera derecha
+                        const progress = (Date.now() - hackerAnimation.start) / 800;
+                        const startPos = -stopDistance;
+                        const endPos = -imageWidth;
+                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
+                      }
+                    })(),
+                    width: '300px',
+                    height: '300px',
+                    transition: 'none',
+                    filter: 'drop-shadow(0 0 20px rgba(255, 69, 0, 0.9))' // Efecto de resplandor rojo/naranja
+                  }}
+                >
+                  <img 
+                    src="/assets/collectibles/pay_tariffs.png" 
+                    alt="Pay Tariffs!" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      animation: hackerAnimation.phase === 'visible' 
+                        ? 'pulse 0.7s infinite alternate'
+                        : 'none'
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Render canvas only when size is determined */}
+              {canvasSize.width > 0 && canvasSize.height > 0 && (
+                <GameCanvas
+                  gameState={gameState}
+                  width={canvasSize.width}
+                  height={canvasSize.height}
+                  energyCollectedFlag={energyCollectedFlag}
+                  damageFlag={damageFlag}
+                />
+              )}
+              
+              {/* Mensaje de pausa como overlay sobre el grid */}
+              {gameState.status === 'paused' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <h2 className="text-3xl font-bold text-primary mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
+                  <p className="text-xl text-primary font-pixellari text-shadow">Press P to Resume</p>
+                  <p className="text-sm text-primary/70 font-pixellari text-shadow mt-2">Game auto-pauses when switching tabs</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Botones principales */}
+            <div className="flex space-x-8 mb-3 justify-center">
+              <button 
+                onClick={handleStartPauseClick} 
+                className="focus:outline-none game-button"
+                aria-label={gameState.status === 'playing' ? 'Pause' : gameState.status === 'paused' ? 'Resume' : 'Start'}
+              >
+                <Image 
+                  src={gameState.status === 'playing' 
+                    ? "/assets/ui/buttons/pause-button.png" 
+                    : "/assets/ui/buttons/play-button.png"}
+                  alt={gameState.status === 'playing' ? "Pause" : "Play"} 
+                  width={120} 
+                  height={50}
+                  className="game-img"
+                />
+              </button>
+              <button 
+                onClick={handleResetClick} 
+                className="focus:outline-none game-button"
+                aria-label="Reset game"
+              >
+                <Image 
+                  src="/assets/ui/buttons/reset-button.png" 
+                  alt="Reset" 
+                  width={120} 
+                  height={50}
+                  className="game-img"
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de información - Siempre disponible */}
       <InfoModal 
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
         onPlaySound={playSound}
-      >
-        <div className="flex flex-col items-center">
-          <Image width={80} height={80} className="game-img mb-2" alt="Jeff GOIT" src={`${basePath}/games/sybil-slayer/play/assets/collectibles/jeff_goit.png`}/>
-          <p className="text-sm">JEFF GOIT</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <Image width={80} height={80} className="game-img mb-2" alt="Whale CHAD Mode" src={`${basePath}/games/sybil-slayer/play/assets/collectibles/whalechadmode.png`}/>
-          <p className="text-sm">WHALECHAD MODE</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <Image width={80} height={80} className="game-img mb-2" alt="Purr" src={`${basePath}/games/sybil-slayer/play/assets/collectibles/meow.png`}/>
-          <p className="text-sm">PURR</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <Image width={80} height={80} className="game-img mb-2" alt="Pay Tariffs" src={`${basePath}/games/sybil-slayer/play/assets/collectibles/pay_tariffs.png`}/>
-          <p className="text-sm">PAY TARIFFS</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <Image width={80} height={80} className="game-img mb-2" alt="Giga Vault" src={`${basePath}/games/sybil-slayer/play/assets/collectibles/giga_vault.png`}/>
-          <p className="text-sm">GIGA VAULT</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <Image width={80} height={80} className="game-img mb-2" alt="Unlisted" src={`${basePath}/games/sybil-slayer/play/assets/collectibles/unlisted.png`}/>
-          <p className="text-sm">UNLISTED</p>
-        </div>
-      </InfoModal>
+      />
 
-      {/* Botones de control flotantes */}
+      {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-        <button onClick={handleMusicToggle} className="focus:outline-none hover:scale-110 transition-transform">
+        {/* Botón de música */}
+        <button 
+          onClick={handleMusicToggle} 
+          className="focus:outline-none hover:scale-110 transition-transform"
+          aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
+        >
           <Image 
-            src={musicEnabled ? `${basePath}/games/sybil-slayer/play/assets/ui/buttons/music_on.png` : `${basePath}/games/sybil-slayer/play/assets/ui/buttons/music_off.png`}
+            src={musicEnabled 
+              ? "/assets/ui/buttons/music_on.png" 
+              : "/assets/ui/buttons/music_off.png"}
             alt={musicEnabled ? "Music On" : "Music Off"} 
-            width={50} height={50} className="game-img"
+            width={50} 
+            height={50}
+            className="game-img"
           />
         </button>
-        <button onClick={handleSoundsToggle} className="focus:outline-none hover:scale-110 transition-transform">
+
+        {/* Botón de sonidos */}
+        <button 
+          onClick={handleSoundsToggle} 
+          className="focus:outline-none hover:scale-110 transition-transform"
+          aria-label={soundsEnabled ? 'Disable sounds' : 'Enable sounds'}
+        >
           <Image 
-            src={soundsEnabled ? `${basePath}/games/sybil-slayer/play/assets/ui/buttons/sounds_on.png` : `${basePath}/games/sybil-slayer/play/assets/ui/buttons/sounds_off.png`}
+            src={soundsEnabled 
+              ? "/assets/ui/buttons/sounds_on.png" 
+              : "/assets/ui/buttons/sounds_off.png"}
             alt={soundsEnabled ? "Sounds On" : "Sounds Off"} 
-            width={50} height={50} className="game-img"
+            width={50} 
+            height={50}
+            className="game-img"
           />
         </button>
-        <button onClick={handleInfoToggle} className="focus:outline-none hover:scale-110 transition-transform">
+
+        {/* Botón de información */}
+        <button 
+          onClick={handleInfoToggle} 
+          className="focus:outline-none hover:scale-110 transition-transform"
+          aria-label="Información del juego"
+        >
           <Image 
-            src={`${basePath}/games/sybil-slayer/play/assets/ui/buttons/button_info.png`}
+            src="/assets/ui/buttons/button_info.png"
             alt="Información" 
-            width={50} height={50} className="game-img"
+            width={50} 
+            height={50}
+            className="game-img"
           />
         </button>
       </div>

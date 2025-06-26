@@ -72,15 +72,53 @@ export function useGameInput(): InputState {
   }, [updateDirection]);
 
 
+  // Función para limpiar teclas presionadas cuando se pierde el foco
+  const clearPressedKeys = useCallback(() => {
+    pressedKeys.clear();
+    setInputState(prev => ({ ...prev, direction: { x: 0, y: 0 } }));
+  }, []);
+
+  // Función para prevenir menú contextual y recuperar foco
+  const handleContextMenu = useCallback((event: MouseEvent) => {
+    event.preventDefault();
+    // Enfocar el window para asegurar que los eventos de teclado funcionen
+    window.focus();
+  }, []);
+
+  // Función para recuperar foco cuando se hace clic en la ventana
+  const handleWindowClick = useCallback(() => {
+    window.focus();
+  }, []);
+
   useEffect(() => {
+    // Eventos de teclado
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    
+    // BUGFIX: Prevenir menú contextual y recuperar foco
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('click', handleWindowClick);
+    
+    // BUGFIX: Limpiar teclas cuando se pierde el foco
+    window.addEventListener('blur', clearPressedKeys);
+    window.addEventListener('focus', clearPressedKeys);
+    
+    // BUGFIX: Limpiar teclas cuando se cambia de pestaña
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearPressedKeys();
+      }
+    });
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('click', handleWindowClick);
+      window.removeEventListener('blur', clearPressedKeys);
+      window.removeEventListener('focus', clearPressedKeys);
     };
-  }, [handleKeyDown, handleKeyUp]);
+  }, [handleKeyDown, handleKeyUp, handleContextMenu, handleWindowClick, clearPressedKeys]);
 
   // Return a stable object, but its properties will update
   return inputState;

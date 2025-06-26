@@ -73,10 +73,23 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
   return others.some(o => {
-    // Solo comprobar si ambos son bug, megaNode o checkpoint
-    const isSpecialA = ('type' in obj) && (obj.type === 'bug' || obj.type === 'megaNode' || obj.type === 'checkpoint');
-    const isSpecialB = ('type' in o) && (o.type === 'bug' || o.type === 'megaNode' || o.type === 'checkpoint');
-    if (isSpecialA && isSpecialB) {
+    // MEJORADO: Comprobar colisiones entre assets positivos y bugs
+    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint'].includes((obj as any).type);
+    const isBug = ('type' in o) && o.type === 'bug';
+    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint'].includes((o as any).type);
+    const isObjBug = ('type' in obj) && (obj as any).type === 'bug';
+    
+    // Casos a verificar:
+    // 1. Asset positivo vs Bug (evitar que assets aparezcan sobre bugs)
+    // 2. Bug vs Asset positivo (evitar que bugs aparezcan sobre assets)
+    // 3. Assets positivos entre sí (como antes)
+    // 4. Bugs entre sí (como antes)
+    const shouldCheck = (isAssetPositive && isBug) || 
+                       (isObjBug && isOtherAssetPositive) ||
+                       (isAssetPositive && isOtherAssetPositive) ||
+                       (isObjBug && ('type' in o) && o.type === 'bug');
+    
+    if (shouldCheck) {
       const dx = obj.x - o.x;
       const dy = obj.y - o.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
@@ -162,7 +175,7 @@ const getHackerAccelerationForLevel = (level: number) => {
 // --- FASE 2: ESCALADO DE ENERGÍA ---
 const getInitialEnergyForLevel = (level: number) => Math.max(2, INITIAL_ENERGY_POINTS - (level - 1)); // Disminuye 1 por nivel, mínimo 2
 const getMaxEnergyForLevel = (level: number) => Math.max(3, MAX_ENERGY_POINTS - (level - 1) * 2); // Disminuye 2 por nivel, mínimo 3
-const getEnergyRespawnChanceForLevel = (level: number) => Math.max(0.1, 1 - (level - 1) * 0.1); // Probabilidad de respawn baja 10% por nivel, mínimo 10%
+const getEnergyRespawnChanceForLevel = (level: number) => Math.max(0.08, 0.5 - (level - 1) * 0.08); // AUMENTADO: Más probabilidad para más energy manteniendo separación
 
 // --- FASE 3: ESCALADO DE CHECKPOINTS ---
 const getCheckpointCooldownForLevel = (level: number) => 15 + (level - 1) * 5; // Cooldown en segundos, aumenta 5s por nivel
@@ -387,7 +400,8 @@ const createObstaclesByPattern = (
   height: number,
   existingObstacles: Obstacle[],
   token: Token,
-  level: number
+  level: number,
+  existingCollectibles: any[] = []
 ): Obstacle[] => {
   const newObstacles: Obstacle[] = [];
   
@@ -399,7 +413,8 @@ const createObstaclesByPattern = (
       if (pattern.type === 'hacker') {
         newObstacle = createSmartHacker(generateId(), width, height, token, level);
       } else if (pattern.type === 'bug') {
-        newObstacle = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newObstacles], level);
+        // MEJORADO: Pasar también collectibles para evitar spawn sobre assets positivos
+        newObstacle = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newObstacles], level, existingCollectibles);
       } else { // fee
         newObstacle = createObstacle(generateId(), 'fee', width, height);
         // Asignar velocidad aleatoria para el nivel actual
@@ -432,7 +447,7 @@ const createObstaclesByPattern = (
 };
 
 // Función para generar bugs adicionales cuando sube el nivel
-const addBugsForLevelUp = (currentLevel: number, width: number, height: number, existingObstacles: Obstacle[], token: Token): Obstacle[] => {
+const addBugsForLevelUp = (currentLevel: number, width: number, height: number, existingObstacles: Obstacle[], token: Token, existingCollectibles: any[] = []): Obstacle[] => {
   // Calcular cuántos bugs adicionales según el nivel de forma más gradual
   // Nivel 1->2: +1 bug, Nivel 2->3: +1 bug, Nivel 3->4: +2 bugs, etc.
   const bugsToAdd = Math.floor((currentLevel - 1) * 0.5) + 1;
@@ -442,7 +457,8 @@ const addBugsForLevelUp = (currentLevel: number, width: number, height: number, 
   const newBugs: Obstacle[] = [];
   
   for (let i = 0; i < bugsToAdd; i++) {
-    const bug = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newBugs], currentLevel);
+    // MEJORADO: Pasar también collectibles para evitar spawn sobre assets positivos
+    const bug = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newBugs], currentLevel, existingCollectibles);
     
     // Solo agregar si no está demasiado cerca del token (aumentada distancia mínima)
     if (distanceBetweenPoints(bug, token) >= TOKEN_RADIUS * 10) {
@@ -726,7 +742,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
      const collectibles: Collectible[] = [];
      const initialEnergy = getInitialEnergyForLevel(level);
      for (let i = 0; i < initialEnergy; i++) {
-         collectibles.push(createEnergyCollectible(generateId(), width, height));
+         // MEJORADO: Usar safeSpawnCollectible para evitar solapamiento entre energy iniciales
+         const newEnergy = safeSpawnCollectible(
+           createEnergyCollectible, 
+           generateId(), 
+           width, 
+           height, 
+           collectibles // Verificar distancia con energy ya creados
+         );
+         collectibles.push(newEnergy);
      }
 
      console.log(`Juego inicializado con 1 fee inicial. Más enemigos aparecerán progresivamente cada 10s. Energía inicial: ${initialEnergy}`);
@@ -783,6 +807,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
           lastNegativeSpawnTime: null, // Sin spawns iniciales
           hackerSpawned: false, // No se ha spawneado hacker aún
+          vaulCollectedCount: 0, // BUGFIX: Resetear contador de vaults al iniciar nueva partida
           // Efectos visuales
           visualEffects: [], // Sin efectos iniciales
           // Efecto de robo de score por hacker
@@ -1179,7 +1204,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  newObs.retreatTimer = undefined;
                  newObs.retreatCollisionPosition = undefined;
                  
-                 console.log(`[HACKER] Destierro terminado - reapareciendo en (${newObs.x.toFixed(1)}, ${newObs.y.toFixed(1)}) - distancia al token: ${maxDistance.toFixed(1)}px`);
+                 // CORREGIDO: Reset contador de energías recogidas para que vuelva a necesitar 5
+                 newObs.energyCollected = 0;
+                 
+                 console.log(`[HACKER] 🔄 DESTIERRO TERMINADO - ID: ${newObs.id} - Reapareciendo en (${newObs.x.toFixed(1)}, ${newObs.y.toFixed(1)}) - CONTADOR ENERGÍA RESETEADO A: ${newObs.energyCollected}`);
                } else {
                  // Mantener al hacker fuera del canvas (posición invisible)
                  newObs.x = -1000; // Fuera del canvas
@@ -1746,11 +1774,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                    
                    // NUEVO: Contar energy recogida por hacker
                    obstacle.energyCollected = (obstacle.energyCollected || 0) + 1;
-                   console.log(`[HACKER] ¡Ha robado energía con EXPLOSION_(n)! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px)`);
+                   console.log(`[HACKER] ¡Ha robado energía con EXPLOSION_(n)! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px) - DEBUG: Estado actual del hacker ID: ${obstacle.id}`);
                    
                    // NUEVO: Si recoge 5 energy, activar retroceso automático
                    if (obstacle.energyCollected >= 5) {
-                     console.log(`[HACKER] ¡Ha recogido 5 energy! Iniciando retroceso automático hacia el borde...`);
+                     console.log(`[HACKER] 🚀 ¡ESCAPE! ID: ${obstacle.id} - Ha recogido 5 energy! Iniciando retroceso automático hacia el borde...`);
                      
                      // NUEVO: Reproducir sonido especial cuando el hacker escapa por 5 energy
                      onPlaySound?.('hacker_escape');
@@ -1815,7 +1843,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            if (isColliding) {
              // Token está tocando el vaul
              if (!collectible.isBeingTouched) {
-               // Nuevo contacto iniciado
+               // Nuevo contacto iniciado - NO resetear activationProgress aquí
                collectible.isBeingTouched = true;
                collectible.contactStartTime = now; // Usar tiempo pausable del juego
                // NUEVO: Pausar el timer de vida mientras se toca
@@ -1823,16 +1851,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                console.log(`[VAUL] Contacto iniciado - Timer pausado - Progreso actual: ${((collectible.activationProgress || 0) * 100).toFixed(1)}%`);
              }
              
-             // Calcular incremento de progreso basado en tiempo pausable real
-             // CORREGIDO: Usar el mismo sistema de tiempo pausable que el countdown y timer principal
-             if (collectible.contactStartTime) {
-               const elapsedContactTime = now - collectible.contactStartTime;
-               const sessionProgress = elapsedContactTime / VAUL_ACTIVATION_TIME_MS;
-               
-               // El progreso total es el progreso acumulado previo + el progreso de esta sesión
-               const previousProgress = collectible.activationProgress || 0;
-               collectible.activationProgress = Math.min(1, previousProgress + sessionProgress);
-             }
+             // CORREGIDO: Usar enfoque más simple con deltaTime pausable
+             const deltaTime = 16; // 60 FPS aproximado
+             const progressIncrement = (deltaTime / VAUL_ACTIVATION_TIME_MS) * VAUL_PROGRESS_RATE;
+             
+             // Actualizar progreso acumulativo
+             const previousProgress = collectible.activationProgress || 0;
+             collectible.activationProgress = Math.min(1, previousProgress + progressIncrement);
              
              // Verificar si se ha completado la activación
              if ((collectible.activationProgress || 0) >= 1 && !collectible.isActivated) {
@@ -1841,8 +1866,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                onPlaySound?.('vaul_collect');
                
                // CORREGIDO: Actualizar la variable local para que afecte el estado final
-               // IMPORTANTE: Usar Date.now() para efectos visuales ya que game-container.tsx usa Date.now()
-               multiplierEndTime = Date.now() + VAUL_DURATION_MS;
+               // IMPORTANTE: Para efectos visuales convertir tiempo pausable a timestamp real
+               const realTimeNow = Date.now();
+               const gameTimeDifference = now - (prev.gameStartTime || 0); // Diferencia en tiempo de juego
+               multiplierEndTime = realTimeNow + VAUL_DURATION_MS;
                
                // NUEVO: Sumar bonus acumulativo de 50 puntos por cada vault recogido
                // CORREGIDO: Este bonus NO debe pasar por el multiplicador
@@ -1850,6 +1877,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                const bonusAmount = 50 * newVaulCount;
                vaulBonusToAdd += bonusAmount;
                console.log(`[VAUL] Bonus recogido: ${bonusAmount} puntos (${newVaulCount}° vaul) - SIN multiplicador`);
+               console.log(`[VAUL] Debug: Score actual: ${prev.score}, Multiplicador previo: ${prev.scoreMultiplier > 1 ? `x${prev.scoreMultiplier}` : 'NO'}`);
                
                // Marcar el vault como activado para que se elimine del filtrado posterior
                collectible.isActivated = true;
@@ -1860,14 +1888,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            } else {
              // Token no está tocando el vaul - conservar progreso pero detener acumulación
              if (collectible.isBeingTouched) {
-               // CORREGIDO: Guardar el progreso acumulado hasta ahora antes de perder contacto
-               if (collectible.contactStartTime) {
-                 const elapsedContactTime = now - collectible.contactStartTime;
-                 const sessionProgress = elapsedContactTime / VAUL_ACTIVATION_TIME_MS;
-                 const previousProgress = collectible.activationProgress || 0;
-                 collectible.activationProgress = Math.min(1, previousProgress + sessionProgress);
-               }
-               
                console.log(`[VAUL] Contacto perdido - Progreso conservado: ${((collectible.activationProgress || 0) * 100).toFixed(1)}%`);
                collectible.isBeingTouched = false;
                collectible.contactStartTime = undefined;
@@ -1925,7 +1945,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                newToken.boostTimer = MEGA_NODE_BOOST_DURATION_MS; // Duración total
            }
            if (collectible.type === 'energy'){
-                 remainingCollectibles.push(createEnergyCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height));
+                 // MEJORADO: Crear energy de reemplazo con verificación de distancia
+                 const replacementEnergy = safeSpawnCollectible(
+                   createEnergyCollectible, 
+                   generateId(), 
+                   prev.canvasSize.width, 
+                   prev.canvasSize.height, 
+                   [...remainingCollectibles, newToken]
+                 );
+                 remainingCollectibles.push(replacementEnergy);
             }
          } 
        }
@@ -1939,7 +1967,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            if (checkCollision(newToken, collectible) && collectible.type !== 'vaul') {
              // Si es energía, spawneamos una nueva en otro lugar
              if (collectible.type === 'energy') {
-               remainingCollectibles.push(createEnergyCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height));
+               // MEJORADO: Crear energy de reemplazo con verificación de distancia
+               const replacementEnergy = safeSpawnCollectible(
+                 createEnergyCollectible, 
+                 generateId(), 
+                 prev.canvasSize.width, 
+                 prev.canvasSize.height, 
+                 [...remainingCollectibles, newToken]
+               );
+               remainingCollectibles.push(replacementEnergy);
              }
              // Los otros tipos no se añaden si fueron recogidos
              continue;
@@ -1992,8 +2028,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
 
        // Token vs Obstacles
-        let collidedObstacle = false;
-        for (const obstacle of newObstacles) {
+       let collidedObstacle = false;
+       
+       // BUGFIX: Solo procesar colisiones durante 'playing', NO durante 'countdown'
+       if (prev.status === 'playing') {
+         for (const obstacle of newObstacles) {
              // Saltar hackers desterrados o en retroceso - no pueden colisionar
              if (obstacle.type === 'hacker' && (obstacle.isBanished || obstacle.isRetreating)) {
                  continue;
@@ -2025,6 +2064,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  
                  // El hacker ROBA 20% de las monedas del jugador
                  if (obstacle.type === 'hacker') {
+                     // CORREGIDO: Sonido del hacker se reproduce SIEMPRE que toque al token
+                     console.log(`[HACKER] 🎵 Reproduciendo voz de Trump al tocar TOKEN`);
+                     onPlaySound?.('hacker_collision');
+                     
                      // Verificar inmunidad de purr para hacker
                      if (newToken.immunityTimer > 0) {
                          console.log(`[HACKER] ¡Colisión con hacker pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No roba monedas.`);
@@ -2072,10 +2115,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          // Actualizar tiempo del último daño
                          lastDamageTime = now;
                          lastDamageSource = obstacle.type;
-                         
-                         // Sonido específico del hacker (voz de Trump) - ÚNICAMENTE cuando hacker toca al TOKEN
-                         console.log(`[HACKER] 🎵 Reproduciendo voz de Trump al robar monedas del TOKEN`);
-                         onPlaySound?.('hacker_collision');
                      } else {
                          console.log(`[HACKER] ¡Colisión con hacker en invulnerabilidad! No roba monedas.`);
                      }
@@ -2160,6 +2199,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  break; // Solo manejar una colisión por frame
              }
         }
+       } // Cerrar el bloque if para las colisiones durante 'playing'
 
       // Game over si se queda sin vidas
       if (hearts <= 0) {
@@ -2176,18 +2216,27 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       const maxEnergy = getMaxEnergyForLevel(currentLevel);
       const energyCount = newCollectibles.filter(c => c.type === 'energy').length;
       if (energyCount < maxEnergy && Math.random() < getEnergyRespawnChanceForLevel(currentLevel)) {
-        remainingCollectibles.push(createEnergyCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height));
+        // MEJORADO: Crear energy con verificación de distancia para evitar solapamiento
+        const newEnergy = safeSpawnCollectible(
+          createEnergyCollectible, 
+          generateId(), 
+          prev.canvasSize.width, 
+          prev.canvasSize.height, 
+          [...remainingCollectibles, newToken] // Verificar distancia con energy existentes y token
+        );
+        remainingCollectibles.push(newEnergy);
       }
 
       // --- Lógica del multiplicador de vaul ---
       let currentMultiplier = 1;
       let multiplierTimeRemaining = 0;
       
-      // Verificar si el multiplicador está activo (usar now para tiempo pausable)
-      if (multiplierEndTime && now < multiplierEndTime) {
+      // CORREGIDO: Verificar si el multiplicador está activo usando timestamp real
+      const realTimeNow = Date.now();
+      if (multiplierEndTime && realTimeNow < multiplierEndTime) {
         currentMultiplier = VAUL_MULTIPLIER;
-        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - now) / 1000));
-      } else if (multiplierEndTime && now >= multiplierEndTime) {
+        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow) / 1000));
+      } else if (multiplierEndTime && realTimeNow >= multiplierEndTime) {
         // El multiplicador ha expirado
         multiplierEndTime = null;
         multiplierTimeRemaining = 0;
@@ -2333,7 +2382,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             prev.canvasSize.height,
             obstaclesToSpawn,
             newToken,
-            currentLevel
+            currentLevel,
+            remainingCollectibles
           );
           
           // Añadir los nuevos obstáculos
@@ -2470,6 +2520,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       }
 
       // --- Final State Update ---
+      // Log final para depuración de score
+      if (vaulBonusToAdd > 0 || finalScoreToAdd > 0 || scoreToSubtract > 0) {
+        console.log(`[SCORE DEBUG] Score anterior: ${prev.score}, Energy (${scoreToAdd}x${currentMultiplier}): +${finalScoreToAdd}, Vault bonus: +${vaulBonusToAdd}, Robado: -${scoreToSubtract}`);
+      }
+      
       return {
         ...prev,
         token: newToken,
@@ -2509,14 +2564,25 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
   return { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame };
 }
 
-// Al crear megaNode o checkpoint, evitar solapamiento con bugs, megaNode y checkpoint
+// Al crear collectibles, evitar solapamiento con otros objetos
 function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameTime?: number) => Collectible, id: string, width: number, height: number, others: GameObject[], gameTime?: number): Collectible {
   let collectible;
   let attempts = 0;
   do {
     collectible = createFn(id, width, height, gameTime); // ✅ Pasar el tiempo de juego pausable
     attempts++;
-  } while (isOverlapping(collectible, others, 8) && attempts < 20);
+    
+    // MEJORADO: Distancia mínima mayor para energy (40px) para evitar solapamiento visual
+    const minDistance = collectible.type === 'energy' ? 40 : 8;
+    
+    // Si no se puede colocar después de muchos intentos, reducir gradualmente la distancia
+    const adjustedMinDistance = attempts > 15 ? Math.max(minDistance * 0.5, 4) : minDistance;
+    
+    const overlapping = isOverlapping(collectible, others, adjustedMinDistance);
+    if (!overlapping) break;
+    
+  } while (attempts < 25); // Más intentos para energy
+  
   return collectible;
 }
 

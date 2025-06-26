@@ -238,8 +238,9 @@ export function createHeartCollectible(id: string, canvasWidth: number, canvasHe
 
 /**
  * Crea un bug en una posición estratégica dentro del grid
+ * MEJORADO: Evita spawn sobre assets positivos (energy, megaNode, purr, vaul, heart, checkpoint)
  */
-export function createStrategicBug(id: string, canvasWidth: number, canvasHeight: number, existingObstacles: Obstacle[], level: number = 1): Obstacle {
+export function createStrategicBug(id: string, canvasWidth: number, canvasHeight: number, existingObstacles: Obstacle[], level: number = 1, existingCollectibles: any[] = []): Obstacle {
   // CORREGIDO: Usar zona segura para evitar bugs en los extremos
   const safeWidth = canvasWidth - (2 * BUG_SAFE_ZONE);
   const safeHeight = canvasHeight - (2 * BUG_SAFE_ZONE);
@@ -252,7 +253,7 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
   // Crear una matriz para rastrear qué celdas ya están ocupadas
   const occupiedCells: boolean[][] = Array(rows).fill(0).map(() => Array(cols).fill(false));
   
-  // Marcar celdas ocupadas por bugs existentes (ajustado para zona segura)
+  // MEJORADO: Marcar celdas ocupadas por bugs existentes (ajustado para zona segura)
   existingObstacles.forEach(obstacle => {
     if (obstacle.type === 'bug') {
       // Convertir coordenadas globales a coordenadas de zona segura
@@ -272,6 +273,30 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
             }
           }
         }
+      }
+    }
+  });
+  
+  // NUEVO: Marcar celdas ocupadas por assets positivos para evitar taparlos
+  existingCollectibles.forEach(collectible => {
+    if (collectible && collectible.type && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint'].includes(collectible.type)) {
+      // Convertir coordenadas globales a coordenadas de zona segura
+      const safeX = collectible.x - BUG_SAFE_ZONE;
+      const safeY = collectible.y - BUG_SAFE_ZONE;
+      const col = Math.floor(safeX / gridSize);
+      const row = Math.floor(safeY / gridSize);
+      if (col >= 0 && col < cols && row >= 0 && row < rows) {
+        // Marcar la celda del asset Y celdas adyacentes para dar espacio extra
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const r = row + dr;
+            const c = col + dc;
+            if (r >= 0 && r < rows && c >= 0 && c < cols) {
+              occupiedCells[r][c] = true;
+            }
+          }
+        }
+        console.log(`[BUG SPAWN] Evitando asset positivo ${collectible.type} en (${collectible.x.toFixed(1)}, ${collectible.y.toFixed(1)})`);
       }
     }
   });

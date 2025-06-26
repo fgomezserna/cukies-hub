@@ -50,15 +50,15 @@ export const VAUL_COLOR = 'hsl(45, 100%, 60%)'; // Color dorado para el cofre
 export const VAUL_VALUE = 0; // Solo proporciona multiplicador, sin puntos directos
 export const VAUL_MULTIPLIER = 5; // Multiplicador de score x5
 export const VAUL_DURATION_MS = 7000; // 7 segundos de duración del multiplicador
-export const VAUL_ACTIVATION_TIME_MS = 8000; // 8 segundos para llenar la barra completamente
-export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 8 segundos exactos
+export const VAUL_ACTIVATION_TIME_MS = 3000; // 3 segundos para llenar la barra completamente
+export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 3 segundos exactos
 
 // Collectible Spawning
-export const INITIAL_ENERGY_POINTS = 10;
+export const INITIAL_ENERGY_POINTS = 8; // AUMENTADO: más energy iniciales pero con separación
 export const MEGA_NODE_SPAWN_CHANCE = 0.0005; // Reducido de 0.002 a 0.0005 (4 veces menos frecuente)
 export const PURR_SPAWN_CHANCE = 0.0003; // Reducido de 0.0015 a 0.0003 (5 veces menos frecuente)
 export const VAUL_SPAWN_CHANCE = 0.0002; // Reducido de 0.001 a 0.0002 (5 veces menos frecuente)
-export const MAX_ENERGY_POINTS = 15;
+export const MAX_ENERGY_POINTS = 10; // AUMENTADO: más energy máximo pero con separación
 
 // Tiempo de vida en ms para Mega_node y Heart
 export const COLLECTIBLE_LIFETIME_MS = 10000; // 10 segundos

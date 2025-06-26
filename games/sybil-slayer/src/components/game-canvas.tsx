@@ -10,8 +10,6 @@ import {
     FEE_RADIUS
 } from '@/lib/constants';
 
-const basePath = '/games/sybil-slayer';
-
 interface GameCanvasProps {
   gameState: GameState;
   width: number;
@@ -217,35 +215,35 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   useEffect(() => {
     // Cargar imagen de fondo (grid)
     const gridImg = new Image();
-    gridImg.src = 'assets/ui/game-container/grid-background.png';
+    gridImg.src = '/assets/ui/game-container/grid-background.png';
     gridImg.onload = () => {
       gridImgRef.current = gridImg;
     };
     
     // Cargar imagen del token (jugador)
     const tokenImg = new Image();
-    tokenImg.src = 'assets/characters/token.png';
+    tokenImg.src = '/assets/characters/token.png';
     tokenImg.onload = () => {
       tokenImgRef.current = tokenImg;
     };
     
     // Cargar imagen de fee (obstáculo)
     const feeImg = new Image();
-    feeImg.src = 'assets/obstacles/fee.png';
+    feeImg.src = '/assets/obstacles/fee.png';
     feeImg.onload = () => {
       feeImgRef.current = feeImg;
     };
     
     // Cargar imagen de bug (obstáculo)
     const bugImg = new Image();
-    bugImg.src = 'assets/obstacles/bug.png';
+    bugImg.src = '/assets/obstacles/bug.png';
     bugImg.onload = () => {
       bugImgRef.current = bugImg;
     };
     
     // Cargar imagen de wallet para mostrar sobre el bug
     const walletImg = new Image();
-    walletImg.src = 'assets/collectibles/wallet_2.png';
+    walletImg.src = '/assets/collectibles/wallet_2.png';
     walletImg.onload = () => {
       console.log('✅ Imagen wallet_2.png cargada exitosamente');
       walletImgRef.current = walletImg;
@@ -256,7 +254,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar imagen de hacker (obstáculo - Trump)
     const hackerImg = new Image();
-    hackerImg.src = 'assets/obstacles/trump.png';
+    hackerImg.src = '/assets/obstacles/trump.png';
     hackerImg.onload = () => {
       console.log('✅ Imagen trump.png cargada EXITOSAMENTE');
       hackerImgRef.current = hackerImg;
@@ -270,14 +268,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar imagen de mega nodo (coleccionable especial) - respaldo por si fallan los sprites
     const megaNodeImg = new Image();
-    megaNodeImg.src = 'assets/collectibles/mega_node.png';
+    megaNodeImg.src = '/assets/collectibles/mega_node.png';
     megaNodeImg.onload = () => {
       megaNodeImgRef.current = megaNodeImg;
     };
     
     // Cargar sprites animados del mega nodo
     const megaNodeSprite1 = new Image();
-    megaNodeSprite1.src = 'assets/collectibles/mega_node_1.png';
+    megaNodeSprite1.src = '/assets/collectibles/mega_node_1.png';
     megaNodeSprite1.onload = () => {
       console.log('✅ Sprite mega_node_1.png cargado EXITOSAMENTE');
       megaNodeSprite1Ref.current = megaNodeSprite1;
@@ -286,7 +284,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando mega_node_1.png:', e);
       // Intentar cargar desde la carpeta alternativa
       const altSprite = new Image();
-      altSprite.src = 'assets/collectibles/mega_node/mega_node_1.png';
+      altSprite.src = '/assets/collectibles/mega_node/mega_node_1.png';
       altSprite.onload = () => {
         console.log('✅ Sprite alternativo mega_node/mega_node_1.png cargado EXITOSAMENTE');
         megaNodeSprite1Ref.current = altSprite;
@@ -294,7 +292,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     
     const megaNodeSprite2 = new Image();
-    megaNodeSprite2.src = 'assets/collectibles/mega_node_2.png';
+    megaNodeSprite2.src = '/assets/collectibles/mega_node_2.png';
     megaNodeSprite2.onload = () => {
       console.log('✅ Sprite mega_node_2.png cargado EXITOSAMENTE');
       megaNodeSprite2Ref.current = megaNodeSprite2;
@@ -303,7 +301,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando mega_node_2.png:', e);
       // Intentar cargar desde la carpeta alternativa
       const altSprite = new Image();
-      altSprite.src = 'assets/collectibles/mega_node/mega_node_2.png';
+      altSprite.src = '/assets/collectibles/mega_node/mega_node_2.png';
       altSprite.onload = () => {
         console.log('✅ Sprite alternativo mega_node/mega_node_2.png cargado EXITOSAMENTE');
         megaNodeSprite2Ref.current = altSprite;
@@ -311,7 +309,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     
     const megaNodeSprite3 = new Image();
-    megaNodeSprite3.src = 'assets/collectibles/mega_node_3.png';
+    megaNodeSprite3.src = '/assets/collectibles/mega_node_3.png';
     megaNodeSprite3.onload = () => {
       console.log('✅ Sprite mega_node_3.png cargado EXITOSAMENTE');
       megaNodeSprite3Ref.current = megaNodeSprite3;
@@ -320,7 +318,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando mega_node_3.png:', e);
       // Intentar cargar desde la carpeta alternativa
       const altSprite = new Image();
-      altSprite.src = 'assets/collectibles/mega_node/mega_node_3.png';
+      altSprite.src = '/assets/collectibles/mega_node/mega_node_3.png';
       altSprite.onload = () => {
         console.log('✅ Sprite alternativo mega_node/mega_node_3.png cargado EXITOSAMENTE');
         megaNodeSprite3Ref.current = altSprite;
@@ -332,7 +330,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     directions.forEach(direction => {
       for (let i = 1; i <= 6; i++) {
         const img = new Image();
-        img.src = `assets/characters/feesprites/fee_${direction}_${i}.png`;
+        img.src = `/assets/characters/feesprites/fee_${direction}_${i}.png`;
         img.onload = () => {
           feeSpritesRef.current[direction][i-1] = img;
         };
@@ -355,7 +353,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           fileName = 'Trump';
         }
         
-        img.src = `assets/characters/trumpsprites/${fileName}_${direction}_${i}.png`;
+        img.src = `/assets/characters/trumpsprites/${fileName}_${direction}_${i}.png`;
         img.onload = () => {
           hackerSpritesRef.current[direction][i-1] = img;
           console.log(`✅ Sprite ${fileName}_${direction}_${i}.png cargado correctamente`);
@@ -365,7 +363,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           // Intentar con la variante alternativa como fallback
           const altFileName = fileName === 'Trump' ? 'trump' : 'Trump';
           const altImg = new Image();
-          altImg.src = `assets/characters/trumpsprites/${altFileName}_${direction}_${i}.png`;
+          altImg.src = `/assets/characters/trumpsprites/${altFileName}_${direction}_${i}.png`;
           altImg.onload = () => {
             hackerSpritesRef.current[direction][i-1] = altImg;
             console.log(`✅ Sprite alternativo ${altFileName}_${direction}_${i}.png cargado correctamente`);
@@ -381,7 +379,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     directions.forEach(direction => {
       for (let i = 1; i <= 6; i++) {
         const img = new Image();
-        img.src = `assets/characters/tokensprites/token_${direction}_${i}.png`;
+        img.src = `/assets/characters/tokensprites/token_${direction}_${i}.png`;
         img.onload = () => {
           tokenSpritesRef.current[direction][i-1] = img;
         };
@@ -391,7 +389,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     directions.forEach(direction => {
       for (let i = 1; i <= 6; i++) {
         const img = new Image();
-        img.src = `assets/characters/tokensprites/token_run_${direction}_${i}.png`;
+        img.src = `/assets/characters/tokensprites/token_run_${direction}_${i}.png`;
         img.onload = () => {
           tokenRunSpritesRef.current[direction][i-1] = img;
         };
@@ -401,7 +399,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Cargar sprites animados de energía
     for (let i = 1; i <= 6; i++) {
       const img = new Image();
-      img.src = `assets/collectibles/energy/energy_${i}.png`;
+      img.src = `/assets/collectibles/energy/energy_${i}.png`;
       img.onload = () => {
         energySpritesRef.current[i-1] = img;
       };
@@ -410,7 +408,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Cargar sprites de explosión (efecto boost)
     for (let i = 1; i <= 10; i++) {
       const img = new Image();
-      img.src = `assets/effects/Explosion_${i}.png`;
+      img.src = `/assets/effects/Explosion_${i}.png`;
       img.onload = () => {
         explosionSpritesRef.current[i-1] = img;
       };
@@ -418,7 +416,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Cargar sprites de explosión de energía
     for (let i = 1; i <= 10; i++) {
       const img = new Image();
-      img.src = `assets/effects/En-Explosion_${i}.png`;
+      img.src = `/assets/effects/En-Explosion_${i}.png`;
       img.onload = () => {
         enExplosionSpritesRef.current[i-1] = img;
       };
@@ -427,7 +425,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Cargar sprites de explosión verde (para heart y mega_node)
     for (let i = 1; i <= 10; i++) {
       const img = new Image();
-      img.src = `assets/effects/green-Explosion_${i}.png`;
+      img.src = `/assets/effects/green-Explosion_${i}.png`;
       img.onload = () => {
         greenExplosionSpritesRef.current[i-1] = img;
       };
@@ -435,7 +433,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar sprite de daño
     const damageImg = new Image();
-    damageImg.src = 'assets/effects/damage.png';
+    damageImg.src = '/assets/effects/damage.png';
     damageImg.onload = () => {
       damageImgRef.current = damageImg;
     };
@@ -449,7 +447,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     purrSprite1.onerror = (e) => {
       console.error('❌ Error cargando purr sprite 1:', e);
     };
-    purrSprite1.src = 'assets/collectibles/purr/purr_1.png';
+    purrSprite1.src = '/assets/collectibles/purr/purr_1.png';
 
     const purrSprite2 = new Image();
     purrSprite2.onload = () => {
@@ -459,7 +457,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     purrSprite2.onerror = (e) => {
       console.error('❌ Error cargando purr sprite 2:', e);
     };
-    purrSprite2.src = 'assets/collectibles/purr/purr_2.png';
+    purrSprite2.src = '/assets/collectibles/purr/purr_2.png';
 
     const purrSprite3 = new Image();
     purrSprite3.onload = () => {
@@ -469,7 +467,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     purrSprite3.onerror = (e) => {
       console.error('❌ Error cargando purr sprite 3:', e);
     };
-    purrSprite3.src = 'assets/collectibles/purr/purr_3.png';
+    purrSprite3.src = '/assets/collectibles/purr/purr_3.png';
 
     const purrSprite4 = new Image();
     purrSprite4.onload = () => {
@@ -479,7 +477,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     purrSprite4.onerror = (e) => {
       console.error('❌ Error cargando purr sprite 4:', e);
     };
-    purrSprite4.src = 'assets/collectibles/purr/purr_4.png';
+    purrSprite4.src = '/assets/collectibles/purr/purr_4.png';
     
     // Cargar sprites animados del bug
     const bugSprite1 = new Image();
@@ -490,7 +488,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     bugSprite1.onerror = (e) => {
       console.error('❌ Error cargando bug sprite 1:', e);
     };
-    bugSprite1.src = 'assets/characters/bug/bug_1.png';
+    bugSprite1.src = '/assets/characters/bug/bug_1.png';
 
     const bugSprite2 = new Image();
     bugSprite2.onload = () => {
@@ -500,7 +498,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     bugSprite2.onerror = (e) => {
       console.error('❌ Error cargando bug sprite 2:', e);
     };
-    bugSprite2.src = 'assets/characters/bug/bug_2.png';
+    bugSprite2.src = '/assets/characters/bug/bug_2.png';
 
     const bugSprite3 = new Image();
     bugSprite3.onload = () => {
@@ -510,18 +508,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     bugSprite3.onerror = (e) => {
       console.error('❌ Error cargando bug sprite 3:', e);
     };
-    bugSprite3.src = 'assets/characters/bug/bug_3.png';
+    bugSprite3.src = '/assets/characters/bug/bug_3.png';
     
     // Cargar imagen de overlay de pausa
     const pauseOverlayImg = new Image();
-    pauseOverlayImg.src = 'assets/ui/effects/pause-overlay.png';
+    pauseOverlayImg.src = '/assets/ui/effects/pause-overlay.png';
     pauseOverlayImg.onload = () => {
       pauseOverlayImgRef.current = pauseOverlayImg;
     };
     
     // Cargar imagen de game over
     const gameOverImg = new Image();
-    gameOverImg.src = 'assets/collectibles/gameover_trump .png';
+    gameOverImg.src = '/assets/collectibles/gameover_trump .png';
     gameOverImg.onload = () => {
       console.log('✅ Imagen gameover_trump .png cargada EXITOSAMENTE');
       gameOverImgRef.current = gameOverImg;
@@ -532,7 +530,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar imagen de game over específica para bugs (wallet)
     const walletGameOverImg = new Image();
-    walletGameOverImg.src = 'assets/collectibles/wallet_gameover.png';
+    walletGameOverImg.src = '/assets/collectibles/wallet_gameover.png';
     walletGameOverImg.onload = () => {
       console.log('✅ Imagen wallet_gameover.png cargada EXITOSAMENTE');
       walletGameOverImgRef.current = walletGameOverImg;
@@ -543,7 +541,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar imagen del heart
     const heartImg = new Image();
-    heartImg.src = 'assets/collectibles/heart.png';
+    heartImg.src = '/assets/collectibles/heart.png';
     heartImg.onload = () => {
       console.log('✅ Imagen heart.png cargada EXITOSAMENTE');
       heartImgRef.current = heartImg;
@@ -554,7 +552,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Cargar imagen del vaul
     const vaulImg = new Image();
-    vaulImg.src = 'assets/collectibles/vaul_close.png';
+    vaulImg.src = '/assets/collectibles/vaul_close.png';
     vaulImg.onload = () => {
       console.log('✅ Imagen vaul_close.png cargada EXITOSAMENTE');
       vaulImgRef.current = vaulImg;
@@ -565,7 +563,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Cargar imagen del watch_sand (efecto encima del vaul)
     const watchSandImg = new Image();
-    watchSandImg.src = 'assets/collectibles/watch_sand.png';
+    watchSandImg.src = '/assets/collectibles/watch_sand.png';
     watchSandImg.onload = () => {
       console.log('✅ Imagen watch_sand.png cargada EXITOSAMENTE');
       watchSandImgRef.current = watchSandImg;
@@ -576,7 +574,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Cargar imagen del checkpoint
     const checkpointImg = new Image();
-    checkpointImg.src = 'assets/collectibles/checkpoint.png';
+    checkpointImg.src = '/assets/collectibles/checkpoint.png';
     checkpointImg.onload = () => {
       console.log('✅ Imagen checkpoint.png cargada EXITOSAMENTE');
       checkpointImgRef.current = checkpointImg;
@@ -587,14 +585,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Cargar imágenes al inicio
     const barrImg = new Image();
-    barrImg.src = 'assets/collectibles/barr.png';
+    barrImg.src = '/assets/collectibles/barr.png';
     barrImg.onload = () => {
       barrImgRef.current = barrImg;
     };
 
     // Cargar barra de progreso
     const progressBarrImg = new Image();
-    progressBarrImg.src = 'assets/collectibles/progress_barr.png';
+    progressBarrImg.src = '/assets/collectibles/progress_barr.png';
     progressBarrImg.onload = () => {
       progressBarrImgRef.current = progressBarrImg;
     };
@@ -1127,16 +1125,49 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            const margin = 15;
            
            // LÓGICA CONDICIONAL: Determinar posición de la barra
-           // Por defecto debajo del vaul, pero arriba si está muy cerca del borde inferior
+           // Por defecto debajo del vaul, pero arriba si está muy cerca del borde inferior O si hay un bug tapando
            const minDistanceFromBottom = 40; // Distancia mínima desde el borde inferior del canvas
            const vaulBottomY = obj.y + (vaulImgSize/2); // Posición inferior del vaul
            const barBelowY = vaulBottomY + margin + barHeight; // Posición de la barra si va debajo
+           
+           // NUEVA LÓGICA: Detectar si hay un bug cerca que pueda tapar la barra
+           let bugBlockingBar = false;
+           const barArea = {
+             x: obj.x - barWidth/2,
+             y: vaulBottomY + margin - barHeight/2,
+             width: barWidth,
+             height: barHeight + margin * 2 // Un poco más de área para detectar conflictos
+           };
+           
+           // Buscar bugs que estén en el área de la barra
+           if (gameState.obstacles) {
+             for (const obstacle of gameState.obstacles) {
+               if (obstacle.type === 'bug') {
+                 const bugRadius = obstacle.radius * 1.5; // Considerando el tamaño visual del bug
+                 const distance = Math.sqrt(
+                   Math.pow(obstacle.x - obj.x, 2) + 
+                   Math.pow(obstacle.y - (barArea.y + barArea.height/2), 2)
+                 );
+                 
+                 // Si el bug está lo suficientemente cerca para tapar la barra
+                 if (distance < (bugRadius + barWidth/2 + 10)) {
+                   bugBlockingBar = true;
+                   console.log(`[VAUL BAR] Bug detectado tapando barra - Bug: (${obstacle.x.toFixed(1)}, ${obstacle.y.toFixed(1)})`);
+                   break;
+                 }
+               }
+             }
+           }
            
            let offsetY;
            if (barBelowY >= (height - minDistanceFromBottom)) {
              // Muy cerca del borde inferior → posicionar ARRIBA
              offsetY = -(vaulImgSize/2 + margin);
              console.log(`[VAUL BAR] Posicionando ARRIBA - Vaul Y: ${obj.y.toFixed(1)}, Canvas height: ${height}`);
+           } else if (bugBlockingBar) {
+             // Bug tapando la barra → posicionar ARRIBA
+             offsetY = -(vaulImgSize/2 + margin);
+             console.log(`[VAUL BAR] Posicionando ARRIBA - Bug tapando barra`);
            } else {
              // Posición normal → posicionar DEBAJO
              offsetY = (vaulImgSize/2 + margin);
@@ -1405,7 +1436,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              console.warn('⚠️ Sprite #1 para mega_node no disponible');
              // Intentar cargar en demanda como último recurso
              const emergencySprite = new Image();
-             emergencySprite.src = 'assets/collectibles/mega_node/mega_node_1.png';
+             emergencySprite.src = '/assets/collectibles/mega_node/mega_node_1.png';
              emergencySprite.onload = () => {
                megaNodeSprite1Ref.current = emergencySprite;
              };
@@ -1413,7 +1444,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              console.warn('⚠️ Sprite #2 para mega_node no disponible');
              // Intentar cargar en demanda como último recurso
              const emergencySprite = new Image();
-             emergencySprite.src = 'assets/collectibles/mega_node/mega_node_2.png';
+             emergencySprite.src = '/assets/collectibles/mega_node/mega_node_2.png';
              emergencySprite.onload = () => {
                megaNodeSprite2Ref.current = emergencySprite;
              };
@@ -1421,7 +1452,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              console.warn('⚠️ Sprite #3 para mega_node no disponible');
              // Intentar cargar en demanda como último recurso
              const emergencySprite = new Image();
-             emergencySprite.src = 'assets/collectibles/mega_node/mega_node_3.png';
+             emergencySprite.src = '/assets/collectibles/mega_node/mega_node_3.png';
              emergencySprite.onload = () => {
                megaNodeSprite3Ref.current = emergencySprite;
              };
@@ -1443,7 +1474,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              // en lugar del círculo amarillo
              const fallbackFrame = frameIndex % 3 + 1;
              const fallbackSprite = new Image();
-             fallbackSprite.src = `assets/collectibles/mega_node/mega_node_${fallbackFrame}.png`;
+             fallbackSprite.src = `/assets/collectibles/mega_node/mega_node_${fallbackFrame}.png`;
              
              // EFECTO DE PARPADEO para sprite fallback
              if ('isBlinking' in obj && obj.isBlinking) {
@@ -1544,7 +1575,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              // Si no tenemos ningún sprite disponible, usar sprite específico
              const fallbackFrame = frameIndex % 4 + 1;
              const fallbackSprite = new Image();
-             fallbackSprite.src = `assets/collectibles/purr/purr_${fallbackFrame}.png`;
+             fallbackSprite.src = `/assets/collectibles/purr/purr_${fallbackFrame}.png`;
              
              // EFECTO DE PARPADEO para sprite fallback
              if ('isBlinking' in obj && obj.isBlinking) {
@@ -2418,13 +2449,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   // Precarga optimizada de sprites
   const preloadSprites = useCallback(() => {
     const sprites = [
-      'assets/collectibles/mega_node_1.png',
-      'assets/collectibles/mega_node_2.png',
-      'assets/collectibles/mega_node_3.png',
-      'assets/collectibles/purr/purr_1.png',
-      'assets/collectibles/purr/purr_2.png',
-      'assets/collectibles/purr/purr_3.png',
-      'assets/collectibles/purr/purr_4.png'
+      '/assets/collectibles/mega_node_1.png',
+      '/assets/collectibles/mega_node_2.png',
+      '/assets/collectibles/mega_node_3.png',
+      '/assets/collectibles/purr/purr_1.png',
+      '/assets/collectibles/purr/purr_2.png',
+      '/assets/collectibles/purr/purr_3.png',
+      '/assets/collectibles/purr/purr_4.png'
     ];
     
     sprites.forEach(src => {
@@ -2451,13 +2482,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   const preloadPrioritySprites = useCallback(() => {
     console.log('🚀 Iniciando precarga de sprites prioritarios...');
     const prioritySprites = [
-      'assets/collectibles/mega_node_1.png',
-      'assets/collectibles/mega_node_2.png',
-      'assets/collectibles/mega_node_3.png',
-      'assets/collectibles/purr/purr_1.png',
-      'assets/collectibles/purr/purr_2.png',
-      'assets/collectibles/purr/purr_3.png',
-      'assets/collectibles/purr/purr_4.png'
+      '/assets/collectibles/mega_node_1.png',
+      '/assets/collectibles/mega_node_2.png',
+      '/assets/collectibles/mega_node_3.png',
+      '/assets/collectibles/purr/purr_1.png',
+      '/assets/collectibles/purr/purr_2.png',
+      '/assets/collectibles/purr/purr_3.png',
+      '/assets/collectibles/purr/purr_4.png'
     ];
     
     return Promise.all(prioritySprites.map(src => new Promise((resolve, reject) => {

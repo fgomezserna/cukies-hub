@@ -16,39 +16,39 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   // Array con la información de cada página
   const pages = [
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/controls_info.png",
+      image: "/assets/ui/buttons/controls_info.png",
       alt: "Información sobre controles del juego"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/coin_info.png",
+      image: "/assets/ui/buttons/coin_info.png",
       alt: "Información sobre monedas"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/hippie_info.png", 
+      image: "/assets/ui/buttons/hippie_info.png", 
       alt: "Información sobre Hyppie"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/whale_info.png",
+      image: "/assets/ui/buttons/whale_info.png",
       alt: "Información sobre ballenas"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/cz_info.png",
+      image: "/assets/ui/buttons/cz_info.png",
       alt: "Información sobre CZ"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/purr_info.png",
+      image: "/assets/ui/buttons/purr_info.png",
       alt: "Información sobre Purr"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/trump_info.png",
+      image: "/assets/ui/buttons/trump_info.png",
       alt: "Información sobre Trump"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/vaul_info.png",
+      image: "/assets/ui/buttons/vaul_info.png",
       alt: "Información sobre Vaul"
     },
     {
-      image: "/games/sybil-slayer/play/assets/ui/buttons/wallet_info.png",
+      image: "/assets/ui/buttons/wallet_info.png",
       alt: "Información sobre Evil Wallet"
     }
   ];
@@ -91,7 +91,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             style={{ marginRight: '200px' }} // Aumentado de 120px a 200px
           >
             <Image
-              src="/games/sybil-slayer/play/assets/ui/buttons/button_left.png"
+              src="/assets/ui/buttons/button_left.png"
               alt="Anterior"
               width={80}
               height={80}
@@ -135,7 +135,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                 }}
               >
                 <Image
-                  src="/games/sybil-slayer/play/assets/ui/buttons/out.png"
+                  src="/assets/ui/buttons/out.png"
                   alt="Cerrar"
                   width={50}
                   height={50}
@@ -153,7 +153,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             style={{ marginLeft: '200px' }} // Aumentado de 120px a 200px
           >
             <Image
-              src="/games/sybil-slayer/play/assets/ui/buttons/button_right.png"
+              src="/assets/ui/buttons/button_right.png"
               alt="Siguiente"
               width={80}
               height={80}
