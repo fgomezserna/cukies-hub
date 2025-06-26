@@ -19,6 +19,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^4.1.3
         version: 4.1.3(react-hook-form@7.58.1)
+      '@hyppie/game-bridge':
+        specifier: workspace:*
+        version: link:../packages/game-bridge
       '@prisma/client':
         specifier: ^6.10.1
         version: 6.10.1(prisma@6.10.1)(typescript@5.8.3)
@@ -173,6 +176,9 @@ importers:
 
   games/sybil-slayer:
     dependencies:
+      '@hyppie/game-bridge':
+        specifier: workspace:*
+        version: link:../../packages/game-bridge
       '@radix-ui/react-slot':
         specifier: ^1.1.2
         version: 1.2.3(@types/react@18.3.23)(react@18.3.1)
@@ -218,6 +224,19 @@ importers:
         version: 3.4.17
       typescript:
         specifier: ^5
+        version: 5.8.3
+
+  packages/game-bridge:
+    dependencies:
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.23
+      typescript:
+        specifier: ^5.4.5
         version: 5.8.3
 
 packages:

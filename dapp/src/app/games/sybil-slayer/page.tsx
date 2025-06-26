@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useRef } from 'react';
+import { useParentConnection } from '@hyppie/game-bridge';
+import { useAuth } from '@/providers/auth-provider';
 import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,13 +15,21 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 // Define a type for the element to handle vendor prefixes for fullscreen
-interface FullscreenElement extends HTMLElement {
+interface FullscreenElement extends HTMLDivElement {
   webkitRequestFullscreen?: () => Promise<void>;
   msRequestFullscreen?: () => Promise<void>;
 }
 
 export default function SybilSlayerPage() {
   const gameContainerRef = useRef<FullscreenElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { user, isLoading } = useAuth();
+
+  // Usa el hook para enviar datos de autenticación al juego
+  useParentConnection(iframeRef, {
+    isAuthenticated: !!user && !isLoading,
+    user: user,
+  });
 
   const handleFullScreen = () => {
     const element = gameContainerRef.current;
@@ -44,6 +54,7 @@ export default function SybilSlayerPage() {
         <div className="lg:col-span-3 flex flex-col gap-6">
           <div ref={gameContainerRef} className="bg-card flex-grow flex flex-col relative overflow-hidden rounded-lg border">
             <iframe
+              ref={iframeRef}
               src="http://localhost:9002/"
               className="w-full h-full border-0 min-h-[480px] lg:min-h-0"
               title="Sybil Slayer Game"

@@ -1,3 +1,4 @@
 packages:
   - 'dapp'
-  - 'games/sybil-slayer' 
+  - 'games/sybil-slayer'
+  - 'packages/*'

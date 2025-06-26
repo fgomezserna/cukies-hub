@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import { useChildConnection } from '@hyppie/game-bridge';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
 import { useGameState } from '../hooks/useGameState';
@@ -21,6 +22,7 @@ interface GameContainerProps {
 
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { isAuthenticated, user } = useChildConnection();
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
@@ -128,6 +130,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Estado para loading de assets
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+
+  // Log para verificar la recepción de datos de autenticación
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('Game received auth state from Dapp:', { isAuthenticated, user });
+    }
+  }, [isAuthenticated, user]);
 
   // Precargar assets al montar el componente
   useEffect(() => {
