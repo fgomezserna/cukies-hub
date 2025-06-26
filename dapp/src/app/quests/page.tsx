@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { User as UserType, Streak } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import CountdownTimer from '@/components/shared/countdown-timer';
 
 // Define Quest and Task types matching backend response
 type Task = {
@@ -149,6 +150,19 @@ function QuestsView() {
   const [isLoadingQuests, setIsLoadingQuests] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
 
+  const unlockDate = useMemo(() => new Date("2025-07-03T00:00:00"), []);
+  const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (new Date() >= unlockDate) {
+        setIsTimeLocked(false);
+        clearInterval(timer);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [unlockDate]);
+
   useEffect(() => {
     const fetchQuests = async () => {
       setIsLoadingQuests(true);
@@ -275,7 +289,8 @@ function QuestsView() {
   }, [quests, activeTab, starterQuest]);
 
   const isLoading = isAuthLoading || isLoadingQuests;
-  const isLocked = !user;
+  const isWalletConnected = !!user;
+  const isLocked = isTimeLocked || !isWalletConnected;
 
   if (isLoading) {
     return (
@@ -381,10 +396,20 @@ function QuestsView() {
         </Tabs>
       </div>
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg p-4 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-start pt-24 text-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
             <Lock className="h-8 w-8 text-muted-foreground" />
-            <p className="mt-4 text-lg font-semibold">Wallet Not Connected</p>
-            <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view and complete quests.</p>
+            {isTimeLocked ? (
+                <>
+                    <p className="mt-4 text-lg font-semibold">Quests are Locked</p>
+                    <p className="mt-1 text-sm text-muted-foreground">This feature will be available soon. Check back later!</p>
+                    <CountdownTimer targetDate={unlockDate.toISOString()} />
+                </>
+            ) : !isWalletConnected ? (
+                 <>
+                    <p className="mt-4 text-lg font-semibold">Wallet Not Connected</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view and complete quests.</p>
+                </>
+            ) : null}
         </div>
       )}
     </div>

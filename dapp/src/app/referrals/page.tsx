@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import Link from 'next/link';
+import CountdownTimer from '@/components/shared/countdown-timer';
 
 const referralsData = [
   { name: "CryptoKing", joined: "2024-07-25", points: 15000, avatar: "https://placehold.co/40x40.png", hint: "king crown" },
@@ -60,14 +61,27 @@ function ReferralsView() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
 
+  const unlockDate = useMemo(() => new Date("2025-07-15T00:00:00"), []);
+  const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
+
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    const timer = setInterval(() => {
+      if (new Date() >= unlockDate) {
+        setIsTimeLocked(false);
+        clearInterval(timer);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [unlockDate]);
 
   const isStarterQuestCompleted = useMemo(() => {
-    if (!user || !user.completedQuests) return false;
+    if (!user) return false;
     return user.completedQuests.some(cq => cq.quest.isStarter);
   }, [user]);
+
+  const isWalletConnected = !!user;
+  const isLocked = isTimeLocked || !isWalletConnected || !isStarterQuestCompleted;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
@@ -85,8 +99,6 @@ function ReferralsView() {
   const onPieLeave = useCallback(() => {
     setActiveIndex(null);
   }, [setActiveIndex]);
-
-  const isLocked = !user || !isStarterQuestCompleted;
 
   if (isAuthLoading) {
     return (
@@ -232,27 +244,28 @@ function ReferralsView() {
         </div>
 
         {isLocked && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/60 backdrop-blur-xs rounded-lg p-4 text-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-start pt-24 text-center bg-card/60 backdrop-blur-xs rounded-lg p-4">
                 <Lock className="h-8 w-8 text-muted-foreground" />
-                <p className="mt-4 text-lg font-semibold">
-                  {
-                    !user
-                      ? 'Connect your wallet'
-                      : 'Feature Locked'
-                  }
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {
-                    !user
-                      ? 'Please connect your wallet to view your referrals.'
-                      : 'Complete the "Get Started" quest to unlock referrals.'
-                  }
-                </p>
-                {user && !isStarterQuestCompleted && (
-                  <Button asChild className="mt-4">
-                    <Link href="/quests">Complete Quest</Link>
-                  </Button>
-                )}
+                {isTimeLocked ? (
+                    <>
+                        <p className="mt-4 text-lg font-semibold">Referrals are Locked</p>
+                        <p className="mt-1 text-sm text-muted-foreground">This feature will be available soon. Check back later!</p>
+                        <CountdownTimer targetDate={unlockDate.toISOString()} />
+                    </>
+                ) : !isWalletConnected ? (
+                    <>
+                        <p className="mt-4 text-lg font-semibold">Connect Your Wallet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view your referrals.</p>
+                    </>
+                ) : !isStarterQuestCompleted ? (
+                    <>
+                        <p className="mt-4 text-lg font-semibold">Feature Locked</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Complete the "Get Started" quest to unlock referrals.</p>
+                        <Button asChild className="mt-4">
+                            <Link href="/quests">Complete Quest</Link>
+                        </Button>
+                    </>
+                ) : null}
             </div>
         )}
 
