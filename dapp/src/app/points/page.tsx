@@ -1,0 +1,454 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import AppLayout from '@/components/layout/app-layout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowDown, Download, Gift, Lock, Search, Shield, Star, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { useAuth } from '@/providers/auth-provider';
+
+const basePointsHistory = [
+  { reason: "Daily Login", points: "+10", date: "2024-07-29" },
+  { reason: "Quest: Winning Streak", points: "+50", date: "2024-07-28" },
+  { reason: "Game Played: Moon or Doom", points: "+5", date: "2024-07-28" },
+  { reason: "Referral Bonus", points: "+100", date: "2024-07-27" },
+  { reason: "Points Spent: Avatar", points: "-25", date: "2024-07-26" },
+  { reason: "Game Played: Coin Flip", points: "+5", date: "2024-07-26" },
+  { reason: "Quest: First Win", points: "+10", date: "2024-07-25" },
+];
+
+const fullPointsHistory = Array.from({ length: 20 })
+  .flatMap((_, i) => basePointsHistory.map(item => ({...item, date: new Date(new Date('2024-07-29').getTime() - (i * 7 + basePointsHistory.indexOf(item)) * 24 * 60 * 60 * 1000).toISOString().split('T')[0] })));
+
+
+const streakRewards = [10, 20, 35, 50, 65, 80, 100];
+
+const fullLeaderboardDataRaw = [
+    { name: "SybilSlayerPro", avatar: "https://placehold.co/40x40.png", hint: "pro gamer", points: 152340, referralPoints: 5000 },
+    { name: "GemHunter", avatar: "https://placehold.co/40x40.png", hint: "gem stone", points: 148970, referralPoints: 2500 },
+    { name: "ChainMaster", avatar: "https://placehold.co/40x40.png", hint: "master crown", points: 115750, referralPoints: 8000 },
+    { name: "You", avatar: "https://placehold.co/40x40.png", hint: "profile avatar", points: 135600, referralPoints: 1250 },
+    { name: "TokenRunner", avatar: "https://placehold.co/40x40.png", hint: "running shoe", points: 121000, referralPoints: 500 },
+    { name: "PixelPioneer", avatar: "https://placehold.co/40x40.png", hint: "pixel art", points: 102300, referralPoints: 1200 },
+    { name: "CryptoKing", avatar: "https://placehold.co/40x40.png", hint: "king crown", points: 98000, referralPoints: 10000 },
+    ...Array.from({ length: 150 }, (_, i) => ({
+        name: `Player${i + 1}`,
+        avatar: "https://placehold.co/40x40.png",
+        hint: "gamer avatar",
+        points: 90000 - (i * 501),
+        referralPoints: 5000 - (i * 25),
+    }))
+];
+
+const ITEMS_PER_PAGE = 20;
+const LEADERBOARD_LIMIT = 100;
+
+// Helper to check if two dates are on the same calendar day
+const isSameDay = (d1: Date, d2: Date) =>
+  d1.getFullYear() === d2.getFullYear() &&
+  d1.getMonth() === d2.getMonth() &&
+  d1.getDate() === d2.getDate();
+
+// Helper to check if a date was yesterday
+const isYesterday = (date: Date) => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return isSameDay(date, yesterday);
+};
+
+
+function PointsView() {
+  const { toast } = useToast();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  
+  const [isStarterQuestCompleted, setIsStarterQuestCompleted] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState(0);
+  const [canClaim, setCanClaim] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // --- Infinite Scroll State ---
+  const [visiblePoints, setVisiblePoints] = useState(fullPointsHistory.slice(0, ITEMS_PER_PAGE));
+  const [hasMorePoints, setHasMorePoints] = useState(fullPointsHistory.length > ITEMS_PER_PAGE);
+  const [isLoadingPoints, setIsLoadingPoints] = useState(false);
+  const pointsObserver = useRef<HTMLDivElement>(null);
+  const pointsContainerRef = useRef<HTMLDivElement>(null);
+
+  const fullLeaderboardData = useMemo(() => fullLeaderboardDataRaw
+    .map(p => ({ ...p, totalPoints: p.points + p.referralPoints }))
+    .sort((a, b) => b.totalPoints - a.totalPoints)
+    .map((p, i) => ({ ...p, rank: i + 1 })), []);
+  
+  const [visiblePlayers, setVisiblePlayers] = useState(fullLeaderboardData.slice(0, ITEMS_PER_PAGE));
+  const [hasMorePlayers, setHasMorePlayers] = useState(fullLeaderboardData.length > ITEMS_PER_PAGE && ITEMS_PER_PAGE < LEADERBOARD_LIMIT);
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
+  const leaderboardObserver = useRef<HTMLDivElement>(null);
+  const leaderboardContainerRef = useRef<HTMLDivElement>(null);
+
+  const filteredLeaderboard = useMemo(() => {
+    if (!searchTerm) return [];
+    return fullLeaderboardData.filter(player =>
+      player.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm, fullLeaderboardData]);
+
+  const playersToDisplay = searchTerm ? filteredLeaderboard : visiblePlayers;
+
+  const loadMorePoints = useCallback(() => {
+    if (isLoadingPoints) return;
+    setIsLoadingPoints(true);
+    setTimeout(() => {
+      const currentLength = visiblePoints.length;
+      const newPoints = fullPointsHistory.slice(currentLength, currentLength + ITEMS_PER_PAGE);
+      setVisiblePoints(prev => [...prev, ...newPoints]);
+      if (currentLength + ITEMS_PER_PAGE >= fullPointsHistory.length) {
+        setHasMorePoints(false);
+      }
+      setIsLoadingPoints(false);
+    }, 500); // Simulate network delay
+  }, [isLoadingPoints, visiblePoints.length]);
+
+  const loadMorePlayers = useCallback(() => {
+    if (isLoadingPlayers || searchTerm) return;
+    setIsLoadingPlayers(true);
+    setTimeout(() => {
+      const currentLength = visiblePlayers.length;
+      const newPlayers = fullLeaderboardData.slice(currentLength, currentLength + ITEMS_PER_PAGE);
+      setVisiblePlayers(prev => [...prev, ...newPlayers]);
+      if (currentLength + ITEMS_PER_PAGE >= LEADERBOARD_LIMIT || currentLength + ITEMS_PER_PAGE >= fullLeaderboardData.length) {
+        setHasMorePlayers(false);
+      }
+      setIsLoadingPlayers(false);
+    }, 500);
+  }, [isLoadingPlayers, visiblePlayers.length, fullLeaderboardData, searchTerm]);
+  
+  const createObserver = (
+    callback: () => void,
+    hasMore: boolean,
+    isLoading: boolean,
+    targetRef: React.RefObject<HTMLDivElement>,
+    rootRef: React.RefObject<HTMLDivElement>
+  ) => {
+    const target = targetRef.current;
+    const root = rootRef.current;
+    if (!target || !root) return () => {};
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+          callback();
+        }
+      },
+      { root, threshold: 1.0 }
+    );
+
+    observer.observe(target);
+
+    return () => {
+      if (target) {
+        observer.unobserve(target);
+      }
+    };
+  };
+
+  useEffect(() => {
+    const cleanup = createObserver(loadMorePoints, hasMorePoints, isLoadingPoints, pointsObserver, pointsContainerRef);
+    return cleanup;
+  }, [hasMorePoints, isLoadingPoints, loadMorePoints]);
+  
+  useEffect(() => {
+    if (searchTerm) return;
+    const cleanup = createObserver(loadMorePlayers, hasMorePlayers, isLoadingPlayers, leaderboardObserver, leaderboardContainerRef);
+    return cleanup;
+  }, [hasMorePlayers, isLoadingPlayers, loadMorePlayers, searchTerm]);
+  
+  // Load state from localStorage on mount
+  useEffect(() => {
+    const starterCompleted = localStorage.getItem('starterQuestCompleted') === 'true';
+    setIsStarterQuestCompleted(starterCompleted);
+
+    if (!starterCompleted) return;
+
+    let currentStreak = parseInt(localStorage.getItem('dailyStreak') || '0', 10);
+    const lastClaimTimestamp = localStorage.getItem('lastClaimTimestamp');
+
+    if (lastClaimTimestamp) {
+      const lastClaimDate = new Date(parseInt(lastClaimTimestamp));
+      const today = new Date();
+
+      if (isSameDay(lastClaimDate, today)) {
+        setCanClaim(false);
+      } else if (isYesterday(lastClaimDate)) {
+        setCanClaim(true);
+        if (currentStreak >= 7) currentStreak = 0;
+      } else {
+        setCanClaim(true);
+        currentStreak = 0;
+      }
+    } else {
+      setCanClaim(true);
+      currentStreak = 0;
+    }
+    
+    setDailyStreak(currentStreak);
+    localStorage.setItem('dailyStreak', currentStreak.toString());
+
+  }, []);
+
+  const currentReward = streakRewards[dailyStreak];
+
+  const handleClaim = useCallback(() => {
+    if (!canClaim || !isStarterQuestCompleted) return;
+
+    toast({
+      title: "Daily Drop Claimed!",
+      description: `You earned ${currentReward} XP. Come back tomorrow!`,
+    });
+
+    const newStreak = dailyStreak + 1;
+    const finalStreak = newStreak >= 7 ? 0 : newStreak;
+    setDailyStreak(finalStreak);
+    localStorage.setItem('dailyStreak', finalStreak.toString());
+    
+    localStorage.setItem('lastClaimTimestamp', new Date().getTime().toString());
+    setCanClaim(false);
+
+  }, [canClaim, dailyStreak, isStarterQuestCompleted, currentReward, toast]);
+
+  const getButtonState = () => {
+      if (!user) {
+          return { text: 'Connect Wallet', disabled: true, icon: Lock };
+      }
+      if (!isStarterQuestCompleted) {
+          return { text: 'Locked', disabled: true, icon: Lock };
+      }
+      return { text: `Claim ${currentReward} XP`, disabled: false, icon: null };
+  }
+
+  const buttonState = getButtonState();
+
+  const getDailyDropDescription = () => {
+    if (!user) {
+        return 'Connect your wallet to participate in the Daily Drop.'
+    }
+    if (!isStarterQuestCompleted) {
+      return 'Complete the "Get Started" quest to unlock.';
+    }
+    if (!canClaim) {
+      return `You've claimed your reward for today. Current streak: ${dailyStreak} day(s).`;
+    }
+    return `You're on a ${dailyStreak} day streak! Claim your reward.`;
+  }
+
+  if (isAuthLoading) {
+    return (
+      <div className="flex justify-center items-center h-40">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  return (
+      <div className="flex flex-col gap-8">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold font-headline">Points</h1>
+        </div>
+
+        {/* Summary Card */}
+        <Card>
+          <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 items-center text-center md:text-left">
+            <div className="flex flex-col md:flex-row items-center gap-4 col-span-2 md:col-span-1 justify-center">
+              <Shield className="h-12 w-12 text-primary/50" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-muted-foreground">Tier</span>
+              <span className="font-bold text-lg flex items-center gap-2 justify-center md:justify-start"><Shield className="h-5 w-5 text-yellow-500" /> Bronze</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-muted-foreground">Position</span>
+              <span className="font-bold text-lg flex items-center gap-1 justify-center md:justify-start">
+                3557 
+                <span className="flex items-center text-destructive text-xs"><ArrowDown className="h-3 w-3" /> 431</span>
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-muted-foreground">Total Points</span>
+              <span className="font-bold text-lg text-primary">1,250</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* Left Column: Points History & Leaderboard */}
+          <div className="lg:col-span-2 flex flex-col gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Points History</CardTitle>
+                <CardDescription>Track your points earned and spent.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div ref={pointsContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-card z-10">
+                      <TableRow>
+                        <TableHead>Activity</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Points</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visiblePoints.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{item.reason}</TableCell>
+                          <TableCell className="text-muted-foreground">{item.date}</TableCell>
+                          <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
+                            {item.points}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {hasMorePoints && (
+                          <TableRow>
+                              <TableCell colSpan={3} className="text-center p-0">
+                                  <div ref={pointsObserver} className="flex justify-center items-center py-4">
+                                      {isLoadingPoints && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                  </div>
+                              </TableCell>
+                          </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                  <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                      <CardTitle>Leaderboard</CardTitle>
+                      <div className="relative w-full md:max-w-xs">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                              placeholder="Search by player..."
+                              className="pl-9"
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                      </div>
+                  </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                  <div ref={leaderboardContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-card z-10">
+                            <TableRow>
+                                <TableHead className="w-[80px] text-center">Rank</TableHead>
+                                <TableHead>Hyppie Player</TableHead>
+                                <TableHead className="text-right">Points (XP)</TableHead>
+                                <TableHead className="text-right">Referral Points</TableHead>
+                                <TableHead className="text-right">Total Points</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {playersToDisplay.map((player) => (
+                                <TableRow key={player.rank} className={player.name === 'You' ? 'bg-primary/10 hover:bg-primary/20' : ''}>
+                                    <TableCell className="font-medium text-lg text-center">{player.rank}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarImage src={player.avatar} data-ai-hint={player.hint} />
+                                                <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <div className='flex items-center gap-2'>
+                                                {isAuthLoading ? (
+                                                  <span className="font-medium">{player.name}</span>
+                                                ) : (
+                                                  <Link href={`/profile/${player.name}`} className="font-medium hover:underline">
+                                                    {player.name}
+                                                  </Link>
+                                                )}
+                                                {player.rank <= 3 && <Badge variant="secondary" className="bg-transparent">{player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : '🥉'}</Badge>}
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono">{player.points.toLocaleString('en-US')}</TableCell>
+                                    <TableCell className="text-right font-mono">{player.referralPoints.toLocaleString('en-US')}</TableCell>
+                                    <TableCell className="text-right font-mono text-primary font-bold">{player.totalPoints.toLocaleString('en-US')}</TableCell>
+                                </TableRow>
+                            ))}
+                            {!searchTerm && hasMorePlayers && (
+                                  <TableRow>
+                                      <TableCell colSpan={5} className="text-center p-0">
+                                          <div ref={leaderboardObserver} className="flex justify-center items-center py-4">
+                                              {isLoadingPlayers && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                          </div>
+                                      </TableCell>
+                                  </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                  </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column: Cards */}
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-8 flex flex-col gap-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-primary" /> Daily Drop</CardTitle>
+                  <CardDescription>{getDailyDropDescription()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={handleClaim} disabled={buttonState.disabled} className="w-full">
+                    {buttonState.icon && <buttonState.icon className="mr-2 h-4 w-4" />}
+                    {buttonState.text}
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              <Card className="relative overflow-hidden text-center bg-card/50">
+                <div className="absolute inset-0 bg-grid-accent opacity-5 animate-grid [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
+                <CardHeader>
+                  <div className="flex justify-center items-center gap-2 font-bold text-foreground">
+                    <Star className="h-5 w-5 text-primary" />
+                    <span>HyppieLiquid</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-4">
+                   <Shield className="h-20 w-20 text-yellow-500" />
+                   <div className="flex flex-col">
+                    <span className="text-4xl font-bold text-primary">726.19</span>
+                    <span className="text-sm text-muted-foreground">Total Points</span>
+                   </div>
+                   <p className="text-sm text-muted-foreground max-w-xs">
+                      Achieved rank 3557 and chilling at <b className="font-bold text-foreground">Bronze</b> tier
+                   </p>
+                   <Button className="w-full">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Image
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+}
+
+export default function PointsPage() {
+  return (
+    <AppLayout>
+      <PointsView />
+    </AppLayout>
+  );
+}

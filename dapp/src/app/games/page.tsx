@@ -1,93 +1,92 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import AppLayout from '@/components/layout/app-layout';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ClientLink } from "@/components/client-link";
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import Image from "next/image";
-import { cn } from "@/lib/utils";
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const games = [
-  {
-    title: "Sybil Slayer",
-    description: "A fun and engaging game where you eliminate sybils.",
-    imageUrl: "/globe.svg",
-    href: "/games/sybil-slayer",
-    status: "live",
-    highlight: "primary",
-  },
-  {
-    title: "Cosmic Drift",
-    description: "Navigate treacherous asteroid fields in this space racer.",
-    imageUrl: "/globe.svg",
-    href: "#",
-    status: "coming_soon",
-    highlight: "secondary",
-  },
-  {
-    title: "DeFi Kingdom",
-    description: "Manage your kingdom and conquer the DeFi world.",
-    imageUrl: "/globe.svg",
-    href: "#",
-    status: "coming_soon",
-    highlight: "primary",
-  },
+  { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: "https://images.unsplash.com/photo-1535223289827-42f1e9919769?w=600&h=400&fit=crop", hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
+  { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: "https://images.unsplash.com/photo-1498084393753-b411b2d26b34?w=600&h=400&fit=crop", hint: "endless runner", live: false, playable: false },
+  { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: "https://images.unsplash.com/photo-1695480542225-bc22cac128d0?w=600&h=400&fit=crop", hint: "chess board", live: true, playable: false }
 ];
 
 export default function GamesPage() {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredGames = useMemo(() => {
+    return games.filter(game =>
+      game.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm]);
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-primary from-30% to-primary/60 bg-clip-text text-transparent">
-          Game Center
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Explore our collection of web3 games. New challenges await.
-        </p>
+    <AppLayout>
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-4">
+          <div>
+            <h1 className="text-3xl font-bold font-headline">Games</h1>
+            <p className="text-muted-foreground">Choose your game and test your luck.</p>
+          </div>
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search games..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredGames.map((game) => (
+            <Card 
+              key={game.name}
+              className={cn(
+                "flex flex-col overflow-hidden transition-all duration-300",
+                game.playable
+                  ? "hover:shadow-lg hover:shadow-primary/20 hover:scale-105"
+                  : "cursor-not-allowed"
+              )}
+            >
+              <CardHeader className="p-0 relative">
+                <Image src={game.imageUrl} alt={game.name} width={600} height={400} className="object-cover" data-ai-hint={game.hint} />
+                {!game.playable && (
+                  <div className="absolute inset-0 bg-black/50 mix-blend-multiply z-10" />
+                )}
+                {game.live && (
+                  <div className="absolute top-4 right-4 flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-xs font-semibold">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                    </span>
+                    LIVE
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="pt-6 flex-grow">
+                <CardTitle className="font-headline text-xl">{game.name}</CardTitle>
+                <CardDescription className="mt-2">{game.description}</CardDescription>
+              </CardContent>
+              <CardFooter>
+                {game.playable ? (
+                  <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Link href={game.href!}>Play Now</Link>
+                  </Button>
+                ) : (
+                  <Button disabled className="w-full cursor-not-allowed">Coming soon</Button>
+                )}
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {games.map((game) => (
-          <Card
-            key={game.title}
-            className={cn(
-              "group overflow-hidden bg-gradient-to-b from-card to-card/90 backdrop-blur-sm border border-border/50 transition-all hover:scale-[1.02] flex flex-col",
-              {
-                "hover:border-primary/80 hover:shadow-lg hover:shadow-primary/20":
-                  game.highlight === "primary",
-                "hover:border-secondary/80 hover:shadow-lg hover:shadow-secondary/20":
-                  game.highlight === "secondary",
-              }
-            )}
-          >
-            <CardHeader>
-              <CardTitle>{game.title}</CardTitle>
-              <CardDescription className="h-10">
-                {game.description}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              <div className="aspect-video relative">
-                <Image
-                  src={game.imageUrl}
-                  alt={game.title}
-                  fill
-                  className="object-cover rounded-md bg-muted group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-            </CardContent>
-            <div className="p-4 pt-0">
-              <Button asChild className="w-full">
-                <ClientLink href={game.href}>
-                  {game.status === "live" ? "Play Now" : "Coming Soon"}
-                </ClientLink>
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-} 
+    </AppLayout>
+  )
+}

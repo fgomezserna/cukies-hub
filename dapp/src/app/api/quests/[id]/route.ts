@@ -9,8 +9,6 @@ export async function GET(
   const walletAddress = searchParams.get('walletAddress');
   const questId = params.id;
 
-  console.log(`API trying to fetch quest with ID: ${questId}`);
-
   try {
     const quest = await prisma.quest.findUnique({
       where: { id: questId },
