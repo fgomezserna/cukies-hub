@@ -53,3 +53,4 @@ node_modules
 
 # genkit
 /games/sybil-slayer/.genkit/* 
+.vercel
