@@ -44,7 +44,7 @@ export default function SybilSlayerPage() {
         <div className="lg:col-span-3 flex flex-col gap-6">
           <div ref={gameContainerRef} className="bg-card flex-grow flex flex-col relative overflow-hidden rounded-lg border">
             <iframe
-              src="https://studio--token-runner.us-central1.hosted.app/"
+              src="http://localhost:9002/"
               className="w-full h-full border-0 min-h-[480px] lg:min-h-0"
               title="Sybil Slayer Game"
               allowFullScreen

@@ -4,19 +4,24 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
-import { useGameState } from '@/hooks/useGameState';
-import { useGameInput } from '@/hooks/useGameInput';
-import { useGameLoop } from '@/hooks/useGameLoop';
-import { useAudio } from '@/hooks/useAudio';
-import { Button } from "@/components/ui/button";
+import { useGameState } from '../hooks/useGameState';
+import { useGameInput } from '../hooks/useGameInput';
+import { useGameLoop } from '../hooks/useGameLoop';
+import { useAudio } from '../hooks/useAudio';
+import { Button } from "./ui/button";
 import { Github, Play, Pause, RotateCcw } from 'lucide-react';
-import { FPS } from '@/lib/constants';
-import { assetLoader } from '@/lib/assetLoader';
+import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT } from '../lib/constants';
+import { assetLoader } from '../lib/assetLoader';
 
 
-const GameContainer: React.FC = () => {
+interface GameContainerProps {
+  width?: number;
+  height?: number;
+}
+
+const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
   // Estado para notificar daño
@@ -176,8 +181,19 @@ const GameContainer: React.FC = () => {
     });
   }, []);
 
-  const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+  useEffect(() => {
+    if (width && height && (canvasSize.width !== width || canvasSize.height !== height)) {
+      setCanvasSize({ width, height });
+    }
+  }, [width, height, canvasSize.width, canvasSize.height]);
+
   const inputState = useGameInput();
+  const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+
+  // Update the gameState hook's internal input ref whenever useGameInput changes
+  useEffect(() => {
+    updateInputRef(inputState);
+  }, [inputState, updateInputRef]);
 
   // Helper para obtener tiempo pausable para animaciones
   const getPausableTime = useCallback(() => {
@@ -188,54 +204,6 @@ const GameContainer: React.FC = () => {
     }
     return Date.now();
   }, [gameState.status]);
-
-  // Update the gameState hook's internal input ref whenever useGameInput changes
-  useEffect(() => {
-    updateInputRef(inputState);
-  }, [inputState, updateInputRef]);
-
-
-  // Resize handler
-   const handleResize = useCallback(() => {
-       if (containerRef.current) {
-           // Usar un porcentaje mayor del ancho de la ventana para hacer el grid más grande
-           const maxWidth = Math.min(window.innerWidth * 0.85, 1100); // 85% del ancho de ventana con máximo de 1100px
-           const maxHeight = window.innerHeight * 0.75; // 75% del viewport height
-
-           // Mantener una relación de aspecto apropiada basada en el ancho
-           const newWidth = Math.min(maxWidth, 1100);
-           
-           // Asegurar que el grid se vea con celdas cuadradas perfectas
-           // El tamaño del grid es 40px, así que hacemos que el ancho y el alto sean múltiplos exactos de 40
-           const gridSize = 40;
-           
-           // Ajuste de proporciones: reducir el ancho para evitar deformación
-           // Calculamos un ancho apropiado que sea múltiplo de 40px y mantenga una mejor proporción
-           const idealWidthInCells = Math.floor(newWidth / gridSize);
-           // Preferimos un ancho que sea aproximadamente 3/4 del ancho disponible
-           const adjustedWidthInCells = Math.floor(idealWidthInCells * 0.8);
-           const heightInCells = Math.floor(maxHeight / gridSize);
-           
-           // Aseguramos que las dimensiones sean múltiplos exactos de 40px
-           const adjustedWidth = adjustedWidthInCells * gridSize;
-           const adjustedHeight = heightInCells * gridSize;
-
-           // Solo actualizar si el tamaño cambia realmente para prevenir actualizaciones innecesarias
-           if (adjustedWidth !== canvasSize.width || adjustedHeight !== canvasSize.height) {
-               console.log(`Resizing canvas to: ${adjustedWidth}x${adjustedHeight}`);
-               setCanvasSize({ width: adjustedWidth, height: adjustedHeight });
-               // useGameState effect manejará la actualización del tamaño interno del canvas
-           }
-       }
-   }, [canvasSize.width, canvasSize.height]);
-
-
-  // Effect for initial size and resize listener
-  useEffect(() => {
-    handleResize(); // Set initial size
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [handleResize]); // Run on mount and when handleResize changes
 
   // NUEVO: Pausa automática cuando se cambia de pestaña
   useEffect(() => {
@@ -887,6 +855,25 @@ const GameContainer: React.FC = () => {
     };
   }, []);
 
+  // Escalado responsivo
+  const [scale, setScale] = useState(1);
+
+  const calculateScale = useCallback(() => {
+    const newScale = Math.min(
+      window.innerWidth / BASE_GAME_WIDTH,
+      window.innerHeight / BASE_GAME_HEIGHT,
+      1 // no ampliamos por encima del 100%
+    );
+    setScale(newScale);
+  }, []);
+
+  // Recalcular al montar y al redimensionar
+  useEffect(() => {
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, [calculateScale]);
+
   // Justo antes del return principal del componente:
   if (!assetsLoaded) {
     return (
@@ -934,7 +921,10 @@ const GameContainer: React.FC = () => {
               pointerEvents: 'none'
             }}
           ></div>
-          <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm">
+          <div
+            className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm"
+            style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+          >
             <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
               SYBIL SLAYER
             </h1>
@@ -966,7 +956,7 @@ const GameContainer: React.FC = () => {
           
           {/* Sin fondos durante countdown - solo el grid del canvas será visible */}
           
-          <div className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2">
+          <div className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2" style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}>
             {/* Score, Hearts y Timer con cajas */}
             <div className="w-full flex justify-between mb-2 px-4 items-center">
               <div className="relative">
@@ -1098,7 +1088,10 @@ const GameContainer: React.FC = () => {
             }}
           ></div>
           
-          <div className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2">
+          <div
+            className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2"
+            style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
+          >
             {/* Score, Hearts y Timer con cajas */}
             <div className="w-full flex justify-between mb-2 px-4 items-center">
               <div className="relative">

@@ -2530,6 +2530,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         width={width}
         height={height}
         className="block border border-border rounded-lg shadow-lg"
+        style={{ imageRendering: 'pixelated' }}
       />
   );
 };

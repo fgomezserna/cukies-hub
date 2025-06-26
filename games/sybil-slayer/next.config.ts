@@ -1,7 +1,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  basePath: '/games/sybil-slayer/play',
 
   /* config options here */
   typescript: {

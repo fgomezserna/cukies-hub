@@ -103,3 +103,6 @@ export const CHECKPOINT_TIME_BONUS_START = 30; // Tiempo fijo para todos los che
 export const CHECKPOINT_TIME_BONUS_MIN = 30;  // Igual al tiempo de bonificación inicial
 export const CHECKPOINT_TIME_BONUS_STEP = 0;  // Sin reducción de tiempo por checkpoint
 export const CHECKPOINT_APPEAR_THRESHOLD = 10; // Segundos restantes para que aparezca
+
+export const BASE_GAME_WIDTH = 1100; // ancho lógico de todo el HUD + canvas
+export const BASE_GAME_HEIGHT = 800; // alto lógico total (HUD + canvas + botones)
