@@ -7,7 +7,7 @@ import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Road, Gem, Maximize, ExternalLink, MessageCircle, ShieldCheck, Zap, HandCoins, Send, TrendingUp } from 'lucide-react';
+import { Map, Gem, Maximize, ExternalLink, MessageCircle, ShieldCheck, Zap, HandCoins, Send, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
@@ -103,7 +103,7 @@ export default function HyppieRoadPage() {
             <CardContent>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-md">
-                    <Road className="h-6 w-6 text-primary" />
+                    <Map className="h-6 w-6 text-primary" />
                 </div>
                 <div className="text-2xl font-bold font-mono">$8.2M</div>
               </div>
@@ -127,7 +127,7 @@ export default function HyppieRoadPage() {
           <Card className="flex-grow">
             <CardHeader className="pb-4">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-sm font-medium flex items-center gap-2"><Road className="h-4 w-4"/> Road Progress</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2"><Map className="h-4 w-4"/> Road Progress</CardTitle>
                 <Link href="#" className="text-xs text-primary hover:underline">View All</Link>
               </div>
               <CardDescription>Recent successful journeys</CardDescription>

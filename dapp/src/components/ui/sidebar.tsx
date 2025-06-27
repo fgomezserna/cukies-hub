@@ -9,7 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
+import * as SeparatorPrimitive from "@radix-ui/react-separator"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -381,18 +381,21 @@ const SidebarFooter = React.forwardRef<
 SidebarFooter.displayName = "SidebarFooter"
 
 const SidebarSeparator = React.forwardRef<
-  React.ElementRef<typeof Separator>,
-  React.ComponentProps<typeof Separator>
->(({ className, ...props }, ref) => {
-  return (
-    <Separator
-      ref={ref}
-      data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border", className)}
-      {...props}
-    />
-  )
-})
+  React.ElementRef<typeof SeparatorPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
+>(({ className, orientation = "horizontal", decorative = true, ...props }, ref) => (
+  <SeparatorPrimitive.Root
+    ref={ref}
+    decorative={decorative}
+    orientation={orientation}
+    className={cn(
+      "shrink-0 bg-border my-2 border-sidebar-border",
+      orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
+      className
+    )}
+    {...props}
+  />
+))
 SidebarSeparator.displayName = "SidebarSeparator"
 
 const SidebarContent = React.forwardRef<
