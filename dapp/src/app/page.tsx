@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import StatsCards from '@/components/home/stats-cards';
+import SybilSlayerImg from "@/assets/sybilslash.png";
 
 const games = [
-  { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: "https://images.unsplash.com/photo-1535223289827-42f1e9919769?w=600&h=400&fit=crop", hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
+  { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
   { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: "https://images.unsplash.com/photo-1498084393753-b411b2d26b34?w=600&h=400&fit=crop", hint: "endless runner", live: false, playable: false },
   { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: "https://images.unsplash.com/photo-1695480542225-bc22cac128d0?w=600&h=400&fit=crop", hint: "chess board", live: true, playable: false }
 ];
@@ -20,8 +21,8 @@ export default function HomePage() {
     <AppLayout>
       <div className="flex flex-col gap-8">
         <Card className="overflow-hidden relative border-2 border-primary/50 shadow-2xl shadow-primary/20">
-          <Image src={featuredGame.imageUrl} alt={featuredGame.name} width={600} height={400} className="object-cover w-full h-[400px] opacity-20" data-ai-hint={featuredGame.hint} />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
+          <Image src={featuredGame.imageUrl} alt={featuredGame.name} width={600} height={400} className="object-cover w-full h-[400px] opacity-100" data-ai-hint={featuredGame.hint} />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
           <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12">
             <h1 className="text-4xl md:text-6xl font-bold font-headline tracking-tighter text-white">
               {featuredGame.name}
