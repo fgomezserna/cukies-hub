@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fuente Pixellari */
+@font-face {
+  font-family: 'Pixellari';
+  src: url('/assets/fonts/Pixellari.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -55,6 +63,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: url('/assets/images/background-playing.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: 100vh;
   }
 }
 
@@ -70,5 +84,17 @@
   
   .animate-shimmer {
     animation: shimmer 2s infinite;
+  }
+
+  .pixellari-title {
+    font-family: 'Pixellari', monospace;
+  }
+
+  .game-background {
+    background-image: url('/assets/images/background-playing.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }

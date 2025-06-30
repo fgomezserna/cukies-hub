@@ -74,7 +74,7 @@ export function GameBoard({ tiles, isAnimating, onTileClick }: GameBoardProps) {
       </div>
       
       <p className="text-center text-sm text-muted-foreground">
-        Progreso: {tiles.filter(t => t.revealed && !t.hasTrap).length} / {tiles.length} casillas
+        Progress: {tiles.filter(t => t.revealed && !t.hasTrap).length} / {tiles.length} tiles
       </p>
     </div>
   );

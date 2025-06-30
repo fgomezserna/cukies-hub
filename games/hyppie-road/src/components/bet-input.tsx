@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DEFAULT_GAME_CONFIG } from '@/types/game';
 
 interface BetInputProps {
@@ -18,19 +17,19 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
   const handleStartGame = () => {
     const amount = parseFloat(betAmount);
     
-    // Validaciones
+    // Validations
     if (isNaN(amount)) {
-      setError('Por favor ingresa un número válido');
+      setError('Please enter a valid number');
       return;
     }
     
     if (amount < DEFAULT_GAME_CONFIG.minBet) {
-      setError(`La apuesta mínima es $${DEFAULT_GAME_CONFIG.minBet}`);
+      setError(`Minimum bet is $${DEFAULT_GAME_CONFIG.minBet}`);
       return;
     }
     
     if (amount > DEFAULT_GAME_CONFIG.maxBet) {
-      setError(`La apuesta máxima es $${DEFAULT_GAME_CONFIG.maxBet}`);
+      setError(`Maximum bet is $${DEFAULT_GAME_CONFIG.maxBet}`);
       return;
     }
     
@@ -40,7 +39,7 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBetAmount(e.target.value);
-    setError(''); // Limpiar error al cambiar valor
+    setError(''); // Clear error when changing value
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -53,14 +52,28 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
   const quickBets = [5, 10, 25, 50, 100];
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-center">Iniciar Nueva Partida</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div 
+      className="w-full max-w-[600px] mx-auto relative"
+      style={{ 
+        backgroundImage: 'url(/assets/images/box_446x362.png)',
+        backgroundSize: '100% 100%',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        height: '400px',
+        aspectRatio: '600/400'
+      }}
+    >
+      <div className="absolute inset-0 px-16 py-8 flex flex-col justify-center">
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-2xl font-semibold leading-none tracking-tight text-center mb-6 mt-2 pixellari-title" style={{ marginTop: '5px' }}>
+            Start New Game
+          </h3>
+        </div>
+        
         <div className="space-y-2">
           <label htmlFor="bet-amount" className="text-sm font-medium">
-            Cantidad a apostar ($)
+            Bet Amount ($)
           </label>
           <Input
             id="bet-amount"
@@ -68,7 +81,7 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
             value={betAmount}
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
-            placeholder={`Entre $${DEFAULT_GAME_CONFIG.minBet} y $${DEFAULT_GAME_CONFIG.maxBet}`}
+            placeholder={`Between $${DEFAULT_GAME_CONFIG.minBet} and $${DEFAULT_GAME_CONFIG.maxBet}`}
             min={DEFAULT_GAME_CONFIG.minBet}
             max={DEFAULT_GAME_CONFIG.maxBet}
             step="0.01"
@@ -80,9 +93,9 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
           )}
         </div>
 
-        {/* Botones de apuesta rápida */}
+        {/* Quick bet buttons */}
         <div className="space-y-2">
-          <p className="text-sm font-medium">Apuestas rápidas:</p>
+          <p className="text-sm font-medium">Quick bets:</p>
           <div className="flex flex-wrap gap-2">
             {quickBets.map((amount) => (
               <Button
@@ -99,20 +112,35 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
           </div>
         </div>
 
-        <Button
-          onClick={handleStartGame}
-          disabled={disabled || !betAmount || !!error}
-          className="w-full"
-          size="lg"
+        <div
+          onClick={disabled || !betAmount || !!error ? undefined : handleStartGame}
+          className={`w-full max-w-[316px] mx-auto cursor-pointer transition-transform duration-200 ${
+            disabled || !betAmount || !!error 
+              ? 'opacity-50 cursor-not-allowed' 
+              : 'hover:scale-105 active:scale-95'
+          }`}
+          style={{ 
+            backgroundImage: 'url(/assets/images/button_44x316.png)',
+            backgroundSize: '100% 100%',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            height: '44px',
+            aspectRatio: '316/44'
+          }}
         >
-          {disabled ? 'Cargando...' : 'Comenzar Juego'}
-        </Button>
+          <div className="w-full h-full flex items-center justify-center">
+            <span className={`font-bold text-white drop-shadow-lg text-sm ${disabled ? 'text-gray-300' : ''}`}>
+              {disabled ? 'Loading...' : 'Start Game'}
+            </span>
+          </div>
+        </div>
 
         <div className="text-xs text-muted-foreground text-center space-y-1">
-          <p>Apuesta mínima: ${DEFAULT_GAME_CONFIG.minBet}</p>
-          <p>Apuesta máxima: ${DEFAULT_GAME_CONFIG.maxBet}</p>
+          <p>Minimum bet: ${DEFAULT_GAME_CONFIG.minBet}</p>
+          <p>Maximum bet: ${DEFAULT_GAME_CONFIG.maxBet}</p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      </div>
+    </div>
   );
 }

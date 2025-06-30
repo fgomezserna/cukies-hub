@@ -27,40 +27,40 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
           )}
         </div>
         <CardTitle className={`text-2xl ${isWin ? 'text-green-600' : 'text-red-600'}`}>
-          {isWin ? '¡Felicitaciones!' : '¡Oh no!'}
+          {isWin ? 'Congratulations!' : 'Oh no!'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-center space-y-2">
           <p className="text-muted-foreground">
             {isWin 
-              ? 'Has completado el juego exitosamente' 
-              : `Pisaste una trampa en la casilla ${result.trapPosition! + 1}`
+              ? 'You have successfully completed the game' 
+              : `You stepped on a trap at tile ${result.trapPosition! + 1}`
             }
           </p>
           
           <div className="space-y-3 py-4">
             {/* Información de la partida */}
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Apuesta inicial:</span>
+              <span className="text-sm text-muted-foreground">Initial bet:</span>
               <span className="font-mono">${betAmount.toFixed(2)}</span>
             </div>
             
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Multiplicador final:</span>
+              <span className="text-sm text-muted-foreground">Final multiplier:</span>
               <span className="font-mono font-bold text-primary">
                 {result.multiplier.toFixed(1)}x
               </span>
             </div>
             
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Casillas completadas:</span>
+              <span className="text-sm text-muted-foreground">Tiles completed:</span>
               <span className="font-mono">{result.stepsCompleted}</span>
             </div>
             
             <div className="border-t pt-3">
               <div className="flex justify-between items-center text-lg font-bold">
-                <span>Resultado final:</span>
+                <span>Final result:</span>
                 <div className={`flex items-center gap-1 ${isWin ? 'text-green-600' : 'text-red-600'}`}>
                   <DollarSign className="h-5 w-5" />
                   <span className="font-mono">{result.finalAmount.toFixed(2)}</span>
@@ -69,7 +69,7 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
               
               {isWin && profit > 0 && (
                 <div className="flex justify-between items-center text-sm text-green-600 mt-1">
-                  <span>Ganancia:</span>
+                  <span>Profit:</span>
                   <span className="font-mono">+${profit.toFixed(2)}</span>
                 </div>
               )}
@@ -79,7 +79,7 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
 
         <Button onClick={onPlayAgain} className="w-full" size="lg">
           <RotateCcw className="h-5 w-5 mr-2" />
-          Jugar Nuevamente
+          Play Again
         </Button>
       </CardContent>
     </Card>

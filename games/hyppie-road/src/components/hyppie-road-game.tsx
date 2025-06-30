@@ -102,7 +102,7 @@ export function HyppieRoadGame() {
   // Si hay un resultado, mostrarlo
   if (gameResult) {
     return (
-      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
         <GameResultComponent
           result={gameResult}
           betAmount={betAmount}
@@ -115,7 +115,7 @@ export function HyppieRoadGame() {
   // Si el juego no está activo, mostrar entrada de apuesta
   if (!isGameActive()) {
     return (
-      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
         <div className="w-full max-w-lg space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-4xl font-bold text-gray-900">🛣️ Hyppie Road</h1>
@@ -134,7 +134,7 @@ export function HyppieRoadGame() {
 
   // Juego activo
   return (
-    <div className="container mx-auto p-4 min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+    <div className="container mx-auto p-4 min-h-screen">
       <div className="space-y-6">
         {/* Header */}
         <div className="text-center">
