@@ -97,4 +97,26 @@
     background-repeat: no-repeat;
     background-attachment: fixed;
   }
+
+  .game-card {
+    background-image: url('/assets/images/box_gray.png');
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+  }
+
+  .game-card {
+    min-height: 120px;
+  }
+
+  .game-card .card-header-custom {
+    padding: 16px 36px 4px 36px;
+  }
+
+  .game-card .card-content-custom {
+    padding: 0px 36px 16px 36px;
+  }
 }

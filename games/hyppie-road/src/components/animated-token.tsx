@@ -30,7 +30,7 @@ export function AnimatedToken({ isMoving, className = '' }: AnimatedTokenProps) 
 
   return (
     <div 
-      className={`transition-all duration-500 ${isMoving ? 'scale-110' : 'scale-100'} ${className}`}
+      className={`transition-all duration-500 ${className}`}
       style={{
         width: '60px',
         height: '60px',

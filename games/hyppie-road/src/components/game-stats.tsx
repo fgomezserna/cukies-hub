@@ -28,53 +28,53 @@ export function GameStats({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Initial bet */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Initial Bet</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Initial Bet</CardTitle>
+          <DollarSign className="h-3 w-3 text-white/70" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">${betAmount.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Amount wagered</p>
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-white">${betAmount.toFixed(2)}</div>
+          <p className="text-xs text-white/70">Amount wagered</p>
         </CardContent>
       </Card>
 
       {/* Progress */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Progress</CardTitle>
-          <Target className="h-4 w-4 text-muted-foreground" />
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Progress</CardTitle>
+          <Target className="h-3 w-3 text-white/70" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{currentStep}/{totalSteps}</div>
-          <Progress value={completionPercentage} className="mt-2" />
-          <p className="text-xs text-muted-foreground mt-1">
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-white">{currentStep}/{totalSteps}</div>
+          <Progress value={completionPercentage} className="mt-1" />
+          <p className="text-xs text-white/70 mt-1">
             {completionPercentage.toFixed(1)}% completed
           </p>
         </CardContent>
       </Card>
 
       {/* Multiplier */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Multiplier</CardTitle>
-          <Zap className="h-4 w-4 text-muted-foreground" />
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Multiplier</CardTitle>
+          <Zap className="h-3 w-3 text-white/70" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-primary">{currentMultiplier.toFixed(1)}x</div>
-          <p className="text-xs text-muted-foreground">Current factor</p>
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-yellow-400">{currentMultiplier.toFixed(1)}x</div>
+          <p className="text-xs text-white/70">Current factor</p>
         </CardContent>
       </Card>
 
       {/* Potential winnings */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Potential Winnings</CardTitle>
-          <Trophy className="h-4 w-4 text-muted-foreground" />
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Potential Winnings</CardTitle>
+          <Trophy className="h-3 w-3 text-white/70" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-600">${potentialWinning.toFixed(2)}</div>
-          <p className={`text-xs ${profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-green-400">${potentialWinning.toFixed(2)}</div>
+          <p className={`text-xs ${profitAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {profitAmount >= 0 ? '+' : ''}{profitPercentage.toFixed(1)}% ({profitAmount >= 0 ? '+' : ''}${profitAmount.toFixed(2)})
           </p>
         </CardContent>

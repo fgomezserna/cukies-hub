@@ -79,7 +79,7 @@ export function MovingToken({ fromIndex, toIndex, isMoving, onAnimationComplete,
       className="absolute pointer-events-none z-50 transition-none"
       style={{
         left: `${(currentCol / gridCols) * 100}%`,
-        top: `${(currentRow / Math.ceil(32 / gridCols)) * 100}%`,
+        top: `${(currentRow / Math.ceil(32 / gridCols)) * 100 + 10}%`,
         width: `${100 / gridCols}%`,
         height: `${100 / Math.ceil(32 / gridCols)}%`,
         transform: 'translate(0, 0)',
@@ -87,15 +87,14 @@ export function MovingToken({ fromIndex, toIndex, isMoving, onAnimationComplete,
     >
       <div className="w-full h-full flex items-center justify-center">
         <div
-          className="drop-shadow-xl"
+          className="drop-shadow-lg"
           style={{
-            width: '70px',
-            height: '70px',
+            width: '60px',
+            height: '60px',
             backgroundImage: `url(${imagePath})`,
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            filter: 'drop-shadow(0 0 10px rgba(255, 215, 0, 0.8))',
           }}
         />
       </div>
