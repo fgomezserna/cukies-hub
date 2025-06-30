@@ -27,49 +27,49 @@ export function GameStats({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Apuesta inicial */}
+      {/* Initial bet */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Apuesta Inicial</CardTitle>
+          <CardTitle className="text-sm font-medium">Initial Bet</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">${betAmount.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Cantidad apostada</p>
+          <p className="text-xs text-muted-foreground">Amount wagered</p>
         </CardContent>
       </Card>
 
-      {/* Progreso */}
+      {/* Progress */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Progreso</CardTitle>
+          <CardTitle className="text-sm font-medium">Progress</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{currentStep}/{totalSteps}</div>
           <Progress value={completionPercentage} className="mt-2" />
           <p className="text-xs text-muted-foreground mt-1">
-            {completionPercentage.toFixed(1)}% completado
+            {completionPercentage.toFixed(1)}% completed
           </p>
         </CardContent>
       </Card>
 
-      {/* Multiplicador */}
+      {/* Multiplier */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Multiplicador</CardTitle>
+          <CardTitle className="text-sm font-medium">Multiplier</CardTitle>
           <Zap className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-primary">{currentMultiplier.toFixed(1)}x</div>
-          <p className="text-xs text-muted-foreground">Factor actual</p>
+          <p className="text-xs text-muted-foreground">Current factor</p>
         </CardContent>
       </Card>
 
-      {/* Ganancia potencial */}
+      {/* Potential winnings */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Ganancia Potencial</CardTitle>
+          <CardTitle className="text-sm font-medium">Potential Winnings</CardTitle>
           <Trophy className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>

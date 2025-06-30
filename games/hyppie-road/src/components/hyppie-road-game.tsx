@@ -41,7 +41,7 @@ export function HyppieRoadGame() {
       initGame(amount);
     } catch (error) {
       console.error('Error starting game:', error);
-      alert(error instanceof Error ? error.message : 'Error al iniciar el juego');
+      alert(error instanceof Error ? error.message : 'Error starting the game');
     }
   }, [initGame]);
 
@@ -60,7 +60,7 @@ export function HyppieRoadGame() {
         }
       } catch (error) {
         console.error('Error advancing:', error);
-        alert(error instanceof Error ? error.message : 'Error al avanzar');
+        alert(error instanceof Error ? error.message : 'Error advancing');
       } finally {
         setIsAnimating(false);
       }
@@ -76,7 +76,7 @@ export function HyppieRoadGame() {
       setGameResult(result);
     } catch (error) {
       console.error('Error cashing out:', error);
-      alert(error instanceof Error ? error.message : 'Error al retirar');
+      alert(error instanceof Error ? error.message : 'Error cashing out');
     }
   }, [canCashOut, makeCashOut]);
 
@@ -118,9 +118,9 @@ export function HyppieRoadGame() {
       <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
         <div className="w-full max-w-lg space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold text-gray-900">🛣️ Hyppie Road</h1>
+            <h1 className="text-6xl font-bold text-white pixellari-title">Hyppie Road</h1>
             <p className="text-lg text-muted-foreground">
-              Navega por el camino crypto, evita las trampas y multiplica tus recompensas
+              Navigate the crypto road, avoid traps and multiply your rewards
             </p>
           </div>
           <BetInput
@@ -138,8 +138,8 @@ export function HyppieRoadGame() {
       <div className="space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">🛣️ Hyppie Road</h1>
-          <p className="text-muted-foreground">Apuesta: ${betAmount.toFixed(2)}</p>
+          <h1 className="text-3xl font-bold text-white pixellari-title">Hyppie Road</h1>
+          <p className="text-muted-foreground">Bet: ${betAmount.toFixed(2)}</p>
         </div>
 
         {/* Estadísticas del juego */}
