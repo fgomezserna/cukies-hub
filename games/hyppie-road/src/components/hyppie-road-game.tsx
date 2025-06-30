@@ -33,6 +33,7 @@ export function HyppieRoadGame() {
   } = useGameState();
 
   const [gameResult, setGameResult] = React.useState<GameResult | null>(null);
+  const [previousPosition, setPreviousPosition] = React.useState<number | undefined>(undefined);
 
   // Manejar inicio del juego
   const handleStartGame = useCallback((amount: number) => {
@@ -49,23 +50,29 @@ export function HyppieRoadGame() {
   const handleAdvance = useCallback(async () => {
     if (!canAdvance()) return;
     
+    // Guardar posición actual antes del avance
+    setPreviousPosition(position);
     setIsAnimating(true);
     
-    // Pequeño delay para la animación
-    setTimeout(() => {
-      try {
-        const result = makeAdvance();
-        if (result) {
-          setGameResult(result);
-        }
-      } catch (error) {
-        console.error('Error advancing:', error);
-        alert(error instanceof Error ? error.message : 'Error advancing');
-      } finally {
+    // Hacer el avance inmediatamente para actualizar el estado
+    try {
+      const result = makeAdvance();
+      if (result) {
+        setGameResult(result);
         setIsAnimating(false);
       }
-    }, 500);
-  }, [canAdvance, makeAdvance, setIsAnimating]);
+    } catch (error) {
+      console.error('Error advancing:', error);
+      alert(error instanceof Error ? error.message : 'Error advancing');
+      setIsAnimating(false);
+    }
+  }, [canAdvance, makeAdvance, setIsAnimating, position]);
+
+  // Callback para cuando termina la animación de movimiento
+  const handleMoveAnimationComplete = useCallback(() => {
+    setIsAnimating(false);
+    setPreviousPosition(undefined);
+  }, []);
 
   // Manejar retiro
   const handleCashOut = useCallback(() => {
@@ -158,6 +165,9 @@ export function HyppieRoadGame() {
         <GameBoard
           tiles={tiles}
           isAnimating={isAnimating}
+          currentPosition={position}
+          previousPosition={previousPosition}
+          onMoveAnimationComplete={handleMoveAnimationComplete}
         />
 
         {/* Controles del juego */}
