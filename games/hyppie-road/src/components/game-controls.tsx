@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, DollarSign, TrendingUp } from 'lucide-react';
+import { ArrowRight, DollarSign } from 'lucide-react';
 
 interface GameControlsProps {
   currentMultiplier: number;
@@ -27,46 +26,7 @@ export function GameControls({
   isAnimating = false
 }: GameControlsProps) {
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
-      {/* Información actual */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 text-2xl font-bold text-primary">
-                <TrendingUp className="h-6 w-6" />
-                {currentMultiplier.toFixed(1)}x
-              </div>
-              <p className="text-sm text-muted-foreground">Current Multiplier</p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 text-2xl font-bold text-green-600">
-                <DollarSign className="h-6 w-6" />
-                {potentialWinning.toFixed(2)}
-              </div>
-              <p className="text-sm text-muted-foreground">Potential Winnings</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Próximo multiplicador */}
-      {nextMultiplier && (
-        <Card className="border-dashed border-2 border-muted-foreground/30">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-lg font-semibold text-muted-foreground mb-1">
-                Next multiplier: {nextMultiplier.toFixed(1)}x
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Potential winnings: ${((potentialWinning / currentMultiplier) * nextMultiplier).toFixed(2)}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Controles */}
+    <div className="w-full max-w-lg mx-auto">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Button
           onClick={onCashOut}
@@ -88,15 +48,16 @@ export function GameControls({
           <ArrowRight className={`h-5 w-5 mr-2 ${isAnimating ? 'animate-pulse' : ''}`} />
           {isAnimating ? 'Advancing...' : 'Advance'}
         </Button>
-      </div>
 
-      {/* Advertencias */}
-      <div className="text-xs text-muted-foreground text-center space-y-1">
         {!canCashOut && (
-          <p className="text-amber-600">⚠️ You must advance at least one tile to cash out</p>
+          <p className="col-span-full text-xs text-amber-600 text-center mt-2">
+            ⚠️ You must advance at least one tile to cash out
+          </p>
         )}
         {!canAdvance && canCashOut && (
-          <p className="text-blue-600">🎉 You've reached the end! You can only cash out</p>
+          <p className="col-span-full text-xs text-blue-600 text-center mt-2">
+            🎉 You've reached the end! You can only cash out
+          </p>
         )}
       </div>
     </div>
