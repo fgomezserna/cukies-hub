@@ -72,20 +72,6 @@ export function GameStats({
         </CardContent>
       </Card>
 
-      {/* Multiplier */}
-      <Card className={`game-card ${isAnimating ? 'multiplier-expand' : ''}`}>
-        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-xs font-medium text-white">Multiplier</CardTitle>
-          <Zap className={`h-3 w-3 text-white/70 ${isAnimating ? 'text-yellow-400' : ''}`} />
-        </CardHeader>
-        <CardContent className="card-content-custom">
-          <div className={`text-base font-bold text-yellow-400 ${isAnimating ? 'text-yellow-300' : ''}`}>
-            {currentMultiplier.toFixed(1)}x
-          </div>
-          <p className="text-xs text-white/70">Current factor</p>
-        </CardContent>
-      </Card>
-
       {/* Potential winnings */}
       <Card className="game-card">
         <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
@@ -97,6 +83,20 @@ export function GameStats({
           <p className={`text-xs ${profitAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {profitAmount >= 0 ? '+' : ''}{profitPercentage.toFixed(1)}% ({profitAmount >= 0 ? '+' : ''}${profitAmount.toFixed(2)})
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Multiplier */}
+      <Card className={`game-card ${isAnimating ? 'multiplier-expand' : ''}`}>
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Multiplier</CardTitle>
+          <Zap className={`h-3 w-3 text-white/70 ${isAnimating ? 'text-yellow-400' : ''}`} />
+        </CardHeader>
+        <CardContent className="card-content-custom">
+          <div className={`text-base font-bold text-yellow-400 ${isAnimating ? 'text-yellow-300' : ''}`}>
+            {currentMultiplier.toFixed(1)}x
+          </div>
+          <p className="text-xs text-white/70">Current factor</p>
         </CardContent>
       </Card>
     </div>
