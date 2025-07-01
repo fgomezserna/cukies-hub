@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Trophy, Target, DollarSign, Zap } from 'lucide-react';
@@ -22,8 +22,26 @@ export function GameStats({
   currentMultiplier,
   potentialWinning
 }: GameStatsProps) {
+  const [previousMultiplier, setPreviousMultiplier] = useState(currentMultiplier);
+  const [isAnimating, setIsAnimating] = useState(false);
+
   const profitAmount = potentialWinning - betAmount;
   const profitPercentage = ((profitAmount / betAmount) * 100);
+
+  // Detectar cambios en el multiplicador
+  useEffect(() => {
+    if (currentMultiplier > previousMultiplier) {
+      setIsAnimating(true);
+      
+      // Remover la clase de animación después de que termine
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 600); // Duración de la animación multiplierExpand
+
+      return () => clearTimeout(timer);
+    }
+    setPreviousMultiplier(currentMultiplier);
+  }, [currentMultiplier, previousMultiplier]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -55,13 +73,15 @@ export function GameStats({
       </Card>
 
       {/* Multiplier */}
-      <Card className="game-card">
+      <Card className={`game-card ${isAnimating ? 'multiplier-expand' : ''}`}>
         <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
           <CardTitle className="text-xs font-medium text-white">Multiplier</CardTitle>
-          <Zap className="h-3 w-3 text-white/70" />
+          <Zap className={`h-3 w-3 text-white/70 ${isAnimating ? 'text-yellow-400' : ''}`} />
         </CardHeader>
         <CardContent className="card-content-custom">
-          <div className="text-base font-bold text-yellow-400">{currentMultiplier.toFixed(1)}x</div>
+          <div className={`text-base font-bold text-yellow-400 ${isAnimating ? 'text-yellow-300' : ''}`}>
+            {currentMultiplier.toFixed(1)}x
+          </div>
           <p className="text-xs text-white/70">Current factor</p>
         </CardContent>
       </Card>
