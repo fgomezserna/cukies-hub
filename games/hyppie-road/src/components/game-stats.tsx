@@ -92,11 +92,11 @@ export function GameStats({
           <CardTitle className="text-xs font-medium text-white">Multiplier</CardTitle>
           <Zap className={`h-3 w-3 text-white/70 ${isAnimating ? 'text-yellow-400' : ''}`} />
         </CardHeader>
-        <CardContent className="card-content-custom">
-          <div className={`text-base font-bold text-yellow-400 ${isAnimating ? 'text-yellow-300' : ''}`}>
+        <CardContent className="card-content-custom flex flex-col items-center justify-center">
+          <div className={`text-2xl font-bold text-yellow-400 ${isAnimating ? 'text-yellow-300' : ''}`}>
             {currentMultiplier.toFixed(1)}x
           </div>
-          <p className="text-xs text-white/70">Current factor</p>
+          <p className="text-xs text-white/70 text-center">Current factor</p>
         </CardContent>
       </Card>
     </div>

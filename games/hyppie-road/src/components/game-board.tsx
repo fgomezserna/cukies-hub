@@ -24,12 +24,13 @@ export function GameBoard({
   onMoveAnimationComplete 
 }: GameBoardProps) {
   const [isMovingToken, setIsMovingToken] = useState(false);
-  const [gridCols, setGridCols] = useState(4); // Comienza con 4 columnas
+  const [gridCols, setGridCols] = useState(16); // 16 columnas para una sola fila
 
   // Hook para detectar el tamaño de pantalla
   useEffect(() => {
     const updateGridCols = () => {
-      setGridCols(window.innerWidth >= 640 ? 8 : 4);
+      // Siempre 16 columnas (una sola fila)
+      setGridCols(16);
     };
 
     // Establecer columnas iniciales
@@ -53,17 +54,17 @@ export function GameBoard({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
+    <div className="w-full max-w-[95vw] mx-auto p-2">
       <div className="relative">
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mb-4">
+                  <div className="grid grid-cols-16 gap-2 mb-4">
         {tiles.map((tile, index) => (
           <div
             key={index}
             className={cn(
               "aspect-square flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden",
               // Estados de la casilla
-              tile.isActive && "ring-4 ring-yellow-400 ring-offset-2 scale-105 shadow-xl",
-              tile.isActive && isAnimating && "ring-8 ring-yellow-300 animate-pulse",
+              tile.isActive && "ring-2 ring-yellow-400 ring-offset-1 scale-105 shadow-xl",
+              tile.isActive && isAnimating && "ring-4 ring-yellow-300 animate-pulse",
               // Animaciones
               isAnimating && tile.isActive && "brightness-125",
               // Estados de hover
@@ -78,7 +79,7 @@ export function GameBoard({
             onClick={() => onTileClick?.(index)}
           >
             {/* Número de casilla */}
-            <span className="absolute top-1 left-1 text-xs text-white font-bold bg-black/50 px-1 rounded">
+            <span className="absolute top-1 left-1 text-sm text-white font-bold bg-black/50 px-1.5 py-0.5 rounded">
               {index + 1}
             </span>
             
@@ -90,14 +91,14 @@ export function GameBoard({
               ) : tile.revealed ? (
                 tile.hasTrap ? (
                   // Icono de trampa
-                  <div className="text-red-500 text-2xl drop-shadow-lg">💥</div>
+                  <div className="text-red-500 text-3xl drop-shadow-lg">💥</div>
                 ) : (
                   // Icono de éxito - solo en casillas completadas donde NO está el token
-                  <div className="text-green-400 text-2xl drop-shadow-lg">✅</div>
+                  <div className="text-green-400 text-3xl drop-shadow-lg">✅</div>
                 )
               ) : (
                 // Casilla no revelada
-                <div className="text-white text-xl drop-shadow-lg opacity-70">❓</div>
+                <div className="text-white text-2xl drop-shadow-lg opacity-70">❓</div>
               )}
             </div>
             
