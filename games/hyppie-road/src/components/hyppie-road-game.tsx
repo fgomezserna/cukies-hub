@@ -142,7 +142,7 @@ export function HyppieRoadGame() {
   // Juego activo
   return (
     <div className="w-full max-w-[98vw] mx-auto p-2 min-h-screen">
-      <div className="space-y-4">
+      <div className="space-y-8">
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white pixellari-title">Hyppie Road</h1>
