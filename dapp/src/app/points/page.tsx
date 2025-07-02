@@ -12,22 +12,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useAuth } from '@/providers/auth-provider';
-import { cn } from '@/lib/utils';
+import { cn, formatPointTransactionForTable } from '@/lib/utils';
 import CountdownTimer from '@/components/shared/countdown-timer';
-
-const basePointsHistory = [
-  { reason: "Daily Login", points: "+10", date: "2024-07-29" },
-  { reason: "Quest: Winning Streak", points: "+50", date: "2024-07-28" },
-  { reason: "Game Played: Moon or Doom", points: "+5", date: "2024-07-28" },
-  { reason: "Referral Bonus", points: "+100", date: "2024-07-27" },
-  { reason: "Points Spent: Avatar", points: "-25", date: "2024-07-26" },
-  { reason: "Game Played: Coin Flip", points: "+5", date: "2024-07-26" },
-  { reason: "Quest: First Win", points: "+10", date: "2024-07-25" },
-];
-
-const fullPointsHistory = Array.from({ length: 20 })
-  .flatMap((_, i) => basePointsHistory.map(item => ({...item, date: new Date(new Date('2024-07-29').getTime() - (i * 7 + basePointsHistory.indexOf(item)) * 24 * 60 * 60 * 1000).toISOString().split('T')[0] })));
-
+import { PointTransaction } from '@/types';
 
 const streakRewards = [10, 20, 35, 50, 65, 80, 100];
 
@@ -69,7 +56,7 @@ function PointsView() {
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   
-  const unlockDate = useMemo(() => new Date("2025-07-31T00:00:00"), []);
+  const unlockDate = useMemo(() => new Date("2025-06-31T00:00:00"), []);
   const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
 
   useEffect(() => {
@@ -91,10 +78,13 @@ function PointsView() {
   const [canClaim, setCanClaim] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // --- Point transactions state ---
+  const [pointTransactions, setPointTransactions] = useState<PointTransaction[]>([]);
+  const [hasMorePointTransactions, setHasMorePointTransactions] = useState(true);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [transactionsOffset, setTransactionsOffset] = useState(0);
+
   // --- Infinite Scroll State ---
-  const [visiblePoints, setVisiblePoints] = useState(fullPointsHistory.slice(0, ITEMS_PER_PAGE));
-  const [hasMorePoints, setHasMorePoints] = useState(fullPointsHistory.length > ITEMS_PER_PAGE);
-  const [isLoadingPoints, setIsLoadingPoints] = useState(false);
   const pointsObserver = useRef<HTMLDivElement>(null);
   const pointsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -118,19 +108,31 @@ function PointsView() {
 
   const playersToDisplay = searchTerm ? filteredLeaderboard : visiblePlayers;
 
-  const loadMorePoints = useCallback(() => {
-    if (isLoadingPoints) return;
-    setIsLoadingPoints(true);
-    setTimeout(() => {
-      const currentLength = visiblePoints.length;
-      const newPoints = fullPointsHistory.slice(currentLength, currentLength + ITEMS_PER_PAGE);
-      setVisiblePoints(prev => [...prev, ...newPoints]);
-      if (currentLength + ITEMS_PER_PAGE >= fullPointsHistory.length) {
-        setHasMorePoints(false);
-      }
-      setIsLoadingPoints(false);
-    }, 500); // Simulate network delay
-  }, [isLoadingPoints, visiblePoints.length]);
+
+
+  const loadMoreTransactions = useCallback(async () => {
+    if (!hasMorePointTransactions || isLoadingTransactions || !user) return;
+    
+    setIsLoadingTransactions(true);
+    try {
+      const response = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=${transactionsOffset}`);
+      if (!response.ok) throw new Error('Failed to fetch point transactions');
+      
+      const data = await response.json();
+      setPointTransactions(prev => [...prev, ...data.transactions]);
+      setHasMorePointTransactions(data.hasMore);
+      setTransactionsOffset(prev => prev + ITEMS_PER_PAGE);
+    } catch (error) {
+      console.error('Error loading more point transactions:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load more point transactions',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [hasMorePointTransactions, isLoadingTransactions, transactionsOffset, user?.walletAddress, toast]);
 
   const loadMorePlayers = useCallback(() => {
     if (isLoadingPlayers || searchTerm) return;
@@ -176,15 +178,44 @@ function PointsView() {
   };
 
   useEffect(() => {
-    const cleanup = createObserver(loadMorePoints, hasMorePoints, isLoadingPoints, pointsObserver, pointsContainerRef);
+    const cleanup = createObserver(loadMoreTransactions, hasMorePointTransactions, isLoadingTransactions, pointsObserver, pointsContainerRef);
     return cleanup;
-  }, [hasMorePoints, isLoadingPoints, loadMorePoints]);
+  }, [hasMorePointTransactions, isLoadingTransactions, loadMoreTransactions]);
   
   useEffect(() => {
     if (searchTerm) return;
     const cleanup = createObserver(loadMorePlayers, hasMorePlayers, isLoadingPlayers, leaderboardObserver, leaderboardContainerRef);
     return cleanup;
   }, [hasMorePlayers, isLoadingPlayers, loadMorePlayers, searchTerm]);
+
+  // Load point transactions when user is available
+  useEffect(() => {
+    if (!user || isAuthLoading) return;
+    
+    const loadInitialTransactions = async () => {
+      setIsLoadingTransactions(true);
+      try {
+        const response = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
+        if (!response.ok) throw new Error('Failed to fetch point transactions');
+        
+        const data = await response.json();
+        setPointTransactions(data.transactions);
+        setHasMorePointTransactions(data.hasMore);
+        setTransactionsOffset(ITEMS_PER_PAGE);
+      } catch (error) {
+        console.error('Error loading point transactions:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load point transactions',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingTransactions(false);
+      }
+    };
+    
+    loadInitialTransactions();
+  }, [user?.walletAddress, isAuthLoading, toast]);
   
   // Load state from localStorage on mount
   useEffect(() => {
@@ -218,23 +249,59 @@ function PointsView() {
 
   const currentReward = streakRewards[dailyStreak];
 
-  const handleClaim = useCallback(() => {
-    if (!canClaim || !isStarterQuestCompleted) return;
+  const handleClaim = useCallback(async () => {
+    if (!canClaim || !isStarterQuestCompleted || !user) return;
 
-    toast({
-      title: "Daily Drop Claimed!",
-      description: `You earned ${currentReward} XP. Come back tomorrow!`,
-    });
+    try {
+      const response = await fetch('/api/points/daily-claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: user.walletAddress,
+          amount: currentReward,
+        }),
+      });
 
-    const newStreak = dailyStreak + 1;
-    const finalStreak = newStreak >= 7 ? 0 : newStreak;
-    setDailyStreak(finalStreak);
-    localStorage.setItem('dailyStreak', finalStreak.toString());
-    
-    localStorage.setItem('lastClaimTimestamp', new Date().getTime().toString());
-    setCanClaim(false);
+      const result = await response.json();
 
-  }, [canClaim, dailyStreak, isStarterQuestCompleted, currentReward, toast]);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to claim daily drop.');
+      }
+
+      toast({
+        title: "Daily Drop Claimed!",
+        description: `You earned ${currentReward} XP. Come back tomorrow!`,
+      });
+
+      const newStreak = dailyStreak + 1;
+      const finalStreak = newStreak >= 7 ? 0 : newStreak;
+      setDailyStreak(finalStreak);
+      localStorage.setItem('dailyStreak', finalStreak.toString());
+      
+      localStorage.setItem('lastClaimTimestamp', new Date().getTime().toString());
+      setCanClaim(false);
+
+      // Refresh point transactions to show the new entry
+      try {
+        const refreshResponse = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          setPointTransactions(refreshData.transactions);
+          setHasMorePointTransactions(refreshData.hasMore);
+          setTransactionsOffset(ITEMS_PER_PAGE);
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing transactions:', refreshError);
+      }
+
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to claim daily drop',
+        variant: 'destructive',
+      });
+    }
+  }, [canClaim, dailyStreak, isStarterQuestCompleted, currentReward, user, toast]);
 
   const getButtonState = () => {
       if (!user) {
@@ -277,6 +344,8 @@ function PointsView() {
     )
   }
 
+  const formattedTransactions = pointTransactions.map(formatPointTransactionForTable);
+
   return (
     <div className="relative h-full">
         <div className={cn("grid flex-1 gap-4 overflow-auto p-4 sm:grid-cols-2 lg:grid-cols-3 h-full", isLocked && 'blur-sm pointer-events-none')}>
@@ -299,20 +368,28 @@ function PointsView() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {visiblePoints.map((item, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell className="font-medium">{item.reason}</TableCell>
-                                            <TableCell className="text-muted-foreground">{item.date}</TableCell>
-                                            <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
-                                                {item.points}
+                                    {formattedTransactions.length === 0 && !isLoadingTransactions ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                                                No point transactions found. Complete some quests to start earning points!
                                             </TableCell>
                                         </TableRow>
-                                    ))}
-                                    {hasMorePoints && (
+                                    ) : (
+                                        formattedTransactions.map((item, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell className="font-medium">{item.reason}</TableCell>
+                                                <TableCell className="text-muted-foreground">{item.date}</TableCell>
+                                                <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
+                                                    {item.points}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                    {hasMorePointTransactions && (
                                         <TableRow>
                                             <TableCell colSpan={3} className="text-center p-0">
                                                 <div ref={pointsObserver} className="flex justify-center items-center py-4">
-                                                    {isLoadingPoints && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                                    {isLoadingTransactions && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
                                                 </div>
                                             </TableCell>
                                         </TableRow>

@@ -37,6 +37,9 @@ model User {
   referrals       User[]  @relation("Referrals")
   referralRewards Int     @default(0)
 
+  // Point transactions history
+  pointTransactions PointTransaction[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -112,4 +115,29 @@ model UserCompletedTask {
   completedAt DateTime @default(now())
 
   @@unique([userId, taskId])
+}
+
+// New model to track all point transactions (earned and spent)
+model PointTransaction {
+  id          String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String             @db.ObjectId
+  user        User               @relation(fields: [userId], references: [id])
+  amount      Int                // Positive for earned, negative for spent
+  type        PointTransactionType
+  reason      String             // Description of why points were gained/lost
+  metadata    Json?              // Additional data (quest id, game id, etc.)
+  createdAt   DateTime           @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum PointTransactionType {
+  QUEST_COMPLETION
+  DAILY_LOGIN
+  GAME_PLAY
+  GAME_WIN
+  REFERRAL_BONUS
+  PURCHASE
+  MANUAL_ADJUSTMENT
+  OTHER
 }
