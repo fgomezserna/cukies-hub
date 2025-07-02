@@ -119,9 +119,9 @@ export function GameBoard({
             <div className="flex flex-col items-center justify-center">
               {tile.isActive ? (
                 tile.hasTrap ? (
-                  // Token cayendo en trampa - usar imagen fall.png SIN animaciones
+                  // Token cayendo hacia abajo dentro del agujero hasta desaparecer
                   <div 
-                    className="w-32 h-32 bg-center bg-no-repeat drop-shadow-lg"
+                    className="w-32 h-32 bg-center bg-no-repeat drop-shadow-lg fall-down"
                     style={{
                       backgroundImage: 'url(/assets/images/fall.png)',
                       backgroundSize: 'contain',

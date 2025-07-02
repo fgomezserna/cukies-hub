@@ -249,4 +249,42 @@
   .animate-fade-in {
     animation: fade-in 0.8s ease-out;
   }
+
+  /* Animación de caída hacia abajo con desaparición */
+  @keyframes fallDown {
+    0% { 
+      transform: translateY(0) scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    15% { 
+      transform: translateY(10px) scale(0.95) rotate(5deg);
+      opacity: 1;
+    }
+    30% { 
+      transform: translateY(25px) scale(0.9) rotate(-3deg);
+      opacity: 1;
+    }
+    50% { 
+      transform: translateY(45px) scale(0.85) rotate(8deg);
+      opacity: 1;
+    }
+    70% { 
+      transform: translateY(70px) scale(0.7) rotate(-5deg);
+      opacity: 0.8;
+    }
+    85% { 
+      transform: translateY(95px) scale(0.5) rotate(10deg);
+      opacity: 0.4;
+    }
+    100% { 
+      transform: translateY(120px) scale(0.2) rotate(0deg);
+      opacity: 0;
+    }
+  }
+
+  /* Clase para la caída hacia abajo */
+  .fall-down {
+    animation: fallDown 2s ease-in forwards;
+    z-index: 10;
+  }
 }
