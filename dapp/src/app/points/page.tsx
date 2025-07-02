@@ -24,7 +24,7 @@ const LEADERBOARD_LIMIT = 100;
 
 function PointsView() {
   const { toast } = useToast();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, fetchUser } = useAuth();
   
   const unlockDate = useMemo(() => new Date("2025-06-31T00:00:00"), []);
   const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
@@ -326,6 +326,9 @@ function PointsView() {
       setDailyStreak(result.newStreak);
       setCanClaim(false);
 
+      // Refresh the authenticated user so other sections stay in sync
+      fetchUser();
+
       // Refresh point transactions to show the new entry
       try {
         const refreshResponse = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
@@ -357,7 +360,7 @@ function PointsView() {
         variant: 'destructive',
       });
     }
-  }, [canClaim, dailyStreak, isStarterQuestCompleted, currentReward, user, toast]);
+  }, [canClaim, dailyStreak, isStarterQuestCompleted, currentReward, user, toast, fetchUser]);
 
   const getButtonState = () => {
       if (!user) {

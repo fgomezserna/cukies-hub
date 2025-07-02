@@ -322,7 +322,7 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
 }
 
 function QuestsView() {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, fetchUser } = useAuth();
   const { toast } = useToast();
   const [quests, setQuests] = useState<Quest[]>([]);
   const [isLoadingQuests, setIsLoadingQuests] = useState(true);
@@ -493,6 +493,9 @@ function QuestsView() {
       }
       
       await refetchQuests();
+
+      // Refresh the authenticated user so other sections (e.g., Points page) react immediately
+      fetchUser();
 
       toast({
         title: 'Quest Completed!',
