@@ -79,18 +79,18 @@ export function MovingToken({ fromIndex, toIndex, isMoving, onAnimationComplete,
       className="absolute pointer-events-none z-50 transition-none"
       style={{
         left: `${(currentCol / gridCols) * 100}%`,
-        top: `${(currentRow / Math.ceil(32 / gridCols)) * 100 + 10}%`,
+        top: `${(currentRow * 100) / 1}%`, // Simplificado para una sola fila
         width: `${100 / gridCols}%`,
-        height: `${100 / Math.ceil(32 / gridCols)}%`,
-        transform: 'translate(0, 0)',
+        height: `100%`, // Altura completa del contenedor
+        transform: 'translate(0, 4px)', // Bajado 4px
       }}
     >
       <div className="w-full h-full flex items-center justify-center">
         <div
           className="drop-shadow-lg"
           style={{
-            width: '60px',
-            height: '60px',
+            width: '120px',
+            height: '120px',
             backgroundImage: `url(${imagePath})`,
             backgroundSize: 'contain',
             backgroundPosition: 'center',

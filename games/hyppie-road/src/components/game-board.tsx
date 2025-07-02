@@ -101,8 +101,6 @@ export function GameBoard({
             key={actualIndex}
             className={cn(
               "aspect-[2/3] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden",
-              // Animaciones
-              isAnimating && tile.isActive && "brightness-125",
               // Estados de hover
               tile.isActive && "hover:scale-110"
             )}
@@ -123,7 +121,7 @@ export function GameBoard({
             <div className="flex flex-col items-center justify-center">
               {tile.isActive ? (
                 // Token animado - idle cuando no se está moviendo (prioridad máxima)
-                !isMovingToken && <AnimatedToken isMoving={false} className="drop-shadow-lg scale-150" />
+                !isMovingToken && <AnimatedToken isMoving={false} className="drop-shadow-lg" />
               ) : tile.revealed ? (
                 tile.hasTrap ? (
                   // Icono de trampa
@@ -137,16 +135,7 @@ export function GameBoard({
                 <div className="text-white text-4xl drop-shadow-lg opacity-70">❓</div>
               )}
             </div>
-            
-            {/* Efecto de brillo para casilla activa */}
-            {tile.isActive && (
-              <>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-                {isAnimating && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-300/30 via-orange-300/30 to-red-300/30 animate-pulse" />
-                )}
-              </>
-            )}
+
           </div>
         );
       })}

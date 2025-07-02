@@ -32,8 +32,8 @@ export function AnimatedToken({ isMoving, className = '' }: AnimatedTokenProps) 
     <div 
       className={`transition-all duration-500 ${className}`}
       style={{
-        width: '60px',
-        height: '60px',
+        width: '120px',
+        height: '120px',
         backgroundImage: `url(${imagePath})`,
         backgroundSize: 'contain',
         backgroundPosition: 'center',
