@@ -100,9 +100,7 @@ export function GameBoard({
           <div
             key={actualIndex}
             className={cn(
-              "aspect-[3/4] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden",
-              // Estados de hover
-              tile.isActive && "hover:scale-110"
+              "aspect-[3/4] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden"
             )}
             style={{
               backgroundImage: 'url(/assets/images/section01.png)',
