@@ -545,27 +545,22 @@ function QuestsView() {
         </div>
 
         {starterQuest && !starterQuest.isCompleted && (
-          <Card className="relative overflow-hidden border-2 border-yellow-500/30 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-yellow-500/20">
-            {/* Special glow effect for the initial quest */}
-            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 animated-gradient" />
-            
+          <Card className="relative overflow-hidden border-2 border-blue-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-blue-500/20 hover:border-blue-400/40 transition-all duration-300">
             <CardHeader className="relative">
               <div className="flex items-center gap-4">
-                <div className="relative p-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <Star className="h-8 w-8 text-white drop-shadow-lg" />
-                  {/* Glow effect */}
-                  <div className="absolute inset-0 rounded-2xl bg-yellow-400/30 blur-xl scale-150" />
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                  <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">
                     ✨ {starterQuest.title}
                   </CardTitle>
                   <CardDescription className="text-base mt-1">
                     {starterQuest.description}
                   </CardDescription>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-400/30">
-                  <span className="text-xs font-bold text-yellow-400 uppercase tracking-wide">Starter Quest</span>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30">
+                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">Starter Quest</span>
                 </div>
               </div>
             </CardHeader>
@@ -590,24 +585,24 @@ function QuestsView() {
                   }
               })}
             </CardContent>
-            <CardFooter className="relative flex-col items-stretch gap-6 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
+            <CardFooter className="relative flex-col items-stretch gap-6 bg-gradient-to-r from-blue-500/5 to-cyan-500/5">
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">🎯 Progress</span>
-                  <span className="text-sm font-bold text-foreground px-2 py-1 rounded-full bg-yellow-500/20">
+                  <span className="text-sm font-bold text-foreground px-2 py-1 rounded-full bg-blue-500/20">
                     {completedStarterTasks}/{totalStarterTasks}
                   </span>
                 </div>
                 <div className="relative">
                   <Progress value={starterProgress} className="h-3" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 rounded-full" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-500/20 rounded-full" />
                 </div>
               </div>
               
               <Button 
                 onClick={() => handleClaimReward(starterQuest.id)} 
                 disabled={!isStarterTasksComplete || starterQuest.isCompleted}
-                className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-yellow-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-yellow-500/40 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:hover:scale-100"
               >
                 {starterQuest.isCompleted ? '✅ Reward Claimed' : `🚀 Claim ${starterQuest.xp} XP`}
               </Button>
