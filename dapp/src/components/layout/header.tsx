@@ -137,7 +137,7 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 border-2 border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-green-500/10">
               <DropdownMenuLabel className="text-base font-bold text-foreground">
-                👤 {user.username ?? "My Account"}
+                {user.username ?? "My Account"}
               </DropdownMenuLabel>
               <div className="px-3 pt-2 pb-3 space-y-3">
                 <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-400/20">
@@ -152,12 +152,12 @@ export default function Header() {
               <DropdownMenuSeparator className="bg-green-500/20" />
               <DropdownMenuItem disabled className="opacity-50">
                 <Wallet className="mr-3 h-4 w-4 text-gray-400" />
-                <span>💼 My Wallet</span>
+                <span>My Wallet</span>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-green-500/10 transition-colors">
                 <Link href="/settings">
                   <Settings className="mr-3 h-4 w-4 text-green-400" />
-                  <span>⚙️ Settings</span>
+                  <span>Settings</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-green-500/20" />
@@ -166,7 +166,7 @@ export default function Header() {
                 className="hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
               >
                 <LogOut className="mr-3 h-4 w-4" />
-                <span>🚪 Disconnect</span>
+                <span>Disconnect</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -175,8 +175,8 @@ export default function Header() {
             onClick={() => connect({ connector: connectors[0] })} 
             className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-6 py-2 rounded-xl shadow-lg shadow-green-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-green-500/40"
           >
-            <Wallet className="mr-2 h-4 w-4" />
-            💰 Connect Wallet
+            <Wallet className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Connect Wallet</span>
           </Button>
         )}
       </div>
