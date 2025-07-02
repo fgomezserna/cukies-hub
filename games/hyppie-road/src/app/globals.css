@@ -162,4 +162,26 @@
   .game-card .card-content-custom {
     padding: 0px 40px 20px 40px;
   }
+
+  /* Optimizaciones para animaciones de tokens */
+  .token-animation {
+    image-rendering: pixelated;
+    -webkit-image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
+    will-change: background-image;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
+  /* Prevenir parpadeos en transiciones */
+  .no-flicker {
+    will-change: transform, opacity, background-image;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
 }
