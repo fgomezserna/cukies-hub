@@ -142,12 +142,21 @@ export function HyppieRoadGame() {
   // Juego activo
   return (
     <div className="w-full max-w-[98vw] mx-auto p-2 min-h-screen overflow-hidden">
-      <div className="space-y-8">
+      <div className="space-y-2">
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white pixellari-title">Hyppie Road</h1>
           <p className="text-muted-foreground">Bet: ${betAmount.toFixed(2)}</p>
         </div>
+
+        {/* Tablero del juego */}
+        <GameBoard
+          tiles={tiles}
+          isAnimating={isAnimating}
+          currentPosition={position}
+          previousPosition={previousPosition}
+          onMoveAnimationComplete={handleMoveAnimationComplete}
+        />
 
         {/* Estadísticas del juego */}
         {gameStats && (
@@ -160,15 +169,6 @@ export function HyppieRoadGame() {
             potentialWinning={potentialWinning}
           />
         )}
-
-        {/* Tablero del juego */}
-        <GameBoard
-          tiles={tiles}
-          isAnimating={isAnimating}
-          currentPosition={position}
-          previousPosition={previousPosition}
-          onMoveAnimationComplete={handleMoveAnimationComplete}
-        />
 
         {/* Controles del juego */}
         {gameStats && (

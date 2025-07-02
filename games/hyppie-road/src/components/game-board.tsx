@@ -100,7 +100,7 @@ export function GameBoard({
           <div
             key={actualIndex}
             className={cn(
-              "aspect-[2/3] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden",
+              "aspect-[3/4] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden",
               // Estados de hover
               tile.isActive && "hover:scale-110"
             )}
@@ -143,17 +143,17 @@ export function GameBoard({
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 mt-12 overflow-hidden">
+    <div className="w-full max-w-4xl mx-auto p-2 overflow-hidden">
       <div className="relative overflow-hidden">
         {/* Indicador de progreso con scroll */}
-        <div className="mb-6 text-center">
-          <span className="text-sm text-white font-semibold">
+        <div className="mb-2 text-center">
+          <span className="text-xs text-white font-semibold">
             Viewing tiles {startIndex + 1}-{Math.min(startIndex + 4, tiles.length)} of {tiles.length}
           </span>
         </div>
         
         {/* Contenedor con overflow para el efecto de deslizamiento */}
-        <div className="relative overflow-hidden mb-6">
+        <div className="relative overflow-hidden mb-2">
           {isSliding ? (
             // Durante la animación, mostrar ambos grupos
             <div className="relative">
@@ -197,22 +197,7 @@ export function GameBoard({
         })()}
       </div>
       
-      {/* Barra de progreso */}
-      <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
-        <div
-          className="bg-primary h-3 rounded-full transition-all duration-500 ease-out"
-          style={{
-            width: `${(tiles.filter(t => t.revealed && !t.hasTrap).length / tiles.length) * 100}%`
-          }}
-        />
-      </div>
-      
-      <p className="text-center text-sm text-white font-semibold mb-8">
-        {isAnimating 
-          ? "🏃 Moving to next tile..." 
-          : `Progress: ${tiles.filter(t => t.revealed && !t.hasTrap).length} / ${tiles.length} tiles`
-        }
-      </p>
+
     </div>
   );
 }
