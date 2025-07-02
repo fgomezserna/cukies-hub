@@ -121,20 +121,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </SidebarMenuItem>
             </SidebarMenu>
             
-            {/* Separador decorativo */}
-            <div className="mx-6 my-4 group-data-[collapsible=icon]:mx-3">
-              <div className="h-px bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <div className="flex justify-center -mt-1">
-                <div className="w-2 h-2 bg-green-400 rounded-full shadow-lg shadow-green-400/50"></div>
-              </div>
-            </div>
           </SidebarContent>
           <SidebarFooter className="border-t border-green-500/20 bg-black/15 backdrop-blur-sm">
             <div className="p-3 flex flex-col gap-3 group-data-[collapsible=icon]:items-center">
-                <div className="px-2 text-xs font-bold text-green-400 group-data-[collapsible=icon]:hidden flex items-center gap-2">
-                  <span className="h-1 w-1 bg-green-400 rounded-full animate-pulse"></span>
-                  🌐 Community
-                </div>
+
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center space-y-1">
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-cyan-500/10 hover:shadow-md hover:shadow-blue-500/20">
@@ -143,7 +133,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-cyan-500/20 group-hover:from-blue-400/30 group-hover:to-cyan-500/30 transition-all">
                               <XIcon className="h-3 w-3 text-blue-400 group-hover:text-cyan-400 transition-colors" />
                             </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">🐦 Twitter</span>
+                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">Twitter</span>
                           </div>
                         </a>
                       </SidebarMenuButton>
@@ -155,7 +145,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-indigo-500/20 group-hover:from-blue-400/30 group-hover:to-indigo-500/30 transition-all">
                               <Send className="h-3 w-3 text-blue-400 group-hover:text-indigo-400 transition-colors" />
                             </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">✈️ Telegram</span>
+                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">Telegram</span>
                           </div>
                         </a>
                       </SidebarMenuButton>
@@ -167,7 +157,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-400/20 to-indigo-500/20 group-hover:from-purple-400/30 group-hover:to-indigo-500/30 transition-all">
                               <DiscordIcon className="h-3 w-3 text-purple-400 group-hover:text-indigo-400 transition-colors" />
                             </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">🎮 Discord</span>
+                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">Discord</span>
                           </div>
                         </a>
                       </SidebarMenuButton>
