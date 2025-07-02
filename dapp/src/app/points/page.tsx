@@ -662,7 +662,7 @@ function PointsView() {
             <div className="grid auto-rows-max items-start gap-6 lg:gap-8">
                 {/* Daily Drop Card */}
                 <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 opacity-5" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 opacity-5 pointer-events-none" />
                     
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -690,7 +690,7 @@ function PointsView() {
                 
                 {/* HyppieLiquid Stats Card */}
                 <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5 pointer-events-none" />
                     
                     <CardHeader className="text-center pb-3">
                         <div className="flex items-center justify-center mb-3">
