@@ -25,7 +25,7 @@ export default function SybilSlayerPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { user, isLoading } = useAuth();
 
-  // Usa el hook para enviar datos de autenticación al juego
+  // Use the hook to send authentication data to the game
   useParentConnection(iframeRef, {
     isAuthenticated: !!user && !isLoading,
     user: user,

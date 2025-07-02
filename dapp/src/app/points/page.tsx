@@ -409,68 +409,121 @@ function PointsView() {
   const formattedTransactions = pointTransactions.map(formatPointTransactionForTable);
 
   return (
-    <div className="relative h-full">
-        <div className={cn("grid flex-1 gap-4 overflow-auto p-4 sm:grid-cols-2 lg:grid-cols-3 h-full", isLocked && 'blur-sm pointer-events-none')}>
-            {/* User Stats Card */}
+    <div className="relative flex flex-col gap-8">
+      <div className={cn("flex flex-col gap-8", isLocked && 'blur-sm pointer-events-none')}>
+        {/* Header moderno */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+            💰 Points Center
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Manage your points, review your history and compete in the global ranking
+          </p>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* User Stats Cards - Estilo consistente */}
             {userStats && (
-              <div className="lg:col-span-3 mb-4">
-                <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                      <div className="text-center md:text-left">
-                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                          <Shield className="h-5 w-5 text-primary" />
-                          <span className="text-sm font-medium text-muted-foreground">Tier</span>
+              <div className="lg:col-span-3">
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* Tier Card */}
+                  <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-500 opacity-5" />
+                    
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        🛡️ Tier
+                      </CardTitle>
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-purple-400 to-pink-500 bg-opacity-10">
+                        <Shield className="h-5 w-5 text-purple-400" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="relative">
+                      <div className={cn("text-3xl font-bold font-headline text-foreground", userStats.stats.tierColor)}>
+                        {userStats.stats.tier}
+                      </div>
+                      <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-purple-400/60 to-transparent" />
+                    </CardContent>
+                  </Card>
+
+                  {/* Position Card */}
+                  <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-cyan-500 opacity-5" />
+                    
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        📈 Position
+                      </CardTitle>
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-500 bg-opacity-10">
+                        <TrendingUp className="h-5 w-5 text-blue-400" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="relative">
+                      <div className="flex items-center gap-2">
+                        <div className="text-3xl font-bold font-headline text-blue-400">
+                          #{userStats.stats.ranking}
                         </div>
-                        <div className={cn("text-2xl font-bold", userStats.stats.tierColor)}>
-                          {userStats.stats.tier}
+                        <div className={cn("flex items-center text-xs px-2 py-1 rounded-full", 
+                          userStats.stats.positionChange > 0 ? 'text-green-400 bg-green-500/20' : 
+                          userStats.stats.positionChange < 0 ? 'text-red-400 bg-red-500/20' : 'text-muted-foreground bg-gray-500/20'
+                        )}>
+                          {userStats.stats.positionChange > 0 && <ArrowUp className="h-3 w-3" />}
+                          {userStats.stats.positionChange < 0 && <ArrowDown className="h-3 w-3" />}
+                          <span className="font-bold">{Math.abs(userStats.stats.positionChange)}</span>
                         </div>
                       </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                          <TrendingUp className="h-5 w-5 text-primary" />
-                          <span className="text-sm font-medium text-muted-foreground">Position</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-2xl font-bold text-primary">#{userStats.stats.ranking}</span>
-                          <div className={cn("flex items-center text-sm", 
-                            userStats.stats.positionChange > 0 ? 'text-green-500' : 
-                            userStats.stats.positionChange < 0 ? 'text-red-500' : 'text-muted-foreground'
-                          )}>
-                            {userStats.stats.positionChange > 0 && <ArrowUp className="h-3 w-3" />}
-                            {userStats.stats.positionChange < 0 && <ArrowDown className="h-3 w-3" />}
-                            <span>{Math.abs(userStats.stats.positionChange)}</span>
-                          </div>
-                        </div>
+                      <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-blue-400/60 to-transparent" />
+                    </CardContent>
+                  </Card>
+
+                  {/* Total Points Card */}
+                  <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5" />
+                    
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        💰 Total Points
+                      </CardTitle>
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 bg-opacity-10">
+                        <Coins className="h-5 w-5 text-green-400" />
                       </div>
-                      <div className="text-center md:text-right">
-                        <div className="flex items-center justify-center md:justify-end gap-2 mb-2">
-                          <Coins className="h-5 w-5 text-primary" />
-                          <span className="text-sm font-medium text-muted-foreground">Total Points</span>
-                        </div>
-                        <div className="text-2xl font-bold text-primary">
-                          {userStats.user.totalPoints.toLocaleString()}
-                        </div>
+                    </CardHeader>
+                    <CardContent className="relative">
+                      <div className="text-3xl font-bold font-headline text-green-400">
+                        {userStats.user.totalPoints.toLocaleString()}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-green-400/60 to-transparent" />
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             )}
             
-            {/* Main Content with Tabs */}
+            {/* Main Content with Tabs - Modernizado */}
             <div className="lg:col-span-2">
                 <Tabs defaultValue="history" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="history">Points History</TabsTrigger>
-                        <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-2xl p-1">
+                        <TabsTrigger 
+                          value="history" 
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+                        >
+                          📊 Points History
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="leaderboard"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+                        >
+                          🏆 Global Ranking
+                        </TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="history" className="mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Points History</CardTitle>
-                                <CardDescription>Track your points earned and spent.</CardDescription>
+                        <Card className="border-2 border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-green-500/10">
+                            <CardHeader className="bg-gradient-to-r from-green-500/5 to-emerald-500/5">
+                                <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                                  📈 Points History
+                                </CardTitle>
+                                <CardDescription>Track the points you have earned and spent.</CardDescription>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div ref={pointsContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
@@ -517,18 +570,20 @@ function PointsView() {
                     </TabsContent>
                     
                     <TabsContent value="leaderboard" className="mt-6">
-                        <Card>
-                            <CardHeader>
+                        <Card className="border-2 border-blue-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-blue-500/10">
+                            <CardHeader className="bg-gradient-to-r from-blue-500/5 to-cyan-500/5">
                                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                                     <div>
-                                        <CardTitle>Leaderboard</CardTitle>
+                                        <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                                          🏆 Global Ranking
+                                        </CardTitle>
                                         <CardDescription>Top players by total points</CardDescription>
                                     </div>
                                     <div className="relative w-full md:max-w-xs">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-400" />
                                         <Input
-                                            placeholder="Search by player..."
-                                            className="pl-9"
+                                            placeholder="🔍 Search player..."
+                                            className="pl-12 py-3 rounded-xl border-2 border-blue-500/20 bg-card/50 backdrop-blur-sm focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20 transition-all duration-300"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
@@ -600,75 +655,97 @@ function PointsView() {
                 </Tabs>
             </div>
             
-            {/* Sidebar with Daily Drop and HyppieLiquid */}
-            <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Daily Drop</CardTitle>
-                        <CardDescription>{getDailyDropDescription()}</CardDescription>
+            {/* Sidebar modernizado */}
+            <div className="grid auto-rows-max items-start gap-6 lg:gap-8">
+                {/* Daily Drop Card */}
+                <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 opacity-5" />
+                    
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          🎁 Daily Drop
+                        </CardTitle>
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 bg-opacity-10">
+                            <Gift className="h-5 w-5 text-yellow-500" />
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <Button onClick={handleClaim} disabled={buttonState.disabled} className="w-full">
+                    <CardContent className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          {getDailyDropDescription()}
+                        </p>
+                        <Button 
+                          onClick={handleClaim} 
+                          disabled={buttonState.disabled} 
+                          className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-yellow-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-yellow-500/40 disabled:opacity-50 disabled:hover:scale-100"
+                        >
                             {buttonState.icon && <buttonState.icon className="mr-2 h-4 w-4" />}
                             {buttonState.text}
                         </Button>
+                        <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-yellow-500/60 to-transparent" />
                     </CardContent>
                 </Card>
                 
                 {/* HyppieLiquid Stats Card */}
-                <Card>
-                    <CardHeader className="text-center pb-2">
-                        <div className="flex items-center justify-center mb-2">
-                            <Star className="h-6 w-6 text-yellow-500" />
-                        </div>
-                        <CardTitle className="text-lg">HyppieLiquid</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                        <div className="flex justify-center mb-4">
-                            <div className="w-16 h-16 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
-                                <Shield className="h-8 w-8 text-yellow-900" />
+                <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5" />
+                    
+                    <CardHeader className="text-center pb-3">
+                        <div className="flex items-center justify-center mb-3">
+                            <div className="p-2 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 bg-opacity-10">
+                                <Star className="h-6 w-6 text-green-400" />
                             </div>
                         </div>
-                        <div className="text-3xl font-bold text-primary mb-1">
-                            {userStats ? userStats.user.totalPoints.toLocaleString() : (isLoadingUserStats ? '--' : '0')}
+                        <CardTitle className="text-lg font-bold text-foreground">
+                          ✨ HyppieLiquid
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center space-y-4">
+                        <div>
+                            <div className="text-3xl font-bold text-green-400 font-headline">
+                                {userStats ? userStats.user.totalPoints.toLocaleString() : (isLoadingUserStats ? '---' : '0')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Total Points</div>
                         </div>
-                        <div className="text-sm text-muted-foreground mb-4">Total Points</div>
+                        
                         {userStats && (
-                            <>
-                                <div className="text-xs text-muted-foreground mb-1">
-                                    Achieved rank #{userStats.stats.ranking} and chilling at
+                            <div className="space-y-2 pt-2 border-t border-green-500/20">
+                                <div className="text-xs text-muted-foreground">
+                                    🏆 Rank #{userStats.stats.ranking}
                                 </div>
-                                <div className={cn("text-sm font-medium", userStats.stats.tierColor)}>
-                                    {userStats.stats.tier} tier
+                                <div className={cn("text-sm font-medium px-3 py-1 rounded-full", userStats.stats.tierColor)}>
+                                    {userStats.stats.tier} Tier
                                 </div>
-                            </>
+                            </div>
                         )}
+                        
+                        <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-green-400/60 to-transparent" />
                     </CardContent>
                 </Card>
             </div>
         </div>
-        {isLocked && (
-            <div className="absolute inset-0 flex flex-col items-center justify-start pt-24 text-center bg-background/80 backdrop-blur-sm rounded-lg p-4 z-10">
-                <Lock className="h-8 w-8 text-muted-foreground" />
-                {isTimeLocked ? (
-                    <>
-                        <p className="mt-4 text-lg font-semibold">Points are Locked</p>
-                        <p className="mt-1 text-sm text-muted-foreground">This feature will be available soon. Check back later!</p>
-                        <CountdownTimer targetDate={unlockDate.toISOString()} />
-                    </>
-                ) : !isWalletConnected ? (
-                    <>
-                        <p className="mt-4 text-lg font-semibold">Connect Your Wallet</p>
-                        <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view your points and leaderboard.</p>
-                    </>
-                ) : !isStarterQuestCompleted ? (
-                    <>
-                        <p className="mt-4 text-lg font-semibold">Complete Starter Quest First</p>
-                        <p className="mt-1 text-sm text-muted-foreground">You need to complete the "Get Started" quest to unlock the Points section.</p>
-                    </>
-                ) : null}
-            </div>
-        )}
+      </div>
+      {isLocked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-start pt-24 text-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
+            <Lock className="h-8 w-8 text-muted-foreground" />
+            {isTimeLocked ? (
+                <>
+                    <p className="mt-4 text-lg font-semibold">Points are Locked</p>
+                    <p className="mt-1 text-sm text-muted-foreground">This feature will be available soon. Check back later!</p>
+                    <CountdownTimer targetDate={unlockDate.toISOString()} />
+                </>
+            ) : !isWalletConnected ? (
+                <>
+                    <p className="mt-4 text-lg font-semibold">Connect Your Wallet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view your points and leaderboard.</p>
+                </>
+            ) : !isStarterQuestCompleted ? (
+                <>
+                    <p className="mt-4 text-lg font-semibold">Complete Starter Quest First</p>
+                    <p className="mt-1 text-sm text-muted-foreground">You need to complete the "Get Started" quest to unlock the Points section.</p>
+                </>
+            ) : null}
+        </div>
+      )}
     </div>
   );
 }

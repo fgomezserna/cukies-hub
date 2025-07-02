@@ -11,7 +11,7 @@ type MessagePayload = {
 };
 
 const TARGET_ORIGIN = process.env.NODE_ENV === 'production' 
-  ? 'https://hyppie-road.vercel.app' // Dominio del juego en producción
+  ? 'https://hyppie-road.vercel.app' // Game domain in production
   : 'http://localhost:9003';
 
 /**
@@ -30,7 +30,7 @@ export function useParentConnection(
         type: 'AUTH_STATE_CHANGED',
         payload: authData,
       };
-      // Esperamos a que el iframe esté cargado para enviar el mensaje
+      // Wait for the iframe to load before sending the message
       iframeRef.current.onload = () => {
         iframeRef.current?.contentWindow?.postMessage(message, TARGET_ORIGIN);
       };

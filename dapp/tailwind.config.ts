@@ -28,6 +28,17 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Colores personalizados para diseño vibrante
+        neon: {
+          green: '#00FFD0',
+          blue: '#00ADEF',
+          purple: '#8B5CF6',
+        },
+        vibrant: {
+          green: '#10B981',
+          emerald: '#059669',
+          teal: '#0D9488',
+        },
         popover: {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
@@ -104,6 +115,17 @@ export default {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'grid': 'grid 15s linear infinite',
+        'float-slow': 'float-slow 20s ease-in-out infinite',
+        'glow-pulse': 'glow-pulse 4s ease-in-out infinite',
+        'wave': 'wave 8s ease-in-out infinite',
+      },
+      animationDelay: {
+        '1000': '1000ms',
+        '2000': '2000ms',
+        '3000': '3000ms',
+        '4000': '4000ms',
+        '6000': '6000ms',
+        '8000': '8000ms',
       },
       backgroundImage: {
         'grid-accent': "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='hsl(var(--accent))'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e\")",

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         const newUser = await prisma.user.create({
           data: {
             walletAddress: lowercasedAddress,
-            username: lowercasedAddress, // Usamos toda la wallet address como username único
+            username: lowercasedAddress, // Use the entire wallet address as unique username
           },
         });
         
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
           }
         });
       } catch (createError) {
-        // Si el error es P2002 (constraint único violado), significa que el usuario ya fue creado
-        // por otro proceso mientras tanto, así que lo buscamos nuevamente
+              // If the error is P2002 (unique constraint violation), it means the user was already created
+      // by another process in the meantime, so we search for it again
         if (createError instanceof Prisma.PrismaClientKnownRequestError && createError.code === 'P2002') {
           user = await prisma.user.findUnique({
             where: {

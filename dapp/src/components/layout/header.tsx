@@ -59,20 +59,23 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6">
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-green-500/20 bg-black/25 backdrop-blur-md shadow-lg shadow-green-500/10 px-4 sm:px-6">
       <Button
         variant="ghost"
         size="icon"
         onClick={toggleSidebar}
+        className="hover:bg-green-500/10 hover:text-green-400 transition-all duration-300"
       >
         <PanelLeft />
         <span className="sr-only">Toggle Sidebar</span>
       </Button>
 
       {(isMobile || state === 'collapsed') && (
-        <div className="flex items-center gap-2">
-            <Logo />
-            <span className="font-bold font-headline text-lg">HyppieLiquid</span>
+        <div className="flex items-center gap-2 group">
+            <Logo className="group-hover:scale-110 transition-transform duration-300" />
+            <span className="font-bold font-headline text-lg bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+              HyppieLiquid
+            </span>
         </div>
       )}
 
@@ -82,32 +85,36 @@ export default function Header() {
         {user && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative rounded-full group">
-                <Bell />
+              <Button variant="ghost" size="icon" className="relative rounded-full group hover:bg-green-500/10 transition-all duration-300">
+                <Bell className="group-hover:text-green-400 transition-colors" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 group-hover:bg-destructive"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary group-hover:bg-destructive"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
                 </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
+            <PopoverContent className="w-80 border-2 border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-green-500/10" align="end">
                 <CardHeader className="pb-4">
-                  <CardTitle>Notifications</CardTitle>
+                  <CardTitle className="text-foreground">🔔 Notifications</CardTitle>
                   <CardDescription>You have 1 unread message.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
-                  <div className="flex items-start gap-4">
-                      <Avatar className="h-8 w-8">
+                  <div className="flex items-start gap-4 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                      <Avatar className="h-10 w-10 border-2 border-green-400/30">
                           <AvatarImage src="https://placehold.co/100x100.png" alt="Avatar" data-ai-hint="logo icon"/>
-                          <AvatarFallback>HL</AvatarFallback>
+                          <AvatarFallback className="bg-gradient-to-br from-green-400 to-emerald-500 text-white font-bold">HL</AvatarFallback>
                       </Avatar>
                       <div className="grid gap-1">
-                          <p className="text-sm font-medium">Welcome to HyppieLiquid!</p>
+                          <p className="text-sm font-medium text-foreground">Welcome to HyppieLiquid! 🎉</p>
                           <p className="text-sm text-muted-foreground">Complete your first quest to earn bonus points.</p>
                       </div>
                   </div>
-                  <Button variant="link" className="w-full" asChild>
-                    <Link href="/quests">View all</Link>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-green-500/30 bg-green-500/10 hover:bg-green-500/20 hover:border-green-400/50 transition-all duration-300" 
+                    asChild
+                  >
+                    <Link href="/quests">✨ View All</Link>
                   </Button>
                 </CardContent>
             </PopoverContent>
@@ -117,43 +124,57 @@ export default function Header() {
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full group hover:bg-green-500/10 transition-all duration-300">
+                <Avatar className="h-10 w-10 border-2 border-green-400/30 group-hover:border-green-400/60 transition-all duration-300">
                   <AvatarImage src={user.profilePictureUrl ?? "https://placehold.co/100x100.png"} alt={user.username ?? "user"} data-ai-hint="profile avatar" />
-                  <AvatarFallback>{user.username?.slice(0,1).toUpperCase() ?? "U"}</AvatarFallback>
+                  <AvatarFallback className="bg-gradient-to-br from-green-400 to-emerald-500 text-white font-bold">
+                    {user.username?.slice(0,1).toUpperCase() ?? "U"}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>{user.username ?? "My Account"}</DropdownMenuLabel>
-              <div className="px-2 pt-1 pb-2">
-                <p className="text-xs text-muted-foreground">Rank</p>
-                <p className="font-semibold text-primary">{userRank}</p>
-                <p className="text-xs text-muted-foreground mt-2">XP</p>
-                <p className="font-semibold font-mono">{userXP.toLocaleString()}</p>
+            <DropdownMenuContent align="end" className="w-64 border-2 border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-green-500/10">
+              <DropdownMenuLabel className="text-base font-bold text-foreground">
+                👤 {user.username ?? "My Account"}
+              </DropdownMenuLabel>
+              <div className="px-3 pt-2 pb-3 space-y-3">
+                <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-400/20">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Rank</p>
+                  <p className="font-bold text-green-400 text-sm">{userRank}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-400/20">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">XP</p>
+                  <p className="font-bold font-mono text-blue-400 text-lg">{userXP.toLocaleString()}</p>
+                </div>
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <Wallet className="mr-2 h-4 w-4" />
-                <span>My Wallet</span>
+              <DropdownMenuSeparator className="bg-green-500/20" />
+              <DropdownMenuItem disabled className="opacity-50">
+                <Wallet className="mr-3 h-4 w-4 text-gray-400" />
+                <span>💼 My Wallet</span>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
+              <DropdownMenuItem asChild className="hover:bg-green-500/10 transition-colors">
                 <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
+                  <Settings className="mr-3 h-4 w-4 text-green-400" />
+                  <span>⚙️ Settings</span>
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => disconnect()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Disconnect</span>
+              <DropdownMenuSeparator className="bg-green-500/20" />
+              <DropdownMenuItem 
+                onClick={() => disconnect()} 
+                className="hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
+              >
+                <LogOut className="mr-3 h-4 w-4" />
+                <span>🚪 Disconnect</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button onClick={() => connect({ connector: connectors[0] })} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/50 hover:shadow-md hover:shadow-primary/50 transition-all">
+          <Button 
+            onClick={() => connect({ connector: connectors[0] })} 
+            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-6 py-2 rounded-xl shadow-lg shadow-green-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-green-500/40"
+          >
             <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet
+            💰 Connect Wallet
           </Button>
         )}
       </div>

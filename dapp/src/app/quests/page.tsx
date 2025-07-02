@@ -74,16 +74,46 @@ const getTaskType = (taskText: string | undefined): string => {
 };
 
 const TaskItem = ({ text, completed, onVerify, disabled, taskType = 'auto_verify', isLoading = false }: { text: string; completed: boolean; onVerify: (payload: { type: string, value?: any }) => void; disabled: boolean; taskType?: string; isLoading?: boolean; }) => (
-  <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
-    {completed ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
-    <span className={completed ? 'text-foreground' : 'text-muted-foreground'}>{text}</span>
-    <Button size="sm" variant="ghost" className="ml-auto" disabled={completed || disabled || isLoading} onClick={() => onVerify({ type: taskType })}>
+  <div className={cn(
+    "flex items-center gap-4 py-4 px-5 rounded-xl transition-all duration-300 border-2",
+    completed 
+      ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30" 
+      : "bg-gradient-to-r from-blue-500/5 to-cyan-500/5 border-blue-500/20 hover:border-blue-400/40"
+  )}>
+    <div className={cn(
+      "p-1 rounded-full",
+      completed ? "bg-green-500/20" : "bg-blue-500/20"
+    )}>
+      {completed ? (
+        <CheckCircle2 className="h-5 w-5 text-green-400" /> 
+      ) : (
+        <Circle className="h-5 w-5 text-blue-400" />
+      )}
+    </div>
+    <span className={cn(
+      "flex-1 font-medium",
+      completed ? 'text-green-400' : 'text-foreground'
+    )}>
+      {text}
+    </span>
+    <Button 
+      size="sm" 
+      variant={completed ? "outline" : "default"}
+      className={cn(
+        "transition-all duration-300 font-semibold px-4 py-2 rounded-lg",
+        completed 
+          ? "border-green-500/30 text-green-400 hover:bg-green-500/10" 
+          : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
+      )}
+      disabled={completed || disabled || isLoading} 
+      onClick={() => onVerify({ type: taskType })}
+    >
       {isLoading ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Verifying
+          Verificando...
         </>
-      ) : completed ? 'Verified' : 'Verify'}
+      ) : completed ? '✅ Verificado' : '🔍 Verificar'}
     </Button>
   </div>
 );
@@ -492,23 +522,50 @@ function QuestsView() {
   }
 
   return (
-    <div className="relative flex flex-col gap-6">
-      <div className={cn("flex flex-col gap-6", isLocked && 'blur-sm pointer-events-none')}>
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Quests</h1>
-          <p className="text-muted-foreground">Complete quests to earn XP and climb the leaderboard.</p>
+    <div className="relative flex flex-col gap-8">
+      <div className={cn("flex flex-col gap-8", isLocked && 'blur-sm pointer-events-none')}>
+        {/* Header moderno */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+            🏆 Mission Center
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Complete missions to earn XP and climb the ranking. Every completed quest brings you closer to the top!
+          </p>
+          <div className="flex justify-center items-center gap-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="h-4 w-4 text-green-400" />
+              {completedQuestsCount} Completed
+            </span>
+            <span className="flex items-center gap-1">
+              <Circle className="h-4 w-4 text-blue-400" />
+              {quests.length - completedQuestsCount} Pending
+            </span>
+          </div>
         </div>
 
         {starterQuest && !starterQuest.isCompleted && (
-          <Card className="bg-card/80 border-primary/50 border-2">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-md">
-                  <Star className="h-6 w-6 text-primary" />
+          <Card className="relative overflow-hidden border-2 border-yellow-500/30 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-yellow-500/20">
+            {/* Special glow effect for the initial quest */}
+            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 animated-gradient" />
+            
+            <CardHeader className="relative">
+              <div className="flex items-center gap-4">
+                <div className="relative p-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Star className="h-8 w-8 text-white drop-shadow-lg" />
+                  {/* Glow effect */}
+                  <div className="absolute inset-0 rounded-2xl bg-yellow-400/30 blur-xl scale-150" />
                 </div>
-                <div>
-                  <CardTitle>{starterQuest.title}</CardTitle>
-                  <CardDescription>{starterQuest.description}</CardDescription>
+                <div className="flex-1">
+                  <CardTitle className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                    ✨ {starterQuest.title}
+                  </CardTitle>
+                  <CardDescription className="text-base mt-1">
+                    {starterQuest.description}
+                  </CardDescription>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-400/30">
+                  <span className="text-xs font-bold text-yellow-400 uppercase tracking-wide">Starter Quest</span>
                 </div>
               </div>
             </CardHeader>
@@ -533,14 +590,26 @@ function QuestsView() {
                   }
               })}
             </CardContent>
-            <CardFooter className="flex-col items-stretch gap-4">
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Progress</span>
-                <span>{completedStarterTasks}/{totalStarterTasks}</span>
+            <CardFooter className="relative flex-col items-stretch gap-6 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">🎯 Progress</span>
+                  <span className="text-sm font-bold text-foreground px-2 py-1 rounded-full bg-yellow-500/20">
+                    {completedStarterTasks}/{totalStarterTasks}
+                  </span>
+                </div>
+                <div className="relative">
+                  <Progress value={starterProgress} className="h-3" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 rounded-full" />
+                </div>
               </div>
-              <Progress value={starterProgress} />
-             <Button onClick={() => handleClaimReward(starterQuest.id)} disabled={!isStarterTasksComplete || starterQuest.isCompleted}>
-                  {starterQuest.isCompleted ? 'Reward Claimed' : `Claim ${starterQuest.xp} XP`}
+              
+              <Button 
+                onClick={() => handleClaimReward(starterQuest.id)} 
+                disabled={!isStarterTasksComplete || starterQuest.isCompleted}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-yellow-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-yellow-500/40 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                {starterQuest.isCompleted ? '✅ Reward Claimed' : `🚀 Claim ${starterQuest.xp} XP`}
               </Button>
             </CardFooter>
           </Card>
@@ -548,58 +617,134 @@ function QuestsView() {
 
         <div className="relative">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className={cn(isQuestsLocked && 'blur-sm pointer-events-none')}>
-              <TabsTrigger value="all">All Quests</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsList className={cn("grid w-full grid-cols-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-2xl p-1", isQuestsLocked && 'blur-sm pointer-events-none')}>
+              <TabsTrigger 
+                value="all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              >
+                📋 All
+              </TabsTrigger>
+              <TabsTrigger 
+                value="active"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              >
+                ⚡ Active
+              </TabsTrigger>
+              <TabsTrigger 
+                value="completed"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              >
+                ✅ Completed
+              </TabsTrigger>
             </TabsList>
             <TabsContent value={activeTab} className={cn("pt-4", isQuestsLocked && 'blur-sm pointer-events-none')}>
               <div className="space-y-4">
                 {displayedQuests.length > 0 ? (
-                  displayedQuests.map(quest => (
+                  displayedQuests.map((quest, index) => (
                   <Accordion type="single" collapsible key={quest.id} className="w-full" disabled={quest.isLocked}>
-                      <AccordionItem value={quest.id} className="border rounded-lg">
-                        <AccordionTrigger className="p-4 hover:no-underline data-[state=open]:border-b">
-                          <div className="flex items-center gap-4 flex-1">
-                              <div className="p-2 bg-muted rounded-md">
-                                  {quest.isLocked ? <Lock className="h-6 w-6 text-muted-foreground" /> : <quest.icon className="h-6 w-6 text-muted-foreground" />}
+                      <AccordionItem 
+                        value={quest.id} 
+                        className={cn(
+                          "border-2 rounded-2xl overflow-hidden transition-all duration-500 hover:shadow-lg",
+                          quest.isCompleted 
+                            ? "border-green-500/30 bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:shadow-green-500/20" 
+                            : "border-blue-500/20 bg-gradient-to-br from-card to-card/50 hover:border-blue-400/40 hover:shadow-blue-500/20",
+                          quest.isLocked && "border-gray-500/20 bg-gradient-to-br from-card/50 to-card/30"
+                        )}
+                      >
+                        <AccordionTrigger className="p-6 hover:no-underline data-[state=open]:border-b data-[state=open]:border-current/20 group">
+                          <div className="flex items-center gap-6 flex-1">
+                              <div className="relative">
+                                <div className={cn(
+                                  "p-3 rounded-2xl transition-all duration-300 group-hover:scale-110",
+                                  quest.isCompleted 
+                                    ? "bg-gradient-to-br from-green-400 to-emerald-500" 
+                                    : quest.isLocked 
+                                      ? "bg-gradient-to-br from-gray-400 to-gray-500"
+                                      : "bg-gradient-to-br from-blue-400 to-cyan-500"
+                                )}>
+                                  {quest.isLocked ? (
+                                    <Lock className="h-7 w-7 text-white drop-shadow-lg" />
+                                  ) : (
+                                    <quest.icon className="h-7 w-7 text-white drop-shadow-lg" />
+                                  )}
+                                </div>
+                                {/* Quest number */}
+                                <div className="absolute -top-2 -right-2 w-6 h-6 bg-black/80 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                                  {index + 1}
+                                </div>
                               </div>
-                              <div className="text-left">
-                                  <p className="font-semibold">{quest.title}</p>
-                                  <p className="text-sm text-muted-foreground">{quest.description}</p>
+                              
+                              <div className="text-left flex-1">
+                                  <p className={cn(
+                                    "font-bold text-lg transition-colors",
+                                    quest.isCompleted ? "text-green-400" : "text-foreground group-hover:text-primary"
+                                  )}>
+                                    {quest.title}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground mt-1">{quest.description}</p>
                               </div>
-                              <div className="ml-auto flex items-center gap-4">
-                                  <Badge variant="secondary" className="font-mono text-base">
-                                      {quest.xp} XP
+                              
+                              <div className="flex items-center gap-4">
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={cn(
+                                      "font-mono text-base py-1 px-3 rounded-xl font-bold",
+                                      quest.isCompleted 
+                                        ? "bg-green-500/20 text-green-400 border border-green-400/30"
+                                        : "bg-blue-500/20 text-blue-400 border border-blue-400/30"
+                                    )}
+                                  >
+                                      💎 {quest.xp} XP
                                   </Badge>
-                                  {quest.isCompleted && <CheckCircle2 className="h-6 w-6 text-primary" />}
+                                  {quest.isCompleted && (
+                                    <div className="p-2 rounded-full bg-green-500/20">
+                                      <CheckCircle2 className="h-6 w-6 text-green-400" />
+                                    </div>
+                                  )}
                               </div>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="p-4 space-y-4">
-                                                      {quest.tasks.map((task) => {
-                              const taskText = getTaskText(task);
-                              const taskType = getTaskType(taskText);
-                              
-                              return (
-                                <TaskItem 
-                                  key={task.id} 
-                                  text={taskText} 
-                                  completed={task.completed} 
-                                  onVerify={(payload) => handleVerifyTask(quest.id, task.id, payload)} 
-                                  disabled={quest.isLocked || quest.isCompleted} 
-                                  taskType={taskType}
-                                  isLoading={verifyingTasks.has(task.id)}
-                                />
-                              );
-                            })}
-                            <Button 
+                        <AccordionContent className="px-6 pb-6 space-y-6 bg-gradient-to-r from-muted/20 to-muted/10">
+                            <div className="space-y-3">
+                              {quest.tasks.map((task, taskIndex) => {
+                                const taskText = getTaskText(task);
+                                const taskType = getTaskType(taskText);
+                                
+                                return (
+                                  <div key={task.id} className="relative">
+                                    <div className="absolute left-0 top-0 w-6 h-6 bg-black/80 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                                      {taskIndex + 1}
+                                    </div>
+                                    <div className="ml-8">
+                                      <TaskItem 
+                                        text={taskText} 
+                                        completed={task.completed} 
+                                        onVerify={(payload) => handleVerifyTask(quest.id, task.id, payload)} 
+                                        disabled={quest.isLocked || quest.isCompleted} 
+                                        taskType={taskType}
+                                        isLoading={verifyingTasks.has(task.id)}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            
+                            <div className="pt-4 border-t border-current/10">
+                              <Button 
                                 onClick={() => handleClaimReward(quest.id)} 
                                 disabled={quest.tasks.some(t => !t.completed) || quest.isCompleted}
-                                className="w-full"
-                            >
-                                {quest.isCompleted ? 'Claimed' : `Claim ${quest.xp} XP`}
-                            </Button>
+                                className={cn(
+                                  "w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:hover:scale-100",
+                                  quest.isCompleted 
+                                    ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-green-500/30 hover:shadow-green-500/40"
+                                    : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-blue-500/30 hover:shadow-blue-500/40"
+                                )}
+                              >
+                                {quest.isCompleted ? '✅ Claimed' : `🚀 Claim ${quest.xp} XP`}
+                              </Button>
+                            </div>
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>

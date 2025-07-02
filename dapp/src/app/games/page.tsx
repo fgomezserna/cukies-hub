@@ -30,59 +30,106 @@ export default function GamesPage() {
   return (
     <AppLayout>
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-3xl font-bold font-headline">Games</h1>
-            <p className="text-muted-foreground">Choose your game and test your luck.</p>
+        <div className="flex flex-col gap-6">
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+              🎮 Game Center
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Choose your favorite game and test your luck in our gaming ecosystem
+            </p>
           </div>
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          
+          <div className="relative w-full max-w-md mx-auto">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-green-400" />
             <Input
-              placeholder="Search games..."
-              className="pl-9"
+              placeholder="🔍 Search games..."
+              className="pl-12 py-3 rounded-xl border-2 border-green-500/20 bg-card/50 backdrop-blur-sm focus:border-green-400/50 focus:ring-2 focus:ring-green-400/20 transition-all duration-300"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredGames.map((game) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredGames.map((game, index) => (
             <Card 
               key={game.name}
               className={cn(
-                "flex flex-col overflow-hidden transition-all duration-300",
+                "group relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all duration-500",
                 game.playable
-                  ? "hover:shadow-lg hover:shadow-primary/20 hover:scale-105"
-                  : "cursor-not-allowed"
+                  ? "border-green-500/20 bg-gradient-to-br from-card to-card/50 hover:border-green-400/40 hover:scale-105 hover:shadow-xl hover:shadow-green-500/20"
+                  : "border-gray-500/20 bg-gradient-to-br from-card/50 to-card/30 cursor-not-allowed"
               )}
             >
-              <CardHeader className="p-0 relative">
-                <Image src={game.imageUrl} alt={game.name} width={600} height={400} className="object-cover" data-ai-hint={game.hint} />
+              <CardHeader className="p-0 relative overflow-hidden">
+                <Image 
+                  src={game.imageUrl} 
+                  alt={game.name} 
+                  width={600} 
+                  height={400} 
+                  className={cn(
+                    "object-cover h-52 transition-transform duration-500",
+                    game.playable ? "group-hover:scale-110" : "grayscale"
+                  )} 
+                  data-ai-hint={game.hint} 
+                />
+                
+                {/* Overlay for non-playable games */}
                 {!game.playable && (
-                  <div className="absolute inset-0 bg-black/50 mix-blend-multiply z-10" />
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-white font-bold text-lg bg-black/80 px-4 py-2 rounded-full">
+                      🚧 Coming Soon
+                    </span>
+                  </div>
                 )}
+                
+                {/* Badge LIVE */}
                 {game.live && (
-                  <div className="absolute top-4 right-4 flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-xs font-semibold">
+                  <div className="absolute top-4 right-4 flex items-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                     </span>
-                    LIVE
+                    🔴 LIVE
                   </div>
                 )}
+                
+                {/* Popularity indicator */}
+                <div className="absolute top-4 left-4 px-2 py-1 bg-black/80 rounded-full text-white text-xs font-bold">
+                  #{index + 1}
+                </div>
+                
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
               </CardHeader>
-              <CardContent className="pt-6 flex-grow">
-                <CardTitle className="font-headline text-xl">{game.name}</CardTitle>
-                <CardDescription className="mt-2">{game.description}</CardDescription>
+              
+              <CardContent className="pt-6 flex-grow space-y-3">
+                <CardTitle className="font-headline text-xl text-foreground group-hover:text-primary transition-colors">
+                  {game.name}
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {game.description}
+                </CardDescription>
               </CardContent>
-              <CardFooter>
+              
+              <CardFooter className="pt-2">
                 {game.playable ? (
-                  <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Link href={game.href!}>Play Now</Link>
+                  <Button 
+                    asChild 
+                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/30"
+                  >
+                    <Link href={game.href!}>
+                      🎮 Play Now
+                    </Link>
                   </Button>
                 ) : (
-                  <Button disabled className="w-full cursor-not-allowed">Coming soon</Button>
+                  <Button 
+                    disabled 
+                    className="w-full bg-gray-600 text-gray-300 cursor-not-allowed py-3 rounded-xl"
+                  >
+                    ⏰ Coming Soon
+                  </Button>
                 )}
               </CardFooter>
             </Card>
