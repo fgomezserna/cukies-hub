@@ -76,9 +76,9 @@ export function MovingToken({ fromIndex, toIndex, isMoving, onAnimationComplete,
 
   return (
     <div
-      className="absolute pointer-events-none z-50 transition-none"
+      className="absolute pointer-events-none z-50 transition-none overflow-hidden"
       style={{
-        left: `${(currentCol / gridCols) * 100}%`,
+        left: `${Math.max(0, Math.min((currentCol / gridCols) * 100, 75))}%`,
         top: `${(currentRow * 100) / 1}%`, // Simplificado para una sola fila
         width: `${100 / gridCols}%`,
         height: `100%`, // Altura completa del contenedor

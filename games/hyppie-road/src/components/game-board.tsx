@@ -143,8 +143,8 @@ export function GameBoard({
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 mt-12">
-      <div className="relative">
+    <div className="w-full max-w-4xl mx-auto p-4 mt-12 overflow-hidden">
+      <div className="relative overflow-hidden">
         {/* Indicador de progreso con scroll */}
         <div className="mb-6 text-center">
           <span className="text-sm text-white font-semibold">
