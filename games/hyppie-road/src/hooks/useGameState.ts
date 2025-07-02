@@ -54,11 +54,24 @@ export const useGameState = create<GameStore>((set, get) => ({
     }
     
     const { game: updatedGame, result } = advance(state);
-    set({
-      ...updatedGame,
-      isAdvanceDisabled: !canAdvance(updatedGame),
-      isCashOutDisabled: !canCashOut(updatedGame),
-    });
+    
+    // Si hay trampa, NO actualizar el estado del juego aún - mantener "playing"
+    if (result && !result.success && result.trapPosition !== undefined) {
+      // Solo actualizar la posición y tiles para mostrar efectos visuales
+      set({
+        ...state,
+        position: updatedGame.position,
+        tiles: updatedGame.tiles,
+        // gameState sigue siendo "playing" para mantener la vista del juego
+      });
+    } else {
+      // Para victorias o avances normales, actualizar todo
+      set({
+        ...updatedGame,
+        isAdvanceDisabled: !canAdvance(updatedGame),
+        isCashOutDisabled: !canCashOut(updatedGame),
+      });
+    }
     
     return result;
   },

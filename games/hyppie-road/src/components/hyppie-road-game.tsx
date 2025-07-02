@@ -8,6 +8,7 @@ import { GameBoard } from './game-board';
 import { GameControls } from './game-controls';
 import { GameStats } from './game-stats';
 import { GameResultComponent } from './game-result';
+import { GameOverAnimation } from './game-over-animation';
 import { GameResult } from '@/types/game';
 
 export function HyppieRoadGame() {
@@ -34,6 +35,7 @@ export function HyppieRoadGame() {
 
   const [gameResult, setGameResult] = React.useState<GameResult | null>(null);
   const [previousPosition, setPreviousPosition] = React.useState<number | undefined>(undefined);
+  const [showGameOverAnimation, setShowGameOverAnimation] = React.useState(false);
 
   // Manejar inicio del juego
   const handleStartGame = useCallback((amount: number) => {
@@ -58,7 +60,18 @@ export function HyppieRoadGame() {
     try {
       const result = makeAdvance();
       if (result) {
-        setGameResult(result);
+        // Si es una derrota por trampa, NO hacer nada más que mostrar efectos visuales
+        if (!result.success && result.trapPosition !== undefined) {
+          // NO actualizar gameResult, solo mostrar efectos visuales
+          // Después de ver los efectos, establecer resultado y volver al menú
+          setTimeout(() => {
+            setGameResult(result);
+          }, 2000); // 2 segundos para ver el efecto visual
+        } else {
+          // Victoria o retiro exitoso - mostrar resultado inmediatamente  
+          setGameResult(result);
+        }
+        
         setIsAnimating(false);
       }
     } catch (error) {
@@ -90,6 +103,14 @@ export function HyppieRoadGame() {
   // Manejar juego nuevo
   const handlePlayAgain = useCallback(() => {
     setGameResult(null);
+    setShowGameOverAnimation(false);
+    resetGame();
+  }, [resetGame]);
+
+  // Manejar retorno al menú desde Game Over
+  const handleReturnToMenu = useCallback(() => {
+    setShowGameOverAnimation(false);
+    setGameResult(null);
     resetGame();
   }, [resetGame]);
 
@@ -106,7 +127,9 @@ export function HyppieRoadGame() {
     });
   }, [gameState, betAmount, tiles, position, multiplier, potentialWinning, isGameActive]);
 
-  // Si hay un resultado, mostrarlo
+
+
+  // Si hay un resultado normal (victoria o retiro), mostrarlo
   if (gameResult) {
     return (
       <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
@@ -141,7 +164,7 @@ export function HyppieRoadGame() {
 
   // Juego activo
   return (
-    <div className="w-full max-w-[98vw] mx-auto p-2 min-h-screen overflow-hidden">
+    <div className="w-full max-w-[98vw] mx-auto p-2 min-h-screen overflow-hidden relative">
       <div className="space-y-2">
         {/* Header */}
         <div className="text-center">
@@ -149,7 +172,7 @@ export function HyppieRoadGame() {
           <p className="text-muted-foreground">Bet: ${betAmount.toFixed(2)}</p>
         </div>
 
-        {/* Tablero del juego */}
+        {/* Tablero del juego - SIEMPRE visible */}
         <GameBoard
           tiles={tiles}
           isAnimating={isAnimating}
@@ -184,6 +207,8 @@ export function HyppieRoadGame() {
           />
         )}
       </div>
+
+
     </div>
   );
 }

@@ -103,7 +103,7 @@ export function GameBoard({
               "aspect-[3/4] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden"
             )}
             style={{
-              backgroundImage: 'url(/assets/images/section01.png)',
+              backgroundImage: `url(/assets/images/${tile.isActive && tile.hasTrap ? 'section02.png' : 'section01.png'})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat'
@@ -118,12 +118,28 @@ export function GameBoard({
             {/* Contenido principal */}
             <div className="flex flex-col items-center justify-center">
               {tile.isActive ? (
-                // Token animado - idle cuando no se está moviendo (prioridad máxima)
-                !isMovingToken && <AnimatedToken isMoving={false} className="drop-shadow-lg" />
+                tile.hasTrap ? (
+                  // Token cayendo en trampa - usar imagen fall.png SIN animaciones
+                  <div 
+                    className="w-32 h-32 bg-center bg-no-repeat drop-shadow-lg"
+                    style={{
+                      backgroundImage: 'url(/assets/images/fall.png)',
+                      backgroundSize: 'contain',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat'
+                    }}
+                  />
+                ) : (
+                  // Token animado normal - solo cuando NO hay trampa
+                  !isMovingToken && <AnimatedToken isMoving={false} className="drop-shadow-lg" />
+                )
               ) : tile.revealed ? (
                 tile.hasTrap ? (
-                  // Icono de trampa
-                  <div className="text-red-500 text-5xl drop-shadow-lg">💥</div>
+                  // Casilla revelada con trampa (ya pasada)
+                  <div className="relative">
+                    <div className="text-red-400 text-4xl drop-shadow-lg opacity-60">💥</div>
+                    <div className="absolute inset-0 bg-red-800 rounded-full opacity-20"></div>
+                  </div>
                 ) : (
                   // Icono de éxito - solo en casillas completadas donde NO está el token
                   <div className="text-green-400 text-5xl drop-shadow-lg">✅</div>
