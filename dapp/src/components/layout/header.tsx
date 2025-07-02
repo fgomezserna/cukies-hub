@@ -20,9 +20,13 @@ import { Bell, Wallet, Settings, LogOut, PanelLeft } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import Logo from '@/components/icons/logo';
+import Image from 'next/image';
+import hyppieletters from '@/assets/hyppieletters.png';
+import hyppieicon from '@/assets/hyppiesymbol.png';
 import { useAuth } from '@/providers/auth-provider';
 import { useConnect, useDisconnect } from 'wagmi';
+
+
 
 const ranks = [
   { xp: 50000, name: 'Hyppie Master' },
@@ -72,10 +76,8 @@ export default function Header() {
 
       {(isMobile || state === 'collapsed') && (
         <div className="flex items-center gap-2 group">
-            <Logo className="group-hover:scale-110 transition-transform duration-300" />
-            <span className="font-bold font-headline text-lg bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-              HyppieLiquid
-            </span>
+            <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
+            <Image src={hyppieletters} alt="HyppieLiquid" height={39} />
         </div>
       )}
 

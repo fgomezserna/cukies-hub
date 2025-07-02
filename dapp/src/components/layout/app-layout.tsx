@@ -28,12 +28,21 @@ import XIcon from '../icons/x-icon';
 import Image from 'next/image';
 import hyppieletters from '@/assets/hyppieletters.png';
 import hyppieicon from '@/assets/hyppiesymbol.png';
+import { usePathname } from 'next/navigation';
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname();
+
   return (
     <div className="flex h-screen w-full bg-background relative">
       <SidebarProvider>
-        <Sidebar collapsible="icon" className="border-r border-green-500/20 bg-black/25 backdrop-blur-md shadow-xl shadow-green-500/10">
+        <Sidebar collapsible="icon" className="border-r border-green-500/20 bg-black/10 backdrop-blur-md shadow-xl shadow-green-500/10" style={{
+            // Override sidebar background variable for transparency
+            // 25% opaque black provides dark overlay while showing content background
+            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+            "--sidebar-background": "rgb(255, 255, 255)",
+            "--sidebar-border": "rgba(16,185,129,0.3)"
+          } as React.CSSProperties}>
           <SidebarHeader className="border-b border-green-500/20 bg-black/15 backdrop-blur-sm">
             <div className="flex items-center gap-3 p-1">
                 <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
@@ -44,7 +53,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <SidebarMenu className="px-3 space-y-1">
               <SidebarMenuItem>
                 <Link href="/" passHref>
-                  <SidebarMenuButton className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50">
+                  <SidebarMenuButton
+                    isActive={pathname === '/'}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-cyan-500/20 group-hover:from-blue-400/30 group-hover:to-cyan-500/30 transition-all">
                         <Home className="h-4 w-4 text-blue-400 group-hover:text-cyan-400 transition-colors" />
@@ -57,7 +69,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               
               <SidebarMenuItem>
                 <Link href="/games" passHref>
-                  <SidebarMenuButton className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50">
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith('/games')}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400/20 to-emerald-500/20 group-hover:from-green-400/30 group-hover:to-emerald-500/30 transition-all">
                         <Gamepad2 className="h-4 w-4 text-green-400 group-hover:text-emerald-400 transition-colors" />
@@ -70,7 +85,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               
               <SidebarMenuItem>
                 <Link href="/leaderboard" passHref>
-                  <SidebarMenuButton className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50">
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith('/leaderboard')}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-yellow-400/20 to-orange-500/20 group-hover:from-yellow-400/30 group-hover:to-orange-500/30 transition-all">
                         <Trophy className="h-4 w-4 text-yellow-400 group-hover:text-orange-400 transition-colors" />
@@ -83,7 +101,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               
               <SidebarMenuItem>
                 <Link href="/quests" passHref>
-                  <SidebarMenuButton className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50">
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith('/quests')}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-400/20 to-pink-500/20 group-hover:from-purple-400/30 group-hover:to-pink-500/30 transition-all">
                         <Star className="h-4 w-4 text-purple-400 group-hover:text-pink-400 transition-colors" />
@@ -96,7 +117,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               
               <SidebarMenuItem>
                 <Link href="/referrals" passHref>
-                  <SidebarMenuButton className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50">
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith('/referrals')}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-indigo-400/20 to-blue-500/20 group-hover:from-indigo-400/30 group-hover:to-blue-500/30 transition-all">
                         <Users className="h-4 w-4 text-indigo-400 group-hover:text-blue-400 transition-colors" />
@@ -109,7 +133,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               
               <SidebarMenuItem>
                 <Link href="/points" passHref>
-                  <SidebarMenuButton className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50">
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith('/points')}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-green-500/10 hover:to-emerald-500/10 hover:border-green-400/30 hover:shadow-md hover:shadow-green-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500/20 data-[active=true]:to-emerald-500/20 data-[active=true]:border-green-400/50"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-400/20 to-yellow-500/20 group-hover:from-amber-400/30 group-hover:to-yellow-500/30 transition-all">
                         <Coins className="h-4 w-4 text-amber-400 group-hover:text-yellow-400 transition-colors" />
@@ -121,6 +148,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </SidebarMenuItem>
             </SidebarMenu>
             
+
           </SidebarContent>
           <SidebarFooter className="border-t border-green-500/20 bg-black/15 backdrop-blur-sm">
             <div className="p-3 flex flex-col gap-3 group-data-[collapsible=icon]:items-center">

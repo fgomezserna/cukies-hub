@@ -13,28 +13,28 @@ export default function StatsCards() {
             value: user?.xp.toLocaleString() ?? '--',
             icon: Star,
             gradient: 'from-emerald-400 to-green-500',
-            iconColor: 'text-emerald-400'
+            iconColor: 'text-white'
         },
         {
             title: 'My Rank',
             value: '#1,234',
             icon: TrendingUp,
             gradient: 'from-blue-400 to-cyan-500',
-            iconColor: 'text-blue-400'
+            iconColor: 'text-white'
         },
         {
             title: 'Total Players',
             value: '12,345',
             icon: Users,
             gradient: 'from-purple-400 to-pink-500',
-            iconColor: 'text-purple-400'
+            iconColor: 'text-white'
         },
         {
             title: 'Total Points',
             value: '1,234,567',
             icon: Coins,
             gradient: 'from-yellow-400 to-orange-500',
-            iconColor: 'text-yellow-400'
+            iconColor: 'text-white'
         }
     ];
 
