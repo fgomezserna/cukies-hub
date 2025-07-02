@@ -38,19 +38,6 @@ const fullLeaderboardDataRaw = [
 const ITEMS_PER_PAGE = 20;
 const LEADERBOARD_LIMIT = 100;
 
-// Helper to check if two dates are on the same calendar day
-const isSameDay = (d1: Date, d2: Date) =>
-  d1.getFullYear() === d2.getFullYear() &&
-  d1.getMonth() === d2.getMonth() &&
-  d1.getDate() === d2.getDate();
-
-// Helper to check if a date was yesterday
-const isYesterday = (date: Date) => {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return isSameDay(date, yesterday);
-};
-
 
 function PointsView() {
   const { toast } = useToast();
@@ -76,6 +63,7 @@ function PointsView() {
 
   const [dailyStreak, setDailyStreak] = useState(0);
   const [canClaim, setCanClaim] = useState(false);
+  const [isLoadingDailyStatus, setIsLoadingDailyStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // --- Point transactions state ---
@@ -217,35 +205,33 @@ function PointsView() {
     loadInitialTransactions();
   }, [user?.walletAddress, isAuthLoading, toast]);
   
-  // Load state from localStorage on mount
+  // Load daily status from API
   useEffect(() => {
-    if (!isStarterQuestCompleted) return;
+    if (!user || !isStarterQuestCompleted || isAuthLoading) return;
 
-    let currentStreak = parseInt(localStorage.getItem('dailyStreak') || '0', 10);
-    const lastClaimTimestamp = localStorage.getItem('lastClaimTimestamp');
-
-    if (lastClaimTimestamp) {
-      const lastClaimDate = new Date(parseInt(lastClaimTimestamp));
-      const today = new Date();
-
-      if (isSameDay(lastClaimDate, today)) {
-        setCanClaim(false);
-      } else if (isYesterday(lastClaimDate)) {
-        setCanClaim(true);
-        if (currentStreak >= 7) currentStreak = 0;
-      } else {
-        setCanClaim(true);
-        currentStreak = 0;
+    const loadDailyStatus = async () => {
+      setIsLoadingDailyStatus(true);
+      try {
+        const response = await fetch(`/api/points/daily-status?walletAddress=${user.walletAddress}`);
+        if (!response.ok) throw new Error('Failed to fetch daily status');
+        
+        const data = await response.json();
+        setCanClaim(data.canClaim);
+        setDailyStreak(data.currentStreak);
+      } catch (error) {
+        console.error('Error loading daily status:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load daily status',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingDailyStatus(false);
       }
-    } else {
-      setCanClaim(true);
-      currentStreak = 0;
-    }
-    
-    setDailyStreak(currentStreak);
-    localStorage.setItem('dailyStreak', currentStreak.toString());
+    };
 
-  }, []);
+    loadDailyStatus();
+  }, [user?.walletAddress, isStarterQuestCompleted, isAuthLoading, toast]);
 
   const currentReward = streakRewards[dailyStreak];
 
@@ -273,12 +259,8 @@ function PointsView() {
         description: `You earned ${currentReward} XP. Come back tomorrow!`,
       });
 
-      const newStreak = dailyStreak + 1;
-      const finalStreak = newStreak >= 7 ? 0 : newStreak;
-      setDailyStreak(finalStreak);
-      localStorage.setItem('dailyStreak', finalStreak.toString());
-      
-      localStorage.setItem('lastClaimTimestamp', new Date().getTime().toString());
+      // Update local state with new data from server
+      setDailyStreak(result.newStreak);
       setCanClaim(false);
 
       // Refresh point transactions to show the new entry
@@ -310,6 +292,12 @@ function PointsView() {
       if (!isStarterQuestCompleted) {
           return { text: 'Locked', disabled: true, icon: Lock };
       }
+      if (isLoadingDailyStatus) {
+          return { text: 'Loading...', disabled: true, icon: null };
+      }
+      if (!canClaim) {
+          return { text: 'Claimed Today', disabled: true, icon: null };
+      }
       return { text: `Claim ${currentReward} XP`, disabled: false, icon: null };
   }
 
@@ -331,8 +319,8 @@ function PointsView() {
   const isWalletConnected = !!user;
 
   const isLocked = useMemo(() => {
-    return isTimeLocked || !isWalletConnected;
-  }, [isTimeLocked, isWalletConnected]);
+    return isTimeLocked || !isWalletConnected || !isStarterQuestCompleted;
+  }, [isTimeLocked, isWalletConnected, isStarterQuestCompleted]);
 
   const isLoading = isAuthLoading;
 
@@ -505,6 +493,11 @@ function PointsView() {
                     <>
                         <p className="mt-4 text-lg font-semibold">Connect Your Wallet</p>
                         <p className="mt-1 text-sm text-muted-foreground">Please connect your wallet to view your points and leaderboard.</p>
+                    </>
+                ) : !isStarterQuestCompleted ? (
+                    <>
+                        <p className="mt-4 text-lg font-semibold">Complete Starter Quest First</p>
+                        <p className="mt-1 text-sm text-muted-foreground">You need to complete the "Get Started" quest to unlock the Points section.</p>
                     </>
                 ) : null}
             </div>
