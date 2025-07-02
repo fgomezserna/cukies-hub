@@ -13,18 +13,18 @@ export function formatPointsChange(amount: number): string {
 
 export function getPointTransactionIcon(type: PointTransactionType): string {
   switch (type) {
-    case PointTransactionType.QUEST_COMPLETION:
+    case 'QUEST_COMPLETION':
       return '🎯';
-    case PointTransactionType.DAILY_LOGIN:
+    case 'DAILY_LOGIN':
       return '📅';
-    case PointTransactionType.GAME_PLAY:
-    case PointTransactionType.GAME_WIN:
+    case 'GAME_PLAY':
+    case 'GAME_WIN':
       return '🎮';
-    case PointTransactionType.REFERRAL_BONUS:
+    case 'REFERRAL_BONUS':
       return '👥';
-    case PointTransactionType.PURCHASE:
+    case 'PURCHASE':
       return '🛒';
-    case PointTransactionType.MANUAL_ADJUSTMENT:
+    case 'MANUAL_ADJUSTMENT':
       return '⚙️';
     default:
       return '📊';

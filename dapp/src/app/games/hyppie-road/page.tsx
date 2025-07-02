@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { useParentConnection } from '@hyppie/game-bridge';
+import { useParentConnection } from '@/hooks/use-parent-connection';
 import { useAuth } from '@/providers/auth-provider';
 import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';

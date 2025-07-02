@@ -5,7 +5,8 @@ import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, Download, Gift, Lock, Search, Shield, Star, Loader2, AlertTriangle, Coins } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowDown, ArrowUp, Download, Gift, Lock, Search, Shield, Star, Loader2, AlertTriangle, Coins, TrendingUp, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,30 +15,12 @@ import Link from 'next/link';
 import { useAuth } from '@/providers/auth-provider';
 import { cn, formatPointTransactionForTable } from '@/lib/utils';
 import CountdownTimer from '@/components/shared/countdown-timer';
-import { PointTransaction } from '@/types';
+import { PointTransaction, UserStats, LeaderboardPlayer } from '@/types';
 
 const streakRewards = [10, 20, 35, 50, 65, 80, 100];
 
-const fullLeaderboardDataRaw = [
-    { name: "SybilSlayerPro", avatar: "https://placehold.co/40x40.png", hint: "pro gamer", points: 152340, referralPoints: 5000 },
-    { name: "GemHunter", avatar: "https://placehold.co/40x40.png", hint: "gem stone", points: 148970, referralPoints: 2500 },
-    { name: "ChainMaster", avatar: "https://placehold.co/40x40.png", hint: "master crown", points: 115750, referralPoints: 8000 },
-    { name: "You", avatar: "https://placehold.co/40x40.png", hint: "profile avatar", points: 135600, referralPoints: 1250 },
-    { name: "TokenRunner", avatar: "https://placehold.co/40x40.png", hint: "running shoe", points: 121000, referralPoints: 500 },
-    { name: "PixelPioneer", avatar: "https://placehold.co/40x40.png", hint: "pixel art", points: 102300, referralPoints: 1200 },
-    { name: "CryptoKing", avatar: "https://placehold.co/40x40.png", hint: "king crown", points: 98000, referralPoints: 10000 },
-    ...Array.from({ length: 150 }, (_, i) => ({
-        name: `Player${i + 1}`,
-        avatar: "https://placehold.co/40x40.png",
-        hint: "gamer avatar",
-        points: 90000 - (i * 501),
-        referralPoints: 5000 - (i * 25),
-    }))
-];
-
 const ITEMS_PER_PAGE = 20;
 const LEADERBOARD_LIMIT = 100;
-
 
 function PointsView() {
   const { toast } = useToast();
@@ -66,37 +49,131 @@ function PointsView() {
   const [isLoadingDailyStatus, setIsLoadingDailyStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // --- User Stats State ---
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [isLoadingUserStats, setIsLoadingUserStats] = useState(false);
+
   // --- Point transactions state ---
   const [pointTransactions, setPointTransactions] = useState<PointTransaction[]>([]);
   const [hasMorePointTransactions, setHasMorePointTransactions] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [transactionsOffset, setTransactionsOffset] = useState(0);
 
+  // --- Leaderboard State ---
+  const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
+  const [hasMorePlayers, setHasMorePlayers] = useState(true);
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
+  const [leaderboardOffset, setLeaderboardOffset] = useState(0);
+
   // --- Infinite Scroll State ---
   const pointsObserver = useRef<HTMLDivElement>(null);
   const pointsContainerRef = useRef<HTMLDivElement>(null);
-
-  const fullLeaderboardData = useMemo(() => fullLeaderboardDataRaw
-    .map(p => ({ ...p, totalPoints: p.points + p.referralPoints }))
-    .sort((a, b) => b.totalPoints - a.totalPoints)
-    .map((p, i) => ({ ...p, rank: i + 1 })), []);
-  
-  const [visiblePlayers, setVisiblePlayers] = useState(fullLeaderboardData.slice(0, ITEMS_PER_PAGE));
-  const [hasMorePlayers, setHasMorePlayers] = useState(fullLeaderboardData.length > ITEMS_PER_PAGE && ITEMS_PER_PAGE < LEADERBOARD_LIMIT);
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
   const leaderboardObserver = useRef<HTMLDivElement>(null);
   const leaderboardContainerRef = useRef<HTMLDivElement>(null);
 
   const filteredLeaderboard = useMemo(() => {
     if (!searchTerm) return [];
-    return fullLeaderboardData.filter(player =>
+    return leaderboard.filter(player =>
       player.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm, fullLeaderboardData]);
+  }, [searchTerm, leaderboard]);
 
-  const playersToDisplay = searchTerm ? filteredLeaderboard : visiblePlayers;
+  const playersToDisplay = searchTerm ? filteredLeaderboard : leaderboard;
 
+  // Load user stats
+  useEffect(() => {
+    if (!user || isAuthLoading) return;
 
+    const loadUserStats = async () => {
+      setIsLoadingUserStats(true);
+      try {
+        const response = await fetch(`/api/user/stats?walletAddress=${user.walletAddress}`);
+        if (!response.ok) throw new Error('Failed to fetch user stats');
+        
+        const data = await response.json();
+        setUserStats(data);
+      } catch (error) {
+        console.error('Error loading user stats:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load user stats',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingUserStats(false);
+      }
+    };
+
+    loadUserStats();
+  }, [user?.walletAddress, isAuthLoading, toast]);
+
+  // Load leaderboard
+  const loadMorePlayers = useCallback(async () => {
+    if (!hasMorePlayers || isLoadingPlayers) return;
+    
+    setIsLoadingPlayers(true);
+    try {
+      const response = await fetch(`/api/leaderboard?limit=${ITEMS_PER_PAGE}&offset=${leaderboardOffset}`);
+      if (!response.ok) throw new Error('Failed to fetch leaderboard');
+      
+      const data = await response.json();
+      
+      // Mark current user in leaderboard
+      const updatedLeaderboard = data.leaderboard.map((player: LeaderboardPlayer) => ({
+        ...player,
+        name: user && player.walletAddress === user.walletAddress ? 'You' : player.name,
+      }));
+      
+      setLeaderboard(prev => [...prev, ...updatedLeaderboard]);
+      setHasMorePlayers(data.hasMore);
+      setLeaderboardOffset(prev => prev + ITEMS_PER_PAGE);
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load leaderboard',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingPlayers(false);
+    }
+  }, [hasMorePlayers, isLoadingPlayers, leaderboardOffset, user?.walletAddress, toast]);
+
+  // Load initial leaderboard
+  useEffect(() => {
+    if (!user || isAuthLoading) return;
+    
+    const loadInitialLeaderboard = async () => {
+      setIsLoadingPlayers(true);
+      try {
+        const response = await fetch(`/api/leaderboard?limit=${ITEMS_PER_PAGE}&offset=0`);
+        if (!response.ok) throw new Error('Failed to fetch leaderboard');
+        
+        const data = await response.json();
+        
+        // Mark current user in leaderboard
+        const updatedLeaderboard = data.leaderboard.map((player: LeaderboardPlayer) => ({
+          ...player,
+          name: player.walletAddress === user.walletAddress ? 'You' : player.name,
+        }));
+        
+        setLeaderboard(updatedLeaderboard);
+        setHasMorePlayers(data.hasMore);
+        setLeaderboardOffset(ITEMS_PER_PAGE);
+      } catch (error) {
+        console.error('Error loading initial leaderboard:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load leaderboard',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingPlayers(false);
+      }
+    };
+    
+    loadInitialLeaderboard();
+  }, [user?.walletAddress, isAuthLoading, toast]);
 
   const loadMoreTransactions = useCallback(async () => {
     if (!hasMorePointTransactions || isLoadingTransactions || !user) return;
@@ -121,20 +198,6 @@ function PointsView() {
       setIsLoadingTransactions(false);
     }
   }, [hasMorePointTransactions, isLoadingTransactions, transactionsOffset, user?.walletAddress, toast]);
-
-  const loadMorePlayers = useCallback(() => {
-    if (isLoadingPlayers || searchTerm) return;
-    setIsLoadingPlayers(true);
-    setTimeout(() => {
-      const currentLength = visiblePlayers.length;
-      const newPlayers = fullLeaderboardData.slice(currentLength, currentLength + ITEMS_PER_PAGE);
-      setVisiblePlayers(prev => [...prev, ...newPlayers]);
-      if (currentLength + ITEMS_PER_PAGE >= LEADERBOARD_LIMIT || currentLength + ITEMS_PER_PAGE >= fullLeaderboardData.length) {
-        setHasMorePlayers(false);
-      }
-      setIsLoadingPlayers(false);
-    }, 500);
-  }, [isLoadingPlayers, visiblePlayers.length, fullLeaderboardData, searchTerm]);
   
   const createObserver = (
     callback: () => void,
@@ -276,6 +339,17 @@ function PointsView() {
         console.error('Error refreshing transactions:', refreshError);
       }
 
+      // Refresh user stats
+      try {
+        const statsResponse = await fetch(`/api/user/stats?walletAddress=${user.walletAddress}`);
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setUserStats(statsData);
+        }
+      } catch (statsError) {
+        console.error('Error refreshing user stats:', statsError);
+      }
+
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -337,126 +411,196 @@ function PointsView() {
   return (
     <div className="relative h-full">
         <div className={cn("grid flex-1 gap-4 overflow-auto p-4 sm:grid-cols-2 lg:grid-cols-3 h-full", isLocked && 'blur-sm pointer-events-none')}>
-            <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle>Points History</CardTitle>
-                            <CardDescription>Track your points earned and spent.</CardDescription>
+            {/* User Stats Card */}
+            {userStats && (
+              <div className="lg:col-span-3 mb-4">
+                <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                      <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                          <Shield className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium text-muted-foreground">Tier</span>
                         </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div ref={pointsContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
-                            <Table>
-                                <TableHeader className="sticky top-0 bg-card z-10">
-                                    <TableRow>
-                                        <TableHead>Activity</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">Points</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {formattedTransactions.length === 0 && !isLoadingTransactions ? (
-                                        <TableRow>
-                                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                                                No point transactions found. Complete some quests to start earning points!
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        formattedTransactions.map((item, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="font-medium">{item.reason}</TableCell>
-                                                <TableCell className="text-muted-foreground">{item.date}</TableCell>
-                                                <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
-                                                    {item.points}
-                                                </TableCell>
+                        <div className={cn("text-2xl font-bold", userStats.stats.tierColor)}>
+                          {userStats.stats.tier}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <TrendingUp className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium text-muted-foreground">Position</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-2xl font-bold text-primary">#{userStats.stats.ranking}</span>
+                          <div className={cn("flex items-center text-sm", 
+                            userStats.stats.positionChange > 0 ? 'text-green-500' : 
+                            userStats.stats.positionChange < 0 ? 'text-red-500' : 'text-muted-foreground'
+                          )}>
+                            {userStats.stats.positionChange > 0 && <ArrowUp className="h-3 w-3" />}
+                            {userStats.stats.positionChange < 0 && <ArrowDown className="h-3 w-3" />}
+                            <span>{Math.abs(userStats.stats.positionChange)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-center md:text-right">
+                        <div className="flex items-center justify-center md:justify-end gap-2 mb-2">
+                          <Coins className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium text-muted-foreground">Total Points</span>
+                        </div>
+                        <div className="text-2xl font-bold text-primary">
+                          {userStats.user.totalPoints.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            {/* Main Content with Tabs */}
+            <div className="lg:col-span-2">
+                <Tabs defaultValue="history" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="history">Points History</TabsTrigger>
+                        <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="history" className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Points History</CardTitle>
+                                <CardDescription>Track your points earned and spent.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div ref={pointsContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10">
+                                            <TableRow>
+                                                <TableHead>Activity</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead className="text-right">Points</TableHead>
                                             </TableRow>
-                                        ))
-                                    )}
-                                    {hasMorePointTransactions && (
-                                        <TableRow>
-                                            <TableCell colSpan={3} className="text-center p-0">
-                                                <div ref={pointsObserver} className="flex justify-center items-center py-4">
-                                                    {isLoadingTransactions && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                            <CardTitle>Leaderboard</CardTitle>
-                            <div className="relative w-full md:max-w-xs">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by player..."
-                                    className="pl-9"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div ref={leaderboardContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
-                            <Table>
-                                <TableHeader className="sticky top-0 bg-card z-10">
-                                    <TableRow>
-                                        <TableHead className="w-[80px] text-center">Rank</TableHead>
-                                        <TableHead>Hyppie Player</TableHead>
-                                        <TableHead className="text-right">Points (XP)</TableHead>
-                                        <TableHead className="text-right">Referral Points</TableHead>
-                                        <TableHead className="text-right">Total Points</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {playersToDisplay.map((player) => (
-                                        <TableRow key={player.rank} className={player.name === 'You' ? 'bg-primary/10 hover:bg-primary/20' : ''}>
-                                            <TableCell className="font-medium text-lg text-center">{player.rank}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="h-8 w-8">
-                                                        <AvatarImage src={player.avatar} data-ai-hint={player.hint} />
-                                                        <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className='flex items-center gap-2'>
-                                                        {isAuthLoading ? (
-                                                          <span className="font-medium">{player.name}</span>
-                                                        ) : (
-                                                          <Link href={`/profile/${player.name}`} className="font-medium hover:underline">
-                                                            {player.name}
-                                                          </Link>
-                                                        )}
-                                                        {player.rank <= 3 && <Badge variant="secondary" className="bg-transparent">{player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : '🥉'}</Badge>}
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">{player.points.toLocaleString('en-US')}</TableCell>
-                                            <TableCell className="text-right font-mono">{player.referralPoints.toLocaleString('en-US')}</TableCell>
-                                            <TableCell className="text-right font-mono text-primary font-bold">{player.totalPoints.toLocaleString('en-US')}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {!searchTerm && hasMorePlayers && (
-                                          <TableRow>
-                                              <TableCell colSpan={5} className="text-center p-0">
-                                                  <div ref={leaderboardObserver} className="flex justify-center items-center py-4">
-                                                      {isLoadingPlayers && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-                                                  </div>
-                                              </TableCell>
-                                          </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {formattedTransactions.length === 0 && !isLoadingTransactions ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                                                        No point transactions found. Complete some quests to start earning points!
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                formattedTransactions.map((item, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell className="font-medium">{item.reason}</TableCell>
+                                                        <TableCell className="text-muted-foreground">{item.date}</TableCell>
+                                                        <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
+                                                            {item.points}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                            {hasMorePointTransactions && (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="text-center p-0">
+                                                        <div ref={pointsObserver} className="flex justify-center items-center py-4">
+                                                            {isLoadingTransactions && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="leaderboard" className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                    <div>
+                                        <CardTitle>Leaderboard</CardTitle>
+                                        <CardDescription>Top players by total points</CardDescription>
+                                    </div>
+                                    <div className="relative w-full md:max-w-xs">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search by player..."
+                                            className="pl-9"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div ref={leaderboardContainerRef} className="relative h-[600px] overflow-y-auto custom-scrollbar">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10">
+                                            <TableRow>
+                                                <TableHead className="w-[80px] text-center">Rank</TableHead>
+                                                <TableHead>Hyppie Player</TableHead>
+                                                <TableHead className="text-right">Points (XP)</TableHead>
+                                                <TableHead className="text-right">Referral Points</TableHead>
+                                                <TableHead className="text-right">Total Points</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {playersToDisplay.length === 0 && !isLoadingPlayers ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                                        {searchTerm ? 'No players found matching your search.' : 'No players found.'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                playersToDisplay.map((player) => (
+                                                    <TableRow key={player.rank} className={player.name === 'You' ? 'bg-primary/10 hover:bg-primary/20' : ''}>
+                                                        <TableCell className="font-medium text-lg text-center">{player.rank}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar className="h-8 w-8">
+                                                                    <AvatarImage src={player.avatar} data-ai-hint={player.hint} />
+                                                                    <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+                                                                </Avatar>
+                                                                <div className='flex items-center gap-2'>
+                                                                    {isAuthLoading ? (
+                                                                      <span className="font-medium">{player.name}</span>
+                                                                    ) : (
+                                                                      <Link href={`/profile/${player.name}`} className="font-medium hover:underline">
+                                                                        {player.name}
+                                                                      </Link>
+                                                                    )}
+                                                                    {player.rank <= 3 && <Badge variant="secondary" className="bg-transparent">{player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : '🥉'}</Badge>}
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono">{player.points.toLocaleString('en-US')}</TableCell>
+                                                        <TableCell className="text-right font-mono">{player.referralPoints.toLocaleString('en-US')}</TableCell>
+                                                        <TableCell className="text-right font-mono text-primary font-bold">{player.totalPoints.toLocaleString('en-US')}</TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                            {!searchTerm && hasMorePlayers && (
+                                                  <TableRow>
+                                                      <TableCell colSpan={5} className="text-center p-0">
+                                                          <div ref={leaderboardObserver} className="flex justify-center items-center py-4">
+                                                              {isLoadingPlayers && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                                                          </div>
+                                                      </TableCell>
+                                                  </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
+            
+            {/* Sidebar with Daily Drop and HyppieLiquid */}
             <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
                 <Card>
                     <CardHeader>
@@ -470,12 +614,35 @@ function PointsView() {
                         </Button>
                     </CardContent>
                 </Card>
+                
+                {/* HyppieLiquid Stats Card */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Leaderboard</CardTitle>
+                    <CardHeader className="text-center pb-2">
+                        <div className="flex items-center justify-center mb-2">
+                            <Star className="h-6 w-6 text-yellow-500" />
+                        </div>
+                        <CardTitle className="text-lg">HyppieLiquid</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        {/* Additional content for leaderboard section */}
+                    <CardContent className="text-center">
+                        <div className="flex justify-center mb-4">
+                            <div className="w-16 h-16 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                                <Shield className="h-8 w-8 text-yellow-900" />
+                            </div>
+                        </div>
+                        <div className="text-3xl font-bold text-primary mb-1">
+                            {userStats ? userStats.user.totalPoints.toLocaleString() : (isLoadingUserStats ? '--' : '0')}
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-4">Total Points</div>
+                        {userStats && (
+                            <>
+                                <div className="text-xs text-muted-foreground mb-1">
+                                    Achieved rank #{userStats.stats.ranking} and chilling at
+                                </div>
+                                <div className={cn("text-sm font-medium", userStats.stats.tierColor)}>
+                                    {userStats.stats.tier} tier
+                                </div>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             </div>

@@ -44,16 +44,15 @@ export type User = {
   completedQuests: UserQuest[];
 }
 
-export enum PointTransactionType {
-  QUEST_COMPLETION = 'QUEST_COMPLETION',
-  DAILY_LOGIN = 'DAILY_LOGIN',
-  GAME_PLAY = 'GAME_PLAY',
-  GAME_WIN = 'GAME_WIN',
-  REFERRAL_BONUS = 'REFERRAL_BONUS',
-  PURCHASE = 'PURCHASE',
-  MANUAL_ADJUSTMENT = 'MANUAL_ADJUSTMENT',
-  OTHER = 'OTHER'
-}
+export type PointTransactionType = 
+  | 'QUEST_COMPLETION'
+  | 'DAILY_LOGIN'
+  | 'GAME_PLAY'
+  | 'GAME_WIN'
+  | 'REFERRAL_BONUS'
+  | 'PURCHASE'
+  | 'MANUAL_ADJUSTMENT'
+  | 'OTHER';
 
 export type PointTransaction = {
   id: string;
@@ -63,4 +62,33 @@ export type PointTransaction = {
   reason: string;
   metadata?: any; // JSON metadata
   createdAt: string;
+}
+
+export type UserStats = {
+  user: {
+    id: string;
+    walletAddress: string;
+    username: string | null;
+    xp: number;
+    referralPoints: number;
+    totalPoints: number;
+  };
+  stats: {
+    tier: string;
+    tierColor: string;
+    ranking: number;
+    positionChange: number;
+    totalUsers: number;
+  };
+}
+
+export type LeaderboardPlayer = {
+  rank: number;
+  name: string;
+  avatar: string;
+  hint: string;
+  points: number;
+  referralPoints: number;
+  totalPoints: number;
+  walletAddress: string;
 } 
