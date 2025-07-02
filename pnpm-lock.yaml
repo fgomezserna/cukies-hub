@@ -19,9 +19,6 @@ importers:
       '@hookform/resolvers':
         specifier: ^4.1.3
         version: 4.1.3(react-hook-form@7.58.1)
-      '@hyppie/game-bridge':
-        specifier: workspace:*
-        version: link:../packages/game-bridge
       '@prisma/client':
         specifier: ^6.10.1
         version: 6.11.0(prisma@6.11.0)(typescript@5.8.3)
