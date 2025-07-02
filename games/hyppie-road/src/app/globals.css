@@ -155,10 +155,10 @@
   }
 
   .game-card .card-header-custom {
-    padding: 16px 36px 4px 36px;
+    padding: 20px 48px 8px 48px;
   }
 
   .game-card .card-content-custom {
-    padding: 0px 36px 16px 36px;
+    padding: 0px 48px 20px 48px;
   }
 }
