@@ -24,6 +24,7 @@ import {
   handleDiscordOAuth,
   handleTwitterOAuth
 } from '@/lib/oauth-utils';
+import { Suspense } from "react";
 
 // Define Quest and Task types matching backend response
 type Task = {
@@ -1038,7 +1039,9 @@ function QuestsView() {
 export default function QuestsPage() {
   return (
     <AppLayout>
-      <QuestsView />
+      <Suspense fallback={<div>Loading quests...</div>}>
+        <QuestsView />
+      </Suspense>
     </AppLayout>
   )
 }
