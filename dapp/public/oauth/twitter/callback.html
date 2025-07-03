@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Twitter OAuth Callback</title>
+</head>
+<body>
+    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h2>Connecting Twitter...</h2>
+        <p>Please wait while we complete the connection.</p>
+        <div id="debug" style="margin-top: 20px; font-size: 12px; color: #666;"></div>
+    </div>
+
+    <script>
+        const debug = document.getElementById('debug');
+        
+        function log(message) {
+            console.log('[Twitter Callback]', message);
+            debug.innerHTML += message + '<br>';
+        }
+        
+        log('Callback page loaded');
+        log('URL: ' + window.location.href);
+        
+        // Extract code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        const state = urlParams.get('state');
+        
+        log('Code: ' + (code ? 'present' : 'missing'));
+        log('Error: ' + (error || 'none'));
+        log('State: ' + (state || 'missing'));
+        
+        if (error) {
+            log('Sending error to parent');
+            // Send error to parent window
+            window.opener?.postMessage({
+                type: 'TWITTER_OAUTH_ERROR',
+                error: error
+            }, '*'); // Use '*' for debugging, should be specific origin in production
+        } else if (code) {
+            log('Sending success to parent');
+            // Send code to parent window
+            window.opener?.postMessage({
+                type: 'TWITTER_OAUTH_SUCCESS',
+                code: code,
+                state: state
+            }, '*'); // Use '*' for debugging
+        } else {
+            log('No code or error found');
+            // No code or error
+            window.opener?.postMessage({
+                type: 'TWITTER_OAUTH_ERROR',
+                error: 'No authorization code received'
+            }, '*');
+        }
+        
+        log('Message sent, closing window in 3 seconds...');
+        
+        // Close this popup window after a short delay for debugging
+        setTimeout(() => {
+            window.close();
+        }, 3000);
+    </script>
+</body>
+</html> 

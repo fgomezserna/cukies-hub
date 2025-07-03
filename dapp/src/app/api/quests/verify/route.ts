@@ -107,25 +107,35 @@ export async function POST(request: Request) {
         verificationResult = true;
         break;
 
+      case 'discord_join':
+        // For Discord, we need to link the user's Discord account
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+          return NextResponse.json({ 
+            error: 'Discord username is required.' 
+          }, { status: 400 });
+        }
+        
+        // Store the Discord username (already verified via OAuth)
+        updateData.discordUsername = value.trim();
+        verificationResult = true;
+        break;
+
       case 'twitter_follow':
-        // For now, we'll trust the frontend verification
-        // In a real implementation, you'd call Twitter API to verify
+        // For Twitter, we need to link the user's Twitter account  
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+          return NextResponse.json({ 
+            error: 'Twitter username is required.' 
+          }, { status: 400 });
+        }
+        
+        // Store the Twitter handle (already verified via OAuth)
+        updateData.twitterHandle = value.trim().replace(/^@/, '');
         verificationResult = true;
         break;
 
       case 'twitter_like_rt':
         // For now, we'll trust the frontend verification
         // In a real implementation, you'd call Twitter API to verify
-        verificationResult = true;
-        break;
-
-      case 'discord_join':
-        // For now, we'll auto-verify Discord tasks
-        // In a real implementation, you'd integrate with Discord API
-        // If a value is provided, save it as discord username
-        if (value && typeof value === 'string' && value.trim().length > 0) {
-          updateData.discordUsername = value.trim();
-        }
         verificationResult = true;
         break;
 

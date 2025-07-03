@@ -18,6 +18,11 @@ import { User as UserType, Streak } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import CountdownTimer from '@/components/shared/countdown-timer';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  handleDiscordOAuth,
+  handleTwitterOAuth
+} from '@/lib/oauth-utils';
 
 // Define Quest and Task types matching backend response
 type Task = {
@@ -288,33 +293,62 @@ function ProfilePictureTask({ task, onVerify, disabled, isLoading = false }: { t
   );
 }
 
-function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'auto_verify' }: { text: string; completed: boolean; onVerify: (payload: { type: string, value?: any }) => void; disabled: boolean; taskType?: string; }) {
+function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'auto_verify', questId, taskId, user }: { text: string; completed: boolean; onVerify: (payload: { type: string, value?: any }) => void; disabled: boolean; taskType?: string; questId: string; taskId: string; user: UserType | null; }) {
   const [isConnecting, setIsConnecting] = useState(false);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
+    if (completed || disabled) return;
+
     setIsConnecting(true);
-    // In a real app, this would trigger an OAuth flow.
-    // We simulate it with a delay.
-    setTimeout(() => {
-      onVerify({ type: taskType });
+    try {
+      if (taskType === 'discord_join') {
+        const data = await handleDiscordOAuth(user?.walletAddress);
+        
+        // Use Discord username for verification
+        const discordUsername = data.discordUser.discriminator 
+          ? `${data.discordUser.username}#${data.discordUser.discriminator}`
+          : data.discordUser.username;
+        
+        onVerify({ type: taskType, value: discordUsername });
+        
+      } else if (taskType === 'twitter_follow') {
+        const data = await handleTwitterOAuth(user?.walletAddress);
+        
+        // Use Twitter username for verification
+        onVerify({ type: taskType, value: data.twitterUser.username });
+        
+      } else {
+        // Para otros tipos simplemente verificamos al instante
+        onVerify({ type: taskType });
+      }
+    } catch (error) {
+      console.error('OAuth flow failed:', error);
+      alert(`Failed to connect ${taskType === 'discord_join' ? 'Discord' : taskType === 'twitter_follow' ? 'Twitter' : 'account'}: ${error.message}`);
+    } finally {
       setIsConnecting(false);
-    }, 1500);
+    }
   };
 
   return (
     <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
       {completed ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
       <span className={completed ? 'text-foreground' : 'text-muted-foreground'}>{text}</span>
-      <Button size="sm" variant="ghost" className="ml-auto w-28 justify-center" disabled={completed || isConnecting || disabled} onClick={handleConnect}>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="ml-auto w-28 justify-center"
+        disabled={completed || isConnecting || disabled}
+        onClick={handleConnect}
+      >
         {isConnecting ? (
-            <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting
-            </>
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Connecting
+          </>
         ) : completed ? (
-            'Connected'
+          'Connected'
         ) : (
-            'Connect'
+          'Connect'
         )}
       </Button>
     </div>
@@ -328,6 +362,8 @@ function QuestsView() {
   const [isLoadingQuests, setIsLoadingQuests] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [verifyingTasks, setVerifyingTasks] = useState<Set<string>>(new Set());
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const unlockDate = useMemo(() => new Date("2025-07-02T00:00:00"), []);
   const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
@@ -511,6 +547,20 @@ function QuestsView() {
     }
   };
 
+  // Auto-verify after OAuth redirect
+  useEffect(() => {
+    const questIdParam = searchParams.get('verify');
+    const taskIdParam = searchParams.get('task');
+    const typeParam = searchParams.get('type');
+
+    if (questIdParam && taskIdParam && typeParam && user) {
+      // Evitar doble ejecución
+      handleVerifyTask(questIdParam, taskIdParam, { type: typeParam });
+      // Limpiar la URL
+      router.replace('/quests');
+    }
+  }, [searchParams, user]);
+
   const isLoading = isAuthLoading || isLoadingQuests;
   const isWalletConnected = !!user;
   const isLocked = isTimeLocked || !isWalletConnected;
@@ -584,7 +634,7 @@ function QuestsView() {
                       return <ProfilePictureTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} />
                     
                     default:
-                      return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={starterQuest.isLocked} onVerify={(payload) => handleVerifyTask(starterQuest.id, task.id, payload)} taskType={taskType} />
+                      return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={starterQuest.isLocked} onVerify={(payload) => handleVerifyTask(starterQuest.id, task.id, payload)} taskType={taskType} questId={starterQuest.id} taskId={task.id} user={user} />
                   }
               })}
             </CardContent>
@@ -708,6 +758,7 @@ function QuestsView() {
                               {quest.tasks.map((task, taskIndex) => {
                                 const taskText = getTaskText(task);
                                 const taskType = getTaskType(taskText);
+                                const isLoading = verifyingTasks.has(task.id);
                                 
                                 return (
                                   <div key={task.id} className="relative">
@@ -715,14 +766,21 @@ function QuestsView() {
                                       {taskIndex + 1}
                                     </div>
                                     <div className="ml-8">
-                                      <TaskItem 
-                                        text={taskText} 
-                                        completed={task.completed} 
-                                        onVerify={(payload) => handleVerifyTask(quest.id, task.id, payload)} 
-                                        disabled={quest.isLocked || quest.isCompleted} 
-                                        taskType={taskType}
-                                        isLoading={verifyingTasks.has(task.id)}
-                                      />
+                                      {(() => {
+                                        switch (taskType) {
+                                          case 'username':
+                                            return <UsernameTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                          
+                                          case 'email':
+                                            return <EmailTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                          
+                                          case 'profilePicture':
+                                            return <ProfilePictureTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                          
+                                          default:
+                                            return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={quest.isLocked || quest.isCompleted} onVerify={(payload) => handleVerifyTask(quest.id, task.id, payload)} taskType={taskType} questId={quest.id} taskId={task.id} user={user} />
+                                        }
+                                      })()}
                                     </div>
                                   </div>
                                 );
