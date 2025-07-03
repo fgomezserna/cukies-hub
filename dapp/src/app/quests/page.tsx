@@ -68,9 +68,11 @@ const getTaskType = (taskText: string | undefined): string => {
   if (text.includes('username')) return 'username';
   if (text.includes('email')) return 'email';
   if (text.includes('profile picture')) return 'profilePicture';
+  if (text.includes('connect') && (text.includes('x account') || text.includes('twitter account'))) return 'twitter_connect';
   if (text.includes('follow') && (text.includes('twitter') || text.includes(' x '))) return 'twitter_follow';
   if (text.includes('like') || text.includes('retweet')) return 'twitter_like_rt';
-  if (text.includes('discord')) return 'discord_join';
+  if (text.includes('connect') && text.includes('discord')) return 'discord_join';
+  if (text.includes('discord') && text.includes('server')) return 'discord_join';
   if (text.includes('telegram')) return 'telegram_join';
   if (text.includes('play') || text.includes('game')) return 'game_play';
   if (text.includes('score') || text.includes('points')) return 'game_play';
@@ -311,7 +313,7 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
         
         onVerify({ type: taskType, value: discordUsername });
         
-      } else if (taskType === 'twitter_follow') {
+      } else if (taskType === 'twitter_connect' || taskType === 'twitter_follow') {
         const data = await handleTwitterOAuth(user?.walletAddress);
         
         // Use Twitter username for verification
@@ -323,7 +325,10 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
       }
     } catch (error) {
       console.error('OAuth flow failed:', error);
-      alert(`Failed to connect ${taskType === 'discord_join' ? 'Discord' : taskType === 'twitter_follow' ? 'Twitter' : 'account'}: ${error.message}`);
+      const serviceName = taskType === 'discord_join' ? 'Discord' : 
+                         (taskType === 'twitter_connect' || taskType === 'twitter_follow') ? 'X/Twitter' : 
+                         'account';
+      alert(`Failed to connect ${serviceName}: ${error.message}`);
     } finally {
       setIsConnecting(false);
     }

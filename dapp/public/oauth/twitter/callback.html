@@ -32,14 +32,15 @@
         log('State: ' + (state || 'missing'));
         
         if (error) {
-            log('Sending error to parent');
+            log('Sending error to parent: ' + error);
             // Send error to parent window
             window.opener?.postMessage({
                 type: 'TWITTER_OAUTH_ERROR',
-                error: error
+                error: error,
+                errorDescription: urlParams.get('error_description')
             }, '*'); // Use '*' for debugging, should be specific origin in production
         } else if (code) {
-            log('Sending success to parent');
+            log('Sending success to parent with code');
             // Send code to parent window
             window.opener?.postMessage({
                 type: 'TWITTER_OAUTH_SUCCESS',
@@ -47,11 +48,13 @@
                 state: state
             }, '*'); // Use '*' for debugging
         } else {
-            log('No code or error found');
+            log('No code or error found in URL parameters');
+            log('All URL params: ' + window.location.search);
             // No code or error
             window.opener?.postMessage({
                 type: 'TWITTER_OAUTH_ERROR',
-                error: 'No authorization code received'
+                error: 'No authorization code received',
+                url: window.location.href
             }, '*');
         }
         

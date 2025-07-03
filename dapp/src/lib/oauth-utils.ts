@@ -49,7 +49,7 @@ export function getTwitterOAuthURL(state: string, codeChallenge: string): string
     client_id: clientId,
     redirect_uri: `${window.location.origin}/oauth/twitter/callback.html`,
     response_type: 'code',
-    scope: 'tweet.read users.read follows.read offline.access',
+    scope: 'users.read tweet.read',
     state: state,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
@@ -89,13 +89,19 @@ export function handleOAuthFlow(
 
     const messageHandler = (event: MessageEvent) => {
       console.log('[OAuth Flow] Received message:', event.data, 'from origin:', event.origin);
+      console.log('[OAuth Flow] Expected origin:', window.location.origin);
       
-      // Verify origin for security
-      // Temporarily allow all origins for debugging
-      // if (event.origin !== window.location.origin) {
-      //   console.log('[OAuth Flow] Origin mismatch, ignoring');
-      //   return;
-      // }
+      // Allow both http and https localhost for development
+      const allowedOrigins = [
+        window.location.origin,
+        'http://localhost:3000',
+        'https://localhost:3000'
+      ];
+      
+      if (!allowedOrigins.includes(event.origin)) {
+        console.log('[OAuth Flow] Origin not allowed, ignoring. Allowed:', allowedOrigins);
+        return;
+      }
 
       if (event.data.type === expectedMessageType) {
         console.log('[OAuth Flow] Success message received');
@@ -194,9 +200,15 @@ export async function handleTwitterOAuth(walletAddress?: string) {
       throw new Error('Twitter OAuth not configured. Please set NEXT_PUBLIC_TWITTER_CLIENT_ID environment variable.');
     }
     
+    console.log('[Twitter OAuth] Client ID:', process.env.NEXT_PUBLIC_TWITTER_CLIENT_ID);
+    
     const state = generateRandomString(32);
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
+    
+    console.log('[Twitter OAuth] State:', state);
+    console.log('[Twitter OAuth] Code verifier length:', codeVerifier.length);
+    console.log('[Twitter OAuth] Code challenge:', codeChallenge);
     
     // Store code verifier for later use
     sessionStorage.setItem('twitter_code_verifier', codeVerifier);

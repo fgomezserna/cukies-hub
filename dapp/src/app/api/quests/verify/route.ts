@@ -120,6 +120,7 @@ export async function POST(request: Request) {
         verificationResult = true;
         break;
 
+      case 'twitter_connect':
       case 'twitter_follow':
         // For Twitter, we need to link the user's Twitter account  
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
