@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
 import DiscordIcon from '@/components/icons/discord';
 import XIcon from '@/components/icons/x-icon';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { User as UserType, Streak } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -71,8 +72,8 @@ const getTaskType = (taskText: string | undefined): string => {
   if (text.includes('connect') && (text.includes('x account') || text.includes('twitter account'))) return 'twitter_connect';
   if (text.includes('follow') && (text.includes('twitter') || text.includes(' x '))) return 'twitter_follow';
   if (text.includes('like') || text.includes('retweet')) return 'twitter_like_rt';
-  if (text.includes('connect') && text.includes('discord')) return 'discord_join';
-  if (text.includes('discord') && text.includes('server')) return 'discord_join';
+  if (text.includes('connect') && text.includes('discord')) return 'discord_connect';
+  if (text.includes('join') && text.includes('discord') && text.includes('server')) return 'discord_join';
   if (text.includes('telegram')) return 'telegram_join';
   if (text.includes('play') || text.includes('game')) return 'game_play';
   if (text.includes('score') || text.includes('points')) return 'game_play';
@@ -295,15 +296,184 @@ function ProfilePictureTask({ task, onVerify, disabled, isLoading = false }: { t
   );
 }
 
+function DiscordJoinTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: UserType | null; }) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState('https://discord.gg/hyppie');
+  const { toast } = useToast();
+
+  // Get Discord invite URL on component mount
+  useEffect(() => {
+    const fetchInviteUrl = async () => {
+      try {
+        const response = await fetch('/api/discord/invite-url');
+        if (response.ok) {
+          const data = await response.json();
+          setInviteUrl(data.inviteUrl);
+        }
+      } catch (error) {
+        console.error('Failed to fetch Discord invite URL:', error);
+      }
+    };
+    fetchInviteUrl();
+  }, []);
+
+  const handleVerifyMembership = async () => {
+    if (!user) return;
+    
+    setIsVerifying(true);
+    try {
+      const response = await fetch('/api/discord/verify-membership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: user.walletAddress }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // User is in the server, complete the task
+        onVerify(task.id, { type: 'discord_join' });
+        toast({
+          title: 'Success!',
+          description: 'Discord server membership verified!',
+        });
+      } else {
+        // Handle different error cases
+        if (data.requiresConnection) {
+          toast({
+            title: 'Discord Not Connected',
+            description: 'Please connect your Discord account first.',
+            variant: 'destructive',
+          });
+        } else if (data.requiresReconnection) {
+          toast({
+            title: 'Discord Connection Expired',
+            description: 'Please reconnect your Discord account.',
+            variant: 'destructive',
+          });
+        } else if (data.requiresJoin) {
+          // Show modal to help user join the server
+          setShowJoinModal(true);
+        } else {
+          toast({
+            title: 'Verification Failed',
+            description: data.error || 'Unable to verify Discord membership.',
+            variant: 'destructive',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Discord verification error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to verify Discord membership. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  if (task.completed) {
+    return (
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <CheckCircle2 className="h-5 w-5 text-primary" />
+        <span className="text-foreground">{getTaskText(task)}</span>
+        <Button size="sm" variant="ghost" className="ml-auto" disabled>
+          Verified
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <Circle className="h-5 w-5 text-muted-foreground" />
+        <span className="text-muted-foreground">{getTaskText(task)}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto w-32 justify-center"
+          disabled={disabled || isVerifying || isLoading}
+          onClick={handleVerifyMembership}
+        >
+          {isVerifying || isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Checking...
+            </>
+          ) : (
+            'Check Membership'
+          )}
+        </Button>
+      </div>
+
+      <Dialog open={showJoinModal} onOpenChange={setShowJoinModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DiscordIcon className="h-5 w-5 text-indigo-500" />
+              Join Our Discord Server
+            </DialogTitle>
+            <DialogDescription>
+              You need to join our Discord server to complete this task. Click the button below to join and then come back to verify.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex flex-col gap-4 py-4">
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-2">Steps to complete:</p>
+              <ol className="text-sm space-y-1 list-decimal list-inside">
+                <li>Click "Join Discord Server" below</li>
+                <li>Accept the invite and join the server</li>
+                <li>Come back and click "I've Joined" to verify</li>
+              </ol>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowJoinModal(false)}>
+              Cancel
+            </Button>
+            <Button asChild className="bg-indigo-600 hover:bg-indigo-700">
+              <a 
+                href={inviteUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Join Discord Server
+              </a>
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowJoinModal(false);
+                handleVerifyMembership();
+              }}
+              variant="secondary"
+            >
+              I've Joined
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'auto_verify', questId, taskId, user }: { text: string; completed: boolean; onVerify: (payload: { type: string, value?: any }) => void; disabled: boolean; taskType?: string; questId: string; taskId: string; user: UserType | null; }) {
   const [isConnecting, setIsConnecting] = useState(false);
+  const { toast } = useToast();
 
   const handleConnect = async () => {
     if (completed || disabled) return;
 
     setIsConnecting(true);
     try {
-      if (taskType === 'discord_join') {
+      if (taskType === 'discord_connect') {
         const data = await handleDiscordOAuth(user?.walletAddress);
         
         // Use Discord username for verification
@@ -325,10 +495,21 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
       }
     } catch (error) {
       console.error('OAuth flow failed:', error);
-      const serviceName = taskType === 'discord_join' ? 'Discord' : 
-                         (taskType === 'twitter_connect' || taskType === 'twitter_follow') ? 'X/Twitter' : 
-                         'account';
-      alert(`Failed to connect ${serviceName}: ${error.message}`);
+      
+      let title = 'Connection Failed';
+      let description = error.message || 'An unexpected error occurred';
+      
+      if (taskType === 'discord_connect') {
+        title = 'Discord Connection Failed';
+      } else if (taskType === 'twitter_connect' || taskType === 'twitter_follow') {
+        title = 'X/Twitter Connection Failed';
+      }
+      
+      toast({
+        title,
+        description,
+        variant: 'destructive',
+      });
     } finally {
       setIsConnecting(false);
     }
@@ -638,6 +819,9 @@ function QuestsView() {
                     case 'profilePicture':
                       return <ProfilePictureTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} />
                     
+                    case 'discord_join':
+                      return <DiscordJoinTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
+                    
                     default:
                       return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={starterQuest.isLocked} onVerify={(payload) => handleVerifyTask(starterQuest.id, task.id, payload)} taskType={taskType} questId={starterQuest.id} taskId={task.id} user={user} />
                   }
@@ -781,6 +965,9 @@ function QuestsView() {
                                           
                                           case 'profilePicture':
                                             return <ProfilePictureTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                          
+                                          case 'discord_join':
+                                            return <DiscordJoinTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
                                           
                                           default:
                                             return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={quest.isLocked || quest.isCompleted} onVerify={(payload) => handleVerifyTask(quest.id, task.id, payload)} taskType={taskType} questId={quest.id} taskId={task.id} user={user} />

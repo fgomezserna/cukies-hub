@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +9,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ 
         error: 'Code and wallet address are required' 
       }, { status: 400 });
+    }
+
+    // Find the user first
+    const user = await prisma.user.findUnique({
+      where: { walletAddress },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Exchange code for access token
@@ -50,6 +60,53 @@ export async function POST(request: Request) {
     }
 
     const discordUser = await userResponse.json();
+
+    // Save or update the Discord account in the accounts table
+    console.log(`[Discord OAuth] Saving account for user ${user.walletAddress}, Discord ID: ${discordUser.id}`);
+    
+    const existingAccount = await prisma.account.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'discord',
+          providerAccountId: discordUser.id,
+        },
+      },
+    });
+
+    if (existingAccount) {
+      // Update existing account with new tokens and link to current user
+      console.log(`[Discord OAuth] Updating existing account ${existingAccount.id}`);
+      await prisma.account.update({
+        where: { id: existingAccount.id },
+        data: {
+          userId: user.id, // Make sure it's linked to the current user
+          access_token: accessToken,
+          expires_at: tokenData.expires_in ? Math.floor(Date.now() / 1000) + tokenData.expires_in : null,
+          refresh_token: tokenData.refresh_token,
+          scope: tokenData.scope,
+          token_type: tokenData.token_type,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      // Create new account
+      console.log(`[Discord OAuth] Creating new account for user ${user.id}`);
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          type: 'oauth',
+          provider: 'discord',
+          providerAccountId: discordUser.id,
+          access_token: accessToken,
+          expires_at: tokenData.expires_in ? Math.floor(Date.now() / 1000) + tokenData.expires_in : null,
+          refresh_token: tokenData.refresh_token,
+          scope: tokenData.scope,
+          token_type: tokenData.token_type,
+        },
+      });
+    }
+    
+    console.log(`[Discord OAuth] Account saved successfully for user ${user.walletAddress}`);
     
     return NextResponse.json({
       success: true,

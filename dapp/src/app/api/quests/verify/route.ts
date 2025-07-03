@@ -107,8 +107,8 @@ export async function POST(request: Request) {
         verificationResult = true;
         break;
 
-      case 'discord_join':
-        // For Discord, we need to link the user's Discord account
+      case 'discord_connect':
+        // For Discord connection, we just link the user's Discord account
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
           return NextResponse.json({ 
             error: 'Discord username is required.' 
@@ -117,6 +117,27 @@ export async function POST(request: Request) {
         
         // Store the Discord username (already verified via OAuth)
         updateData.discordUsername = value.trim();
+        verificationResult = true;
+        break;
+
+      case 'discord_join':
+        // For Discord server join, verify membership without OAuth
+        const membershipResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/discord/verify-membership`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress }),
+        });
+
+        if (!membershipResponse.ok) {
+          const membershipData = await membershipResponse.json();
+          return NextResponse.json({ 
+            error: membershipData.error,
+            requiresConnection: membershipData.requiresConnection,
+            requiresReconnection: membershipData.requiresReconnection,
+            requiresJoin: membershipData.requiresJoin,
+          }, { status: membershipResponse.status });
+        }
+
         verificationResult = true;
         break;
 
