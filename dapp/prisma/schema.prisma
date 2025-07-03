@@ -14,7 +14,7 @@ model User {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   walletAddress     String  @unique
   username          String? @unique
-  email             String? @unique
+  email             String?
   profilePictureUrl String?
   xp                Int     @default(0)
 
@@ -31,7 +31,7 @@ model User {
   lastCheckIn   Streak?
 
   // Referrals
-  referralCode    String? @unique
+  referralCode    String?
   referredById    String? @db.ObjectId
   referredBy      User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
   referrals       User[]  @relation("Referrals")
