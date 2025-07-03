@@ -110,13 +110,27 @@ export function GameBoard({
             }}
             onClick={() => onTileClick?.(actualIndex)}
           >
+            {/* Capa adicional section03.png por encima de section02.png durante game over */}
+            {tile.isActive && tile.hasTrap && (
+              <div 
+                className="absolute inset-0 w-full h-full"
+                style={{
+                  backgroundImage: 'url(/assets/images/section03.png)',
+                  backgroundSize: 'auto 50px',
+                  backgroundPosition: 'center bottom',
+                  backgroundRepeat: 'no-repeat',
+                  zIndex: 20
+                }}
+              />
+            )}
+
             {/* Número de casilla */}
-            <span className="absolute top-2 left-2 text-lg text-white font-bold bg-black/50 px-2 py-1 rounded">
+            <span className="absolute top-2 left-2 text-lg text-white font-bold bg-black/50 px-2 py-1 rounded z-10">
               {actualIndex + 1}
             </span>
             
             {/* Contenido principal */}
-            <div className="flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center justify-center relative z-10">
               {tile.isActive ? (
                 tile.hasTrap ? (
                   // Token cayendo hacia abajo dentro del agujero hasta desaparecer
