@@ -129,8 +129,20 @@ export function HyppieRoadGame() {
 
 
 
-  // Si hay un resultado normal (victoria o retiro), mostrarlo
+  // Si hay un resultado, mostrar el componente apropiado
   if (gameResult) {
+    // Para game over (derrota), mostrar GameOverAnimation
+    if (!gameResult.success && gameResult.trapPosition !== undefined) {
+      return (
+        <GameOverAnimation
+          result={gameResult}
+          betAmount={betAmount}
+          onReturnToMenu={handleReturnToMenu}
+        />
+      );
+    }
+    
+    // Para victoria o retiro exitoso, mostrar GameResultComponent
     return (
       <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
         <GameResultComponent

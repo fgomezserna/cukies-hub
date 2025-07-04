@@ -287,4 +287,46 @@
     animation: fallDown 2s ease-in forwards;
     z-index: 10;
   }
+
+  /* Animación para el fondo del game over */
+  @keyframes backgroundMove {
+    0% { 
+      background-position: 0px 0px;
+    }
+    100% { 
+      background-position: 40px 40px;
+    }
+  }
+
+  /* Animación de caída del hippie */
+  @keyframes hippieFalling {
+    0% { 
+      transform: translateY(-150vh) scale(1);
+      opacity: 1;
+    }
+    20% { 
+      transform: translateY(-100vh) scale(1);
+      opacity: 1;
+    }
+    40% { 
+      transform: translateY(-50vh) scale(1);
+      opacity: 1;
+    }
+    60% { 
+      transform: translateY(-20vh) scale(1);
+      opacity: 1;
+    }
+    80% { 
+      transform: translateY(10vh) scale(1);
+      opacity: 0.8;
+    }
+    100% { 
+      transform: translateY(50vh) scale(1);
+      opacity: 0;
+    }
+  }
+
+  .hippie-falling {
+    animation: hippieFalling 3s ease-in forwards;
+  }
 }
