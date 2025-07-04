@@ -83,23 +83,23 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
               }}
             >
               <div className="pixellari-title text-white space-y-3 text-lg">
-                <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                   <span>INITIAL BET:</span>
                   <span className="text-yellow-400">${betAmount.toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
+            </div>
+            
+            <div className="flex justify-between items-center">
                   <span>MULTIPLIER:</span>
                   <span className="text-orange-400 font-bold text-xl">
-                    {result.multiplier.toFixed(1)}x
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
+                {result.multiplier.toFixed(1)}x
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center">
                   <span>TILES COMPLETED:</span>
                   <span className="text-blue-400">{result.stepsCompleted}</span>
-                </div>
-                
+            </div>
+            
                 <div className="border-t-2 border-yellow-600 pt-3">
                   <div className="flex justify-between items-center text-green-400 font-bold text-2xl">
                     <span>WON:</span>
@@ -111,7 +111,7 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
                   </div>
                 </div>
               </div>
-
+              
               {/* Botón de jugar de nuevo */}
               <div className="pt-4 text-center">
                 <Button 
@@ -125,7 +125,7 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
                 >
                   🎮 PLAY AGAIN 🎮
                 </Button>
-              </div>
+                </div>
             </div>
           </div>
         </div>

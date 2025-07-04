@@ -14,7 +14,7 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
   const [showDetails, setShowDetails] = useState(false);
   const [showButton, setShowButton] = useState(false);
   const [showMainContent, setShowMainContent] = useState(true); // Inmediato
-  const [showHippieFall, setShowHippieFall] = useState(false);
+  const [showHippie, setShowHippie] = useState(false);
 
   useEffect(() => {
     // Mostrar detalles después de 1 segundo
@@ -22,9 +22,9 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
       setShowDetails(true);
     }, 1000);
 
-    // Mostrar hippie cayendo después de 1.5 segundos
+    // Mostrar hippie después de 1.5 segundos
     const hippieTimer = setTimeout(() => {
-      setShowHippieFall(true);
+      setShowHippie(true);
     }, 1500);
 
     // Mostrar botón después de 2 segundos
@@ -46,35 +46,32 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
         backgroundImage: 'url(/assets/images/background-playing.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed'
+        backgroundRepeat: 'no-repeat'
       }}
     >
-      {/* Efecto de caída del hippie */}
-      {showHippieFall && (
-        <div 
-          className="absolute inset-0 z-20 pointer-events-none"
-          style={{ overflow: 'hidden' }}
-        >
-          <div 
-            className="absolute left-1/2 transform -translate-x-1/2 hippie-falling"
-            style={{
-              width: '300px',
-              height: '300px',
-              backgroundImage: 'url(/assets/images/hippie_fall.png)',
-              backgroundSize: 'contain',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              imageRendering: 'pixelated',
-              zIndex: 20
-            }}
-          />
-        </div>
-      )}
-
       {/* Contenedor principal con caja pixel art */}
       {showMainContent && (
         <div className="relative z-10 max-w-2xl mx-auto px-4">
+          
+          {/* Efecto de caída del hippie - relativo a la caja */}
+          {showHippie && (
+            <div 
+              className="absolute top-0 -right-12 z-20 pointer-events-none"
+            >
+              <div 
+                className="hippie-falling"
+                style={{
+                  width: '200px',
+                  height: '200px',
+                  backgroundImage: 'url(/assets/images/hippie_fall.png)',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  imageRendering: 'pixelated'
+                }}
+              />
+            </div>
+          )}
         {/* Caja principal usando asset PNG */}
         <div 
           className="relative px-16 py-12 w-full max-w-xl min-h-[320px] flex flex-col items-center justify-center"
@@ -86,23 +83,20 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
             imageRendering: 'pixelated'
           }}
         >
-          {/* Título Game Over con efecto mejorado */}
-          <div className="text-center space-y-6 animate-fade-in">
+          {/* Título Game Over */}
+          <div className="text-center space-y-6">
             <h1 
-              className="text-6xl md:text-8xl font-bold text-red-400 pixellari-title screen-shake"
+              className="text-6xl md:text-8xl font-bold text-red-400 pixellari-title"
               style={{ 
-                textShadow: '4px 4px 0px rgba(139, 0, 0, 0.8), 8px 8px 0px rgba(0, 0, 0, 0.6)',
-                filter: 'drop-shadow(0 0 10px rgba(255, 0, 0, 0.5))'
+                textShadow: '4px 4px 0px rgba(139, 0, 0, 0.8)'
               }}
             >
               GAME OVER
             </h1>
 
-
-
             {/* Mensaje de trampa */}
             <div className="pixellari-title text-xl md:text-2xl text-white space-y-2">
-              <p className="drop-shadow-lg">You stepped on a trap!</p>
+              <p>You stepped on a trap!</p>
               <p 
                 className="text-red-300 text-lg md:text-xl"
                 style={{ textShadow: '2px 2px 0px rgba(0,0,0,0.8)' }}
@@ -117,18 +111,9 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
 
         {/* Detalles de la partida - aparecen después */}
         {showDetails && (
-          <div 
-            className="mt-6 animate-fade-in"
-            style={{ animationDelay: '0.5s' }}
-          >
+          <div className="mt-6">
             <div 
-              className="p-6 space-y-3 border-4 border-red-800"
-              style={{
-                background: 'rgba(0, 0, 0, 0.8)',
-                borderStyle: 'solid',
-                borderImage: 'linear-gradient(45deg, #8B0000, #DC143C) 1',
-                boxShadow: 'inset 0 0 20px rgba(255, 0, 0, 0.3)'
-              }}
+              className="p-6 space-y-3 border-4 border-red-800 bg-black/80 rounded-lg"
             >
               <div className="pixellari-title text-white space-y-2 text-lg">
                 <div className="flex justify-between items-center">
@@ -152,15 +137,10 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
 
         {/* Botón OK */}
         {showButton && (
-          <div className="mt-6 text-center animate-fade-in">
+          <div className="mt-6 text-center">
             <Button 
               onClick={onReturnToMenu}
               className="pixellari-title text-xl px-8 py-3 bg-red-600 hover:bg-red-700 border-2 border-red-400"
-              style={{
-                textShadow: '2px 2px 0px rgba(0,0,0,0.8)',
-                boxShadow: '4px 4px 0px rgba(0,0,0,0.3)',
-                imageRendering: 'pixelated'
-              }}
             >
               OK
             </Button>
