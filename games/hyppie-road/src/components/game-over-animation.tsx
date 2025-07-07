@@ -98,16 +98,11 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
             <div className="pb-8">
               <Button 
                 onClick={onReturnToMenu}
-                className="pixellari-title text-2xl px-12 py-4 bg-transparent border-none text-white font-bold hover:scale-105 transition-transform"
+                className="game-over-button pixellari-title text-2xl px-12 py-4 border-none text-white font-bold hover:scale-105 transition-transform"
                 style={{
-                  backgroundImage: 'url(/assets/images/button_442x75_groc.png)',
-                  backgroundSize: '100% 100%',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  imageRendering: 'pixelated',
-                  textShadow: '2px 2px 0px rgba(0,0,0,0.8)',
                   minWidth: '250px',
-                  height: '70px'
+                  height: '70px',
+                  textShadow: '2px 2px 0px rgba(0,0,0,0.8)'
                 }}
               >
                 OK
