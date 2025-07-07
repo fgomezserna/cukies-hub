@@ -11,29 +11,22 @@ interface GameOverAnimationProps {
 }
 
 export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOverAnimationProps) {
-  const [showDetails, setShowDetails] = useState(false);
   const [showButton, setShowButton] = useState(false);
   const [showMainContent, setShowMainContent] = useState(true); // Inmediato
   const [showHippie, setShowHippie] = useState(false);
 
   useEffect(() => {
-    // Mostrar detalles después de 300ms
-    const detailsTimer = setTimeout(() => {
-      setShowDetails(true);
-    }, 300);
-
     // Mostrar hippie después de 200ms
     const hippieTimer = setTimeout(() => {
       setShowHippie(true);
     }, 200);
 
-    // Mostrar botón después de 600ms
+    // Mostrar botón después de 800ms
     const buttonTimer = setTimeout(() => {
       setShowButton(true);
-    }, 600);
+    }, 800);
 
     return () => {
-      clearTimeout(detailsTimer);
       clearTimeout(hippieTimer);
       clearTimeout(buttonTimer);
     };
@@ -68,7 +61,7 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
           )}
         {/* Caja principal usando asset PNG */}
         <div 
-          className="relative px-16 py-12 w-full max-w-xl min-h-[320px] flex flex-col items-center justify-center"
+          className="relative px-16 py-12 w-full max-w-xl min-h-[400px] flex flex-col items-center justify-between"
           style={{
             backgroundImage: 'url(/assets/images/box_game_over.png)',
             backgroundSize: 'contain',
@@ -78,7 +71,7 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
           }}
         >
           {/* Título Game Over */}
-          <div className="text-center space-y-6">
+          <div className="text-center space-y-6 pt-8">
             <h1 
               className="text-6xl md:text-8xl font-bold text-red-400 pixellari-title"
               style={{ 
@@ -88,59 +81,32 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
               GAME OVER
             </h1>
 
-            {/* Mensaje de trampa */}
+            {/* Mensaje de pérdida */}
             <div className="pixellari-title text-xl md:text-2xl text-white space-y-2">
               <p>You stepped on a trap!</p>
               <p 
-                className="text-red-300 text-lg md:text-xl"
+                className="text-red-400 text-2xl md:text-3xl font-bold"
                 style={{ textShadow: '2px 2px 0px rgba(0,0,0,0.8)' }}
               >
-                TILE #{result.trapPosition! + 1} WAS DANGEROUS
+                LOST: ${betAmount.toFixed(2)}
               </p>
             </div>
           </div>
 
+          {/* Botón OK dentro de la caja */}
+          {showButton && (
+            <div className="pb-8">
+              <Button 
+                onClick={onReturnToMenu}
+                className="pixellari-title text-xl px-8 py-3 bg-red-600 hover:bg-red-700 border-2 border-red-400"
+              >
+                OK
+              </Button>
+            </div>
+          )}
 
         </div>
-
-        {/* Detalles de la partida - aparecen después */}
-        {showDetails && (
-          <div className="mt-6">
-            <div 
-              className="p-6 space-y-3 border-4 border-red-800 bg-black/80 rounded-lg"
-            >
-              <div className="pixellari-title text-white space-y-2 text-lg">
-                <div className="flex justify-between items-center">
-                  <span>BET AMOUNT:</span>
-                  <span className="text-yellow-400">${betAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>TILES REACHED:</span>
-                  <span className="text-blue-400">{result.stepsCompleted}</span>
-                </div>
-                <div className="border-t-2 border-red-800 pt-2">
-                  <div className="flex justify-between items-center text-red-400 font-bold text-xl">
-                    <span>LOST:</span>
-                    <span>-${betAmount.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Botón OK */}
-        {showButton && (
-          <div className="mt-6 text-center">
-            <Button 
-              onClick={onReturnToMenu}
-              className="pixellari-title text-xl px-8 py-3 bg-red-600 hover:bg-red-700 border-2 border-red-400"
-            >
-              OK
-            </Button>
-          </div>
-        )}
-      </div>
+        </div>
       )}
     </div>
   );
