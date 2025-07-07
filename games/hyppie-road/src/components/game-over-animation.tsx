@@ -11,24 +11,16 @@ interface GameOverAnimationProps {
 }
 
 export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOverAnimationProps) {
-  const [showButton, setShowButton] = useState(false);
-  const [showMainContent, setShowMainContent] = useState(true); // Inmediato
   const [showHippie, setShowHippie] = useState(false);
 
   useEffect(() => {
-    // Mostrar hippie después de 200ms
+    // Mostrar hippie después de 600ms
     const hippieTimer = setTimeout(() => {
       setShowHippie(true);
-    }, 200);
-
-    // Mostrar botón después de 800ms
-    const buttonTimer = setTimeout(() => {
-      setShowButton(true);
-    }, 800);
+    }, 600);
 
     return () => {
       clearTimeout(hippieTimer);
-      clearTimeout(buttonTimer);
     };
   }, []);
 
@@ -37,8 +29,7 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
       className="fixed inset-0 flex items-center justify-center z-50 bg-black/20"
     >
       {/* Contenedor principal con caja pixel art */}
-      {showMainContent && (
-        <div className="relative z-10 max-w-2xl mx-auto px-4">
+      <div className="relative max-w-2xl mx-auto px-4 animate-fade-in">
           
           {/* Efecto de caída del hippie - relativo a la caja */}
           {showHippie && (
@@ -94,25 +85,22 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
           </div>
 
           {/* Botón OK dentro de la caja */}
-          {showButton && (
-            <div className="pb-8">
-              <Button 
-                onClick={onReturnToMenu}
-                className="game-over-button pixellari-title text-2xl px-12 py-4 border-none text-white font-bold hover:scale-105 transition-transform"
-                style={{
-                  minWidth: '250px',
-                  height: '70px',
-                  textShadow: '2px 2px 0px rgba(0,0,0,0.8)'
-                }}
-              >
-                OK
-              </Button>
-            </div>
-          )}
+          <div className="pb-8">
+            <Button 
+              onClick={onReturnToMenu}
+              className="game-over-button pixellari-title text-2xl px-12 py-4 border-none text-white font-bold hover:scale-105 transition-transform"
+              style={{
+                minWidth: '250px',
+                height: '70px',
+                textShadow: '2px 2px 0px rgba(0,0,0,0.8)'
+              }}
+            >
+              OK
+            </Button>
+          </div>
 
         </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 } 
