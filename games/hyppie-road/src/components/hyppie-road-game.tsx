@@ -189,6 +189,11 @@ export function HyppieRoadGame() {
           }}
         />
       </div>
+
+      {/* Título por delante del sky */}
+      <div className="absolute w-full text-center" style={{ top: '-120px', left: '0', right: '0', zIndex: 10 }}>
+        <h1 className="text-5xl font-bold text-white pixellari-title">Hyppie Road</h1>
+      </div>
       
       <div className="space-y-6">
 
@@ -227,10 +232,7 @@ export function HyppieRoadGame() {
           />
         )}
 
-        {/* Título movido abajo */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white pixellari-title">Hyppie Road</h1>
-        </div>
+
       </div>
 
 
