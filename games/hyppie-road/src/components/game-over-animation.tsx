@@ -43,13 +43,13 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
           {/* Efecto de caída del hippie - relativo a la caja */}
           {showHippie && (
             <div 
-              className="absolute top-0 -right-16 z-20 pointer-events-none"
+              className="absolute top-0 -right-24 z-20 pointer-events-none"
             >
               <div 
                 className="hippie-falling"
                 style={{
-                  width: '180px',
-                  height: '180px',
+                  width: '280px',
+                  height: '280px',
                   backgroundImage: 'url(/assets/images/hippie_fall.png)',
                   backgroundSize: 'contain',
                   backgroundPosition: 'center',

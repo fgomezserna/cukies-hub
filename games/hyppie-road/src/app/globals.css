@@ -270,15 +270,15 @@
   /* Animación de caída del hippie optimizada */
   @keyframes hippieFalling {
     0% { 
-      transform: translate3d(0, -120px, 0) scale(1);
+      transform: translate3d(0, -150px, 0) scale(1);
       opacity: 0.8;
     }
     50% { 
-      transform: translate3d(0, 150px, 0) scale(1);
+      transform: translate3d(0, 120px, 0) scale(1);
       opacity: 1;
     }
     100% { 
-      transform: translate3d(0, 280px, 0) scale(1);
+      transform: translate3d(0, 250px, 0) scale(1);
       opacity: 1;
     }
   }
