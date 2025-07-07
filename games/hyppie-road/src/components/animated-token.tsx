@@ -123,6 +123,8 @@ export function AnimatedToken({ isMoving, className = '' }: AnimatedTokenProps) 
         backgroundRepeat: 'no-repeat',
         // Remover transiciones que pueden causar conflictos
         transition: 'none',
+        // Bajar 10px la animación idle
+        marginTop: isMoving ? '0px' : '10px'
       }}
     />
   );
