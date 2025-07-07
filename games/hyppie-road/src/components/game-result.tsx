@@ -58,7 +58,17 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
           <div className="pb-8">
             <Button 
               onClick={onPlayAgain}
-              className="pixellari-title text-xl px-8 py-3 bg-green-600 hover:bg-green-700 border-2 border-green-400"
+              className="pixellari-title text-2xl px-12 py-4 bg-transparent border-none text-white font-bold hover:scale-105 transition-transform"
+              style={{
+                backgroundImage: 'url(/assets/images/button_442x75_groc.png)',
+                backgroundSize: '100% 100%',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                imageRendering: 'pixelated',
+                textShadow: '2px 2px 0px rgba(0,0,0,0.8)',
+                minWidth: '300px',
+                height: '80px'
+              }}
             >
               🎮 PLAY AGAIN 🎮
             </Button>

@@ -31,8 +31,15 @@ export function GameControls({
         <Button
           onClick={onCashOut}
           disabled={!canCashOut || isAnimating}
-          variant="outline"
-          className="w-full h-14 text-base bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 hover:text-green-800"
+          className="w-full h-[90px] text-base pixellari-title text-white font-bold text-xl border-none bg-transparent hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+          style={{
+            backgroundImage: 'url(/assets/images/button_442x75_groc.png)',
+            backgroundSize: '100% 100%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            imageRendering: 'pixelated',
+            textShadow: '2px 2px 0px rgba(0,0,0,0.8)'
+          }}
         >
           <DollarSign className="h-5 w-5 mr-2" />
           Cash Out ${potentialWinning.toFixed(2)}
@@ -41,7 +48,15 @@ export function GameControls({
         <Button
           onClick={onAdvance}
           disabled={!canAdvance || isAnimating}
-          className="w-full h-14 text-base"
+          className="w-full h-[90px] text-base pixellari-title text-white font-bold text-xl border-none bg-transparent hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+          style={{
+            backgroundImage: 'url(/assets/images/button_442x75_groc.png)',
+            backgroundSize: '100% 100%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            imageRendering: 'pixelated',
+            textShadow: '2px 2px 0px rgba(0,0,0,0.8)'
+          }}
         >
           <ArrowRight className={`h-5 w-5 mr-2 ${isAnimating ? 'animate-pulse' : ''}`} />
           {isAnimating ? 'Advancing...' : 'Advance'}

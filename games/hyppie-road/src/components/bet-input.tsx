@@ -97,15 +97,23 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
           {/* Quick bet buttons */}
           <div className="space-y-2">
             <p className="text-sm font-medium">Quick bets:</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {quickBets.map((amount) => (
                 <Button
                   key={amount}
-                  variant="outline"
-                  size="sm"
                   onClick={() => setBetAmount(amount.toString())}
                   disabled={disabled}
-                  className="flex-1 min-w-0"
+                  className="flex-1 min-w-0 pixellari-title text-white font-bold bg-transparent border-none hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+                  style={{
+                    backgroundImage: 'url(/assets/images/button_442x75_groc.png)',
+                    backgroundSize: '100% 100%',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    imageRendering: 'pixelated',
+                    textShadow: '2px 2px 0px rgba(0,0,0,0.8)',
+                    height: '55px',
+                    fontSize: '16px'
+                  }}
                 >
                   ${amount}
                 </Button>
