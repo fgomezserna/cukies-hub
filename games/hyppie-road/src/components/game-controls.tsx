@@ -61,11 +61,6 @@ export function GameControls({
           {isAnimating ? 'Advancing...' : 'Advance'}
         </Button>
 
-        {!canCashOut && (
-          <p className="col-span-full text-sm text-amber-600 text-center mt-3">
-            ⚠️ You must advance at least one tile to cash out
-          </p>
-        )}
         {!canAdvance && canCashOut && (
           <p className="col-span-full text-sm text-blue-600 text-center mt-3">
             🎉 You've reached the end! You can only cash out

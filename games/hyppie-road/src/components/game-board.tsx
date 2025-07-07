@@ -171,15 +171,8 @@ export function GameBoard({
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-2 overflow-hidden">
-      <div className="relative overflow-hidden">
-        {/* Indicador de progreso con scroll */}
-        <div className="mb-2 text-center">
-          <span className="text-xs text-white font-semibold">
-            Viewing tiles {startIndex + 1}-{Math.min(startIndex + 4, tiles.length)} of {tiles.length}
-          </span>
-        </div>
-        
+    <div className="w-full max-w-4xl mx-auto p-2">
+      <div className="relative">
         {/* Contenedor con overflow para el efecto de deslizamiento */}
         <div className="relative overflow-hidden mb-2">
           {isSliding ? (

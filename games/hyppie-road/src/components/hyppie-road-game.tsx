@@ -176,13 +176,21 @@ export function HyppieRoadGame() {
 
   // Juego activo
   return (
-    <div className="w-full max-w-[98vw] mx-auto p-2 min-h-screen overflow-hidden relative">
-      <div className="space-y-2">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white pixellari-title">Hyppie Road</h1>
-          <p className="text-muted-foreground">Bet: ${betAmount.toFixed(2)}</p>
-        </div>
+    <div className="w-full max-w-[98vw] mx-auto p-2 min-h-screen relative" style={{ marginTop: '150px' }}>
+      {/* Sky independiente - exactamente igual que el contenedor de tiles */}
+      <div className="absolute w-full max-w-4xl mx-auto p-2 pointer-events-none" style={{ top: '-200px', left: '0', right: '0', zIndex: -1 }}>
+        <div 
+          style={{
+            backgroundImage: 'url(/assets/images/BAck_ground_sky.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center top',
+            backgroundRepeat: 'no-repeat',
+            height: '400px'
+          }}
+        />
+      </div>
+      
+      <div className="space-y-6">
 
         {/* Tablero del juego - SIEMPRE visible */}
         <GameBoard
@@ -218,6 +226,11 @@ export function HyppieRoadGame() {
             isAnimating={isAnimating}
           />
         )}
+
+        {/* Título movido abajo */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white pixellari-title">Hyppie Road</h1>
+        </div>
       </div>
 
 

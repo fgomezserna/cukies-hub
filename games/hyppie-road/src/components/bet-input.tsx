@@ -103,14 +103,8 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
                   key={amount}
                   onClick={() => setBetAmount(amount.toString())}
                   disabled={disabled}
-                  className="flex-1 min-w-0 pixellari-title text-white font-bold bg-transparent border-none hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+                  className="flex-1 min-w-0 text-black font-bold bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-md"
                   style={{
-                    backgroundImage: 'url(/assets/images/button_442x75_groc.png)',
-                    backgroundSize: '100% 100%',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    imageRendering: 'pixelated',
-                    textShadow: '2px 2px 0px rgba(0,0,0,0.8)',
                     height: '55px',
                     fontSize: '16px'
                   }}
