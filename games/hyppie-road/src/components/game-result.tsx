@@ -47,9 +47,7 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
               <h1 
                 className="relative text-5xl md:text-7xl font-bold text-yellow-400 pixellari-title"
                 style={{ 
-                  textShadow: '4px 4px 0px rgba(184, 134, 11, 0.8), 8px 8px 0px rgba(0, 0, 0, 0.6)',
-                  filter: 'drop-shadow(0 0 15px rgba(255, 215, 0, 0.7))',
-                  animation: 'fire-flicker 2s ease-in-out infinite'
+                  textShadow: '4px 4px 0px rgba(184, 134, 11, 0.8), 8px 8px 0px rgba(0, 0, 0, 0.6)'
                 }}
               >
                 VICTORY!
@@ -117,11 +115,6 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
                 <Button 
                   onClick={onPlayAgain} 
                   className="pixellari-title text-lg px-8 py-3 bg-green-600 hover:bg-green-700 border-2 border-green-400"
-                  style={{
-                    textShadow: '2px 2px 0px rgba(0,0,0,0.8)',
-                    boxShadow: '4px 4px 0px rgba(0,0,0,0.3)',
-                    imageRendering: 'pixelated'
-                  }}
                 >
                   🎮 PLAY AGAIN 🎮
                 </Button>

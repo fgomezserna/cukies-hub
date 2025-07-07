@@ -17,20 +17,20 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
   const [showHippie, setShowHippie] = useState(false);
 
   useEffect(() => {
-    // Mostrar detalles después de 1 segundo
+    // Mostrar detalles después de 300ms
     const detailsTimer = setTimeout(() => {
       setShowDetails(true);
-    }, 1000);
+    }, 300);
 
-    // Mostrar hippie después de 1.5 segundos
+    // Mostrar hippie después de 200ms
     const hippieTimer = setTimeout(() => {
       setShowHippie(true);
-    }, 1500);
+    }, 200);
 
-    // Mostrar botón después de 2 segundos
+    // Mostrar botón después de 600ms
     const buttonTimer = setTimeout(() => {
       setShowButton(true);
-    }, 2000);
+    }, 600);
 
     return () => {
       clearTimeout(detailsTimer);
@@ -41,13 +41,7 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
 
   return (
     <div 
-      className="fixed inset-0 flex items-center justify-center z-50"
-      style={{
-        backgroundImage: 'url(/assets/images/background-playing.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}
+      className="fixed inset-0 flex items-center justify-center z-50 bg-black/20"
     >
       {/* Contenedor principal con caja pixel art */}
       {showMainContent && (
@@ -56,13 +50,13 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
           {/* Efecto de caída del hippie - relativo a la caja */}
           {showHippie && (
             <div 
-              className="absolute top-0 -right-12 z-20 pointer-events-none"
+              className="absolute top-0 -right-16 z-20 pointer-events-none"
             >
               <div 
                 className="hippie-falling"
                 style={{
-                  width: '200px',
-                  height: '200px',
+                  width: '180px',
+                  height: '180px',
                   backgroundImage: 'url(/assets/images/hippie_fall.png)',
                   backgroundSize: 'contain',
                   backgroundPosition: 'center',
