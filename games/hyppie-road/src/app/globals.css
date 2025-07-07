@@ -137,20 +137,17 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-attachment: fixed;
   }
 
   .game-card {
-    background-image: url('/assets/images/box_gray.png');
-    background-size: 100% 100%;
-    background-position: center;
-    background-repeat: no-repeat;
-    border: none;
-    box-shadow: none;
-    background-color: transparent;
-  }
-
-  .game-card {
+    background-image: url('/assets/images/box_gray.png') !important;
+    background-size: 100% 100% !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
     min-height: 120px;
   }
 

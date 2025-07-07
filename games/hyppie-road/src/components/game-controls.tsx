@@ -26,8 +26,7 @@ export function GameControls({
   isAnimating = false
 }: GameControlsProps) {
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-3 max-w-4xl mx-auto">
         <Button
           onClick={onCashOut}
           disabled={!canCashOut || isAnimating}
@@ -72,7 +71,6 @@ export function GameControls({
             🎉 You've reached the end! You can only cash out
           </p>
         )}
-      </div>
     </div>
   );
 }
