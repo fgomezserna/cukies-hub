@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { GameResult } from '@/types/game';
 import { useAudio } from '@/hooks/useAudio';
@@ -13,12 +13,75 @@ interface GameResultProps {
 
 export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResultProps) {
   const profit = result.finalAmount - betAmount;
-  const { playSound } = useAudio();
+  const { playSound, stopMusic } = useAudio();
+
+  // CLEANUP: Detener TODA la música cuando el componente se desmonte
+  useEffect(() => {
+    // Reproducir música de victoria inmediatamente al montar el componente
+    console.log('🏆 Reproduciendo música de Victoria...');
+    try {
+      playSound('victory_road');
+      console.log('✅ Música victory_road reproducida exitosamente');
+    } catch (error) {
+      console.error('❌ Error reproduciendo música victory_road:', error);
+    }
+
+    return () => {
+      console.log('🔇 CLEANUP: Componente GameResultComponent (Victoria) desmontándose - Deteniendo TODA la música...');
+      try {
+        // Buscar y detener TODOS los elementos de audio en el DOM
+        const allAudioElements = document.querySelectorAll('audio');
+        let stoppedCount = 0;
+        
+        allAudioElements.forEach((audio, index) => {
+          console.log(`🎵 CLEANUP VICTORIA Audio ${index}: src=${audio.src}, paused=${audio.paused}`);
+          if (!audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+            stoppedCount++;
+            console.log(`🔇 ✅ CLEANUP VICTORIA Audio detenido: ${index}`);
+          }
+        });
+        
+        console.log(`🔇 ✅ CLEANUP VICTORIA Detenidos ${stoppedCount} audios en total`);
+      } catch (error) {
+        console.error('❌ CLEANUP VICTORIA Error deteniendo audios:', error);
+      }
+    };
+  }, [playSound]);
 
   const handlePlayAgain = () => {
     console.log('🎮 handlePlayAgain called (Victory)');
     
-    // Reproducir sonido SIEMPRE, antes de cualquier otra acción
+    // DETENER TODA LA MÚSICA antes de continuar
+    console.log('🏠 PLAY AGAIN - Deteniendo toda la música...');
+    try {
+      const allAudioElements = document.querySelectorAll('audio');
+      let stoppedCount = 0;
+      
+      allAudioElements.forEach((audio, index) => {
+        console.log(`🎵 PLAY AGAIN Audio ${index}: src=${audio.src}, paused=${audio.paused}`);
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+          stoppedCount++;
+          console.log(`🔇 ✅ PLAY AGAIN Audio detenido: ${index}`);
+        }
+      });
+      
+      console.log(`🔇 ✅ PLAY AGAIN Detenidos ${stoppedCount} audios antes de nuevo juego`);
+    } catch (error) {
+      console.error('❌ PLAY AGAIN Error deteniendo audios:', error);
+    }
+    
+    // También usar el método del hook por si acaso
+    try {
+      stopMusic();
+    } catch (error) {
+      console.error('❌ PLAY AGAIN Error con stopMusic():', error);
+    }
+    
+    // Reproducir sonido del botón
     console.log('🔊 Intentando reproducir sonido del botón PLAY AGAIN (Victory)...');
     try {
       playSound('button_click');
@@ -27,7 +90,7 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
       console.error('❌ Error reproduciendo sonido Victory:', error);
     }
     
-    // Llamar a onPlayAgain después de un pequeño delay para asegurar que el sonido se reproduce
+    // Llamar a onPlayAgain después de un pequeño delay
     setTimeout(() => {
       onPlayAgain();
     }, 50);

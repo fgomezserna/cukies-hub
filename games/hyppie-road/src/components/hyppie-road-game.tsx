@@ -133,10 +133,39 @@ export function HyppieRoadGame() {
 
   // Manejar juego nuevo
   const handlePlayAgain = useCallback(() => {
+    console.log('🎮 NUEVO JUEGO - Deteniendo toda la música...');
+    
+    // FUERZA DETENER TODA LA MÚSICA directamente desde el DOM
+    try {
+      const allAudioElements = document.querySelectorAll('audio');
+      let stoppedCount = 0;
+      
+      allAudioElements.forEach((audio, index) => {
+        console.log(`🎵 NUEVO JUEGO Audio ${index}: src=${audio.src}, paused=${audio.paused}`);
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+          stoppedCount++;
+          console.log(`🔇 ✅ NUEVO JUEGO Audio detenido: ${index}`);
+        }
+      });
+      
+      console.log(`🔇 ✅ NUEVO JUEGO Detenidos ${stoppedCount} audios antes de empezar`);
+    } catch (error) {
+      console.error('❌ NUEVO JUEGO Error deteniendo audios:', error);
+    }
+    
+    // También usar el método del hook por si acaso
+    try {
+      stopMusic();
+    } catch (error) {
+      console.error('❌ NUEVO JUEGO Error con stopMusic():', error);
+    }
+    
     setGameResult(null);
     setShowGameOverAnimation(false);
     resetGame();
-  }, [resetGame]);
+  }, [resetGame, stopMusic]);
 
   // Manejar retorno al menú desde Game Over
   const handleReturnToMenu = useCallback(() => {

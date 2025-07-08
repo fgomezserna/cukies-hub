@@ -5,6 +5,7 @@ export type SoundType =
   | 'button_click'
   | 'fall_hole'
   | 'gameover_road'
+  | 'victory_road'
   | 'background_music';
 
 // Configuración de cada sonido
@@ -20,6 +21,7 @@ const SOUND_CONFIG: Record<SoundType, {
   fall_hole: { path: '/assets/sounds/fall-hole.mp3', volume: 0.7, category: 'effect' },
   // Music
   gameover_road: { path: '/assets/sounds/gameover-road.mp3', volume: 0.6, category: 'music' },
+  victory_road: { path: '/assets/sounds/victory-road.mp3', volume: 0.6, category: 'music' },
   background_music: { path: '/assets/sounds/Peter Gresser - Skipping in the No Standing Zone.mp3', volume: 0.3, loop: true, category: 'music' },
 };
 
@@ -172,7 +174,7 @@ export const useAudio = () => {
     console.log('🔇 INICIANDO stopMusic() - Deteniendo toda la música...');
     
     // Detener todas las categorías de música, no solo currentMusicRef
-    const musicSounds: SoundType[] = ['background_music', 'gameover_road'];
+    const musicSounds: SoundType[] = ['background_music', 'gameover_road', 'victory_road'];
     let stoppedCount = 0;
     
     musicSounds.forEach(musicType => {
