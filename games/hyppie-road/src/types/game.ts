@@ -69,4 +69,5 @@ export interface UIState {
   isCashOutDisabled: boolean;
   showConfirmation: boolean;
   isAnimating: boolean;
+  hasFallenInTrap: boolean; // NUEVO: Indica si el token cayó en una trampa y no se puede hacer cash out
 }

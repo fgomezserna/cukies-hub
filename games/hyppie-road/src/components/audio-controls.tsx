@@ -5,24 +5,58 @@ import { useAudio } from '@/hooks/useAudio';
 
 export function AudioControls() {
   const { toggleMusic, toggleSounds, isMusicEnabled, getSoundsEnabled, playSound } = useAudio();
-  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(true); // EMPEZAR como true (igual que sybil-slayer)
   const [soundsEnabled, setSoundsEnabled] = useState(true);
 
-  // Sincronizar estado inicial con el hook de audio
+  // Sincronizar estado continuamente con el hook de audio
   useEffect(() => {
-    setMusicEnabled(isMusicEnabled());
-    setSoundsEnabled(getSoundsEnabled());
-  }, [isMusicEnabled, getSoundsEnabled]);
+    const interval = setInterval(() => {
+      const currentMusicState = isMusicEnabled();
+      const currentSoundsState = getSoundsEnabled();
+      
+      if (currentMusicState !== musicEnabled) {
+        setMusicEnabled(currentMusicState);
+        console.log(`🎵 AudioControls: Estado música sincronizado a ${currentMusicState}`);
+      }
+      if (currentSoundsState !== soundsEnabled) {
+        setSoundsEnabled(currentSoundsState);
+        console.log(`🔊 AudioControls: Estado sonidos sincronizado a ${currentSoundsState}`);
+      }
+    }, 100); // Verificar cada 100ms
+
+    return () => clearInterval(interval);
+  }, [isMusicEnabled, getSoundsEnabled, musicEnabled, soundsEnabled]);
 
   const handleMusicToggle = () => {
-    playSound('button_click');
-    const newState = toggleMusic();
-    setMusicEnabled(newState);
+    console.log('🎵 BOTÓN MÚSICA CLICKEADO - Estado actual:', musicEnabled);
+    
+    // Reproducir sonido del botón SOLO si los sonidos están activados
+    if (soundsEnabled) {
+      try {
+        playSound('button_click');
+      } catch (error) {
+        console.error('❌ Error reproduciendo sonido del botón:', error);
+      }
+    }
+    
+    // Ejecutar toggle
+    try {
+      const newState = toggleMusic();
+      console.log('🎵 BOTÓN MÚSICA - Estado después del toggle:', newState);
+      setMusicEnabled(newState);
+    } catch (error) {
+      console.error('❌ Error en toggleMusic:', error);
+    }
   };
 
   const handleSoundsToggle = () => {
+    console.log('🔊 handleSoundsToggle - Estado antes:', soundsEnabled);
+    
+    // Reproducir sonido del botón antes de cambiar el estado
     playSound('button_click');
+    
     const newState = toggleSounds();
+    console.log('🔊 handleSoundsToggle - Nuevo estado:', newState);
     setSoundsEnabled(newState);
   };
 

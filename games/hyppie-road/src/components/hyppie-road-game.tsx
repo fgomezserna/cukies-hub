@@ -40,16 +40,13 @@ export function HyppieRoadGame() {
   const [showGameOverAnimation, setShowGameOverAnimation] = React.useState(false);
   const { playSound, playBackgroundMusic, stopMusic, playMusic } = useAudio();
 
-  // Iniciar música de fondo cuando el juego esté activo
+  // Asegurar música de fondo cuando el juego esté activo
   useEffect(() => {
     if (isGameActive()) {
-      console.log('🎵 Juego activo - Iniciando música de fondo');
+      console.log('🎵 Juego activo - Asegurando música de fondo');
       playBackgroundMusic();
-    } else {
-      console.log('🎵 Juego no activo - Deteniendo música');
-      stopMusic();
     }
-  }, [isGameActive, playBackgroundMusic, stopMusic]);
+  }, [isGameActive, playBackgroundMusic]);
 
   // Manejar inicio del juego
   const handleStartGame = useCallback((amount: number) => {
