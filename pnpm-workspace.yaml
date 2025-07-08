@@ -2,3 +2,4 @@ packages:
   - 'dapp'
   - 'games/sybil-slayer'
   - 'packages/*'
+  - 'games/tower-builder'
