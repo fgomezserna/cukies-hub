@@ -20,6 +20,7 @@ const GameContainer = () => {
             private tower: Phaser.Physics.Matter.Image[] = [];
             private topBlock: Phaser.Physics.Matter.Image | null = null;
             private blockWidth = 100;
+            private initialBlockWidth = 300;
             private blockHeight = 40;
             private moveSpeed = 2;
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
@@ -46,14 +47,17 @@ const GameContainer = () => {
               this.scoreText = this.add.text(10, 10, 'Score: 0', {
                 fontSize: '24px',
                 color: '#ffffff'
-              }).setDepth(1);
+              }).setDepth(1).setScrollFactor(0);
 
               // Overlay instruction text (shown in ready / gameOver)
               this.overlayText = this.add.text(width / 2, height / 2, 'Tap to Start', {
                 fontSize: '32px',
                 color: '#ffffff',
                 align: 'center'
-              }).setOrigin(0.5);
+              }).setOrigin(0.5).setScrollFactor(0);
+
+              // Extend world bounds upward for camera scrolling
+              this.cameras.main.setBounds(0, -10000, width, height + 10000);
 
               this.input.on('pointerdown', () => {
                 if (this.gameState === 'ready') {
@@ -85,7 +89,7 @@ const GameContainer = () => {
                 (this.game.config.height as number) - 50,
                 'block'
               );
-              baseImg.setDisplaySize(200, 50);
+              baseImg.setDisplaySize(this.initialBlockWidth, 50);
               baseImg.setStatic(true);
               this.tower.push(baseImg);
             }
@@ -97,9 +101,17 @@ const GameContainer = () => {
                 (lastBlock.y) - this.blockHeight,
                 'block'
               );
-              blockImg.setDisplaySize(this.blockWidth, this.blockHeight);
-              blockImg.setStatic(true);
-              this.topBlock = blockImg;
+              // El primer bloque móvil debe ser igual de ancho que la base
+              if (this.tower.length === 1) {
+                blockImg.setDisplaySize(this.initialBlockWidth, this.blockHeight);
+                blockImg.setStatic(true);
+                this.topBlock = blockImg;
+                this.blockWidth = 100; // Para los siguientes bloques
+              } else {
+                blockImg.setDisplaySize(this.blockWidth, this.blockHeight);
+                blockImg.setStatic(true);
+                this.topBlock = blockImg;
+              }
             }
 
             startGame = () => {
@@ -114,7 +126,10 @@ const GameContainer = () => {
               this.blockWidth = 100;
 
               this.createBase();
+              // El primer bloque móvil debe ser igual de ancho que la base
+              this.blockWidth = this.initialBlockWidth;
               this.spawnBlock();
+              this.blockWidth = 100; // Para los siguientes bloques
             };
 
             placeBlock() {
@@ -149,6 +164,17 @@ const GameContainer = () => {
                 // Update score
                 this.score += 1;
                 if (this.scoreText) this.scoreText.setText(`Score: ${this.score}`);
+
+                // Increase difficulty ligeramente en cada bloque (0.2 px/frame) hasta un máximo de 6
+                const sign = Math.sign(this.moveSpeed) || 1;
+                const newMag = Math.min(Math.abs(this.moveSpeed) + 0.05, 6);
+                this.moveSpeed = sign * newMag;
+
+                // Camera scroll up if near top
+                const cameraRelativeY = yPos - this.cameras.main.scrollY;
+                if (cameraRelativeY < 150) {
+                  this.cameras.main.scrollY -= this.blockHeight;
+                }
 
                 // Spawn the next moving block on top
                 this.spawnBlock();
