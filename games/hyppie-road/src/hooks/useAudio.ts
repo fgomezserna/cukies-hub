@@ -3,7 +3,9 @@ import { useRef, useCallback, useEffect } from 'react';
 // Tipos de sonidos disponibles
 export type SoundType = 
   | 'button_click'
-  | 'fall_hole';
+  | 'fall_hole'
+  | 'gameover_road'
+  | 'background_music';
 
 // Configuración de cada sonido
 const SOUND_CONFIG: Record<SoundType, { 
@@ -16,12 +18,17 @@ const SOUND_CONFIG: Record<SoundType, {
   button_click: { path: '/assets/sounds/button-click-01.mp3', volume: 0.5, category: 'ui' },
   // Effects
   fall_hole: { path: '/assets/sounds/fall-hole.mp3', volume: 0.7, category: 'effect' },
+  // Music
+  gameover_road: { path: '/assets/sounds/gameover-road.mp3', volume: 0.6, category: 'music' },
+  background_music: { path: '/assets/sounds/Peter Gresser - Skipping in the No Standing Zone.mp3', volume: 0.3, loop: true, category: 'music' },
 };
 
 export const useAudio = () => {
   // Refs para almacenar las instancias de Audio
   const audioInstancesRef = useRef<Map<SoundType, HTMLAudioElement>>(new Map());
   const soundsEnabledRef = useRef<boolean>(true);
+  const musicEnabledRef = useRef<boolean>(true);
+  const currentMusicRef = useRef<SoundType | null>(null);
   
   // Estados de volumen por categoría
   const volumeSettingsRef = useRef({
@@ -85,8 +92,14 @@ export const useAudio = () => {
 
     const soundConfig = SOUND_CONFIG[soundType];
     
-    // Si están desactivados los sonidos, no reproducir
-    if (!soundsEnabledRef.current) {
+    // Si es música y está desactivada, no reproducir (excepto gameover_road)
+    if (soundConfig.category === 'music' && !musicEnabledRef.current && soundType !== 'gameover_road') {
+      console.log(`🔇 Música desactivada, no reproduciendo: ${soundType}`);
+      return;
+    }
+
+    // Si son sonidos de efectos y están desactivados, no reproducir
+    if ((soundConfig.category === 'effect' || soundConfig.category === 'ui') && !soundsEnabledRef.current) {
       console.log(`🔇 Sonidos desactivados, no reproduciendo: ${soundType}`);
       return;
     }
@@ -119,11 +132,124 @@ export const useAudio = () => {
     }
   }, []);
 
+  // Función para reproducir música de fondo
+  const playBackgroundMusic = useCallback(() => {
+    if (!musicEnabledRef.current) {
+      console.log('🔇 Música desactivada, no reproduciendo música de fondo');
+      return;
+    }
+
+    console.log('🎵 Iniciando música de fondo: Peter Gresser');
+    playSound('background_music');
+    currentMusicRef.current = 'background_music';
+  }, [playSound]);
+
+  // Función para reproducir música específica
+  const playMusic = useCallback((musicType: SoundType) => {
+    if (!musicEnabledRef.current && musicType !== 'gameover_road') {
+      console.log(`🔇 Música desactivada, no reproduciendo: ${musicType}`);
+      return;
+    }
+
+    // Detener música actual si existe
+    if (currentMusicRef.current) {
+      const currentMusic = audioInstancesRef.current.get(currentMusicRef.current);
+      if (currentMusic) {
+        currentMusic.pause();
+        currentMusic.currentTime = 0;
+        currentMusic.onended = null;
+      }
+    }
+
+    // Reproducir nueva música
+    playSound(musicType);
+    currentMusicRef.current = musicType;
+    console.log(`🎵 Música cambiada a: ${musicType}`);
+  }, [playSound]);
+
+  // Función para detener toda la música
+  const stopMusic = useCallback(() => {
+    console.log('🔇 INICIANDO stopMusic() - Deteniendo toda la música...');
+    
+    // Detener todas las categorías de música, no solo currentMusicRef
+    const musicSounds: SoundType[] = ['background_music', 'gameover_road'];
+    let stoppedCount = 0;
+    
+    musicSounds.forEach(musicType => {
+      const audio = audioInstancesRef.current.get(musicType);
+      if (audio) {
+        console.log(`🎵 Revisando ${musicType}: paused=${audio.paused}, currentTime=${audio.currentTime.toFixed(2)}s`);
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.onended = null;
+          stoppedCount++;
+          console.log(`🔇 ✅ Música detenida: ${musicType}`);
+        } else {
+          console.log(`🔇 ⏸️ ${musicType} ya estaba pausada`);
+        }
+      } else {
+        console.log(`🔇 ❌ Audio ${musicType} no encontrado`);
+      }
+    });
+    
+    // Limpiar la referencia actual
+    console.log(`🔇 currentMusicRef.current antes: ${currentMusicRef.current}`);
+    currentMusicRef.current = null;
+    console.log(`🔇 FINALIZANDO stopMusic() - Detenidas ${stoppedCount} pistas. currentMusicRef limpiado.`);
+  }, []);
+
+  // Función para activar/desactivar música
+  const toggleMusic = useCallback(() => {
+    musicEnabledRef.current = !musicEnabledRef.current;
+    
+    if (!musicEnabledRef.current) {
+      // Si se desactiva, pausar música actual (sin resetear)
+      if (currentMusicRef.current) {
+        const currentMusic = audioInstancesRef.current.get(currentMusicRef.current);
+        if (currentMusic && !currentMusic.paused) {
+          currentMusic.pause();
+          console.log(`⏸️ Música pausada: ${currentMusicRef.current} (tiempo: ${currentMusic.currentTime.toFixed(2)}s)`);
+        }
+      }
+      console.log('🔇 Música desactivada');
+    } else {
+      // Si se activa, reanudar música desde donde se quedó
+      if (currentMusicRef.current) {
+        const currentMusic = audioInstancesRef.current.get(currentMusicRef.current);
+        if (currentMusic && currentMusic.paused && currentMusic.currentTime > 0) {
+          const playPromise = currentMusic.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.warn(`⚠️ Error reanudando ${currentMusicRef.current}:`, error);
+            });
+          }
+          console.log(`▶️ Música reanudada: ${currentMusicRef.current} (desde tiempo: ${currentMusic.currentTime.toFixed(2)}s)`);
+        } else {
+          // Si no hay música o se perdió, iniciar música de fondo
+          console.log('🔊 No hay música pausada, iniciando música de fondo');
+          playBackgroundMusic();
+        }
+      } else {
+        // Si no hay música actual, iniciar música de fondo
+        console.log('🔊 Música activada, iniciando música de fondo');
+        playBackgroundMusic();
+      }
+    }
+    
+    return musicEnabledRef.current;
+  }, [playBackgroundMusic]);
+
   // Función para activar/desactivar sonidos
   const toggleSounds = useCallback(() => {
     soundsEnabledRef.current = !soundsEnabledRef.current;
     console.log(`🔊 Sonidos ${soundsEnabledRef.current ? 'activados' : 'desactivados'}`);
     return soundsEnabledRef.current;
+  }, []);
+
+  // Función para obtener el estado de la música
+  const isMusicEnabled = useCallback(() => {
+    return musicEnabledRef.current;
   }, []);
 
   // Función para obtener el estado de los sonidos
@@ -133,7 +259,13 @@ export const useAudio = () => {
 
   return {
     playSound,
+    playMusic,
+    playBackgroundMusic,
+    stopMusic,
+    toggleMusic,
     toggleSounds,
+    isMusicEnabled,
     getSoundsEnabled,
+    currentMusic: currentMusicRef.current,
   };
 }; 

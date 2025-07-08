@@ -13,32 +13,86 @@ interface GameOverAnimationProps {
 
 export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOverAnimationProps) {
   const [showHippie, setShowHippie] = useState(false);
-  const { playSound } = useAudio();
+  const { playSound, stopMusic } = useAudio();
 
   useEffect(() => {
+    // La música de Game Over ya se reproduce desde hyppie-road-game.tsx
+    // No necesitamos reproducirla aquí para evitar duplicación
+    
     // Mostrar hippie después de 600ms
     const hippieTimer = setTimeout(() => {
       setShowHippie(true);
     }, 600);
 
+    // CLEANUP: Detener TODA la música cuando el componente se desmonte
     return () => {
       clearTimeout(hippieTimer);
+      
+      console.log('🔇 CLEANUP: Componente GameOverAnimation desmontándose - Deteniendo TODA la música...');
+      try {
+        // Buscar y detener TODOS los elementos de audio en el DOM
+        const allAudioElements = document.querySelectorAll('audio');
+        let stoppedCount = 0;
+        
+        allAudioElements.forEach((audio, index) => {
+          console.log(`🎵 CLEANUP Audio ${index}: src=${audio.src}, paused=${audio.paused}`);
+          if (!audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+            stoppedCount++;
+            console.log(`🔇 ✅ CLEANUP Audio detenido: ${index}`);
+          }
+        });
+        
+        console.log(`🔇 ✅ CLEANUP Detenidos ${stoppedCount} audios en total`);
+      } catch (error) {
+        console.error('❌ CLEANUP Error deteniendo audios:', error);
+      }
     };
   }, []);
 
   const handleReturnToMenu = () => {
     console.log('🎮 handleReturnToMenu called (Game Over)');
     
-    // Reproducir sonido SIEMPRE, antes de cualquier otra acción
-    console.log('🔊 Intentando reproducir sonido del botón OK (Game Over)...');
+    // DETENER DIRECTAMENTE el audio de gameover_road
+    console.log('🔇 Deteniendo gameover_road DIRECTAMENTE desde el botón...');
     try {
-      playSound('button_click');
-      console.log('✅ Sonido Game Over reproducido exitosamente');
+      // Buscar y detener TODOS los elementos de audio que contengan "gameover-road"
+      const allAudioElements = document.querySelectorAll('audio');
+      let stoppedCount = 0;
+      
+      allAudioElements.forEach((audio, index) => {
+        console.log(`🎵 Audio ${index}: src=${audio.src}, paused=${audio.paused}`);
+        if (audio.src && audio.src.includes('gameover-road')) {
+          console.log(`🎵 Encontrado gameover-road en audio ${index}!`);
+          if (!audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+            stoppedCount++;
+            console.log(`🔇 ✅ Audio gameover-road detenido: ${index}`);
+          }
+        }
+      });
+      
+      if (stoppedCount === 0) {
+        console.log('🔇 ⚠️ No se encontraron audios gameover-road reproduciéndose');
+      } else {
+        console.log(`🔇 ✅ Detenidos ${stoppedCount} audios gameover-road`);
+      }
     } catch (error) {
-      console.error('❌ Error reproduciendo sonido Game Over:', error);
+      console.error('❌ Error deteniendo audio directamente:', error);
     }
     
-    // Llamar a onReturnToMenu después de un pequeño delay para asegurar que el sonido se reproduce
+    // Reproducir sonido del botón
+    console.log('🔊 Intentando reproducir sonido del botón OK...');
+    try {
+      playSound('button_click');
+      console.log('✅ Sonido botón reproducido exitosamente');
+    } catch (error) {
+      console.error('❌ Error reproduciendo sonido del botón:', error);
+    }
+    
+    // Llamar a onReturnToMenu después de un pequeño delay
     setTimeout(() => {
       onReturnToMenu();
     }, 50);

@@ -9,6 +9,7 @@ import { GameControls } from './game-controls';
 import { GameStats } from './game-stats';
 import { GameResultComponent } from './game-result';
 import { GameOverAnimation } from './game-over-animation';
+import { AudioControls } from './audio-controls';
 import { GameResult } from '@/types/game';
 import { useAudio } from '@/hooks/useAudio';
 
@@ -37,7 +38,18 @@ export function HyppieRoadGame() {
   const [gameResult, setGameResult] = React.useState<GameResult | null>(null);
   const [previousPosition, setPreviousPosition] = React.useState<number | undefined>(undefined);
   const [showGameOverAnimation, setShowGameOverAnimation] = React.useState(false);
-  const { playSound } = useAudio();
+  const { playSound, playBackgroundMusic, stopMusic, playMusic } = useAudio();
+
+  // Iniciar música de fondo cuando el juego esté activo
+  useEffect(() => {
+    if (isGameActive()) {
+      console.log('🎵 Juego activo - Iniciando música de fondo');
+      playBackgroundMusic();
+    } else {
+      console.log('🎵 Juego no activo - Deteniendo música');
+      stopMusic();
+    }
+  }, [isGameActive, playBackgroundMusic, stopMusic]);
 
   // Manejar inicio del juego
   const handleStartGame = useCallback((amount: number) => {
@@ -72,13 +84,22 @@ export function HyppieRoadGame() {
             console.error('❌ Error reproduciendo sonido fall_hole:', error);
           }
           
+          // Detener música de fondo y cambiar a Game Over después de un delay
+          setTimeout(() => {
+            console.log('🎵 Deteniendo música de fondo y cambiando a Game Over');
+            stopMusic();
+            playMusic('gameover_road');
+          }, 1000);
+          
           // NO actualizar gameResult, solo mostrar efectos visuales
           // Después de ver los efectos, establecer resultado y volver al menú
           setTimeout(() => {
             setGameResult(result);
           }, 2000); // 2 segundos para ver el efecto visual
         } else {
-          // Victoria o retiro exitoso - mostrar resultado inmediatamente  
+          // Victoria o retiro exitoso - detener música de fondo
+          console.log('🎵 Juego terminado exitosamente - Deteniendo música');
+          stopMusic();
           setGameResult(result);
         }
         
@@ -89,7 +110,7 @@ export function HyppieRoadGame() {
       alert(error instanceof Error ? error.message : 'Error advancing');
       setIsAnimating(false);
     }
-  }, [canAdvance, makeAdvance, setIsAnimating, position, playSound]);
+  }, [canAdvance, makeAdvance, setIsAnimating, position, playSound, stopMusic, playMusic]);
 
   // Callback para cuando termina la animación de movimiento
   const handleMoveAnimationComplete = useCallback(() => {
@@ -119,10 +140,39 @@ export function HyppieRoadGame() {
 
   // Manejar retorno al menú desde Game Over
   const handleReturnToMenu = useCallback(() => {
+    console.log('🏠 RETORNO AL MENÚ - Deteniendo toda la música...');
+    
+    // FUERZA DETENER TODA LA MÚSICA directamente desde el DOM
+    try {
+      const allAudioElements = document.querySelectorAll('audio');
+      let stoppedCount = 0;
+      
+      allAudioElements.forEach((audio, index) => {
+        console.log(`🎵 MENÚ Audio ${index}: src=${audio.src}, paused=${audio.paused}`);
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+          stoppedCount++;
+          console.log(`🔇 ✅ MENÚ Audio detenido: ${index}`);
+        }
+      });
+      
+      console.log(`🔇 ✅ MENÚ Detenidos ${stoppedCount} audios antes de ir al menú`);
+    } catch (error) {
+      console.error('❌ MENÚ Error deteniendo audios:', error);
+    }
+    
+    // También usar el método del hook por si acaso
+    try {
+      stopMusic();
+    } catch (error) {
+      console.error('❌ MENÚ Error con stopMusic():', error);
+    }
+    
     setShowGameOverAnimation(false);
     setGameResult(null);
     resetGame();
-  }, [resetGame]);
+  }, [resetGame, stopMusic]);
 
   // Calcular estadísticas del juego
   const gameStats = React.useMemo(() => {
@@ -144,22 +194,28 @@ export function HyppieRoadGame() {
     // Para game over (derrota), mostrar GameOverAnimation
     if (!gameResult.success && gameResult.trapPosition !== undefined) {
       return (
-        <GameOverAnimation
-          result={gameResult}
-          betAmount={betAmount}
-          onReturnToMenu={handleReturnToMenu}
-        />
+        <div className="relative">
+          <GameOverAnimation
+            result={gameResult}
+            betAmount={betAmount}
+            onReturnToMenu={handleReturnToMenu}
+          />
+          {/* Controles de audio - siempre visibles */}
+          <AudioControls />
+        </div>
       );
     }
     
     // Para victoria o retiro exitoso, mostrar GameResultComponent
     return (
-      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
+      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center relative">
         <GameResultComponent
           result={gameResult}
           betAmount={betAmount}
           onPlayAgain={handlePlayAgain}
         />
+        {/* Controles de audio - siempre visibles */}
+        <AudioControls />
       </div>
     );
   }
@@ -167,7 +223,7 @@ export function HyppieRoadGame() {
   // Si el juego no está activo, mostrar entrada de apuesta
   if (!isGameActive()) {
     return (
-      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center">
+      <div className="container mx-auto p-4 min-h-screen flex items-center justify-center relative">
         <div className="w-full max-w-lg space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-6xl font-bold text-white pixellari-title">Hyppie Road</h1>
@@ -180,6 +236,8 @@ export function HyppieRoadGame() {
             disabled={isAnimating}
           />
         </div>
+        {/* Controles de audio - siempre visibles */}
+        <AudioControls />
       </div>
     );
   }
@@ -242,6 +300,8 @@ export function HyppieRoadGame() {
           />
         )}
 
+        {/* Controles de audio - siempre visibles */}
+        <AudioControls />
 
       </div>
 
