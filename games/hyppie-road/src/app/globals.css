@@ -67,6 +67,7 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    background-attachment: fixed;
     min-height: 100vh;
     overflow-x: hidden;
   }
@@ -137,17 +138,20 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 
   .game-card {
-    background-image: url('/assets/images/box_gray.png') !important;
-    background-size: 100% 100% !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    background-color: transparent !important;
+    background-image: url('/assets/images/box_gray.png');
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+  }
+
+  .game-card {
     min-height: 120px;
   }
 
@@ -165,29 +169,43 @@
     -webkit-image-rendering: pixelated;
     image-rendering: crisp-edges;
     -ms-interpolation-mode: nearest-neighbor;
-    transform: translate3d(0, 0, 0);
+    will-change: background-image;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
   /* Prevenir parpadeos en transiciones */
   .no-flicker {
-    will-change: transform;
+    will-change: transform, opacity, background-image;
     backface-visibility: hidden;
-    transform: translate3d(0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
-  /* Animaciones para Game Over optimizadas */
+  /* Animaciones para Game Over */
   @keyframes trap-explosion {
     0% { 
-      transform: scale3d(1, 1, 1) rotate(0deg);
+      transform: scale(1) rotate(0deg);
       opacity: 1;
     }
+    25% { 
+      transform: scale(1.5) rotate(90deg);
+      opacity: 0.8;
+    }
     50% { 
-      transform: scale3d(1.8, 1.8, 1) rotate(180deg);
+      transform: scale(2) rotate(180deg);
       opacity: 0.6;
     }
+    75% { 
+      transform: scale(1.8) rotate(270deg);
+      opacity: 0.4;
+    }
     100% { 
-      transform: scale3d(2, 2, 1) rotate(360deg);
-      opacity: 0;
+      transform: scale(2.2) rotate(360deg);
+      opacity: 0.2;
     }
   }
 
@@ -232,18 +250,34 @@
     animation: fade-in 0.8s ease-out;
   }
 
-  /* Animación de caída hacia abajo optimizada */
+  /* Animación de caída hacia abajo con desaparición */
   @keyframes fallDown {
     0% { 
-      transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+      transform: translateY(0) scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    15% { 
+      transform: translateY(10px) scale(0.95) rotate(5deg);
+      opacity: 1;
+    }
+    30% { 
+      transform: translateY(25px) scale(0.9) rotate(-3deg);
       opacity: 1;
     }
     50% { 
-      transform: translate3d(0, 60px, 0) scale3d(0.8, 0.8, 1);
-      opacity: 0.7;
+      transform: translateY(45px) scale(0.85) rotate(8deg);
+      opacity: 1;
+    }
+    70% { 
+      transform: translateY(70px) scale(0.7) rotate(-5deg);
+      opacity: 0.8;
+    }
+    85% { 
+      transform: translateY(95px) scale(0.5) rotate(10deg);
+      opacity: 0.4;
     }
     100% { 
-      transform: translate3d(0, 120px, 0) scale3d(0.3, 0.3, 1);
+      transform: translateY(120px) scale(0.2) rotate(0deg);
       opacity: 0;
     }
   }
@@ -264,50 +298,35 @@
     }
   }
 
-  /* Animación de caída del hippie optimizada */
+  /* Animación de caída del hippie */
   @keyframes hippieFalling {
     0% { 
-      transform: translate3d(0, -150px, 0) scale(1);
-      opacity: 0.8;
+      transform: translateY(-150vh) scale(1);
+      opacity: 1;
     }
-    50% { 
-      transform: translate3d(0, 120px, 0) scale(1);
+    30% { 
+      transform: translateY(-80vh) scale(1);
+      opacity: 1;
+    }
+    60% { 
+      transform: translateY(-30vh) scale(1);
+      opacity: 1;
+    }
+    80% { 
+      transform: translateY(10vh) scale(1);
+      opacity: 1;
+    }
+    95% { 
+      transform: translateY(25vh) scale(1);
       opacity: 1;
     }
     100% { 
-      transform: translate3d(0, 250px, 0) scale(1);
+      transform: translateY(25vh) scale(1);
       opacity: 1;
     }
   }
 
   .hippie-falling {
-    animation: hippieFalling 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-    will-change: transform;
-  }
-
-  /* Botón específico para Game Over - estilo rojo */
-  .game-over-button {
-    background: linear-gradient(135deg, #dc2626 0%, #991b1b  50%, #7f1d1d 100%) !important;
-    border: 3px solid #450a0a !important;
-    border-radius: 8px !important;
-    box-shadow: 
-      0 4px 0 #450a0a,
-      0 6px 8px rgba(0,0,0,0.4),
-      inset 0 1px 0 rgba(255,255,255,0.2) !important;
-    position: relative !important;
-    image-rendering: pixelated !important;
-  }
-
-  .game-over-button:hover {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%) !important;
-    transform: scale(1.05) !important;
-  }
-
-  .game-over-button:active {
-    transform: scale(0.98) translateY(2px) !important;
-    box-shadow: 
-      0 2px 0 #450a0a,
-      0 3px 4px rgba(0,0,0,0.4),
-      inset 0 1px 0 rgba(255,255,255,0.2) !important;
+    animation: hippieFalling 3s ease-in forwards;
   }
 }

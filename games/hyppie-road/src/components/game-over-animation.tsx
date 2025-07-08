@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { GameResult } from '@/types/game';
+import { useAudio } from '@/hooks/useAudio';
 
 interface GameOverAnimationProps {
   result: GameResult;
@@ -12,6 +13,7 @@ interface GameOverAnimationProps {
 
 export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOverAnimationProps) {
   const [showHippie, setShowHippie] = useState(false);
+  const { playSound } = useAudio();
 
   useEffect(() => {
     // Mostrar hippie después de 600ms
@@ -23,6 +25,24 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
       clearTimeout(hippieTimer);
     };
   }, []);
+
+  const handleReturnToMenu = () => {
+    console.log('🎮 handleReturnToMenu called (Game Over)');
+    
+    // Reproducir sonido SIEMPRE, antes de cualquier otra acción
+    console.log('🔊 Intentando reproducir sonido del botón OK (Game Over)...');
+    try {
+      playSound('button_click');
+      console.log('✅ Sonido Game Over reproducido exitosamente');
+    } catch (error) {
+      console.error('❌ Error reproduciendo sonido Game Over:', error);
+    }
+    
+    // Llamar a onReturnToMenu después de un pequeño delay para asegurar que el sonido se reproduce
+    setTimeout(() => {
+      onReturnToMenu();
+    }, 50);
+  };
 
   return (
     <div 
@@ -87,7 +107,13 @@ export function GameOverAnimation({ result, betAmount, onReturnToMenu }: GameOve
           {/* Botón OK dentro de la caja */}
           <div className="pb-8">
             <Button 
-              onClick={onReturnToMenu}
+              onClick={handleReturnToMenu}
+              onMouseDown={() => {
+                // Reproducir sonido también en mouseDown para mayor garantía
+                console.log('🔊 Sonido Game Over desde mouseDown');
+                playSound('button_click');
+              }}
+              disableSound={true}
               className="game-over-button pixellari-title text-2xl px-12 py-4 border-none text-white font-bold hover:scale-105 transition-transform"
               style={{
                 minWidth: '250px',

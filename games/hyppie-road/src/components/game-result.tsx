@@ -3,6 +3,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { GameResult } from '@/types/game';
+import { useAudio } from '@/hooks/useAudio';
 
 interface GameResultProps {
   result: GameResult;
@@ -12,6 +13,25 @@ interface GameResultProps {
 
 export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResultProps) {
   const profit = result.finalAmount - betAmount;
+  const { playSound } = useAudio();
+
+  const handlePlayAgain = () => {
+    console.log('🎮 handlePlayAgain called (Victory)');
+    
+    // Reproducir sonido SIEMPRE, antes de cualquier otra acción
+    console.log('🔊 Intentando reproducir sonido del botón PLAY AGAIN (Victory)...');
+    try {
+      playSound('button_click');
+      console.log('✅ Sonido Victory reproducido exitosamente');
+    } catch (error) {
+      console.error('❌ Error reproduciendo sonido Victory:', error);
+    }
+    
+    // Llamar a onPlayAgain después de un pequeño delay para asegurar que el sonido se reproduce
+    setTimeout(() => {
+      onPlayAgain();
+    }, 50);
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/20">
@@ -57,7 +77,13 @@ export function GameResultComponent({ result, betAmount, onPlayAgain }: GameResu
           {/* Botón PLAY AGAIN dentro de la caja */}
           <div className="pb-8">
             <Button 
-              onClick={onPlayAgain}
+              onClick={handlePlayAgain}
+              onMouseDown={() => {
+                // Reproducir sonido también en mouseDown para mayor garantía
+                console.log('🔊 Sonido Victory desde mouseDown');
+                playSound('button_click');
+              }}
+              disableSound={true} // Desactivamos el sonido automático porque lo manejamos manualmente
               className="pixellari-title text-2xl px-12 py-4 bg-transparent border-none text-white font-bold hover:scale-105 transition-transform"
               style={{
                 backgroundImage: 'url(/assets/images/button_442x75_groc.png)',

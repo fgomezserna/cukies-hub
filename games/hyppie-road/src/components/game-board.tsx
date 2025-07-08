@@ -5,6 +5,7 @@ import { Tile } from '@/types/game';
 import { cn } from '@/lib/utils';
 import { AnimatedToken } from './animated-token';
 import { MovingToken } from './moving-token';
+import { useAudio } from '@/hooks/useAudio';
 
 interface GameBoardProps {
   tiles: Tile[];
@@ -27,6 +28,7 @@ export function GameBoard({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
   const [previousScrollGroup, setPreviousScrollGroup] = useState(0);
+  const { playSound } = useAudio();
 
   // Calcular qué casillas mostrar (4 a la vez)
   const getVisibleTiles = () => {
@@ -88,7 +90,12 @@ export function GameBoard({
     onMoveAnimationComplete?.();
   };
 
-    const { visibleTiles, startIndex } = getVisibleTiles();
+  const handleTileClick = (index: number) => {
+    playSound('button_click');
+    onTileClick?.(index);
+  };
+
+  const { visibleTiles, startIndex } = getVisibleTiles();
   const previousGroup = getPreviousGroupTiles();
 
   // Función para renderizar un grupo de casillas
@@ -108,7 +115,7 @@ export function GameBoard({
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat'
             }}
-            onClick={() => onTileClick?.(actualIndex)}
+            onClick={() => handleTileClick(actualIndex)}
           >
             {/* Capa adicional section03.png por encima de section02.png durante game over */}
             {tile.isActive && tile.hasTrap && (

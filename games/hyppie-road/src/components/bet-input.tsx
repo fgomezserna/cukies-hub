@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DEFAULT_GAME_CONFIG } from '@/types/game';
+import { useAudio } from '@/hooks/useAudio';
 
 interface BetInputProps {
   onStartGame: (betAmount: number) => void;
@@ -13,9 +14,12 @@ interface BetInputProps {
 export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
   const [betAmount, setBetAmount] = useState<string>('10');
   const [error, setError] = useState<string>('');
+  const { playSound } = useAudio();
 
   const handleStartGame = () => {
     const amount = parseFloat(betAmount);
+    
+    console.log('🎮 handleStartGame called, disabled:', disabled, 'amount:', amount);
     
     // Validations
     if (isNaN(amount)) {
@@ -34,7 +38,20 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
     }
     
     setError('');
-    onStartGame(amount);
+    
+    // Reproducir sonido SIEMPRE, antes de cualquier otra acción
+    console.log('🔊 Intentando reproducir sonido del botón Start Game...');
+    try {
+      playSound('button_click');
+      console.log('✅ Sonido reproducido exitosamente');
+    } catch (error) {
+      console.error('❌ Error reproduciendo sonido:', error);
+    }
+    
+    // Llamar a onStartGame después de un pequeño delay para asegurar que el sonido se reproduce
+    setTimeout(() => {
+      onStartGame(amount);
+    }, 50);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +63,14 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
     if (e.key === 'Enter') {
       handleStartGame();
     }
+  };
+
+  const handleQuickBetClick = (amount: number) => {
+    // Reproducir sonido solo si no está disabled
+    if (!disabled) {
+      playSound('button_click');
+    }
+    setBetAmount(amount.toString());
   };
 
   // Quick bet buttons
@@ -101,8 +126,9 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
               {quickBets.map((amount) => (
                 <Button
                   key={amount}
-                  onClick={() => setBetAmount(amount.toString())}
+                  onClick={() => handleQuickBetClick(amount)}
                   disabled={disabled}
+                  disableSound={true} // Desactivamos el sonido automático porque lo manejamos manualmente
                   className="flex-1 min-w-0 text-black font-bold bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-md"
                   style={{
                     height: '55px',
@@ -117,6 +143,13 @@ export function BetInput({ onStartGame, disabled = false }: BetInputProps) {
 
           <div
             onClick={disabled || !betAmount || !!error ? undefined : handleStartGame}
+            onMouseDown={() => {
+              // Reproducir sonido también en mouseDown para mayor garantía
+              if (!disabled && betAmount && !error) {
+                console.log('🔊 Sonido desde mouseDown');
+                playSound('button_click');
+              }
+            }}
             className={`w-full max-w-[316px] mx-auto cursor-pointer transition-transform duration-200 ${
               disabled || !betAmount || !!error 
                 ? 'opacity-50 cursor-not-allowed' 
