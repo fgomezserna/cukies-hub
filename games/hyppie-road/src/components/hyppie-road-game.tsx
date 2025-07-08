@@ -10,6 +10,7 @@ import { GameStats } from './game-stats';
 import { GameResultComponent } from './game-result';
 import { GameOverAnimation } from './game-over-animation';
 import { GameResult } from '@/types/game';
+import { useAudio } from '@/hooks/useAudio';
 
 export function HyppieRoadGame() {
   const {
@@ -36,6 +37,7 @@ export function HyppieRoadGame() {
   const [gameResult, setGameResult] = React.useState<GameResult | null>(null);
   const [previousPosition, setPreviousPosition] = React.useState<number | undefined>(undefined);
   const [showGameOverAnimation, setShowGameOverAnimation] = React.useState(false);
+  const { playSound } = useAudio();
 
   // Manejar inicio del juego
   const handleStartGame = useCallback((amount: number) => {
@@ -60,8 +62,16 @@ export function HyppieRoadGame() {
     try {
       const result = makeAdvance();
       if (result) {
-        // Si es una derrota por trampa, NO hacer nada más que mostrar efectos visuales
+        // Si es una derrota por trampa, reproducir sonido de caída
         if (!result.success && result.trapPosition !== undefined) {
+          console.log('🕳️ Token cayó en trampa! Reproduciendo sonido fall_hole...');
+          try {
+            playSound('fall_hole');
+            console.log('✅ Sonido fall_hole reproducido exitosamente');
+          } catch (error) {
+            console.error('❌ Error reproduciendo sonido fall_hole:', error);
+          }
+          
           // NO actualizar gameResult, solo mostrar efectos visuales
           // Después de ver los efectos, establecer resultado y volver al menú
           setTimeout(() => {
@@ -79,7 +89,7 @@ export function HyppieRoadGame() {
       alert(error instanceof Error ? error.message : 'Error advancing');
       setIsAnimating(false);
     }
-  }, [canAdvance, makeAdvance, setIsAnimating, position]);
+  }, [canAdvance, makeAdvance, setIsAnimating, position, playSound]);
 
   // Callback para cuando termina la animación de movimiento
   const handleMoveAnimationComplete = useCallback(() => {

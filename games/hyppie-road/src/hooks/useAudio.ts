@@ -2,7 +2,8 @@ import { useRef, useCallback, useEffect } from 'react';
 
 // Tipos de sonidos disponibles
 export type SoundType = 
-  | 'button_click';
+  | 'button_click'
+  | 'fall_hole';
 
 // Configuración de cada sonido
 const SOUND_CONFIG: Record<SoundType, { 
@@ -13,6 +14,8 @@ const SOUND_CONFIG: Record<SoundType, {
 }> = {
   // UI
   button_click: { path: '/assets/sounds/button-click-01.mp3', volume: 0.5, category: 'ui' },
+  // Effects
+  fall_hole: { path: '/assets/sounds/fall-hole.mp3', volume: 0.7, category: 'effect' },
 };
 
 export const useAudio = () => {
