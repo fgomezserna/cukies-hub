@@ -27,7 +27,7 @@ import DiscordIcon from '../icons/discord';
 import XIcon from '../icons/x-icon';
 import Image from 'next/image';
 import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/hyppiesymbol.png';
+import hyppieicon from '@/assets/dice-512.png';
 import { usePathname } from 'next/navigation';
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {

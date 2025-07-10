@@ -22,7 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import Image from 'next/image';
 import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/hyppiesymbol.png';
+import hyppieicon from '@/assets/dice-512.png';
 import { useAuth } from '@/providers/auth-provider';
 import { useConnect, useDisconnect } from 'wagmi';
 
