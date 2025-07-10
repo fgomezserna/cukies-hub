@@ -25,8 +25,8 @@ export default function LandingFooter() {
             <h3 className="font-semibold mb-4 font-headline">Community</h3>
             <ul className="space-y-2">
               <li><Link href="https://x.com/hyppieliquid" className="text-sm text-muted-foreground hover:text-foreground">Twitter</Link></li>
-              <li><Link href="https://discord.com" className="text-sm text-muted-foreground hover:text-foreground">Discord</Link></li>
-              <li><Link href="https://telegram.org" className="text-sm text-muted-foreground hover:text-foreground">Telegram</Link></li>
+              <li><Link href="https://discord.gg/BxFxZZeAAj" className="text-sm text-muted-foreground hover:text-foreground">Discord</Link></li>
+              <li><Link href="https://t.me/HyppieLiquid" className="text-sm text-muted-foreground hover:text-foreground">Telegram</Link></li>
             </ul>
           </div>
           <div>

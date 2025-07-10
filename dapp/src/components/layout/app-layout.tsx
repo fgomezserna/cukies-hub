@@ -168,7 +168,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-indigo-500/10 hover:shadow-md hover:shadow-blue-500/20">
-                        <a href="https://telegram.org" target="_blank" rel="noopener noreferrer">
+                        <a href="https://t.me/HyppieLiquid" target="_blank" rel="noopener noreferrer">
                           <div className="flex items-center gap-3">
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-indigo-500/20 group-hover:from-blue-400/30 group-hover:to-indigo-500/30 transition-all">
                               <Send className="h-3 w-3 text-blue-400 group-hover:text-indigo-400 transition-colors" />
@@ -180,7 +180,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-indigo-500/10 hover:shadow-md hover:shadow-purple-500/20">
-                        <a href="https://discord.com" target="_blank" rel="noopener noreferrer">
+                        <a href="https://discord.gg/BxFxZZeAAj" target="_blank" rel="noopener noreferrer">
                           <div className="flex items-center gap-3">
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-400/20 to-indigo-500/20 group-hover:from-purple-400/30 group-hover:to-indigo-500/30 transition-all">
                               <DiscordIcon className="h-3 w-3 text-purple-400 group-hover:text-indigo-400 transition-colors" />
