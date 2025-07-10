@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
+import { ASSETS_CONFIG } from '../lib/assets-config';
 
 const GameContainer = () => {
   const gameRef = useRef<HTMLDivElement>(null);
@@ -36,7 +37,9 @@ const GameContainer = () => {
             }
       
             preload() {
-              this.load.image('block', 'https://s3-us-west-2.amazonaws.com/s.cdpn.io/141552/block_1.png');
+              // Cargar assets locales
+              this.load.image('block', ASSETS_CONFIG.images.block);
+              this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
             }
       
             create() {
@@ -98,7 +101,7 @@ const GameContainer = () => {
               const baseImg = this.matter.add.image(
                 (this.game.config.width as number) / 2,
                 (this.game.config.height as number) - 50,
-                'block'
+                'baseTower'
               );
               baseImg.setDisplaySize(this.initialBlockWidth, 50);
               baseImg.setStatic(true);

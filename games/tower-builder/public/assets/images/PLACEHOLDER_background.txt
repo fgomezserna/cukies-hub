@@ -1,0 +1,11 @@
+🎨 ASSET NECESARIO: background.png
+
+Este archivo debe ser reemplazado por la imagen de fondo del juego.
+
+Especificaciones:
+- Tamaño: 375x667px (tamaño completo del juego)
+- Formato: PNG o JPG
+- Colores: Fondo oscuro (#2C3E50) con gradiente
+- Estilo: Sutil, no debe interferir con la jugabilidad
+
+Una vez creado, eliminar este archivo placeholder. 
