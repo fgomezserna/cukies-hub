@@ -65,11 +65,14 @@ export default function HomePage() {
               </Button>
               
               <Button 
+                asChild 
                 variant="outline" 
                 size="lg"
                 className="border-2 border-white/30 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 hover:border-white/50 transition-all duration-300"
               >
-                📊 View Stats
+                <Link href="/leaderboard">
+                  📊 View Stats
+                </Link>
               </Button>
             </div>
           </div>
