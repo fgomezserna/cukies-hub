@@ -282,14 +282,23 @@ const GameContainer = () => {
                 const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, 'block');
                 leftPiece.setDisplaySize(leftOverhangWidth, this.blockHeight);
                 leftPiece.setStatic(false); // Hacer que caiga
-                leftPiece.setFrictionAir(0.02); // Un poco de resistencia al aire
-                leftPiece.setTint(0xff6b6b); // Tinte rojizo para diferenciarlo
                 
-                // Aplicar un pequeño impulso hacia afuera para mayor realismo
-                leftPiece.setVelocity(-1, 0);
+                // ¡EFECTOS ESPECTACULARES! 🎪
+                leftPiece.setBounce(0.8); // ¡SÚPER REBOTE!
+                leftPiece.setFrictionAir(0.005); // Menos fricción = más vuelo
+                leftPiece.setFriction(0.3); // Fricción al tocar superficies
+                leftPiece.setTint(0xff4757); // Rojo más vibrante
                 
-                // Destruir la pieza después de unos segundos para limpiar
-                this.time.delayedCall(3000, () => {
+                // ¡Impulso dramático hacia afuera!
+                const horizontalForce = -3 - Math.random() * 2; // Entre -3 y -5
+                const verticalForce = -1 - Math.random() * 2; // Un poco hacia arriba
+                leftPiece.setVelocity(horizontalForce, verticalForce);
+                
+                // ¡Rotación espectacular!
+                leftPiece.setAngularVelocity(-0.1 - Math.random() * 0.2); // Giro hacia la izquierda
+                
+                // Destruir después de más tiempo para ver el espectáculo
+                this.time.delayedCall(5000, () => {
                   if (leftPiece && leftPiece.body) {
                     leftPiece.destroy();
                   }
@@ -304,14 +313,23 @@ const GameContainer = () => {
                 const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, 'block');
                 rightPiece.setDisplaySize(rightOverhangWidth, this.blockHeight);
                 rightPiece.setStatic(false); // Hacer que caiga
-                rightPiece.setFrictionAir(0.02); // Un poco de resistencia al aire
-                rightPiece.setTint(0xff6b6b); // Tinte rojizo para diferenciarlo
                 
-                // Aplicar un pequeño impulso hacia afuera para mayor realismo
-                rightPiece.setVelocity(1, 0);
+                // ¡EFECTOS ESPECTACULARES! 🎪
+                rightPiece.setBounce(0.8); // ¡SÚPER REBOTE!
+                rightPiece.setFrictionAir(0.005); // Menos fricción = más vuelo
+                rightPiece.setFriction(0.3); // Fricción al tocar superficies
+                rightPiece.setTint(0xff4757); // Rojo más vibrante
                 
-                // Destruir la pieza después de unos segundos para limpiar
-                this.time.delayedCall(3000, () => {
+                // ¡Impulso dramático hacia afuera!
+                const horizontalForce = 3 + Math.random() * 2; // Entre 3 y 5
+                const verticalForce = -1 - Math.random() * 2; // Un poco hacia arriba
+                rightPiece.setVelocity(horizontalForce, verticalForce);
+                
+                // ¡Rotación espectacular!
+                rightPiece.setAngularVelocity(0.1 + Math.random() * 0.2); // Giro hacia la derecha
+                
+                // Destruir después de más tiempo para ver el espectáculo
+                this.time.delayedCall(5000, () => {
                   if (rightPiece && rightPiece.body) {
                     rightPiece.destroy();
                   }
