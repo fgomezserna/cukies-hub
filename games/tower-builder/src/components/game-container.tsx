@@ -209,7 +209,7 @@ const GameContainer = () => {
 
               const lastBlock = this.tower[this.tower.length - 1];
 
-              // Calcular la superposición usando las posiciones finales
+              // Calcular la superposición para verificar si el juego debe continuar
               const topLeft = this.topBlock.x - this.topBlock.displayWidth / 2;
               const topRight = this.topBlock.x + this.topBlock.displayWidth / 2;
 
@@ -218,22 +218,34 @@ const GameContainer = () => {
 
               const overlap = Math.max(0, Math.min(topRight, lastRight) - Math.max(topLeft, lastLeft));
 
+              // Verificar si hay suficiente superposición para continuar (mínimo 10px)
               if (overlap > 10) {
-                const newWidth = overlap;
-                const newX = (Math.max(topLeft, lastLeft) + Math.min(topRight, lastRight)) / 2;
+                // Calcular las coordenadas de la parte que realmente está apoyada
+                const supportedLeft = Math.max(topLeft, lastLeft);
+                const supportedRight = Math.min(topRight, lastRight);
+                const supportedWidth = supportedRight - supportedLeft;
+                const supportedCenterX = (supportedLeft + supportedRight) / 2;
 
+                // Obtener la posición Y donde cayó el bloque
                 const yPos = this.topBlock.y;
-                // Remove the old moving block
+                
+                // Crear efectos de partes que caen ANTES de destruir el bloque original
+                this.createFallingPieces(this.topBlock, supportedLeft, supportedRight);
+                
+                // Destruir el bloque original
                 this.topBlock.destroy();
                 this.topBlock = null;
 
-                // Create a new static block with the overlapped width
-                const newBlock = this.matter.add.image(newX, yPos, 'block');
-                newBlock.setDisplaySize(newWidth, this.blockHeight);
-                newBlock.setStatic(true);
+                // Crear un nuevo bloque solo con la parte apoyada
+                const supportedBlock = this.matter.add.image(supportedCenterX, yPos, 'block');
+                supportedBlock.setDisplaySize(supportedWidth, this.blockHeight);
+                supportedBlock.setStatic(true);
 
-                this.blockWidth = newWidth;
-                this.tower.push(newBlock);
+                // Agregar el bloque apoyado a la torre
+                this.tower.push(supportedBlock);
+
+                // Para el próximo bloque, usar el ancho de la parte que quedó apoyada
+                this.blockWidth = supportedWidth;
 
                 // Update score
                 this.score += 1;
@@ -254,6 +266,56 @@ const GameContainer = () => {
                 this.spawnBlock();
               } else {
                 this.gameOver();
+              }
+            }
+
+            createFallingPieces(block: Phaser.Physics.Matter.Image, supportedLeft: number, supportedRight: number) {
+              const blockLeft = block.x - block.displayWidth / 2;
+              const blockRight = block.x + block.displayWidth / 2;
+              const blockY = block.y;
+
+              // Parte izquierda sobresaliente (si existe)
+              if (blockLeft < supportedLeft) {
+                const leftOverhangWidth = supportedLeft - blockLeft;
+                const leftOverhangCenterX = blockLeft + leftOverhangWidth / 2;
+                
+                const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, 'block');
+                leftPiece.setDisplaySize(leftOverhangWidth, this.blockHeight);
+                leftPiece.setStatic(false); // Hacer que caiga
+                leftPiece.setFrictionAir(0.02); // Un poco de resistencia al aire
+                leftPiece.setTint(0xff6b6b); // Tinte rojizo para diferenciarlo
+                
+                // Aplicar un pequeño impulso hacia afuera para mayor realismo
+                leftPiece.setVelocity(-1, 0);
+                
+                // Destruir la pieza después de unos segundos para limpiar
+                this.time.delayedCall(3000, () => {
+                  if (leftPiece && leftPiece.body) {
+                    leftPiece.destroy();
+                  }
+                });
+              }
+
+              // Parte derecha sobresaliente (si existe)
+              if (blockRight > supportedRight) {
+                const rightOverhangWidth = blockRight - supportedRight;
+                const rightOverhangCenterX = supportedRight + rightOverhangWidth / 2;
+                
+                const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, 'block');
+                rightPiece.setDisplaySize(rightOverhangWidth, this.blockHeight);
+                rightPiece.setStatic(false); // Hacer que caiga
+                rightPiece.setFrictionAir(0.02); // Un poco de resistencia al aire
+                rightPiece.setTint(0xff6b6b); // Tinte rojizo para diferenciarlo
+                
+                // Aplicar un pequeño impulso hacia afuera para mayor realismo
+                rightPiece.setVelocity(1, 0);
+                
+                // Destruir la pieza después de unos segundos para limpiar
+                this.time.delayedCall(3000, () => {
+                  if (rightPiece && rightPiece.body) {
+                    rightPiece.destroy();
+                  }
+                });
               }
             }
       
