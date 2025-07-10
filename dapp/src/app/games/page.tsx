@@ -77,21 +77,7 @@ export default function GamesPage() {
                   data-ai-hint={game.hint} 
                 />
                 
-                {/* Badge LIVE */}
-                {game.live && (
-                  <div className="absolute top-4 right-4 flex items-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-20">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                    </span>
-                    🔴 LIVE
-                  </div>
-                )}
-                
-                {/* Popularity indicator */}
-                <div className="absolute top-4 left-4 px-2 py-1 bg-black/80 rounded-full text-white text-xs font-bold z-20">
-                  #{index + 1}
-                </div>
+
                 
                 {/* Gradient overlay - only for playable games */}
                 {game.playable && (
