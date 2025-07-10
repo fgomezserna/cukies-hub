@@ -7,10 +7,12 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import StatsCards from '@/components/home/stats-cards';
 import SybilSlayerImg from "@/assets/sybilslash.png";
+import HyppieRoadImg from "@/assets/hyppie-road.png";
 import ComingSoonImg from "@/assets/coming-soon.png";
 
 const games = [
   { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
+  { name: "Hyppie Road", description: "Navigate the crypto road, avoid traps, and multiply your rewards!", imageUrl: HyppieRoadImg, hint: "road adventure", live: false, playable: true, href: "/games/hyppie-road" },
   { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: ComingSoonImg, hint: "endless runner", live: false, playable: false },
   { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: ComingSoonImg, hint: "chess board", live: true, playable: false }
 ];
@@ -95,7 +97,7 @@ export default function HomePage() {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {otherGames.map((game, index) => (
                 <Card 
                   key={game.name}
@@ -127,22 +129,6 @@ export default function HomePage() {
                         </span>
                       </div>
                     )}
-                    
-                    {/* Badge LIVE */}
-                    {game.live && (
-                      <div className="absolute top-4 right-4 flex items-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                        </span>
-                        🔴 LIVE
-                      </div>
-                    )}
-                    
-                    {/* Index indicator */}
-                    <div className="absolute top-4 left-4 w-8 h-8 bg-black/80 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                      {index + 2}
-                    </div>
                 </CardHeader>
                 
                 <CardContent className="pt-6 flex-grow space-y-3">
