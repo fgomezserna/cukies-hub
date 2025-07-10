@@ -7,11 +7,12 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import StatsCards from '@/components/home/stats-cards';
 import SybilSlayerImg from "@/assets/sybilslash.png";
+import ComingSoonImg from "@/assets/coming-soon.png";
 
 const games = [
   { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
-  { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: "https://images.unsplash.com/photo-1498084393753-b411b2d26b34?w=600&h=400&fit=crop", hint: "endless runner", live: false, playable: false },
-  { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: "https://images.unsplash.com/photo-1695480542225-bc22cac128d0?w=600&h=400&fit=crop", hint: "chess board", live: true, playable: false }
+  { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: ComingSoonImg, hint: "endless runner", live: false, playable: false },
+  { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: ComingSoonImg, hint: "chess board", live: true, playable: false }
 ];
 const featuredGame = games[0];
 const otherGames = games.slice(1);
@@ -120,7 +121,7 @@ export default function HomePage() {
                     
                     {/* Overlay for non-playable games */}
                     {!game.playable && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <div className="absolute top-0 left-0 right-0 h-48 bg-black/60 flex items-center justify-center z-10 !mt-0">
                         <span className="text-white font-bold text-lg bg-black/80 px-4 py-2 rounded-full">
                           🚧 Coming Soon
                         </span>
