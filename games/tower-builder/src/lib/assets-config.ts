@@ -5,6 +5,7 @@ export const ASSETS_CONFIG = {
     block: '/assets/images/block.png',        // Mostrado como 300x60px
     baseTower: '/assets/images/base-tower.png', // Mostrado como 300x70px
     background: '/assets/images/sky-tower.png',
+    cloudsPanner: '/assets/images/clouds-background.png',
     
     // Elementos de UI
     ui: {

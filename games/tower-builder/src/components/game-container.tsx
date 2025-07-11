@@ -32,6 +32,10 @@ const GameContainer = () => {
             private score = 0;
             private scoreText: Phaser.GameObjects.Text | null = null;
             private overlayText: Phaser.GameObjects.Text | null = null;
+            
+            // Parallax clouds
+            private cloudsLayers: Phaser.GameObjects.TileSprite[] = [];
+            private cloudsSpeeds = [0.15, 0.25, 0.35]; // Velocidades más lentas y suaves para el parallax
       
             constructor() {
               super({ key: 'TowerScene' });
@@ -42,6 +46,7 @@ const GameContainer = () => {
               this.load.image('block', ASSETS_CONFIG.images.block);
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
+              this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
             }
       
             create() {
@@ -55,6 +60,9 @@ const GameContainer = () => {
               background.setDisplaySize(width, height);
               background.setScrollFactor(0); // Mantener fijo mientras la cámara se mueve
               background.setDepth(-1); // Enviar al fondo
+
+              // Crear capas de nubes parallax en la parte superior
+              this.createCloudsParallax(width, height);
 
               // Score text (always visible)
               this.scoreText = this.add.text(10, 10, 'Score: 0', {
@@ -103,6 +111,9 @@ const GameContainer = () => {
                   this.onBlockLanded();
                 }
               }
+
+              // Animar las nubes parallax
+              this.updateCloudsParallax();
             }
       
             createBase() {
@@ -169,6 +180,11 @@ const GameContainer = () => {
 
               // Reset camera position
               this.cameras.main.scrollY = 0;
+
+              // Recrear las nubes parallax
+              const width = this.game.config.width as number;
+              const height = this.game.config.height as number;
+              this.createCloudsParallax(width, height);
             };
 
             startGame = () => {
@@ -196,6 +212,11 @@ const GameContainer = () => {
 
               // Reset camera
               this.cameras.main.scrollY = 0;
+
+              // Recrear las nubes parallax
+              const width = this.game.config.width as number;
+              const height = this.game.config.height as number;
+              this.createCloudsParallax(width, height);
 
               this.createBase();
               // El primer bloque móvil debe ser igual de ancho que la base
@@ -348,6 +369,38 @@ const GameContainer = () => {
               }
             }
       
+            createCloudsParallax(width: number, height: number) {
+              // Limpiar capas existentes
+              this.cloudsLayers.forEach(layer => layer.destroy());
+              this.cloudsLayers = [];
+
+              // Crear múltiples capas de nubes con diferentes profundidades
+              for (let i = 0; i < this.cloudsSpeeds.length; i++) {
+                const cloudsLayer = this.add.tileSprite(
+                  0, 
+                  i * 40, // Posicionar cada capa un poco más abajo
+                  width * 2, // Hacer el tile más ancho para mejor efecto
+                  120, // Altura de las nubes
+                  'cloudsPanner'
+                );
+                
+                cloudsLayer.setOrigin(0, 0);
+                cloudsLayer.setScrollFactor(0); // Fijo en la pantalla
+                cloudsLayer.setDepth(0); // Por encima del fondo, pero debajo del juego
+                cloudsLayer.setAlpha(0.8 - i * 0.15); // Transparencia creciente para profundidad
+                cloudsLayer.setScale(0.8 + i * 0.1); // Escala diferente para cada capa
+                
+                this.cloudsLayers.push(cloudsLayer);
+              }
+            }
+
+            updateCloudsParallax() {
+              // Mover cada capa de nubes a diferente velocidad
+              this.cloudsLayers.forEach((layer, index) => {
+                layer.tilePositionX += this.cloudsSpeeds[index];
+              });
+            }
+
             gameOver() {
               this.gameState = 'gameOver';
               this.isBlockFalling = false;
