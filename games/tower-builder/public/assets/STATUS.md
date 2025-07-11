@@ -24,6 +24,7 @@
   - ✅ CDN reemplazado por assets locales
   - ✅ Método preload() actualizado
   - ✅ Método createBase() usando base-tower.png
+  - ✅ Alturas ajustadas para evitar deformación (bloques: 60px, base: 70px)
 
 ## 🚧 **PENDIENTE**
 

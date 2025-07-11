@@ -2,9 +2,9 @@
 export const ASSETS_CONFIG = {
   images: {
     // Elementos del juego
-    block: '/assets/images/block.png',
-    baseTower: '/assets/images/base-tower.png',
-    background: '/assets/images/background.png',
+    block: '/assets/images/block.png',        // Mostrado como 300x60px
+    baseTower: '/assets/images/base-tower.png', // Mostrado como 300x70px
+    background: '/assets/images/sky-tower.png',
     
     // Elementos de UI
     ui: {

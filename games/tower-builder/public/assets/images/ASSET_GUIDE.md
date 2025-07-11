@@ -4,13 +4,13 @@
 
 ### 🧱 Bloques del Juego
 - **Archivo**: `block.png` ✅ **COMPLETADO**
-- **Tamaño**: 300x40px (tamaño óptimo)
+- **Tamaño en juego**: 300x60px (altura aumentada para evitar deformación)
 - **Formato**: PNG con transparencia
 - **Uso**: Bloques móviles del juego
 
 ### 🏗️ Base de la Torre
 - **Archivo**: `base-tower.png` ✅ **COMPLETADO**
-- **Tamaño**: 300x50px (base más ancha)
+- **Tamaño en juego**: 300x70px (altura aumentada para evitar deformación)
 - **Formato**: PNG con transparencia
 - **Uso**: Bloque base estático del juego
 

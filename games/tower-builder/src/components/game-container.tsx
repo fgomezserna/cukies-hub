@@ -22,10 +22,11 @@ const GameContainer = () => {
             private topBlock: Phaser.Physics.Matter.Image | null = null;
             private blockWidth = 100;
             private initialBlockWidth = 300;
-            private blockHeight = 40;
+            private blockHeight = 60; // Aumentada para evitar deformación
+            private baseHeight = 70; // Altura específica para la base
             private moveSpeed = 2;
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
-            private separationHeight = 80; // Nueva separación durante el movimiento
+            private separationHeight = 90; // Ajustada para la nueva altura
             private isBlockFalling = false; // Para controlar si el bloque está cayendo
 
             private score = 0;
@@ -40,6 +41,7 @@ const GameContainer = () => {
               // Cargar assets locales
               this.load.image('block', ASSETS_CONFIG.images.block);
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
+              this.load.image('background', ASSETS_CONFIG.images.background);
             }
       
             create() {
@@ -47,6 +49,12 @@ const GameContainer = () => {
               const height = this.game.config.height as number;
 
               this.matter.world.setBounds(0, 0, width, height);
+
+              // Agregar fondo
+              const background = this.add.image(width / 2, height / 2, 'background');
+              background.setDisplaySize(width, height);
+              background.setScrollFactor(0); // Mantener fijo mientras la cámara se mueve
+              background.setDepth(-1); // Enviar al fondo
 
               // Score text (always visible)
               this.scoreText = this.add.text(10, 10, 'Score: 0', {
@@ -100,10 +108,10 @@ const GameContainer = () => {
             createBase() {
               const baseImg = this.matter.add.image(
                 (this.game.config.width as number) / 2,
-                (this.game.config.height as number) - 50,
+                (this.game.config.height as number) - this.baseHeight / 2,
                 'baseTower'
               );
-              baseImg.setDisplaySize(this.initialBlockWidth, 50);
+              baseImg.setDisplaySize(this.initialBlockWidth, this.baseHeight);
               baseImg.setStatic(true);
               this.tower.push(baseImg);
             }
