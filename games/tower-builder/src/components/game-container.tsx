@@ -26,7 +26,7 @@ const GameContainer = () => {
             private baseHeight = 70; // Altura específica para la base
             private moveSpeed = 2;
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
-            private separationHeight = 90; // Ajustada para la nueva altura
+            private separationHeight = 15; // Reducida para evitar separación visual excesiva
             private isBlockFalling = false; // Para controlar si el bloque está cayendo
 
             private score = 0;
@@ -258,8 +258,8 @@ const GameContainer = () => {
                 const supportedWidth = supportedRight - supportedLeft;
                 const supportedCenterX = (supportedLeft + supportedRight) / 2;
 
-                // Obtener la posición Y donde cayó el bloque
-                const yPos = this.topBlock.y;
+                // Calcular la posición Y ideal para depositar (sin separación, pegado al anterior)
+                const idealYPos = lastBlock.y - this.blockHeight;
                 
                 // Crear efectos de partes que caen ANTES de destruir el bloque original
                 this.createFallingPieces(this.topBlock, supportedLeft, supportedRight);
@@ -268,8 +268,8 @@ const GameContainer = () => {
                 this.topBlock.destroy();
                 this.topBlock = null;
 
-                // Crear un nuevo bloque solo con la parte apoyada
-                const supportedBlock = this.matter.add.image(supportedCenterX, yPos, 'block');
+                // Crear un nuevo bloque solo con la parte apoyada en la posición ideal
+                const supportedBlock = this.matter.add.image(supportedCenterX, idealYPos, 'block');
                 supportedBlock.setDisplaySize(supportedWidth, this.blockHeight);
                 supportedBlock.setStatic(true);
 
@@ -289,9 +289,9 @@ const GameContainer = () => {
                 this.moveSpeed = sign * newMag;
 
                 // Camera scroll up if near top
-                const cameraRelativeY = yPos - this.cameras.main.scrollY;
+                const cameraRelativeY = idealYPos - this.cameras.main.scrollY;
                 if (cameraRelativeY < 150) {
-                  this.cameras.main.scrollY -= this.blockHeight;
+                  this.cameras.main.scrollY -= (this.blockHeight + this.separationHeight);
                 }
 
                 // Spawn the next moving block on top
