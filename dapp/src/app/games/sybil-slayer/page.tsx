@@ -112,7 +112,7 @@ export default function SybilSlayerPage() {
                 <Separator orientation="vertical" className="h-6 hidden sm:block"/>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
                     <Trophy className="h-5 w-5 text-primary" />
-                    <span>WIN</span>
+                    <span>EARN XP</span>
                 </div>
             </CardContent>
           </Card>
