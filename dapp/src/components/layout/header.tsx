@@ -21,8 +21,8 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import Image from 'next/image';
-import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/dice-512.png';
+import hyppieletters from '@/assets/hyppielettersss.png';
+import hyppieicon from '@/assets/dice.png';
 import { useAuth } from '@/providers/auth-provider';
 import { useConnect, useDisconnect } from 'wagmi';
 
@@ -76,8 +76,8 @@ export default function Header() {
 
       {(isMobile || state === 'collapsed') && (
         <div className="flex items-center gap-2 group">
-            <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
-            <Image src={hyppieletters} alt="HyppieLiquid" height={39} />
+            <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />
+            <Image src={hyppieletters} alt="HyppieLiquid" height={52} />
         </div>
       )}
 

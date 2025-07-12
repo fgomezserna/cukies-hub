@@ -26,8 +26,8 @@ import Header from './header';
 import DiscordIcon from '../icons/discord';
 import XIcon from '../icons/x-icon';
 import Image from 'next/image';
-import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/dice-512.png';
+import hyppieletters from '@/assets/hyppielettersss.png';
+import hyppieicon from '@/assets/dice.png';
 import { usePathname } from 'next/navigation';
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -45,8 +45,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           } as React.CSSProperties}>
           <SidebarHeader className="border-b border-green-500/20 bg-black/15 backdrop-blur-sm">
             <div className="flex items-center gap-3 p-1">
-                <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
-                <Image src={hyppieletters} alt="HyppieLiquid" height={39} />
+                <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />
+                <Image src={hyppieletters} alt="HyppieLiquid" height={52} />
             </div>
           </SidebarHeader>
           <SidebarContent className="py-4 bg-black/10 backdrop-blur-sm">
