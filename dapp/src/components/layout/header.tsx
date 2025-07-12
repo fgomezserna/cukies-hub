@@ -76,7 +76,8 @@ export default function Header() {
 
       {(isMobile || state === 'collapsed') && (
         <div className="flex items-center gap-2 group">
-            <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />
+            {/* En móvil muestra icono + texto, en desktop colapsado solo texto */}
+            {isMobile && <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />}
             <Image src={hyppieletters} alt="HyppieLiquid" height={52} />
         </div>
       )}
