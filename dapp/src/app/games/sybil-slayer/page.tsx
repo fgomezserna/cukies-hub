@@ -7,7 +7,7 @@ import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Maximize, ExternalLink, MessageCircle, ShieldCheck, Zap, HandCoins, Send, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { Maximize, ExternalLink, MessageCircle, Gamepad2, Heart, Send, Trophy, Star, Medal, Crown } from 'lucide-react';
 import Link from 'next/link';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
@@ -101,18 +101,18 @@ export default function SybilSlayerPage() {
           <Card>
             <CardContent className="p-4 flex flex-wrap justify-around items-center text-center gap-4">
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
-                    <ShieldCheck className="h-5 w-5 text-primary" />
-                    <span>PROVABLY FAIR</span>
+                    <Gamepad2 className="h-5 w-5 text-primary" />
+                    <span>PLAY</span>
                 </div>
                 <Separator orientation="vertical" className="h-6 hidden sm:block"/>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
-                    <Zap className="h-5 w-5 text-primary" />
-                    <span>INSTANT PAYMENTS</span>
+                    <Heart className="h-5 w-5 text-primary" />
+                    <span>HAVE FUN</span>
                 </div>
                 <Separator orientation="vertical" className="h-6 hidden sm:block"/>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
-                    <HandCoins className="h-5 w-5 text-primary" />
-                    <span>NON CUSTODIAL</span>
+                    <Trophy className="h-5 w-5 text-primary" />
+                    <span>WIN</span>
                 </div>
             </CardContent>
           </Card>
