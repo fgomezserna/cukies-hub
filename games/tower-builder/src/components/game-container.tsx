@@ -140,9 +140,19 @@ const GameContainer = () => {
               
               // El primer bloque móvil debe ser igual de ancho que la base
               if (this.tower.length === 1) {
+                // Para el primer bloque, usar el ancho completo sin crop
                 blockImg.setDisplaySize(this.initialBlockWidth, this.blockHeight);
                 this.blockWidth = 100; // Para los siguientes bloques
               } else {
+                // Para bloques posteriores, cortar por los laterales (no desde abajo)
+                const originalTextureWidth = blockImg.texture.source[0].width; // Ancho real del PNG
+                const originalTextureHeight = blockImg.texture.source[0].height; // Altura real del PNG
+                const cropOffsetX = (originalTextureWidth - (originalTextureWidth * this.blockWidth / this.initialBlockWidth)) / 2;
+                
+                // Recortar LATERALMENTE: mantener altura completa, reducir ancho desde los lados
+                const croppedWidth = originalTextureWidth * this.blockWidth / this.initialBlockWidth;
+                blockImg.setCrop(cropOffsetX, 0, croppedWidth, originalTextureHeight);
+                // El tamaño de display debe coincidir con el tamaño deseado
                 blockImg.setDisplaySize(this.blockWidth, this.blockHeight);
               }
               
@@ -272,6 +282,15 @@ const GameContainer = () => {
 
                 // Crear un nuevo bloque solo con la parte apoyada en la posición ideal
                 const supportedBlock = this.matter.add.image(supportedCenterX, idealYPos, 'block');
+                
+                // Cortar por los laterales (no desde abajo) para mantener la calidad del PNG
+                const originalTextureWidth = supportedBlock.texture.source[0].width; // Ancho real del PNG
+                const originalTextureHeight = supportedBlock.texture.source[0].height; // Altura real del PNG
+                const cropOffsetX = (originalTextureWidth - (originalTextureWidth * supportedWidth / this.initialBlockWidth)) / 2;
+                
+                // Recortar LATERALMENTE: mantener altura completa, reducir ancho desde los lados
+                const croppedWidth = originalTextureWidth * supportedWidth / this.initialBlockWidth;
+                supportedBlock.setCrop(cropOffsetX, 0, croppedWidth, originalTextureHeight);
                 supportedBlock.setDisplaySize(supportedWidth, this.blockHeight);
                 supportedBlock.setStatic(true);
 
@@ -320,26 +339,28 @@ const GameContainer = () => {
                 const leftOverhangWidth = supportedLeft - blockLeft;
                 const leftOverhangCenterX = blockLeft + leftOverhangWidth / 2;
                 
-                // Crear una pieza con la textura simple generada
+                // Crear una pieza con la textura específica para bloques sobrantes
                 const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, 'blockPiece');
+                
+                // Usar solo setDisplaySize sin crop para que se vean bien
                 leftPiece.setDisplaySize(leftOverhangWidth, this.blockHeight);
                 leftPiece.setStatic(false); // Hacer que caiga
                 
-                // Efectos físicos sin el tint rojo
-                leftPiece.setBounce(0.8);
-                leftPiece.setFrictionAir(0.005);
-                leftPiece.setFriction(0.3);
+                // Efectos físicos más suaves
+                leftPiece.setBounce(0.3); // Reducido de 0.8 a 0.3
+                leftPiece.setFrictionAir(0.02); // Aumentado para que caigan más rápido
+                leftPiece.setFriction(0.5); // Más fricción al tocar el suelo
                 
-                // Impulso dramático hacia afuera
-                const horizontalForce = -3 - Math.random() * 2; // Entre -3 y -5
-                const verticalForce = -1 - Math.random() * 2; // Un poco hacia arriba
+                // Impulso menos dramático
+                const horizontalForce = -1.5 - Math.random() * 1; // Reducido: entre -1.5 y -2.5
+                const verticalForce = -0.5 - Math.random() * 1; // Reducido: entre -0.5 y -1.5
                 leftPiece.setVelocity(horizontalForce, verticalForce);
                 
-                // Rotación espectacular
-                leftPiece.setAngularVelocity(-0.1 - Math.random() * 0.2); // Giro hacia la izquierda
+                // Rotación más suave
+                leftPiece.setAngularVelocity(-0.05 - Math.random() * 0.1); // Reducido
                 
-                // Destruir después de más tiempo para ver el espectáculo
-                this.time.delayedCall(5000, () => {
+                // Destruir después de menos tiempo
+                this.time.delayedCall(3000, () => {
                   if (leftPiece && leftPiece.body) {
                     leftPiece.destroy();
                   }
@@ -351,26 +372,28 @@ const GameContainer = () => {
                 const rightOverhangWidth = blockRight - supportedRight;
                 const rightOverhangCenterX = supportedRight + rightOverhangWidth / 2;
                 
-                // Crear una pieza con la textura simple generada
+                // Crear una pieza con la textura específica para bloques sobrantes
                 const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, 'blockPiece');
+                
+                // Usar solo setDisplaySize sin crop para que se vean bien
                 rightPiece.setDisplaySize(rightOverhangWidth, this.blockHeight);
                 rightPiece.setStatic(false); // Hacer que caiga
                 
-                // Efectos físicos sin el tint rojo
-                rightPiece.setBounce(0.8);
-                rightPiece.setFrictionAir(0.005);
-                rightPiece.setFriction(0.3);
+                // Efectos físicos más suaves
+                rightPiece.setBounce(0.3); // Reducido de 0.8 a 0.3
+                rightPiece.setFrictionAir(0.02); // Aumentado para que caigan más rápido
+                rightPiece.setFriction(0.5); // Más fricción al tocar el suelo
                 
-                // Impulso dramático hacia afuera
-                const horizontalForce = 3 + Math.random() * 2; // Entre 3 y 5
-                const verticalForce = -1 - Math.random() * 2; // Un poco hacia arriba
+                // Impulso menos dramático
+                const horizontalForce = 1.5 + Math.random() * 1; // Reducido: entre 1.5 y 2.5
+                const verticalForce = -0.5 - Math.random() * 1; // Reducido: entre -0.5 y -1.5
                 rightPiece.setVelocity(horizontalForce, verticalForce);
                 
-                // Rotación espectacular
-                rightPiece.setAngularVelocity(0.1 + Math.random() * 0.2); // Giro hacia la derecha
+                // Rotación más suave
+                rightPiece.setAngularVelocity(0.05 + Math.random() * 0.1); // Reducido
                 
-                // Destruir después de más tiempo para ver el espectáculo
-                this.time.delayedCall(5000, () => {
+                // Destruir después de menos tiempo
+                this.time.delayedCall(3000, () => {
                   if (rightPiece && rightPiece.body) {
                     rightPiece.destroy();
                   }
