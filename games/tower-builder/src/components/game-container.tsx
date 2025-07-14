@@ -55,6 +55,13 @@ const GameContainer = () => {
 
               this.matter.world.setBounds(0, 0, width, height);
 
+              // Crear una textura simple para los bloques sobrantes
+              const graphics = this.add.graphics();
+              graphics.fillStyle(0x8B4513); // Color marrón para simular madera
+              graphics.fillRect(0, 0, 50, 50); // Tamaño temporal
+              graphics.generateTexture('blockPiece', 50, 50);
+              graphics.destroy();
+
               // Agregar fondo
               const background = this.add.image(width / 2, height / 2, 'background');
               background.setDisplaySize(width, height);
@@ -311,22 +318,22 @@ const GameContainer = () => {
                 const leftOverhangWidth = supportedLeft - blockLeft;
                 const leftOverhangCenterX = blockLeft + leftOverhangWidth / 2;
                 
-                const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, 'block');
+                // Crear una pieza con la textura simple generada
+                const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, 'blockPiece');
                 leftPiece.setDisplaySize(leftOverhangWidth, this.blockHeight);
                 leftPiece.setStatic(false); // Hacer que caiga
                 
-                // ¡EFECTOS ESPECTACULARES! 🎪
-                leftPiece.setBounce(0.8); // ¡SÚPER REBOTE!
-                leftPiece.setFrictionAir(0.005); // Menos fricción = más vuelo
-                leftPiece.setFriction(0.3); // Fricción al tocar superficies
-                leftPiece.setTint(0xff4757); // Rojo más vibrante
+                // Efectos físicos sin el tint rojo
+                leftPiece.setBounce(0.8);
+                leftPiece.setFrictionAir(0.005);
+                leftPiece.setFriction(0.3);
                 
-                // ¡Impulso dramático hacia afuera!
+                // Impulso dramático hacia afuera
                 const horizontalForce = -3 - Math.random() * 2; // Entre -3 y -5
                 const verticalForce = -1 - Math.random() * 2; // Un poco hacia arriba
                 leftPiece.setVelocity(horizontalForce, verticalForce);
                 
-                // ¡Rotación espectacular!
+                // Rotación espectacular
                 leftPiece.setAngularVelocity(-0.1 - Math.random() * 0.2); // Giro hacia la izquierda
                 
                 // Destruir después de más tiempo para ver el espectáculo
@@ -342,22 +349,22 @@ const GameContainer = () => {
                 const rightOverhangWidth = blockRight - supportedRight;
                 const rightOverhangCenterX = supportedRight + rightOverhangWidth / 2;
                 
-                const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, 'block');
+                // Crear una pieza con la textura simple generada
+                const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, 'blockPiece');
                 rightPiece.setDisplaySize(rightOverhangWidth, this.blockHeight);
                 rightPiece.setStatic(false); // Hacer que caiga
                 
-                // ¡EFECTOS ESPECTACULARES! 🎪
-                rightPiece.setBounce(0.8); // ¡SÚPER REBOTE!
-                rightPiece.setFrictionAir(0.005); // Menos fricción = más vuelo
-                rightPiece.setFriction(0.3); // Fricción al tocar superficies
-                rightPiece.setTint(0xff4757); // Rojo más vibrante
+                // Efectos físicos sin el tint rojo
+                rightPiece.setBounce(0.8);
+                rightPiece.setFrictionAir(0.005);
+                rightPiece.setFriction(0.3);
                 
-                // ¡Impulso dramático hacia afuera!
+                // Impulso dramático hacia afuera
                 const horizontalForce = 3 + Math.random() * 2; // Entre 3 y 5
                 const verticalForce = -1 - Math.random() * 2; // Un poco hacia arriba
                 rightPiece.setVelocity(horizontalForce, verticalForce);
                 
-                // ¡Rotación espectacular!
+                // Rotación espectacular
                 rightPiece.setAngularVelocity(0.1 + Math.random() * 0.2); // Giro hacia la derecha
                 
                 // Destruir después de más tiempo para ver el espectáculo
