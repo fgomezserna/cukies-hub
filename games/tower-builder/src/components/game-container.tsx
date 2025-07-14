@@ -24,6 +24,7 @@ const GameContainer = () => {
             private initialBlockWidth = 300;
             private blockHeight = 100; // Aumentada considerablemente para mejores proporciones
             private baseHeight = 100; // Altura específica para la base, igual que blockHeight
+            private baseSpeed = 2; // Velocidad base inicial
             private moveSpeed = 2;
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
             private separationHeight = 15; // Reducida para evitar separación visual excesiva
@@ -31,6 +32,7 @@ const GameContainer = () => {
 
             private score = 0;
             private scoreText: Phaser.GameObjects.Text | null = null;
+            private speedText: Phaser.GameObjects.Text | null = null;
             private overlayText: Phaser.GameObjects.Text | null = null;
             
             // Parallax clouds
@@ -70,6 +72,12 @@ const GameContainer = () => {
               this.scoreText = this.add.text(10, 10, 'Score: 0', {
                 fontSize: '24px',
                 color: '#ffffff'
+              }).setDepth(1).setScrollFactor(0);
+
+              // Speed multiplier text (always visible)
+              this.speedText = this.add.text(10, 40, 'Speed: x1.0', {
+                fontSize: '20px',
+                color: '#ffff00'
               }).setDepth(1).setScrollFactor(0);
 
               // Overlay instruction text (shown in ready / gameOver)
@@ -167,11 +175,15 @@ const GameContainer = () => {
               this.gameState = 'ready';
               this.score = 0;
               this.isBlockFalling = false;
-              this.moveSpeed = 2; // Reset speed
+              this.moveSpeed = this.baseSpeed; // Reset to base speed
               this.blockWidth = 100;
               
               // Reset UI
               if (this.scoreText) this.scoreText.setText('Score: 0');
+              if (this.speedText) {
+                this.speedText.setText('Speed: x1.0');
+                this.speedText.setColor('#ffff00'); // Reset to yellow
+              }
               if (this.overlayText) {
                 this.overlayText.setText('Tap to Start');
                 this.overlayText.setVisible(true);
@@ -203,9 +215,13 @@ const GameContainer = () => {
               this.gameState = 'playing';
               this.score = 0;
               this.isBlockFalling = false;
-              this.moveSpeed = 2; // Ensure speed is reset
+              this.moveSpeed = this.baseSpeed; // Reset to base speed
               
               if (this.scoreText) this.scoreText.setText('Score: 0');
+              if (this.speedText) {
+                this.speedText.setText('Speed: x1.0');
+                this.speedText.setColor('#ffff00'); // Reset to yellow
+              }
               if (this.overlayText) this.overlayText.setVisible(false);
 
               // Clean up any existing blocks
@@ -304,10 +320,20 @@ const GameContainer = () => {
                 this.score += 1;
                 if (this.scoreText) this.scoreText.setText(`Score: ${this.score}`);
 
-                // Increase difficulty ligeramente en cada bloque (0.05 px/frame) hasta un máximo de 6
+                // Incremento de velocidad: 10% por cada 10 bloques acumulados
+                const speedMultiplier = 1 + (0.1 * Math.floor(this.score / 10));
                 const sign = Math.sign(this.moveSpeed) || 1;
-                const newMag = Math.min(Math.abs(this.moveSpeed) + 0.05, 6);
-                this.moveSpeed = sign * newMag;
+                const newSpeed = this.baseSpeed * speedMultiplier;
+                this.moveSpeed = sign * newSpeed;
+
+                // Actualizar texto de velocidad
+                if (this.speedText) {
+                  this.speedText.setText(`Speed: x${speedMultiplier.toFixed(1)}`);
+                  // Resaltar cuando hay incremento de velocidad
+                  if (speedMultiplier > 1) {
+                    this.speedText.setColor('#00ff00'); // Verde para velocidad aumentada
+                  }
+                }
 
                 // Camera scroll up suave - animación gradual en lugar de salto brusco
                 const cameraRelativeY = idealYPos - this.cameras.main.scrollY;
