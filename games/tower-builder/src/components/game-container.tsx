@@ -320,8 +320,8 @@ const GameContainer = () => {
                 this.score += 1;
                 if (this.scoreText) this.scoreText.setText(`Score: ${this.score}`);
 
-                // Incremento de velocidad: 10% por cada 10 bloques acumulados
-                const speedMultiplier = 1 + (0.1 * Math.floor(this.score / 10));
+                // Incremento de velocidad: 50% por cada 10 bloques acumulados
+                const speedMultiplier = 1 + (0.5 * Math.floor(this.score / 10));
                 const sign = Math.sign(this.moveSpeed) || 1;
                 const newSpeed = this.baseSpeed * speedMultiplier;
                 this.moveSpeed = sign * newSpeed;
