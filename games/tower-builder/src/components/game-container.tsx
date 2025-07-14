@@ -290,11 +290,17 @@ const GameContainer = () => {
                 const newMag = Math.min(Math.abs(this.moveSpeed) + 0.05, 6);
                 this.moveSpeed = sign * newMag;
 
-                // Camera scroll up mejorado - sube más agresivamente para mostrar más background
+                // Camera scroll up suave - animación gradual en lugar de salto brusco
                 const cameraRelativeY = idealYPos - this.cameras.main.scrollY;
                 if (cameraRelativeY < 250) { // Threshold aumentado de 150 a 250px
-                  // Scroll más agresivo: sube 200px de una vez para mostrar más background
-                  this.cameras.main.scrollY -= 200;
+                  // Scroll suave: animar la cámara hacia arriba gradualmente
+                  const targetScrollY = this.cameras.main.scrollY - 200;
+                  this.tweens.add({
+                    targets: this.cameras.main,
+                    scrollY: targetScrollY,
+                    duration: 800, // 800ms para transición suave
+                    ease: 'Power2.easeOut' // Easing suave
+                  });
                 }
 
                 // Spawn the next moving block on top
