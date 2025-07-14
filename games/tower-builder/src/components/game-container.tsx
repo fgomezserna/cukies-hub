@@ -47,6 +47,8 @@ const GameContainer = () => {
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
+              // Cargar el PNG personalizado para bloques sobrantes
+              this.load.image('blockPiece', '/assets/images/fall-block.png');
             }
       
             create() {
@@ -54,13 +56,6 @@ const GameContainer = () => {
               const height = this.game.config.height as number;
 
               this.matter.world.setBounds(0, 0, width, height);
-
-              // Crear una textura simple para los bloques sobrantes
-              const graphics = this.add.graphics();
-              graphics.fillStyle(0x8B4513); // Color marrón para simular madera
-              graphics.fillRect(0, 0, 50, 50); // Tamaño temporal
-              graphics.generateTexture('blockPiece', 50, 50);
-              graphics.destroy();
 
               // Agregar fondo
               const background = this.add.image(width / 2, height / 2, 'background');
