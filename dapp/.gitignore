@@ -9,10 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
-# firebase
-firebase-debug.log
-firestore-debug.log
+ 
 
 # testing
 /coverage
