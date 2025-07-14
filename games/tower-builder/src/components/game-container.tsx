@@ -35,9 +35,14 @@ const GameContainer = () => {
             private speedText: Phaser.GameObjects.Text | null = null;
             private overlayText: Phaser.GameObjects.Text | null = null;
             
-            // Parallax clouds
+            // Parallax clouds con configuración mejorada
             private cloudsLayers: Phaser.GameObjects.TileSprite[] = [];
-            private cloudsSpeeds = [0.15, 0.25, 0.35]; // Velocidades más lentas y suaves para el parallax
+            private cloudsConfigs = [
+              { speed: 0.1, alpha: 0.3, scale: 1.2, offsetY: 0, tint: 0xffffff },      // Fondo - muy lento, grande, transparente
+              { speed: 0.2, alpha: 0.5, scale: 1.0, offsetY: 50, tint: 0xf0f0f0 },    // Medio - velocidad media, tamaño normal
+              { speed: 0.4, alpha: 0.7, scale: 0.8, offsetY: 120, tint: 0xe0e0e0 },   // Frente - rápido, pequeño, más opaco
+              { speed: 0.6, alpha: 0.4, scale: 0.6, offsetY: 190, tint: 0xd0d0d0 }    // Primer plano - muy rápido, muy pequeño
+            ];
       
             constructor() {
               super({ key: 'TowerScene' });
@@ -412,30 +417,37 @@ const GameContainer = () => {
               this.cloudsLayers.forEach(layer => layer.destroy());
               this.cloudsLayers = [];
 
-              // Crear múltiples capas de nubes con diferentes profundidades
-              for (let i = 0; i < this.cloudsSpeeds.length; i++) {
+              console.log('🌤️ Creando parallax de nubes mejorado con', this.cloudsConfigs.length, 'capas');
+
+              // Crear múltiples capas de nubes con configuraciones únicas
+              this.cloudsConfigs.forEach((config, i) => {
                 const cloudsLayer = this.add.tileSprite(
                   0, 
-                  i * 40, // Posicionar cada capa un poco más abajo
-                  width * 2, // Hacer el tile más ancho para mejor efecto
-                  120, // Altura de las nubes
+                  config.offsetY, // Posición Y específica para cada capa
+                  width * 2.5, // Más ancho para mejor seamless scrolling
+                  100, // Altura de las nubes
                   'cloudsPanner'
                 );
                 
                 cloudsLayer.setOrigin(0, 0);
                 cloudsLayer.setScrollFactor(0); // Fijo en la pantalla
-                cloudsLayer.setDepth(0); // Por encima del fondo, pero debajo del juego
-                cloudsLayer.setAlpha(0.8 - i * 0.15); // Transparencia creciente para profundidad
-                cloudsLayer.setScale(0.8 + i * 0.1); // Escala diferente para cada capa
+                cloudsLayer.setDepth(-0.5 + i * 0.1); // Depth creciente, pero detrás del juego
+                cloudsLayer.setAlpha(config.alpha); // Transparencia específica
+                cloudsLayer.setScale(config.scale); // Escala específica
+                cloudsLayer.setTint(config.tint); // Tinte específico para diferenciación
                 
                 this.cloudsLayers.push(cloudsLayer);
-              }
+                
+                console.log(`  ☁️ Capa ${i+1}: velocidad=${config.speed}, alpha=${config.alpha}, escala=${config.scale}`);
+              });
             }
 
             updateCloudsParallax() {
-              // Mover cada capa de nubes a diferente velocidad
+              // Mover cada capa de nubes con sus velocidades específicas
               this.cloudsLayers.forEach((layer, index) => {
-                layer.tilePositionX += this.cloudsSpeeds[index];
+                if (this.cloudsConfigs[index]) {
+                  layer.tilePositionX += this.cloudsConfigs[index].speed;
+                }
               });
             }
 
