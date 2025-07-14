@@ -10,12 +10,14 @@ import Image from "next/image";
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import SybilSlayerImg from "@/assets/sybilslash.png";
+import HyppieRoadImg from "@/assets/hyppie-road.png";
+import ComingSoonImg from "@/assets/coming-soon.png";
 
 const games = [
   { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
-  { name: "Hyppie Road", description: "Navigate the crypto road, avoid traps, and multiply your rewards!", imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop", hint: "road adventure", live: false, playable: true, href: "/games/hyppie-road" },
-  { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: "https://images.unsplash.com/photo-1498084393753-b411b2d26b34?w=600&h=400&fit=crop", hint: "endless runner", live: false, playable: false },
-  { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: "https://images.unsplash.com/photo-1695480542225-bc22cac128d0?w=600&h=400&fit=crop", hint: "chess board", live: true, playable: false }
+  { name: "Hyppie Road", description: "Navigate the crypto road, avoid traps, and multiply your rewards!", imageUrl: HyppieRoadImg, hint: "road adventure", live: false, playable: true, href: "/games/hyppie-road" },
+  { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: ComingSoonImg, hint: "endless runner", live: false, playable: false },
+  { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: ComingSoonImg, hint: "chess board", live: true, playable: false }
 ];
 
 export default function GamesPage() {
@@ -75,33 +77,21 @@ export default function GamesPage() {
                   data-ai-hint={game.hint} 
                 />
                 
+
+                
+                {/* Gradient overlay - only for playable games */}
+                {game.playable && (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                )}
+                
                 {/* Overlay for non-playable games */}
                 {!game.playable && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <div className="absolute top-0 left-0 right-0 h-52 bg-black/60 flex items-center justify-center z-10 !mt-0">
                     <span className="text-white font-bold text-lg bg-black/80 px-4 py-2 rounded-full">
                       🚧 Coming Soon
                     </span>
                   </div>
                 )}
-                
-                {/* Badge LIVE */}
-                {game.live && (
-                  <div className="absolute top-4 right-4 flex items-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                    </span>
-                    🔴 LIVE
-                  </div>
-                )}
-                
-                {/* Popularity indicator */}
-                <div className="absolute top-4 left-4 px-2 py-1 bg-black/80 rounded-full text-white text-xs font-bold">
-                  #{index + 1}
-                </div>
-                
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
               </CardHeader>
               
               <CardContent className="pt-6 flex-grow space-y-3">
