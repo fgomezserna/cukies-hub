@@ -22,8 +22,8 @@ const GameContainer = () => {
             private topBlock: Phaser.Physics.Matter.Image | null = null;
             private blockWidth = 100;
             private initialBlockWidth = 300;
-            private blockHeight = 60; // Aumentada para evitar deformación
-            private baseHeight = 70; // Altura específica para la base
+            private blockHeight = 100; // Aumentada considerablemente para mejores proporciones
+            private baseHeight = 100; // Altura específica para la base, igual que blockHeight
             private moveSpeed = 2;
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
             private separationHeight = 15; // Reducida para evitar separación visual excesiva
@@ -290,10 +290,11 @@ const GameContainer = () => {
                 const newMag = Math.min(Math.abs(this.moveSpeed) + 0.05, 6);
                 this.moveSpeed = sign * newMag;
 
-                // Camera scroll up if near top
+                // Camera scroll up mejorado - sube más agresivamente para mostrar más background
                 const cameraRelativeY = idealYPos - this.cameras.main.scrollY;
-                if (cameraRelativeY < 150) {
-                  this.cameras.main.scrollY -= (this.blockHeight + this.separationHeight);
+                if (cameraRelativeY < 250) { // Threshold aumentado de 150 a 250px
+                  // Scroll más agresivo: sube 200px de una vez para mostrar más background
+                  this.cameras.main.scrollY -= 200;
                 }
 
                 // Spawn the next moving block on top
