@@ -471,7 +471,7 @@ const GameContainer = () => {
               // Score text (always visible)
               this.scoreText = this.add.text(10, 10, 'Score: 0', {
                 fontSize: 24,
-                color: '#40E0D0',  // Turquesa
+                color: '#20B2AA',  // Turquesa verde oscuro (Light Sea Green)
                 fontFamily: '"Pixellari", "Courier New", monospace',
                 stroke: '#000000',
                 strokeThickness: 3
@@ -489,7 +489,7 @@ const GameContainer = () => {
               // Overlay instruction text (shown in ready / gameOver)
               this.overlayText = this.add.text(width / 2, height / 2, 'Tap to Start', {
                 fontSize: 36,
-                color: '#40E0D0',  // Turquesa
+                color: '#20B2AA',  // Turquesa verde oscuro (Light Sea Green)
                 fontFamily: '"Pixellari", "Courier New", monospace',
                 align: 'center',
                 stroke: '#000000',
