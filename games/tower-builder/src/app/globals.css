@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fuente personalizada Pixellari */
+@font-face {
+  font-family: 'Pixellari';
+  src: url('/assets/ui/fonts/Pixellari.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0020-007F; /* ASCII básico */
+}
+
+/* Clase utilitaria para la fuente Pixellari */
+.font-pixellari {
+  font-family: 'Pixellari', 'Courier New', monospace;
+}
+
+/* Preload de la fuente - esto fuerza al navegador a cargarla */
+.pixellari-preload {
+  font-family: 'Pixellari';
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  visibility: hidden;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

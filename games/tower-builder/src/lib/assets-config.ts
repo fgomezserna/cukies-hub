@@ -13,6 +13,11 @@ export const ASSETS_CONFIG = {
       scoreBg: '/assets/images/ui/score-bg.png',
     }
   },
+
+  fonts: {
+    // Fuentes del juego
+    pixellari: '/assets/ui/fonts/Pixellari.ttf',
+  },
   
   sounds: {
     // Efectos de juego

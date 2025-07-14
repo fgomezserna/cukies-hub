@@ -49,8 +49,12 @@ const GameContainer = () => {
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
+              
               // Cargar el PNG personalizado para bloques sobrantes
               this.load.image('blockPiece', '/assets/images/fall-block.png');
+
+              // Precargar la fuente Pixellari
+              this.preloadPixellariFont();
             }
       
             create() {
@@ -68,37 +72,11 @@ const GameContainer = () => {
               // Crear capas de nubes parallax en la parte superior
               this.createCloudsParallax(width, height);
 
-              // Score text (always visible)
-              this.scoreText = this.add.text(10, 10, 'Score: 0', {
-                fontSize: '24px',
-                color: '#ffffff'
-              }).setDepth(1).setScrollFactor(0);
-
-              // Speed multiplier text (always visible)
-              this.speedText = this.add.text(10, 40, 'Speed: x1.0', {
-                fontSize: '20px',
-                color: '#ffff00'
-              }).setDepth(1).setScrollFactor(0);
-
-              // Overlay instruction text (shown in ready / gameOver)
-              this.overlayText = this.add.text(width / 2, height / 2, 'Tap to Start', {
-                fontSize: '32px',
-                color: '#ffffff',
-                align: 'center'
-              }).setOrigin(0.5).setScrollFactor(0);
+              // Crear textos del juego directamente
+              this.createGameTexts(width, height);
 
               // Extend world bounds upward for camera scrolling
               this.cameras.main.setBounds(0, -10000, width, height + 10000);
-
-              this.input.on('pointerdown', () => {
-                if (this.gameState === 'ready') {
-                  this.startGame();
-                } else if (this.gameState === 'playing') {
-                  this.placeBlock();
-                } else if (this.gameState === 'gameOver') {
-                  this.resetGame();
-                }
-              });
             }
       
             update() {
@@ -182,7 +160,7 @@ const GameContainer = () => {
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
                 this.speedText.setText('Speed: x1.0');
-                this.speedText.setColor('#ffff00'); // Reset to yellow
+                this.speedText.setColor('#FFD700'); // Reset to gold
               }
               if (this.overlayText) {
                 this.overlayText.setText('Tap to Start');
@@ -220,7 +198,7 @@ const GameContainer = () => {
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
                 this.speedText.setText('Speed: x1.0');
-                this.speedText.setColor('#ffff00'); // Reset to yellow
+                this.speedText.setColor('#FFD700'); // Reset to gold
               }
               if (this.overlayText) this.overlayText.setVisible(false);
 
@@ -331,7 +309,9 @@ const GameContainer = () => {
                   this.speedText.setText(`Speed: x${speedMultiplier.toFixed(1)}`);
                   // Resaltar cuando hay incremento de velocidad
                   if (speedMultiplier > 1) {
-                    this.speedText.setColor('#00ff00'); // Verde para velocidad aumentada
+                    this.speedText.setColor('#FFA500'); // Naranja dorado para velocidad aumentada
+                  } else {
+                    this.speedText.setColor('#FFD700'); // Dorado normal
                   }
                 }
 
@@ -456,6 +436,84 @@ const GameContainer = () => {
               // Mover cada capa de nubes a diferente velocidad
               this.cloudsLayers.forEach((layer, index) => {
                 layer.tilePositionX += this.cloudsSpeeds[index];
+              });
+            }
+
+            preloadPixellariFont() {
+              console.log('🎨 Preparando fuente Pixellari para Phaser');
+              
+              // Crear un elemento invisible para forzar la carga de la fuente
+              if (!document.getElementById('pixellari-preloader')) {
+                const preloader = document.createElement('div');
+                preloader.id = 'pixellari-preloader';
+                preloader.className = 'pixellari-preload';
+                preloader.innerHTML = 'Pixellari font preload';
+                document.body.appendChild(preloader);
+                console.log('✅ Preloader de Pixellari creado');
+              }
+              
+              // Verificar que la fuente esté disponible
+              try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.font = '16px Pixellari';
+                  console.log('✅ Fuente Pixellari configurada en canvas test');
+                }
+              } catch (e) {
+                console.log('⚠️ Test de canvas falló, pero continuando');
+              }
+            }
+
+            createGameTexts(width: number, height: number) {
+              console.log('🎮 Creando textos del juego con fuente Pixellari');
+              
+              // Score text (always visible)
+              this.scoreText = this.add.text(10, 10, 'Score: 0', {
+                fontSize: 24,
+                color: '#40E0D0',  // Turquesa
+                fontFamily: '"Pixellari", "Courier New", monospace',
+                stroke: '#000000',
+                strokeThickness: 3
+              }).setDepth(1).setScrollFactor(0);
+
+              // Speed multiplier text (always visible)
+              this.speedText = this.add.text(10, 40, 'Speed: x1.0', {
+                fontSize: 18,
+                color: '#FFD700',  // Dorado (Gold)
+                fontFamily: '"Pixellari", "Courier New", monospace',
+                stroke: '#000000',
+                strokeThickness: 2
+              }).setDepth(1).setScrollFactor(0);
+
+              // Overlay instruction text (shown in ready / gameOver)
+              this.overlayText = this.add.text(width / 2, height / 2, 'Tap to Start', {
+                fontSize: 36,
+                color: '#40E0D0',  // Turquesa
+                fontFamily: '"Pixellari", "Courier New", monospace',
+                align: 'center',
+                stroke: '#000000',
+                strokeThickness: 4,
+                shadow: {
+                  offsetX: 2,
+                  offsetY: 2,
+                  color: '#000000',
+                  blur: 0,
+                  fill: true
+                }
+              }).setOrigin(0.5).setScrollFactor(0);
+
+              console.log('✅ Textos creados con fuente Pixellari');
+
+              // Setup input events after texts are created
+              this.input.on('pointerdown', () => {
+                if (this.gameState === 'ready') {
+                  this.startGame();
+                } else if (this.gameState === 'playing') {
+                  this.placeBlock();
+                } else if (this.gameState === 'gameOver') {
+                  this.resetGame();
+                }
               });
             }
 
