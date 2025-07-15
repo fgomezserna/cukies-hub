@@ -27,6 +27,11 @@ TWITTER_CLIENT_SECRET="your-twitter-client-secret"
 # Telegram Bot
 TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
 TELEGRAM_CHAT_ID="your-telegram-group-chat-id"
+TELEGRAM_GROUP_INVITE="https://t.me/your-group-invite"
+
+# Social Media URLs (for frontend)
+NEXT_PUBLIC_TWITTER_PROFILE_URL="https://x.com/hyppieliquid"
+NEXT_PUBLIC_DISCORD_INVITE_URL="https://discord.gg/your-invite-code"
 
 # Webhooks
 IFTTT_WEBHOOK_SECRET="super-secret-value"
