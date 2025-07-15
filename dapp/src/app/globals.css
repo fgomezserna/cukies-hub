@@ -43,25 +43,25 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --background: 173 40% 15%;
-    --foreground: 173 20% 98%;
-    --card: 175 59% 21%;
-    --card-foreground: 173 20% 98%;
-    --popover: 175 59% 18%;
-    --popover-foreground: 173 20% 98%;
-    --primary: 173 97% 48%;
-    --primary-foreground: 173 100% 5%;
-    --secondary: 177 60% 28%;
-    --secondary-foreground: 173 20% 98%;
-    --muted: 177 60% 28%;
-    --muted-foreground: 176 36% 65%;
-    --accent: 173 97% 48%;
-    --accent-foreground: 173 100% 5%;
+    --background: 173 50% 8%;
+    --foreground: 0 0% 98%;
+    --card: 175 65% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 175 65% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 158 64% 52%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 177 60% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 177 60% 18%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 158 64% 52%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 173 20% 98%;
-    --border: 175 50% 28%;
-    --input: 175 50% 28%;
-    --ring: 173 97% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 175 50% 20%;
+    --input: 175 50% 15%;
+    --ring: 158 64% 52%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -114,5 +114,109 @@ body {
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) hsl(var(--card));
+  }
+
+  /* Efectos adicionales para HyppieLiquid */
+  .glow-effect {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .neon-text {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  /* Animación para el background */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .floating {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  /* Gradiente animado */
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .animated-gradient {
+    background: linear-gradient(-45deg, #10b981, #059669, #0d9488, #0891b2);
+    background-size: 400% 400%;
+    animation: gradient-shift 15s ease infinite;
+  }
+
+  /* Gradiente radial personalizado */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+
+  /* Efectos de partículas flotantes */
+  @keyframes float-slow {
+    0%, 100% { 
+      transform: translateY(0px) rotate(0deg); 
+    }
+    25% { 
+      transform: translateY(-20px) rotate(90deg); 
+    }
+    50% { 
+      transform: translateY(-10px) rotate(180deg); 
+    }
+    75% { 
+      transform: translateY(-30px) rotate(270deg); 
+    }
+  }
+
+  .floating-slow {
+    animation: float-slow 20s ease-in-out infinite;
+  }
+
+  /* Patrón de puntos animado */
+  @keyframes dots-move {
+    0%, 100% { 
+      background-position: 0% 0%; 
+    }
+    50% { 
+      background-position: 100% 100%; 
+    }
+  }
+
+  .animated-dots {
+    animation: dots-move 60s linear infinite;
+  }
+
+  /* Efecto de resplandor pulsante */
+  @keyframes glow-pulse {
+    0%, 100% { 
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+    50% { 
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
+    }
+  }
+
+  .glow-pulse {
+    animation: glow-pulse 4s ease-in-out infinite;
+  }
+
+  /* Animación de ondas */
+  @keyframes wave {
+    0%, 100% { 
+      transform: translateX(-100%) skewX(-15deg); 
+    }
+    50% { 
+      transform: translateX(100%) skewX(-15deg); 
+    }
+  }
+
+  .wave-animation {
+    animation: wave 8s ease-in-out infinite;
   }
 }

@@ -14,7 +14,7 @@ const questsData = [
       { title: 'Connect X account', validationApiEndpoint: '/api/tasks/validate/twitter-connect' },
       { title: 'Follow us on X', description: 'Follow @hyppieliquid', validationApiEndpoint: '/api/tasks/validate/twitter-follow' },
       { title: 'Connect Discord account', validationApiEndpoint: '/api/tasks/validate/discord-connect' },
-      { title: 'Join our Discord server', validationApiEndpoint: '/api/tasks/validate/discord-join' },
+      { title: 'Join our Discord server', description: 'Join the official Hyppie Discord server to complete this task', validationApiEndpoint: '/api/tasks/validate/discord-join' },
       { title: 'Join our Telegram group', validationApiEndpoint: '/api/tasks/validate/telegram-join' },
     ],
   },

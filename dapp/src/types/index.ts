@@ -42,4 +42,53 @@ export type User = {
   updatedAt: string;
   lastCheckIn: Streak | null; // Added field
   completedQuests: UserQuest[];
+}
+
+export type PointTransactionType = 
+  | 'QUEST_COMPLETION'
+  | 'DAILY_LOGIN'
+  | 'GAME_PLAY'
+  | 'GAME_WIN'
+  | 'REFERRAL_BONUS'
+  | 'PURCHASE'
+  | 'MANUAL_ADJUSTMENT'
+  | 'OTHER';
+
+export type PointTransaction = {
+  id: string;
+  userId: string;
+  amount: number; // Positive for earned, negative for spent
+  type: PointTransactionType;
+  reason: string;
+  metadata?: any; // JSON metadata
+  createdAt: string;
+}
+
+export type UserStats = {
+  user: {
+    id: string;
+    walletAddress: string;
+    username: string | null;
+    xp: number;
+    referralPoints: number;
+    totalPoints: number;
+  };
+  stats: {
+    tier: string;
+    tierColor: string;
+    ranking: number;
+    positionChange: number;
+    totalUsers: number;
+  };
+}
+
+export type LeaderboardPlayer = {
+  rank: number;
+  name: string;
+  avatar: string;
+  hint: string;
+  points: number;
+  referralPoints: number;
+  totalPoints: number;
+  walletAddress: string;
 } 

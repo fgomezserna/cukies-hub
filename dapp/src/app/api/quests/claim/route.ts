@@ -63,6 +63,19 @@ export async function POST(request: Request) {
         where: { id: user.id },
         data: { xp: { increment: quest.xp } },
       }),
+      // Register the point transaction
+      prisma.pointTransaction.create({
+        data: {
+          userId: user.id,
+          amount: quest.xp,
+          type: 'QUEST_COMPLETION',
+          reason: `Quest: ${quest.title}`,
+          metadata: {
+            questId: quest.id,
+            questTitle: quest.title
+          }
+        }
+      })
     ]);
 
     return NextResponse.json({
