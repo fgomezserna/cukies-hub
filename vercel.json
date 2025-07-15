@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm -w run build:hyppie-road",
+  "outputDirectory": "games/hyppie-road/.next",
+  "installCommand": "pnpm install",
+  "framework": "nextjs"
+} 
