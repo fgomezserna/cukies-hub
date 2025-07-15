@@ -30,6 +30,7 @@ const GameContainer = () => {
             private separationHeight = 15; // Reducida para evitar separación visual excesiva
             private isBlockFalling = false; // Para controlar si el bloque está cayendo
             private blockVariants = ['block', 'block1', 'block2']; // Variantes de bloques disponibles
+            private recentBlocks: string[] = []; // Historial de últimos bloques para evitar repetición
 
             private score = 0;
             private scoreText: Phaser.GameObjects.Text | null = null;
@@ -123,10 +124,35 @@ const GameContainer = () => {
             }
 
             getRandomBlockVariant(): string {
-              // Elegir aleatoriamente una de las variantes de bloques disponibles
-              // Esto asegura que cada bloque tenga una apariencia diferente
-              const randomIndex = Math.floor(Math.random() * this.blockVariants.length);
-              return this.blockVariants[randomIndex];
+              let selectedVariant: string;
+              
+              // Si ya tenemos 2 bloques recientes y son iguales, evitar ese tipo
+              if (this.recentBlocks.length >= 2 && 
+                  this.recentBlocks[0] === this.recentBlocks[1]) {
+                
+                // Filtrar las opciones disponibles para excluir el tipo repetido
+                const availableVariants = this.blockVariants.filter(
+                  variant => variant !== this.recentBlocks[0]
+                );
+                
+                // Elegir aleatoriamente de las opciones disponibles
+                const randomIndex = Math.floor(Math.random() * availableVariants.length);
+                selectedVariant = availableVariants[randomIndex];
+              } else {
+                // Elección completamente aleatoria si no hay restricciones
+                const randomIndex = Math.floor(Math.random() * this.blockVariants.length);
+                selectedVariant = this.blockVariants[randomIndex];
+              }
+              
+              // Actualizar el historial de bloques recientes
+              this.recentBlocks.unshift(selectedVariant);
+              
+              // Mantener solo los últimos 2 bloques en el historial
+              if (this.recentBlocks.length > 2) {
+                this.recentBlocks.pop();
+              }
+              
+              return selectedVariant;
             }
 
             spawnBlock() {
@@ -170,6 +196,7 @@ const GameContainer = () => {
               this.moveSpeed = this.baseSpeed; // Reset to base speed
               this.blockWidth = 100;
               this.lastSpeedLevel = 0; // Reset level tracking
+              this.recentBlocks = []; // Reset block history
               
               // Reset UI
               if (this.scoreText) this.scoreText.setText('Score: 0');
@@ -210,6 +237,7 @@ const GameContainer = () => {
               this.isBlockFalling = false;
               this.moveSpeed = this.baseSpeed; // Reset to base speed
               this.lastSpeedLevel = 0; // Reset level tracking
+              this.recentBlocks = []; // Reset block history
               
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
