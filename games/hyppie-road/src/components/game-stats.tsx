@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Trophy, Target, DollarSign, Zap } from 'lucide-react';
+import { Trophy, DollarSign, Zap } from 'lucide-react';
 
 interface GameStatsProps {
   betAmount: number;
@@ -44,19 +43,16 @@ export function GameStats({
   }, [currentMultiplier, previousMultiplier]);
 
   return (
-    <div className="grid grid-cols-2 gap-3 max-w-4xl mx-auto">
-      {/* Primera fila: Potential winnings y Multiplier */}
-      {/* Potential winnings */}
+    <div className="grid grid-cols-3 gap-3 max-w-4xl mx-auto">
+      {/* Initial bet */}
       <Card className="game-card">
         <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-xs font-medium text-white">Potential Winnings</CardTitle>
-          <Trophy className="h-3 w-3 text-white/70" />
+          <CardTitle className="text-xs font-medium text-white">Initial Bet</CardTitle>
+          <DollarSign className="h-3 w-3 text-white/70" />
         </CardHeader>
         <CardContent className="card-content-custom">
-          <div className="text-base font-bold text-green-400">${potentialWinning.toFixed(2)}</div>
-          <p className={`text-xs ${profitAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {profitAmount >= 0 ? '+' : ''}{profitPercentage.toFixed(1)}% ({profitAmount >= 0 ? '+' : ''}${profitAmount.toFixed(2)})
-          </p>
+          <div className="text-base font-bold text-white">${betAmount.toFixed(2)}</div>
+          <p className="text-xs text-white/70">Amount wagered</p>
         </CardContent>
       </Card>
 
@@ -74,30 +70,16 @@ export function GameStats({
         </CardContent>
       </Card>
 
-      {/* Segunda fila: Initial bet y Progress */}
-      {/* Initial bet */}
+      {/* Potential winnings */}
       <Card className="game-card">
         <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-xs font-medium text-white">Initial Bet</CardTitle>
-          <DollarSign className="h-3 w-3 text-white/70" />
+          <CardTitle className="text-xs font-medium text-white">Potential Winnings</CardTitle>
+          <Trophy className="h-3 w-3 text-white/70" />
         </CardHeader>
         <CardContent className="card-content-custom">
-          <div className="text-base font-bold text-white">${betAmount.toFixed(2)}</div>
-          <p className="text-xs text-white/70">Amount wagered</p>
-        </CardContent>
-      </Card>
-
-      {/* Progress */}
-      <Card className="game-card">
-        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-xs font-medium text-white">Progress</CardTitle>
-          <Target className="h-3 w-3 text-white/70" />
-        </CardHeader>
-        <CardContent className="card-content-custom">
-          <div className="text-base font-bold text-white">{currentStep}/{totalSteps}</div>
-          <Progress value={completionPercentage} className="mt-1" />
-          <p className="text-xs text-white/70 mt-1">
-            {completionPercentage.toFixed(1)}% completed
+          <div className="text-base font-bold text-green-400">${potentialWinning.toFixed(2)}</div>
+          <p className={`text-xs ${profitAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {profitAmount >= 0 ? '+' : ''}{profitPercentage.toFixed(1)}% ({profitAmount >= 0 ? '+' : ''}${profitAmount.toFixed(2)})
           </p>
         </CardContent>
       </Card>
