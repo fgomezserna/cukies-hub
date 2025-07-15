@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect } from 'react';
+import { useChildConnection } from '@hyppie/game-bridge';
 import { useGameState } from '@/hooks/useGameState';
 import { getGameStats } from '@/lib/game-logic';
 import { BetInput } from './bet-input';
@@ -14,6 +15,7 @@ import { GameResult } from '@/types/game';
 import { useAudio } from '@/hooks/useAudio';
 
 export function HyppieRoadGame() {
+  const { isAuthenticated, user } = useChildConnection();
   const {
     // State
     gameState,
@@ -47,6 +49,13 @@ export function HyppieRoadGame() {
       playBackgroundMusic();
     }
   }, [isGameActive, playBackgroundMusic]);
+
+  // Log para verificar la recepción de datos de autenticación
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('Hyppie Road received auth state from Dapp:', { isAuthenticated, user });
+    }
+  }, [isAuthenticated, user]);
 
   // Manejar inicio del juego
   const handleStartGame = useCallback((amount: number) => {
