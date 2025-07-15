@@ -29,6 +29,7 @@ const GameContainer = () => {
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
             private separationHeight = 15; // Reducida para evitar separación visual excesiva
             private isBlockFalling = false; // Para controlar si el bloque está cayendo
+            private blockVariants = ['block', 'block1', 'block2']; // Variantes de bloques disponibles
 
             private score = 0;
             private scoreText: Phaser.GameObjects.Text | null = null;
@@ -53,12 +54,11 @@ const GameContainer = () => {
             preload() {
               // Cargar assets locales
               this.load.image('block', ASSETS_CONFIG.images.block);
+              this.load.image('block1', ASSETS_CONFIG.images.block1);
+              this.load.image('block2', ASSETS_CONFIG.images.block2);
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
-              
-              // Cargar el PNG personalizado para bloques sobrantes
-              this.load.image('blockPiece', '/assets/images/fall-block.png');
 
               // Precargar la fuente Pixellari
               this.preloadPixellariFont();
@@ -122,13 +122,20 @@ const GameContainer = () => {
               this.tower.push(baseImg);
             }
 
+            getRandomBlockVariant(): string {
+              // Elegir aleatoriamente una de las variantes de bloques disponibles
+              // Esto asegura que cada bloque tenga una apariencia diferente
+              const randomIndex = Math.floor(Math.random() * this.blockVariants.length);
+              return this.blockVariants[randomIndex];
+            }
+
             spawnBlock() {
               const lastBlock = this.tower[this.tower.length - 1];
-              // Posicionar el bloque con separación visual
+              // Posicionar el bloque con separación visual usando una variante aleatoria
               const blockImg = this.matter.add.image(
                 (this.game.config.width as number) / 2,
                 (lastBlock.y) - this.blockHeight - this.separationHeight,
-                'block'
+                this.getRandomBlockVariant()
               );
               
               // El primer bloque móvil debe ser igual de ancho que la base
@@ -279,12 +286,15 @@ const GameContainer = () => {
                 // Crear efectos de partes que caen ANTES de destruir el bloque original
                 this.createFallingPieces(this.topBlock, supportedLeft, supportedRight);
                 
+                // Capturar la textura del bloque original antes de destruirlo
+                const originalBlockTexture = this.topBlock.texture.key;
+                
                 // Destruir el bloque original
                 this.topBlock.destroy();
                 this.topBlock = null;
 
-                // Crear un nuevo bloque solo con la parte apoyada en la posición ideal
-                const supportedBlock = this.matter.add.image(supportedCenterX, idealYPos, 'block');
+                // Crear un nuevo bloque solo con la parte apoyada usando la misma textura
+                const supportedBlock = this.matter.add.image(supportedCenterX, idealYPos, originalBlockTexture);
                 
                 // Cortar por los laterales (no desde abajo) para mantener la calidad del PNG
                 const originalTextureWidth = supportedBlock.texture.source[0].width; // Ancho real del PNG
@@ -361,8 +371,8 @@ const GameContainer = () => {
                 const leftOverhangWidth = supportedLeft - blockLeft;
                 const leftOverhangCenterX = blockLeft + leftOverhangWidth / 2;
                 
-                // Crear una pieza con la textura específica para bloques sobrantes
-                const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, 'blockPiece');
+                // Crear una pieza con una variante aleatoria de bloque
+                const leftPiece = this.matter.add.image(leftOverhangCenterX, blockY, this.getRandomBlockVariant());
                 
                 // Usar solo setDisplaySize sin crop para que se vean bien
                 leftPiece.setDisplaySize(leftOverhangWidth, this.blockHeight);
@@ -394,8 +404,8 @@ const GameContainer = () => {
                 const rightOverhangWidth = blockRight - supportedRight;
                 const rightOverhangCenterX = supportedRight + rightOverhangWidth / 2;
                 
-                // Crear una pieza con la textura específica para bloques sobrantes
-                const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, 'blockPiece');
+                // Crear una pieza con una variante aleatoria de bloque
+                const rightPiece = this.matter.add.image(rightOverhangCenterX, blockY, this.getRandomBlockVariant());
                 
                 // Usar solo setDisplaySize sin crop para que se vean bien
                 rightPiece.setDisplaySize(rightOverhangWidth, this.blockHeight);
