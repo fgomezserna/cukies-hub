@@ -60,6 +60,7 @@ const GameContainer = () => {
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
+              this.load.image('cityBack', ASSETS_CONFIG.images.cityBack);
 
               // Precargar la fuente Pixellari
               this.preloadPixellariFont();
@@ -76,6 +77,19 @@ const GameContainer = () => {
               background.setDisplaySize(width, height);
               background.setScrollFactor(0); // Mantener fijo mientras la cámara se mueve
               background.setDepth(-1); // Enviar al fondo
+
+              // Agregar edificios del fondo con efecto parallax
+              const cityBackground = this.add.image(width / 2, height, 'cityBack');
+              
+              // Escalar manteniendo proporciones para que cubra el ancho completo
+              const naturalWidth = cityBackground.texture.source[0].width;
+              const naturalHeight = cityBackground.texture.source[0].height;
+              const scaleX = width / naturalWidth;
+              cityBackground.setScale(scaleX);
+              
+              cityBackground.setScrollFactor(0.3); // Parallax: se mueve más lento que la cámara
+              cityBackground.setDepth(-0.8); // Entre el cielo y las nubes
+              cityBackground.setOrigin(0.5, 1); // Anclado en la parte inferior
 
               // Crear capas de nubes parallax en la parte superior
               this.createCloudsParallax(width, height);

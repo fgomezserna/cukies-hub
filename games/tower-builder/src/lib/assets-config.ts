@@ -8,6 +8,7 @@ export const ASSETS_CONFIG = {
     baseTower: '/assets/images/base-tower.png', // Mostrado como 300x70px
     background: '/assets/images/sky-tower.png',
     cloudsPanner: '/assets/images/clouds-background.png',
+    cityBack: '/assets/images/city-back.png',   // Edificios del fondo
     
     // Elementos de UI
     ui: {
