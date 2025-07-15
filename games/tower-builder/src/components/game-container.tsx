@@ -29,7 +29,7 @@ const GameContainer = () => {
             private gameState: 'ready' | 'playing' | 'gameOver' = 'ready';
             private separationHeight = 15; // Reducida para evitar separación visual excesiva
             private isBlockFalling = false; // Para controlar si el bloque está cayendo
-            private blockVariants = ['block', 'block1', 'block2']; // Variantes de bloques disponibles
+            private blockVariants = ['block', 'block-1', 'block-2']; // Variantes de bloques disponibles
             private recentBlocks: string[] = []; // Historial de últimos bloques para evitar repetición
 
             private score = 0;
@@ -43,6 +43,10 @@ const GameContainer = () => {
             private cloudsLayers: Phaser.GameObjects.TileSprite[] = [];
             private cloudsOriginalY: number[] = []; // Posiciones Y originales de las nubes
             private cloudsCurrentY: number[] = []; // Posiciones Y actuales (para interpolación suave)
+            
+            // Sistema de avión
+            private airplane: Phaser.GameObjects.Image | null = null;
+            private airplaneActive = false;
             private cloudsConfigs = [
               { speed: 0.1, alpha: 0.3, scale: 1.2, offsetY: 0, tint: 0xffffff },      // Fondo - muy lento, grande, transparente
               { speed: 0.2, alpha: 0.5, scale: 1.0, offsetY: 50, tint: 0xf0f0f0 },    // Medio - velocidad media, tamaño normal
@@ -57,12 +61,13 @@ const GameContainer = () => {
             preload() {
               // Cargar assets locales
               this.load.image('block', ASSETS_CONFIG.images.block);
-              this.load.image('block1', ASSETS_CONFIG.images.block1);
-              this.load.image('block2', ASSETS_CONFIG.images.block2);
+              this.load.image('block-1', ASSETS_CONFIG.images.block1);
+              this.load.image('block-2', ASSETS_CONFIG.images.block2);
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
               this.load.image('cityBack', ASSETS_CONFIG.images.cityBack);
+              this.load.image('airplane', ASSETS_CONFIG.images.airplane);
 
               // Precargar la fuente Pixellari
               this.preloadPixellariFont();
@@ -99,6 +104,8 @@ const GameContainer = () => {
               // Crear textos del juego directamente
               this.createGameTexts(width, height);
 
+
+
               // Extend world bounds upward for camera scrolling
               this.cameras.main.setBounds(0, -10000, width, height + 10000);
             }
@@ -126,6 +133,9 @@ const GameContainer = () => {
 
               // Animar las nubes parallax
               this.updateCloudsParallax();
+              
+              // Animar el avión (siempre, independiente del estado)
+              this.updateAirplane();
             }
       
             createBase() {
@@ -214,6 +224,13 @@ const GameContainer = () => {
               this.lastSpeedLevel = 0; // Reset level tracking
               this.recentBlocks = []; // Reset block history
               
+              // Reset airplane
+              if (this.airplane) {
+                this.airplane.destroy();
+                this.airplane = null;
+              }
+              this.airplaneActive = false;
+              
               // Reset UI
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
@@ -254,6 +271,13 @@ const GameContainer = () => {
               this.moveSpeed = this.baseSpeed; // Reset to base speed
               this.lastSpeedLevel = 0; // Reset level tracking
               this.recentBlocks = []; // Reset block history
+              
+              // Reset airplane
+              if (this.airplane) {
+                this.airplane.destroy();
+                this.airplane = null;
+              }
+              this.airplaneActive = false;
               
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
@@ -553,6 +577,62 @@ const GameContainer = () => {
             // Función de interpolación lineal para movimiento suave
             lerp(start: number, end: number, factor: number): number {
               return start + (end - start) * factor;
+            }
+
+            updateAirplane() {
+              // Crear avión cuando el score es >= 15 y no está activo
+              if (this.score >= 15 && !this.airplaneActive) {
+                this.createAirplane();
+                this.airplaneActive = true;
+              }
+              
+              // Desactivar avión si score baja de 15
+              if (this.score < 15 && this.airplaneActive) {
+                if (this.airplane) {
+                  this.airplane.destroy();
+                  this.airplane = null;
+                }
+                this.airplaneActive = false;
+              }
+              
+              // Mover avión si está activo
+              if (this.airplane && this.airplaneActive) {
+                // Movimiento lateral suave
+                this.airplane.x += 2; // Velocidad horizontal
+                
+                // Reset posición cuando sale de pantalla
+                const gameWidth = this.game.config.width as number;
+                if (this.airplane.x > gameWidth + 100) {
+                  // Reposicionar desde el lado izquierdo
+                  this.airplane.x = -100;
+                  // Variar ligeramente la altura para más dinamismo
+                  const gameHeight = this.game.config.height as number;
+                  this.airplane.y = gameHeight * 0.2 + (Math.random() * 100 - 50);
+                }
+              }
+            }
+
+            createAirplane() {
+              const gameWidth = this.game.config.width as number;
+              const gameHeight = this.game.config.height as number;
+              
+              // Verificar si la textura existe
+              if (!this.textures.exists('airplane')) {
+                return;
+              }
+              
+              // Crear avión en el lado izquierdo, fuera de la pantalla
+              this.airplane = this.add.image(-100, gameHeight * 0.2, 'airplane');
+              
+              if (this.airplane) {
+                // Tamaño pequeño del avión (75% más pequeño que el original)
+                this.airplane.setScale(0.1);
+                
+                // Configuración visual
+                this.airplane.setDepth(0.5); // Detrás de los elementos principales
+                this.airplane.setScrollFactor(0.8); // Parallax suave
+                this.airplane.setAlpha(0.8); // Ligeramente transparente
+              }
             }
 
             preloadPixellariFont() {

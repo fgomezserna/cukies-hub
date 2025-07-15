@@ -9,6 +9,7 @@ export const ASSETS_CONFIG = {
     background: '/assets/images/sky-tower.png',
     cloudsPanner: '/assets/images/clouds-background.png',
     cityBack: '/assets/images/city-back.png',   // Edificios del fondo
+    airplane: '/assets/images/airplane.png',    // Avión para altitudes
     
     // Elementos de UI
     ui: {
