@@ -47,6 +47,14 @@ const GameContainer = () => {
             // Sistema de avión
             private airplane: Phaser.GameObjects.Image | null = null;
             private airplaneActive = false;
+            private airplaneWaitTime = 0; // Tiempo de espera entre apariciones (en milisegundos)
+            
+            // Sistema de transición de background
+            private backgroundTransitionTriggered = false;
+            private backgroundTransitionActive = false;
+            private currentBackground: Phaser.GameObjects.Image | null = null;
+            private newBackground: Phaser.GameObjects.Image | null = null;
+            private cloudsParallaxStopped = false;
             private cloudsConfigs = [
               { speed: 0.1, alpha: 0.3, scale: 1.2, offsetY: 0, tint: 0xffffff },      // Fondo - muy lento, grande, transparente
               { speed: 0.2, alpha: 0.5, scale: 1.0, offsetY: 50, tint: 0xf0f0f0 },    // Medio - velocidad media, tamaño normal
@@ -65,6 +73,7 @@ const GameContainer = () => {
               this.load.image('block-2', ASSETS_CONFIG.images.block2);
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
+              this.load.image('sky-space', '/assets/images/sky-space.png');
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
               this.load.image('cityBack', ASSETS_CONFIG.images.cityBack);
               this.load.image('airplane', ASSETS_CONFIG.images.airplane);
@@ -80,10 +89,10 @@ const GameContainer = () => {
               this.matter.world.setBounds(0, 0, width, height);
 
               // Agregar fondo
-              const background = this.add.image(width / 2, height / 2, 'background');
-              background.setDisplaySize(width, height);
-              background.setScrollFactor(0); // Mantener fijo mientras la cámara se mueve
-              background.setDepth(-1); // Enviar al fondo
+              this.currentBackground = this.add.image(width / 2, height / 2, 'background');
+              this.currentBackground.setDisplaySize(width, height);
+              this.currentBackground.setScrollFactor(0); // Mantener fijo mientras la cámara se mueve
+              this.currentBackground.setDepth(-1); // Enviar al fondo
 
               // Agregar edificios del fondo con efecto parallax
               const cityBackground = this.add.image(width / 2, height, 'cityBack');
@@ -136,6 +145,9 @@ const GameContainer = () => {
               
               // Animar el avión (siempre, independiente del estado)
               this.updateAirplane();
+              
+              // Verificar transición de background
+              this.checkBackgroundTransition();
             }
       
             createBase() {
@@ -230,6 +242,30 @@ const GameContainer = () => {
                 this.airplane = null;
               }
               this.airplaneActive = false;
+              this.airplaneWaitTime = 0;
+              
+              // Reset background transition
+              this.backgroundTransitionTriggered = false;
+              this.backgroundTransitionActive = false;
+              this.cloudsParallaxStopped = false;
+              if (this.newBackground) {
+                this.newBackground.destroy();
+                this.newBackground = null;
+              }
+              
+              // Restaurar background original
+              if (this.currentBackground) {
+                this.currentBackground.destroy();
+              }
+              const gameWidth = this.game.config.width as number;
+              const gameHeight = this.game.config.height as number;
+              this.currentBackground = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
+              this.currentBackground.setDisplaySize(gameWidth, gameHeight);
+              this.currentBackground.setScrollFactor(0);
+              this.currentBackground.setDepth(-1);
+              
+              // Recrear las nubes parallax si fueron destruidas
+              this.createCloudsParallax(gameWidth, gameHeight);
               
               // Reset UI
               if (this.scoreText) this.scoreText.setText('Score: 0');
@@ -278,6 +314,30 @@ const GameContainer = () => {
                 this.airplane = null;
               }
               this.airplaneActive = false;
+              this.airplaneWaitTime = 0;
+              
+              // Reset background transition
+              this.backgroundTransitionTriggered = false;
+              this.backgroundTransitionActive = false;
+              this.cloudsParallaxStopped = false;
+              if (this.newBackground) {
+                this.newBackground.destroy();
+                this.newBackground = null;
+              }
+              
+              // Restaurar background original si es necesario
+              if (this.currentBackground && this.currentBackground.texture.key === 'sky-space') {
+                this.currentBackground.destroy();
+                const gameWidth = this.game.config.width as number;
+                const gameHeight = this.game.config.height as number;
+                this.currentBackground = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
+                this.currentBackground.setDisplaySize(gameWidth, gameHeight);
+                this.currentBackground.setScrollFactor(0);
+                this.currentBackground.setDepth(-1);
+                
+                // Recrear las nubes parallax
+                this.createCloudsParallax(gameWidth, gameHeight);
+              }
               
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
@@ -536,6 +596,11 @@ const GameContainer = () => {
             }
 
             updateCloudsParallax() {
+              // Si las nubes están detenidas, no hacer nada
+              if (this.cloudsParallaxStopped) {
+                return;
+              }
+              
               // Mover cada capa de nubes con sus velocidades específicas
               this.cloudsLayers.forEach((layer, index) => {
                 if (this.cloudsConfigs[index] && this.cloudsOriginalY[index] !== undefined) {
@@ -579,20 +644,86 @@ const GameContainer = () => {
               return start + (end - start) * factor;
             }
 
+            checkBackgroundTransition() {
+              // Activar transición solo una vez al llegar al score 25
+              if (this.score >= 25 && !this.backgroundTransitionTriggered && !this.backgroundTransitionActive) {
+                this.backgroundTransitionTriggered = true;
+                this.backgroundTransitionActive = true;
+                this.startBackgroundTransition();
+              }
+            }
+            
+            startBackgroundTransition() {
+              const gameWidth = this.game.config.width as number;
+              const gameHeight = this.game.config.height as number;
+              
+              // Hacer desaparecer las nubes completamente
+              this.cloudsLayers.forEach(layer => {
+                this.tweens.add({
+                  targets: layer,
+                  alpha: 0, // Fade out
+                  duration: 3000, // 3 segundos para desvanecerse
+                  onComplete: () => {
+                    layer.destroy();
+                  }
+                });
+              });
+              this.cloudsLayers = [];
+              this.cloudsParallaxStopped = true;
+              
+              // Crear el nuevo background (sky-space) desde arriba
+              this.newBackground = this.add.image(gameWidth / 2, -gameHeight / 2, 'sky-space');
+              this.newBackground.setDisplaySize(gameWidth, gameHeight);
+              this.newBackground.setScrollFactor(0);
+              this.newBackground.setDepth(-1); // Mismo depth que el anterior
+              
+              // Animar background actual hacia abajo (10 segundos)
+              this.tweens.add({
+                targets: this.currentBackground,
+                y: gameHeight + gameHeight / 2, // Salir por abajo
+                duration: 10000, // 10 segundos
+                ease: 'Power2.easeInOut'
+              });
+              
+              // Animar nuevo background desde arriba (10 segundos)
+              this.tweens.add({
+                targets: this.newBackground,
+                y: gameHeight / 2, // Posición final centrada
+                duration: 10000, // 10 segundos
+                ease: 'Power2.easeInOut',
+                onComplete: () => {
+                  // Al finalizar la transición
+                  if (this.currentBackground) {
+                    this.currentBackground.destroy();
+                    this.currentBackground = null;
+                  }
+                  this.currentBackground = this.newBackground;
+                  this.newBackground = null;
+                  this.backgroundTransitionActive = false;
+                }
+              });
+            }
+
             updateAirplane() {
-              // Crear avión cuando el score es >= 15 y no está activo
-              if (this.score >= 15 && !this.airplaneActive) {
+              // Crear avión solo entre score 15 y 24 (no después del 25)
+              if (this.score >= 15 && this.score < 25 && !this.airplaneActive && this.airplaneWaitTime <= 0) {
                 this.createAirplane();
                 this.airplaneActive = true;
               }
               
-              // Desactivar avión si score baja de 15
-              if (this.score < 15 && this.airplaneActive) {
+              // Desactivar avión si score baja de 15 O si llega a 25 o más
+              if ((this.score < 15 || this.score >= 25) && this.airplaneActive) {
                 if (this.airplane) {
                   this.airplane.destroy();
                   this.airplane = null;
                 }
                 this.airplaneActive = false;
+                this.airplaneWaitTime = 0; // Reset timer
+              }
+              
+              // Actualizar tiempo de espera
+              if (this.airplaneWaitTime > 0) {
+                this.airplaneWaitTime -= this.game.loop.delta;
               }
               
               // Mover avión si está activo
@@ -600,14 +731,14 @@ const GameContainer = () => {
                 // Movimiento horizontal suave
                 this.airplane.x += 2; // Velocidad horizontal
                 
-                // Reset posición cuando sale de pantalla
+                // Cuando sale de pantalla, iniciar pausa de 15 segundos
                 const gameWidth = this.game.config.width as number;
                 if (this.airplane.x > gameWidth + 100) {
-                  // Reposicionar desde el lado izquierdo
-                  this.airplane.x = -100;
-                  // Variar ligeramente la altura para más dinamismo
-                  const gameHeight = this.game.config.height as number;
-                  this.airplane.y = gameHeight * 0.2 + (Math.random() * 100 - 50);
+                  // Destruir avión y iniciar pausa
+                  this.airplane.destroy();
+                  this.airplane = null;
+                  this.airplaneActive = false;
+                  this.airplaneWaitTime = 15000; // 15 segundos en milisegundos
                 }
               }
             }
@@ -628,9 +759,9 @@ const GameContainer = () => {
                 // Configuración visual
                 this.airplane.setOrigin(0.5, 0.5);       // Origen en el centro
                 this.airplane.setScrollFactor(0);        // Fijo en pantalla (no se mueve con cámara)  
-                this.airplane.setDepth(0.5);             // Detrás de elementos principales
-                this.airplane.setAlpha(0.8);             // Más visible
-                this.airplane.setScale(0.3);             // Tamaño apropiado
+                this.airplane.setDepth(-0.5);            // Por detrás de los bloques pero delante del background
+                this.airplane.setAlpha(1.0);             // Sin transparencia
+                this.airplane.setScale(0.2);             // Tamaño más pequeño
               }
             }
 
