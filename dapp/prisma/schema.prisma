@@ -33,7 +33,7 @@ model User {
   lastCheckIn   Streak?
 
   // Referrals
-  referralCode    String?
+  referralCode    String? @unique
   referredById    String? @db.ObjectId
   referredBy      User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
   referrals       User[]  @relation("Referrals")

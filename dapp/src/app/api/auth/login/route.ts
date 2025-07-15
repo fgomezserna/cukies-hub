@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { processReferralByUsername } from '@/lib/referrals';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
@@ -28,12 +30,28 @@ export async function POST(request: Request) {
 
     if (!user) {
       try {
+        // Check for referrer username in cookies
+        const cookieStore = await cookies();
+        const referrerUsername = cookieStore.get('referrerUsername')?.value;
+        
         const newUser = await prisma.user.create({
           data: {
             walletAddress: lowercasedAddress,
             username: lowercasedAddress, // Use the entire wallet address as unique username
           },
         });
+
+        // Process referral if username exists
+        if (referrerUsername) {
+          try {
+            await processReferralByUsername(newUser.id, referrerUsername);
+            // Clear the referral cookie after successful processing
+            cookieStore.set('referrerUsername', '', { expires: new Date(0) });
+          } catch (referralError) {
+            console.error('Error processing referral:', referralError);
+            // Continue with user creation even if referral fails
+          }
+        }
         
         // Now fetch the user with the same includes as above to ensure consistent object shape
         user = await prisma.user.findUnique({
