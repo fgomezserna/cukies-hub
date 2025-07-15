@@ -142,8 +142,7 @@ export async function POST(request: Request) {
         break;
 
       case 'twitter_connect':
-      case 'twitter_follow':
-        // For Twitter, we need to link the user's Twitter account  
+        // For Twitter connect, we just link the user's Twitter account  
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
           return NextResponse.json({ 
             error: 'Twitter username is required.' 
@@ -152,6 +151,34 @@ export async function POST(request: Request) {
         
         // Store the Twitter handle (already verified via OAuth)
         updateData.twitterHandle = value.trim().replace(/^@/, '');
+        verificationResult = true;
+        break;
+
+      case 'twitter_follow':
+        // For Twitter follow, we verify the user is following us by checking the TwitterFollower collection
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+          return NextResponse.json({ 
+            error: 'Twitter username is required.' 
+          }, { status: 400 });
+        }
+        
+        const twitterUsername = value.trim().replace(/^@/, '').toLowerCase();
+        
+        // Check if this user is in our followers collection
+        const follower = await prisma.twitterFollower.findUnique({
+          where: {
+            twitterUsername: twitterUsername
+          }
+        });
+        
+        if (!follower) {
+          return NextResponse.json({ 
+            error: 'You are not following us on X/Twitter. Please follow us first and try again.' 
+          }, { status: 403 });
+        }
+        
+        // Store the Twitter handle and mark as verified
+        updateData.twitterHandle = twitterUsername;
         verificationResult = true;
         break;
 

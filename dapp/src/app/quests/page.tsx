@@ -978,7 +978,7 @@ function QuestsView() {
 
       toast({
         title: 'Task Completed!',
-        description: `You completed: "${task.text}".`,
+        description: `You completed: "${getTaskText(task)}".`,
       });
 
     } catch (error) {

@@ -20,6 +20,8 @@ model User {
 
   // Socials
   twitterHandle     String?
+  twitterName       String?  // Nombre completo de Twitter
+  twitterId         String?  // ID de Twitter
   discordUsername   String?
   telegramUsername  String?
 
@@ -187,4 +189,16 @@ model VerificationToken {
   expires     DateTime
 
   @@index([identifier])
+}
+
+// Model to track Twitter followers from IFTTT webhook
+model TwitterFollower {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  twitterUsername String   @unique // Twitter username without @
+  twitterHandle   String   // Twitter handle (same as username, for consistency)
+  twitterName     String?  // Display name from Twitter
+  followedAt      DateTime @default(now())
+  
+  // For debugging and webhook verification
+  webhookData     Json?    // Raw data from IFTTT webhook
 }

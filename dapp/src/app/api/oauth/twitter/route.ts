@@ -95,13 +95,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // Optionally update user's twitterHandle
-    if (!user.twitterHandle) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { twitterHandle: twitterUser.username.toLowerCase() },
-      });
-    }
+    // Update user's Twitter data
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { 
+        twitterHandle: twitterUser.username.toLowerCase(),
+        twitterName: twitterUser.name,
+        twitterId: twitterUser.id,
+      },
+    });
 
     return NextResponse.json({
       success: true,
