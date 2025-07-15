@@ -33,6 +33,7 @@ export async function POST(request: Request) {
         // Check for referrer username in cookies
         const cookieStore = await cookies();
         const referrerUsername = cookieStore.get('referrerUsername')?.value;
+        console.log('🔍 Checking for referrer cookie:', referrerUsername);
         
         const newUser = await prisma.user.create({
           data: {
@@ -44,13 +45,17 @@ export async function POST(request: Request) {
         // Process referral if username exists
         if (referrerUsername) {
           try {
-            await processReferralByUsername(newUser.id, referrerUsername);
+            console.log('🎯 Processing referral for:', referrerUsername);
+            const result = await processReferralByUsername(newUser.id, referrerUsername);
+            console.log('✅ Referral processed successfully:', result);
             // Clear the referral cookie after successful processing
             cookieStore.set('referrerUsername', '', { expires: new Date(0) });
           } catch (referralError) {
-            console.error('Error processing referral:', referralError);
+            console.error('❌ Error processing referral:', referralError);
             // Continue with user creation even if referral fails
           }
+        } else {
+          console.log('❌ No referrer username found in cookies');
         }
         
         // Now fetch the user with the same includes as above to ensure consistent object shape
