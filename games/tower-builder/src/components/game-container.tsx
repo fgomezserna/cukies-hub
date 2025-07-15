@@ -34,6 +34,8 @@ const GameContainer = () => {
             private scoreText: Phaser.GameObjects.Text | null = null;
             private speedText: Phaser.GameObjects.Text | null = null;
             private overlayText: Phaser.GameObjects.Text | null = null;
+            private levelUpText: Phaser.GameObjects.Text | null = null;
+            private lastSpeedLevel = 0; // Para trackear el último nivel de velocidad mostrado
             
             // Parallax clouds con configuración mejorada
             private cloudsLayers: Phaser.GameObjects.TileSprite[] = [];
@@ -160,6 +162,7 @@ const GameContainer = () => {
               this.isBlockFalling = false;
               this.moveSpeed = this.baseSpeed; // Reset to base speed
               this.blockWidth = 100;
+              this.lastSpeedLevel = 0; // Reset level tracking
               
               // Reset UI
               if (this.scoreText) this.scoreText.setText('Score: 0');
@@ -199,6 +202,7 @@ const GameContainer = () => {
               this.score = 0;
               this.isBlockFalling = false;
               this.moveSpeed = this.baseSpeed; // Reset to base speed
+              this.lastSpeedLevel = 0; // Reset level tracking
               
               if (this.scoreText) this.scoreText.setText('Score: 0');
               if (this.speedText) {
@@ -305,9 +309,16 @@ const GameContainer = () => {
 
                 // Incremento de velocidad: 50% por cada 10 bloques acumulados
                 const speedMultiplier = 1 + (0.5 * Math.floor(this.score / 10));
+                const currentSpeedLevel = Math.floor(this.score / 10);
                 const sign = Math.sign(this.moveSpeed) || 1;
                 const newSpeed = this.baseSpeed * speedMultiplier;
                 this.moveSpeed = sign * newSpeed;
+
+                // Detectar si hay un nuevo nivel de velocidad
+                if (currentSpeedLevel > this.lastSpeedLevel && currentSpeedLevel > 0) {
+                  this.showLevelUpMessage();
+                  this.lastSpeedLevel = currentSpeedLevel;
+                }
 
                 // Actualizar texto de velocidad
                 if (this.speedText) {
@@ -515,6 +526,23 @@ const GameContainer = () => {
                 }
               }).setOrigin(0.5).setScrollFactor(0);
 
+              // Level up text (initially hidden)
+              this.levelUpText = this.add.text(width / 2, height / 2 - 50, 'NEXT LEVEL!!!', {
+                fontSize: 48,
+                color: '#FF6B35',  // Naranja vibrante
+                fontFamily: '"Pixellari", "Courier New", monospace',
+                align: 'center',
+                stroke: '#FFFFFF',
+                strokeThickness: 4,
+                shadow: {
+                  offsetX: 3,
+                  offsetY: 3,
+                  color: '#000000',
+                  blur: 2,
+                  fill: true
+                }
+              }).setOrigin(0.5).setScrollFactor(0).setVisible(false).setDepth(100);
+              
               console.log('✅ Textos creados con fuente Pixellari');
 
               // Setup input events after texts are created
@@ -543,6 +571,54 @@ const GameContainer = () => {
                 this.overlayText.setText(`Game Over\nScore: ${this.score}\nTap to Replay`);
                 this.overlayText.setVisible(true);
               }
+            }
+
+            showLevelUpMessage() {
+              if (!this.levelUpText) return;
+
+              // Mostrar el texto
+              this.levelUpText.setVisible(true);
+              
+              // Animación de aparición: escala desde 0 y fade in
+              this.levelUpText.setScale(0);
+              this.levelUpText.setAlpha(0);
+              
+              this.tweens.add({
+                targets: this.levelUpText,
+                scaleX: 1.2,
+                scaleY: 1.2,
+                alpha: 1,
+                duration: 300,
+                ease: 'Power2.easeOut',
+                onComplete: () => {
+                  // Mantener visible por un momento, luego hacer bounce
+                  this.tweens.add({
+                    targets: this.levelUpText,
+                    scaleX: 1,
+                    scaleY: 1,
+                    duration: 200,
+                    ease: 'Bounce.easeOut',
+                    onComplete: () => {
+                      // Esperar un poco y luego desvanecer
+                      this.time.delayedCall(1500, () => {
+                        this.tweens.add({
+                          targets: this.levelUpText,
+                          alpha: 0,
+                          scaleX: 0.8,
+                          scaleY: 0.8,
+                          duration: 400,
+                          ease: 'Power2.easeIn',
+                          onComplete: () => {
+                            if (this.levelUpText) {
+                              this.levelUpText.setVisible(false);
+                            }
+                          }
+                        });
+                      });
+                    }
+                  });
+                }
+              });
             }
           }
 
