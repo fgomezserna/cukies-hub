@@ -930,31 +930,33 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               pointerEvents: 'none'
             }}
           ></div>
-          <div
-            className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm"
-            style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
-          >
-            <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
-              SYBIL SLAYER
-            </h1>
-            <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center max-w-xl select-none">
-              Welcome to SYBIL SLAYER!<br/>
-              Dodge obstacles, collect energy and achieve the highest score.<br/>
-              Ready to play?
-            </p>
-            <button 
-              onClick={handleStartPauseClick} 
-              className="focus:outline-none game-button mb-4"
-              aria-label="Start game"
+          <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm">
+            <div
+              className="flex flex-col items-center justify-center"
+              style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
             >
-              <Image 
-                src="/assets/ui/buttons/play-button.png"
-                alt="Play"
-                width={160}
-                height={60}
-                className="game-img"
-              />
-            </button>
+              <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
+                SYBIL SLAYER
+              </h1>
+              <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center max-w-xl select-none">
+                Welcome to SYBIL SLAYER!<br/>
+                Dodge obstacles, collect energy and achieve the highest score.<br/>
+                Ready to play?
+              </p>
+              <button 
+                onClick={handleStartPauseClick} 
+                className="focus:outline-none game-button mb-4"
+                aria-label="Start game"
+              >
+                <Image 
+                  src="/assets/ui/buttons/play-button.png"
+                  alt="Play"
+                  width={160}
+                  height={60}
+                  className="game-img"
+                />
+              </button>
+            </div>
           </div>
         </>
       ) : gameState.status === 'countdown' ? (
@@ -1603,7 +1605,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       />
 
       {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      <div 
+        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+        style={{ transform: `scale(${1/scale})`, transformOrigin: 'bottom right' }}
+      >
         {/* Botón de música */}
         <button 
           onClick={handleMusicToggle} 
