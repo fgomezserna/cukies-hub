@@ -1,4 +1,5 @@
 packages:
   - 'dapp'
   - 'games/sybil-slayer'
+  - 'games/hyppie-road'
   - 'packages/*'

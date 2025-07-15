@@ -1,81 +1,231 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tile } from '@/types/game';
 import { cn } from '@/lib/utils';
+import { AnimatedToken } from './animated-token';
+import { MovingToken } from './moving-token';
+import { useAudio } from '@/hooks/useAudio';
 
 interface GameBoardProps {
   tiles: Tile[];
   isAnimating: boolean;
+  currentPosition: number;
+  previousPosition?: number;
   onTileClick?: (index: number) => void;
+  onMoveAnimationComplete?: () => void;
 }
 
-export function GameBoard({ tiles, isAnimating, onTileClick }: GameBoardProps) {
-  return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mb-4">
-        {tiles.map((tile, index) => (
+export function GameBoard({ 
+  tiles, 
+  isAnimating, 
+  currentPosition, 
+  previousPosition, 
+  onTileClick, 
+  onMoveAnimationComplete 
+}: GameBoardProps) {
+  const [isMovingToken, setIsMovingToken] = useState(false);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [isSliding, setIsSliding] = useState(false);
+  const [previousScrollGroup, setPreviousScrollGroup] = useState(0);
+  const { playSound } = useAudio();
+
+  // Calcular qué casillas mostrar (4 a la vez)
+  const getVisibleTiles = () => {
+    const tilesPerView = 4;
+    const startIndex = Math.max(0, Math.floor(currentPosition / tilesPerView) * tilesPerView);
+    const endIndex = Math.min(tiles.length, startIndex + tilesPerView);
+    
+    return {
+      visibleTiles: tiles.slice(startIndex, endIndex),
+      startIndex,
+      endIndex
+    };
+  };
+
+  // Obtener casillas del grupo anterior para la animación
+  const getPreviousGroupTiles = () => {
+    const tilesPerView = 4;
+    const startIndex = previousScrollGroup * tilesPerView;
+    const endIndex = Math.min(tiles.length, startIndex + tilesPerView);
+    
+    return {
+      visibleTiles: tiles.slice(startIndex, endIndex),
+      startIndex,
+      endIndex
+    };
+  };
+
+  // Actualizar scroll cuando cambie la posición
+  useEffect(() => {
+    const tilesPerView = 4;
+    const newScrollGroup = Math.floor(currentPosition / tilesPerView);
+    
+    if (newScrollGroup !== scrollOffset) {
+      // Iniciar animación de deslizamiento
+      setPreviousScrollGroup(scrollOffset);
+      setIsSliding(true);
+      
+      // Cambiar al nuevo grupo después de iniciar la animación
+      setTimeout(() => {
+        setScrollOffset(newScrollGroup);
+      }, 50);
+      
+      // Terminar la animación
+      setTimeout(() => {
+        setIsSliding(false);
+      }, 600); // Duración de la animación
+    }
+  }, [currentPosition, scrollOffset]);
+
+  // Detectar cuando comenzar la animación de movimiento
+  useEffect(() => {
+    if (isAnimating && previousPosition !== undefined && previousPosition !== currentPosition) {
+      setIsMovingToken(true);
+    }
+  }, [isAnimating, previousPosition, currentPosition]);
+
+  const handleMoveComplete = () => {
+    setIsMovingToken(false);
+    onMoveAnimationComplete?.();
+  };
+
+  const handleTileClick = (index: number) => {
+    playSound('button_click');
+    onTileClick?.(index);
+  };
+
+  const { visibleTiles, startIndex } = getVisibleTiles();
+  const previousGroup = getPreviousGroupTiles();
+
+  // Función para renderizar un grupo de casillas
+  const renderTileGroup = (groupTiles: any[], groupStartIndex: number, animationClass: string = '') => (
+    <div className={`grid grid-cols-4 gap-0 mb-4 ${animationClass}`}>
+      {groupTiles.map((tile, viewIndex) => {
+        const actualIndex = groupStartIndex + viewIndex;
+        return (
           <div
-            key={index}
+            key={actualIndex}
             className={cn(
-              "aspect-square rounded-lg border-2 flex items-center justify-center text-sm font-bold transition-all duration-300 cursor-pointer relative overflow-hidden",
-              // Estados de la casilla
-              tile.isActive && "ring-4 ring-primary ring-offset-2 scale-105 shadow-lg",
-              tile.revealed && !tile.hasTrap && "bg-green-100 border-green-500 text-green-800",
-              tile.revealed && tile.hasTrap && "bg-red-100 border-red-500 text-red-800",
-              !tile.revealed && !tile.isActive && "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200",
-              // Animaciones
-              isAnimating && "animate-pulse",
-              // Estados de hover
-              tile.isActive && "hover:scale-110"
+              "aspect-[3/4] flex items-center justify-center text-sm font-bold transition-all duration-500 cursor-pointer relative overflow-hidden"
             )}
-            onClick={() => onTileClick?.(index)}
+            style={{
+              backgroundImage: `url(/assets/images/${tile.isActive && tile.hasTrap ? 'section02.png' : 'section01.png'})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+            onClick={() => handleTileClick(actualIndex)}
           >
+            {/* Capa adicional section03.png por encima de section02.png durante game over */}
+            {tile.isActive && tile.hasTrap && (
+              <div 
+                className="absolute inset-0 w-full h-full"
+                style={{
+                  backgroundImage: 'url(/assets/images/section03.png)',
+                  backgroundSize: 'auto 50px',
+                  backgroundPosition: 'center bottom',
+                  backgroundRepeat: 'no-repeat',
+                  zIndex: 20
+                }}
+              />
+            )}
+
             {/* Número de casilla */}
-            <span className="absolute top-1 left-1 text-xs opacity-60">
-              {index + 1}
+            <span className="absolute top-2 left-2 text-lg text-white font-bold bg-black/50 px-2 py-1 rounded z-10">
+              {actualIndex + 1}
             </span>
             
             {/* Contenido principal */}
-            <div className="flex flex-col items-center justify-center">
-              {tile.revealed ? (
+            <div className="flex flex-col items-center justify-center relative z-10">
+              {tile.isActive ? (
                 tile.hasTrap ? (
-                  // Icono de trampa
-                  <div className="text-red-600 text-lg">💥</div>
+                  // Token cayendo hacia abajo dentro del agujero hasta desaparecer
+                  <div 
+                    className="w-32 h-32 bg-center bg-no-repeat drop-shadow-lg fall-down"
+                    style={{
+                      backgroundImage: 'url(/assets/images/fall.png)',
+                      backgroundSize: 'contain',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat'
+                    }}
+                  />
                 ) : (
-                  // Icono de éxito
-                  <div className="text-green-600 text-lg">✅</div>
+                  // Token animado normal - solo cuando NO hay trampa
+                  !isMovingToken && <AnimatedToken isMoving={false} className="drop-shadow-lg" />
                 )
-              ) : tile.isActive ? (
-                // Casilla activa
-                <div className="text-primary text-lg">👤</div>
+              ) : tile.revealed ? (
+                tile.hasTrap ? (
+                  // Casilla revelada con trampa (ya pasada)
+                  <div className="relative">
+                    <div className="text-red-400 text-4xl drop-shadow-lg opacity-60">💥</div>
+                    <div className="absolute inset-0 bg-red-800 rounded-full opacity-20"></div>
+                  </div>
+                ) : (
+                  // Icono de éxito - solo en casillas completadas donde NO está el token
+                  <div className="text-green-400 text-5xl drop-shadow-lg">✅</div>
+                )
               ) : (
                 // Casilla no revelada
-                <div className="text-gray-400 text-lg">❓</div>
+                <div className="text-white text-4xl drop-shadow-lg opacity-70">❓</div>
               )}
             </div>
-            
-            {/* Efecto de brillo para casilla activa */}
-            {tile.isActive && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-            )}
+
           </div>
-        ))}
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="w-full max-w-4xl mx-auto p-2">
+      <div className="relative">
+        {/* Contenedor con overflow para el efecto de deslizamiento */}
+        <div className="relative overflow-hidden mb-2">
+          {isSliding ? (
+            // Durante la animación, mostrar ambos grupos
+            <div className="relative">
+              {/* Grupo anterior deslizándose hacia la izquierda */}
+              <div className="absolute inset-0 slide-out-left">
+                {renderTileGroup(previousGroup.visibleTiles, previousGroup.startIndex)}
+              </div>
+              {/* Nuevo grupo deslizándose desde la derecha */}
+              <div className="slide-in-right">
+                {renderTileGroup(visibleTiles, startIndex)}
+              </div>
+            </div>
+          ) : (
+            // Vista normal sin animación
+            renderTileGroup(visibleTiles, startIndex)
+          )}
+        </div>
+
+        {/* Moving Token - layer superior */}
+        {isMovingToken && previousPosition !== undefined && (() => {
+          const tilesPerView = 4;
+          const previousViewGroup = Math.floor(previousPosition / tilesPerView);
+          const currentViewGroup = Math.floor(currentPosition / tilesPerView);
+          
+          // Solo mostrar MovingToken si ambas posiciones están en la misma vista
+          if (previousViewGroup === currentViewGroup) {
+            return (
+              <MovingToken
+                fromIndex={previousPosition % tilesPerView}
+                toIndex={currentPosition % tilesPerView}
+                isMoving={isMovingToken}
+                onAnimationComplete={handleMoveComplete}
+                gridCols={4}
+              />
+            );
+          }
+          
+          // Si hay cambio de vista, completar la animación inmediatamente
+          setTimeout(() => handleMoveComplete(), 100);
+          return null;
+        })()}
       </div>
       
-      {/* Barra de progreso */}
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-        <div
-          className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
-          style={{
-            width: `${(tiles.filter(t => t.revealed && !t.hasTrap).length / tiles.length) * 100}%`
-          }}
-        />
-      </div>
-      
-      <p className="text-center text-sm text-muted-foreground">
-        Progreso: {tiles.filter(t => t.revealed && !t.hasTrap).length} / {tiles.length} casillas
-      </p>
+
     </div>
   );
 }

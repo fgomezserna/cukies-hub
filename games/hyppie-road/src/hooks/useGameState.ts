@@ -27,6 +27,7 @@ const initialState: Game & UIState = {
   isCashOutDisabled: true,
   showConfirmation: false,
   isAnimating: false,
+  hasFallenInTrap: false,
 };
 
 export const useGameState = create<GameStore>((set, get) => ({
@@ -44,6 +45,7 @@ export const useGameState = create<GameStore>((set, get) => ({
       isCashOutDisabled: true,
       showConfirmation: false,
       isAnimating: false,
+      hasFallenInTrap: false,
     });
   },
   
@@ -54,11 +56,28 @@ export const useGameState = create<GameStore>((set, get) => ({
     }
     
     const { game: updatedGame, result } = advance(state);
-    set({
-      ...updatedGame,
-      isAdvanceDisabled: !canAdvance(updatedGame),
-      isCashOutDisabled: !canCashOut(updatedGame),
-    });
+    
+    // Si hay trampa, marcar hasFallenInTrap y NO actualizar el estado del juego aún
+    if (result && !result.success && result.trapPosition !== undefined) {
+      console.log('🕳️ TRAMPA DETECTADA - Desactivando Cash Out');
+      // Solo actualizar la posición y tiles para mostrar efectos visuales
+      // Y marcar que cayó en trampa para desactivar cash out
+      set({
+        ...state,
+        position: updatedGame.position,
+        tiles: updatedGame.tiles,
+        hasFallenInTrap: true,
+        // gameState sigue siendo "playing" para mantener la vista del juego
+      });
+    } else {
+      // Para victorias o avances normales, actualizar todo
+      set({
+        ...updatedGame,
+        isAdvanceDisabled: !canAdvance(updatedGame),
+        isCashOutDisabled: !canCashOut(updatedGame),
+        hasFallenInTrap: false,
+      });
+    }
     
     return result;
   },
@@ -74,6 +93,7 @@ export const useGameState = create<GameStore>((set, get) => ({
       ...updatedGame,
       isAdvanceDisabled: true,
       isCashOutDisabled: true,
+      hasFallenInTrap: false,
     });
     
     return result;
@@ -94,6 +114,9 @@ export const useGameState = create<GameStore>((set, get) => ({
   
   canCashOut: () => {
     const state = get();
+    if (state.hasFallenInTrap) {
+      return false;
+    }
     return canCashOut(state);
   },
   

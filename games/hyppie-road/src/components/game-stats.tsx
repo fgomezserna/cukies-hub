@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Trophy, Target, DollarSign, Zap } from 'lucide-react';
@@ -22,60 +22,82 @@ export function GameStats({
   currentMultiplier,
   potentialWinning
 }: GameStatsProps) {
+  const [previousMultiplier, setPreviousMultiplier] = useState(currentMultiplier);
+  const [isMultiplierAnimating, setIsMultiplierAnimating] = useState(false);
+
   const profitAmount = potentialWinning - betAmount;
   const profitPercentage = ((profitAmount / betAmount) * 100);
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Apuesta inicial */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Apuesta Inicial</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">${betAmount.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">Cantidad apostada</p>
-        </CardContent>
-      </Card>
+  // Detectar cambios en el multiplicador
+  useEffect(() => {
+    if (currentMultiplier > previousMultiplier) {
+      setIsMultiplierAnimating(true);
+      
+      // Remover la clase de animación después de que termine
+      const timer = setTimeout(() => {
+        setIsMultiplierAnimating(false);
+      }, 600); // Duración de la animación multiplierExpand
 
-      {/* Progreso */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Progreso</CardTitle>
-          <Target className="h-4 w-4 text-muted-foreground" />
+      return () => clearTimeout(timer);
+    }
+    setPreviousMultiplier(currentMultiplier);
+  }, [currentMultiplier, previousMultiplier]);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 max-w-4xl mx-auto">
+      {/* Primera fila: Potential winnings y Multiplier */}
+      {/* Potential winnings */}
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Potential Winnings</CardTitle>
+          <Trophy className="h-3 w-3 text-white/70" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{currentStep}/{totalSteps}</div>
-          <Progress value={completionPercentage} className="mt-2" />
-          <p className="text-xs text-muted-foreground mt-1">
-            {completionPercentage.toFixed(1)}% completado
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-green-400">${potentialWinning.toFixed(2)}</div>
+          <p className={`text-xs ${profitAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {profitAmount >= 0 ? '+' : ''}{profitPercentage.toFixed(1)}% ({profitAmount >= 0 ? '+' : ''}${profitAmount.toFixed(2)})
           </p>
         </CardContent>
       </Card>
 
-      {/* Multiplicador */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Multiplicador</CardTitle>
-          <Zap className="h-4 w-4 text-muted-foreground" />
+      {/* Multiplier */}
+      <Card className={`game-card ${isMultiplierAnimating ? 'multiplier-expand' : ''}`}>
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Multiplier</CardTitle>
+          <Zap className={`h-3 w-3 text-white/70 ${isMultiplierAnimating ? 'text-yellow-400' : ''}`} />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-primary">{currentMultiplier.toFixed(1)}x</div>
-          <p className="text-xs text-muted-foreground">Factor actual</p>
+        <CardContent className="card-content-custom flex flex-col items-center justify-center">
+          <div className={`text-2xl font-bold text-yellow-400 ${isMultiplierAnimating ? 'text-yellow-300' : ''}`}>
+            {currentMultiplier.toFixed(1)}x
+          </div>
+          <p className="text-xs text-white/70 text-center">Current factor</p>
         </CardContent>
       </Card>
 
-      {/* Ganancia potencial */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Ganancia Potencial</CardTitle>
-          <Trophy className="h-4 w-4 text-muted-foreground" />
+      {/* Segunda fila: Initial bet y Progress */}
+      {/* Initial bet */}
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Initial Bet</CardTitle>
+          <DollarSign className="h-3 w-3 text-white/70" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-600">${potentialWinning.toFixed(2)}</div>
-          <p className={`text-xs ${profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {profitAmount >= 0 ? '+' : ''}{profitPercentage.toFixed(1)}% ({profitAmount >= 0 ? '+' : ''}${profitAmount.toFixed(2)})
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-white">${betAmount.toFixed(2)}</div>
+          <p className="text-xs text-white/70">Amount wagered</p>
+        </CardContent>
+      </Card>
+
+      {/* Progress */}
+      <Card className="game-card">
+        <CardHeader className="card-header-custom flex flex-row items-center justify-between space-y-0 pb-1">
+          <CardTitle className="text-xs font-medium text-white">Progress</CardTitle>
+          <Target className="h-3 w-3 text-white/70" />
+        </CardHeader>
+        <CardContent className="card-content-custom">
+          <div className="text-base font-bold text-white">{currentStep}/{totalSteps}</div>
+          <Progress value={completionPercentage} className="mt-1" />
+          <p className="text-xs text-white/70 mt-1">
+            {completionPercentage.toFixed(1)}% completed
           </p>
         </CardContent>
       </Card>
