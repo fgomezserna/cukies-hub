@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Home,
@@ -26,9 +27,27 @@ import Header from './header';
 import DiscordIcon from '../icons/discord';
 import XIcon from '../icons/x-icon';
 import Image from 'next/image';
-import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/dice-512.png';
+import hyppieletters from '@/assets/hyppielettersss.png';
+import hyppieicon from '@/assets/dice.png';
 import { usePathname } from 'next/navigation';
+
+const SidebarLogo = () => {
+  const { state } = useSidebar();
+  
+  return (
+    <div className="flex items-center gap-3 p-1">
+      <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />
+      <Image 
+        src={hyppieletters} 
+        alt="HyppieLiquid" 
+        height={52} 
+        className={`transition-opacity duration-200 ${
+          state === 'collapsed' ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+        }`}
+      />
+    </div>
+  );
+};
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -44,10 +63,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             "--sidebar-border": "rgba(16,185,129,0.3)"
           } as React.CSSProperties}>
           <SidebarHeader className="border-b border-green-500/20 bg-black/15 backdrop-blur-sm">
-            <div className="flex items-center gap-3 p-1">
-                <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
-                <Image src={hyppieletters} alt="HyppieLiquid" height={39} />
-            </div>
+            <SidebarLogo />
           </SidebarHeader>
           <SidebarContent className="py-4 bg-black/10 backdrop-blur-sm">
             <SidebarMenu className="px-3 space-y-1">
