@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import StatsCards from '@/components/home/stats-cards';
-import SybilSlayerImg from "@/assets/sybilslash.png";
+import SybilSlayerImg from "@/assets/sybilslayer-featured-550px.png";
 import HyppieRoadImg from "@/assets/hyppie-road.png";
 import ComingSoonImg from "@/assets/coming-soon.png";
 
@@ -30,7 +30,7 @@ export default function HomePage() {
             alt={featuredGame.name} 
             width={600} 
             height={400} 
-            className="object-cover w-full h-[450px] transition-transform duration-700 group-hover:scale-110" 
+            className="object-cover w-full h-[450px] sm:h-auto sm:aspect-[16/9] md:aspect-[21/9] lg:aspect-[5/2] transition-transform duration-700 group-hover:scale-110" 
             data-ai-hint={featuredGame.hint} 
           />
           
