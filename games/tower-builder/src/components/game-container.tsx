@@ -597,7 +597,7 @@ const GameContainer = () => {
               
               // Mover avión si está activo
               if (this.airplane && this.airplaneActive) {
-                // Movimiento lateral suave
+                // Movimiento horizontal suave
                 this.airplane.x += 2; // Velocidad horizontal
                 
                 // Reset posición cuando sale de pantalla
@@ -621,17 +621,16 @@ const GameContainer = () => {
                 return;
               }
               
-              // Crear avión en el lado izquierdo, fuera de la pantalla
+              // Crear avión como Image simple (no TileSprite)
               this.airplane = this.add.image(-100, gameHeight * 0.2, 'airplane');
               
               if (this.airplane) {
-                // Tamaño pequeño del avión (75% más pequeño que el original)
-                this.airplane.setScale(0.1);
-                
                 // Configuración visual
-                this.airplane.setDepth(0.5); // Detrás de los elementos principales
-                this.airplane.setScrollFactor(0.8); // Parallax suave
-                this.airplane.setAlpha(0.8); // Ligeramente transparente
+                this.airplane.setOrigin(0.5, 0.5);       // Origen en el centro
+                this.airplane.setScrollFactor(0);        // Fijo en pantalla (no se mueve con cámara)  
+                this.airplane.setDepth(0.5);             // Detrás de elementos principales
+                this.airplane.setAlpha(0.8);             // Más visible
+                this.airplane.setScale(0.3);             // Tamaño apropiado
               }
             }
 
