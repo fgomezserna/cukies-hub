@@ -42,6 +42,7 @@ const GameContainer = () => {
             // Parallax clouds con configuración mejorada
             private cloudsLayers: Phaser.GameObjects.TileSprite[] = [];
             private cloudsOriginalY: number[] = []; // Posiciones Y originales de las nubes
+            private cloudsCurrentY: number[] = []; // Posiciones Y actuales (para interpolación suave)
             private cloudsConfigs = [
               { speed: 0.1, alpha: 0.3, scale: 1.2, offsetY: 0, tint: 0xffffff },      // Fondo - muy lento, grande, transparente
               { speed: 0.2, alpha: 0.5, scale: 1.0, offsetY: 50, tint: 0xf0f0f0 },    // Medio - velocidad media, tamaño normal
@@ -481,6 +482,7 @@ const GameContainer = () => {
               this.cloudsLayers.forEach(layer => layer.destroy());
               this.cloudsLayers = [];
               this.cloudsOriginalY = []; // Reset posiciones originales
+              this.cloudsCurrentY = []; // Reset posiciones actuales
 
               console.log('🌤️ Creando parallax de nubes mejorado con', this.cloudsConfigs.length, 'capas');
 
@@ -503,6 +505,7 @@ const GameContainer = () => {
                 
                 this.cloudsLayers.push(cloudsLayer);
                 this.cloudsOriginalY.push(config.offsetY); // Almacenar posición Y original
+                this.cloudsCurrentY.push(config.offsetY); // Inicializar posición actual
                 
                 console.log(`  ☁️ Capa ${i+1}: velocidad=${config.speed}, alpha=${config.alpha}, escala=${config.scale}`);
               });
@@ -515,32 +518,41 @@ const GameContainer = () => {
                   // Movimiento horizontal normal
                   layer.tilePositionX += this.cloudsConfigs[index].speed;
                   
-                  // Efecto de descenso de nubes basado en score (a partir del score 10)
+                  // Calcular posición objetivo Y basada en score
+                  let targetY: number;
                   if (this.score >= 10) {
                     // Calcular cuánto deben descender las nubes
                     const descentProgress = (this.score - 10) * 15; // 15px por cada punto después del 10
-                    const newY = this.cloudsOriginalY[index] + descentProgress;
-                    
-                    // Aplicar la nueva posición Y
-                    layer.y = newY;
-                    
-                    // Opcional: Hacer que las nubes se desvanezcan gradualmente cuando bajan mucho
-                    const gameHeight = this.game.config.height as number;
-                    if (newY > gameHeight * 0.8) {
-                      // Empezar a desvanecer cuando están muy abajo
-                      const fadeProgress = Math.max(0, 1 - (newY - gameHeight * 0.8) / (gameHeight * 0.3));
-                      layer.setAlpha(this.cloudsConfigs[index].alpha * fadeProgress);
-                    } else {
-                      // Restaurar alpha original si las nubes suben de nuevo
-                      layer.setAlpha(this.cloudsConfigs[index].alpha);
-                    }
+                    targetY = this.cloudsOriginalY[index] + descentProgress;
                   } else {
                     // Mantener posición Y original si score < 10
-                    layer.y = this.cloudsOriginalY[index];
+                    targetY = this.cloudsOriginalY[index];
+                  }
+                  
+                  // Interpolación suave hacia la posición objetivo (lerp)
+                  const lerpSpeed = 0.02; // Velocidad de interpolación (más bajo = más suave)
+                  this.cloudsCurrentY[index] = this.lerp(this.cloudsCurrentY[index], targetY, lerpSpeed);
+                  
+                  // Aplicar la posición interpolada
+                  layer.y = this.cloudsCurrentY[index];
+                  
+                  // Efecto de fade gradual cuando las nubes bajan mucho
+                  const gameHeight = this.game.config.height as number;
+                  if (this.cloudsCurrentY[index] > gameHeight * 0.8) {
+                    // Empezar a desvanecer cuando están muy abajo
+                    const fadeProgress = Math.max(0, 1 - (this.cloudsCurrentY[index] - gameHeight * 0.8) / (gameHeight * 0.3));
+                    layer.setAlpha(this.cloudsConfigs[index].alpha * fadeProgress);
+                  } else {
+                    // Restaurar alpha original si las nubes suben de nuevo
                     layer.setAlpha(this.cloudsConfigs[index].alpha);
                   }
                 }
               });
+            }
+
+            // Función de interpolación lineal para movimiento suave
+            lerp(start: number, end: number, factor: number): number {
+              return start + (end - start) * factor;
             }
 
             preloadPixellariFont() {
