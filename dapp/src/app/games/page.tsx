@@ -71,7 +71,7 @@ export default function GamesPage() {
                   width={600} 
                   height={400} 
                   className={cn(
-                    "object-cover h-52 transition-transform duration-500",
+                    "object-cover h-52 lg:h-auto lg:aspect-[4/3] transition-transform duration-500",
                     game.playable ? "group-hover:scale-110" : "grayscale"
                   )} 
                   data-ai-hint={game.hint} 
@@ -86,7 +86,7 @@ export default function GamesPage() {
                 
                 {/* Overlay for non-playable games */}
                 {!game.playable && (
-                  <div className="absolute top-0 left-0 right-0 h-52 bg-black/60 flex items-center justify-center z-10 !mt-0">
+                  <div className="absolute top-0 left-0 right-0 h-52 lg:h-full bg-black/60 flex items-center justify-center z-10 !mt-0">
                     <span className="text-white font-bold text-lg bg-black/80 px-4 py-2 rounded-full">
                       🚧 Coming Soon
                     </span>
