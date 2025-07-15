@@ -82,7 +82,7 @@ export default function HyppieRoadPage() {
           <div ref={gameContainerRef} className="bg-card flex-grow flex flex-col relative overflow-hidden rounded-lg border">
             <iframe
               ref={iframeRef}
-              src={`${process.env.GAME_HYPPIE_ROAD || 'http://localhost:9003'}`}
+              src={`${process.env.GAME_HYPPIE_ROAD || 'https://hyppie-stack-dapp.vercel.app/'}`}
               className="w-full h-full border-0 min-h-[480px] lg:min-h-0"
               title="Hyppie Road Game"
               allowFullScreen
