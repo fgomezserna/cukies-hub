@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Disable tracing to prevent permission errors on Windows
+  tracing: false,
 };
 
 export default nextConfig; 

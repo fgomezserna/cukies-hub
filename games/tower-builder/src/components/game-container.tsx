@@ -37,6 +37,7 @@ const GameContainer = () => {
             private speedText: Phaser.GameObjects.Text | null = null;
             private overlayText: Phaser.GameObjects.Text | null = null;
             private levelUpText: Phaser.GameObjects.Text | null = null;
+            private gameOverBg: Phaser.GameObjects.Rectangle | null = null;
             private lastSpeedLevel = 0; // Para trackear el último nivel de velocidad mostrado
             
             // Parallax clouds con configuración mejorada
@@ -147,6 +148,36 @@ const GameContainer = () => {
                 if (Math.abs(velocity) < 0.1) {
                   this.onBlockLanded();
                 }
+              }
+
+              // *** NUEVO: Game Over automático cuando el bloque sale del canvas ***
+              if (this.gameState === 'playing' && this.topBlock && this.isBlockFalling) {
+                const gameWidth = this.game.config.width as number;
+                const gameHeight = this.game.config.height as number;
+                const blockX = this.topBlock.x;
+                const blockY = this.topBlock.y;
+                const blockWidth = this.topBlock.displayWidth;
+                
+                // Game Over si el bloque sale completamente por los lados
+                if (blockX + blockWidth / 2 < 0 || blockX - blockWidth / 2 > gameWidth) {
+                  console.log('🎮 Game Over: Bloque salió por los laterales');
+                  this.gameOver('Bloque salió del área de juego');
+                  return;
+                }
+                
+                // Game Over si el bloque cae muy por debajo del canvas
+                if (blockY > gameHeight + 200) {
+                  console.log('🎮 Game Over: Bloque cayó fuera del canvas');
+                  this.gameOver('Bloque cayó fuera del canvas');
+                  return;
+                }
+              }
+
+              // *** NUEVO: Game Over automático cuando el bloque es muy pequeño ***
+              if (this.gameState === 'playing' && this.blockWidth < 20) {
+                console.log('🎮 Game Over: Bloque demasiado pequeño para continuar');
+                this.gameOver('Bloque demasiado pequeño');
+                return;
               }
 
               // Animar las nubes parallax
@@ -302,6 +333,12 @@ const GameContainer = () => {
                 this.overlayText.setText('Tap to Start');
                 this.overlayText.setVisible(true);
               }
+              
+              // Limpiar fondo de Game Over
+              if (this.gameOverBg) {
+                this.gameOverBg.destroy();
+                this.gameOverBg = null;
+              }
 
               // Clean up existing tower and blocks
               if (this.topBlock) {
@@ -383,6 +420,12 @@ const GameContainer = () => {
                 this.speedText.setColor('#FFD700'); // Reset to gold
               }
               if (this.overlayText) this.overlayText.setVisible(false);
+              
+              // Limpiar fondo de Game Over
+              if (this.gameOverBg) {
+                this.gameOverBg.destroy();
+                this.gameOverBg = null;
+              }
 
               // Clean up any existing blocks
               if (this.topBlock) {
@@ -523,7 +566,7 @@ const GameContainer = () => {
                 // Spawn the next moving block on top
                 this.spawnBlock();
               } else {
-                this.gameOver();
+                this.gameOver('Bloque sin apoyo suficiente');
               }
             }
 
@@ -957,20 +1000,20 @@ const GameContainer = () => {
 
               // Overlay instruction text (shown in ready / gameOver)
               this.overlayText = this.add.text(width / 2, height / 2, 'Tap to Start', {
-                fontSize: 36,
-                color: '#20B2AA',  // Turquesa verde oscuro (Light Sea Green)
+                fontSize: 32,
+                color: '#FFFFFF',  // Blanco para mejor contraste
                 fontFamily: '"Pixellari", "Courier New", monospace',
                 align: 'center',
                 stroke: '#000000',
-                strokeThickness: 4,
+                strokeThickness: 6,  // Borde más grueso
                 shadow: {
-                  offsetX: 2,
-                  offsetY: 2,
+                  offsetX: 4,
+                  offsetY: 4,
                   color: '#000000',
-                  blur: 0,
+                  blur: 2,
                   fill: true
                 }
-              }).setOrigin(0.5).setScrollFactor(0);
+              }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);  // Profundidad máxima para estar por delante
 
               // Level up text (initially hidden)
               this.levelUpText = this.add.text(width / 2, height / 2 - 50, 'NEXT LEVEL!!!', {
@@ -1003,7 +1046,7 @@ const GameContainer = () => {
               });
             }
 
-            gameOver() {
+            gameOver(reason?: string) {
               this.gameState = 'gameOver';
               this.isBlockFalling = false;
 
@@ -1013,8 +1056,30 @@ const GameContainer = () => {
                 this.topBlock = null;
               }
 
+              // Crear fondo semi-transparente para el Game Over con padding lateral
+              const gameWidth = this.game.config.width as number;
+              const gameHeight = this.game.config.height as number;
+              const lateralPadding = 20; // 20px de padding en cada lado
+              
+              this.gameOverBg = this.add.rectangle(
+                gameWidth / 2, 
+                gameHeight / 2, 
+                gameWidth - (lateralPadding * 2),  // Reducir ancho para crear padding
+                gameHeight - (lateralPadding * 2), // También un poco de padding vertical
+                0x000000, 
+                0.75  // 75% de transparencia para mejor contraste
+              );
+              this.gameOverBg.setScrollFactor(0);
+              this.gameOverBg.setDepth(999); // Justo detrás del texto pero delante de todo lo demás
+              
+              // Agregar esquinas redondeadas al fondo (si es posible)
+              // this.gameOverBg.setStrokeStyle(2, 0xFFFFFF, 0.3); // Borde sutil opcional
+
               if (this.overlayText) {
-                this.overlayText.setText(`Game Over\nScore: ${this.score}\nTap to Replay`);
+                const gameOverText = reason 
+                  ? `Game Over\n${reason}\nScore: ${this.score}\nTap to Replay`
+                  : `Game Over\nScore: ${this.score}\nTap to Replay`;
+                this.overlayText.setText(gameOverText);
                 this.overlayText.setVisible(true);
               }
             }
