@@ -147,7 +147,7 @@ export default function HomePage() {
                       asChild 
                       className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/30"
                     >
-                        <Link href="/games">
+                        <Link href={game.href!}>
                           🎮 Play Now
                         </Link>
                     </Button>
