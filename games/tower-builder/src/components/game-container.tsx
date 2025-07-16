@@ -50,7 +50,8 @@ const GameContainer = () => {
             private airplaneWaitTime = 0; // Tiempo de espera entre apariciones (en milisegundos)
             
             // Sistema de transición de background
-            private backgroundTransitionTriggered = false;
+            private backgroundTransition25Triggered = false;
+            private backgroundTransition35Triggered = false;
             private backgroundTransitionActive = false;
             private currentBackground: Phaser.GameObjects.Image | null = null;
             private newBackground: Phaser.GameObjects.Image | null = null;
@@ -73,7 +74,8 @@ const GameContainer = () => {
               this.load.image('block-2', ASSETS_CONFIG.images.block2);
               this.load.image('baseTower', ASSETS_CONFIG.images.baseTower);
               this.load.image('background', ASSETS_CONFIG.images.background);
-              this.load.image('sky-space', '/assets/images/sky-space.png');
+              this.load.image('sky-space', ASSETS_CONFIG.images.skySpace);
+              this.load.image('sky-stars', ASSETS_CONFIG.images.skyStars);
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
               this.load.image('cityBack', ASSETS_CONFIG.images.cityBack);
               this.load.image('airplane', ASSETS_CONFIG.images.airplane);
@@ -245,7 +247,8 @@ const GameContainer = () => {
               this.airplaneWaitTime = 0;
               
               // Reset background transition
-              this.backgroundTransitionTriggered = false;
+              this.backgroundTransition25Triggered = false;
+              this.backgroundTransition35Triggered = false;
               this.backgroundTransitionActive = false;
               this.cloudsParallaxStopped = false;
               if (this.newBackground) {
@@ -317,7 +320,8 @@ const GameContainer = () => {
               this.airplaneWaitTime = 0;
               
               // Reset background transition
-              this.backgroundTransitionTriggered = false;
+              this.backgroundTransition25Triggered = false;
+              this.backgroundTransition35Triggered = false;
               this.backgroundTransitionActive = false;
               this.cloudsParallaxStopped = false;
               if (this.newBackground) {
@@ -645,34 +649,43 @@ const GameContainer = () => {
             }
 
             checkBackgroundTransition() {
-              // Activar transición solo una vez al llegar al score 25
-              if (this.score >= 25 && !this.backgroundTransitionTriggered && !this.backgroundTransitionActive) {
-                this.backgroundTransitionTriggered = true;
+              // Activar transición de score 25 (sky-tower -> sky-space)
+              if (this.score >= 25 && !this.backgroundTransition25Triggered && !this.backgroundTransitionActive) {
+                this.backgroundTransition25Triggered = true;
                 this.backgroundTransitionActive = true;
-                this.startBackgroundTransition();
+                this.startBackgroundTransition('sky-space');
+              }
+              
+              // Activar transición de score 35 (sky-space -> sky-stars)
+              if (this.score >= 35 && !this.backgroundTransition35Triggered && !this.backgroundTransitionActive) {
+                this.backgroundTransition35Triggered = true;
+                this.backgroundTransitionActive = true;
+                this.startBackgroundTransition('sky-stars');
               }
             }
             
-            startBackgroundTransition() {
+            startBackgroundTransition(backgroundKey: string) {
               const gameWidth = this.game.config.width as number;
               const gameHeight = this.game.config.height as number;
               
-              // Hacer desaparecer las nubes completamente
-              this.cloudsLayers.forEach(layer => {
-                this.tweens.add({
-                  targets: layer,
-                  alpha: 0, // Fade out
-                  duration: 3000, // 3 segundos para desvanecerse
-                  onComplete: () => {
-                    layer.destroy();
-                  }
+              // Hacer desaparecer las nubes completamente solo en la primera transición (score 25)
+              if (backgroundKey === 'sky-space') {
+                this.cloudsLayers.forEach(layer => {
+                  this.tweens.add({
+                    targets: layer,
+                    alpha: 0, // Fade out
+                    duration: 3000, // 3 segundos para desvanecerse
+                    onComplete: () => {
+                      layer.destroy();
+                    }
+                  });
                 });
-              });
-              this.cloudsLayers = [];
-              this.cloudsParallaxStopped = true;
+                this.cloudsLayers = [];
+                this.cloudsParallaxStopped = true;
+              }
               
-              // Crear el nuevo background (sky-space) desde arriba
-              this.newBackground = this.add.image(gameWidth / 2, -gameHeight / 2, 'sky-space');
+              // Crear el nuevo background desde arriba
+              this.newBackground = this.add.image(gameWidth / 2, -gameHeight / 2, backgroundKey);
               this.newBackground.setDisplaySize(gameWidth, gameHeight);
               this.newBackground.setScrollFactor(0);
               this.newBackground.setDepth(-1); // Mismo depth que el anterior

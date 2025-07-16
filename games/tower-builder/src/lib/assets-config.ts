@@ -7,6 +7,8 @@ export const ASSETS_CONFIG = {
     block2: '/assets/images/block-2.png',     // Variante 2
     baseTower: '/assets/images/base-tower.png', // Mostrado como 300x70px
     background: '/assets/images/sky-tower.png',
+    skySpace: '/assets/images/sky-space.png',  // Background para score 25+
+    skyStars: '/assets/images/sky-stars.png',  // Background para score 35+
     cloudsPanner: '/assets/images/clouds-background.png',
     cityBack: '/assets/images/city-back.png',   // Edificios del fondo
     airplane: '/assets/images/airplane.png',    // Avión para altitudes
