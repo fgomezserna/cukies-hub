@@ -827,11 +827,12 @@ const GameContainer = () => {
               
               // Mover cohete si está activo
               if (this.rocket && this.rocketActive) {
-                // Movimiento horizontal suave de derecha a izquierda
-                this.rocket.x -= 3; // Velocidad horizontal hacia la izquierda
+                // Movimiento diagonal desde esquina inferior derecha hacia esquina superior izquierda
+                this.rocket.x -= 4; // Velocidad horizontal hacia la izquierda
+                this.rocket.y -= 3; // Velocidad vertical hacia arriba (diagonal más pronunciada)
                 
-                // Cuando sale de pantalla por la izquierda, iniciar pausa de 12 segundos
-                if (this.rocket.x < -100) {
+                // Cuando sale de pantalla por la esquina superior izquierda, iniciar pausa de 12 segundos
+                if (this.rocket.x < -100 || this.rocket.y < -100) {
                   // Destruir cohete y iniciar pausa
                   this.rocket.destroy();
                   this.rocket = null;
@@ -850,8 +851,8 @@ const GameContainer = () => {
                 return;
               }
               
-              // Crear cohete como Image simple (no TileSprite) desde la derecha
-              this.rocket = this.add.image(gameWidth + 100, gameHeight * 0.15, 'rocket'); // Aparece desde la derecha, más arriba que el avión
+              // Crear cohete desde la esquina inferior derecha visible en pantalla
+              this.rocket = this.add.image(gameWidth - 20, gameHeight - 20, 'rocket'); // Aparece desde esquina inferior derecha visible
               
               if (this.rocket) {
                 // Configuración visual
@@ -859,7 +860,8 @@ const GameContainer = () => {
                 this.rocket.setScrollFactor(0);        // Fijo en pantalla (no se mueve con cámara)  
                 this.rocket.setDepth(-0.4);            // Un poco más adelante que el avión
                 this.rocket.setAlpha(1.0);             // Sin transparencia
-                this.rocket.setScale(0.25);            // Ligeramente más grande que el avión, sin voltear
+                this.rocket.setScale(0.3);             // Más grande para ser más visible
+                this.rocket.setRotation(-0.015);       // Rotado 45 grados a la derecha desde la posición anterior
               }
             }
 
