@@ -51,6 +51,7 @@ const GameContainer = () => {
             
             // Sistema de cohete
             private rocket: Phaser.GameObjects.Image | null = null;
+            private rocketText: Phaser.GameObjects.Text | null = null;
             private rocketActive = false;
             private rocketWaitTime = 0; // Tiempo de espera entre apariciones (en milisegundos)
             
@@ -260,6 +261,10 @@ const GameContainer = () => {
                 this.rocket.destroy();
                 this.rocket = null;
               }
+              if (this.rocketText) {
+                this.rocketText.destroy();
+                this.rocketText = null;
+              }
               this.rocketActive = false;
               this.rocketWaitTime = 0;
               
@@ -340,6 +345,10 @@ const GameContainer = () => {
               if (this.rocket) {
                 this.rocket.destroy();
                 this.rocket = null;
+              }
+              if (this.rocketText) {
+                this.rocketText.destroy();
+                this.rocketText = null;
               }
               this.rocketActive = false;
               this.rocketWaitTime = 0;
@@ -816,6 +825,10 @@ const GameContainer = () => {
                   this.rocket.destroy();
                   this.rocket = null;
                 }
+                if (this.rocketText) {
+                  this.rocketText.destroy();
+                  this.rocketText = null;
+                }
                 this.rocketActive = false;
                 this.rocketWaitTime = 0; // Reset timer
               }
@@ -831,11 +844,21 @@ const GameContainer = () => {
                 this.rocket.x -= 4; // Velocidad horizontal hacia la izquierda
                 this.rocket.y -= 3; // Velocidad vertical hacia arriba (diagonal más pronunciada)
                 
+                // Mover el texto junto con el cohete
+                if (this.rocketText) {
+                  this.rocketText.x = this.rocket.x + 40; // Posicionar el texto al lado del cohete
+                  this.rocketText.y = this.rocket.y - 20; // Ligeramente arriba del cohete
+                }
+                
                 // Cuando sale de pantalla por la esquina superior izquierda, iniciar pausa de 12 segundos
                 if (this.rocket.x < -100 || this.rocket.y < -100) {
-                  // Destruir cohete y iniciar pausa
+                  // Destruir cohete, texto y iniciar pausa
                   this.rocket.destroy();
                   this.rocket = null;
+                  if (this.rocketText) {
+                    this.rocketText.destroy();
+                    this.rocketText = null;
+                  }
                   this.rocketActive = false;
                   this.rocketWaitTime = 12000; // 12 segundos en milisegundos (más rápido que el avión)
                 }
@@ -862,6 +885,26 @@ const GameContainer = () => {
                 this.rocket.setAlpha(1.0);             // Sin transparencia
                 this.rocket.setScale(0.3);             // Más grande para ser más visible
                 this.rocket.setRotation(-0.015);       // Rotado 45 grados a la derecha desde la posición anterior
+              }
+              
+              // Crear texto "To the moon!!" junto al cohete
+              this.rocketText = this.add.text(
+                gameWidth + 20, gameHeight - 40, 
+                'To the\nmoon!!', 
+                {
+                  fontFamily: 'Pixellari',
+                  fontSize: '16px',
+                  color: '#FFD700',
+                  stroke: '#000000',
+                  strokeThickness: 2,
+                  align: 'center'
+                }
+              );
+              
+              if (this.rocketText) {
+                this.rocketText.setOrigin(0, 0.5);     // Origen en el lado izquierdo del texto
+                this.rocketText.setScrollFactor(0);    // Fijo en pantalla
+                this.rocketText.setDepth(-0.3);        // Delante del cohete
               }
             }
 
