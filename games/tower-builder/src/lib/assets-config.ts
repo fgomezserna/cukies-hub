@@ -12,6 +12,7 @@ export const ASSETS_CONFIG = {
     cloudsPanner: '/assets/images/clouds-background.png',
     cityBack: '/assets/images/city-back.png',   // Edificios del fondo
     airplane: '/assets/images/airplane.png',    // Avión para altitudes
+    rocket: '/assets/images/rocket.png',        // Cohete para score 30+
     
     // Elementos de UI
     ui: {

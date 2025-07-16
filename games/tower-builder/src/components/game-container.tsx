@@ -49,6 +49,11 @@ const GameContainer = () => {
             private airplaneActive = false;
             private airplaneWaitTime = 0; // Tiempo de espera entre apariciones (en milisegundos)
             
+            // Sistema de cohete
+            private rocket: Phaser.GameObjects.Image | null = null;
+            private rocketActive = false;
+            private rocketWaitTime = 0; // Tiempo de espera entre apariciones (en milisegundos)
+            
             // Sistema de transición de background
             private backgroundTransition25Triggered = false;
             private backgroundTransition35Triggered = false;
@@ -79,6 +84,7 @@ const GameContainer = () => {
               this.load.image('cloudsPanner', ASSETS_CONFIG.images.cloudsPanner);
               this.load.image('cityBack', ASSETS_CONFIG.images.cityBack);
               this.load.image('airplane', ASSETS_CONFIG.images.airplane);
+              this.load.image('rocket', ASSETS_CONFIG.images.rocket);
 
               // Precargar la fuente Pixellari
               this.preloadPixellariFont();
@@ -147,6 +153,9 @@ const GameContainer = () => {
               
               // Animar el avión (siempre, independiente del estado)
               this.updateAirplane();
+              
+              // Animar el cohete (siempre, independiente del estado)
+              this.updateRocket();
               
               // Verificar transición de background
               this.checkBackgroundTransition();
@@ -246,6 +255,14 @@ const GameContainer = () => {
               this.airplaneActive = false;
               this.airplaneWaitTime = 0;
               
+              // Reset rocket
+              if (this.rocket) {
+                this.rocket.destroy();
+                this.rocket = null;
+              }
+              this.rocketActive = false;
+              this.rocketWaitTime = 0;
+              
               // Reset background transition
               this.backgroundTransition25Triggered = false;
               this.backgroundTransition35Triggered = false;
@@ -318,6 +335,14 @@ const GameContainer = () => {
               }
               this.airplaneActive = false;
               this.airplaneWaitTime = 0;
+              
+              // Reset rocket
+              if (this.rocket) {
+                this.rocket.destroy();
+                this.rocket = null;
+              }
+              this.rocketActive = false;
+              this.rocketWaitTime = 0;
               
               // Reset background transition
               this.backgroundTransition25Triggered = false;
@@ -775,6 +800,66 @@ const GameContainer = () => {
                 this.airplane.setDepth(-0.5);            // Por detrás de los bloques pero delante del background
                 this.airplane.setAlpha(1.0);             // Sin transparencia
                 this.airplane.setScale(0.2);             // Tamaño más pequeño
+              }
+            }
+
+            updateRocket() {
+              // Crear cohete a partir del score 30
+              if (this.score >= 30 && !this.rocketActive && this.rocketWaitTime <= 0) {
+                this.createRocket();
+                this.rocketActive = true;
+              }
+              
+              // Desactivar cohete si score baja de 30
+              if (this.score < 30 && this.rocketActive) {
+                if (this.rocket) {
+                  this.rocket.destroy();
+                  this.rocket = null;
+                }
+                this.rocketActive = false;
+                this.rocketWaitTime = 0; // Reset timer
+              }
+              
+              // Actualizar tiempo de espera
+              if (this.rocketWaitTime > 0) {
+                this.rocketWaitTime -= this.game.loop.delta;
+              }
+              
+              // Mover cohete si está activo
+              if (this.rocket && this.rocketActive) {
+                // Movimiento horizontal suave de derecha a izquierda
+                this.rocket.x -= 3; // Velocidad horizontal hacia la izquierda
+                
+                // Cuando sale de pantalla por la izquierda, iniciar pausa de 12 segundos
+                if (this.rocket.x < -100) {
+                  // Destruir cohete y iniciar pausa
+                  this.rocket.destroy();
+                  this.rocket = null;
+                  this.rocketActive = false;
+                  this.rocketWaitTime = 12000; // 12 segundos en milisegundos (más rápido que el avión)
+                }
+              }
+            }
+
+            createRocket() {
+              const gameWidth = this.game.config.width as number;
+              const gameHeight = this.game.config.height as number;
+              
+              // Verificar si la textura existe
+              if (!this.textures.exists('rocket')) {
+                return;
+              }
+              
+              // Crear cohete como Image simple (no TileSprite) desde la derecha
+              this.rocket = this.add.image(gameWidth + 100, gameHeight * 0.15, 'rocket'); // Aparece desde la derecha, más arriba que el avión
+              
+              if (this.rocket) {
+                // Configuración visual
+                this.rocket.setOrigin(0.5, 0.5);       // Origen en el centro
+                this.rocket.setScrollFactor(0);        // Fijo en pantalla (no se mueve con cámara)  
+                this.rocket.setDepth(-0.4);            // Un poco más adelante que el avión
+                this.rocket.setAlpha(1.0);             // Sin transparencia
+                this.rocket.setScale(0.25);            // Ligeramente más grande que el avión, sin voltear
               }
             }
 
