@@ -33,7 +33,7 @@ model User {
   lastCheckIn   Streak?
 
   // Referrals
-  referralCode    String? @unique
+  referralCode    String?
   referredById    String? @db.ObjectId
   referredBy      User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
   referrals       User[]  @relation("Referrals")
@@ -41,6 +41,10 @@ model User {
 
   // Point transactions history
   pointTransactions PointTransaction[]
+
+  // Game sessions and results
+  gameSessions GameSession[]
+  gameResults  GameResult[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -51,6 +55,68 @@ model User {
   // NextAuth relations
   accounts Account[]
   sessions Session[]
+}
+
+// Game Session model
+model GameSession {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken  String   @unique
+  sessionId     String   @unique
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  gameId        String   // e.g., 'sybil-slayer', 'hyppie-road'
+  gameVersion   String?
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  isActive      Boolean  @default(true)
+  
+  // Checkpoints during the session
+  checkpoints   GameCheckpoint[]
+  
+  // Final result
+  result        GameResult?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, gameId])
+}
+
+// Game Checkpoint model
+model GameCheckpoint {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId     String   @db.ObjectId
+  session       GameSession @relation(fields: [sessionId], references: [id])
+  score         Int
+  gameTime      Int      // Time in milliseconds
+  timestamp     DateTime @default(now())
+  nonce         String?  // For security validation
+  hash          String?  // For security validation
+  events        Json?    // Array of events that happened
+  
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, timestamp])
+}
+
+// Game Result model
+model GameResult {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId     String   @unique @db.ObjectId
+  session       GameSession @relation(fields: [sessionId], references: [id])
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  gameId        String
+  finalScore    Int
+  gameTime      Int      // Total time played in milliseconds
+  metadata      Json?    // Additional game data (level, hearts, etc.)
+  isValid       Boolean  @default(true)
+  xpEarned      Int      @default(0)
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId, gameId])
+  @@index([finalScore])
 }
 
 model Streak {

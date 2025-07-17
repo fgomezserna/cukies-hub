@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { useChildConnection } from '@hyppie/game-bridge';
+import { useGameConnection } from '../hooks/useGameConnection';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
 import { useGameState } from '../hooks/useGameState';
@@ -22,7 +22,15 @@ interface GameContainerProps {
 
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { isAuthenticated, user } = useChildConnection();
+  const { 
+    isAuthenticated, 
+    user, 
+    gameSession, 
+    sendCheckpoint, 
+    sendSessionEnd, 
+    startCheckpointInterval, 
+    stopCheckpointInterval 
+  } = useGameConnection();
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
@@ -131,13 +139,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Log para verificar la recepción de datos de autenticación
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('Game received auth state from Dapp:', { isAuthenticated, user });
-    }
-  }, [isAuthenticated, user]);
-
   // Precargar assets al montar el componente
   useEffect(() => {
     assetLoader.preloadAll(progress => {
@@ -198,6 +199,47 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const inputState = useGameInput();
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+
+  // Log para verificar la recepción de datos de autenticación
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('Game received auth state from Dapp:', { isAuthenticated, user });
+    }
+  }, [isAuthenticated, user]);
+
+  // Handle game session start
+  useEffect(() => {
+    if (gameSession && gameState.status === 'playing') {
+      console.log('🎮 [GAME] Starting checkpoint interval for session:', gameSession.sessionId);
+      startCheckpointInterval(
+        () => gameState.score,
+        () => {
+          const now = Date.now();
+          const startTime = gameState.gameStartTime || now;
+          return now - startTime;
+        }
+      );
+    }
+    
+    return () => {
+      if (gameState.status !== 'playing') {
+        stopCheckpointInterval();
+      }
+    };
+  }, [gameSession, gameState.status, gameState.score, gameState.gameStartTime, startCheckpointInterval, stopCheckpointInterval]);
+
+  // Handle game session end
+  useEffect(() => {
+    if (gameSession && gameState.status === 'gameOver') {
+      console.log('🏁 [GAME] Ending session with score:', gameState.score);
+      sendSessionEnd(gameState.score, {
+        gameOverReason: gameState.gameOverReason,
+        level: gameState.level,
+        hearts: gameState.hearts
+      });
+      stopCheckpointInterval();
+    }
+  }, [gameSession, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, sendSessionEnd, stopCheckpointInterval]);
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {

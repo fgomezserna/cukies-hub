@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect } from 'react';
-import { useChildConnection } from '@hyppie/game-bridge';
+import { useGameConnection } from '@/hooks/useGameConnection';
 import { useGameState } from '@/hooks/useGameState';
 import { getGameStats } from '@/lib/game-logic';
 import { BetInput } from './bet-input';
@@ -15,7 +15,15 @@ import { GameResult } from '@/types/game';
 import { useAudio } from '@/hooks/useAudio';
 
 export function HyppieRoadGame() {
-  const { isAuthenticated, user } = useChildConnection();
+  const { 
+    isAuthenticated, 
+    user, 
+    gameSession, 
+    sendCheckpoint, 
+    sendSessionEnd, 
+    startCheckpointInterval, 
+    stopCheckpointInterval 
+  } = useGameConnection();
   const {
     // State
     gameState,
@@ -49,6 +57,38 @@ export function HyppieRoadGame() {
       playBackgroundMusic();
     }
   }, [isGameActive, playBackgroundMusic]);
+
+  // Handle game session checkpoints
+  useEffect(() => {
+    if (gameSession && isGameActive()) {
+      console.log('🎮 [GAME] Starting checkpoint interval for session:', gameSession.sessionId);
+      startCheckpointInterval(
+        () => potentialWinning, // Use potential winning as score
+        () => Date.now() - (gameSession?.sessionId ? parseInt(gameSession.sessionId) : Date.now()) // Rough game time
+      );
+    }
+    
+    return () => {
+      if (!isGameActive()) {
+        stopCheckpointInterval();
+      }
+    };
+  }, [gameSession, isGameActive, potentialWinning, startCheckpointInterval, stopCheckpointInterval]);
+
+  // Handle game session end
+  useEffect(() => {
+    if (gameSession && gameResult) {
+      console.log('🏁 [GAME] Ending session with result:', gameResult);
+      sendSessionEnd(gameResult.finalAmount || 0, {
+        success: gameResult.success,
+        stepsCompleted: gameResult.stepsCompleted,
+        multiplier: gameResult.multiplier,
+        trapPosition: gameResult.trapPosition,
+        betAmount: betAmount
+      });
+      stopCheckpointInterval();
+    }
+  }, [gameSession, gameResult, sendSessionEnd, stopCheckpointInterval, betAmount]);
 
   // Log para verificar la recepción de datos de autenticación
   useEffect(() => {

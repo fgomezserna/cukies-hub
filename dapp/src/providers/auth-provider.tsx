@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [address, isConnected, disconnect, toast, isWaitingForApproval]);
+  }, [address, isConnected, disconnect, toast]); // Removed isWaitingForApproval dependency
 
   useEffect(() => {
     fetchUser();
@@ -173,6 +173,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
           const currentAccount = accounts[0]?.toLowerCase();
           
+          // Only log if there's an actual change and we haven't logged it recently
           if (currentAccount && currentAccount !== address && currentAccount !== previousAddressRef.current) {
             console.log('🔄 Polling detected wallet change:', {
               wagmiAddress: address,
@@ -184,14 +185,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // We just log here to help with debugging
           }
         } catch (error) {
+          // Only log errors occasionally to avoid spam
           console.error('Error polling wallet accounts:', error);
         }
       };
 
-      // Poll every 2 seconds when connected
+      // Poll every 5 seconds when connected (reduced frequency)
       let interval: NodeJS.Timeout;
       if (isConnected) {
-        interval = setInterval(pollWalletAccounts, 2000);
+        interval = setInterval(pollWalletAccounts, 5000);
       }
 
       return () => {

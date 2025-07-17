@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef } from 'react';
-import { useParentConnection } from '@/hooks/use-parent-connection';
+import React, { useRef, useState, useCallback } from 'react';
+import { useGameConnection } from '@/hooks/use-game-connection';
 import { useAuth } from '@/providers/auth-provider';
 import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
@@ -47,12 +47,60 @@ export default function SybilSlayerPage() {
   const gameContainerRef = useRef<FullscreenElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { user, isLoading } = useAuth();
+  const [gameStats, setGameStats] = useState({
+    currentScore: 0,
+    bestScore: 0,
+    sessionsPlayed: 0,
+    validSessions: 0
+  });
 
-  // Use the hook to send authentication data to the game
-  useParentConnection(iframeRef, {
+  // Memoize callback functions to prevent hook re-initialization
+  const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
+    console.log('Game session started:', sessionData);
+    setGameStats(prev => ({ ...prev, sessionsPlayed: prev.sessionsPlayed + 1 }));
+  }, []);
+
+  const onCheckpoint = useCallback((checkpoint: any) => {
+    console.log('Checkpoint received:', checkpoint);
+    setGameStats(prev => ({ ...prev, currentScore: checkpoint.score }));
+  }, []);
+
+  const onSessionEnd = useCallback((result: { finalScore: number; isValid: boolean }) => {
+    console.log('Game session ended:', result);
+    setGameStats(prev => ({
+      ...prev,
+      bestScore: Math.max(prev.bestScore, result.finalScore),
+      currentScore: 0,
+      validSessions: prev.validSessions + (result.isValid ? 1 : 0)
+    }));
+  }, []);
+
+  const onHoneypotDetected = useCallback((event: string) => {
+    console.warn('Honeypot detected:', event);
+  }, []);
+
+  // Memoize the options object to prevent hook re-initialization
+  const gameConnectionOptions = useCallback(() => ({
+    gameId: 'sybil-slayer',
+    gameVersion: '1.0.0',
+    onSessionStart,
+    onCheckpoint,
+    onSessionEnd,
+    onHoneypotDetected
+  }), [onSessionStart, onCheckpoint, onSessionEnd, onHoneypotDetected]);
+
+  // Memoize auth data to prevent hook re-initialization
+  const authData = useCallback(() => ({
     isAuthenticated: !!user && !isLoading,
     user: user,
-  });
+  }), [user, isLoading]);
+
+  // Use the enhanced game connection hook
+  const { currentSession, gameStats: sessionStats, isSessionActive, startGameSession } = useGameConnection(
+    iframeRef,
+    authData(),
+    gameConnectionOptions()
+  );
 
   const handleFullScreen = () => {
     const element = gameContainerRef.current;
@@ -69,10 +117,13 @@ export default function SybilSlayerPage() {
     }
   };
 
-  // Mock data - En el futuro vendrá de la base de datos
-  const userHighScore = user ? 12450 : 0; // High score del usuario actual
+  // Real-time game data
+  const userHighScore = gameStats.bestScore || 0;
   const userXP = user?.xp ?? 0;
   const userRank = getRank(userXP);
+  const currentScore = gameStats.currentScore;
+
+
 
   return (
     <AppLayout>
@@ -83,12 +134,13 @@ export default function SybilSlayerPage() {
           <div ref={gameContainerRef} className="bg-card flex-grow flex flex-col relative overflow-hidden rounded-lg border">
             <iframe
               ref={iframeRef}
-              src={`${process.env.GAME_SYBILSLASH || 'https://hyppie-games-sybilslayer.vercel.app/'}`}
+              src={`${process.env.GAME_SYBILSLASH || 'http://localhost:9002/'}`}
               className="w-full h-full border-0 min-h-[480px] lg:min-h-0"
               title="Sybil Slayer Game"
               allowFullScreen
+
             ></iframe>
-             <Button
+                           <Button
                 variant="ghost"
                 size="icon"
                 className="absolute bottom-2 left-2 text-white/50 bg-black/10 hover:text-white hover:bg-black/30 backdrop-blur-sm"
@@ -96,6 +148,35 @@ export default function SybilSlayerPage() {
                 title="Toggle Fullscreen"
               >
                 <Maximize className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute bottom-2 right-2 text-white/50 bg-black/10 hover:text-white hover:bg-black/30 backdrop-blur-sm"
+                onClick={() => {
+                  console.log('🔍 [DEBUG] Manual auth check:', {
+                    user,
+                    isLoading,
+                    isAuthenticated: !!user && !isLoading
+                  });
+                  if (iframeRef.current) {
+                    console.log('🔍 [DEBUG] Sending manual auth message');
+                    const message = {
+                      type: 'AUTH_STATE_CHANGED',
+                      payload: { isAuthenticated: !!user && !isLoading, user }
+                    };
+                    iframeRef.current.contentWindow?.postMessage(message, 'http://localhost:9002');
+                    
+                    // Also try to start session manually
+                    if (user?.id) {
+                      console.log('🔍 [DEBUG] Manually starting session for user:', user.id);
+                      startGameSession(user.id);
+                    }
+                  }
+                }}
+                title="Debug Auth"
+              >
+                🔍
               </Button>
           </div>
           <Card>
