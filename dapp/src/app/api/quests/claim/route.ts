@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { distributeReferralXp } from '@/lib/referrals';
 
 export async function POST(request: Request) {
   try {
@@ -77,6 +78,14 @@ export async function POST(request: Request) {
         }
       })
     ]);
+
+    // Distribute referral XP after quest completion
+    try {
+      await distributeReferralXp(user.id, quest.xp);
+    } catch (error) {
+      console.error('Error distributing referral XP:', error);
+      // Don't fail the quest claim if referral distribution fails
+    }
 
     return NextResponse.json({
       success: true,
