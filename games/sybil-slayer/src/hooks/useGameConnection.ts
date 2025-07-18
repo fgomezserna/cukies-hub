@@ -1,4 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { 
+  validateSecureMessage, 
+  extractMessageData, 
+  sendSecureMessageToParent,
+  logSecurityEvent,
+  type GameMessageType 
+} from '../lib/secure-communication';
 
 // Simple hash function for browser compatibility
 function simpleHash(str: string): string {
@@ -10,19 +17,6 @@ function simpleHash(str: string): string {
   }
   return Math.abs(hash).toString(16);
 }
-
-// Game message types
-type GameMessage = 
-  | { type: 'AUTH_STATE_CHANGED'; payload: { isAuthenticated: boolean; user: any; token?: string } }
-  | { type: 'GAME_SESSION_START'; payload: { gameId: string; sessionToken: string; sessionId: string } }
-  | { type: 'GAME_CHECKPOINT'; payload: { sessionToken: string; checkpoint: any; events?: any[] } }
-  | { type: 'GAME_SESSION_END'; payload: { sessionToken: string; finalScore: number; metadata?: any } }
-  | { type: 'GAME_EVENT'; payload: { sessionToken: string; event: string; data?: any } }
-  | { type: 'HONEYPOT_TRIGGER'; payload: { sessionToken: string; event: string } };
-
-const TARGET_ORIGIN = process.env.NODE_ENV === 'production' 
-  ? 'https://hyppieliquid.com' 
-  : '*';
 
 // Honeypot events for cheat detection
 const HONEYPOT_EVENTS = [
@@ -74,7 +68,7 @@ export function useGameConnection() {
   }, []);
 
   // Send checkpoint to parent
-  const sendCheckpoint = useCallback((score: number, gameTime: number, events?: any[]) => {
+  const sendCheckpoint = useCallback(async (score: number, gameTime: number, events?: any[]) => {
     if (!gameSession) return;
 
     const checkpoint = {
@@ -94,34 +88,24 @@ export function useGameConnection() {
       events = [...(events || []), { type: 'honeypot', event: honeypotEvent }];
     }
 
-    const message: GameMessage = {
-      type: 'GAME_CHECKPOINT',
-      payload: {
-        sessionToken: gameSession.sessionToken,
-        checkpoint,
-        events
-      }
-    };
-
-    console.log('🎮 [GAME] Sending checkpoint:', message);
-    window.parent.postMessage(message, TARGET_ORIGIN);
+    // Send secure checkpoint message
+    await sendSecureMessageToParent('GAME_CHECKPOINT', {
+      sessionToken: gameSession.sessionToken,
+      checkpoint,
+      events
+    });
   }, [gameSession, generateCheckpointHash]);
 
   // Send session end to parent
-  const sendSessionEnd = useCallback((finalScore: number, metadata?: any) => {
+  const sendSessionEnd = useCallback(async (finalScore: number, metadata?: any) => {
     if (!gameSession) return;
 
-    const message: GameMessage = {
-      type: 'GAME_SESSION_END',
-      payload: {
-        sessionToken: gameSession.sessionToken,
-        finalScore,
-        metadata
-      }
-    };
-
-    console.log('🏁 [GAME] Sending session end:', message);
-    window.parent.postMessage(message, TARGET_ORIGIN);
+    // Send secure session end message
+    await sendSecureMessageToParent('GAME_SESSION_END', {
+      sessionToken: gameSession.sessionToken,
+      finalScore,
+      metadata
+    });
 
     // Clear checkpoint interval
     if (checkpointIntervalRef.current) {
@@ -131,19 +115,14 @@ export function useGameConnection() {
   }, [gameSession]);
 
   // Send honeypot trigger to parent
-  const sendHoneypotTrigger = useCallback((event: string) => {
+  const sendHoneypotTrigger = useCallback(async (event: string) => {
     if (!gameSession) return;
 
-    const message: GameMessage = {
-      type: 'HONEYPOT_TRIGGER',
-      payload: {
-        sessionToken: gameSession.sessionToken,
-        event
-      }
-    };
-
-    console.log('🍯 [GAME] Sending honeypot trigger:', message);
-    window.parent.postMessage(message, TARGET_ORIGIN);
+    // Send secure honeypot trigger message
+    await sendSecureMessageToParent('HONEYPOT_TRIGGER', {
+      sessionToken: gameSession.sessionToken,
+      event
+    });
   }, [gameSession]);
 
   // Start periodic checkpoints
@@ -172,7 +151,7 @@ export function useGameConnection() {
 
   // Listen for messages from parent
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       // Filter out non-game messages (MetaMask, etc.)
       if (!event.data || typeof event.data !== 'object') {
         return;
@@ -192,26 +171,41 @@ export function useGameConnection() {
 
       console.log('🎮 [GAME] Received message from parent:', event.data);
       
-      const message = event.data as GameMessage;
+      // Validate secure message
+      const validation = await validateSecureMessage(event.data);
+      if (!validation.isValid) {
+        logSecurityEvent('Invalid message received', { 
+          reason: validation.reason, 
+          message: event.data 
+        });
+        return;
+      }
+
+      const message = validation.parsedMessage!;
+      const messageData = extractMessageData(message);
       
-      switch (message.type) {
+      logSecurityEvent('Valid message received', { 
+        type: messageData.type 
+      });
+      
+      switch (messageData.type) {
         case 'AUTH_STATE_CHANGED':
-          console.log('🔐 [GAME] Auth state changed:', message.payload);
-          setAuthState(message.payload);
+          console.log('🔐 [GAME] Auth state changed:', messageData.payload);
+          setAuthState(messageData.payload);
           break;
         
         case 'GAME_SESSION_START':
-          console.log('🚀 [GAME] Game session started:', message.payload);
-          setGameSession(message.payload);
+          console.log('🚀 [GAME] Game session started:', messageData.payload);
+          setGameSession(messageData.payload);
           break;
         
         default:
-          console.log('🔄 [GAME] Ignored message type:', message.type);
+          console.log('🔄 [GAME] Ignored message type:', messageData.type);
           break;
       }
     };
 
-    console.log('🎧 [GAME] Starting to listen for parent messages...');
+    console.log('🎧 [GAME] Starting to listen for secure parent messages...');
     window.addEventListener('message', handleMessage);
     return () => {
       console.log('🔇 [GAME] Stopped listening for parent messages');

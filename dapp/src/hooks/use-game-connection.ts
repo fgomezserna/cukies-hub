@@ -1,5 +1,12 @@
 import { useEffect, RefObject, useCallback, useState, useRef } from 'react';
 import { generateCheckpointHash, generateNonce, HONEYPOT_EVENTS } from '@/lib/game-validation';
+import { 
+  createSecureMessage, 
+  validateSecureMessage, 
+  extractMessageData,
+  logSecurityEvent,
+  type GameMessageType 
+} from '@/lib/secure-game-communication';
 
 // Define message types for game communication
 type GameMessage = 
@@ -94,21 +101,19 @@ export function useGameConnection(
           gameId: options.gameId
         });
 
-        // Send session data to game
+        // Send secure session data to game
         if (iframeRef.current) {
-          const message: GameMessage = {
-            type: 'GAME_SESSION_START',
-            payload: { 
-              gameId: options.gameId, 
-              sessionToken: data.sessionToken, 
-              sessionId: data.sessionId 
-            }
-          };
-          console.log('📨 [DAPP] Sending session start message to game:', message);
+          const secureMessage = await createSecureMessage('GAME_SESSION_START', { 
+            gameId: options.gameId, 
+            sessionToken: data.sessionToken, 
+            sessionId: data.sessionId 
+          });
+          
+          console.log('📨 [DAPP] Sending secure session start message to game:', secureMessage);
           // Send to all possible game origins
           const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'https://hyppie-road.vercel.app'];
           gameOrigins.forEach(origin => {
-            iframeRef.current?.contentWindow?.postMessage(message, origin);
+            iframeRef.current?.contentWindow?.postMessage(secureMessage, origin);
           });
         } else {
           console.warn('⚠️ [DAPP] No iframe reference available');
@@ -200,7 +205,7 @@ export function useGameConnection(
 
   // Listen for messages from game
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       // Filter out non-game messages (MetaMask, etc.)
       if (!event.data || typeof event.data !== 'object') {
         return;
@@ -227,35 +232,52 @@ export function useGameConnection(
 
       console.log('🎮 [DAPP] Received message from game:', event.data, 'origin:', event.origin);
       
-      const message = event.data as GameMessage;
+      // Validate secure message
+      const validation = await validateSecureMessage(event.data);
+      if (!validation.isValid) {
+        logSecurityEvent('Invalid message received', { 
+          reason: validation.reason, 
+          origin: event.origin,
+          message: event.data 
+        });
+        return;
+      }
+
+      const message = validation.parsedMessage!;
+      const messageData = extractMessageData(message);
       
-      switch (message.type) {
+      logSecurityEvent('Valid message received', { 
+        type: messageData.type, 
+        origin: event.origin 
+      });
+      
+      switch (messageData.type) {
         case 'GAME_CHECKPOINT':
-          console.log('📍 [DAPP] Processing checkpoint:', message.payload);
-          handleCheckpoint(message.payload.checkpoint, message.payload.events);
+          console.log('📍 [DAPP] Processing secure checkpoint:', messageData.payload);
+          handleCheckpoint(messageData.payload.checkpoint, messageData.payload.events);
           break;
         
         case 'GAME_SESSION_END':
-          console.log('🏁 [DAPP] Processing session end:', message.payload);
-          endGameSession(message.payload.finalScore, message.payload.metadata);
+          console.log('🏁 [DAPP] Processing secure session end:', messageData.payload);
+          endGameSession(messageData.payload.finalScore, messageData.payload.metadata);
           break;
         
         case 'HONEYPOT_TRIGGER':
-          console.log('🍯 [DAPP] Honeypot triggered:', message.payload);
+          console.log('🍯 [DAPP] Honeypot triggered:', messageData.payload);
           setGameStats(prev => ({
             ...prev,
             honeypotEvents: prev.honeypotEvents + 1
           }));
-          options.onHoneypotDetected?.(message.payload.event);
+          options.onHoneypotDetected?.(messageData.payload.event);
           break;
         
         default:
-          console.log('🔄 [DAPP] Ignored message type:', message.type);
+          console.log('🔄 [DAPP] Ignored message type:', messageData.type);
           break;
       }
     };
 
-    console.log('🎧 [DAPP] Starting to listen for game messages...');
+    console.log('🎧 [DAPP] Starting to listen for secure game messages...');
     window.addEventListener('message', handleMessage);
     return () => {
       console.log('🔇 [DAPP] Stopped listening for game messages');
@@ -278,23 +300,21 @@ export function useGameConnection(
     // Mark as initialized
     initializedRef.current = true;
 
-    const sendAuthAndStartSession = () => {
+    const sendAuthAndStartSession = async () => {
       if (authSentRef.current) {
         return; // Already sent auth data
       }
 
       authSentRef.current = true;
       
-      const message: GameMessage = {
-        type: 'AUTH_STATE_CHANGED',
-        payload: authData,
-      };
+      // Create secure auth message
+      const secureAuthMessage = await createSecureMessage('AUTH_STATE_CHANGED', authData);
       
-      console.log('🔐 [DAPP] Sending auth data:', message);
+      console.log('🔐 [DAPP] Sending secure auth data:', secureAuthMessage);
       // Send to all possible game origins
       const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'https://hyppie-road.vercel.app'];
       gameOrigins.forEach(origin => {
-        iframeRef.current?.contentWindow?.postMessage(message, origin);
+        iframeRef.current?.contentWindow?.postMessage(secureAuthMessage, origin);
       });
       
       // Auto-start session if user is authenticated
@@ -308,13 +328,13 @@ export function useGameConnection(
     sendAuthAndStartSession();
     
     // Also set up onload handler as backup
-    console.log('🔐 [DAPP] Setting up iframe onload handler for auth');
+    console.log('🔐 [DAPP] Setting up iframe onload handler for secure auth');
     iframeRef.current.onload = sendAuthAndStartSession;
     
     // Additional backup: try again after a short delay
     setTimeout(() => {
       if (iframeRef.current && !authSentRef.current) {
-        console.log('🔐 [DAPP] Backup: sending auth data after delay');
+        console.log('🔐 [DAPP] Backup: sending secure auth data after delay');
         sendAuthAndStartSession();
       }
     }, 1000);
