@@ -1649,12 +1649,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
       <div 
         className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
-        style={{ transform: `scale(${1/scale})`, transformOrigin: 'bottom right' }}
+        style={{ transform: `scale(${scale})`, transformOrigin: 'bottom right' }}
       >
         {/* Botón de música */}
         <button 
           onClick={handleMusicToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
         >
           <Image 
@@ -1671,7 +1671,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de sonidos */}
         <button 
           onClick={handleSoundsToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label={soundsEnabled ? 'Disable sounds' : 'Enable sounds'}
         >
           <Image 
@@ -1688,7 +1688,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de información */}
         <button 
           onClick={handleInfoToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label="Información del juego"
         >
           <Image 
