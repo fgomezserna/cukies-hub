@@ -1654,7 +1654,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de música */}
         <button 
           onClick={handleMusicToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
         >
           <Image 
@@ -1671,7 +1671,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de sonidos */}
         <button 
           onClick={handleSoundsToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label={soundsEnabled ? 'Disable sounds' : 'Enable sounds'}
         >
           <Image 
@@ -1688,7 +1688,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de información */}
         <button 
           onClick={handleInfoToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label="Información del juego"
         >
           <Image 
