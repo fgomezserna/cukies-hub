@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useGameConnection } from '@/hooks/use-game-connection';
 import { useAuth } from '@/providers/auth-provider';
 import AppLayout from '@/components/layout/app-layout';
@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LeaderboardPlayer } from '@/types';
 
 
 // Define a type for the element to handle vendor prefixes for fullscreen
@@ -20,14 +21,36 @@ interface FullscreenElement extends HTMLDivElement {
   msRequestFullscreen?: () => Promise<void>;
 }
 
-// Mock data - En el futuro esto vendrá de la base de datos
-const mockTopSlayers = [
-  { id: 1, username: "CryptoKing", profilePicture: "https://placehold.co/40x40.png", score: 15420 },
-  { id: 2, username: "SybilHunter", profilePicture: "https://placehold.co/40x40.png", score: 14850 },
-  { id: 3, username: "TokenMaster", profilePicture: "https://placehold.co/40x40.png", score: 13990 },
-  { id: 4, username: "DiamondHands", profilePicture: "https://placehold.co/40x40.png", score: 13210 },
-  { id: 5, username: "BlockchainPro", profilePicture: "https://placehold.co/40x40.png", score: 12750 }
-];
+interface GameStats {
+  gameId: string;
+  totalPlayers: number;
+  totalSessions: number;
+  avgScore: number;
+  topScore: number;
+  userStats?: {
+    bestScore: number;
+    sessionsCount: number;
+    rank: number;
+  };
+  recentSessions: Array<{
+    finalScore: number;
+    gameTime: number;
+    xpEarned: number;
+    createdAt: string;
+    user: {
+      username: string;
+      walletAddress: string;
+    };
+  }>;
+}
+
+interface LeaderboardResponse {
+  leaderboard: LeaderboardPlayer[];
+  totalCount: number;
+  hasMore: boolean;
+  gameId?: string;
+  period?: string;
+}
 
 // Sistema de rangos basado en experiencia
 const ranks = [
@@ -53,6 +76,62 @@ export default function SybilSlayerPage() {
     sessionsPlayed: 0,
     validSessions: 0
   });
+  const [apiGameStats, setApiGameStats] = useState<GameStats | null>(null);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch game statistics and leaderboard data
+  useEffect(() => {
+    const fetchGameData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch game statistics
+        const statsParams = new URLSearchParams({
+          gameId: 'sybil-slayer'
+        });
+        if (user?.id) {
+          statsParams.append('userId', user.id);
+        }
+        
+        const statsResponse = await fetch(`/api/games/stats?${statsParams}`);
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setApiGameStats(statsData);
+          
+          // Update local game stats with API data
+          if (statsData.userStats) {
+            setGameStats(prev => ({
+              ...prev,
+              bestScore: statsData.userStats.bestScore,
+              sessionsPlayed: statsData.userStats.sessionsCount,
+              validSessions: statsData.userStats.sessionsCount // Assume all sessions are valid for now
+            }));
+          }
+        }
+        
+        // Fetch leaderboard data
+        const leaderboardParams = new URLSearchParams({
+          gameId: 'sybil-slayer',
+          period: 'all-time',
+          limit: '10'
+        });
+        
+        const leaderboardResponse = await fetch(`/api/leaderboard?${leaderboardParams}`);
+        if (leaderboardResponse.ok) {
+          const leaderboardData = await leaderboardResponse.json();
+          setLeaderboardData(leaderboardData);
+        }
+        
+      } catch (error) {
+        console.error('Failed to fetch game data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGameData();
+  }, [user]);
 
   // Memoize callback functions to prevent hook re-initialization
   const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
@@ -273,27 +352,37 @@ export default function SybilSlayerPage() {
             </CardHeader>
             <CardContent className="p-3">
               <div className="space-y-0">
-                {mockTopSlayers.map((player, index) => (
-                  <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="text-sm font-bold text-muted-foreground w-6">
-                        #{index + 1}
+                {loading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="text-sm text-muted-foreground">Loading...</div>
                   </div>
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={player.profilePicture} />
-                        <AvatarFallback className="text-xs">
-                          {player.username.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{player.username}</p>
-                </div>
+                ) : leaderboardData?.leaderboard.length === 0 ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="text-sm text-muted-foreground">No players yet</div>
                   </div>
-                    <div className="text-sm font-mono font-bold text-yellow-400">
-                      {player.score.toLocaleString()}
-                </div>
-                  </div>
-                ))}
+                ) : (
+                  leaderboardData?.leaderboard.slice(0, 5).map((player, index) => (
+                    <div key={player.walletAddress} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="text-sm font-bold text-muted-foreground w-6">
+                          #{index + 1}
+                        </div>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={player.avatar} />
+                          <AvatarFallback className="text-xs">
+                            {player.name.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{player.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm font-mono font-bold text-yellow-400">
+                        {player.totalPoints.toLocaleString()}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

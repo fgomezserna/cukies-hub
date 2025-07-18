@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import StatsCards from '@/components/home/stats-cards'
 import { useAuth } from '@/providers/auth-provider'
 import { User } from '@/types'
@@ -6,6 +6,9 @@ import { User } from '@/types'
 // Mock the auth provider
 jest.mock('@/providers/auth-provider')
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
+
+// Mock fetch globally
+global.fetch = jest.fn()
 
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({
@@ -37,6 +40,21 @@ describe('components/home/StatsCards', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    // Mock successful API response
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        totalUsers: 12345,
+        totalSessions: 5678,
+        totalXpDistributed: 1234567,
+        userStats: {
+          totalXp: 1500,
+          referralRewards: 0,
+          rank: 1234,
+          totalSessions: 10,
+        },
+      }),
+    })
   })
 
   it('should render all stat cards', () => {
@@ -44,6 +62,7 @@ describe('components/home/StatsCards', () => {
       user: mockUser,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
@@ -51,19 +70,22 @@ describe('components/home/StatsCards', () => {
     expect(screen.getByText('My XP')).toBeInTheDocument()
     expect(screen.getByText('My Rank')).toBeInTheDocument()
     expect(screen.getByText('Total Players')).toBeInTheDocument()
-    expect(screen.getByText('Total Points')).toBeInTheDocument()
+    expect(screen.getByText('Total XP')).toBeInTheDocument()
   })
 
-  it('should display user XP when user is available', () => {
+  it('should display user XP when user is available', async () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
 
-    expect(screen.getByText('1,500')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('1,500')).toBeInTheDocument()
+    })
   })
 
   it('should display placeholder when user is not available', () => {
@@ -71,6 +93,7 @@ describe('components/home/StatsCards', () => {
       user: null,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
@@ -83,6 +106,7 @@ describe('components/home/StatsCards', () => {
       user: null,
       isLoading: true,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
@@ -95,6 +119,7 @@ describe('components/home/StatsCards', () => {
       user: mockUser,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
@@ -115,6 +140,7 @@ describe('components/home/StatsCards', () => {
       user: userWithHighXP,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
@@ -132,6 +158,7 @@ describe('components/home/StatsCards', () => {
       user: userWithZeroXP,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
@@ -139,18 +166,21 @@ describe('components/home/StatsCards', () => {
     expect(screen.getByText('0')).toBeInTheDocument()
   })
 
-  it('should render static values for rank, total players, and total points', () => {
+  it('should render dynamic values for rank, total players, and total XP', async () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
 
-    expect(screen.getByText('#1,234')).toBeInTheDocument()
-    expect(screen.getByText('12,345')).toBeInTheDocument()
-    expect(screen.getByText('1,234,567')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('#1,234')).toBeInTheDocument()
+      expect(screen.getByText('12,345')).toBeInTheDocument()
+      expect(screen.getByText('1,234,567')).toBeInTheDocument()
+    })
   })
 
   it('should have correct grid layout classes', () => {
@@ -158,6 +188,7 @@ describe('components/home/StatsCards', () => {
       user: mockUser,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     const { container } = render(<StatsCards />)
@@ -166,20 +197,23 @@ describe('components/home/StatsCards', () => {
     expect(gridContainer).toHaveClass('grid', 'gap-4', 'md:grid-cols-2', 'lg:grid-cols-4')
   })
 
-  it('should render card structure correctly', () => {
+  it('should render card structure correctly', async () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
       fetchUser: jest.fn(),
+      isWaitingForApproval: false,
     })
 
     render(<StatsCards />)
 
     // Check that each stat has both title and value
-    const myXpCard = screen.getByText('My XP').closest('div')
-    expect(myXpCard).toContainElement(screen.getByText('1,500'))
+    await waitFor(() => {
+      const myXpCard = screen.getByText('My XP').closest('div')
+      expect(myXpCard).toContainElement(screen.getByText('1,500'))
 
-    const myRankCard = screen.getByText('My Rank').closest('div')
-    expect(myRankCard).toContainElement(screen.getByText('#1,234'))
+      const myRankCard = screen.getByText('My Rank').closest('div')
+      expect(myRankCard).toContainElement(screen.getByText('#1,234'))
+    })
   })
 })
