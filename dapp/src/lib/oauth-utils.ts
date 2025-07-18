@@ -163,6 +163,10 @@ export async function handleDiscordOAuth(walletAddress?: string) {
     const popup = openOAuthPopup(authUrl, 'discord-oauth');
     console.log('[Discord OAuth] Popup opened:', popup);
     
+    if (!popup) {
+      throw new Error('Failed to open OAuth popup');
+    }
+    
     const result = await handleOAuthFlow(popup, 'DISCORD_OAUTH_SUCCESS');
     console.log('[Discord OAuth] Flow completed, result:', result);
     
@@ -218,6 +222,10 @@ export async function handleTwitterOAuth(walletAddress?: string) {
     
     const popup = openOAuthPopup(authUrl, 'twitter-oauth');
     console.log('[Twitter OAuth] Popup opened:', popup);
+    
+    if (!popup) {
+      throw new Error('Failed to open OAuth popup');
+    }
     
     const result = await handleOAuthFlow(popup, 'TWITTER_OAUTH_SUCCESS');
     console.log('[Twitter OAuth] Flow completed, result:', result);

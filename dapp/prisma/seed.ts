@@ -69,9 +69,9 @@ async function main() {
         xp: qData.xp,
         isStarter: qData.isStarter || false, // Ensure isStarter is not undefined
         tasks: {
-          create: qData.tasks.map(task => ({
+          create: qData.tasks.map((task: any) => ({
             title: task.title,
-            description: task.description,
+            description: task.description || null,
             validationApiEndpoint: task.validationApiEndpoint,
           })),
         },

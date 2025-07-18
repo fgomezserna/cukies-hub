@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import GameChat from '@/components/ui/GameChat';
 
 
 // Define a type for the element to handle vendor prefixes for fullscreen
@@ -53,6 +54,7 @@ export default function SybilSlayerPage() {
     sessionsPlayed: 0,
     validSessions: 0
   });
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Memoize callback functions to prevent hook re-initialization
   const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
@@ -298,70 +300,21 @@ export default function SybilSlayerPage() {
             </CardContent>
           </Card>
 
-          {/* 5. Chat - mantenido como estaba */}
-           <Sheet>
-            <SheetTrigger asChild>
-               <Button variant="outline" className="w-full justify-center gap-2 bg-card">
-                <MessageCircle className="h-5 w-5" />
-                <span>Chat</span>
-               </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="flex flex-col w-full sm:max-w-md p-0">
-              <SheetHeader className="p-6 pb-4">
-                <SheetTitle>Live Chat</SheetTitle>
-                <SheetDescription>
-                  Chat with other players in real-time.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="flex-grow overflow-y-auto p-6 space-y-6">
-                <div className="flex gap-3 text-sm">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="king crown" />
-                    <AvatarFallback>CK</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-bold text-primary">CryptoKing</p>
-                    <div className="bg-muted p-3 rounded-lg mt-1">
-                      <p>This game is awesome! 🔥</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-3 text-sm justify-end">
-                   <div className="flex-1">
-                    <p className="font-bold text-right">You</p>
-                    <div className="bg-primary text-primary-foreground p-3 rounded-lg mt-1">
-                      <p>I know right?! Just got a huge win!</p>
-                    </div>
-                  </div>
-                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="profile avatar" />
-                    <AvatarFallback>U</AvatarFallback>
-                  </Avatar>
-                </div>
-                 <div className="flex gap-3 text-sm">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="diamond hands" />
-                    <AvatarFallback>DH</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-bold text-primary">DiamondHands</p>
-                    <div className="bg-muted p-3 rounded-lg mt-1">
-                      <p>LFG! 🚀</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <SheetFooter className="p-4 border-t bg-card">
-                <form className="flex w-full space-x-2" onSubmit={(e) => e.preventDefault()}>
-                  <Input placeholder="Type your message..." className="flex-1" />
-                  <Button type="submit" size="icon">
-                    <Send className="h-4 w-4" />
-                    <span className="sr-only">Send</span>
-                  </Button>
-                </form>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
+          {/* 5. Chat - Real-time chat integration */}
+          <Button 
+            variant="outline" 
+            className="w-full justify-center gap-2 bg-card"
+            onClick={() => setIsChatOpen(true)}
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span>Chat</span>
+          </Button>
+          
+          <GameChat 
+            gameId="sybil-slayer" 
+            isOpen={isChatOpen} 
+            onClose={() => setIsChatOpen(false)} 
+          />
         </div>
       </div>
     </AppLayout>
