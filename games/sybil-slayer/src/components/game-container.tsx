@@ -1649,7 +1649,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
       <div 
         className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
-        style={{ transform: `scale(${1/scale})`, transformOrigin: 'bottom right' }}
+        style={{ transform: `scale(${scale})`, transformOrigin: 'bottom right' }}
       >
         {/* Botón de música */}
         <button 
