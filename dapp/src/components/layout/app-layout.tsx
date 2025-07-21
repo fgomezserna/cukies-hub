@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Home,
@@ -26,9 +27,27 @@ import Header from './header';
 import DiscordIcon from '../icons/discord';
 import XIcon from '../icons/x-icon';
 import Image from 'next/image';
-import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/hyppiesymbol.png';
+import hyppieletters from '@/assets/hyppielettersss.png';
+import hyppieicon from '@/assets/dice.png';
 import { usePathname } from 'next/navigation';
+
+const SidebarLogo = () => {
+  const { state } = useSidebar();
+  
+  return (
+    <div className="flex items-center gap-3 p-1">
+      <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />
+      <Image 
+        src={hyppieletters} 
+        alt="HyppieLiquid" 
+        height={52} 
+        className={`transition-opacity duration-200 ${
+          state === 'collapsed' ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+        }`}
+      />
+    </div>
+  );
+};
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -44,10 +63,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             "--sidebar-border": "rgba(16,185,129,0.3)"
           } as React.CSSProperties}>
           <SidebarHeader className="border-b border-green-500/20 bg-black/15 backdrop-blur-sm">
-            <div className="flex items-center gap-3 p-1">
-                <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
-                <Image src={hyppieletters} alt="HyppieLiquid" height={39} />
-            </div>
+            <SidebarLogo />
           </SidebarHeader>
           <SidebarContent className="py-4 bg-black/10 backdrop-blur-sm">
             <SidebarMenu className="px-3 space-y-1">
@@ -168,7 +184,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-indigo-500/10 hover:shadow-md hover:shadow-blue-500/20">
-                        <a href="https://telegram.org" target="_blank" rel="noopener noreferrer">
+                        <a href="https://t.me/HyppieLiquid" target="_blank" rel="noopener noreferrer">
                           <div className="flex items-center gap-3">
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-indigo-500/20 group-hover:from-blue-400/30 group-hover:to-indigo-500/30 transition-all">
                               <Send className="h-3 w-3 text-blue-400 group-hover:text-indigo-400 transition-colors" />
@@ -180,7 +196,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-indigo-500/10 hover:shadow-md hover:shadow-purple-500/20">
-                        <a href="https://discord.com" target="_blank" rel="noopener noreferrer">
+                        <a href="https://discord.gg/BxFxZZeAAj" target="_blank" rel="noopener noreferrer">
                           <div className="flex items-center gap-3">
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-400/20 to-indigo-500/20 group-hover:from-purple-400/30 group-hover:to-indigo-500/30 transition-all">
                               <DiscordIcon className="h-3 w-3 text-purple-400 group-hover:text-indigo-400 transition-colors" />

@@ -67,15 +67,25 @@ const getTaskType = (taskText: string | undefined): string => {
   
   const text = taskText.toLowerCase();
   
+  // Debug logging for all tasks
+  const result = getTaskTypeInternal(text);
+  console.log('Task type detection:', { original: taskText, normalized: text, result });
+  return result;
+};
+
+const getTaskTypeInternal = (text: string): string => {
   if (text.includes('username')) return 'username';
   if (text.includes('email')) return 'email';
   if (text.includes('profile picture')) return 'profilePicture';
   if (text.includes('connect') && (text.includes('x account') || text.includes('twitter account'))) return 'twitter_connect';
-  if (text.includes('follow') && (text.includes('twitter') || text.includes(' x '))) return 'twitter_follow';
+  if (text.includes('follow') && (text.includes('twitter') || text.includes(' x ') || text.includes('on x') || text.includes('us on x'))) {
+    return 'twitter_follow';
+  }
   if (text.includes('like') || text.includes('retweet')) return 'twitter_like_rt';
+  if (text.includes('pinned post')) return 'twitter_like_rt';
   if (text.includes('connect') && text.includes('discord')) return 'discord_connect';
   if (text.includes('join') && text.includes('discord') && text.includes('server')) return 'discord_join';
-  if (text.includes('telegram')) return 'telegram_join';
+  if (text.includes('telegram') && text.includes('join')) return 'telegram_join';
   if (text.includes('play') || text.includes('game')) return 'game_play';
   if (text.includes('score') || text.includes('points')) return 'game_play';
   
@@ -392,23 +402,44 @@ function DiscordJoinTask({ task, onVerify, disabled, isLoading = false, user }: 
     <>
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
         <Circle className="h-5 w-5 text-muted-foreground" />
-        <span className="text-muted-foreground">{getTaskText(task)}</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="ml-auto w-32 justify-center"
-          disabled={disabled || isVerifying || isLoading}
-          onClick={handleVerifyMembership}
-        >
-          {isVerifying || isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Checking...
-            </>
-          ) : (
-            'Check Membership'
-          )}
-        </Button>
+        <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
+        
+        <div className="flex items-center gap-2">
+          {/* Join Discord Button */}
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="text-xs"
+          >
+            <a 
+              href={inviteUrl}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Join Discord
+            </a>
+          </Button>
+
+          {/* Verify Button */}
+          <Button
+            size="sm"
+            className="text-xs"
+            disabled={disabled || isVerifying || isLoading}
+            onClick={handleVerifyMembership}
+          >
+            {isVerifying || isLoading ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Checking...
+              </>
+            ) : (
+              'Verify'
+            )}
+          </Button>
+        </div>
       </div>
 
       <Dialog open={showJoinModal} onOpenChange={setShowJoinModal}>
@@ -465,9 +496,244 @@ function DiscordJoinTask({ task, onVerify, disabled, isLoading = false, user }: 
   );
 }
 
+function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: UserType | null; }) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [telegramGroupInfo, setTelegramGroupInfo] = useState<{
+    title: string;
+    inviteLink: string | null;
+    fallbackLink: string | null;
+  } | null>(null);
+  const { toast } = useToast();
+
+  // Get Telegram group info on component mount
+  useEffect(() => {
+    const fetchGroupInfo = async () => {
+      try {
+        const response = await fetch('/api/telegram/group-invite');
+        if (response.ok) {
+          const data = await response.json();
+          setTelegramGroupInfo({
+            title: data.chatInfo.title,
+            inviteLink: data.inviteLink,
+            fallbackLink: data.fallbackLink
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch Telegram group info:', error);
+      }
+    };
+    fetchGroupInfo();
+  }, []);
+
+  const generateVerificationCode = async () => {
+    setIsGeneratingCode(true);
+    try {
+      const response = await fetch('/api/telegram/generate-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: user?.walletAddress }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate code');
+      }
+
+      const data = await response.json();
+      setGeneratedCode(data.verificationCode);
+      
+      toast({
+        title: 'Code Generated!',
+        description: `Your verification code is: ${data.verificationCode}`,
+      });
+    } catch (error) {
+      console.error('Error generating code:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate verification code. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
+  const handleVerifyMembership = async () => {
+    if (!generatedCode.trim()) {
+      toast({
+        title: 'No Code Generated',
+        description: 'Please generate a code first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      onVerify(task.id, { type: 'telegram_join', value: generatedCode.trim() });
+    } catch (error) {
+      console.error('Telegram verification error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to verify Telegram membership. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  if (task.completed) {
+    return (
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <CheckCircle2 className="h-5 w-5 text-primary" />
+        <span className="text-foreground">{getTaskText(task)}</span>
+        <Button size="sm" variant="ghost" className="ml-auto" disabled>
+          Verified
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <Circle className="h-5 w-5 text-muted-foreground" />
+        <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
+        
+        <div className="flex items-center gap-2">
+          {/* Join Group Button */}
+          {telegramGroupInfo && (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="text-xs"
+            >
+              <a 
+                href={telegramGroupInfo.inviteLink || telegramGroupInfo.fallbackLink || 'https://t.me/hyppie'}
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Join Group
+              </a>
+            </Button>
+          )}
+
+          {/* Generate Code / Verify Button */}
+          {!generatedCode ? (
+            <Button
+              onClick={generateVerificationCode}
+              disabled={disabled || isGeneratingCode || isLoading}
+              size="sm"
+              className="text-xs"
+            >
+              {isGeneratingCode ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Generate Code'
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleVerifyMembership}
+              disabled={disabled || isVerifying || isLoading}
+              size="sm"
+              className="text-xs"
+            >
+              {isVerifying || isLoading ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify'
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Code Modal */}
+      <Dialog open={!!generatedCode && !task.completed} onOpenChange={() => setGeneratedCode('')}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Verification Code</DialogTitle>
+            <DialogDescription>
+              Send this code to our Telegram group to verify your membership.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                Step 1: Copy this code
+              </p>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded border font-mono text-center text-xl font-bold mb-3 select-all">
+                {generatedCode}
+              </div>
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                Copy this code and send it as a message in our Telegram group.
+              </p>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                <strong>Step 2:</strong> After sending the code, close this modal and click "Verify" to complete the task.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => setGeneratedCode('')}
+              variant="outline"
+              className="flex-1"
+            >
+              Generate New Code
+            </Button>
+            <Button 
+              onClick={() => {}}
+              className="flex-1"
+            >
+              Code Sent
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'auto_verify', questId, taskId, user }: { text: string; completed: boolean; onVerify: (payload: { type: string, value?: any }) => void; disabled: boolean; taskType?: string; questId: string; taskId: string; user: UserType | null; }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
+
+  const getExternalLink = () => {
+    switch (taskType) {
+      case 'twitter_follow':
+        return {
+          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/hyppieliquid',
+          text: 'Follow on X',
+          description: 'Follow us on X (Twitter) first, then connect your account'
+        };
+      case 'twitter_like_rt':
+        return {
+          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/hyppieliquid',
+          text: 'Go to X Profile',
+          description: 'Visit our X profile to like and retweet our pinned post'
+        };
+      // twitter_connect and discord_connect don't need external links - they're pure OAuth
+      default:
+        return null;
+    }
+  };
 
   const handleConnect = async () => {
     if (completed || disabled) return;
@@ -490,6 +756,9 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
         // Use Twitter username for verification
         onVerify({ type: taskType, value: data.twitterUser.username });
         
+      } else if (taskType === 'twitter_like_rt') {
+        // For like and retweet tasks, we'll trust the user (or implement later verification)
+        onVerify({ type: taskType });
       } else {
         // Para otros tipos simplemente verificamos al instante
         onVerify({ type: taskType });
@@ -498,7 +767,7 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
       console.error('OAuth flow failed:', error);
       
       let title = 'Connection Failed';
-      let description = error.message || 'An unexpected error occurred';
+      let description = (error as Error)?.message || 'An unexpected error occurred';
       
       if (taskType === 'discord_connect') {
         title = 'Discord Connection Failed';
@@ -516,28 +785,54 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
     }
   };
 
+  const externalLink = getExternalLink();
+
   return (
     <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
       {completed ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
-      <span className={completed ? 'text-foreground' : 'text-muted-foreground'}>{text}</span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="ml-auto w-28 justify-center"
-        disabled={completed || isConnecting || disabled}
-        onClick={handleConnect}
-      >
-        {isConnecting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Connecting
-          </>
-        ) : completed ? (
-          'Connected'
-        ) : (
-          'Connect'
+      <span className={cn('flex-grow', completed ? 'text-foreground' : 'text-muted-foreground')}>{text}</span>
+      
+      <div className="flex items-center gap-2">
+        {/* External Link Button */}
+        {externalLink && !completed && (
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="text-xs"
+          >
+            <a 
+              href={externalLink.url}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1"
+            >
+              <ExternalLink className="h-3 w-3" />
+              {externalLink.text}
+            </a>
+          </Button>
         )}
-      </Button>
+
+        {/* Connect/Verify Button */}
+        <Button
+          size="sm"
+          variant={completed ? "ghost" : "default"}
+          className="text-xs"
+          disabled={completed || isConnecting || disabled}
+          onClick={handleConnect}
+        >
+          {isConnecting ? (
+            <>
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              {taskType === 'twitter_like_rt' ? 'Verifying' : 'Connecting'}
+            </>
+          ) : completed ? (
+            taskType === 'twitter_like_rt' ? 'Verified' : 'Connected'
+          ) : (
+            taskType === 'twitter_like_rt' ? 'Verify' : 'Connect'
+          )}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -647,9 +942,24 @@ function QuestsView() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle specific error cases with more helpful messages
+        let title = 'Verification Failed';
+        let description = data.error || 'Failed to verify task';
+        
+        if (response.status === 409) {
+          title = 'Username Already Taken';
+          description = 'This username is already verified by another user. Please use a different username.';
+        } else if (response.status === 404) {
+          title = 'User Not Found';
+          description = 'The username was not found. Please check your username and try again.';
+        } else if (response.status === 403 && data.requiresJoin) {
+          title = 'Join Required';
+          description = 'You need to join the group first before verifying membership.';
+        }
+        
         toast({
-          title: 'Error',
-          description: data.error || 'Failed to verify task',
+          title,
+          description,
           variant: 'destructive',
         });
         return;
@@ -668,7 +978,7 @@ function QuestsView() {
 
       toast({
         title: 'Task Completed!',
-        description: `You completed: "${task.text}".`,
+        description: `You completed: "${getTaskText(task)}".`,
       });
 
     } catch (error) {
@@ -823,6 +1133,9 @@ function QuestsView() {
                     case 'discord_join':
                       return <DiscordJoinTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
                     
+                    case 'telegram_join':
+                      return <TelegramJoinTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
+                    
                     default:
                       return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={starterQuest.isLocked} onVerify={(payload) => handleVerifyTask(starterQuest.id, task.id, payload)} taskType={taskType} questId={starterQuest.id} taskId={task.id} user={user} />
                   }
@@ -969,6 +1282,9 @@ function QuestsView() {
                                           
                                           case 'discord_join':
                                             return <DiscordJoinTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
+                                          
+                                          case 'telegram_join':
+                                            return <TelegramJoinTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
                                           
                                           default:
                                             return <ConnectAccountTask key={task.id} text={taskText} completed={task.completed} disabled={quest.isLocked || quest.isCompleted} onVerify={(payload) => handleVerifyTask(quest.id, task.id, payload)} taskType={taskType} questId={quest.id} taskId={task.id} user={user} />

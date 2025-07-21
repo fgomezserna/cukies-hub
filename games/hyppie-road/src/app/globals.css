@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fuente Pixellari */
+@font-face {
+  font-family: 'Pixellari';
+  src: url('/assets/fonts/Pixellari.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -55,6 +63,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: url('/assets/images/background-playing.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
 }
 
@@ -70,5 +85,248 @@
   
   .animate-shimmer {
     animation: shimmer 2s infinite;
+  }
+
+  @keyframes multiplierExpand {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.15);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .multiplier-expand {
+    animation: multiplierExpand 0.6s ease-out;
+  }
+
+  @keyframes slideLeft {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
+  @keyframes slideInFromRight {
+    0% {
+      transform: translateX(100%);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .slide-out-left {
+    animation: slideLeft 0.6s ease-in-out forwards;
+  }
+
+  .slide-in-right {
+    animation: slideInFromRight 0.6s ease-in-out forwards;
+  }
+
+  .pixellari-title {
+    font-family: 'Pixellari', monospace;
+  }
+
+  .game-background {
+    background-image: url('/assets/images/background-playing.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  .game-card {
+    background-image: url('/assets/images/box_gray.png');
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+  }
+
+  .game-card {
+    min-height: 120px;
+  }
+
+  .game-card .card-header-custom {
+    padding: 20px 40px 8px 40px;
+  }
+
+  .game-card .card-content-custom {
+    padding: 0px 40px 20px 40px;
+  }
+
+  /* Optimizaciones para animaciones de tokens */
+  .token-animation {
+    image-rendering: pixelated;
+    -webkit-image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
+    will-change: background-image;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
+  /* Prevenir parpadeos en transiciones */
+  .no-flicker {
+    will-change: transform, opacity, background-image;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
+  /* Animaciones para Game Over */
+  @keyframes trap-explosion {
+    0% { 
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    25% { 
+      transform: scale(1.5) rotate(90deg);
+      opacity: 0.8;
+    }
+    50% { 
+      transform: scale(2) rotate(180deg);
+      opacity: 0.6;
+    }
+    75% { 
+      transform: scale(1.8) rotate(270deg);
+      opacity: 0.4;
+    }
+    100% { 
+      transform: scale(2.2) rotate(360deg);
+      opacity: 0.2;
+    }
+  }
+
+  @keyframes screen-shake {
+    0%, 100% { transform: translateX(0); }
+    10% { transform: translateX(-2px); }
+    20% { transform: translateX(2px); }
+    30% { transform: translateX(-3px); }
+    40% { transform: translateX(3px); }
+    50% { transform: translateX(-2px); }
+    60% { transform: translateX(2px); }
+    70% { transform: translateX(-1px); }
+    80% { transform: translateX(1px); }
+    90% { transform: translateX(-1px); }
+  }
+
+  @keyframes fire-flicker {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    25% { opacity: 0.8; transform: scale(1.1) rotate(5deg); }
+    50% { opacity: 0.9; transform: scale(0.95) rotate(-3deg); }
+    75% { opacity: 0.7; transform: scale(1.05) rotate(2deg); }
+  }
+
+  .trap-explosion {
+    animation: trap-explosion 1s ease-out;
+  }
+
+  .screen-shake {
+    animation: screen-shake 0.5s ease-in-out;
+  }
+
+  .fire-flicker {
+    animation: fire-flicker 0.3s ease-in-out infinite;
+  }
+
+  @keyframes fade-in {
+    0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.8s ease-out;
+  }
+
+  /* Animación de caída hacia abajo con desaparición */
+  @keyframes fallDown {
+    0% { 
+      transform: translateY(0) scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    15% { 
+      transform: translateY(10px) scale(0.95) rotate(5deg);
+      opacity: 1;
+    }
+    30% { 
+      transform: translateY(25px) scale(0.9) rotate(-3deg);
+      opacity: 1;
+    }
+    50% { 
+      transform: translateY(45px) scale(0.85) rotate(8deg);
+      opacity: 1;
+    }
+    70% { 
+      transform: translateY(70px) scale(0.7) rotate(-5deg);
+      opacity: 0.8;
+    }
+    85% { 
+      transform: translateY(95px) scale(0.5) rotate(10deg);
+      opacity: 0.4;
+    }
+    100% { 
+      transform: translateY(120px) scale(0.2) rotate(0deg);
+      opacity: 0;
+    }
+  }
+
+  /* Clase para la caída hacia abajo */
+  .fall-down {
+    animation: fallDown 2s ease-in forwards;
+    z-index: 10;
+  }
+
+  /* Animación para el fondo del game over */
+  @keyframes backgroundMove {
+    0% { 
+      background-position: 0px 0px;
+    }
+    100% { 
+      background-position: 40px 40px;
+    }
+  }
+
+  /* Animación de caída del hippie */
+  @keyframes hippieFalling {
+    0% { 
+      transform: translateY(-150vh) scale(1);
+      opacity: 1;
+    }
+    30% { 
+      transform: translateY(-80vh) scale(1);
+      opacity: 1;
+    }
+    60% { 
+      transform: translateY(-30vh) scale(1);
+      opacity: 1;
+    }
+    80% { 
+      transform: translateY(10vh) scale(1);
+      opacity: 1;
+    }
+    95% { 
+      transform: translateY(25vh) scale(1);
+      opacity: 1;
+    }
+    100% { 
+      transform: translateY(25vh) scale(1);
+      opacity: 1;
+    }
+  }
+
+  .hippie-falling {
+    animation: hippieFalling 3s ease-in forwards;
   }
 }

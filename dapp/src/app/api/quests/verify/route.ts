@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         }
         
         // Check if email already exists
-        const existingEmail = await prisma.user.findUnique({
+        const existingEmail = await prisma.user.findFirst({
           where: { email: value },
         });
         
@@ -142,8 +142,7 @@ export async function POST(request: Request) {
         break;
 
       case 'twitter_connect':
-      case 'twitter_follow':
-        // For Twitter, we need to link the user's Twitter account  
+        // For Twitter connect, we just link the user's Twitter account  
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
           return NextResponse.json({ 
             error: 'Twitter username is required.' 
@@ -152,6 +151,34 @@ export async function POST(request: Request) {
         
         // Store the Twitter handle (already verified via OAuth)
         updateData.twitterHandle = value.trim().replace(/^@/, '');
+        verificationResult = true;
+        break;
+
+      case 'twitter_follow':
+        // For Twitter follow, we verify the user is following us by checking the TwitterFollower collection
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+          return NextResponse.json({ 
+            error: 'Twitter username is required.' 
+          }, { status: 400 });
+        }
+        
+        const twitterUsername = value.trim().replace(/^@/, '').toLowerCase();
+        
+        // Check if this user is in our followers collection
+        const follower = await prisma.twitterFollower.findUnique({
+          where: {
+            twitterUsername: twitterUsername
+          }
+        });
+        
+        if (!follower) {
+          return NextResponse.json({ 
+            error: 'You are not following us on X/Twitter. Please follow us first and try again.' 
+          }, { status: 403 });
+        }
+        
+        // Store the Twitter handle and mark as verified
+        updateData.twitterHandle = twitterUsername;
         verificationResult = true;
         break;
 
@@ -168,13 +195,32 @@ export async function POST(request: Request) {
         break;
 
       case 'telegram_join':
-        // For now, we'll auto-verify Telegram tasks
-        // In a real implementation, you'd integrate with Telegram API
-        // If a value is provided, save it as telegram username
-        if (value && typeof value === 'string' && value.trim().length > 0) {
-          updateData.telegramUsername = value.trim();
+        // Verify Telegram membership using verification code
+        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+          return NextResponse.json({ 
+            error: 'Verification code is required' 
+          }, { status: 400 });
         }
-        verificationResult = true;
+
+        try {
+          // Use direct verification function instead of HTTP call
+          const { verifyTelegramByCode } = await import('@/lib/telegram-utils');
+          const telegramResult = await verifyTelegramByCode(user.walletAddress, value.trim());
+          
+          if (!telegramResult.success) {
+            return NextResponse.json({ 
+              error: telegramResult.error || 'Failed to verify Telegram membership'
+            }, { status: telegramResult.status });
+          }
+
+          updateData.telegramUsername = telegramResult.user?.username || `user_${telegramResult.user?.id}`;
+          verificationResult = true;
+        } catch (error) {
+          console.error('Telegram verification error:', error);
+          return NextResponse.json({ 
+            error: 'Failed to verify Telegram membership. Please try again.' 
+          }, { status: 500 });
+        }
         break;
 
       case 'auto_verify':

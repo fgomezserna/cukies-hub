@@ -20,6 +20,8 @@ model User {
 
   // Socials
   twitterHandle     String?
+  twitterName       String?  // Nombre completo de Twitter
+  twitterId         String?  // ID de Twitter
   discordUsername   String?
   telegramUsername  String?
 
@@ -40,6 +42,10 @@ model User {
   // Point transactions history
   pointTransactions PointTransaction[]
 
+  // Game sessions and results
+  gameSessions GameSession[]
+  gameResults  GameResult[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -49,6 +55,72 @@ model User {
   // NextAuth relations
   accounts Account[]
   sessions Session[]
+  
+  // Chat relations
+  chatMessages    ChatMessage[]
+  chatRoomMembers ChatRoomMember[]
+}
+
+// Game Session model
+model GameSession {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken  String   @unique
+  sessionId     String   @unique
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  gameId        String   // e.g., 'sybil-slayer', 'hyppie-road'
+  gameVersion   String?
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  isActive      Boolean  @default(true)
+  
+  // Checkpoints during the session
+  checkpoints   GameCheckpoint[]
+  
+  // Final result
+  result        GameResult?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, gameId])
+}
+
+// Game Checkpoint model
+model GameCheckpoint {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId     String   @db.ObjectId
+  session       GameSession @relation(fields: [sessionId], references: [id])
+  score         Int
+  gameTime      Int      // Time in milliseconds
+  timestamp     DateTime @default(now())
+  nonce         String?  // For security validation
+  hash          String?  // For security validation
+  events        Json?    // Array of events that happened
+  
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, timestamp])
+}
+
+// Game Result model
+model GameResult {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId     String   @unique @db.ObjectId
+  session       GameSession @relation(fields: [sessionId], references: [id])
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  gameId        String
+  finalScore    Int
+  gameTime      Int      // Total time played in milliseconds
+  metadata      Json?    // Additional game data (level, hearts, etc.)
+  isValid       Boolean  @default(true)
+  xpEarned      Int      @default(0)
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId, gameId])
+  @@index([finalScore])
 }
 
 model Streak {
@@ -141,6 +213,8 @@ enum PointTransactionType {
   GAME_PLAY
   GAME_WIN
   REFERRAL_BONUS
+  REFERRAL_LEVEL_1
+  REFERRAL_LEVEL_2
   PURCHASE
   MANUAL_ADJUSTMENT
   OTHER
@@ -187,4 +261,117 @@ model VerificationToken {
   expires     DateTime
 
   @@index([identifier])
+}
+
+// Model to track Twitter followers from IFTTT webhook
+model TwitterFollower {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  twitterUsername String   @unique // Twitter username without @
+  twitterHandle   String   // Twitter handle (same as username, for consistency)
+  twitterName     String?  // Display name from Twitter
+  followedAt      DateTime @default(now())
+  
+  // For debugging and webhook verification
+  webhookData     Json?    // Raw data from IFTTT webhook
+}
+
+// Chat models for game-specific chat rooms
+model ChatRoom {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  gameId        String   // 'sybil-slayer', 'hyppie-road', etc.
+  name          String   // Display name for the chat room
+  description   String?  // Optional description
+  
+  // Telegram integration
+  telegramTopicId  Int?  // Topic ID in Telegram group
+  telegramGroupId  String? // Telegram group chat ID
+  
+  // Settings
+  isActive      Boolean  @default(true)
+  maxMembers    Int?     // Optional member limit
+  
+  // Relations
+  messages      ChatMessage[]
+  members       ChatRoomMember[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([gameId])
+  @@index([gameId, isActive])
+}
+
+model ChatMessage {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId        String   @db.ObjectId
+  room          ChatRoom @relation(fields: [roomId], references: [id])
+  
+  // Message content
+  content       String
+  messageType   MessageType @default(TEXT)
+  
+  // Author information
+  userId        String?  @db.ObjectId
+  user          User?    @relation(fields: [userId], references: [id])
+  
+  // For messages from Telegram users not in our system
+  telegramUserId     Int?
+  telegramUsername   String?
+  telegramFirstName  String?
+  telegramLastName   String?
+  
+  // Telegram message info
+  telegramMessageId  Int?     // Original message ID from Telegram
+  
+  // Message metadata
+  isFromTelegram    Boolean  @default(false)
+  isFromWeb         Boolean  @default(false)
+  isEdited          Boolean  @default(false)
+  isDeleted         Boolean  @default(false)
+  
+  // Reply functionality
+  replyToId     String?  @db.ObjectId
+  replyTo       ChatMessage? @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies       ChatMessage[] @relation("MessageReplies")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([roomId, createdAt])
+  @@index([userId, createdAt])
+  @@index([telegramMessageId])
+}
+
+model ChatRoomMember {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId        String   @db.ObjectId
+  room          ChatRoom @relation(fields: [roomId], references: [id])
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  
+  // Member status
+  role          ChatRole @default(MEMBER)
+  isActive      Boolean  @default(true)
+  isMuted       Boolean  @default(false)
+  
+  // Timestamps
+  joinedAt      DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  
+  @@unique([roomId, userId])
+  @@index([userId, isActive])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  STICKER
+  SYSTEM
+}
+
+enum ChatRole {
+  MEMBER
+  MODERATOR
+  ADMIN
 }

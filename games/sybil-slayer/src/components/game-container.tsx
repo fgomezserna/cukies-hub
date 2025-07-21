@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { useChildConnection } from '@hyppie/game-bridge';
+import { useGameConnection } from '../hooks/useGameConnection';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
 import { useGameState } from '../hooks/useGameState';
@@ -22,7 +22,15 @@ interface GameContainerProps {
 
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { isAuthenticated, user } = useChildConnection();
+  const { 
+    isAuthenticated, 
+    user, 
+    gameSession, 
+    sendCheckpoint, 
+    sendSessionEnd, 
+    startCheckpointInterval, 
+    stopCheckpointInterval 
+  } = useGameConnection();
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
@@ -131,13 +139,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Log para verificar la recepción de datos de autenticación
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('Game received auth state from Dapp:', { isAuthenticated, user });
-    }
-  }, [isAuthenticated, user]);
-
   // Precargar assets al montar el componente
   useEffect(() => {
     assetLoader.preloadAll(progress => {
@@ -198,6 +199,47 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const inputState = useGameInput();
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+
+  // Log para verificar la recepción de datos de autenticación
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('Game received auth state from Dapp:', { isAuthenticated, user });
+    }
+  }, [isAuthenticated, user]);
+
+  // Handle game session start
+  useEffect(() => {
+    if (gameSession && gameState.status === 'playing') {
+      console.log('🎮 [GAME] Starting checkpoint interval for session:', gameSession.sessionId);
+      startCheckpointInterval(
+        () => gameState.score,
+        () => {
+          const now = Date.now();
+          const startTime = gameState.gameStartTime || now;
+          return now - startTime;
+        }
+      );
+    }
+    
+    return () => {
+      if (gameState.status !== 'playing') {
+        stopCheckpointInterval();
+      }
+    };
+  }, [gameSession, gameState.status, gameState.score, gameState.gameStartTime, startCheckpointInterval, stopCheckpointInterval]);
+
+  // Handle game session end
+  useEffect(() => {
+    if (gameSession && gameState.status === 'gameOver') {
+      console.log('🏁 [GAME] Ending session with score:', gameState.score);
+      sendSessionEnd(gameState.score, {
+        gameOverReason: gameState.gameOverReason,
+        level: gameState.level,
+        hearts: gameState.hearts
+      });
+      stopCheckpointInterval();
+    }
+  }, [gameSession, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, sendSessionEnd, stopCheckpointInterval]);
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
@@ -930,31 +972,33 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               pointerEvents: 'none'
             }}
           ></div>
-          <div
-            className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm"
-            style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
-          >
-            <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
-              SYBIL SLAYER
-            </h1>
-            <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center max-w-xl select-none">
-              Welcome to SYBIL SLAYER!<br/>
-              Dodge obstacles, collect energy and achieve the highest score.<br/>
-              Ready to play?
-            </p>
-            <button 
-              onClick={handleStartPauseClick} 
-              className="focus:outline-none game-button mb-4"
-              aria-label="Start game"
+          <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm">
+            <div
+              className="flex flex-col items-center justify-center"
+              style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
             >
-              <Image 
-                src="/assets/ui/buttons/play-button.png"
-                alt="Play"
-                width={160}
-                height={60}
-                className="game-img"
-              />
-            </button>
+              <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
+                SYBIL SLAYER
+              </h1>
+              <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center max-w-xl select-none">
+                Welcome to SYBIL SLAYER!<br/>
+                Dodge obstacles, collect energy and achieve the highest score.<br/>
+                Ready to play?
+              </p>
+              <button 
+                onClick={handleStartPauseClick} 
+                className="focus:outline-none game-button mb-4"
+                aria-label="Start game"
+              >
+                <Image 
+                  src="/assets/ui/buttons/play-button.png"
+                  alt="Play"
+                  width={160}
+                  height={60}
+                  className="game-img"
+                />
+              </button>
+            </div>
           </div>
         </>
       ) : gameState.status === 'countdown' ? (
@@ -1603,11 +1647,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       />
 
       {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      <div 
+        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+        style={{ transform: `scale(${scale})`, transformOrigin: 'bottom right' }}
+      >
         {/* Botón de música */}
         <button 
           onClick={handleMusicToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
         >
           <Image 
@@ -1624,7 +1671,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de sonidos */}
         <button 
           onClick={handleSoundsToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label={soundsEnabled ? 'Disable sounds' : 'Enable sounds'}
         >
           <Image 
@@ -1641,7 +1688,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón de información */}
         <button 
           onClick={handleInfoToggle} 
-          className="focus:outline-none hover:scale-110 transition-transform"
+          className="focus:outline-none game-button"
           aria-label="Información del juego"
         >
           <Image 

@@ -20,22 +20,25 @@ import { useAuth } from '@/providers/auth-provider';
 import Link from 'next/link';
 import CountdownTimer from '@/components/shared/countdown-timer';
 
-const referralsData = [
-  { name: "CryptoKing", joined: "2024-07-25", points: 15000, avatar: "https://placehold.co/40x40.png", hint: "king crown" },
-  { name: "DiamondHands", joined: "2024-07-22", points: 12500, avatar: "https://placehold.co/40x40.png", hint: "diamond hands" },
-  { name: "PixelPioneer", joined: "2024-07-20", points: 10000, avatar: "https://placehold.co/40x40.png", hint: "pixel art" },
-  { name: "ChainMaster", joined: "2024-07-18", points: 8000, avatar: "https://placehold.co/40x40.png", hint: "master crown" },
-  { name: "TokenRunner", joined: "2024-07-15", points: 4000, avatar: "https://placehold.co/40x40.png", hint: "running shoe" },
-];
+interface ReferralData {
+  username: string | null;
+  referralLink: string | null;
+  totalReferrals: number;
+  referralRewards: number;
+  referrals: Array<{
+    id: string;
+    username: string;
+    image: string | null;
+    joinedAt: string;
+    xp: number;
+  }>;
+  referredBy: {
+    id: string;
+    username: string;
+    image: string | null;
+  } | null;
+}
 
-const directPoints = 1250;
-const totalReferralPoints = referralsData.reduce((acc, referral) => acc + referral.points, 0);
-const totalPoints = directPoints + totalReferralPoints;
-
-const chartData = [
-  { name: "Direct XP", value: directPoints, fill: "var(--color-direct)" },
-  { name: "Referral XP", value: totalReferralPoints, fill: "var(--color-referral)" },
-];
 
 const chartConfig = {
   value: {
@@ -56,12 +59,12 @@ function ReferralsView() {
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   
-  const referralLink = user?.referralCode ? `https://hyppieliquid.com/r/${user.referralCode}` : "https://hyppieliquid.com/r/your-code-123";
-
+  const [referralData, setReferralData] = useState<ReferralData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
 
-  const unlockDate = useMemo(() => new Date("2025-07-15T00:00:00"), []);
+  const unlockDate = useMemo(() => new Date("2024-01-01T00:00:00"), []);
   const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
 
   useEffect(() => {
@@ -75,6 +78,30 @@ function ReferralsView() {
     return () => clearInterval(timer);
   }, [unlockDate]);
 
+  useEffect(() => {
+    if (user && !isTimeLocked) {
+      fetchReferralData();
+    }
+  }, [user, isTimeLocked]);
+
+  const fetchReferralData = async () => {
+    if (!user?.walletAddress) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/referrals?walletAddress=${user.walletAddress}`);
+      if (response.ok) {
+        const data = await response.json();
+        setReferralData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching referral data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   const isStarterQuestCompleted = useMemo(() => {
     if (!user) return false;
     return user.completedQuests.some(cq => cq.quest.isStarter);
@@ -82,15 +109,34 @@ function ReferralsView() {
 
   const isWalletConnected = !!user;
   const isLocked = isTimeLocked || !isWalletConnected || !isStarterQuestCompleted;
+  
+  console.log('Lock status:', {
+    isTimeLocked,
+    isWalletConnected,
+    isStarterQuestCompleted,
+    isLocked
+  });
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(referralLink);
-    toast({
-      title: "Copied to clipboard!",
-      description: "You can now share your referral link.",
-    });
+    if (user?.username) {
+      const referralLink = `${window.location.origin}/r/${user.username}`;
+      navigator.clipboard.writeText(referralLink);
+      toast({
+        title: "Copied to clipboard!",
+        description: "You can now share your referral link.",
+      });
+    }
     setActiveIndex(null);
   };
+
+  const directXP = user?.xp || 0;
+  const referralXP = referralData?.referralRewards || 0;
+  const totalXP = directXP + referralXP;
+
+  const chartData = [
+    { name: "Direct XP", value: directXP, fill: "var(--color-direct)" },
+    { name: "Referral XP", value: referralXP, fill: "var(--color-referral)" },
+  ];
 
   const onPieEnter = useCallback((_: any, index: number) => {
     setActiveIndex(index);
@@ -100,7 +146,7 @@ function ReferralsView() {
     setActiveIndex(null);
   }, [setActiveIndex]);
 
-  if (isAuthLoading) {
+  if (isAuthLoading || isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="h-8 w-8 animate-spin text-primary" />
@@ -125,13 +171,19 @@ function ReferralsView() {
                       <CardDescription>Share this link with your friends to earn rewards.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                      <div className="flex items-center space-x-2">
-                          <Input value={referralLink} readOnly />
-                          <Button variant="outline" size="icon" onClick={copyToClipboard}>
-                              <Copy className="h-4 w-4" />
-                              <span className="sr-only">Copy link</span>
-                          </Button>
-                      </div>
+                      {user?.username && isClient ? (
+                        <div className="flex items-center space-x-2">
+                            <Input value={`${window.location.origin}/r/${user.username}`} readOnly />
+                            <Button variant="outline" size="icon" onClick={copyToClipboard}>
+                                <Copy className="h-4 w-4" />
+                                <span className="sr-only">Copy link</span>
+                            </Button>
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-muted-foreground">
+                            <p>Set your username in your profile to get your referral link</p>
+                        </div>
+                      )}
                   </CardContent>
               </Card>
               <Card>
@@ -140,7 +192,7 @@ function ReferralsView() {
                   </CardHeader>
                   <CardContent className="flex flex-col items-center justify-center p-6 pt-0">
                       <Users className="h-10 w-10 text-muted-foreground mb-2" />
-                      <span className="text-5xl font-bold text-primary">{referralsData.length}</span>
+                      <span className="text-5xl font-bold text-primary">{referralData?.totalReferrals || 0}</span>
                   </CardContent>
               </Card>
           </div>
@@ -170,7 +222,7 @@ function ReferralsView() {
                       </ChartContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" aria-hidden="true">
                           <span className="text-3xl font-bold font-mono">
-                              {isClient && totalPoints.toLocaleString()}
+                              {isClient && totalXP.toLocaleString()}
                           </span>
                           <span className="text-sm text-muted-foreground">Total XP</span>
                       </div>
@@ -199,7 +251,7 @@ function ReferralsView() {
                       <Separator />
                       <div className="flex justify-between font-bold">
                         <span>Total</span>
-                        <span>{isClient && totalPoints.toLocaleString()}</span>
+                        <span>{isClient && totalXP.toLocaleString()}</span>
                       </div>
                   </div>
               </CardContent>
@@ -209,36 +261,47 @@ function ReferralsView() {
             <CardHeader>
               <CardTitle>Your Referrals</CardTitle>
               <CardDescription>
-                You've referred {referralsData.length} friends. Keep it up!
+                You've referred {referralData?.totalReferrals || 0} friends. Keep it up!
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Player</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Points Earned</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {referralsData.map((referral) => (
-                    <TableRow key={referral.name}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={referral.avatar} data-ai-hint={referral.hint} />
-                            <AvatarFallback>{referral.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{referral.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{referral.joined}</TableCell>
-                      <TableCell className="text-right font-medium text-primary">{isClient && `${referral.points.toLocaleString('en-US')} XP`}</TableCell>
+              {referralData?.referrals && referralData.referrals.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Player</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Points Earned</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {referralData.referrals.map((referral) => (
+                      <TableRow key={referral.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={referral.image || ''} />
+                              <AvatarFallback>{referral.username.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{referral.username}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(referral.joinedAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-primary">
+                          {isClient && `${referral.xp.toLocaleString('en-US')} XP`}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No referrals yet. Share your link to get started!</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

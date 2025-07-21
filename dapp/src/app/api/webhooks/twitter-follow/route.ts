@@ -3,15 +3,17 @@ import { prisma } from '@/lib/prisma';
 
 /*
 Webhook endpoint called by IFTTT when a user follows the official X/Twitter account.
+Now stores followers in TwitterFollower collection instead of auto-completing tasks.
 Expected JSON payload:
 {
-  "handle": "username",   // Twitter handle without @
+  "handle": "username",     // Twitter handle without @
+  "displayName": "Name",    // Display name (optional)
   "secret": "shared_secret" // Pre-shared secret for validation
 }
 */
 export async function POST(request: Request) {
   try {
-    const { handle, secret } = await request.json();
+    const { handle, displayName, secret, ...rawData } = await request.json();
 
     // Basic validation
     if (!handle || typeof handle !== 'string') {
@@ -24,55 +26,58 @@ export async function POST(request: Request) {
 
     const normalizedHandle = handle.trim().replace(/^@/, '').toLowerCase();
 
-    // Find the user by twitterHandle
-    const user = await prisma.user.findFirst({
+    console.log('Processing Twitter follow webhook:', {
+      handle: normalizedHandle,
+      displayName,
+      rawData
+    });
+
+    // Store the follower in the TwitterFollower collection
+    const follower = await prisma.twitterFollower.upsert({
       where: {
+        twitterUsername: normalizedHandle
+      },
+      update: {
+        twitterName: displayName || null,
+        followedAt: new Date(), // Update follow date if they re-follow
+        webhookData: rawData
+      },
+      create: {
+        twitterUsername: normalizedHandle,
         twitterHandle: normalizedHandle,
-      },
+        twitterName: displayName || null,
+        webhookData: rawData
+      }
     });
 
-    if (!user) {
-      return NextResponse.json({ error: `User with handle ${normalizedHandle} not found` }, { status: 404 });
-    }
+    console.log('Twitter follower stored:', follower);
 
-    // Find the "Follow us on X" task (validationApiEndpoint ends with twitter-follow)
-    const task = await prisma.task.findFirst({
-      where: {
-        validationApiEndpoint: {
-          endsWith: 'twitter-follow',
-        },
-      },
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Follower recorded successfully',
+      follower: {
+        username: follower.twitterUsername,
+        name: follower.twitterName,
+        followedAt: follower.followedAt
+      }
     });
 
-    if (!task) {
-      return NextResponse.json({ error: 'Follow task not found' }, { status: 500 });
-    }
-
-    // Check if already completed
-    const existingCompletion = await prisma.userCompletedTask.findUnique({
-      where: {
-        userId_taskId: {
-          userId: user.id,
-          taskId: task.id,
-        },
-      },
-    });
-
-    if (existingCompletion) {
-      return NextResponse.json({ success: true, alreadyCompleted: true });
-    }
-
-    // Mark as completed and optionally store twitterHandle (already saved during connect)
-    await prisma.userCompletedTask.create({
-      data: {
-        userId: user.id,
-        taskId: task.id,
-      },
-    });
-
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Twitter follow webhook error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
+}
+
+// Optional: Handle GET requests for webhook verification
+export async function GET() {
+  const webhookSecret = process.env.IFTTT_WEBHOOK_SECRET;
+  
+  if (!webhookSecret) {
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+  }
+
+  return NextResponse.json({ 
+    message: 'Twitter follow webhook endpoint is active',
+    timestamp: new Date().toISOString()
+  });
 } 

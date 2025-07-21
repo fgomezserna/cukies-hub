@@ -185,7 +185,7 @@ export default function ProfilePage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {user.recentActivity.length > 0 ? user.recentActivity.map((activity, index) => (
+                            {user.recentActivity.length > 0 ? user.recentActivity.map((activity: any, index: number) => (
                                 <TableRow key={index}>
                                     <TableCell className="font-medium">{activity.game}</TableCell>
                                     <TableCell className="font-mono text-primary">{activity.score.toLocaleString()}</TableCell>

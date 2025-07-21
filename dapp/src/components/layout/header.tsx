@@ -21,8 +21,8 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import Image from 'next/image';
-import hyppieletters from '@/assets/hyppieletters.png';
-import hyppieicon from '@/assets/hyppiesymbol.png';
+import hyppieletters from '@/assets/hyppielettersss.png';
+import hyppieicon from '@/assets/dice.png';
 import { useAuth } from '@/providers/auth-provider';
 import { useConnect, useDisconnect } from 'wagmi';
 
@@ -43,7 +43,7 @@ const getRank = (xp: number): string => {
 
 export default function Header() {
   const { toggleSidebar, state, isMobile } = useSidebar();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, isWaitingForApproval } = useAuth();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   
@@ -76,8 +76,9 @@ export default function Header() {
 
       {(isMobile || state === 'collapsed') && (
         <div className="flex items-center gap-2 group">
-            <Image src={hyppieicon} alt="HyppieLiquid" width={39} height={20} />
-            <Image src={hyppieletters} alt="HyppieLiquid" height={39} />
+            {/* En móvil muestra icono + texto, en desktop colapsado solo texto */}
+            {isMobile && <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />}
+            <Image src={hyppieletters} alt="HyppieLiquid" height={52} />
         </div>
       )}
 
@@ -172,11 +173,27 @@ export default function Header() {
           </DropdownMenu>
         ) : (
           <Button 
-            onClick={() => connect({ connector: connectors[0] })} 
-            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-6 py-2 rounded-xl shadow-lg shadow-green-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-green-500/40"
+            onClick={() => !isWaitingForApproval && connect({ connector: connectors[0] })} 
+            disabled={isWaitingForApproval}
+            className={`${
+              isWaitingForApproval 
+                ? "bg-gradient-to-r from-amber-500 to-orange-600 cursor-not-allowed" 
+                : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:scale-105 hover:shadow-xl hover:shadow-green-500/40"
+            } text-white font-bold px-6 py-2 rounded-xl shadow-lg transition-all duration-300 ${
+              isWaitingForApproval ? "shadow-amber-500/30 animate-pulse" : "shadow-green-500/30"
+            }`}
           >
-            <Wallet className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">Connect Wallet</span>
+            {isWaitingForApproval ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent md:mr-2" />
+                <span className="hidden md:inline">Waiting for Approval...</span>
+              </>
+            ) : (
+              <>
+                <Wallet className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Connect Wallet</span>
+              </>
+            )}
           </Button>
         )}
       </div>
