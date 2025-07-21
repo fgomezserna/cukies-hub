@@ -767,7 +767,7 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
       console.error('OAuth flow failed:', error);
       
       let title = 'Connection Failed';
-      let description = error.message || 'An unexpected error occurred';
+      let description = (error as Error)?.message || 'An unexpected error occurred';
       
       if (taskType === 'discord_connect') {
         title = 'Discord Connection Failed';

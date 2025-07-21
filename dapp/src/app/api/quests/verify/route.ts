@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         }
         
         // Check if email already exists
-        const existingEmail = await prisma.user.findUnique({
+        const existingEmail = await prisma.user.findFirst({
           where: { email: value },
         });
         
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
             }, { status: telegramResult.status });
           }
 
-          updateData.telegramUsername = telegramResult.user.username || `user_${telegramResult.user.id}`;
+          updateData.telegramUsername = telegramResult.user?.username || `user_${telegramResult.user?.id}`;
           verificationResult = true;
         } catch (error) {
           console.error('Telegram verification error:', error);

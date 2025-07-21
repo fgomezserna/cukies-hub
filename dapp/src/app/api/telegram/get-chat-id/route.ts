@@ -21,7 +21,12 @@ export async function GET() {
 
     // Extract chat IDs from the updates
     const chatIds = new Set();
-    const chats = [];
+    const chats: Array<{
+      id: number;
+      title: string;
+      type: string;
+      username: string | null;
+    }> = [];
 
     data.result.forEach((update: any) => {
       if (update.message?.chat) {

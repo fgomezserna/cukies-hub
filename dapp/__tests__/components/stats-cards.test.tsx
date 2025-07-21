@@ -61,6 +61,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -77,6 +78,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -92,6 +94,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -105,6 +108,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: true,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -118,6 +122,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -139,6 +144,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: userWithHighXP,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -157,6 +163,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: userWithZeroXP,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -170,6 +177,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -187,6 +195,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })
@@ -201,6 +210,7 @@ describe('components/home/StatsCards', () => {
     mockUseAuth.mockReturnValue({
       user: mockUser,
       isLoading: false,
+      isWaitingForApproval: false,
       fetchUser: jest.fn(),
       isWaitingForApproval: false,
     })

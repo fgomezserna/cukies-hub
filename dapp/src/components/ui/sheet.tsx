@@ -62,12 +62,12 @@ const SheetContent = React.forwardRef<
   const hasTitle = React.Children.toArray(children).some((child) => {
     if (React.isValidElement(child)) {
       return child.type === SheetTitle || 
-             (typeof child.type === 'object' && child.type?.displayName === 'SheetTitle') ||
+             (typeof child.type === 'object' && child.type !== null && 'displayName' in child.type && (child.type as any).displayName === 'SheetTitle') ||
              (child.props && child.props.children && 
               React.Children.toArray(child.props.children).some((nestedChild) => 
                 React.isValidElement(nestedChild) && 
                 (nestedChild.type === SheetTitle || 
-                 (typeof nestedChild.type === 'object' && nestedChild.type?.displayName === 'SheetTitle'))
+                 (typeof nestedChild.type === 'object' && nestedChild.type !== null && 'displayName' in nestedChild.type && (nestedChild.type as any).displayName === 'SheetTitle'))
               )
              );
     }

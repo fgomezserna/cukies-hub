@@ -55,6 +55,10 @@ model User {
   // NextAuth relations
   accounts Account[]
   sessions Session[]
+  
+  // Chat relations
+  chatMessages    ChatMessage[]
+  chatRoomMembers ChatRoomMember[]
 }
 
 // Game Session model
@@ -269,4 +273,105 @@ model TwitterFollower {
   
   // For debugging and webhook verification
   webhookData     Json?    // Raw data from IFTTT webhook
+}
+
+// Chat models for game-specific chat rooms
+model ChatRoom {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  gameId        String   // 'sybil-slayer', 'hyppie-road', etc.
+  name          String   // Display name for the chat room
+  description   String?  // Optional description
+  
+  // Telegram integration
+  telegramTopicId  Int?  // Topic ID in Telegram group
+  telegramGroupId  String? // Telegram group chat ID
+  
+  // Settings
+  isActive      Boolean  @default(true)
+  maxMembers    Int?     // Optional member limit
+  
+  // Relations
+  messages      ChatMessage[]
+  members       ChatRoomMember[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([gameId])
+  @@index([gameId, isActive])
+}
+
+model ChatMessage {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId        String   @db.ObjectId
+  room          ChatRoom @relation(fields: [roomId], references: [id])
+  
+  // Message content
+  content       String
+  messageType   MessageType @default(TEXT)
+  
+  // Author information
+  userId        String?  @db.ObjectId
+  user          User?    @relation(fields: [userId], references: [id])
+  
+  // For messages from Telegram users not in our system
+  telegramUserId     Int?
+  telegramUsername   String?
+  telegramFirstName  String?
+  telegramLastName   String?
+  
+  // Telegram message info
+  telegramMessageId  Int?     // Original message ID from Telegram
+  
+  // Message metadata
+  isFromTelegram    Boolean  @default(false)
+  isFromWeb         Boolean  @default(false)
+  isEdited          Boolean  @default(false)
+  isDeleted         Boolean  @default(false)
+  
+  // Reply functionality
+  replyToId     String?  @db.ObjectId
+  replyTo       ChatMessage? @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies       ChatMessage[] @relation("MessageReplies")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([roomId, createdAt])
+  @@index([userId, createdAt])
+  @@index([telegramMessageId])
+}
+
+model ChatRoomMember {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId        String   @db.ObjectId
+  room          ChatRoom @relation(fields: [roomId], references: [id])
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  
+  // Member status
+  role          ChatRole @default(MEMBER)
+  isActive      Boolean  @default(true)
+  isMuted       Boolean  @default(false)
+  
+  // Timestamps
+  joinedAt      DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  
+  @@unique([roomId, userId])
+  @@index([userId, isActive])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  STICKER
+  SYSTEM
+}
+
+enum ChatRole {
+  MEMBER
+  MODERATOR
+  ADMIN
 }
