@@ -10,7 +10,8 @@
     "sybil-slayer": "pnpm --filter sybil-slayer",
     "build:dapp": "pnpm --filter dapp build",
     "build:sybil-slayer": "pnpm --filter sybil-slayer build",
-    "build:hyppie-road": "pnpm --filter hyppie-road build"
+    "build:hyppie-road": "pnpm --filter hyppie-road build",
+    "build:tower-builder": "pnpm --filter tower-builder build"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",
