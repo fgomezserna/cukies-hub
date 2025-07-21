@@ -111,7 +111,11 @@ export function useGameConnection(
           
           console.log('📨 [DAPP] Sending secure session start message to game:', secureMessage);
           // Send to all possible game origins
-          const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004'];
+          const gameOrigins = [
+            process.env.NEXT_PUBLIC_GAME_SYBILSLASH || 'http://localhost:9002',
+            process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003', 
+            process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
+          ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
           gameOrigins.forEach(origin => {
             iframeRef.current?.contentWindow?.postMessage(secureMessage, origin);
           });
@@ -234,9 +238,13 @@ export function useGameConnection(
       }
 
       // Only process messages from game origins
-      if (event.origin !== 'http://localhost:9002' && 
-          event.origin !== 'http://localhost:9003' && 
-          event.origin !== 'http://localhost:9004') {
+      const gameOrigins = [
+        process.env.NEXT_PUBLIC_GAME_SYBILSLASH || 'http://localhost:9002',
+        process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003', 
+        process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
+      ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
+      
+      if (!gameOrigins.includes(event.origin)) {
         return;
       }
 
@@ -330,7 +338,11 @@ export function useGameConnection(
       
       console.log('🔐 [DAPP] Sending secure auth data:', secureAuthMessage);
       // Send to all possible game origins
-      const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004'];
+      const gameOrigins = [
+        process.env.NEXT_PUBLIC_GAME_SYBILSLASH || 'http://localhost:9002',
+        process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003', 
+        process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
+      ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
       gameOrigins.forEach(origin => {
         try {
           iframeRef.current?.contentWindow?.postMessage(secureAuthMessage, origin);

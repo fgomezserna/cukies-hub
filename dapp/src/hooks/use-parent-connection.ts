@@ -12,7 +12,7 @@ type MessagePayload = {
 
 const TARGET_ORIGIN = process.env.NODE_ENV === 'production' 
   ? 'https://hyppie-road.vercel.app' // Game domain in production
-  : 'http://localhost:9003';
+  : (process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003').replace(/\/$/, '');
 
 /**
  * Hook para ser usado en la DApp (el contenedor padre).
