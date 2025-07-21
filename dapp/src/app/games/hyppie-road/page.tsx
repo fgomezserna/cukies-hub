@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useParentConnection } from '@/hooks/use-parent-connection';
 import { useAuth } from '@/providers/auth-provider';
 import AppLayout from '@/components/layout/app-layout';
@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
+import { LeaderboardPlayer } from '@/types';
 
 
 // Define a type for the element to handle vendor prefixes for fullscreen
@@ -20,14 +21,26 @@ interface FullscreenElement extends HTMLDivElement {
   msRequestFullscreen?: () => Promise<void>;
 }
 
-// Mock data - En el futuro esto vendrá de la base de datos
-const mockTopRiders = [
-  { id: 1, username: "RoadMaster", profilePicture: "https://placehold.co/40x40.png", score: 25680 },
-  { id: 2, username: "CryptoDriver", profilePicture: "https://placehold.co/40x40.png", score: 24320 },
-  { id: 3, username: "HyppieRacer", profilePicture: "https://placehold.co/40x40.png", score: 23150 },
-  { id: 4, username: "BlockchainSpeed", profilePicture: "https://placehold.co/40x40.png", score: 22890 },
-  { id: 5, username: "TokenRunner", profilePicture: "https://placehold.co/40x40.png", score: 21450 }
-];
+interface GameStats {
+  gameId: string;
+  totalPlayers: number;
+  totalSessions: number;
+  avgScore: number;
+  topScore: number;
+  userStats?: {
+    bestScore: number;
+    sessionsCount: number;
+    rank: number;
+  };
+}
+
+interface LeaderboardResponse {
+  leaderboard: LeaderboardPlayer[];
+  totalCount: number;
+  hasMore: boolean;
+  gameId?: string;
+  period?: string;
+}
 
 // Sistema de rangos basado en experiencia
 const ranks = [
@@ -48,12 +61,58 @@ export default function HyppieRoadPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { user, isLoading } = useAuth();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [apiGameStats, setApiGameStats] = useState<GameStats | null>(null);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Use the hook to send authentication data to the game
   useParentConnection(iframeRef, {
     isAuthenticated: !!user && !isLoading,
     user: user,
   });
+
+  // Fetch game statistics and leaderboard data
+  useEffect(() => {
+    const fetchGameData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch game statistics
+        const statsParams = new URLSearchParams({
+          gameId: 'hyppie-road'
+        });
+        if (user?.id) {
+          statsParams.append('userId', user.id);
+        }
+        
+        const statsResponse = await fetch(`/api/games/stats?${statsParams}`);
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setApiGameStats(statsData);
+        }
+        
+        // Fetch leaderboard data
+        const leaderboardParams = new URLSearchParams({
+          gameId: 'hyppie-road',
+          period: 'all-time',
+          limit: '10'
+        });
+        
+        const leaderboardResponse = await fetch(`/api/leaderboard?${leaderboardParams}`);
+        if (leaderboardResponse.ok) {
+          const leaderboardData = await leaderboardResponse.json();
+          setLeaderboardData(leaderboardData);
+        }
+        
+      } catch (error) {
+        console.error('Failed to fetch game data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGameData();
+  }, [user]);
 
   const handleFullScreen = () => {
     const element = gameContainerRef.current;
@@ -70,8 +129,8 @@ export default function HyppieRoadPage() {
     }
   };
 
-  // Mock data - En el futuro vendrá de la base de datos
-  const userHighScore = user ? 18750 : 0; // High score del usuario actual
+  // Real data from API
+  const userHighScore = apiGameStats?.userStats?.bestScore ?? 0;
   const userXP = user?.xp ?? 0;
   const userRank = getRank(userXP);
 
@@ -193,27 +252,37 @@ export default function HyppieRoadPage() {
             </CardHeader>
             <CardContent className="p-3">
               <div className="space-y-0">
-                {mockTopRiders.map((player, index) => (
-                  <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="text-sm font-bold text-muted-foreground w-6">
-                        #{index + 1}
+                {loading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="text-sm text-muted-foreground">Loading...</div>
                   </div>
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={player.profilePicture} />
-                        <AvatarFallback className="text-xs">
-                          {player.username.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{player.username}</p>
-                </div>
+                ) : leaderboardData?.leaderboard.length === 0 ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="text-sm text-muted-foreground">No players yet</div>
                   </div>
-                    <div className="text-sm font-mono font-bold text-yellow-400">
-                      {player.score.toLocaleString()}
-                </div>
-                  </div>
-                ))}
+                ) : (
+                  leaderboardData?.leaderboard.slice(0, 5).map((player, index) => (
+                    <div key={player.walletAddress} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="text-sm font-bold text-muted-foreground w-6">
+                          #{index + 1}
+                        </div>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={player.avatar} />
+                          <AvatarFallback className="text-xs">
+                            {player.name.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{player.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm font-mono font-bold text-yellow-400">
+                        {player.totalPoints.toLocaleString()}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
