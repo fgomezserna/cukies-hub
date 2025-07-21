@@ -39,6 +39,7 @@ const GameContainer = () => {
             private levelUpText: Phaser.GameObjects.Text | null = null;
             private gameOverBg: Phaser.GameObjects.Rectangle | null = null;
             private lastSpeedLevel = 0; // Para trackear el último nivel de velocidad mostrado
+            private gameStartTime = 0; // Tiempo de inicio del juego
             
             // Parallax clouds con configuración mejorada
             private cloudsLayers: Phaser.GameObjects.TileSprite[] = [];
@@ -369,6 +370,10 @@ const GameContainer = () => {
               this.moveSpeed = this.baseSpeed; // Reset to base speed
               this.lastSpeedLevel = 0; // Reset level tracking
               this.recentBlocks = []; // Reset block history
+              this.gameStartTime = Date.now(); // Record game start time
+              
+              // Start game session if parent connection is available
+              this.startGameSession();
               
               // Reset airplane
               if (this.airplane) {
@@ -525,6 +530,11 @@ const GameContainer = () => {
                 // Update score
                 this.score += 1;
                 if (this.scoreText) this.scoreText.setText(`Score: ${this.score}`);
+
+                // Send checkpoint to parent (every 5 points to avoid spam)
+                if (this.score % 5 === 0) {
+                  this.sendCheckpoint();
+                }
 
                 // Incremento de velocidad: 50% por cada 10 bloques acumulados
                 const speedMultiplier = 1 + (0.5 * Math.floor(this.score / 10));
@@ -1050,6 +1060,9 @@ const GameContainer = () => {
               this.gameState = 'gameOver';
               this.isBlockFalling = false;
 
+              // Send final score to parent
+              this.endGameSession(reason);
+
               // Clean up the falling block if it exists
               if (this.topBlock) {
                 this.topBlock.destroy();
@@ -1130,6 +1143,52 @@ const GameContainer = () => {
                   });
                 }
               });
+            }
+
+            // Game session communication methods
+            startGameSession() {
+              try {
+                if ((window as any).towerBuilderGame?.startSession) {
+                  (window as any).towerBuilderGame.startSession();
+                  console.log('🏗️ Tower Builder: Game session started');
+                }
+              } catch (error) {
+                console.warn('🏗️ Tower Builder: Could not start session', error);
+              }
+            }
+
+            sendCheckpoint() {
+              try {
+                if ((window as any).towerBuilderGame?.sendCheckpoint && this.gameStartTime > 0) {
+                  const gameTime = Date.now() - this.gameStartTime;
+                  (window as any).towerBuilderGame.sendCheckpoint(this.score, gameTime);
+                  console.log(`🏗️ Tower Builder: Checkpoint sent - Score: ${this.score}, Time: ${gameTime}ms`);
+                }
+              } catch (error) {
+                console.warn('🏗️ Tower Builder: Could not send checkpoint', error);
+              }
+            }
+
+            endGameSession(reason?: string) {
+              try {
+                console.log('🎮 [PHASER] endGameSession called, checking availability:', !!(window as any).towerBuilderGame?.endSession, 'gameStartTime:', this.gameStartTime);
+                if ((window as any).towerBuilderGame?.endSession && this.gameStartTime > 0) {
+                  const gameTime = Date.now() - this.gameStartTime;
+                  const metadata = {
+                    gameOverReason: reason || 'Game completed',
+                    finalHeight: this.score,
+                    gameTime,
+                    blocksPlaced: this.score
+                  };
+                  console.log('🎮 [PHASER] Calling endSession with score:', this.score, 'metadata:', metadata);
+                  (window as any).towerBuilderGame.endSession(this.score, metadata);
+                  console.log(`🏗️ Tower Builder: Session ended - Final Score: ${this.score}, Reason: ${reason}`);
+                } else {
+                  console.warn('⚠️ [PHASER] endSession not available or gameStartTime invalid:', this.gameStartTime);
+                }
+              } catch (error) {
+                console.warn('🏗️ Tower Builder: Could not end session', error);
+              }
             }
           }
 

@@ -175,11 +175,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
           // Only log if there's an actual change and we haven't logged it recently
           if (currentAccount && currentAccount !== address && currentAccount !== previousAddressRef.current) {
-            console.log('🔄 Polling detected wallet change:', {
-              wagmiAddress: address,
-              polledAddress: currentAccount,
-              previousAddress: previousAddressRef.current
-            });
+           
             
             // This will trigger the useEffect above when wagmi updates
             // We just log here to help with debugging

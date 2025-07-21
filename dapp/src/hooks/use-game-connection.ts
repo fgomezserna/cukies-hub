@@ -111,7 +111,7 @@ export function useGameConnection(
           
           console.log('📨 [DAPP] Sending secure session start message to game:', secureMessage);
           // Send to all possible game origins
-          const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'https://hyppie-road.vercel.app'];
+          const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004', 'https://hyppie-road.vercel.app'];
           gameOrigins.forEach(origin => {
             iframeRef.current?.contentWindow?.postMessage(secureMessage, origin);
           });
@@ -226,6 +226,7 @@ export function useGameConnection(
       // Only process messages from game origins
       if (event.origin !== 'http://localhost:9002' && 
           event.origin !== 'http://localhost:9003' && 
+          event.origin !== 'http://localhost:9004' && 
           event.origin !== 'https://hyppie-road.vercel.app') {
         return;
       }
@@ -305,23 +306,38 @@ export function useGameConnection(
         return; // Already sent auth data
       }
 
+      // Ensure iframe is available and loaded
+      if (!iframeRef.current?.contentWindow) {
+        console.log('⏳ [DAPP] Iframe not ready, waiting...');
+        return;
+      }
+
       authSentRef.current = true;
+      
+      console.log('🔐 [DAPP] Iframe ready, sending auth data...');
       
       // Create secure auth message
       const secureAuthMessage = await createSecureMessage('AUTH_STATE_CHANGED', authData);
       
       console.log('🔐 [DAPP] Sending secure auth data:', secureAuthMessage);
       // Send to all possible game origins
-      const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'https://hyppie-road.vercel.app'];
+      const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004', 'https://hyppie-road.vercel.app'];
       gameOrigins.forEach(origin => {
-        iframeRef.current?.contentWindow?.postMessage(secureAuthMessage, origin);
+        try {
+          iframeRef.current?.contentWindow?.postMessage(secureAuthMessage, origin);
+          console.log('📨 [DAPP] Auth message sent to:', origin);
+        } catch (e) {
+          console.warn('⚠️ [DAPP] Failed to send auth to:', origin);
+        }
       });
       
-      // Auto-start session if user is authenticated
-      if (authData.user?.id) {
-        console.log('🚀 [DAPP] Auto-starting session for user:', authData.user.id);
-        startGameSession(authData.user.id);
-      }
+      // Wait a bit before starting session to ensure auth is processed
+      setTimeout(() => {
+        if (authData.user?.id) {
+          console.log('🚀 [DAPP] Auto-starting session for user:', authData.user.id);
+          startGameSession(authData.user.id);
+        }
+      }, 500); // Wait 500ms for auth to be processed
     };
 
     // Try to send immediately
@@ -331,13 +347,21 @@ export function useGameConnection(
     console.log('🔐 [DAPP] Setting up iframe onload handler for secure auth');
     iframeRef.current.onload = sendAuthAndStartSession;
     
-    // Additional backup: try again after a short delay
+    // Additional backup: try again after delays
     setTimeout(() => {
       if (iframeRef.current && !authSentRef.current) {
-        console.log('🔐 [DAPP] Backup: sending secure auth data after delay');
+        console.log('🔐 [DAPP] Backup 1: sending secure auth data after delay');
         sendAuthAndStartSession();
       }
     }, 1000);
+    
+    // Final backup after iframe should be fully loaded
+    setTimeout(() => {
+      if (iframeRef.current && !authSentRef.current) {
+        console.log('🔐 [DAPP] Backup 2: final attempt to send auth data');
+        sendAuthAndStartSession();
+      }
+    }, 2000);
   }, [iframeRef, authData.isAuthenticated, authData.user?.id, startGameSession]);
 
   // Cleanup on unmount

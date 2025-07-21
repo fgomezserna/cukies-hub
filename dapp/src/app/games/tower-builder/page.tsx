@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useRef } from 'react';
-import { useParentConnection } from '@/hooks/use-parent-connection';
+import { useGameConnection } from '@/hooks/use-game-connection';
 import { useAuth } from '@/providers/auth-provider';
 import { useGameData } from '@/hooks/use-game-data';
 import GameLayout from '@/components/layout/GameLayout';
@@ -10,16 +10,61 @@ export default function TowerBuilderPage() {
   const { user, isLoading } = useAuth();
   const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('tower-builder');
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Use the parent connection hook to send authentication data to the game
-  useParentConnection(iframeRef, {
-    isAuthenticated: !!user && !isLoading,
-    user: user,
+  
+  // Local game state for real-time updates
+  const [localGameStats, setLocalGameStats] = React.useState({
+    currentScore: 0,
+    bestScore: 0,
+    sessionsPlayed: 0,
+    validSessions: 0
   });
 
-  // Handle game connection setup - no-op since connection is already set up
+  // Game connection callbacks
+  const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
+    console.log('Tower Builder session started:', sessionData);
+    setLocalGameStats(prev => ({ ...prev, sessionsPlayed: prev.sessionsPlayed + 1 }));
+  }, []);
+
+  const onCheckpoint = useCallback((checkpoint: any) => {
+    console.log('Tower Builder checkpoint received:', checkpoint);
+    setLocalGameStats(prev => ({ ...prev, currentScore: checkpoint.score }));
+  }, []);
+
+  const onSessionEnd = useCallback((result: { finalScore: number; isValid: boolean }) => {
+    console.log('Tower Builder session ended:', result);
+    setLocalGameStats(prev => ({
+      ...prev,
+      bestScore: Math.max(prev.bestScore, result.finalScore),
+      currentScore: 0,
+      validSessions: prev.validSessions + (result.isValid ? 1 : 0)
+    }));
+  }, []);
+
+  const onHoneypotDetected = useCallback((event: string) => {
+    console.warn('Tower Builder honeypot detected:', event);
+  }, []);
+
+  // Set up game connection options
+  const gameConnectionOptions = React.useMemo(() => ({
+    gameId: 'tower-builder',
+    gameVersion: '1.0.0',
+    onSessionStart,
+    onCheckpoint,
+    onSessionEnd,
+    onHoneypotDetected
+  }), [onSessionStart, onCheckpoint, onSessionEnd, onHoneypotDetected]);
+
+  const authData = React.useMemo(() => ({
+    isAuthenticated: !!user && !isLoading,
+    user: user,
+  }), [user, isLoading]);
+
+  // Use the enhanced game connection hook
+  const gameConnection = useGameConnection(iframeRef, authData, gameConnectionOptions);
+
+  // Handle game connection setup - just pass the ref
   const handleGameConnection = useCallback((iframeRef: React.RefObject<HTMLIFrameElement>) => {
-    // Connection is already handled by useParentConnection hook above
+    // The connection is already set up via the hook above
     return;
   }, []);
 
