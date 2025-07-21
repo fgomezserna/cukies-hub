@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { gameId: string } }
-) {
+export async function GET(request: NextRequest, context: { params: { gameId: string } }) {
+  const { params } = context;
+  const awaitedParams = await params;
   try {
     // For GET requests, we'll check if a wallet address is provided in query params
     const { searchParams } = new URL(request.url);
@@ -26,7 +25,7 @@ export async function GET(
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
+      where: { gameId: awaitedParams.gameId },
     });
 
     if (!room) {
@@ -87,12 +86,19 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { gameId: string } }
-) {
+export async function POST(request: NextRequest, context: { params: { gameId: string } }) {
+  const { params } = context;
+  const awaitedParams = await params;
   try {
-    const { walletAddress, content, messageType = 'TEXT', replyToId } = await request.json();
+    let requestData;
+    try {
+      requestData = await request.json();
+    } catch (jsonError) {
+      console.error('JSON parsing error:', jsonError);
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+    
+    const { walletAddress, content, messageType = 'TEXT', replyToId } = requestData;
     
     if (!walletAddress) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
@@ -113,7 +119,7 @@ export async function POST(
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
+      where: { gameId: awaitedParams.gameId },
     });
 
     if (!room) {
@@ -174,8 +180,41 @@ export async function POST(
       },
     });
 
-    // TODO: Send message to Telegram if room has Telegram integration
-    // await sendMessageToTelegram(room, message);
+    console.log('💬 Message created successfully');
+    
+    // Send to Telegram in background
+    if (room.telegramGroupId && room.telegramTopicId && process.env.TELEGRAM_BOT_TOKEN) {
+      setTimeout(async () => {
+        try {
+          const displayName = user.username || `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`;
+          const telegramContent = `<b>${displayName}</b>: ${content.trim()}`;
+          
+          const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: room.telegramGroupId,
+              text: telegramContent,
+              parse_mode: 'HTML',
+              message_thread_id: room.telegramTopicId
+            })
+          });
+          
+          const data = await response.json();
+          console.log('📱 Telegram API response:', data.ok ? `✅ Sent (${data.result.message_id})` : `❌ ${data.description}`);
+          
+          if (data.ok && data.result) {
+            // Update the message with the Telegram message ID for future reference
+            await prisma.chatMessage.update({
+              where: { id: message.id },
+              data: { telegramMessageId: data.result.message_id }
+            });
+          }
+        } catch (telegramError: any) {
+          console.error('❌ Telegram error:', telegramError.message);
+        }
+      }, 100);
+    }
 
     return NextResponse.json(message, { status: 201 });
   } catch (error) {

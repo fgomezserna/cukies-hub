@@ -43,9 +43,11 @@ export async function sendMessageToTelegram(
   replyToTelegramMessageId?: number
 ): Promise<TelegramSendMessageResponse> {
   try {
+    console.log('sendMessageToTelegram called with roomId:', roomId);
     const room = await prisma.chatRoom.findUnique({
       where: { id: roomId },
     });
+    console.log('Found room:', room ? `${room.gameId} (topic: ${room.telegramTopicId})` : 'null');
 
     if (!room || !room.telegramGroupId || !process.env.TELEGRAM_BOT_TOKEN) {
       return { ok: false, error_code: 404, description: 'Room or Telegram configuration not found' };
@@ -60,6 +62,12 @@ export async function sendMessageToTelegram(
     // Add topic threading if available
     if (room.telegramTopicId) {
       payload.message_thread_id = room.telegramTopicId;
+    } else {
+      // For forum groups, we need to specify a topic ID
+      // Use a default topic or create one specifically for games
+      // For now, we'll skip sending to Telegram if no topic is configured
+      console.warn('No topic configured for forum group, skipping Telegram send');
+      return { ok: false, error_code: 400, description: 'No topic configured for forum group' };
     }
 
     // Add reply if specified
@@ -87,6 +95,13 @@ export async function processTelegramMessage(telegramMessage: TelegramMessage): 
       return; // Skip non-text messages for now
     }
 
+    console.log('🔍 Processing Telegram message:', {
+      messageId: telegramMessage.message_id,
+      chatId: telegramMessage.chat.id,
+      threadId: telegramMessage.message_thread_id,
+      text: telegramMessage.text.slice(0, 50)
+    });
+
     // Find the chat room by Telegram group ID and topic ID
     const room = await prisma.chatRoom.findFirst({
       where: {
@@ -96,6 +111,8 @@ export async function processTelegramMessage(telegramMessage: TelegramMessage): 
         }),
       },
     });
+
+    console.log('🏠 Room found:', room ? `${room.gameId} (topic: ${room.telegramTopicId})` : 'null');
 
     if (!room) {
       console.log('No chat room found for Telegram message');
@@ -195,7 +212,12 @@ export async function createGameChatRooms(): Promise<void> {
   }
 }
 
-export async function getTelegramUpdates(offset?: number): Promise<TelegramMessage[]> {
+export interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+}
+
+export async function getTelegramUpdates(offset?: number): Promise<TelegramUpdate[]> {
   try {
     if (!process.env.TELEGRAM_BOT_TOKEN) {
       return [];
@@ -214,9 +236,7 @@ export async function getTelegramUpdates(offset?: number): Promise<TelegramMessa
       return [];
     }
 
-    return data.result
-      .filter((update: any) => update.message)
-      .map((update: any) => update.message);
+    return data.result.filter((update: any) => update.message);
   } catch (error) {
     console.error('Error getting Telegram updates:', error);
     return [];

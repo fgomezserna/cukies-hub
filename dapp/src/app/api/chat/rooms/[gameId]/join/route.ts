@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { gameId: string } }
-) {
+export async function POST(request: NextRequest, context: { params: { gameId: string } }) {
+  const { params } = context;
+  const awaitedParams = await params;
   try {
     const { walletAddress } = await request.json();
     
@@ -20,7 +19,7 @@ export async function POST(
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
+      where: { gameId: awaitedParams.gameId },
     });
 
     if (!room) {
@@ -78,10 +77,9 @@ export async function POST(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { gameId: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: { gameId: string } }) {
+  const { params } = context;
+  const awaitedParams = await params;
   try {
     const { walletAddress } = await request.json();
     
@@ -96,7 +94,7 @@ export async function DELETE(
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
+      where: { gameId: awaitedParams.gameId },
     });
 
     if (!room) {

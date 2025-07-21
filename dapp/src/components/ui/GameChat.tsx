@@ -126,11 +126,27 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     }
   }, [isOpen, user?.walletAddress, gameId]);
 
-  // Poll for new messages (basic implementation)
+  // Poll for new messages and sync from Telegram
   useEffect(() => {
     if (!isOpen || !user?.walletAddress) return;
 
-    const interval = setInterval(fetchMessages, 5000);
+    const interval = setInterval(() => {
+      // Fetch new messages from database
+      fetchMessages();
+      
+      // Also trigger Telegram sync in background
+      fetch('/api/telegram/poll', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.processed > 0) {
+            console.log(`📱 Synced ${data.processed} messages from Telegram`);
+            // Refresh messages after sync
+            setTimeout(fetchMessages, 500);
+          }
+        })
+        .catch(err => console.error('Telegram sync error:', err));
+    }, 5000);
+    
     return () => clearInterval(interval);
   }, [isOpen, user?.walletAddress, gameId]);
 
@@ -163,7 +179,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-card border-l border-border flex flex-col z-50">
+    <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-card border-l border-border flex flex-col z-[100]">
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
