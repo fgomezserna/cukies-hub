@@ -132,13 +132,6 @@ export async function processTelegramMessage(telegramMessage: TelegramMessage): 
       return;
     }
 
-    // Try to find if this Telegram user is registered in our system
-    const user = await prisma.user.findFirst({
-      where: {
-        telegramUsername: telegramMessage.from.username,
-      },
-    });
-
     // Handle reply
     let replyToId: string | undefined;
     if (telegramMessage.reply_to_message) {
@@ -152,12 +145,13 @@ export async function processTelegramMessage(telegramMessage: TelegramMessage): 
     }
 
     // Create the message in our database
+    // Note: For Telegram messages, we DON'T set userId to preserve Telegram identity
     await prisma.chatMessage.create({
       data: {
         roomId: room.id,
         content: telegramMessage.text,
         messageType: 'TEXT',
-        userId: user?.id,
+        userId: null, // Don't link to web user for Telegram messages
         telegramUserId: telegramMessage.from.id,
         telegramUsername: telegramMessage.from.username,
         telegramFirstName: telegramMessage.from.first_name,

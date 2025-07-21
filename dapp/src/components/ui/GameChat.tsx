@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,6 +37,7 @@ interface ChatMessage {
   };
   createdAt: string;
   updatedAt: string;
+  isNew?: boolean;
 }
 
 interface GameChatProps {
@@ -55,23 +56,28 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   const [memberCount, setMemberCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const checkingForMessages = useRef(false);
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Fetch messages
+  // Fetch initial messages
   const fetchMessages = async () => {
     if (!user?.walletAddress) return;
 
     setIsLoading(true);
     try {
+      console.log('🔄 Fetching messages for gameId:', gameId);
       const response = await fetch(`/api/chat/rooms/${gameId}/messages?limit=50&walletAddress=${encodeURIComponent(user.walletAddress)}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('📨 Received messages:', data.length);
         setMessages(data);
         setTimeout(scrollToBottom, 100);
+      } else {
+        console.error('❌ API response error:', response.status);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -79,6 +85,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
       setIsLoading(false);
     }
   };
+
 
   // Send message
   const sendMessage = async (e: React.FormEvent) => {
@@ -126,51 +133,84 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     }
   }, [isOpen, user?.walletAddress, gameId]);
 
+  // Check for new messages without full refresh
+  const checkForNewMessages = useCallback(async () => {
+    if (!user?.walletAddress || checkingForMessages.current) return;
+    
+    checkingForMessages.current = true;
+    try {
+      if (messages.length === 0) {
+        await fetchMessages();
+        return;
+      }
+
+      const lastMessageTime = messages[messages.length - 1]?.createdAt;
+      const response = await fetch(`/api/chat/rooms/${gameId}/messages?limit=10&after=${encodeURIComponent(lastMessageTime)}&walletAddress=${encodeURIComponent(user.walletAddress)}`);
+      
+      if (response.ok) {
+        const newData = await response.json();
+        if (newData.length > 0) {
+          const newMessages = newData.map((msg: ChatMessage) => ({ ...msg, isNew: true }));
+          setMessages(prev => {
+            const actuallyNewMessages = newMessages.filter(msg => 
+              !prev.some(existing => existing.id === msg.id)
+            );
+            
+            if (actuallyNewMessages.length > 0) {
+              setTimeout(scrollToBottom, 50);
+              setTimeout(() => {
+                setMessages(msgs => msgs.map(msg => ({ ...msg, isNew: false })));
+              }, 600);
+              
+              return [...prev, ...actuallyNewMessages];
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for new messages:', error);
+    } finally {
+      checkingForMessages.current = false;
+    }
+  }, [user?.walletAddress, gameId, messages]);
+
   // Poll for new messages and sync from Telegram
   useEffect(() => {
     if (!isOpen || !user?.walletAddress) return;
 
-    const interval = setInterval(() => {
-      // Fetch new messages from database
-      fetchMessages();
-      
-      // Also trigger Telegram sync in background
-      fetch('/api/telegram/poll', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-          if (data.processed > 0) {
-            console.log(`📱 Synced ${data.processed} messages from Telegram`);
-            // Refresh messages after sync
-            setTimeout(fetchMessages, 500);
-          }
-        })
-        .catch(err => console.error('Telegram sync error:', err));
-    }, 5000);
+    const interval = setInterval(checkForNewMessages, 3000);
     
     return () => clearInterval(interval);
-  }, [isOpen, user?.walletAddress, gameId]);
+  }, [isOpen, checkForNewMessages]);
 
-  // Get display name for message author
-  const getDisplayName = (message: ChatMessage) => {
+  // Get display name for message author - memoized to avoid recreating
+  const getDisplayName = useCallback((message: ChatMessage) => {
     if (message.messageType === 'SYSTEM') {
       return 'System';
     }
     
+    // For Telegram messages, prioritize Telegram user info
+    if (message.isFromTelegram) {
+      if (message.telegramUsername) {
+        return `@${message.telegramUsername}`;
+      }
+      
+      if (message.telegramFirstName || message.telegramLastName) {
+        return `${message.telegramFirstName || ''} ${message.telegramLastName || ''}`.trim();
+      }
+      
+      return 'Telegram User';
+    }
+    
+    // For web messages, use web user info
     if (message.user) {
       return message.user.username || 
              `${message.user.walletAddress.slice(0, 6)}...${message.user.walletAddress.slice(-4)}`;
     }
     
-    if (message.telegramUsername) {
-      return `@${message.telegramUsername}`;
-    }
-    
-    if (message.telegramFirstName || message.telegramLastName) {
-      return `${message.telegramFirstName || ''} ${message.telegramLastName || ''}`.trim();
-    }
-    
     return 'Anonymous';
-  };
+  }, []);
 
   const handleReply = (message: ChatMessage) => {
     setReplyTo(message);
@@ -179,7 +219,20 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-card border-l border-border flex flex-col z-[100]">
+    <>
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+      <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-card border-l border-border flex flex-col z-[100]">
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -203,13 +256,19 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex flex-col gap-1 ${
-                  message.messageType === 'SYSTEM' ? 'items-center' : 'items-start'
-                }`}
-              >
+            {messages.map((message) => {
+              const messageClasses = `flex flex-col gap-1 transition-all duration-300 ${
+                message.messageType === 'SYSTEM' ? 'items-center' : 'items-start'
+              } ${message.isNew ? 'animate-fade-in-up opacity-0' : 'opacity-100'}`;
+              
+              return (
+                <div
+                  key={message.id}
+                  className={messageClasses}
+                  style={{
+                    animation: message.isNew ? 'fadeInUp 0.4s ease-out forwards' : undefined
+                  }}
+                >
                 {message.messageType === 'SYSTEM' ? (
                   <div className="text-xs text-muted-foreground italic">
                     {message.content}
@@ -259,8 +318,9 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
                     </div>
                   </>
                 )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -305,6 +365,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
           </Button>
         </form>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

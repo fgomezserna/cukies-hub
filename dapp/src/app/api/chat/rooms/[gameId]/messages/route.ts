@@ -22,6 +22,7 @@ export async function GET(request: NextRequest, context: { params: { gameId: str
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const before = searchParams.get('before'); // For pagination
+    const after = searchParams.get('after'); // For new messages
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
@@ -40,6 +41,10 @@ export async function GET(request: NextRequest, context: { params: { gameId: str
 
     if (before) {
       whereConditions.createdAt = { lt: new Date(before) };
+    }
+    
+    if (after) {
+      whereConditions.createdAt = { gt: new Date(after) };
     }
 
     const messages = await prisma.chatMessage.findMany({
