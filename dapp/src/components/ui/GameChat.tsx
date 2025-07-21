@@ -110,7 +110,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
         setMessages(prev => [...prev, message]);
         setNewMessage('');
         setReplyTo(null);
-        scrollToBottom();
+        setTimeout(scrollToBottom, 100);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -232,7 +232,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
           }
         }
       `}</style>
-      <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-card border-l border-border flex flex-col z-[100]">
+      <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-full sm:w-96 bg-card border-l border-border flex flex-col z-[100]">
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
