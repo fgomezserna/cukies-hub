@@ -31,7 +31,7 @@ function LeaderboardView() {
     const [selectedGame, setSelectedGame] = useState<string>('all');
     const [selectedPeriod, setSelectedPeriod] = useState<string>('all-time');
     
-    const unlockDate = useMemo(() => new Date("2025-08-15T00:00:00"), []);
+    const unlockDate = useMemo(() => new Date("2025-07-15T00:00:00"), []);
     const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
 
     useEffect(() => {

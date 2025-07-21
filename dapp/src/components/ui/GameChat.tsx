@@ -152,7 +152,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
         if (newData.length > 0) {
           const newMessages = newData.map((msg: ChatMessage) => ({ ...msg, isNew: true }));
           setMessages(prev => {
-            const actuallyNewMessages = newMessages.filter(msg => 
+            const actuallyNewMessages = newMessages.filter((msg: any) => 
               !prev.some(existing => existing.id === msg.id)
             );
             

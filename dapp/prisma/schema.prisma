@@ -275,6 +275,37 @@ model TwitterFollower {
   webhookData     Json?    // Raw data from IFTTT webhook
 }
 
+// Game Configuration model
+model Game {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  gameId        String   @unique  // e.g., 'sybil-slayer', 'hyppie-road'
+  name          String   // Display name: 'Sybil Slayer', 'Hyppie Road'
+  description   String   // Game description
+  emoji         String?  // Game emoji/icon
+  gameUrl       String   // URL to the game iframe
+  port          Int?     // Development port
+  
+  // Game-specific ranks
+  ranks         Json     // Array of rank objects with xp thresholds
+  
+  // UI Configuration
+  leaderboardTitle String // e.g., 'Top Slayers', 'Top Riders'
+  playInstructions Json?  // Array of instruction objects
+  
+  // Game status
+  isActive      Boolean  @default(true)
+  isInMaintenance Boolean @default(false)
+  
+  // Metadata
+  version       String?  @default("1.0.0")
+  category      String?  // 'arcade', 'strategy', 'betting', etc.
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([gameId, isActive])
+}
+
 // Chat models for game-specific chat rooms
 model ChatRoom {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
