@@ -58,6 +58,34 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
     category: 'betting',
     createdAt: new Date(),
     updatedAt: new Date(),
+  },
+  'tower-builder': {
+    id: 'mock-id-3',
+    gameId: 'tower-builder',
+    name: 'Tower Builder',
+    description: 'Stack blocks as high as you can in this precision-based tower building game.',
+    emoji: '🏗️',
+    gameUrl: process.env.GAME_TOWER_BUILDER || 'http://localhost:9004/',
+    port: 9004,
+    ranks: [
+      { xp: 50000, name: 'Master Architect', icon: 'Crown', color: 'text-yellow-400' },
+      { xp: 20000, name: 'Building Expert', icon: 'Medal', color: 'text-purple-400' },
+      { xp: 10000, name: 'Tower Master', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 5000, name: 'Skilled Builder', icon: 'Star', color: 'text-blue-400' },
+      { xp: 2500, name: 'Construction Worker', icon: 'Star', color: 'text-green-400' },
+    ],
+    leaderboardTitle: 'Top Builders',
+    playInstructions: [
+      { icon: 'Gamepad2', text: 'BUILD' },
+      { icon: 'Heart', text: 'STACK HIGH' },
+      { icon: 'Trophy', text: 'EARN XP' }
+    ],
+    isActive: true,
+    isInMaintenance: false,
+    version: '1.0.0',
+    category: 'arcade',
+    createdAt: new Date(),
+    updatedAt: new Date(),
   }
 };
 
