@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useRef } from 'react';
-import { useParentConnection } from '@/hooks/use-parent-connection';
+import React, { useRef } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import { useGameData } from '@/hooks/use-game-data';
+import { useGameConnection } from '@/hooks/use-game-connection';
 import GameLayout from '@/components/layout/GameLayout';
 
 export default function HyppieRoadPage() {
@@ -11,17 +11,28 @@ export default function HyppieRoadPage() {
   const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('hyppie-road');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Use the parent connection hook directly
-  useParentConnection(iframeRef, {
-    isAuthenticated: !!user && !isLoading,
-    user: user,
-  });
-
-  // Handle game connection setup - no-op since connection is already set up
-  const handleGameConnection = useCallback((iframeRef: React.RefObject<HTMLIFrameElement>) => {
-    // Connection is already handled by useParentConnection hook above
-    return;
-  }, []);
+  // Use game connection - same as other games
+  const gameConnection = useGameConnection(
+    iframeRef,
+    {
+      isAuthenticated: !!user && !isLoading,
+      user: user,
+      token: user?.token
+    },
+    {
+      gameId: 'hyppie-road',
+      gameVersion: '1.0.0',
+      onSessionStart: (sessionData) => {
+        console.log('🚀 [HYPPIE ROAD] Session started:', sessionData);
+      },
+      onCheckpoint: (checkpoint) => {
+        console.log('📍 [HYPPIE ROAD] Checkpoint received:', checkpoint);
+      },
+      onSessionEnd: (result) => {
+        console.log('🏁 [HYPPIE ROAD] Session ended:', result);
+      }
+    }
+  );
 
   // Show loading state
   if (loading || !gameConfig) {
@@ -59,7 +70,6 @@ export default function HyppieRoadPage() {
       }}
       loading={loading}
       iframeRef={iframeRef}
-      onGameConnection={handleGameConnection}
     />
   );
 }

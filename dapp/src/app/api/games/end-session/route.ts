@@ -9,19 +9,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Find the active session
+    // Find the session (active or recently ended)
     const session = await prisma.gameSession.findUnique({
-      where: { sessionToken, isActive: true },
+      where: { sessionToken },
       include: {
         checkpoints: {
           orderBy: { timestamp: 'desc' },
           take: 1
-        }
+        },
+        result: true // Include existing result to check for duplicates
       }
     });
 
     if (!session) {
-      return NextResponse.json({ success: false, error: 'Invalid or inactive session' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Session not found' }, { status: 400 });
+    }
+
+    // Check if this session already has a result (prevent duplicates)
+    if (session.result) {
+      console.log('⚠️ [API] Session already has results, preventing duplicate:', sessionToken);
+      return NextResponse.json({
+        success: true,
+        finalScore: session.result.finalScore,
+        isValid: session.result.isValid,
+        xpEarned: session.result.xpEarned,
+        isDuplicate: true
+      });
+    }
+
+    // Check if session is still active
+    if (!session.isActive) {
+      console.log('⚠️ [API] Session is no longer active:', sessionToken);
+      // Still allow processing if no results exist yet
     }
 
     // Calculate game time from last checkpoint or session start

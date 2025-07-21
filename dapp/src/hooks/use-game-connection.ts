@@ -111,7 +111,7 @@ export function useGameConnection(
           
           console.log('📨 [DAPP] Sending secure session start message to game:', secureMessage);
           // Send to all possible game origins
-          const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004', 'https://hyppie-road.vercel.app'];
+          const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004'];
           gameOrigins.forEach(origin => {
             iframeRef.current?.contentWindow?.postMessage(secureMessage, origin);
           });
@@ -167,15 +167,17 @@ export function useGameConnection(
   }, [currentSession, options]);
 
   // End game session
-  const endGameSession = useCallback(async (finalScore: number, metadata?: any) => {
-    if (!currentSession) return;
+  const endGameSession = useCallback(async (sessionToken: string, finalScore: number, metadata?: any) => {
+    console.log('🏁 [DAPP] endGameSession called with:', { sessionToken, finalScore, metadata, hasSession: !!currentSession });
+
+    console.log('🏁 [DAPP] Ending session:', sessionToken, 'with score:', finalScore);
 
     try {
       const response = await fetch('/api/games/end-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionToken: currentSession.sessionToken,
+          sessionToken,
           finalScore,
           metadata
         })
@@ -186,7 +188,7 @@ export function useGameConnection(
       if (data.success) {
         setCurrentSession(null);
         sessionStartedRef.current = false; // Reset session flag
-        authSentRef.current = false; // Reset auth flag
+        // DON'T reset authSentRef.current = false; // Keep auth flag to avoid re-sending auth
         setGameStats({
           checkpointsReceived: 0,
           honeypotEvents: 0,
@@ -197,11 +199,19 @@ export function useGameConnection(
           finalScore: data.finalScore,
           isValid: data.isValid
         });
+
+        // Auto-start a new session for the next game
+        if (authData.user?.id && authData.isAuthenticated) {
+          console.log('🔄 [DAPP] Auto-starting new session after game end');
+          setTimeout(() => {
+            startGameSession(authData.user.id);
+          }, 1000); // Wait 1 second before starting new session
+        }
       }
     } catch (error) {
       console.error('Failed to end game session:', error);
     }
-  }, [currentSession, options]);
+  }, [options, authData.user?.id, authData.isAuthenticated, startGameSession]);
 
   // Listen for messages from game
   useEffect(() => {
@@ -226,8 +236,7 @@ export function useGameConnection(
       // Only process messages from game origins
       if (event.origin !== 'http://localhost:9002' && 
           event.origin !== 'http://localhost:9003' && 
-          event.origin !== 'http://localhost:9004' && 
-          event.origin !== 'https://hyppie-road.vercel.app') {
+          event.origin !== 'http://localhost:9004') {
         return;
       }
 
@@ -260,7 +269,7 @@ export function useGameConnection(
         
         case 'GAME_SESSION_END':
           console.log('🏁 [DAPP] Processing secure session end:', messageData.payload);
-          endGameSession(messageData.payload.finalScore, messageData.payload.metadata);
+          endGameSession(messageData.payload.sessionToken, messageData.payload.finalScore, messageData.payload.metadata);
           break;
         
         case 'HONEYPOT_TRIGGER':
@@ -321,7 +330,7 @@ export function useGameConnection(
       
       console.log('🔐 [DAPP] Sending secure auth data:', secureAuthMessage);
       // Send to all possible game origins
-      const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004', 'https://hyppie-road.vercel.app'];
+      const gameOrigins = ['http://localhost:9002', 'http://localhost:9003', 'http://localhost:9004'];
       gameOrigins.forEach(origin => {
         try {
           iframeRef.current?.contentWindow?.postMessage(secureAuthMessage, origin);

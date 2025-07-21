@@ -37,7 +37,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
     name: 'Hyppie Road',
     description: 'Navigate the crypto road, avoid traps, and multiply your rewards in this thrilling betting game.',
     emoji: '🛣️',
-    gameUrl: process.env.GAME_HYPPIE_ROAD || 'https://hyppie-stack-dapp.vercel.app/',
+    gameUrl: process.env.GAME_HYPPIE_ROAD || 'http://localhost:9003/',
     port: 9003,
     ranks: [
       { xp: 50000, name: 'Road Legend', icon: 'Crown', color: 'text-yellow-400' },

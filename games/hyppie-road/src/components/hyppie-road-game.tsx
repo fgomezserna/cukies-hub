@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useGameConnection } from '@/hooks/useGameConnection';
 import { useGameState } from '@/hooks/useGameState';
 import { getGameStats } from '@/lib/game-logic';
@@ -24,6 +24,9 @@ export function HyppieRoadGame() {
     startCheckpointInterval, 
     stopCheckpointInterval 
   } = useGameConnection();
+
+  // Track if we've already sent session end for current gameResult
+  const sessionEndSentRef = useRef<string | null>(null);
   const {
     // State
     gameState,
@@ -58,14 +61,23 @@ export function HyppieRoadGame() {
     }
   }, [isGameActive, playBackgroundMusic]);
 
-  // Handle game session checkpoints
+  // Handle game session changes - clear old results when new session starts
   useEffect(() => {
-    if (gameSession && isGameActive()) {
-      console.log('🎮 [GAME] Starting checkpoint interval for session:', gameSession.sessionId);
-      startCheckpointInterval(
-        () => potentialWinning, // Use potential winning as score
-        () => Date.now() - (gameSession?.sessionId ? parseInt(gameSession.sessionId) : Date.now()) // Rough game time
-      );
+    if (gameSession) {
+      console.log('🎮 [GAME] New session received:', gameSession.sessionId);
+      // Reset session end tracking for new game
+      sessionEndSentRef.current = null;
+      // ALWAYS clear any previous game result when new session arrives
+      setGameResult(null);
+      
+      // Only start checkpoint interval if game is active
+      if (isGameActive()) {
+        console.log('🎮 [GAME] Starting checkpoint interval for session:', gameSession.sessionId);
+        startCheckpointInterval(
+          () => potentialWinning, // Use potential winning as score
+          () => Date.now() - (gameSession?.sessionId ? parseInt(gameSession.sessionId) : Date.now()) // Rough game time
+        );
+      }
     }
     
     return () => {
@@ -75,11 +87,30 @@ export function HyppieRoadGame() {
     };
   }, [gameSession, isGameActive, potentialWinning, startCheckpointInterval, stopCheckpointInterval]);
 
-  // Handle game session end
+  // Handle game session end - with duplicate protection
   useEffect(() => {
-    if (gameSession && gameResult) {
-      console.log('🏁 [GAME] Ending session with result:', gameResult);
-      sendSessionEnd(gameResult.finalAmount || 0, {
+    // Only process if we have both a session, a result, and the game is NOT active (game ended)
+    if (gameSession && gameResult && !isGameActive()) {
+      // Create unique identifier for this game result
+      const resultId = `${gameSession.sessionToken}-${gameResult.finalAmount}-${gameResult.success}-${gameResult.stepsCompleted}`;
+      
+      // Check if we already sent this specific result
+      if (sessionEndSentRef.current === resultId) {
+        console.log('🚫 [GAME] Already sent this result, skipping:', resultId);
+        return;
+      }
+      
+      console.log('🏁 [GAME] Game ended, sending session end with result:', gameResult);
+      console.log('🏁 [GAME] Final amount:', gameResult.finalAmount, 'type:', typeof gameResult.finalAmount);
+      console.log('🏁 [GAME] Success:', gameResult.success, 'Steps:', gameResult.stepsCompleted, 'Multiplier:', gameResult.multiplier);
+      
+      const finalScore = gameResult.finalAmount || 0;
+      console.log('🏁 [GAME] Sending final score:', finalScore);
+      
+      // Mark this result as sent
+      sessionEndSentRef.current = resultId;
+      
+      sendSessionEnd(finalScore, {
         success: gameResult.success,
         stepsCompleted: gameResult.stepsCompleted,
         multiplier: gameResult.multiplier,
@@ -87,8 +118,13 @@ export function HyppieRoadGame() {
         betAmount: betAmount
       });
       stopCheckpointInterval();
+      
+      // Clear gameResult immediately after sending to prevent re-sending
+      setTimeout(() => {
+        setGameResult(null);
+      }, 100);
     }
-  }, [gameSession, gameResult, sendSessionEnd, stopCheckpointInterval, betAmount]);
+  }, [gameResult, sendSessionEnd, stopCheckpointInterval, betAmount, isGameActive]); // Added isGameActive dependency
 
   // Log para verificar la recepción de datos de autenticación
   useEffect(() => {

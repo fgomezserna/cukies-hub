@@ -93,7 +93,6 @@ export const useAudio = () => {
   // Precargar todos los sonidos
   useEffect(() => {
     const loadAudio = async () => {
-      console.log('🔊 Precargando archivos de audio...');
       
       for (const [soundType, config] of Object.entries(SOUND_CONFIG)) {
         try {
@@ -105,22 +104,17 @@ export const useAudio = () => {
           audio.preload = 'auto';
           
           audioInstancesRef.current.set(soundType as SoundType, audio);
-          console.log(`✅ Audio cargado: ${soundType}`);
           if (soundType === 'purr_collect') {
-            console.log(`🐱 PURR_COLLECT específicamente cargado con volumen: ${audio.volume}`);
           }
           if (soundType === 'hacker_collision') {
-            console.log(`🗣️ HACKER_COLLISION (voice_trump) específicamente cargado con volumen: ${audio.volume}, path: ${config.path}`);
           }
           if (soundType === 'heart_collect') {
-            console.log(`❤️ HEART_COLLECT (life.mp3) específicamente cargado con volumen: ${audio.volume}, path: ${config.path}`);
           }
         } catch (error) {
           console.warn(`⚠️ Error cargando audio ${soundType}:`, error);
         }
       }
       
-      console.log('🎵 Sistema de audio inicializado');
     };
 
     loadAudio();
