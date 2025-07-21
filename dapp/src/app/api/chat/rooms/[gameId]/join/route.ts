@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { gameId: string } }
 ) {
   try {
-    const session = await auth();
+    const { walletAddress } = await request.json();
     
-    if (!session?.user?.id) {
+    if (!walletAddress) {
+      return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
+    }
+
+    const user = await verifyWalletAuth(walletAddress);
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -31,7 +36,7 @@ export async function POST(
       where: {
         roomId_userId: {
           roomId: room.id,
-          userId: session.user.id,
+          userId: user.id,
         },
       },
     });
@@ -51,7 +56,7 @@ export async function POST(
       await prisma.chatRoomMember.create({
         data: {
           roomId: room.id,
-          userId: session.user.id,
+          userId: user.id,
         },
       });
     }
@@ -60,7 +65,7 @@ export async function POST(
     await prisma.chatMessage.create({
       data: {
         roomId: room.id,
-        content: `${(session.user as any).username || (session.user as any).walletAddress} joined the chat`,
+        content: `${user.username || user.walletAddress} joined the chat`,
         messageType: 'SYSTEM',
         isFromWeb: true,
       },
@@ -78,9 +83,14 @@ export async function DELETE(
   { params }: { params: { gameId: string } }
 ) {
   try {
-    const session = await auth();
+    const { walletAddress } = await request.json();
     
-    if (!session?.user?.id) {
+    if (!walletAddress) {
+      return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
+    }
+
+    const user = await verifyWalletAuth(walletAddress);
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -97,7 +107,7 @@ export async function DELETE(
     await prisma.chatRoomMember.updateMany({
       where: {
         roomId: room.id,
-        userId: session.user.id,
+        userId: user.id,
       },
       data: { isActive: false },
     });
@@ -106,7 +116,7 @@ export async function DELETE(
     await prisma.chatMessage.create({
       data: {
         roomId: room.id,
-        content: `${(session.user as any).username || (session.user as any).walletAddress} left the chat`,
+        content: `${user.username || user.walletAddress} left the chat`,
         messageType: 'SYSTEM',
         isFromWeb: true,
       },

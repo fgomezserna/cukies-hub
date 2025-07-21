@@ -63,11 +63,11 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
 
   // Fetch messages
   const fetchMessages = async () => {
-    if (!user?.id) return;
+    if (!user?.walletAddress) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/chat/rooms/${gameId}/messages?limit=50`);
+      const response = await fetch(`/api/chat/rooms/${gameId}/messages?limit=50&walletAddress=${encodeURIComponent(user.walletAddress)}`);
       if (response.ok) {
         const data = await response.json();
         setMessages(data);
@@ -83,7 +83,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   // Send message
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user?.id || isSending) return;
+    if (!newMessage.trim() || !user?.walletAddress || isSending) return;
 
     setIsSending(true);
     try {
@@ -91,6 +91,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          walletAddress: user.walletAddress,
           content: newMessage.trim(),
           messageType: 'TEXT',
           replyToId: replyTo?.id,
@@ -113,21 +114,25 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
 
   // Join room when component mounts
   useEffect(() => {
-    if (isOpen && user?.id) {
+    if (isOpen && user?.walletAddress) {
       // Auto-join room
-      fetch(`/api/chat/rooms/${gameId}/join`, { method: 'POST' })
+      fetch(`/api/chat/rooms/${gameId}/join`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: user.walletAddress })
+      })
         .then(() => fetchMessages())
         .catch(console.error);
     }
-  }, [isOpen, user?.id, gameId]);
+  }, [isOpen, user?.walletAddress, gameId]);
 
   // Poll for new messages (basic implementation)
   useEffect(() => {
-    if (!isOpen || !user?.id) return;
+    if (!isOpen || !user?.walletAddress) return;
 
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
-  }, [isOpen, user?.id, gameId]);
+  }, [isOpen, user?.walletAddress, gameId]);
 
   // Get display name for message author
   const getDisplayName = (message: ChatMessage) => {

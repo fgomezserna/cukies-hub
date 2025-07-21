@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { gameId: string } }
 ) {
   try {
-    const session = await auth();
+    // For GET requests, we'll check if a wallet address is provided in query params
+    const { searchParams } = new URL(request.url);
+    const walletAddress = searchParams.get('walletAddress');
     
-    if (!session?.user?.id) {
+    if (!walletAddress) {
+      return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
+    }
+
+    const user = await verifyWalletAuth(walletAddress);
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const before = searchParams.get('before'); // For pagination
@@ -86,13 +92,16 @@ export async function POST(
   { params }: { params: { gameId: string } }
 ) {
   try {
-    const session = await auth();
+    const { walletAddress, content, messageType = 'TEXT', replyToId } = await request.json();
     
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!walletAddress) {
+      return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
     }
 
-    const { content, messageType = 'TEXT', replyToId } = await request.json();
+    const user = await verifyWalletAuth(walletAddress);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json({ error: 'Message content is required' }, { status: 400 });
@@ -116,7 +125,7 @@ export async function POST(
       where: {
         roomId_userId: {
           roomId: room.id,
-          userId: session.user.id,
+          userId: user.id,
         },
       },
     });
@@ -126,7 +135,7 @@ export async function POST(
       await prisma.chatRoomMember.create({
         data: {
           roomId: room.id,
-          userId: session.user.id,
+          userId: user.id,
         },
       });
     }
@@ -135,7 +144,7 @@ export async function POST(
     const message = await prisma.chatMessage.create({
       data: {
         roomId: room.id,
-        userId: session.user.id,
+        userId: user.id,
         content: content.trim(),
         messageType,
         replyToId,
