@@ -8,14 +8,52 @@ import ExpImg from "@/assets/exp.png";
 import RankImg from "@/assets/rank.png";
 import PlayersImg from "@/assets/players.png";
 import PointsImg from "@/assets/points.png";
+import { useEffect, useState } from "react";
+
+interface PlatformStats {
+    totalUsers: number;
+    totalSessions: number;
+    totalXpDistributed: number;
+    userStats?: {
+        totalXp: number;
+        referralRewards: number;
+        rank: number;
+        totalSessions: number;
+    };
+}
 
 export default function StatsCards() {
     const { user } = useAuth();
+    const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const params = new URLSearchParams();
+                if (user?.id) {
+                    params.append('userId', user.id);
+                }
+                
+                const response = await fetch(`/api/games/stats?${params}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setPlatformStats(data);
+                }
+            } catch (error) {
+                console.error('Failed to fetch platform stats:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+    }, [user]);
 
     const stats = [
         {
             title: 'My XP',
-            value: user?.xp.toLocaleString() ?? '--',
+            value: loading ? '--' : (user?.xp.toLocaleString() ?? '--'),
             icon: Star,
             gradient: 'from-emerald-400 to-green-500',
             iconColor: 'text-white',
@@ -23,7 +61,7 @@ export default function StatsCards() {
         },
         {
             title: 'My Rank',
-            value: '#1,234',
+            value: loading ? '--' : (platformStats?.userStats?.rank ? `#${platformStats.userStats.rank.toLocaleString()}` : '--'),
             icon: TrendingUp,
             gradient: 'from-blue-400 to-cyan-500',
             iconColor: 'text-white',
@@ -31,15 +69,15 @@ export default function StatsCards() {
         },
         {
             title: 'Total Players',
-            value: '12,345',
+            value: loading ? '--' : (platformStats?.totalUsers.toLocaleString() ?? '--'),
             icon: Users,
             gradient: 'from-purple-400 to-pink-500',
             iconColor: 'text-white',
             backgroundImage: PlayersImg
         },
         {
-            title: 'Total Points',
-            value: '1,234,567',
+            title: 'Total XP',
+            value: loading ? '--' : (platformStats?.totalXpDistributed.toLocaleString() ?? '--'),
             icon: Coins,
             gradient: 'from-yellow-400 to-orange-500',
             iconColor: 'text-white',
