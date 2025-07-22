@@ -110,15 +110,20 @@ export function useGameConnection(
           });
           
           console.log('📨 [DAPP] Sending secure session start message to game:', secureMessage);
-          // Send to all possible game origins
-          const gameOrigins = [
-            process.env.NEXT_PUBLIC_GAME_SYBILSLASH || 'http://localhost:9002',
-            process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003', 
-            process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
-          ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
-          gameOrigins.forEach(origin => {
-            iframeRef.current?.contentWindow?.postMessage(secureMessage, origin);
-          });
+          // Get the actual game origin from the iframe src
+          const iframeSrc = iframeRef.current?.src;
+          if (iframeSrc) {
+            try {
+              const gameUrl = new URL(iframeSrc);
+              const gameOrigin = `${gameUrl.protocol}//${gameUrl.host}`;
+              console.log('🎯 [DAPP] Sending message to game origin:', gameOrigin);
+              iframeRef.current?.contentWindow?.postMessage(secureMessage, gameOrigin);
+            } catch (e) {
+              console.error('❌ [DAPP] Failed to parse iframe src:', e);
+            }
+          } else {
+            console.warn('⚠️ [DAPP] No iframe src available');
+          }
         } else {
           console.warn('⚠️ [DAPP] No iframe reference available');
         }
