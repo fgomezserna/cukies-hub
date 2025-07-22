@@ -9,11 +9,12 @@ import StatsCards from '@/components/home/stats-cards';
 import SybilSlayerImg from "@/assets/sybilslayer-featured-550px.png";
 import HyppieRoadImg from "@/assets/hyppie-road.png";
 import ComingSoonImg from "@/assets/coming-soon.png";
+import HyppieTowerImg from "@/assets/hyppie-tower.webp";
 
 const games = [
   { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
   { name: "Hyppie Road", description: "Navigate the crypto road, avoid traps, and multiply your rewards!", imageUrl: HyppieRoadImg, hint: "road adventure", live: false, playable: true, href: "/games/hyppie-road" },
-  { name: "Tower Builder", description: "Stack blocks as high as you can in this precision-based tower building game.", imageUrl: ComingSoonImg, hint: "tower building", live: false, playable: true, href: "/games/tower-builder" },
+  { name: "Hyppie Tower", description: "Stack blocks as high as you can in this precision-based tower building game.", imageUrl: HyppieTowerImg, hint: "tower building", live: false, playable: true, href: "/games/tower-builder" },
   { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: ComingSoonImg, hint: "endless runner", live: false, playable: false },
   { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: ComingSoonImg, hint: "chess board", live: true, playable: false }
 ];

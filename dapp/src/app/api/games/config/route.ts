@@ -62,7 +62,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
   'tower-builder': {
     id: 'mock-id-3',
     gameId: 'tower-builder',
-    name: 'Tower Builder',
+    name: 'Hyppie Tower',
     description: 'Stack blocks as high as you can in this precision-based tower building game.',
     emoji: '🏗️',
     gameUrl: process.env.GAME_TOWER_BUILDER || 'http://localhost:9004/',
@@ -74,7 +74,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
       { xp: 5000, name: 'Skilled Builder', icon: 'Star', color: 'text-blue-400' },
       { xp: 2500, name: 'Construction Worker', icon: 'Star', color: 'text-green-400' },
     ],
-    leaderboardTitle: 'Top Builders',
+    leaderboardTitle: 'Top Hyppie Builders',
     playInstructions: [
       { icon: 'Gamepad2', text: 'BUILD' },
       { icon: 'Heart', text: 'STACK HIGH' },
