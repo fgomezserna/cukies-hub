@@ -179,6 +179,13 @@ export function useGameConnection(
   const endGameSession = useCallback(async (sessionToken: string, finalScore: number, metadata?: any) => {
     console.log('🏁 [DAPP] endGameSession called with:', { sessionToken, finalScore, metadata, hasSession: !!currentSession });
 
+    // Skip API call if there's no valid session
+    if (!sessionToken || sessionToken === 'no-session') {
+      console.log('⚠️ [DAPP] No valid session to end, skipping API call');
+      options.onSessionEnd?.({ finalScore, isValid: false });
+      return;
+    }
+
     console.log('🏁 [DAPP] Ending session:', sessionToken, 'with score:', finalScore);
 
     try {
