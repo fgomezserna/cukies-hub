@@ -153,3 +153,15 @@ Test configuration excludes API routes and type definitions from coverage.
 - `src/hooks/` - Game logic hooks
 - `src/lib/` - Game utilities and logic
 - `src/types/` - Game type definitions
+
+## Working with Issues
+
+When working on a GitHub issue:
+1. Create a new branch for the issue (e.g., `fix/issue-123` or `feature/issue-456`)
+2. Make all necessary changes and commits
+3. Run lint and type checks before finalizing
+4. Push the branch to the remote repository
+5. **IMPORTANT**: When the issue is resolved, comment on the GitHub issue indicating:
+   - That the issue has been resolved
+   - The branch name where the development was done (e.g., "Fixed in branch `fix/issue-123`")
+   - A brief summary of the changes made
