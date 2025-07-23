@@ -9,11 +9,12 @@ import StatsCards from '@/components/home/stats-cards';
 import SybilSlayerImg from "@/assets/sybilslayer-featured-550px.png";
 import HyppieRoadImg from "@/assets/hyppie-road.png";
 import ComingSoonImg from "@/assets/coming-soon.png";
+import HyppieTowerImg from "@/assets/hyppie-tower.webp";
 
 const games = [
   { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
   { name: "Hyppie Road", description: "Navigate the crypto road, avoid traps, and multiply your rewards!", imageUrl: HyppieRoadImg, hint: "road adventure", live: false, playable: true, href: "/games/hyppie-road" },
-  { name: "Tower Builder", description: "Stack blocks as high as you can in this precision-based tower building game.", imageUrl: ComingSoonImg, hint: "tower building", live: false, playable: true, href: "/games/tower-builder" },
+  { name: "Hyppie Tower", description: "Stack blocks as high as you can in this precision-based tower building game.", imageUrl: HyppieTowerImg, hint: "tower building", live: false, playable: true, href: "/games/tower-builder" },
   { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: ComingSoonImg, hint: "endless runner", live: false, playable: false },
   { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: ComingSoonImg, hint: "chess board", live: true, playable: false }
 ];
@@ -116,15 +117,20 @@ export default function HomePage() {
                       width={600} 
                       height={400} 
                       className={cn(
-                        "object-cover h-48 transition-transform duration-500",
+                        "object-cover h-52 lg:h-auto lg:aspect-[4/3] transition-transform duration-500",
                         game.playable ? "group-hover:scale-110" : "grayscale"
                       )} 
                       data-ai-hint={game.hint} 
                     />
                     
+                    {/* Gradient overlay - only for playable games */}
+                    {game.playable && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                    )}
+                    
                     {/* Overlay for non-playable games */}
                     {!game.playable && (
-                      <div className="absolute top-0 left-0 right-0 h-48 bg-black/60 flex items-center justify-center z-10 !mt-0">
+                      <div className="absolute top-0 left-0 right-0 h-52 lg:h-full bg-black/60 flex items-center justify-center z-10 !mt-0">
                         <span className="text-white font-bold text-lg bg-black/80 px-4 py-2 rounded-full">
                           🚧 Coming Soon
                         </span>
@@ -147,7 +153,7 @@ export default function HomePage() {
                       asChild 
                       className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/30"
                     >
-                        <Link href="/games">
+                        <Link href={game.href!}>
                           🎮 Play Now
                         </Link>
                     </Button>
