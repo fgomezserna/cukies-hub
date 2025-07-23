@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         email: true,
         profilePictureUrl: true,
         walletAddress: true,
-        // bio: true,
+        bio: true,
       },
     });
 
@@ -102,7 +102,7 @@ export async function PUT(request: NextRequest) {
       data: {
         ...(username !== undefined && { username: username.trim() }),
         ...(email !== undefined && { email: email || null }),
-        // ...(bio !== undefined && { bio: bio || null }),
+        ...(bio !== undefined && { bio: bio || null }),
       },
       select: {
         id: true,
@@ -110,7 +110,7 @@ export async function PUT(request: NextRequest) {
         email: true,
         profilePictureUrl: true,
         walletAddress: true,
-        // bio: true,
+        bio: true,
       },
     });
 
