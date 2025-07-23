@@ -16,6 +16,7 @@ model User {
   username          String? @unique
   email             String?
   profilePictureUrl String?
+  bio               String? @db.String
   xp                Int     @default(0)
 
   // Socials
