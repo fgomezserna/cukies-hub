@@ -60,14 +60,23 @@ export function useGameConnection(
 
   // Start a new game session
   const startGameSession = useCallback(async (userId: string) => {
+    console.log('🎯 [DAPP] startGameSession called with:', { 
+      userId, 
+      authenticated: authData.isAuthenticated, 
+      gameId: options.gameId,
+      sessionStarted: sessionStartedRef.current,
+      initialized: initializedRef.current,
+      authSent: authSentRef.current
+    });
+    
     if (!authData.isAuthenticated || !userId) {
-      console.log('🚫 [DAPP] Cannot start session - not authenticated or no userId');
+      console.log('🚫 [DAPP] Cannot start session - not authenticated or no userId', { authenticated: authData.isAuthenticated, userId });
       return;
     }
 
     // Prevent multiple session starts
     if (sessionStartedRef.current) {
-      console.log('🚫 [DAPP] Session already started, skipping...');
+      console.log('🚫 [DAPP] Session already started, skipping...', { sessionStartedRef: sessionStartedRef.current });
       return;
     }
 
@@ -76,6 +85,12 @@ export function useGameConnection(
     console.log('🚀 [DAPP] Starting game session for userId:', userId, 'gameId:', options.gameId);
 
     try {
+      console.log('📞 [DAPP] Making API call to /api/games/start-session with:', {
+        userId,
+        gameId: options.gameId,
+        gameVersion: options.gameVersion
+      });
+      
       const response = await fetch('/api/games/start-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,6 +101,8 @@ export function useGameConnection(
         })
       });
 
+      console.log('📬 [DAPP] API response received:', { status: response.status, ok: response.ok });
+      
       const data = await response.json();
       console.log('📡 [DAPP] Session API response:', data);
       
@@ -94,6 +111,12 @@ export function useGameConnection(
           sessionToken: data.sessionToken,
           sessionId: data.sessionId
         };
+        
+        console.log('💾 [DAPP] Setting currentSession to:', {
+          sessionToken: data.sessionToken,
+          sessionId: data.sessionId,
+          gameId: options.gameId
+        });
         
         setCurrentSession({
           sessionToken: data.sessionToken,
@@ -134,7 +157,11 @@ export function useGameConnection(
         sessionStartedRef.current = false; // Reset flag on failure
       }
     } catch (error) {
-      console.error('❌ [DAPP] Failed to start game session:', error);
+      console.error('❌ [DAPP] Failed to start game session:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       sessionStartedRef.current = false; // Reset flag on error
     }
   }, [authData.isAuthenticated, options.gameId, options.gameVersion, options.onSessionStart, iframeRef]);
@@ -177,23 +204,44 @@ export function useGameConnection(
 
   // End game session
   const endGameSession = useCallback(async (sessionToken: string, finalScore: number, metadata?: any) => {
-    console.log('🏁 [DAPP] endGameSession called with:', { sessionToken, finalScore, metadata, hasSession: !!currentSession });
+    console.log('🏁 [DAPP] endGameSession called with:', { sessionToken, finalScore, metadata, hasSession: !!currentSession, currentSessionToken: currentSession?.sessionToken });
 
-    // Skip API call if there's no valid session
-    if (!sessionToken || sessionToken === 'no-session') {
+    let actualSessionToken = sessionToken;
+
+    // If game sent 'no-session', find the most recent active session for this user and game
+    if (sessionToken === 'no-session' && authData.isAuthenticated && authData.user?.id) {
+      console.log('🔍 [DAPP] Game sent no-session, finding active session via API...');
+      
+      try {
+        const response = await fetch(`/api/games/active-session?userId=${authData.user.id}&gameId=${options.gameId}`);
+        const data = await response.json();
+        
+        if (data.success && data.sessionToken) {
+          actualSessionToken = data.sessionToken;
+          console.log('✅ [DAPP] Found active session:', data.sessionToken);
+        } else {
+          console.log('❌ [DAPP] No active session found via API');
+        }
+      } catch (error) {
+        console.error('❌ [DAPP] Error finding active session:', error);
+      }
+    }
+
+    // Skip API call if there's no valid session at all
+    if (!actualSessionToken || actualSessionToken === 'no-session') {
       console.log('⚠️ [DAPP] No valid session to end, skipping API call');
       options.onSessionEnd?.({ finalScore, isValid: false });
       return;
     }
 
-    console.log('🏁 [DAPP] Ending session:', sessionToken, 'with score:', finalScore);
+    console.log('🏁 [DAPP] Ending session:', actualSessionToken, 'with score:', finalScore);
 
     try {
       const response = await fetch('/api/games/end-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionToken,
+          sessionToken: actualSessionToken,
           finalScore,
           metadata
         })
@@ -227,7 +275,7 @@ export function useGameConnection(
     } catch (error) {
       console.error('Failed to end game session:', error);
     }
-  }, [options, authData.user?.id, authData.isAuthenticated, startGameSession]);
+  }, [options, authData.user?.id, authData.isAuthenticated, startGameSession, currentSession]);
 
   // Listen for messages from game
   useEffect(() => {
@@ -315,87 +363,49 @@ export function useGameConnection(
     };
   }, [handleCheckpoint, endGameSession, options]);
 
-  // Initialize connection only once when iframe is ready and user is authenticated
+  // Initialize session when user is authenticated (don't wait for iframe)
   useEffect(() => {
+    console.log('🔄 [DAPP] useEffect - Initialize connection', { 
+      initialized: initializedRef.current, 
+      hasIframe: !!iframeRef.current, 
+      authenticated: authData.isAuthenticated, 
+      userId: authData.user?.id 
+    });
+
     // Only initialize once
     if (initializedRef.current) {
+      console.log('🔄 [DAPP] Already initialized, skipping');
       return;
     }
 
-    // Wait for iframe to be available and user to be authenticated
-    if (!iframeRef.current || !authData.isAuthenticated || !authData.user?.id) {
-      return;
-    }
-
-    // Mark as initialized
-    initializedRef.current = true;
-
-    const sendAuthAndStartSession = async () => {
-      if (authSentRef.current) {
-        return; // Already sent auth data
-      }
-
-      // Ensure iframe is available and loaded
-      if (!iframeRef.current?.contentWindow) {
-        console.log('⏳ [DAPP] Iframe not ready, waiting...');
-        return;
-      }
-
-      authSentRef.current = true;
-      
-      console.log('🔐 [DAPP] Iframe ready, sending auth data...');
-      
-      // Create secure auth message
-      const secureAuthMessage = await createSecureMessage('AUTH_STATE_CHANGED', authData);
-      
-      console.log('🔐 [DAPP] Sending secure auth data:', secureAuthMessage);
-      // Send to all possible game origins
-      const gameOrigins = [
-        process.env.NEXT_PUBLIC_GAME_SYBILSLASH || 'http://localhost:9002',
-        process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003', 
-        process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
-      ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
-      gameOrigins.forEach(origin => {
-        try {
-          iframeRef.current?.contentWindow?.postMessage(secureAuthMessage, origin);
-          console.log('📨 [DAPP] Auth message sent to:', origin);
-        } catch (e) {
-          console.warn('⚠️ [DAPP] Failed to send auth to:', origin);
-        }
+    // Start session as soon as user is authenticated (don't wait for iframe)
+    if (!authData.isAuthenticated || !authData.user?.id) {
+      console.log('🔄 [DAPP] User not authenticated yet, waiting...', { 
+        authenticated: authData.isAuthenticated, 
+        userId: authData.user?.id 
       });
-      
-      // Wait a bit before starting session to ensure auth is processed
-      setTimeout(() => {
-        if (authData.user?.id) {
-          console.log('🚀 [DAPP] Auto-starting session for user:', authData.user.id);
-          startGameSession(authData.user.id);
-        }
-      }, 500); // Wait 500ms for auth to be processed
-    };
+      return;
+    }
 
-    // Try to send immediately
-    sendAuthAndStartSession();
+    // Mark as initialized and start session immediately
+    initializedRef.current = true;
+    console.log('✅ [DAPP] User authenticated, starting session immediately...');
     
-    // Also set up onload handler as backup
-    console.log('🔐 [DAPP] Setting up iframe onload handler for secure auth');
-    iframeRef.current.onload = sendAuthAndStartSession;
-    
-    // Additional backup: try again after delays
-    setTimeout(() => {
-      if (iframeRef.current && !authSentRef.current) {
-        console.log('🔐 [DAPP] Backup 1: sending secure auth data after delay');
-        sendAuthAndStartSession();
-      }
-    }, 1000);
-    
-    // Final backup after iframe should be fully loaded
-    setTimeout(() => {
-      if (iframeRef.current && !authSentRef.current) {
-        console.log('🔐 [DAPP] Backup 2: final attempt to send auth data');
-        sendAuthAndStartSession();
-      }
-    }, 2000);
-  }, [iframeRef, authData.isAuthenticated, authData.user?.id, startGameSession]);
+    // Start session immediately for authenticated user
+    startGameSession(authData.user.id);
+  }, [authData.isAuthenticated, authData.user?.id, startGameSession, options.gameId]);
+
+  // Monitor currentSession changes
+  useEffect(() => {
+    console.log('🔄 [DAPP] currentSession state changed:', currentSession);
+  }, [currentSession]);
+
+  // Separate effect to handle iframe communication (optional - for future features)
+  useEffect(() => {
+    // This effect can be used later if we need to send additional data to games
+    // For now, the games work independently without needing auth data from parent
+    console.log('🔗 [DAPP] Iframe reference updated:', { hasIframe: !!iframeRef.current });
+  }, [iframeRef?.current]);
 
   // Cleanup on unmount
   useEffect(() => {

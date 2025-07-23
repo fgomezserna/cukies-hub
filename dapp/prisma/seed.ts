@@ -50,16 +50,96 @@ const questsData = [
   },
 ];
 
+// Games data based on existing mock data
+const gamesData = [
+  {
+    gameId: 'sybil-slayer',
+    name: 'Sybil Slayer',
+    description: 'Collect energy points while avoiding enemies in this intense survival game.',
+    emoji: '🎮',
+    gameUrl: process.env.GAME_SYBILSLASH || 'http://localhost:9002/',
+    port: 9002,
+    ranks: [
+      { xp: 50000, name: 'Hyppie Master', icon: 'Crown', color: 'text-yellow-400' },
+      { xp: 20000, name: 'Hyperliquid Veteran', icon: 'Medal', color: 'text-purple-400' },
+      { xp: 10000, name: 'Sybil Slayer', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 5000, name: 'Experimented Hyppie', icon: 'Star', color: 'text-blue-400' },
+      { xp: 2500, name: 'Explorer', icon: 'Star', color: 'text-green-400' },
+    ],
+    leaderboardTitle: 'Top Slayers',
+    playInstructions: [
+      { icon: 'Gamepad2', text: 'PLAY' },
+      { icon: 'Heart', text: 'HAVE FUN' },
+      { icon: 'Trophy', text: 'EARN XP' }
+    ],
+    isActive: true,
+    isInMaintenance: false,
+    version: '1.0.0',
+    category: 'arcade',
+  },
+  {
+    gameId: 'hyppie-road',
+    name: 'Hyppie Road',
+    description: 'Navigate the crypto road, avoid traps, and multiply your rewards in this thrilling betting game.',
+    emoji: '🛣️',
+    gameUrl: process.env.GAME_HYPPIE_ROAD || 'http://localhost:9003/',
+    port: 9003,
+    ranks: [
+      { xp: 50000, name: 'Road Legend', icon: 'Crown', color: 'text-yellow-400' },
+      { xp: 20000, name: 'Highway Master', icon: 'Medal', color: 'text-purple-400' },
+      { xp: 10000, name: 'Speed Demon', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 5000, name: 'Experienced Driver', icon: 'Gamepad2', color: 'text-blue-400' },
+      { xp: 2500, name: 'Road Explorer', icon: 'Star', color: 'text-green-400' },
+    ],
+    leaderboardTitle: 'Top Riders',
+    playInstructions: [
+      { icon: 'Gamepad2', text: 'PLAY' },
+      { icon: 'Heart', text: 'HAVE FUN' },
+      { icon: 'Trophy', text: 'EARN XP' }
+    ],
+    isActive: true,
+    isInMaintenance: false,
+    version: '1.0.0',
+    category: 'betting',
+  },
+  {
+    gameId: 'tower-builder',
+    name: 'Hyppie Tower',
+    description: 'Stack blocks as high as you can in this precision-based tower building game.',
+    emoji: '🏗️',
+    gameUrl: process.env.GAME_TOWER_BUILDER || 'http://localhost:9004/',
+    port: 9004,
+    ranks: [
+      { xp: 50000, name: 'Master Architect', icon: 'Crown', color: 'text-yellow-400' },
+      { xp: 20000, name: 'Building Expert', icon: 'Medal', color: 'text-purple-400' },
+      { xp: 10000, name: 'Tower Master', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 5000, name: 'Skilled Builder', icon: 'Star', color: 'text-blue-400' },
+      { xp: 2500, name: 'Construction Worker', icon: 'Star', color: 'text-green-400' },
+    ],
+    leaderboardTitle: 'Top Hyppie Builders',
+    playInstructions: [
+      { icon: 'Gamepad2', text: 'BUILD' },
+      { icon: 'Heart', text: 'STACK HIGH' },
+      { icon: 'Trophy', text: 'EARN XP' }
+    ],
+    isActive: true,
+    isInMaintenance: false,
+    version: '1.0.0',
+    category: 'arcade',
+  }
+];
+
 async function main() {
   console.log(`Start seeding ...`);
   
-  // Clear existing quests to avoid duplicates during development
+  // Clear existing data to avoid duplicates during development
   await prisma.userCompletedTask.deleteMany({});
   await prisma.userQuest.deleteMany({});
   await prisma.task.deleteMany({});
   await prisma.quest.deleteMany({});
+  await prisma.game.deleteMany({});
 
-  console.log('Old quests and user progress deleted.');
+  console.log('Old quests, games and user progress deleted.');
 
   for (const qData of questsData) {
     const quest = await prisma.quest.create({
@@ -79,6 +159,29 @@ async function main() {
     });
     console.log(`Created quest with title: ${quest.title}`);
   }
+
+  // Seed games
+  for (const gameData of gamesData) {
+    const game = await prisma.game.create({
+      data: {
+        gameId: gameData.gameId,
+        name: gameData.name,
+        description: gameData.description,
+        emoji: gameData.emoji,
+        gameUrl: gameData.gameUrl,
+        port: gameData.port,
+        ranks: gameData.ranks,
+        leaderboardTitle: gameData.leaderboardTitle,
+        playInstructions: gameData.playInstructions,
+        isActive: gameData.isActive,
+        isInMaintenance: gameData.isInMaintenance,
+        version: gameData.version,
+        category: gameData.category,
+      },
+    });
+    console.log(`Created game with id: ${game.gameId}`);
+  }
+
   console.log(`Seeding finished.`);
 }
 
