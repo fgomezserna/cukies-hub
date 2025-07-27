@@ -500,6 +500,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
   const [isVerifying, setIsVerifying] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
   const [telegramGroupInfo, setTelegramGroupInfo] = useState<{
     title: string;
     inviteLink: string | null;
@@ -542,6 +543,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
 
       const data = await response.json();
       setGeneratedCode(data.verificationCode);
+      setCodeSent(false);
       
       toast({
         title: 'Code Generated!',
@@ -624,7 +626,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
           )}
 
           {/* Generate Code / Verify Button */}
-          {!generatedCode ? (
+          {!generatedCode && !codeSent ? (
             <Button
               onClick={generateVerificationCode}
               disabled={disabled || isGeneratingCode || isLoading}
@@ -692,14 +694,20 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
           
           <DialogFooter>
             <Button 
-              onClick={() => setGeneratedCode('')}
+              onClick={() => {
+                setGeneratedCode('');
+                setCodeSent(false);
+              }}
               variant="outline"
               className="flex-1"
             >
               Generate New Code
             </Button>
             <Button 
-              onClick={() => setGeneratedCode('')}
+              onClick={() => {
+                setGeneratedCode('');
+                setCodeSent(true);
+              }}
               className="flex-1"
             >
               Code Sent
