@@ -91,4 +91,5 @@ export type LeaderboardPlayer = {
   referralPoints: number;
   totalPoints: number;
   walletAddress: string;
+  username: string | null;
 } 

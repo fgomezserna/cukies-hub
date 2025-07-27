@@ -97,6 +97,7 @@ async function getGameSpecificLeaderboard(gameId: string, period: string, limit:
     referralPoints: 0, // Not applicable for game-specific leaderboards
     totalPoints: result.finalScore,
     walletAddress: result.user.walletAddress,
+    username: result.user.username,
     gameTime: result.gameTime,
     xpEarned: result.xpEarned,
     playedAt: result.createdAt,
@@ -202,6 +203,7 @@ async function getGeneralGameResultsLeaderboard(period: string, limit: number, o
     referralPoints: result.totalXpEarned, // Using XP earned as secondary metric
     totalPoints: result.totalScore + result.totalXpEarned,
     walletAddress: result.user.walletAddress,
+    username: result.user.username,
     gamesPlayed: result.gamesPlayed,
     bestScore: result.bestScore,
     lastPlayedAt: result.lastPlayedAt,
