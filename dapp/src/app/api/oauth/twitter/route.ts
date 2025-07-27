@@ -17,6 +17,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Get the correct redirect URI (match frontend logic)
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    const redirectUri = `${baseUrl}/oauth/twitter/callback.html`;
+    
+    console.log(`[Twitter OAuth] Using redirect URI: ${redirectUri}`);
+    
     // Exchange code for access token (Twitter OAuth 2.0 with PKCE)
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',
@@ -27,7 +33,7 @@ export async function POST(request: Request) {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${process.env.NEXTAUTH_URL}/oauth/twitter/callback.html`,
+        redirect_uri: redirectUri,
         code_verifier: codeVerifier,
       }),
     });

@@ -31,28 +31,59 @@
         log('Error: ' + (error || 'none'));
         log('State: ' + (state || 'missing'));
         
+        // Get the origin from the opener or use fallback origins
+        const allowedOrigins = [
+            window.opener?.location?.origin,
+            'http://localhost:3000',
+            'https://localhost:3000'
+        ].filter(Boolean);
+        
+        // Try to detect production origin from referrer
+        if (document.referrer) {
+            try {
+                const referrerOrigin = new URL(document.referrer).origin;
+                allowedOrigins.push(referrerOrigin);
+            } catch (e) {
+                log('Could not parse referrer: ' + document.referrer);
+            }
+        }
+        
+        log('Allowed origins: ' + JSON.stringify(allowedOrigins));
+        
         if (error) {
             log('Sending error to parent');
             // Send error to parent window
-            window.opener?.postMessage({
-                type: 'DISCORD_OAUTH_ERROR',
-                error: error
-            }, '*'); // Use '*' for debugging, should be specific origin in production
+            allowedOrigins.forEach(origin => {
+                if (origin) {
+                    window.opener?.postMessage({
+                        type: 'DISCORD_OAUTH_ERROR',
+                        error: error
+                    }, origin);
+                }
+            });
         } else if (code) {
             log('Sending success to parent');
             // Send code to parent window
-            window.opener?.postMessage({
-                type: 'DISCORD_OAUTH_SUCCESS',
-                code: code,
-                state: state
-            }, '*'); // Use '*' for debugging
+            allowedOrigins.forEach(origin => {
+                if (origin) {
+                    window.opener?.postMessage({
+                        type: 'DISCORD_OAUTH_SUCCESS',
+                        code: code,
+                        state: state
+                    }, origin);
+                }
+            });
         } else {
             log('No code or error found');
             // No code or error
-            window.opener?.postMessage({
-                type: 'DISCORD_OAUTH_ERROR',
-                error: 'No authorization code received'
-            }, '*');
+            allowedOrigins.forEach(origin => {
+                if (origin) {
+                    window.opener?.postMessage({
+                        type: 'DISCORD_OAUTH_ERROR',
+                        error: 'No authorization code received'
+                    }, origin);
+                }
+            });
         }
         
         log('Message sent, closing window in 3 seconds...');
