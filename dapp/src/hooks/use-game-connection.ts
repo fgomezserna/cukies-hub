@@ -202,9 +202,16 @@ export function useGameConnection(
     }
   }, [currentSession, options]);
 
-  // End game session
-  const endGameSession = useCallback(async (sessionToken: string, finalScore: number, metadata?: any) => {
-    console.log('🏁 [DAPP] endGameSession called with:', { sessionToken, finalScore, metadata, hasSession: !!currentSession, currentSessionToken: currentSession?.sessionToken });
+  // End game session with retry logic
+  const endGameSession = useCallback(async (sessionToken: string, finalScore: number, metadata?: any, retryCount = 0) => {
+    console.log('🏁 [DAPP] endGameSession called with:', { 
+      sessionToken, 
+      finalScore, 
+      metadata, 
+      retryCount,
+      hasSession: !!currentSession, 
+      currentSessionToken: currentSession?.sessionToken 
+    });
 
     let actualSessionToken = sessionToken;
 
@@ -250,6 +257,13 @@ export function useGameConnection(
       const data = await response.json();
       
       if (data.success) {
+        console.log('✅ [DAPP] Session ended successfully:', {
+          sessionId: data.sessionId,
+          finalScore: data.finalScore,
+          xpEarned: data.xpEarned,
+          retryCount
+        });
+
         setCurrentSession(null);
         sessionStartedRef.current = false; // Reset session flag
         // DON'T reset authSentRef.current = false; // Keep auth flag to avoid re-sending auth
@@ -271,9 +285,35 @@ export function useGameConnection(
             startGameSession(authData.user.id);
           }, 1000); // Wait 1 second before starting new session
         }
+      } else {
+        console.error('❌ [DAPP] End session failed:', data);
+        // Retry logic for failed requests (max 2 retries)
+        if (retryCount < 2 && actualSessionToken !== 'no-session') {
+          console.log(`🔄 [DAPP] Retrying end session (attempt ${retryCount + 1}/2)...`);
+          setTimeout(() => {
+            endGameSession(sessionToken, finalScore, metadata, retryCount + 1);
+          }, 1000 * (retryCount + 1)); // Exponential backoff
+        } else {
+          console.error('❌ [DAPP] Max retries reached, giving up on ending session');
+        }
       }
     } catch (error) {
-      console.error('Failed to end game session:', error);
+      console.error('❌ [DAPP] Network error ending game session:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        sessionToken: actualSessionToken,
+        finalScore,
+        retryCount
+      });
+      
+      // Retry logic for network errors (max 2 retries)
+      if (retryCount < 2 && actualSessionToken !== 'no-session') {
+        console.log(`🔄 [DAPP] Retrying after network error (attempt ${retryCount + 1}/2)...`);
+        setTimeout(() => {
+          endGameSession(sessionToken, finalScore, metadata, retryCount + 1);
+        }, 2000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        console.error('❌ [DAPP] Max retries reached after network errors, giving up');
+      }
     }
   }, [options, authData.user?.id, authData.isAuthenticated, startGameSession, currentSession]);
 
