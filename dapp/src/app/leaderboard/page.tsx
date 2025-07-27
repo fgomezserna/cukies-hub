@@ -158,12 +158,12 @@ function LeaderboardView() {
                                                                 <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <div className='flex items-center gap-2'>
-                                                                {user ? (
-                                                                    <Link href={`/profile/${player.walletAddress}`} className="font-medium hover:underline">
+                                                                {user && player.username ? (
+                                                                    <Link href={`/profile/${player.username}`} className="font-medium hover:underline">
                                                                         {isCurrentUser ? 'You' : player.name}
                                                                     </Link>
                                                                 ) : (
-                                                                    <span className="font-medium">{player.name}</span>
+                                                                    <span className="font-medium">{isCurrentUser ? 'You' : player.name}</span>
                                                                 )}
                                                                 {player.rank <= 3 && <Badge variant="secondary" className="bg-transparent">{player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : '🥉'}</Badge>}
                                                             </div>
