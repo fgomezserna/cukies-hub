@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useGameData } from '@/hooks/use-game-data';
 import { useGameConnection } from '@/hooks/use-game-connection';
 import GameLayout from '@/components/layout/GameLayout';
+import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 
 export default function HyppieRoadPage() {
   const { user, isLoading } = useAuth();
@@ -16,8 +17,7 @@ export default function HyppieRoadPage() {
     iframeRef,
     {
       isAuthenticated: !!user && !isLoading,
-      user: user,
-      token: user?.token
+      user: user
     },
     {
       gameId: 'hyppie-road',
@@ -36,11 +36,7 @@ export default function HyppieRoadPage() {
 
   // Show loading state
   if (loading || !gameConfig) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading game...</div>
-      </div>
-    );
+    return <GameLoadingSkeleton message="Loading Hyppie Road..." />;
   }
 
   // Show error state

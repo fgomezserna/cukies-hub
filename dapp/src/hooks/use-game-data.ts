@@ -35,63 +35,59 @@ export function useGameData(gameId: string): UseGameDataResult {
         setLoading(true);
         setError(null);
 
-        // Fetch all data in parallel
-        const [configResponse, statsResponse, leaderboardResponse] = await Promise.all([
-          // 1. Fetch game configuration
-          fetch(`/api/games/config?gameId=${gameId}`),
-          
-          // 2. Fetch game statistics
-          fetch(`/api/games/stats?gameId=${gameId}${user?.id ? `&userId=${user.id}` : ''}`),
-          
-          // 3. Fetch leaderboard data
-          fetch(`/api/leaderboard?gameId=${gameId}&period=all-time&limit=10`)
-        ]);
-
-        // Process game configuration
+        // Step 1: Fetch critical game configuration first (fastest load)
+        const configResponse = await fetch(`/api/games/config?gameId=${gameId}`);
+        
         if (configResponse.ok) {
           const configData = await configResponse.json();
           setGameConfig(configData);
+          
+          // Critical data loaded - can show game layout now
+          setLoading(false);
+          
+          // Step 2: Fetch non-critical data in parallel (background loading)
+          const [statsResponse, leaderboardResponse] = await Promise.all([
+            fetch(`/api/games/stats?gameId=${gameId}${user?.id ? `&userId=${user.id}` : ''}`),
+            fetch(`/api/leaderboard?gameId=${gameId}&period=all-time&limit=10`)
+          ]);
+
+          // Process game statistics
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            setGameStats(statsData);
+          } else {
+            console.warn('Failed to fetch game stats - using defaults');
+            setGameStats({
+              gameId,
+              totalPlayers: 0,
+              totalSessions: 0,
+              avgScore: 0,
+              topScore: 0,
+              recentSessions: []
+            });
+          }
+
+          // Process leaderboard data
+          if (leaderboardResponse.ok) {
+            const leaderboardData = await leaderboardResponse.json();
+            setLeaderboardData(leaderboardData);
+          } else {
+            console.warn('Failed to fetch leaderboard - using defaults');
+            setLeaderboardData({
+              leaderboard: [],
+              totalCount: 0,
+              hasMore: false,
+              gameId,
+              period: 'all-time'
+            });
+          }
         } else {
           throw new Error('Failed to fetch game configuration');
-        }
-
-        // Process game statistics
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setGameStats(statsData);
-        } else {
-          console.warn('Failed to fetch game stats - using defaults');
-          // Set default stats if API fails
-          setGameStats({
-            gameId,
-            totalPlayers: 0,
-            totalSessions: 0,
-            avgScore: 0,
-            topScore: 0,
-            recentSessions: []
-          });
-        }
-
-        // Process leaderboard data
-        if (leaderboardResponse.ok) {
-          const leaderboardData = await leaderboardResponse.json();
-          setLeaderboardData(leaderboardData);
-        } else {
-          console.warn('Failed to fetch leaderboard - using defaults');
-          // Set default leaderboard if API fails
-          setLeaderboardData({
-            leaderboard: [],
-            totalCount: 0,
-            hasMore: false,
-            gameId,
-            period: 'all-time'
-          });
         }
 
       } catch (err) {
         console.error('Error fetching game data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load game data');
-      } finally {
         setLoading(false);
       }
     };
