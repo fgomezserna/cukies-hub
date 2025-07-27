@@ -2,10 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  let sessionToken: string | undefined;
+  let finalScore: number | undefined;
+  let metadata: any;
+  
   try {
-    const { sessionToken, finalScore, metadata } = await request.json();
+    ({ sessionToken, finalScore, metadata } = await request.json());
+
+    console.log('🏁 [API] End session request received:', {
+      sessionToken: sessionToken || 'missing',
+      finalScore,
+      metadata,
+      timestamp: new Date().toISOString()
+    });
 
     if (!sessionToken || finalScore === undefined) {
+      console.error('❌ [API] Missing required fields:', { sessionToken, finalScore });
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -22,8 +35,21 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session) {
+      console.error('❌ [API] Session not found:', { 
+        sessionToken, 
+        searchAttempted: 'findUnique by sessionToken' 
+      });
       return NextResponse.json({ success: false, error: 'Session not found' }, { status: 400 });
     }
+
+    console.log('✅ [API] Session found:', {
+      sessionId: session.sessionId,
+      userId: session.userId,
+      gameId: session.gameId,
+      isActive: session.isActive,
+      hasResult: !!session.result,
+      checkpointsCount: session.checkpoints.length
+    });
 
     // Check if this session already has a result (prevent duplicates)
     if (session.result) {
@@ -101,22 +127,34 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log('🏁 [API] Game session ended:', {
+    const processingTime = Date.now() - startTime;
+    console.log('🏁 [API] Game session ended successfully:', {
       sessionToken,
+      sessionId: session.sessionId,
       finalScore,
       metadata,
-      xpEarned
+      xpEarned,
+      processingTimeMs: processingTime
     });
 
     return NextResponse.json({
       success: true,
       finalScore,
       isValid: true,
-      xpEarned
+      xpEarned,
+      sessionId: session.sessionId
     });
 
   } catch (error) {
-    console.error('❌ [API] Error ending game session:', error);
+    const processingTime = Date.now() - startTime;
+    console.error('❌ [API] Error ending game session:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      sessionToken: sessionToken || 'undefined',
+      finalScore: finalScore || 'undefined',
+      metadata: metadata || 'undefined',
+      processingTimeMs: processingTime
+    });
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
 } 
