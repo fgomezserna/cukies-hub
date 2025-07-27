@@ -3,7 +3,7 @@
 import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Gamepad2 } from 'lucide-react';
+import AppLayout from '@/components/layout/app-layout';
 
 interface GameLoadingSkeletonProps {
   message?: string;
@@ -11,133 +11,129 @@ interface GameLoadingSkeletonProps {
 
 export default function GameLoadingSkeleton({ message = "Loading game..." }: GameLoadingSkeletonProps) {
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="mx-auto max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Game Area */}
-          <div className="lg:col-span-3">
-            <Card className="h-[600px] border-border/50">
-              <CardContent className="p-6 h-full flex flex-col">
-                {/* Game Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="animate-pulse">
-                      <Gamepad2 className="h-8 w-8 text-primary" />
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-6 w-32" />
-                      <Skeleton className="h-4 w-48" />
-                    </div>
+    <AppLayout>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+        
+        {/* Left Column: Game Loading Area */}
+        <div className="lg:col-span-3 flex flex-col gap-6">
+          {/* Game Container */}
+          <div className="bg-card flex-grow flex flex-col relative overflow-hidden rounded-lg border">
+            <div className="w-full h-full min-h-[480px] lg:min-h-0 flex items-center justify-center bg-muted/10">
+              <div className="text-center space-y-6">
+                {/* Animated Game Icon */}
+                <div className="relative mx-auto w-20 h-20">
+                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping"></div>
+                  <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 border-2 border-primary/30">
+                    <div className="text-3xl animate-bounce">🎮</div>
                   </div>
-                  <Skeleton className="h-10 w-24" />
                 </div>
                 
-                {/* Game Loading Area */}
-                <div className="flex-1 bg-muted/20 rounded-lg flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <div className="relative">
-                      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
-                      <div className="absolute inset-0 rounded-full h-16 w-16 border-2 border-primary/20 mx-auto"></div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-lg font-medium text-foreground">{message}</p>
-                      <p className="text-sm text-muted-foreground">Preparing your gaming experience...</p>
-                    </div>
-                    <div className="flex justify-center space-x-1">
-                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
+                {/* Loading Text */}
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-foreground">{message}</h3>
+                  <p className="text-sm text-muted-foreground">Preparing your gaming experience...</p>
                 </div>
-
-                {/* Game Controls Skeleton */}
-                <div className="mt-4 flex gap-2">
-                  <Skeleton className="h-10 flex-1" />
-                  <Skeleton className="h-10 w-32" />
+                
+                {/* Loading Dots */}
+                <div className="flex justify-center space-x-1">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
+          
+          {/* Game Instructions Skeleton */}
+          <Card>
+            <CardContent className="p-4 flex justify-around items-center">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Skeleton className="h-5 w-5 rounded" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* User Stats */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-5 w-24" />
-                </div>
-                <Skeleton className="h-4 w-32" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-1 flex-1">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-3 w-16" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Skeleton className="h-3 w-12" />
-                    <Skeleton className="h-6 w-16" />
-                  </div>
-                  <div className="space-y-1">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-6 w-12" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Right Column: Game Info Skeletons */}
+        <div className="lg:col-span-1 flex flex-col gap-3">
+          
+          {/* Game Title Skeleton */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-6 rounded" />
+                <Skeleton className="h-6 w-32" />
+              </div>
+              <Skeleton className="h-4 w-full mt-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardHeader>
+          </Card>
 
-            {/* Game Stats */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-5 w-20" />
+          {/* User High Score Skeleton */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-md" />
+                <Skeleton className="h-8 w-20" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* User Rank Skeleton */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-md" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-3 w-20" />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 w-12" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Leaderboard */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-5 w-28" />
-                </div>
-                <Skeleton className="h-4 w-32" />
-              </CardHeader>
-              <CardContent className="space-y-2">
+          {/* Leaderboard Skeleton */}
+          <Card className="flex-grow">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-3 w-32" />
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-3 p-2">
-                    <Skeleton className="h-4 w-6" />
+                    <Skeleton className="h-3 w-4" />
                     <Skeleton className="h-8 w-8 rounded-full" />
-                    <div className="flex-1 space-y-1">
-                      <Skeleton className="h-4 w-20" />
-                    </div>
+                    <Skeleton className="h-4 flex-1" />
                     <Skeleton className="h-4 w-12" />
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Chat Button */}
-            <Skeleton className="h-10 w-full" />
-          </div>
+          {/* Chat Button Skeleton */}
+          <Skeleton className="h-10 w-full rounded-md" />
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }
