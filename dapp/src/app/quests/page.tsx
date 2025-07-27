@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle, ExternalLink, Copy, Check } from 'lucide-react';
 import DiscordIcon from '@/components/icons/discord';
 import XIcon from '@/components/icons/x-icon';
 import { Badge } from '@/components/ui/badge';
@@ -500,6 +500,9 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
   const [isVerifying, setIsVerifying] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [telegramGroupInfo, setTelegramGroupInfo] = useState<{
     title: string;
     inviteLink: string | null;
@@ -542,6 +545,9 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
 
       const data = await response.json();
       setGeneratedCode(data.verificationCode);
+      setCodeSent(false);
+      setShowCodeModal(true);
+      setCodeCopied(false);
       
       toast({
         title: 'Code Generated!',
@@ -556,6 +562,24 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
       });
     } finally {
       setIsGeneratingCode(false);
+    }
+  };
+
+  const copyCodeToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedCode);
+      setCodeCopied(true);
+      toast({
+        title: 'Code Copied!',
+        description: 'Verification code copied to clipboard',
+      });
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch (err) {
+      toast({
+        title: 'Copy Failed',
+        description: 'Could not copy code to clipboard',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -623,12 +647,14 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
             </Button>
           )}
 
-          {/* Generate Code / Verify Button */}
-          {!generatedCode ? (
+          {/* Action Buttons */}
+          <div className="flex gap-2 flex-wrap">
+            {/* Generate/Regenerate Code Button */}
             <Button
               onClick={generateVerificationCode}
               disabled={disabled || isGeneratingCode || isLoading}
               size="sm"
+              variant={generatedCode || codeSent ? "outline" : "default"}
               className="text-xs"
             >
               {isGeneratingCode ? (
@@ -637,31 +663,47 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
                   Generating...
                 </>
               ) : (
-                'Generate Code'
+                generatedCode || codeSent ? 'Generate New Code' : 'Generate Code'
               )}
             </Button>
-          ) : (
-            <Button
-              onClick={handleVerifyMembership}
-              disabled={disabled || isVerifying || isLoading}
-              size="sm"
-              className="text-xs"
-            >
-              {isVerifying || isLoading ? (
-                <>
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                'Verify'
-              )}
-            </Button>
-          )}
+
+            {/* Show Code Button - only when code exists but modal is closed */}
+            {generatedCode && !codeSent && (
+              <Button
+                onClick={() => setShowCodeModal(true)}
+                disabled={disabled}
+                size="sm"
+                variant="outline"
+                className="text-xs"
+              >
+                Show Code
+              </Button>
+            )}
+
+            {/* Verify Button - only when code has been sent */}
+            {(generatedCode || codeSent) && (
+              <Button
+                onClick={handleVerifyMembership}
+                disabled={disabled || isVerifying || isLoading}
+                size="sm"
+                className="text-xs"
+              >
+                {isVerifying || isLoading ? (
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify'
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Code Modal */}
-      <Dialog open={!!generatedCode && !task.completed} onOpenChange={() => setGeneratedCode('')}>
+      <Dialog open={showCodeModal && !!generatedCode && !task.completed} onOpenChange={() => setShowCodeModal(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Verification Code</DialogTitle>
@@ -675,8 +717,22 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
               <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
                 Step 1: Copy this code
               </p>
-              <div className="bg-white dark:bg-gray-800 p-3 rounded border font-mono text-center text-xl font-bold mb-3 select-all">
-                {generatedCode}
+              <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded border">
+                <div className="font-mono text-center text-xl font-bold flex-1 select-all">
+                  {generatedCode}
+                </div>
+                <Button
+                  onClick={copyCodeToClipboard}
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                >
+                  {codeCopied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
               <p className="text-xs text-blue-700 dark:text-blue-300">
                 Copy this code and send it as a message in our Telegram group.
@@ -692,14 +748,20 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
           
           <DialogFooter>
             <Button 
-              onClick={() => setGeneratedCode('')}
+              onClick={() => {
+                setShowCodeModal(false);
+                generateVerificationCode();
+              }}
               variant="outline"
               className="flex-1"
             >
               Generate New Code
             </Button>
             <Button 
-              onClick={() => {}}
+              onClick={() => {
+                setShowCodeModal(false);
+                setCodeSent(true);
+              }}
               className="flex-1"
             >
               Code Sent
