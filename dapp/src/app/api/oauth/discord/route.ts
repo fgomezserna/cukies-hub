@@ -20,6 +20,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Get the correct redirect URI (match frontend logic)
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    const redirectUri = `${baseUrl}/oauth/discord/callback.html`;
+    
+    console.log(`[Discord OAuth] Using redirect URI: ${redirectUri}`);
+    
     // Exchange code for access token
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
@@ -31,7 +37,7 @@ export async function POST(request: Request) {
         client_secret: process.env.DISCORD_CLIENT_SECRET!,
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: `${process.env.NEXTAUTH_URL}/oauth/discord/callback.html`,
+        redirect_uri: redirectUri,
       }),
     });
 

@@ -1,5 +1,16 @@
 // Utility functions for OAuth flows
 
+// Get the correct base URL for OAuth redirects
+function getBaseUrl(): string {
+  // In production, use NEXT_PUBLIC_APP_URL if available, otherwise window.location.origin
+  // In development, always use window.location.origin
+  if (typeof window !== 'undefined') {
+    return process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+  }
+  // Fallback for SSR (should not be used in OAuth flows)
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
+
 // Generate a random string for OAuth state parameter
 export function generateRandomString(length: number): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -20,7 +31,9 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(verifier);
   const digest = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+  const bytes = new Uint8Array(digest);
+  const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+  return btoa(binary)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '');
@@ -29,10 +42,11 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 // Discord OAuth URL generator
 export function getDiscordOAuthURL(state: string): string {
   const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || 'DISCORD_CLIENT_ID_NOT_SET';
+  const baseUrl = getBaseUrl();
   
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: `${window.location.origin}/oauth/discord/callback.html`,
+    redirect_uri: `${baseUrl}/oauth/discord/callback.html`,
     response_type: 'code',
     scope: 'identify guilds',
     state: state,
@@ -44,10 +58,11 @@ export function getDiscordOAuthURL(state: string): string {
 // Twitter OAuth URL generator
 export function getTwitterOAuthURL(state: string, codeChallenge: string): string {
   const clientId = process.env.NEXT_PUBLIC_TWITTER_CLIENT_ID || 'TWITTER_CLIENT_ID_NOT_SET';
+  const baseUrl = getBaseUrl();
   
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: `${window.location.origin}/oauth/twitter/callback.html`,
+    redirect_uri: `${baseUrl}/oauth/twitter/callback.html`,
     response_type: 'code',
     scope: 'users.read tweet.read',
     state: state,
@@ -91,9 +106,11 @@ export function handleOAuthFlow(
       console.log('[OAuth Flow] Received message:', event.data, 'from origin:', event.origin);
       console.log('[OAuth Flow] Expected origin:', window.location.origin);
       
-      // Allow both http and https localhost for development
+      // Allow both http and https localhost for development and production URL
+      const baseUrl = getBaseUrl();
       const allowedOrigins = [
         window.location.origin,
+        baseUrl,
         'http://localhost:3000',
         'https://localhost:3000'
       ];
