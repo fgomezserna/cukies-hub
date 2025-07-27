@@ -21,10 +21,27 @@ export async function POST(request: Request) {
     }
 
     // Get the correct redirect URI (match frontend logic)
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    let baseUrl = process.env.NEXTAUTH_URL;
+    
+    if (!baseUrl && process.env.VERCEL_URL) {
+      // VERCEL_URL might not include protocol, ensure it has https://
+      baseUrl = process.env.VERCEL_URL.startsWith('http') 
+        ? process.env.VERCEL_URL 
+        : `https://${process.env.VERCEL_URL}`;
+    }
+    
+    if (!baseUrl) {
+      baseUrl = 'http://localhost:3000';
+    }
+    
     const redirectUri = `${baseUrl}/oauth/discord/callback.html`;
     
-    console.log(`[Discord OAuth] Using redirect URI: ${redirectUri}`);
+    console.log(`[Discord OAuth] Environment check:`, {
+      NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'not set',
+      VERCEL_URL: process.env.VERCEL_URL || 'not set',
+      finalBaseUrl: baseUrl,
+      redirectUri: redirectUri
+    });
     
     // Exchange code for access token
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
@@ -43,9 +60,21 @@ export async function POST(request: Request) {
 
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
-      console.error('Discord token exchange failed:', error);
+      console.error('Discord token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: error,
+        redirectUri: redirectUri,
+        code: code?.substring(0, 20) + '...'
+      });
       return NextResponse.json({ 
-        error: 'Failed to exchange code for token' 
+        error: 'Failed to exchange code for token',
+        details: error,
+        redirectUri: redirectUri,
+        debug: {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText
+        }
       }, { status: 400 });
     }
 
