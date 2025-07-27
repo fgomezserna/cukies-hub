@@ -5,6 +5,7 @@ import { useGameConnection } from '@/hooks/use-game-connection';
 import { useAuth } from '@/providers/auth-provider';
 import { useGameData } from '@/hooks/use-game-data';
 import GameLayout from '@/components/layout/GameLayout';
+import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 
 export default function SybilSlayerPage() {
   const { user, isLoading } = useAuth();
@@ -71,11 +72,7 @@ export default function SybilSlayerPage() {
 
   // Show loading state
   if (loading || !gameConfig) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading game...</div>
-      </div>
-    );
+    return <GameLoadingSkeleton message="Loading Sybil Slayer..." />;
   }
 
   // Show error state
