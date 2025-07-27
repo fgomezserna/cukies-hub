@@ -13,6 +13,8 @@ import { Button } from "./ui/button";
 import { Github, Play, Pause, RotateCcw } from 'lucide-react';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
+import { spriteManager } from '../lib/spriteManager';
+import { performanceMonitor } from '../lib/performanceMonitor';
 
 
 interface GameContainerProps {
@@ -135,17 +137,70 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setSoundsEnabled(isSoundsEnabled()); // NUEVO: Sincronizar sonidos también
   }, [isMusicEnabled, isSoundsEnabled]);
   
-  // Estado para loading de assets
-  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  // Estado para loading de assets optimizado
+  const [criticalAssetsLoaded, setCriticalAssetsLoaded] = useState(false);
+  const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingPhase, setLoadingPhase] = useState<'preload' | 'full'>('preload');
 
-  // Precargar assets al montar el componente
+  // Carga progresiva y optimizada de assets con monitoreo de rendimiento
   useEffect(() => {
-    assetLoader.preloadAll(progress => {
-      setLoadingProgress(progress);
-    }).then(() => {
-      setAssetsLoaded(true);
-    });
+    const loadAssets = async () => {
+      try {
+        // Inicializar monitoreo de rendimiento
+        performanceMonitor.startTimer('totalAssets');
+        performanceMonitor.startTimer('criticalAssets');
+        performanceMonitor.startTimer('sprites');
+        
+        console.log('🚀 Iniciando carga optimizada de assets...');
+        setLoadingPhase('preload');
+        
+        // Cargar assets críticos en paralelo
+        const [, ] = await Promise.all([
+          assetLoader.preloadCritical((progress) => {
+            setLoadingProgress(progress * 0.6); // 60% para assets críticos
+          }),
+          spriteManager.loadGameSprites().then(() => {
+            performanceMonitor.endTimer('sprites');
+            setLoadingProgress(prev => prev + 0.3); // 30% para sprites
+          })
+        ]);
+        
+        performanceMonitor.endTimer('criticalAssets');
+        console.log('✅ Assets críticos y sprites cargados - juego puede iniciar');
+        setCriticalAssetsLoaded(true);
+        
+        // Fase 2: Cargar assets restantes en background
+        setTimeout(async () => {
+          console.log('⏳ Cargando assets decorativos en background...');
+          setLoadingPhase('full');
+          
+          await assetLoader.loadRemaining((progress, phase) => {
+            setLoadingProgress(0.9 + (progress * 0.1)); // 10% restante
+            setLoadingPhase(phase);
+          });
+          
+          performanceMonitor.endTimer('totalAssets');
+          console.log('🎉 Todos los assets cargados');
+          setAllAssetsLoaded(true);
+          
+          // Mostrar reporte de rendimiento en desarrollo
+          if (process.env.NODE_ENV === 'development') {
+            setTimeout(() => {
+              performanceMonitor.printReport();
+            }, 1000);
+          }
+        }, 300); // Delay reducido para mejor UX
+        
+      } catch (error) {
+        console.error('❌ Error cargando assets:', error);
+        performanceMonitor.recordAssetFailed();
+        // Aún así permitir que el juego inicie con assets básicos
+        setCriticalAssetsLoaded(true);
+      }
+    };
+    
+    loadAssets();
   }, []);
   
   // Estilos CSS para las animaciones
@@ -828,83 +883,36 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     return () => clearInterval(intervalId);
   }, [hackerAnimation, gameState.status]);
 
-  // Cargar la imagen de jeff_goit
+  // Usar assets del AssetLoader optimizado en lugar de carga individual
   useEffect(() => {
-    const jeffGoitImg = new window.Image();
-    jeffGoitImg.src = '/assets/collectibles/jeff_goit.png';
-    jeffGoitImg.onload = () => {
-      console.log('✅ Imagen jeff_goit.png cargada EXITOSAMENTE');
-      jeffGoitImgRef.current = jeffGoitImg;
+    // Actualizar referencias cuando los assets estén disponibles
+    const updateImageRefs = () => {
+      jeffGoitImgRef.current = assetLoader.getAsset('jeff_goit');
+      whaleChadImgRef.current = assetLoader.getAsset('whalechadmode');
+      meowImgRef.current = assetLoader.getAsset('meow');
+      unlistedImgRef.current = assetLoader.getAsset('unlisted');
+      gigaVaultImgRef.current = assetLoader.getAsset('giga_vault');
+      hackerTrumpImgRef.current = assetLoader.getAsset('pay_tariffs');
     };
-    jeffGoitImg.onerror = () => {
-      console.error('❌ Error cargando jeff_goit.png');
-    };
-  }, []);
-
-  // Cargar la imagen de whalechadmode
-  useEffect(() => {
-    const whaleChadImg = new window.Image();
-    whaleChadImg.src = '/assets/collectibles/whalechadmode.png';
-    whaleChadImg.onload = () => {
-      console.log('✅ Imagen whalechadmode.png cargada EXITOSAMENTE');
-      whaleChadImgRef.current = whaleChadImg;
-    };
-    whaleChadImg.onerror = () => {
-      console.error('❌ Error cargando whalechadmode.png');
-    };
-  }, []);
-
-  // Cargar la imagen de meow
-  useEffect(() => {
-    const meowImg = new window.Image();
-    meowImg.src = '/assets/collectibles/meow.png';
-    meowImg.onload = () => {
-      console.log('✅ Imagen meow.png cargada EXITOSAMENTE');
-      meowImgRef.current = meowImg;
-    };
-    meowImg.onerror = () => {
-      console.error('❌ Error cargando meow.png');
-    };
-  }, []);
-
-  // Cargar la imagen de unlisted
-  useEffect(() => {
-    const unlistedImg = new window.Image();
-    unlistedImg.src = '/assets/collectibles/unlisted.png';
-    unlistedImg.onload = () => {
-      console.log('✅ Imagen unlisted.png cargada EXITOSAMENTE');
-      unlistedImgRef.current = unlistedImg;
-    };
-    unlistedImg.onerror = () => {
-      console.error('❌ Error cargando unlisted.png');
-    };
-  }, []);
-
-  // Cargar la imagen de giga vault
-  useEffect(() => {
-    const gigaVaultImg = new window.Image();
-    gigaVaultImg.src = '/assets/collectibles/giga_vault.png';
-    gigaVaultImg.onload = () => {
-      console.log('✅ Imagen giga_vault.png cargada EXITOSAMENTE');
-      gigaVaultImgRef.current = gigaVaultImg;
-    };
-    gigaVaultImg.onerror = () => {
-      console.error('❌ Error cargando giga_vault.png');
-    };
-  }, []);
-
-  // Cargar la imagen del hacker (pay tariffs)
-  useEffect(() => {
-    const hackerTrumpImg = new window.Image();
-    hackerTrumpImg.src = '/assets/collectibles/pay_tariffs.png';
-    hackerTrumpImg.onload = () => {
-      console.log('✅ Imagen pay_tariffs.png cargada EXITOSAMENTE');
-      hackerTrumpImgRef.current = hackerTrumpImg;
-    };
-    hackerTrumpImg.onerror = () => {
-      console.error('❌ Error cargando pay_tariffs.png');
-    };
-  }, []);
+    
+    // Actualizar inmediatamente si ya están cargados
+    updateImageRefs();
+    
+    // Verificar periódicamente hasta que todos estén cargados
+    const interval = setInterval(() => {
+      updateImageRefs();
+      
+      // Detener cuando todos los assets críticos estén disponibles
+      if (jeffGoitImgRef.current && whaleChadImgRef.current && 
+          meowImgRef.current && unlistedImgRef.current && 
+          gigaVaultImgRef.current && hackerTrumpImgRef.current) {
+        clearInterval(interval);
+        console.log('✅ Todas las referencias de imágenes actualizadas desde AssetLoader');
+      }
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [allAssetsLoaded]);
 
   // Escalado responsivo
   const [scale, setScale] = useState(1);
@@ -925,8 +933,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     return () => window.removeEventListener('resize', calculateScale);
   }, [calculateScale]);
 
-  // Justo antes del return principal del componente:
-  if (!assetsLoaded) {
+  // Loading screen optimizado con fases
+  if (!criticalAssetsLoaded) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-background z-50">
         <div className="w-full flex flex-col items-center justify-center py-10">
@@ -938,7 +946,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               ></div>
             </div>
           </div>
-          <p className="text-muted-foreground text-lg font-pixellari mt-2">Cargando assets: {Math.round(loadingProgress * 100)}%</p>
+          <p className="text-muted-foreground text-lg font-pixellari mt-2">
+            {loadingPhase === 'preload' 
+              ? `Cargando elementos esenciales: ${Math.round(loadingProgress * 100)}%`
+              : `Optimizando experiencia: ${Math.round(loadingProgress * 100)}%`
+            }
+          </p>
+          <p className="text-muted-foreground text-sm font-pixellari mt-1 opacity-70">
+            {loadingPhase === 'preload' 
+              ? 'Preparando juego...'
+              : 'Cargando efectos especiales...'
+            }
+          </p>
         </div>
       </div>
     );
