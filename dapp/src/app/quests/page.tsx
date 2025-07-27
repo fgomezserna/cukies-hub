@@ -648,52 +648,55 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
-            {!generatedCode && !codeSent ? (
+          <div className="flex gap-2 flex-wrap">
+            {/* Generate/Regenerate Code Button */}
+            <Button
+              onClick={generateVerificationCode}
+              disabled={disabled || isGeneratingCode || isLoading}
+              size="sm"
+              variant={generatedCode || codeSent ? "outline" : "default"}
+              className="text-xs"
+            >
+              {isGeneratingCode ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                generatedCode || codeSent ? 'Generate New Code' : 'Generate Code'
+              )}
+            </Button>
+
+            {/* Show Code Button - only when code exists but modal is closed */}
+            {generatedCode && !codeSent && (
               <Button
-                onClick={generateVerificationCode}
-                disabled={disabled || isGeneratingCode || isLoading}
+                onClick={() => setShowCodeModal(true)}
+                disabled={disabled}
+                size="sm"
+                variant="outline"
+                className="text-xs"
+              >
+                Show Code
+              </Button>
+            )}
+
+            {/* Verify Button - only when code has been sent */}
+            {(generatedCode || codeSent) && (
+              <Button
+                onClick={handleVerifyMembership}
+                disabled={disabled || isVerifying || isLoading}
                 size="sm"
                 className="text-xs"
               >
-                {isGeneratingCode ? (
+                {isVerifying || isLoading ? (
                   <>
                     <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    Generating...
+                    Verifying...
                   </>
                 ) : (
-                  'Generate Code'
+                  'Verify'
                 )}
               </Button>
-            ) : (
-              <>
-                {generatedCode && !codeSent && (
-                  <Button
-                    onClick={() => setShowCodeModal(true)}
-                    disabled={disabled}
-                    size="sm"
-                    variant="outline"
-                    className="text-xs"
-                  >
-                    Show Code
-                  </Button>
-                )}
-                <Button
-                  onClick={handleVerifyMembership}
-                  disabled={disabled || isVerifying || isLoading}
-                  size="sm"
-                  className="text-xs"
-                >
-                  {isVerifying || isLoading ? (
-                    <>
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    'Verify'
-                  )}
-                </Button>
-              </>
             )}
           </div>
         </div>
