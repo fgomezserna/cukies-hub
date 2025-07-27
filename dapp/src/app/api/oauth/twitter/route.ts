@@ -31,6 +31,9 @@ export async function POST(request: Request) {
       baseUrl = 'http://localhost:3000';
     }
     
+    // Remove trailing slash to avoid double slashes
+    baseUrl = baseUrl.replace(/\/$/, '');
+    
     const redirectUri = `${baseUrl}/oauth/twitter/callback.html`;
     
     console.log(`[Twitter OAuth] Environment check:`, {

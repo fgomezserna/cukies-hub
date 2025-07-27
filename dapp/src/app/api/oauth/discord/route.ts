@@ -34,6 +34,9 @@ export async function POST(request: Request) {
       baseUrl = 'http://localhost:3000';
     }
     
+    // Remove trailing slash to avoid double slashes
+    baseUrl = baseUrl.replace(/\/$/, '');
+    
     const redirectUri = `${baseUrl}/oauth/discord/callback.html`;
     
     console.log(`[Discord OAuth] Environment check:`, {
