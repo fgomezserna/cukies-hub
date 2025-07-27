@@ -234,10 +234,48 @@ export function useGameConnection(
       }
     }
 
-    // Skip API call if there's no valid session at all
+    // Try emergency save if there's no valid session at all
     if (!actualSessionToken || actualSessionToken === 'no-session') {
-      console.log('⚠️ [DAPP] No valid session to end, skipping API call');
-      options.onSessionEnd?.({ finalScore, isValid: false });
+      console.log('⚠️ [DAPP] No valid session found, attempting emergency save...');
+      
+      if (authData.user?.id) {
+        try {
+          const response = await fetch('/api/games/emergency-result', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: authData.user.id,
+              gameId: options.gameId,
+              finalScore,
+              metadata: { ...metadata, reason: 'No session token available' }
+            })
+          });
+
+          const data = await response.json();
+          
+          if (data.success) {
+            console.log('🚨 [DAPP] Emergency save successful:', data);
+            options.onSessionEnd?.({
+              finalScore: data.finalScore,
+              isValid: data.isValid
+            });
+            
+            // Auto-start a new session for the next game
+            setTimeout(() => {
+              startGameSession(authData.user.id);
+            }, 1000);
+          } else {
+            console.error('❌ [DAPP] Emergency save failed:', data);
+            options.onSessionEnd?.({ finalScore, isValid: false });
+          }
+        } catch (error) {
+          console.error('❌ [DAPP] Emergency save error:', error);
+          options.onSessionEnd?.({ finalScore, isValid: false });
+        }
+      } else {
+        console.log('⚠️ [DAPP] No user ID available for emergency save');
+        options.onSessionEnd?.({ finalScore, isValid: false });
+      }
       return;
     }
 
@@ -320,8 +358,17 @@ export function useGameConnection(
   // Listen for messages from game
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
+      // Log all incoming messages for debugging
+      console.log('📨 [DAPP] Raw message received:', {
+        origin: event.origin,
+        data: event.data,
+        type: typeof event.data,
+        hasType: !!event.data?.type
+      });
+
       // Filter out non-game messages (MetaMask, etc.)
       if (!event.data || typeof event.data !== 'object') {
+        console.log('🚫 [DAPP] Filtered: Invalid data structure');
         return;
       }
 
@@ -329,11 +376,13 @@ export function useGameConnection(
       if (event.data.target === 'metamask-inpage' || 
           event.data.name === 'metamask-provider' ||
           event.data.method?.startsWith('metamask_')) {
+        console.log('🚫 [DAPP] Filtered: MetaMask message');
         return;
       }
 
       // Only process messages with a type from game origins
       if (!event.data.type) {
+        console.log('🚫 [DAPP] Filtered: No message type');
         return;
       }
 
@@ -344,15 +393,29 @@ export function useGameConnection(
         process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
       ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
       
+      console.log('🔍 [DAPP] Origin check:', {
+        messageOrigin: event.origin,
+        allowedOrigins: gameOrigins,
+        isAllowed: gameOrigins.includes(event.origin)
+      });
+      
       if (!gameOrigins.includes(event.origin)) {
+        console.log('🚫 [DAPP] Filtered: Origin not allowed');
         return;
       }
 
       console.log('🎮 [DAPP] Received message from game:', event.data, 'origin:', event.origin);
       
       // Validate secure message
+      console.log('🔐 [DAPP] Validating secure message...');
       const validation = await validateSecureMessage(event.data);
+      console.log('🔐 [DAPP] Validation result:', {
+        isValid: validation.isValid,
+        reason: validation.reason
+      });
+      
       if (!validation.isValid) {
+        console.error('❌ [DAPP] Message validation failed:', validation.reason);
         logSecurityEvent('Invalid message received', { 
           reason: validation.reason, 
           origin: event.origin,
