@@ -699,7 +699,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
               Generate New Code
             </Button>
             <Button 
-              onClick={() => {}}
+              onClick={() => setGeneratedCode('')}
               className="flex-1"
             >
               Code Sent
