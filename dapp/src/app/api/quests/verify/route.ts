@@ -79,10 +79,7 @@ export async function POST(request: Request) {
         }
         
         updateData.username = value.trim();
-        // Only set isUsernameSet if the field exists in the database
-        if (user.isUsernameSet !== undefined) {
-          updateData.isUsernameSet = true;
-        }
+        // Note: isUsernameSet is inferred from username existence for compatibility
         verificationResult = true;
         break;
 
