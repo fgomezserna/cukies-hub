@@ -53,13 +53,16 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
-        // Allow all users to modify username for now (temporary for migration period)
-        // const hasUsernameSet = user.isUsernameSet !== undefined ? user.isUsernameSet : Boolean(user.username);
-        // if (hasUsernameSet) {
-        //   return NextResponse.json({ 
-        //     error: 'Username can only be set once and cannot be modified' 
-        //   }, { status: 400 });
-        // }
+        // Check if user already modified username after feature implementation
+        const FEATURE_IMPLEMENTATION_DATE = new Date('2025-07-28T00:00:00Z');
+        const hasModifiedAfterImplementation = user.updatedAt && 
+          user.updatedAt > FEATURE_IMPLEMENTATION_DATE;
+        
+        if (hasModifiedAfterImplementation) {
+          return NextResponse.json({ 
+            error: 'Username can only be set once and cannot be modified' 
+          }, { status: 400 });
+        }
 
         if (!value || typeof value !== 'string' || value.trim().length < 3) {
           return NextResponse.json({ 

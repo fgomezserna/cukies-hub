@@ -75,7 +75,7 @@ export default function SettingsPage() {
     }
   }, [user?.walletAddress, toast]);
 
-  const validateUsername = useCallback((username: string) => {
+  const validateUsername = useCallback(async (username: string) => {
     if (profile.isUsernameSet) {
       setUsernameValidation({
         isValid: null,
@@ -103,12 +103,46 @@ export default function SettingsPage() {
       return;
     }
 
+    // Start checking with database
     setUsernameValidation({
-      isValid: true,
-      message: 'Username looks good',
-      isChecking: false
+      isValid: null,
+      message: 'Checking availability...',
+      isChecking: true
     });
-  }, [profile.isUsernameSet]);
+
+    try {
+      const response = await fetch('/api/user/validate-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: user?.walletAddress,
+          username: username
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUsernameValidation({
+          isValid: data.valid,
+          message: data.valid ? data.message : data.error,
+          isChecking: false
+        });
+      } else {
+        setUsernameValidation({
+          isValid: false,
+          message: data.error || 'Error checking username availability',
+          isChecking: false
+        });
+      }
+    } catch (error) {
+      setUsernameValidation({
+        isValid: false,
+        message: 'Error checking username availability',
+        isChecking: false
+      });
+    }
+  }, [profile.isUsernameSet, user?.walletAddress]);
 
   useEffect(() => {
     if (!isLoading && user) {

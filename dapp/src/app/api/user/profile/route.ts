@@ -27,14 +27,21 @@ export async function GET(request: NextRequest) {
         profilePictureUrl: true,
         walletAddress: true,
         bio: true,
+        updatedAt: true,
       },
     });
 
-    // Add isUsernameSet field - set to false to allow all users to modify username once
-    // This provides compatibility and allows existing users to change their username
+    // Feature implementation date - users who modify username after this date cannot modify again
+    const FEATURE_IMPLEMENTATION_DATE = new Date('2025-07-28T00:00:00Z');
+    
+    // Check if user already modified username after feature implementation
+    const hasModifiedAfterImplementation = userProfile?.updatedAt && 
+      userProfile.updatedAt > FEATURE_IMPLEMENTATION_DATE;
+
+    // Add isUsernameSet field based on modification date
     const profileWithUsernameSet = {
       ...userProfile,
-      isUsernameSet: false // Allow all users to modify username for now
+      isUsernameSet: hasModifiedAfterImplementation
     };
 
     return NextResponse.json(profileWithUsernameSet);
@@ -62,23 +69,29 @@ export async function PUT(request: NextRequest) {
     // Get current user data to check if username is already set
     const currentUserData = await prisma.user.findUnique({
       where: { walletAddress: user.walletAddress },
-      select: { username: true }
+      select: { username: true, updatedAt: true }
     });
     
-    // Set isUsernameSet to false to allow all users to modify username once
+    // Feature implementation date - users who modify username after this date cannot modify again
+    const FEATURE_IMPLEMENTATION_DATE = new Date('2025-07-28T00:00:00Z');
+    
+    // Check if user already modified username after feature implementation
+    const hasModifiedAfterImplementation = currentUserData?.updatedAt && 
+      currentUserData.updatedAt > FEATURE_IMPLEMENTATION_DATE;
+    
     const currentUser = {
       ...currentUserData,
-      isUsernameSet: false // Allow all users to modify username for now
+      isUsernameSet: hasModifiedAfterImplementation
     };
 
     // Validate username if provided
     if (username !== undefined) {
-      // Allow all users to modify username for now (temporary for migration period)
-      // if (currentUser?.isUsernameSet && currentUser.username !== username.trim()) {
-      //   return NextResponse.json({ 
-      //     error: 'Username can only be set once and cannot be modified' 
-      //   }, { status: 400 });
-      // }
+      // Check if username is already set and prevent modification
+      if (currentUser?.isUsernameSet && currentUser.username !== username.trim()) {
+        return NextResponse.json({ 
+          error: 'Username can only be set once and cannot be modified' 
+        }, { status: 400 });
+      }
 
       if (typeof username !== 'string' || username.trim().length < 3) {
         return NextResponse.json({ 
@@ -141,10 +154,10 @@ export async function PUT(request: NextRequest) {
       },
     });
     
-    // Add isUsernameSet field - set to false to allow all users to modify username once
+    // Add isUsernameSet field based on modification (user just updated, so they can't modify again)
     const updatedUserWithUsernameSet = {
       ...updatedUser,
-      isUsernameSet: false // Allow all users to modify username for now
+      isUsernameSet: username !== undefined ? true : false // If username was updated, mark as set
     };
 
     return NextResponse.json(updatedUserWithUsernameSet);
