@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         username: true,
+        isUsernameSet: true,
         email: true,
         profilePictureUrl: true,
         walletAddress: true,
@@ -51,8 +52,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Get current user data to check if username is already set
+    const currentUser = await prisma.user.findUnique({
+      where: { walletAddress: user.walletAddress },
+      select: { isUsernameSet: true, username: true }
+    });
+
     // Validate username if provided
     if (username !== undefined) {
+      // Check if username is already set and prevent modification
+      if (currentUser?.isUsernameSet && currentUser.username !== username.trim()) {
+        return NextResponse.json({ 
+          error: 'Username can only be set once and cannot be modified' 
+        }, { status: 400 });
+      }
+
       if (typeof username !== 'string' || username.trim().length < 3) {
         return NextResponse.json({ 
           error: 'Username must be at least 3 characters long' 
@@ -100,13 +114,17 @@ export async function PUT(request: NextRequest) {
     const updatedUser = await prisma.user.update({
       where: { walletAddress: user.walletAddress },
       data: {
-        ...(username !== undefined && { username: username.trim() }),
+        ...(username !== undefined && { 
+          username: username.trim(),
+          isUsernameSet: true
+        }),
         ...(email !== undefined && { email: email || null }),
         ...(bio !== undefined && { bio: bio || null }),
       },
       select: {
         id: true,
         username: true,
+        isUsernameSet: true,
         email: true,
         profilePictureUrl: true,
         walletAddress: true,

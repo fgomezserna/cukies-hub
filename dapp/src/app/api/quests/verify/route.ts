@@ -53,6 +53,13 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
+        // Check if username is already set
+        if (user.isUsernameSet) {
+          return NextResponse.json({ 
+            error: 'Username can only be set once and cannot be modified' 
+          }, { status: 400 });
+        }
+
         if (!value || typeof value !== 'string' || value.trim().length < 3) {
           return NextResponse.json({ 
             error: 'Username must be at least 3 characters long' 
@@ -71,6 +78,7 @@ export async function POST(request: Request) {
         }
         
         updateData.username = value.trim();
+        updateData.isUsernameSet = true;
         verificationResult = true;
         break;
 
