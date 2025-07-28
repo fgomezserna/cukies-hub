@@ -31,12 +31,12 @@ export async function GET(request: NextRequest) {
     });
 
     // Logic: user can change username if they don't have one OR if current username is their wallet address
-    const hasCustomUsername = userProfile?.username && 
+    const hasCustomUsernameGet = userProfile?.username && 
       userProfile.username !== userProfile.walletAddress;
     
     const profileWithUsernameSet = {
       ...userProfile,
-      isUsernameSet: Boolean(hasCustomUsername)
+      isUsernameSet: Boolean(hasCustomUsernameGet)
     };
 
     return NextResponse.json(profileWithUsernameSet);
@@ -68,12 +68,12 @@ export async function PUT(request: NextRequest) {
     });
     
     // Logic: user can change username if they don't have one OR if current username is their wallet address
-    const hasCustomUsername = currentUserData?.username && 
+    const hasCustomUsernameCurrent = currentUserData?.username && 
       currentUserData.username !== currentUserData.walletAddress;
     
     const currentUser = {
       ...currentUserData,
-      isUsernameSet: Boolean(hasCustomUsername)
+      isUsernameSet: Boolean(hasCustomUsernameCurrent)
     };
 
     // Validate username if provided
@@ -147,12 +147,12 @@ export async function PUT(request: NextRequest) {
     });
     
     // Add isUsernameSet field - user can change username if current username is their wallet address
-    const hasCustomUsername = updatedUser.username && 
+    const hasCustomUsernameUpdated = updatedUser.username && 
       updatedUser.username !== updatedUser.walletAddress;
     
     const updatedUserWithUsernameSet = {
       ...updatedUser,
-      isUsernameSet: Boolean(hasCustomUsername)
+      isUsernameSet: Boolean(hasCustomUsernameUpdated)
     };
 
     return NextResponse.json(updatedUserWithUsernameSet);
