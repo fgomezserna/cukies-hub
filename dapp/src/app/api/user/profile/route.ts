@@ -17,20 +17,46 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const userProfile = await prisma.user.findUnique({
-      where: { walletAddress: user.walletAddress },
-      select: {
-        id: true,
-        username: true,
-        isUsernameSet: true,
-        email: true,
-        profilePictureUrl: true,
-        walletAddress: true,
-        bio: true,
-      },
-    });
+    try {
+      const userProfile = await prisma.user.findUnique({
+        where: { walletAddress: user.walletAddress },
+        select: {
+          id: true,
+          username: true,
+          isUsernameSet: true,
+          email: true,
+          profilePictureUrl: true,
+          walletAddress: true,
+          bio: true,
+        },
+      });
 
-    return NextResponse.json(userProfile);
+      return NextResponse.json(userProfile);
+    } catch (prismaError: any) {
+      // Handle case where isUsernameSet field doesn't exist yet in database
+      if (prismaError.message?.includes('Unknown field `isUsernameSet`')) {
+        const userProfile = await prisma.user.findUnique({
+          where: { walletAddress: user.walletAddress },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            profilePictureUrl: true,
+            walletAddress: true,
+            bio: true,
+          },
+        });
+
+        // Add isUsernameSet field based on whether username exists
+        const profileWithUsernameSet = {
+          ...userProfile,
+          isUsernameSet: Boolean(userProfile?.username)
+        };
+
+        return NextResponse.json(profileWithUsernameSet);
+      }
+      throw prismaError;
+    }
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -53,10 +79,27 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get current user data to check if username is already set
-    const currentUser = await prisma.user.findUnique({
-      where: { walletAddress: user.walletAddress },
-      select: { isUsernameSet: true, username: true }
-    });
+    let currentUser;
+    try {
+      currentUser = await prisma.user.findUnique({
+        where: { walletAddress: user.walletAddress },
+        select: { isUsernameSet: true, username: true }
+      });
+    } catch (prismaError: any) {
+      // Handle case where isUsernameSet field doesn't exist yet in database
+      if (prismaError.message?.includes('Unknown field `isUsernameSet`')) {
+        const userProfile = await prisma.user.findUnique({
+          where: { walletAddress: user.walletAddress },
+          select: { username: true }
+        });
+        currentUser = {
+          ...userProfile,
+          isUsernameSet: Boolean(userProfile?.username)
+        };
+      } else {
+        throw prismaError;
+      }
+    }
 
     // Validate username if provided
     if (username !== undefined) {
@@ -111,26 +154,57 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update user profile
-    const updatedUser = await prisma.user.update({
-      where: { walletAddress: user.walletAddress },
-      data: {
-        ...(username !== undefined && { 
-          username: username.trim(),
-          isUsernameSet: true
-        }),
-        ...(email !== undefined && { email: email || null }),
-        ...(bio !== undefined && { bio: bio || null }),
-      },
-      select: {
-        id: true,
-        username: true,
-        isUsernameSet: true,
-        email: true,
-        profilePictureUrl: true,
-        walletAddress: true,
-        bio: true,
-      },
-    });
+    let updatedUser;
+    try {
+      updatedUser = await prisma.user.update({
+        where: { walletAddress: user.walletAddress },
+        data: {
+          ...(username !== undefined && { 
+            username: username.trim(),
+            isUsernameSet: true
+          }),
+          ...(email !== undefined && { email: email || null }),
+          ...(bio !== undefined && { bio: bio || null }),
+        },
+        select: {
+          id: true,
+          username: true,
+          isUsernameSet: true,
+          email: true,
+          profilePictureUrl: true,
+          walletAddress: true,
+          bio: true,
+        },
+      });
+    } catch (prismaError: any) {
+      // Handle case where isUsernameSet field doesn't exist yet in database
+      if (prismaError.message?.includes('Unknown field `isUsernameSet`')) {
+        updatedUser = await prisma.user.update({
+          where: { walletAddress: user.walletAddress },
+          data: {
+            ...(username !== undefined && { username: username.trim() }),
+            ...(email !== undefined && { email: email || null }),
+            ...(bio !== undefined && { bio: bio || null }),
+          },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            profilePictureUrl: true,
+            walletAddress: true,
+            bio: true,
+          },
+        });
+        
+        // Add isUsernameSet field based on whether username exists
+        updatedUser = {
+          ...updatedUser,
+          isUsernameSet: Boolean(updatedUser.username)
+        };
+      } else {
+        throw prismaError;
+      }
+    }
 
     return NextResponse.json(updatedUser);
   } catch (error) {

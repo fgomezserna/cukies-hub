@@ -53,8 +53,9 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
-        // Check if username is already set
-        if (user.isUsernameSet) {
+        // Check if username is already set (handle case where field might not exist)
+        const hasUsernameSet = user.isUsernameSet !== undefined ? user.isUsernameSet : Boolean(user.username);
+        if (hasUsernameSet) {
           return NextResponse.json({ 
             error: 'Username can only be set once and cannot be modified' 
           }, { status: 400 });
@@ -78,7 +79,10 @@ export async function POST(request: Request) {
         }
         
         updateData.username = value.trim();
-        updateData.isUsernameSet = true;
+        // Only set isUsernameSet if the field exists in the database
+        if (user.isUsernameSet !== undefined) {
+          updateData.isUsernameSet = true;
+        }
         verificationResult = true;
         break;
 
