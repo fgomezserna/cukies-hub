@@ -53,13 +53,13 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
-        // Check if username is already set (handle case where field might not exist)
-        const hasUsernameSet = user.isUsernameSet !== undefined ? user.isUsernameSet : Boolean(user.username);
-        if (hasUsernameSet) {
-          return NextResponse.json({ 
-            error: 'Username can only be set once and cannot be modified' 
-          }, { status: 400 });
-        }
+        // Allow all users to modify username for now (temporary for migration period)
+        // const hasUsernameSet = user.isUsernameSet !== undefined ? user.isUsernameSet : Boolean(user.username);
+        // if (hasUsernameSet) {
+        //   return NextResponse.json({ 
+        //     error: 'Username can only be set once and cannot be modified' 
+        //   }, { status: 400 });
+        // }
 
         if (!value || typeof value !== 'string' || value.trim().length < 3) {
           return NextResponse.json({ 

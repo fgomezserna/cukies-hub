@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Add isUsernameSet field based on whether username exists
-    // This provides compatibility whether the field exists in DB or not
+    // Add isUsernameSet field - set to false to allow all users to modify username once
+    // This provides compatibility and allows existing users to change their username
     const profileWithUsernameSet = {
       ...userProfile,
-      isUsernameSet: Boolean(userProfile?.username)
+      isUsernameSet: false // Allow all users to modify username for now
     };
 
     return NextResponse.json(profileWithUsernameSet);
@@ -65,20 +65,20 @@ export async function PUT(request: NextRequest) {
       select: { username: true }
     });
     
-    // Infer isUsernameSet from username existence for compatibility
+    // Set isUsernameSet to false to allow all users to modify username once
     const currentUser = {
       ...currentUserData,
-      isUsernameSet: Boolean(currentUserData?.username)
+      isUsernameSet: false // Allow all users to modify username for now
     };
 
     // Validate username if provided
     if (username !== undefined) {
-      // Check if username is already set and prevent modification
-      if (currentUser?.isUsernameSet && currentUser.username !== username.trim()) {
-        return NextResponse.json({ 
-          error: 'Username can only be set once and cannot be modified' 
-        }, { status: 400 });
-      }
+      // Allow all users to modify username for now (temporary for migration period)
+      // if (currentUser?.isUsernameSet && currentUser.username !== username.trim()) {
+      //   return NextResponse.json({ 
+      //     error: 'Username can only be set once and cannot be modified' 
+      //   }, { status: 400 });
+      // }
 
       if (typeof username !== 'string' || username.trim().length < 3) {
         return NextResponse.json({ 
@@ -141,10 +141,10 @@ export async function PUT(request: NextRequest) {
       },
     });
     
-    // Add isUsernameSet field based on whether username exists
+    // Add isUsernameSet field - set to false to allow all users to modify username once
     const updatedUserWithUsernameSet = {
       ...updatedUser,
-      isUsernameSet: Boolean(updatedUser.username)
+      isUsernameSet: false // Allow all users to modify username for now
     };
 
     return NextResponse.json(updatedUserWithUsernameSet);
