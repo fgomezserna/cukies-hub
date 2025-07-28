@@ -30,10 +30,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Simple logic: if user already has a username, they can't change it
+    // Logic: user can change username if they don't have one OR if current username is their wallet address
+    const hasCustomUsername = userProfile?.username && 
+      userProfile.username !== userProfile.walletAddress;
+    
     const profileWithUsernameSet = {
       ...userProfile,
-      isUsernameSet: Boolean(userProfile?.username)
+      isUsernameSet: Boolean(hasCustomUsername)
     };
 
     return NextResponse.json(profileWithUsernameSet);
@@ -61,13 +64,16 @@ export async function PUT(request: NextRequest) {
     // Get current user data to check if username is already set
     const currentUserData = await prisma.user.findUnique({
       where: { walletAddress: user.walletAddress },
-      select: { username: true }
+      select: { username: true, walletAddress: true }
     });
     
-    // Simple logic: if user already has a username, they can't change it
+    // Logic: user can change username if they don't have one OR if current username is their wallet address
+    const hasCustomUsername = currentUserData?.username && 
+      currentUserData.username !== currentUserData.walletAddress;
+    
     const currentUser = {
       ...currentUserData,
-      isUsernameSet: Boolean(currentUserData?.username)
+      isUsernameSet: Boolean(hasCustomUsername)
     };
 
     // Validate username if provided
@@ -140,10 +146,13 @@ export async function PUT(request: NextRequest) {
       },
     });
     
-    // Add isUsernameSet field - if user has username, they can't change it
+    // Add isUsernameSet field - user can change username if current username is their wallet address
+    const hasCustomUsername = updatedUser.username && 
+      updatedUser.username !== updatedUser.walletAddress;
+    
     const updatedUserWithUsernameSet = {
       ...updatedUser,
-      isUsernameSet: Boolean(updatedUser.username)
+      isUsernameSet: Boolean(hasCustomUsername)
     };
 
     return NextResponse.json(updatedUserWithUsernameSet);

@@ -53,8 +53,9 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
-        // Simple logic: if user already has a username, they can't change it
-        if (user.username) {
+        // Logic: user can change username if they don't have one OR if current username is their wallet address
+        const hasCustomUsername = user.username && user.username !== user.walletAddress;
+        if (hasCustomUsername) {
           return NextResponse.json({ 
             error: 'Username can only be set once and cannot be modified' 
           }, { status: 400 });
