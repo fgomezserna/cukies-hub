@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle, ExternalLink, Copy, Check } from 'lucide-react';
+import { CheckCircle2, Circle, Coins, Gamepad2, Lock, Mail, Star, User, Loader2, AlertTriangle, ExternalLink, Copy, Check, Info } from 'lucide-react';
 import DiscordIcon from '@/components/icons/discord';
 import XIcon from '@/components/icons/x-icon';
 import { Badge } from '@/components/ui/badge';
@@ -176,18 +176,24 @@ function UsernameTask({ task, onVerify, disabled, isLoading = false }: { task: T
             </Button>
         </div>
         {isEditing && (
-            <form className="flex w-full space-x-2 pl-8" onSubmit={handleSubmit}>
-                <Input
-                    placeholder="Enter your unique username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="flex-1 h-9"
-                    autoFocus
-                />
-                <Button type="submit" size="sm" disabled={!username.trim() || isLoading}>
-                    {isLoading ? 'Saving...' : 'Save'}
-                </Button>
-            </form>
+            <div className="space-y-2 pl-8">
+                <form className="flex w-full space-x-2" onSubmit={handleSubmit}>
+                    <Input
+                        placeholder="Enter your unique username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="flex-1 h-9"
+                        autoFocus
+                    />
+                    <Button type="submit" size="sm" disabled={!username.trim() || isLoading}>
+                        {isLoading ? 'Saving...' : 'Save'}
+                    </Button>
+                </form>
+                <p className="text-xs text-yellow-500 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    Username can only be set once and cannot be modified in the future
+                </p>
+            </div>
         )}
     </div>
   );

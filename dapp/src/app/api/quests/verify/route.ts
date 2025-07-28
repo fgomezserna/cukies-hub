@@ -53,6 +53,14 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
+        // Logic: user can change username if they don't have one OR if current username is their wallet address
+        const hasCustomUsername = user.username && user.username !== user.walletAddress;
+        if (hasCustomUsername) {
+          return NextResponse.json({ 
+            error: 'Username can only be set once and cannot be modified' 
+          }, { status: 400 });
+        }
+
         if (!value || typeof value !== 'string' || value.trim().length < 3) {
           return NextResponse.json({ 
             error: 'Username must be at least 3 characters long' 
@@ -71,6 +79,7 @@ export async function POST(request: Request) {
         }
         
         updateData.username = value.trim();
+        // Note: isUsernameSet is inferred from username existence for compatibility
         verificationResult = true;
         break;
 

@@ -11,23 +11,31 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Loader2, User, Mail, FileText, Save, Settings as SettingsIcon } from 'lucide-react';
+import { Camera, Loader2, User, Mail, FileText, Save, Settings as SettingsIcon, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface UserProfile {
   username: string | null;
+  isUsernameSet: boolean;
   email: string | null;
   profilePictureUrl: string | null;
   bio: string | null;
 }
 
 export default function SettingsPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, fetchUser } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [usernameValidation, setUsernameValidation] = useState<{
+    isValid: boolean | null;
+    message: string;
+    isChecking: boolean;
+  }>({ isValid: null, message: '', isChecking: false });
   const hasFetchedRef = useRef(false);
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [profile, setProfile] = useState<UserProfile>({
     username: '',
+    isUsernameSet: false,
     email: '',
     profilePictureUrl: '',
     bio: '',
@@ -43,6 +51,7 @@ export default function SettingsPage() {
         const data = await response.json();
         setProfile({
           username: data.username || '',
+          isUsernameSet: data.isUsernameSet || false,
           email: data.email || '',
           profilePictureUrl: data.profilePictureUrl || '',
           bio: data.bio || '',
@@ -65,6 +74,75 @@ export default function SettingsPage() {
       setLoading(false);
     }
   }, [user?.walletAddress, toast]);
+
+  const validateUsername = useCallback(async (username: string) => {
+    if (profile.isUsernameSet) {
+      setUsernameValidation({
+        isValid: null,
+        message: '',
+        isChecking: false
+      });
+      return;
+    }
+
+    if (!username) {
+      setUsernameValidation({
+        isValid: null,
+        message: '',
+        isChecking: false
+      });
+      return;
+    }
+
+    if (username.length < 3) {
+      setUsernameValidation({
+        isValid: false,
+        message: 'Username must be at least 3 characters long',
+        isChecking: false
+      });
+      return;
+    }
+
+    // Start checking with database
+    setUsernameValidation({
+      isValid: null,
+      message: 'Checking availability...',
+      isChecking: true
+    });
+
+    try {
+      const response = await fetch('/api/user/validate-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: user?.walletAddress,
+          username: username
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUsernameValidation({
+          isValid: data.valid,
+          message: data.valid ? data.message : data.error,
+          isChecking: false
+        });
+      } else {
+        setUsernameValidation({
+          isValid: false,
+          message: data.error || 'Error checking username availability',
+          isChecking: false
+        });
+      }
+    } catch (error) {
+      setUsernameValidation({
+        isValid: false,
+        message: 'Error checking username availability',
+        isChecking: false
+      });
+    }
+  }, [profile.isUsernameSet, user?.walletAddress]);
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -97,6 +175,7 @@ export default function SettingsPage() {
       if (response.ok) {
         setProfile({
           username: data.username || '',
+          isUsernameSet: data.isUsernameSet || false,
           email: data.email || '',
           profilePictureUrl: data.profilePictureUrl || '',
           bio: data.bio || '',
@@ -105,6 +184,11 @@ export default function SettingsPage() {
           title: "Profile Updated",
           description: "Your settings have been saved successfully.",
         });
+        
+        // Refresh user data in AuthProvider to update header
+        if (fetchUser) {
+          fetchUser();
+        }
       } else {
         toast({
           title: "Error",
@@ -165,6 +249,11 @@ export default function SettingsPage() {
             title: "Avatar Updated",
             description: "Your profile picture has been updated successfully.",
           });
+          
+          // Refresh user data in AuthProvider to update header
+          if (fetchUser) {
+            fetchUser();
+          }
         } else {
           toast({
             title: "Error",
@@ -187,10 +276,21 @@ export default function SettingsPage() {
   const handleInputChange = (field: keyof UserProfile) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
+    const newValue = e.target.value;
     setProfile(prev => ({
       ...prev,
-      [field]: e.target.value
+      [field]: newValue
     }));
+
+    // Real-time validation for username
+    if (field === 'username') {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+      validationTimeoutRef.current = setTimeout(() => {
+        validateUsername(newValue);
+      }, 300); // Debounce validation
+    }
   };
 
   if (loading || isLoading) {
@@ -306,14 +406,47 @@ export default function SettingsPage() {
                         <Label htmlFor="username" className="flex items-center gap-2">
                           <User className="h-4 w-4" />
                           Username
+                          {profile.isUsernameSet && (
+                            <div className="flex items-center gap-1 ml-auto">
+                              <Info className="h-4 w-4 text-yellow-500" />
+                              <span className="text-xs text-yellow-500">Cannot be modified</span>
+                            </div>
+                          )}
                         </Label>
                         <Input 
                           id="username" 
                           value={profile.username || ''} 
                           onChange={handleInputChange('username')}
                           placeholder="Enter your username"
-                          className="border-green-500/20 focus:border-green-400 bg-card/50 backdrop-blur-sm"
+                          disabled={profile.isUsernameSet}
+                          className={`border-green-500/20 focus:border-green-400 bg-card/50 backdrop-blur-sm ${
+                            profile.isUsernameSet ? 'opacity-60 cursor-not-allowed' : ''
+                          }`}
                         />
+                        {!profile.isUsernameSet && (
+                          <p className="text-xs text-yellow-500 flex items-center gap-1">
+                            <Info className="h-3 w-3" />
+                            Username can only be set once and cannot be modified in the future
+                          </p>
+                        )}
+                        {usernameValidation.message && (
+                          <p className={`text-xs flex items-center gap-1 ${
+                            usernameValidation.isValid 
+                              ? 'text-green-500' 
+                              : usernameValidation.isValid === false 
+                                ? 'text-red-500' 
+                                : 'text-muted-foreground'
+                          }`}>
+                            {usernameValidation.isChecking ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : usernameValidation.isValid ? (
+                              <CheckCircle2 className="h-3 w-3" />
+                            ) : usernameValidation.isValid === false ? (
+                              <AlertTriangle className="h-3 w-3" />
+                            ) : null}
+                            {usernameValidation.message}
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-2">

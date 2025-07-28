@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Query user profile without isUsernameSet field for compatibility
     const userProfile = await prisma.user.findUnique({
       where: { walletAddress: user.walletAddress },
       select: {
@@ -29,7 +30,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(userProfile);
+    // Logic: user can change username if they don't have one OR if current username is their wallet address
+    const hasCustomUsernameGet = userProfile?.username && 
+      userProfile.username !== userProfile.walletAddress;
+    
+    const profileWithUsernameSet = {
+      ...userProfile,
+      isUsernameSet: Boolean(hasCustomUsernameGet)
+    };
+
+    return NextResponse.json(profileWithUsernameSet);
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -51,8 +61,30 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Get current user data to check if username is already set
+    const currentUserData = await prisma.user.findUnique({
+      where: { walletAddress: user.walletAddress },
+      select: { username: true, walletAddress: true }
+    });
+    
+    // Logic: user can change username if they don't have one OR if current username is their wallet address
+    const hasCustomUsernameCurrent = currentUserData?.username && 
+      currentUserData.username !== currentUserData.walletAddress;
+    
+    const currentUser = {
+      ...currentUserData,
+      isUsernameSet: Boolean(hasCustomUsernameCurrent)
+    };
+
     // Validate username if provided
     if (username !== undefined) {
+      // Check if username is already set and prevent modification
+      if (currentUser?.isUsernameSet && currentUser.username !== username.trim()) {
+        return NextResponse.json({ 
+          error: 'Username can only be set once and cannot be modified' 
+        }, { status: 400 });
+      }
+
       if (typeof username !== 'string' || username.trim().length < 3) {
         return NextResponse.json({ 
           error: 'Username must be at least 3 characters long' 
@@ -96,7 +128,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update user profile
+    // Update user profile (without isUsernameSet field for compatibility)
     const updatedUser = await prisma.user.update({
       where: { walletAddress: user.walletAddress },
       data: {
@@ -113,8 +145,17 @@ export async function PUT(request: NextRequest) {
         bio: true,
       },
     });
+    
+    // Add isUsernameSet field - user can change username if current username is their wallet address
+    const hasCustomUsernameUpdated = updatedUser.username && 
+      updatedUser.username !== updatedUser.walletAddress;
+    
+    const updatedUserWithUsernameSet = {
+      ...updatedUser,
+      isUsernameSet: Boolean(hasCustomUsernameUpdated)
+    };
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json(updatedUserWithUsernameSet);
   } catch (error) {
     console.error('Error updating user profile:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

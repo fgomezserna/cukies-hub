@@ -138,7 +138,11 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 border-2 border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-green-500/10">
               <DropdownMenuLabel className="text-base font-bold text-foreground">
-                {user.username ?? "My Account"}
+                {user.username 
+                  ? user.username.length > 15 
+                    ? `${user.username.slice(0, 15)}...` 
+                    : user.username
+                  : "My Account"}
               </DropdownMenuLabel>
               <div className="px-3 pt-2 pb-3 space-y-3">
                 <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-400/20">
