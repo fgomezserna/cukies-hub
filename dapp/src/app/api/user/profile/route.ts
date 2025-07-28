@@ -27,21 +27,13 @@ export async function GET(request: NextRequest) {
         profilePictureUrl: true,
         walletAddress: true,
         bio: true,
-        updatedAt: true,
       },
     });
 
-    // Feature implementation date - users who modify username after this date cannot modify again
-    const FEATURE_IMPLEMENTATION_DATE = new Date('2025-07-28T00:00:00Z');
-    
-    // Check if user already modified username after feature implementation
-    const hasModifiedAfterImplementation = userProfile?.updatedAt && 
-      userProfile.updatedAt > FEATURE_IMPLEMENTATION_DATE;
-
-    // Add isUsernameSet field based on modification date
+    // Simple logic: if user already has a username, they can't change it
     const profileWithUsernameSet = {
       ...userProfile,
-      isUsernameSet: hasModifiedAfterImplementation
+      isUsernameSet: Boolean(userProfile?.username)
     };
 
     return NextResponse.json(profileWithUsernameSet);
@@ -69,19 +61,13 @@ export async function PUT(request: NextRequest) {
     // Get current user data to check if username is already set
     const currentUserData = await prisma.user.findUnique({
       where: { walletAddress: user.walletAddress },
-      select: { username: true, updatedAt: true }
+      select: { username: true }
     });
     
-    // Feature implementation date - users who modify username after this date cannot modify again
-    const FEATURE_IMPLEMENTATION_DATE = new Date('2025-07-28T00:00:00Z');
-    
-    // Check if user already modified username after feature implementation
-    const hasModifiedAfterImplementation = currentUserData?.updatedAt && 
-      currentUserData.updatedAt > FEATURE_IMPLEMENTATION_DATE;
-    
+    // Simple logic: if user already has a username, they can't change it
     const currentUser = {
       ...currentUserData,
-      isUsernameSet: hasModifiedAfterImplementation
+      isUsernameSet: Boolean(currentUserData?.username)
     };
 
     // Validate username if provided
@@ -154,10 +140,10 @@ export async function PUT(request: NextRequest) {
       },
     });
     
-    // Add isUsernameSet field based on modification (user just updated, so they can't modify again)
+    // Add isUsernameSet field - if user has username, they can't change it
     const updatedUserWithUsernameSet = {
       ...updatedUser,
-      isUsernameSet: username !== undefined ? true : false // If username was updated, mark as set
+      isUsernameSet: Boolean(updatedUser.username)
     };
 
     return NextResponse.json(updatedUserWithUsernameSet);

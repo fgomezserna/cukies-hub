@@ -53,12 +53,8 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
-        // Check if user already modified username after feature implementation
-        const FEATURE_IMPLEMENTATION_DATE = new Date('2025-07-28T00:00:00Z');
-        const hasModifiedAfterImplementation = user.updatedAt && 
-          user.updatedAt > FEATURE_IMPLEMENTATION_DATE;
-        
-        if (hasModifiedAfterImplementation) {
+        // Simple logic: if user already has a username, they can't change it
+        if (user.username) {
           return NextResponse.json({ 
             error: 'Username can only be set once and cannot be modified' 
           }, { status: 400 });
