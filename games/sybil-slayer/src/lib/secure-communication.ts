@@ -1,5 +1,7 @@
 // Secret key for game communication (should match the DApp key)
-const GAME_COMMUNICATION_KEY = 'hyppie-secure-game-key-2024';
+// Environment variable keeps it consistent with the dapp
+const GAME_COMMUNICATION_KEY =
+  process.env.NEXT_PUBLIC_GAME_COMMUNICATION_KEY || 'hyppie-secure-game-key-2024';
 
 /**
  * Game message types for secure communication

@@ -1,5 +1,7 @@
 // Secret key for game communication (should match the DApp key)
-const GAME_COMMUNICATION_KEY = 'hyppie-secure-game-key-2024';
+// Uses environment variable so production and development stay in sync
+const GAME_COMMUNICATION_KEY =
+  process.env.NEXT_PUBLIC_GAME_COMMUNICATION_KEY || 'hyppie-secure-game-key-2024';
 
 /**
  * Game message types for secure communication
@@ -234,18 +236,9 @@ export async function sendSecureMessageToParent(type: GameMessageType, payload: 
   try {
     const secureMessage = await createSecureMessage(type, payload);
     console.log('📤 [GAME] Sending secure message to parent:', secureMessage);
-    // Send to the correct parent origin (dapp)
-    // Try to detect the parent origin automatically, fallback to common ports
-    const possibleOrigins = ['http://localhost:3000', 'http://localhost:3001'];
-    
-    // Send to all possible parent origins (one will succeed)
-    possibleOrigins.forEach(origin => {
-      try {
-        window.parent.postMessage(secureMessage, origin);
-      } catch (e) {
-        // Ignore errors for incorrect origins
-      }
-    });
+    // Broadcast to parent without assuming a specific origin.
+    // The dapp validates the origin on receipt.
+    window.parent.postMessage(secureMessage, '*');
   } catch (error) {
     console.error('❌ [GAME] Error sending secure message:', error);
   }
