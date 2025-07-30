@@ -26,15 +26,25 @@ export function useParentConnection(
   authData: { isAuthenticated: boolean; user: any; token?: string }
 ) {
   useEffect(() => {
-    if (iframeRef.current && authData.isAuthenticated) {
-      const message: MessagePayload = {
-        type: 'AUTH_STATE_CHANGED',
-        payload: authData,
-      };
-      // Esperamos a que el iframe esté cargado para enviar el mensaje
-      iframeRef.current.onload = () => {
-        iframeRef.current?.contentWindow?.postMessage(message, TARGET_ORIGIN);
-      };
+    const iframe = iframeRef.current;
+    if (!iframe || !authData.isAuthenticated) return;
+
+    const message: MessagePayload = {
+      type: 'AUTH_STATE_CHANGED',
+      payload: authData,
+    };
+
+    const sendMessage = () => {
+      iframe.contentWindow?.postMessage(message, TARGET_ORIGIN);
+    };
+
+    if (iframe.contentWindow) {
+      // Si el iframe ya está cargado, enviamos el mensaje inmediatamente
+      sendMessage();
+    } else {
+      // Si aún no está cargado, esperamos al evento load
+      iframe.addEventListener('load', sendMessage, { once: true });
+      return () => iframe.removeEventListener('load', sendMessage);
     }
   }, [iframeRef, authData]);
 }
