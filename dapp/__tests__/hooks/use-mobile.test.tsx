@@ -40,8 +40,10 @@ describe('hooks/use-mobile', () => {
     return listeners
   }
 
+  let listeners: Array<() => void> = []
+
   beforeEach(() => {
-    mockMatchMedia()
+    listeners = mockMatchMedia()
   })
 
   afterEach(() => {
@@ -111,7 +113,10 @@ describe('hooks/use-mobile', () => {
 
     // Simulate window resize to mobile
     mockInnerWidth(400)
-    
+
+    // Dispatch change event to notify listeners
+    listeners.forEach(listener => listener())
+
     // Trigger a rerender to simulate the effect
     rerender()
 
