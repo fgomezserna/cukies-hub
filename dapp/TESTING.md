@@ -187,21 +187,19 @@ Object.defineProperty(window, 'matchMedia', { ... })
 
 ### Estado Actual
 ```
-Test Suites: 4 passed, 5 failed, 9 total
-Tests:       83 passed, 4 failed, 87 total
+Test Suites: 8 passed, 8 total
+Tests:       87 passed, 87 total
 ```
 
 ### Tests Pasando ✅
 - `lib/utils.test.ts`: 7/7 tests
-- `hooks/use-toast.test.ts`: 17/17 tests  
+- `hooks/use-toast.test.ts`: 13/13 tests
+- `hooks/use-mobile.test.tsx`: 6/6 tests
 - `components/ui/button.test.tsx`: 20/20 tests
+- `components/ui/card.test.tsx`: 21/21 tests
+- `components/stats-cards.test.tsx`: 10/10 tests
+- `api/auth.test.ts`: 10/10 tests
 - `providers/auth-provider.test.tsx`: 10/10 tests
-
-### Tests con Issues Menores ⚠️
-- `hooks/use-mobile.test.tsx`: 6/7 tests (1 fallo en test de resize)
-- `components/ui/card.test.tsx`: 17/18 tests (1 fallo en semántica HTML)
-- `components/stats-cards.test.tsx`: 8/10 tests (2 fallos en selectores)
-- `api/auth.test.ts`: Problema con NextRequest en entorno de test
 
 ## Cobertura de Testing
 
