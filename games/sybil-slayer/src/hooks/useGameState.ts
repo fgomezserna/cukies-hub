@@ -219,6 +219,20 @@ const createHackerExplosionEffect = (x: number, y: number): VisualEffect => ({
   frameTimer: 0
 });
 
+// Crear efecto de explosión dorado para vault activado
+const createVaultActivationEffect = (x: number, y: number): VisualEffect => ({
+  id: generateId(),
+  type: 'vault_activation',
+  x,
+  y,
+  scale: 0.3, // Empezar más grande
+  opacity: 1.0,
+  duration: 1000, // Duración más larga para efecto épico
+  elapsedTime: 0,
+  frameIndex: 0,
+  frameTimer: 0
+});
+
 // Actualizar efectos visuales
 const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): VisualEffect[] => {
   return effects
@@ -252,6 +266,22 @@ const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): Visual
         if (newEffect.frameTimer >= 50) { // Cambiar frame cada 50ms
           newEffect.frameIndex = ((newEffect.frameIndex || 0) + 1) % 8; // 8 frames de explosión
           newEffect.frameTimer = 0;
+        }
+      } else if (newEffect.type === 'vault_activation') {
+        // Animación épica para activación del vault
+        if (progress < 0.2) {
+          // Fase 1: Expansión rápida
+          newEffect.scale = 0.3 + (progress / 0.2) * 1.2; // De 0.3 a 1.5
+          newEffect.opacity = 1.0;
+        } else if (progress < 0.8) {
+          // Fase 2: Mantener tamaño con efecto pulsante
+          const pulseProgress = (progress - 0.2) / 0.6;
+          newEffect.scale = 1.5 + Math.sin(pulseProgress * Math.PI * 3) * 0.2;
+          newEffect.opacity = 1.0 - ((progress - 0.2) / 0.6) * 0.3; // De 1.0 a 0.7
+        } else {
+          // Fase 3: Desvanecer
+          newEffect.scale = 1.5 - ((progress - 0.8) / 0.2) * 1.0; // De 1.5 a 0.5
+          newEffect.opacity = 0.7 - ((progress - 0.8) / 0.2) * 0.7; // De 0.7 a 0.0
         }
       } else if (newEffect.type === 'Explosion_(n)') {
         // Animación específica para hacker: más dramática e intensa
@@ -1736,6 +1766,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let vaulCollectedCount = prev.vaulCollectedCount || 0; // <-- Declarar aquí
       let vaulBonusToAdd = 0; // Bonus directo de vaul (NO debe pasar por multiplicador)
       let remainingCollectibles: Collectible[] = [];
+      let vaultJustActivated = false; // Flag para indicar si se acaba de activar un vault
 
        // --- NEW: Fees y Hackers roban energía ---
        // Comprobar colisión entre obstáculos y Energy
@@ -1865,6 +1896,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                console.log("Vault activated! Score multiplier x5 activated.");
                onPlaySound?.('vaul_collect');
                
+               // NUEVO: Crear efecto visual de activación del vault
+               const vaultEffect = createVaultActivationEffect(collectible.x, collectible.y);
+               newVisualEffects.push(vaultEffect);
+               
                // CORREGIDO: Actualizar la variable local para que afecte el estado final
                // IMPORTANTE: Para efectos visuales convertir tiempo pausable a timestamp real
                const realTimeNow = Date.now();
@@ -1883,6 +1918,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.isActivated = true;
                // Actualizar el contador de vaults recogidos
                vaulCollectedCount = newVaulCount;
+               // NUEVO: Establecer flag para actualizar el multiplicador inmediatamente
+               vaultJustActivated = true;
                continue;
              }
            } else {
@@ -2245,15 +2282,21 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let currentMultiplier = 1;
       let multiplierTimeRemaining = 0;
       
-      // CORREGIDO: Verificar si el multiplicador está activo usando timestamp real
-      const realTimeNow = Date.now();
-      if (multiplierEndTime && realTimeNow < multiplierEndTime) {
+      // NUEVO: Si se acaba de activar un vault, establecer el multiplicador inmediatamente
+      if (vaultJustActivated) {
         currentMultiplier = VAUL_MULTIPLIER;
-        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow) / 1000));
-      } else if (multiplierEndTime && realTimeNow >= multiplierEndTime) {
-        // El multiplicador ha expirado
-        multiplierEndTime = null;
-        multiplierTimeRemaining = 0;
+        multiplierTimeRemaining = Math.ceil(VAUL_DURATION_MS / 1000); // 7 segundos
+      } else {
+        // CORREGIDO: Verificar si el multiplicador está activo usando timestamp real
+        const realTimeNow = Date.now();
+        if (multiplierEndTime && realTimeNow < multiplierEndTime) {
+          currentMultiplier = VAUL_MULTIPLIER;
+          multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow) / 1000));
+        } else if (multiplierEndTime && realTimeNow >= multiplierEndTime) {
+          // El multiplicador ha expirado
+          multiplierEndTime = null;
+          multiplierTimeRemaining = 0;
+        }
       }
       
       // Aplicar el multiplicador SOLO a los puntos de energy (NO al bonus de vaul)

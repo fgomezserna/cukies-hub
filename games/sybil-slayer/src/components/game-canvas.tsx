@@ -2026,6 +2026,35 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
             ctx.drawImage(img, -size/2, -size/2, size, size);
           }
           
+        } else if (effect.type === 'vault_activation') {
+          // Efecto especial dorado para vault activado
+          ctx.beginPath();
+          ctx.strokeStyle = '#FFD700';
+          ctx.lineWidth = 3;
+          ctx.shadowColor = '#FFD700';
+          ctx.shadowBlur = 20 * effect.scale;
+          
+          // Dibujar múltiples círculos concéntricos
+          for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.arc(0, 0, (30 + i * 15) * effect.scale, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          
+          // Dibujar partículas doradas
+          const particleCount = 8;
+          for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 * i) / particleCount + effect.elapsedTime * 0.002;
+            const distance = 50 * effect.scale;
+            const px = Math.cos(angle) * distance;
+            const py = Math.sin(angle) * distance;
+            
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(px, py, 5 * effect.scale, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
         } else if (effect.type === 'Explosion_(n)') {
           // Usar sprites Explosion para hackers (naranja/rojo)
           if (explosionSpritesRef.current[frameIndex]) {

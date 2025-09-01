@@ -75,7 +75,7 @@ export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | '
 // Tipos para efectos visuales
 export interface VisualEffect {
   id: string;
-  type: 'explosion' | 'burst' | 'sparkle' | 'Explosion_(n)';
+  type: 'explosion' | 'burst' | 'sparkle' | 'Explosion_(n)' | 'vault_activation';
   x: number;
   y: number;
   scale: number;
