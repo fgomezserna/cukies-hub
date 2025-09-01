@@ -2296,7 +2296,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (vaultJustActivated) {
         currentMultiplier = VAUL_MULTIPLIER;
         multiplierTimeRemaining = Math.ceil(VAUL_DURATION_MS / 1000); // 7 segundos
-        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s`);
+        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s
+          - multiplierEndTime antes de la lógica: ${multiplierEndTime}`);
+        // IMPORTANTE: NO modificar multiplierEndTime aquí, mantener el valor que se estableció al activar
       } else if (multiplierEndTime) {
         // Solo verificar expiración si NO se acaba de activar un vault
         const currentTimeForMultiplier = Date.now();
@@ -2602,11 +2604,16 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       
       // Log para depuración del multiplicador
       if (currentMultiplier !== prev.scoreMultiplier || multiplierEndTime !== prev.multiplierEndTime) {
-        console.log(`[VAULT-ISSUE] Estado final:
+        console.log(`[VAULT-ISSUE] Estado final ANTES del return:
           - scoreMultiplier: ${prev.scoreMultiplier} -> ${currentMultiplier}
           - multiplierEndTime: ${prev.multiplierEndTime} -> ${multiplierEndTime}
           - multiplierTimeRemaining: ${multiplierTimeRemaining}`);
       }
+      
+      console.log(`[VAULT-ISSUE] 📦 VALORES EN EL RETURN:
+        - multiplierEndTime a retornar: ${multiplierEndTime}
+        - scoreMultiplier a retornar: ${currentMultiplier}
+        - vaultJustActivated: ${vaultJustActivated}`);
       
       return {
         ...prev,
