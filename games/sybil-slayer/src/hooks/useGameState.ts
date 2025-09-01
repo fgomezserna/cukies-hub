@@ -924,6 +924,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let lastDamageSource = prev.lastDamageSource;
       let multiplierEndTime = prev.multiplierEndTime;
       let scoreStealEffect = prev.scoreStealEffect;
+      
+      console.log(`[VAULT-ISSUE] === INICIO FRAME ===
+        - multiplierEndTime inicial (desde prev): ${multiplierEndTime}`);
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
