@@ -2286,19 +2286,19 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let multiplierTimeRemaining = 0;
       
       // CORREGIDO: Verificar si el multiplicador está activo usando timestamp real
-      const realTimeNow = Date.now();
-      if (multiplierEndTime && realTimeNow < multiplierEndTime) {
+      const realTimeNow2 = Date.now(); // Usar otro nombre para no confundir con el realTimeNow anterior
+      if (multiplierEndTime && realTimeNow2 < multiplierEndTime) {
         currentMultiplier = VAUL_MULTIPLIER;
-        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow) / 1000));
+        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow2) / 1000));
         console.log(`[VAUL DEBUG] Multiplicador ACTIVO:
           - currentMultiplier: ${currentMultiplier}
           - multiplierTimeRemaining: ${multiplierTimeRemaining}s
           - multiplierEndTime: ${multiplierEndTime}
-          - realTimeNow: ${realTimeNow}`);
-      } else if (multiplierEndTime && realTimeNow >= multiplierEndTime) {
-        // El multiplicador ha expirado
+          - realTimeNow: ${realTimeNow2}`);
+      } else if (multiplierEndTime && realTimeNow2 >= multiplierEndTime) {
+        // El multiplicador ha expirado - NO modificar multiplierEndTime aquí, solo en el return
         console.log(`[VAUL DEBUG] Multiplicador EXPIRADO`);
-        multiplierEndTime = null;
+        multiplierEndTime = null; // Esto se mantiene para limpiar el estado
         multiplierTimeRemaining = 0;
       }
       
