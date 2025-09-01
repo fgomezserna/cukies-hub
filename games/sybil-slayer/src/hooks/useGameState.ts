@@ -1766,6 +1766,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let vaulCollectedCount = prev.vaulCollectedCount || 0; // <-- Declarar aquí
       let vaulBonusToAdd = 0; // Bonus directo de vaul (NO debe pasar por multiplicador)
       let remainingCollectibles: Collectible[] = [];
+      let vaultJustActivated = false; // Flag para saber si se activó un vault en este frame
 
        // --- NEW: Fees y Hackers roban energía ---
        // Comprobar colisión entre obstáculos y Energy
@@ -1905,11 +1906,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                const gameTimeDifference = now - (prev.gameStartTime || 0); // Diferencia en tiempo de juego
                multiplierEndTime = realTimeNow + VAUL_DURATION_MS;
                
-               console.log(`[VAULT-ISSUE] Activación:
-                 - multiplierEndTime establecido: ${multiplierEndTime}
+               console.log(`[VAULT-ISSUE] ⭐ ACTIVACIÓN VAULT:
+                 - multiplierEndTime NUEVO: ${multiplierEndTime}
                  - realTimeNow: ${realTimeNow}
                  - VAUL_DURATION_MS: ${VAUL_DURATION_MS}
-                 - prev.multiplierEndTime: ${prev.multiplierEndTime}`);
+                 - prev.multiplierEndTime: ${prev.multiplierEndTime}
+                 - Debe durar hasta: ${new Date(multiplierEndTime).toISOString()}`);
                
                // NUEVO: Sumar bonus acumulativo de 50 puntos por cada vault recogido
                // CORREGIDO: Este bonus NO debe pasar por el multiplicador
@@ -1923,6 +1925,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.isActivated = true;
                // Actualizar el contador de vaults recogidos
                vaulCollectedCount = newVaulCount;
+               // Marcar que se activó un vault en este frame
+               vaultJustActivated = true;
                continue;
              }
            } else {
@@ -2285,21 +2289,32 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let currentMultiplier = 1;
       let multiplierTimeRemaining = 0;
       
-      // CORREGIDO: Verificar si el multiplicador está activo usando timestamp real
-      const realTimeNow2 = Date.now(); // Usar otro nombre para no confundir con el realTimeNow anterior
-      if (multiplierEndTime && realTimeNow2 < multiplierEndTime) {
+      // Si se acaba de activar un vault, establecer el multiplicador inmediatamente
+      if (vaultJustActivated) {
         currentMultiplier = VAUL_MULTIPLIER;
-        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow2) / 1000));
-        console.log(`[VAULT-ISSUE] Multiplicador ACTIVO:
-          - currentMultiplier: ${currentMultiplier}
-          - multiplierTimeRemaining: ${multiplierTimeRemaining}s
-          - multiplierEndTime: ${multiplierEndTime}
-          - realTimeNow: ${realTimeNow2}`);
-      } else if (multiplierEndTime && realTimeNow2 >= multiplierEndTime) {
-        // El multiplicador ha expirado - NO modificar multiplierEndTime aquí, solo en el return
-        console.log(`[VAULT-ISSUE] Multiplicador EXPIRADO`);
-        multiplierEndTime = null; // Esto se mantiene para limpiar el estado
-        multiplierTimeRemaining = 0;
+        multiplierTimeRemaining = Math.ceil(VAUL_DURATION_MS / 1000); // 7 segundos
+        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s`);
+      } else if (multiplierEndTime) {
+        // Solo verificar expiración si NO se acaba de activar un vault
+        const currentTimeForMultiplier = Date.now();
+        if (currentTimeForMultiplier < multiplierEndTime) {
+          // El multiplicador está activo
+          currentMultiplier = VAUL_MULTIPLIER;
+          multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - currentTimeForMultiplier) / 1000));
+          console.log(`[VAULT-ISSUE] Multiplicador ACTIVO:
+            - currentMultiplier: ${currentMultiplier}
+            - multiplierTimeRemaining: ${multiplierTimeRemaining}s
+            - multiplierEndTime: ${multiplierEndTime}
+            - currentTime: ${currentTimeForMultiplier}`);
+        } else {
+          // El multiplicador ha expirado
+          console.log(`[VAULT-ISSUE] Multiplicador EXPIRADO:
+            - multiplierEndTime: ${multiplierEndTime}
+            - currentTime: ${currentTimeForMultiplier}
+            - diferencia: ${currentTimeForMultiplier - multiplierEndTime}ms tarde`);
+          multiplierEndTime = null; // Limpiar para el siguiente frame
+          multiplierTimeRemaining = 0;
+        }
       }
       
       // Aplicar el multiplicador SOLO a los puntos de energy (NO al bonus de vaul)
