@@ -675,6 +675,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
      pauseToggled: false,
      startToggled: false,
    });
+   
+   // Ref para mantener el multiplierEndTime entre renders
+   const multiplierEndTimeRef = useRef<number | null>(null);
 
    // Contador de checkpoints recogidos
    const checkpointCountRef = useRef<number>(0);
@@ -922,11 +925,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     setGameState(prev => {
       let lastDamageTime = prev.lastDamageTime;
       let lastDamageSource = prev.lastDamageSource;
-      let multiplierEndTime = prev.multiplierEndTime;
+      // Usar el ref si tiene valor, sino usar el del estado
+      let multiplierEndTime = multiplierEndTimeRef.current || prev.multiplierEndTime;
       let scoreStealEffect = prev.scoreStealEffect;
       
       console.log(`[VAULT-ISSUE] === INICIO FRAME ===
-        - multiplierEndTime inicial (desde prev): ${multiplierEndTime}`);
+        - multiplierEndTime inicial (desde prev): ${prev.multiplierEndTime}
+        - multiplierEndTime desde ref: ${multiplierEndTimeRef.current}
+        - multiplierEndTime usado: ${multiplierEndTime}`);
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -1908,6 +1914,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                const realTimeNow = Date.now();
                const gameTimeDifference = now - (prev.gameStartTime || 0); // Diferencia en tiempo de juego
                multiplierEndTime = realTimeNow + VAUL_DURATION_MS;
+               multiplierEndTimeRef.current = multiplierEndTime; // Guardar también en el ref
                
                console.log(`[VAULT-ISSUE] ⭐ ACTIVACIÓN VAULT:
                  - multiplierEndTime NUEVO: ${multiplierEndTime}
@@ -2296,9 +2303,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (vaultJustActivated) {
         currentMultiplier = VAUL_MULTIPLIER;
         multiplierTimeRemaining = Math.ceil(VAUL_DURATION_MS / 1000); // 7 segundos
-        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s
-          - multiplierEndTime antes de la lógica: ${multiplierEndTime}`);
-        // IMPORTANTE: NO modificar multiplierEndTime aquí, mantener el valor que se estableció al activar
+        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s`);
       } else if (multiplierEndTime) {
         // Solo verificar expiración si NO se acaba de activar un vault
         const currentTimeForMultiplier = Date.now();
@@ -2318,6 +2323,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             - currentTime: ${currentTimeForMultiplier}
             - diferencia: ${currentTimeForMultiplier - multiplierEndTime}ms tarde`);
           multiplierEndTime = null; // Limpiar para el siguiente frame
+          multiplierEndTimeRef.current = null; // También limpiar el ref
           multiplierTimeRemaining = 0;
         }
       }
@@ -2604,16 +2610,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       
       // Log para depuración del multiplicador
       if (currentMultiplier !== prev.scoreMultiplier || multiplierEndTime !== prev.multiplierEndTime) {
-        console.log(`[VAULT-ISSUE] Estado final ANTES del return:
+        console.log(`[VAULT-ISSUE] Estado final:
           - scoreMultiplier: ${prev.scoreMultiplier} -> ${currentMultiplier}
           - multiplierEndTime: ${prev.multiplierEndTime} -> ${multiplierEndTime}
           - multiplierTimeRemaining: ${multiplierTimeRemaining}`);
       }
-      
-      console.log(`[VAULT-ISSUE] 📦 VALORES EN EL RETURN:
-        - multiplierEndTime a retornar: ${multiplierEndTime}
-        - scoreMultiplier a retornar: ${currentMultiplier}
-        - vaultJustActivated: ${vaultJustActivated}`);
       
       return {
         ...prev,
@@ -2649,7 +2650,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         vaulCollectedCount,
       };
     });
-  }, [gameState, startGame, togglePause, getGameTime]); // Dependencies
+  }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
 
   return { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame };
 }
