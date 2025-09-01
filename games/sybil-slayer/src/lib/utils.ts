@@ -407,5 +407,6 @@ export function createVaulCollectible(id: string, canvasWidth: number, canvasHei
     activationProgress: 0, // Inicializar progreso acumulativo en 0
     isBeingTouched: false,
     isActivated: false,
+    timeOnTouch: 0, // Inicializar tiempo acumulado de contacto en 0
   };
 }

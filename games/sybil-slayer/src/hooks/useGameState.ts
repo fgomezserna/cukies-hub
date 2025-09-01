@@ -1845,13 +1845,19 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                console.log(`[VAUL] Contacto iniciado - Timer pausado - Progreso actual: ${((collectible.activationProgress || 0) * 100).toFixed(1)}%`);
              }
              
-             // CORREGIDO: Usar enfoque más simple con deltaTime pausable
-             const deltaTime = 16; // 60 FPS aproximado
-             const progressIncrement = (deltaTime / VAUL_ACTIVATION_TIME_MS) * VAUL_PROGRESS_RATE;
-             
-             // Actualizar progreso acumulativo
-             const previousProgress = collectible.activationProgress || 0;
-             collectible.activationProgress = Math.min(1, previousProgress + progressIncrement);
+             // CORREGIDO: Usar tiempo real del juego para progreso consistente entre dispositivos
+             if (collectible.contactStartTime) {
+               const contactDuration = now - collectible.contactStartTime;
+               
+               // Calcular el progreso total acumulado: tiempo previo + tiempo del contacto actual
+               const totalContactTime = (collectible.timeOnTouch || 0) + contactDuration;
+               collectible.activationProgress = Math.min(1, totalContactTime / VAUL_ACTIVATION_TIME_MS);
+               
+               // Log para debug del progreso
+               if (contactDuration % 500 < 16) { // Log cada ~500ms
+                 console.log(`[VAUL] Progreso: ${((collectible.activationProgress || 0) * 100).toFixed(1)}% (Tiempo total: ${(totalContactTime / 1000).toFixed(1)}s, Contacto actual: ${(contactDuration / 1000).toFixed(1)}s, Acumulado previo: ${((collectible.timeOnTouch || 0) / 1000).toFixed(1)}s)`);
+               }
+             }
              
              // Verificar si se ha completado la activación
              if ((collectible.activationProgress || 0) >= 1 && !collectible.isActivated) {
@@ -1882,7 +1888,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            } else {
              // Token no está tocando el vaul - conservar progreso pero detener acumulación
              if (collectible.isBeingTouched) {
-               console.log(`[VAUL] Contacto perdido - Progreso conservado: ${((collectible.activationProgress || 0) * 100).toFixed(1)}%`);
+               // Acumular el tiempo del contacto actual al tiempo total
+               if (collectible.contactStartTime) {
+                 const currentContactDuration = now - collectible.contactStartTime;
+                 collectible.timeOnTouch = (collectible.timeOnTouch || 0) + currentContactDuration;
+               }
+               
+               console.log(`[VAUL] Contacto perdido - Progreso conservado: ${((collectible.activationProgress || 0) * 100).toFixed(1)}% (Tiempo acumulado: ${((collectible.timeOnTouch || 0) / 1000).toFixed(1)}s)`);
                collectible.isBeingTouched = false;
                collectible.contactStartTime = undefined;
                // NUEVO: Reiniciar timer de vida (darle otros 10 segundos COMPLETOS)
@@ -1890,6 +1902,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.createdAt = now; // Reiniciar completamente el timer usando tiempo pausable
                collectible.isBlinking = false;
                console.log(`[VAUL] Timer reiniciado - Nuevos 10 segundos de vida`);
+               // IMPORTANTE: El progreso acumulado se mantiene en timeOnTouch
              }
            }
            // El vaul siempre se mantiene (no se consume hasta activarse)
