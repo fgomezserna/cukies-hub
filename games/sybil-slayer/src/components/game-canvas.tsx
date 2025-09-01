@@ -2398,14 +2398,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       }
     }
 
-    // DEBUG TEMPORAL: Verificar si hay purr en los collectibles
-    const purrCollectibles = gameState.collectibles.filter(c => c.type === 'purr');
-    if (purrCollectibles.length > 0) {
-      console.log('🐱 PURR DETECTADO EN GAMESTATE:', purrCollectibles.length, 'purr(s) encontrado(s)');
-      purrCollectibles.forEach((purr, index) => {
-        console.log(`🐱 Purr ${index + 1}:`, { id: purr.id, x: purr.x, y: purr.y, radius: purr.radius });
-      });
-    }
+ 
   }, [gameState, width, height, explosion, enExplosion]);
   
   // Efecto simplificado para verificar carga inicial de sprites

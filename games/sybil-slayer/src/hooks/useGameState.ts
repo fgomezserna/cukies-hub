@@ -153,8 +153,6 @@ const getRandomFeeSpeed = (level: number): number => {
   
   const finalSpeed = baseSpeed * speedMultiplier;
   
-  // Log para debugging con información de categoría
-  console.log(`[FEE ${category}] Velocidad: ${finalSpeed.toFixed(2)} (${(speedMultiplier * 100).toFixed(0)}% de la base) - Nivel ${level}`);
   
   return finalSpeed;
 };
@@ -917,7 +915,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       // Debug temporal: Log para verificar que el tiempo se pausa correctamente
       if (Math.random() < 0.01) { // Solo 1% de las veces para no spam
         const gameTimeElapsed = prev.gameStartTime ? (now - prev.gameStartTime) / 1000 : 0;
-        console.log(`[TIMER DEBUG] Game time elapsed: ${gameTimeElapsed.toFixed(2)}s, remaining: ${remainingTime.toFixed(2)}s, checkpoints: +${prev.checkpointTimeBonus}s, penalties: -${prev.timePenalties}s`);
       }
       
       // Calcular nivel basado en el tiempo transcurrido pausable desde el inicio del juego,
@@ -958,7 +955,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       } else {
         // Si está congelado, mantener la posición pero mostrar que está parado
         newToken.velocity = { x: 0, y: 0 };
-        console.log(`[TOKEN] Congelado por daño (${((tokenFrozenUntilRef.current - now) / 1000).toFixed(1)}s restantes)`);
       }
 
       // Actualizar animación de sprites del token
@@ -1812,11 +1808,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                      obstacle.retreatSpeed = 6.0; // Velocidad rápida de huida
                      obstacle.retreatTimer = -1; // Sin límite de tiempo, hasta que toque el borde
                      
-                     console.log(`[HACKER] ¡Hacker huye por 5 energy recogidas! Dirección: (${escapeDirection.x}, ${escapeDirection.y})`);
                    }
                  } else {
                    explosionEffect = createExplosionEffect(collectible.x, collectible.y);
-                   console.log(`[FEE] ¡Ha robado energía con explosión! (Nivel ${currentLevel}, radio: ${collectionRadius}px)`);
                  }
                  newVisualEffects.push(explosionEffect);
                  
@@ -2131,6 +2125,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          // Lógica de daño de vida - SOLO para fees y otros obstáculos (NO hacker)
                          hearts--;
                          console.log(`[CORAZONES] Quitado 1 corazón por ${obstacle.type.toUpperCase()}, quedan: ${hearts}`);
+                         console.log(`[DEBUG HEARTS] Estado anterior: ${prev.hearts}, nueva variable local: ${hearts}`);
+                         
+                         // Verificar si el juego debe terminar inmediatamente
+                         if (hearts <= 0) {
+                             console.log(`[GAME OVER] ¡Sin corazones! Terminando juego inmediatamente.`);
+                             return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts' };
+                         }
                          
                          // Activar efecto visual de daño
                          if (onDamage) onDamage();
@@ -2203,7 +2204,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       // Game over si se queda sin vidas
       if (hearts <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: 0, gameOverReason: 'hearts' };
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts' };
       }
 
       // Ya no necesitamos aplicar aquí porque se aplica en el cálculo de tiempo real arriba
@@ -2508,21 +2509,18 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       const checkpointCooldown = getCheckpointCooldownForLevel(currentLevel);
       const nowTime = getGameTime();
       
-      // Debug: mostrar información sobre condiciones de checkpoint
-      if (remainingTime <= CHECKPOINT_APPEAR_THRESHOLD) {
-        console.log(`[CHECKPOINT DEBUG] Tiempo: ${remainingTime.toFixed(1)}s, Hay checkpoint: ${hasCheckpoint}, Cooldown: ${((nowTime - lastCheckpointTime) / 1000).toFixed(1)}s/${checkpointCooldown}s`);
-      }
+    
       
       if (!hasCheckpoint && remainingTime <= CHECKPOINT_APPEAR_THRESHOLD) {
-        console.log(`[CHECKPOINT] ¡Creando checkpoint en tiempo ${remainingTime.toFixed(1)}s!`);
         remainingCollectibles.push(safeSpawnCollectible(createCheckpointCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime)); // ✅ Pasar tiempo aunque no se use en checkpoint
         lastCheckpointTime = nowTime;
       }
 
       // --- Final State Update ---
-      // Log final para depuración de score
-      if (vaulBonusToAdd > 0 || finalScoreToAdd > 0 || scoreToSubtract > 0) {
-        console.log(`[SCORE DEBUG] Score anterior: ${prev.score}, Energy (${scoreToAdd}x${currentMultiplier}): +${finalScoreToAdd}, Vault bonus: +${vaulBonusToAdd}, Robado: -${scoreToSubtract}`);
+      
+      // Log final para depuración de hearts
+      if (hearts !== prev.hearts) {
+        console.log(`[HEARTS DEBUG] Hearts en return final: ${prev.hearts} -> ${hearts}`);
       }
       
       return {
