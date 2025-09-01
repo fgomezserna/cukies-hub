@@ -219,6 +219,20 @@ const createHackerExplosionEffect = (x: number, y: number): VisualEffect => ({
   frameTimer: 0
 });
 
+// Crear efecto de explosión dorado para vault activado
+const createVaultActivationEffect = (x: number, y: number): VisualEffect => ({
+  id: generateId(),
+  type: 'vault_activation',
+  x,
+  y,
+  scale: 0.3, // Empezar más grande
+  opacity: 1.0,
+  duration: 1000, // Duración más larga para efecto épico
+  elapsedTime: 0,
+  frameIndex: 0,
+  frameTimer: 0
+});
+
 // Actualizar efectos visuales
 const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): VisualEffect[] => {
   return effects
@@ -252,6 +266,22 @@ const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): Visual
         if (newEffect.frameTimer >= 50) { // Cambiar frame cada 50ms
           newEffect.frameIndex = ((newEffect.frameIndex || 0) + 1) % 8; // 8 frames de explosión
           newEffect.frameTimer = 0;
+        }
+      } else if (newEffect.type === 'vault_activation') {
+        // Animación épica para activación del vault
+        if (progress < 0.2) {
+          // Fase 1: Expansión rápida
+          newEffect.scale = 0.3 + (progress / 0.2) * 1.2; // De 0.3 a 1.5
+          newEffect.opacity = 1.0;
+        } else if (progress < 0.8) {
+          // Fase 2: Mantener tamaño con efecto pulsante
+          const pulseProgress = (progress - 0.2) / 0.6;
+          newEffect.scale = 1.5 + Math.sin(pulseProgress * Math.PI * 3) * 0.2;
+          newEffect.opacity = 1.0 - ((progress - 0.2) / 0.6) * 0.3; // De 1.0 a 0.7
+        } else {
+          // Fase 3: Desvanecer
+          newEffect.scale = 1.5 - ((progress - 0.8) / 0.2) * 1.0; // De 1.5 a 0.5
+          newEffect.opacity = 0.7 - ((progress - 0.8) / 0.2) * 0.7; // De 0.7 a 0.0
         }
       } else if (newEffect.type === 'Explosion_(n)') {
         // Animación específica para hacker: más dramática e intensa
@@ -645,6 +675,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
      pauseToggled: false,
      startToggled: false,
    });
+   
+   // Ref para mantener el multiplierEndTime entre renders
+   const multiplierEndTimeRef = useRef<number | null>(null);
 
    // Contador de checkpoints recogidos
    const checkpointCountRef = useRef<number>(0);
@@ -892,8 +925,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     setGameState(prev => {
       let lastDamageTime = prev.lastDamageTime;
       let lastDamageSource = prev.lastDamageSource;
-      let multiplierEndTime = prev.multiplierEndTime;
+      // Usar el ref si tiene valor, sino usar el del estado
+      let multiplierEndTime = multiplierEndTimeRef.current || prev.multiplierEndTime;
       let scoreStealEffect = prev.scoreStealEffect;
+      
+      console.log(`[VAULT-ISSUE] === INICIO FRAME ===
+        - multiplierEndTime inicial (desde prev): ${prev.multiplierEndTime}
+        - multiplierEndTime desde ref: ${multiplierEndTimeRef.current}
+        - multiplierEndTime usado: ${multiplierEndTime}`);
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -1736,6 +1775,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let vaulCollectedCount = prev.vaulCollectedCount || 0; // <-- Declarar aquí
       let vaulBonusToAdd = 0; // Bonus directo de vaul (NO debe pasar por multiplicador)
       let remainingCollectibles: Collectible[] = [];
+      let vaultJustActivated = false; // Flag para saber si se activó un vault en este frame
 
        // --- NEW: Fees y Hackers roban energía ---
        // Comprobar colisión entre obstáculos y Energy
@@ -1865,11 +1905,23 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                console.log("Vault activated! Score multiplier x5 activated.");
                onPlaySound?.('vaul_collect');
                
+               // NUEVO: Crear efecto visual de activación del vault
+               const vaultEffect = createVaultActivationEffect(collectible.x, collectible.y);
+               newVisualEffects.push(vaultEffect);
+               
                // CORREGIDO: Actualizar la variable local para que afecte el estado final
                // IMPORTANTE: Para efectos visuales convertir tiempo pausable a timestamp real
                const realTimeNow = Date.now();
                const gameTimeDifference = now - (prev.gameStartTime || 0); // Diferencia en tiempo de juego
                multiplierEndTime = realTimeNow + VAUL_DURATION_MS;
+               multiplierEndTimeRef.current = multiplierEndTime; // Guardar también en el ref
+               
+               console.log(`[VAULT-ISSUE] ⭐ ACTIVACIÓN VAULT:
+                 - multiplierEndTime NUEVO: ${multiplierEndTime}
+                 - realTimeNow: ${realTimeNow}
+                 - VAUL_DURATION_MS: ${VAUL_DURATION_MS}
+                 - prev.multiplierEndTime: ${prev.multiplierEndTime}
+                 - Debe durar hasta: ${new Date(multiplierEndTime).toISOString()}`);
                
                // NUEVO: Sumar bonus acumulativo de 50 puntos por cada vault recogido
                // CORREGIDO: Este bonus NO debe pasar por el multiplicador
@@ -1883,6 +1935,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.isActivated = true;
                // Actualizar el contador de vaults recogidos
                vaulCollectedCount = newVaulCount;
+               // Marcar que se activó un vault en este frame
+               vaultJustActivated = true;
                continue;
              }
            } else {
@@ -2245,15 +2299,33 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let currentMultiplier = 1;
       let multiplierTimeRemaining = 0;
       
-      // CORREGIDO: Verificar si el multiplicador está activo usando timestamp real
-      const realTimeNow = Date.now();
-      if (multiplierEndTime && realTimeNow < multiplierEndTime) {
+      // Si se acaba de activar un vault, establecer el multiplicador inmediatamente
+      if (vaultJustActivated) {
         currentMultiplier = VAUL_MULTIPLIER;
-        multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow) / 1000));
-      } else if (multiplierEndTime && realTimeNow >= multiplierEndTime) {
-        // El multiplicador ha expirado
-        multiplierEndTime = null;
-        multiplierTimeRemaining = 0;
+        multiplierTimeRemaining = Math.ceil(VAUL_DURATION_MS / 1000); // 7 segundos
+        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s`);
+      } else if (multiplierEndTime) {
+        // Solo verificar expiración si NO se acaba de activar un vault
+        const currentTimeForMultiplier = Date.now();
+        if (currentTimeForMultiplier < multiplierEndTime) {
+          // El multiplicador está activo
+          currentMultiplier = VAUL_MULTIPLIER;
+          multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - currentTimeForMultiplier) / 1000));
+          console.log(`[VAULT-ISSUE] Multiplicador ACTIVO:
+            - currentMultiplier: ${currentMultiplier}
+            - multiplierTimeRemaining: ${multiplierTimeRemaining}s
+            - multiplierEndTime: ${multiplierEndTime}
+            - currentTime: ${currentTimeForMultiplier}`);
+        } else {
+          // El multiplicador ha expirado
+          console.log(`[VAULT-ISSUE] Multiplicador EXPIRADO:
+            - multiplierEndTime: ${multiplierEndTime}
+            - currentTime: ${currentTimeForMultiplier}
+            - diferencia: ${currentTimeForMultiplier - multiplierEndTime}ms tarde`);
+          multiplierEndTime = null; // Limpiar para el siguiente frame
+          multiplierEndTimeRef.current = null; // También limpiar el ref
+          multiplierTimeRemaining = 0;
+        }
       }
       
       // Aplicar el multiplicador SOLO a los puntos de energy (NO al bonus de vaul)
@@ -2536,6 +2608,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         console.log(`[HEARTS DEBUG] Hearts en return final: ${prev.hearts} -> ${hearts}`);
       }
       
+      // Log para depuración del multiplicador
+      if (currentMultiplier !== prev.scoreMultiplier || multiplierEndTime !== prev.multiplierEndTime) {
+        console.log(`[VAULT-ISSUE] Estado final:
+          - scoreMultiplier: ${prev.scoreMultiplier} -> ${currentMultiplier}
+          - multiplierEndTime: ${prev.multiplierEndTime} -> ${multiplierEndTime}
+          - multiplierTimeRemaining: ${multiplierTimeRemaining}`);
+      }
+      
       return {
         ...prev,
         token: newToken,
@@ -2570,7 +2650,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         vaulCollectedCount,
       };
     });
-  }, [gameState, startGame, togglePause, getGameTime]); // Dependencies
+  }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
 
   return { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame };
 }
