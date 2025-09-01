@@ -1905,6 +1905,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                const gameTimeDifference = now - (prev.gameStartTime || 0); // Diferencia en tiempo de juego
                multiplierEndTime = realTimeNow + VAUL_DURATION_MS;
                
+               console.log(`[VAUL DEBUG] Activación:
+                 - multiplierEndTime establecido: ${multiplierEndTime}
+                 - realTimeNow: ${realTimeNow}
+                 - VAUL_DURATION_MS: ${VAUL_DURATION_MS}
+                 - prev.multiplierEndTime: ${prev.multiplierEndTime}`);
+               
                // NUEVO: Sumar bonus acumulativo de 50 puntos por cada vault recogido
                // CORREGIDO: Este bonus NO debe pasar por el multiplicador
                const newVaulCount = (prev.vaulCollectedCount || 0) + 1;
@@ -2284,8 +2290,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (multiplierEndTime && realTimeNow < multiplierEndTime) {
         currentMultiplier = VAUL_MULTIPLIER;
         multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - realTimeNow) / 1000));
+        console.log(`[VAUL DEBUG] Multiplicador ACTIVO:
+          - currentMultiplier: ${currentMultiplier}
+          - multiplierTimeRemaining: ${multiplierTimeRemaining}s
+          - multiplierEndTime: ${multiplierEndTime}
+          - realTimeNow: ${realTimeNow}`);
       } else if (multiplierEndTime && realTimeNow >= multiplierEndTime) {
         // El multiplicador ha expirado
+        console.log(`[VAUL DEBUG] Multiplicador EXPIRADO`);
         multiplierEndTime = null;
         multiplierTimeRemaining = 0;
       }
@@ -2568,6 +2580,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       // Log final para depuración de hearts
       if (hearts !== prev.hearts) {
         console.log(`[HEARTS DEBUG] Hearts en return final: ${prev.hearts} -> ${hearts}`);
+      }
+      
+      // Log para depuración del multiplicador
+      if (currentMultiplier !== prev.scoreMultiplier || multiplierEndTime !== prev.multiplierEndTime) {
+        console.log(`[VAUL DEBUG] Estado final:
+          - scoreMultiplier: ${prev.scoreMultiplier} -> ${currentMultiplier}
+          - multiplierEndTime: ${prev.multiplierEndTime} -> ${multiplierEndTime}
+          - multiplierTimeRemaining: ${multiplierTimeRemaining}`);
       }
       
       return {
