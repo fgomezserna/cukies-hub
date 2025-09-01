@@ -1223,13 +1223,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </div>
                 {/* Temporizador de multiplicador x5 - FUERA de la caja */}
                 {(() => {
-                  console.log(`[UI DEBUG] Condición multiplicador:
-                    - scoreMultiplier: ${gameState.scoreMultiplier}
-                    - multiplierEndTime: ${gameState.multiplierEndTime}
-                    - multiplierTimeRemaining: ${gameState.multiplierTimeRemaining}
-                    - Condición (>1): ${gameState.scoreMultiplier > 1}
-                    - Condición (endTime): ${!!gameState.multiplierEndTime}
-                    - MOSTRAR: ${gameState.scoreMultiplier > 1 && gameState.multiplierEndTime}`);
+                  if (gameState.scoreMultiplier !== 1 || gameState.multiplierEndTime) {
+                    console.log(`[VAULT-ISSUE] UI Condición:
+                      - scoreMultiplier: ${gameState.scoreMultiplier}
+                      - multiplierEndTime: ${gameState.multiplierEndTime}
+                      - multiplierTimeRemaining: ${gameState.multiplierTimeRemaining}
+                      - Condición (>1): ${gameState.scoreMultiplier > 1}
+                      - Condición (endTime): ${!!gameState.multiplierEndTime}
+                      - MOSTRAR x5: ${gameState.scoreMultiplier > 1 && gameState.multiplierEndTime}`);
+                  }
                   return null;
                 })()}
                 {gameState.scoreMultiplier > 1 && gameState.multiplierEndTime && (
