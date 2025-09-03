@@ -137,16 +137,25 @@ const TaskItem = ({ text, completed, onVerify, disabled, taskType = 'auto_verify
   </div>
 );
 
-function UsernameTask({ task, onVerify, disabled, isLoading = false }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; }) {
+function UsernameTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: any; }) {
   const [username, setUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   console.log("task", task);
+  
+  // Check if user already has a custom username (not their wallet address)
+  const hasCustomUsername = user?.username && user.username !== user.walletAddress;
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
       onVerify(task.id, { type: 'username', value: username.trim() });
       setIsEditing(false);
     }
+  };
+
+  const handleVerifyExisting = () => {
+    // Verify the existing username to complete the task
+    onVerify(task.id, { type: 'username', value: user.username });
   };
 
   if (task.completed) {
@@ -156,6 +165,25 @@ function UsernameTask({ task, onVerify, disabled, isLoading = false }: { task: T
         <span className="text-foreground">{getTaskText(task)}</span>
         <Button size="sm" variant="ghost" className="ml-auto" disabled>
           Verified
+        </Button>
+      </div>
+    );
+  }
+
+  // If user already has a custom username, show verify button
+  if (hasCustomUsername) {
+    return (
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <Circle className="h-5 w-5 text-muted-foreground" />
+        <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
+        <span className="text-sm text-green-500">Username: {user.username}</span>
+        <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verifying
+            </>
+          ) : 'Verify'}
         </Button>
       </div>
     );
@@ -1190,7 +1218,7 @@ function QuestsView() {
                   
                   switch (taskType) {
                     case 'username':
-                      return <UsernameTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} />
+                      return <UsernameTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
                     
                     case 'email':
                       return <EmailTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} />

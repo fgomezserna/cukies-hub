@@ -53,9 +53,18 @@ export async function POST(request: Request) {
 
     switch (type) {
       case 'username':
-        // Logic: user can change username if they don't have one OR if current username is their wallet address
+        // Check if user already has a custom username (not their wallet address)
         const hasCustomUsername = user.username && user.username !== user.walletAddress;
-        if (hasCustomUsername) {
+        
+        // If user already has a custom username and they're trying to verify it
+        if (hasCustomUsername && value === user.username) {
+          // Just mark the task as completed, no need to update anything
+          verificationResult = true;
+          break;
+        }
+        
+        // If user already has a custom username but trying to set a different one
+        if (hasCustomUsername && value !== user.username) {
           return NextResponse.json({ 
             error: 'Username can only be set once and cannot be modified' 
           }, { status: 400 });
