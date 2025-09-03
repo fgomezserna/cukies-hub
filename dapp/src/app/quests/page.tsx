@@ -229,22 +229,127 @@ function UsernameTask({ task, onVerify, disabled, isLoading = false, user }: { t
 
 function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: any; }) {
   const [email, setEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [step, setStep] = useState<'email' | 'code'>('email'); // 'email' or 'code'
+  const [isSending, setIsSending] = useState(false);
+  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
+  const { toast } = useToast();
 
   // Check if user already has an email
   const hasEmail = user?.email && user.email.length > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
+    if (!email.trim()) return;
+
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/email/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          walletAddress: user.walletAddress
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to send verification code',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setCodeExpiresAt(data.expiresAt);
+      setStep('code');
+      toast({
+        title: 'Verification Code Sent',
+        description: `Check your email for the verification code${data.verificationCode ? ` (Dev: ${data.verificationCode})` : ''}`,
+        variant: 'default'
+      });
+
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send verification code',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verificationCode.trim()) return;
+
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/email/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          verificationCode: verificationCode.trim(),
+          walletAddress: user.walletAddress
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: 'Verification Failed',
+          description: data.error || 'Invalid verification code',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Complete the task
       onVerify(task.id, { type: 'email', value: email.trim() });
       setIsEditing(false);
+      setStep('email');
+      setVerificationCode('');
+      setEmail('');
+
+      toast({
+        title: 'Email Verified!',
+        description: 'Your email has been successfully verified',
+        variant: 'default'
+      });
+
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to verify email',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleVerifyExisting = () => {
     // Verify the existing email to complete the task
     onVerify(task.id, { type: 'email', value: user.email });
+  };
+
+  const handleBack = () => {
+    setStep('email');
+    setVerificationCode('');
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setStep('email');
+    setVerificationCode('');
+    setEmail('');
   };
 
   if (task.completed) {
@@ -283,29 +388,77 @@ function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task
         <div className="flex items-center gap-3">
             <Circle className="h-5 w-5 text-muted-foreground" />
             <span className='flex-grow text-muted-foreground'>{getTaskText(task)}</span>
-                         <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setIsEditing(!isEditing)} disabled={disabled || isLoading}>
-                 {isLoading ? (
-                   <>
-                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                     Verifying
-                   </>
-                 ) : isEditing ? 'Cancel' : 'Verify Email'}
-             </Button>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setIsEditing(!isEditing)} disabled={disabled || isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying
+                  </>
+                ) : isEditing ? 'Cancel' : 'Verify Email'}
+            </Button>
         </div>
         {isEditing && (
-            <form className="flex w-full space-x-2 pl-8" onSubmit={handleSubmit}>
-                <Input
-                    type="email"
-                    placeholder="Enter your email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="flex-1 h-9"
-                    autoFocus
-                />
-                                 <Button type="submit" size="sm" disabled={!email.trim() || isLoading}>
-                     {isLoading ? 'Verifying...' : 'Verify'}
-                </Button>
-            </form>
+          <div className="space-y-3 pl-8">
+            {step === 'email' && (
+              <form onSubmit={handleSendCode} className="space-y-2">
+                <div className="flex w-full space-x-2">
+                  <Input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="flex-1 h-9"
+                      autoFocus
+                  />
+                  <Button type="submit" size="sm" disabled={!email.trim() || isSending}>
+                      {isSending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : 'Send Code'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A 6-digit verification code will be sent to your email
+                </p>
+              </form>
+            )}
+            
+            {step === 'code' && (
+              <form onSubmit={handleVerifyCode} className="space-y-2">
+                <div className="flex w-full space-x-2">
+                  <Input
+                      type="text"
+                      placeholder="Enter 6-digit code"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      className="flex-1 h-9"
+                      maxLength={6}
+                      autoFocus
+                  />
+                  <Button type="submit" size="sm" disabled={verificationCode.length !== 6 || isSending}>
+                      {isSending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : 'Verify'}
+                  </Button>
+                </div>
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <p>Code sent to: {email}</p>
+                  <Button type="button" variant="link" size="sm" onClick={handleBack} className="h-auto p-0 text-xs">
+                    Change email
+                  </Button>
+                </div>
+              </form>
+            )}
+            
+            <Button type="button" variant="ghost" size="sm" onClick={handleCancel} className="w-full">
+              Cancel
+            </Button>
+          </div>
         )}
     </div>
   );

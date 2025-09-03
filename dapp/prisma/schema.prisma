@@ -277,6 +277,21 @@ model TwitterFollower {
   webhookData     Json?    // Raw data from IFTTT webhook
 }
 
+// Email verification model
+model EmailVerification {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  email         String
+  verificationCode String
+  walletAddress String
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  isUsed        Boolean  @default(false)
+
+  @@index([email])
+  @@index([verificationCode])
+  @@index([walletAddress])
+}
+
 // Game Configuration model
 model Game {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId

@@ -117,6 +117,9 @@ export async function POST(request: Request) {
           }, { status: 400 });
         }
         
+        // For new emails, they should be verified through the email verification system
+        // This path should only be reached if the email was verified through our verification flow
+        // The actual email update happens in the /api/email/verify-code endpoint
         updateData.email = value;
         verificationResult = true;
         break;
