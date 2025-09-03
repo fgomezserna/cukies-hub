@@ -787,7 +787,7 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
     switch (taskType) {
       case 'twitter_follow':
         return {
-          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/hyppieliquid',
+          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/intent/follow?screen_name=hyppieliquid',
           text: 'Follow on X',
           description: 'Follow us on X (Twitter) first, then connect your account'
         };

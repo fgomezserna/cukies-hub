@@ -5,8 +5,13 @@ import { Web3Provider } from '@/providers/web3-provider';
 import { AuthProvider } from '@/providers/auth-provider';
 
 export const metadata: Metadata = {
-  title: 'HyppieLiquid',
+  title: 'Hyppie Games',
   description: 'P2P betting games on Hyperliquid.',
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon-512.png',
+  },
 };
 
 export default function RootLayout({
