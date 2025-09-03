@@ -17,6 +17,11 @@ async function initializeChatRooms() {
         name: 'Hyppie Road Chat',
         description: 'Chat room for Hyppie Road game players',
       },
+      {
+        gameId: 'tower-builder',
+        name: 'Tower Builder Chat',
+        description: 'Chat room for Tower Builder game players',
+      },
     ];
 
     for (const roomData of rooms) {

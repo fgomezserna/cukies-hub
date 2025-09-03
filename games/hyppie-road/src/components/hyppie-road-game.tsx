@@ -87,25 +87,25 @@ export function HyppieRoadGame() {
     };
   }, [gameSession, isGameActive, potentialWinning, startCheckpointInterval, stopCheckpointInterval]);
 
-  // Handle game session end - with duplicate protection
+  // Handle game session end - with duplicate protection using Pusher
   useEffect(() => {
     // Only process if we have both a session, a result, and the game is NOT active (game ended)
     if (gameSession && gameResult && !isGameActive()) {
       // Create unique identifier for this game result
-      const resultId = `${gameSession.sessionToken}-${gameResult.finalAmount}-${gameResult.success}-${gameResult.stepsCompleted}`;
+      const resultId = `${gameSession.sessionId}_${gameResult.finalAmount}_${gameResult.success}`;
       
       // Check if we already sent this specific result
       if (sessionEndSentRef.current === resultId) {
-        console.log('🚫 [GAME] Already sent this result, skipping:', resultId);
+        console.log('🚫 [GAME-PUSHER] Already sent this result, skipping:', resultId);
         return;
       }
       
-      console.log('🏁 [GAME] Game ended, sending session end with result:', gameResult);
-      console.log('🏁 [GAME] Final amount:', gameResult.finalAmount, 'type:', typeof gameResult.finalAmount);
-      console.log('🏁 [GAME] Success:', gameResult.success, 'Steps:', gameResult.stepsCompleted, 'Multiplier:', gameResult.multiplier);
+      console.log('🏁 [GAME-PUSHER] Game ended, sending session end with result:', gameResult);
+      console.log('🏁 [GAME-PUSHER] Final amount:', gameResult.finalAmount, 'type:', typeof gameResult.finalAmount);
+      console.log('🏁 [GAME-PUSHER] Success:', gameResult.success, 'Steps:', gameResult.stepsCompleted, 'Multiplier:', gameResult.multiplier);
       
       const finalScore = gameResult.finalAmount || 0;
-      console.log('🏁 [GAME] Sending final score:', finalScore);
+      console.log('🏁 [GAME-PUSHER] Sending final score via Pusher:', finalScore);
       
       // Mark this result as sent
       sessionEndSentRef.current = resultId;

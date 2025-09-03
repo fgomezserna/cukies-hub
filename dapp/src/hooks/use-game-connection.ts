@@ -1,22 +1,7 @@
 import { useEffect, RefObject, useCallback, useState, useRef } from 'react';
-import { generateCheckpointHash, generateNonce, HONEYPOT_EVENTS } from '@/lib/game-validation';
-import { 
-  createSecureMessage, 
-  validateSecureMessage, 
-  extractMessageData,
-  logSecurityEvent,
-  type GameMessageType 
-} from '@/lib/secure-game-communication';
+import { usePusherGameConnection } from './use-pusher-game-connection';
 
-// Define message types for game communication
-type GameMessage = 
-  | { type: 'AUTH_STATE_CHANGED'; payload: { isAuthenticated: boolean; user: any; token?: string } }
-  | { type: 'GAME_SESSION_START'; payload: { gameId: string; sessionToken: string; sessionId: string } }
-  | { type: 'GAME_CHECKPOINT'; payload: { sessionToken: string; checkpoint: any; events?: any[] } }
-  | { type: 'GAME_SESSION_END'; payload: { sessionToken: string; finalScore: number; metadata?: any } }
-  | { type: 'GAME_EVENT'; payload: { sessionToken: string; event: string; data?: any } }
-  | { type: 'HONEYPOT_TRIGGER'; payload: { sessionToken: string; event: string } };
-
+// Game connection options (kept for compatibility)
 type GameConnectionOptions = {
   gameId: string;
   gameVersion?: string;
@@ -26,13 +11,9 @@ type GameConnectionOptions = {
   onHoneypotDetected?: (event: string) => void;
 };
 
-const TARGET_ORIGIN = process.env.NODE_ENV === 'production' 
-  ? 'https://hyppie-road.vercel.app' // Game domain in production
-  : '*'; // Allow all origins in development
-
 /**
- * Enhanced hook for game-to-parent communication with security features
- * Used in the DApp (parent container) to handle game sessions
+ * Enhanced hook for game-to-parent communication using Pusher WebSockets
+ * Replaced the secure postMessage system with robust Pusher communication
  */
 export function useGameConnection(
   iframeRef: RefObject<HTMLIFrameElement>,
@@ -53,477 +34,263 @@ export function useGameConnection(
 
   // Flag to prevent multiple session starts
   const sessionStartedRef = useRef(false);
-  // Flag to prevent multiple auth sends
-  const authSentRef = useRef(false);
-  // Flag to track if the hook has been initialized
   const initializedRef = useRef(false);
+
+  // Use the robust Pusher connection system
+  const {
+    channel,
+    connectionState,
+    gameStats: pusherGameStats,
+    isConnected,
+    notifySessionStart,
+    sendGameCommand,
+    sendSessionUpdate
+  } = usePusherGameConnection(
+    currentSession?.sessionId || null,
+    authData,
+    {
+      gameId: options.gameId,
+      gameVersion: options.gameVersion,
+      onSessionStart: options.onSessionStart,
+      onCheckpoint: options.onCheckpoint,
+      onSessionEnd: options.onSessionEnd,
+      onHoneypotDetected: options.onHoneypotDetected
+    }
+  );
+
+  // Update stats from Pusher system
+  useEffect(() => {
+    setGameStats(prev => ({
+      ...prev,
+      checkpointsReceived: pusherGameStats.checkpointsReceived,
+      honeypotEvents: pusherGameStats.honeypotEvents,
+      sessionValid: pusherGameStats.sessionValid
+    }));
+  }, [pusherGameStats]);
 
   // Start a new game session
   const startGameSession = useCallback(async (userId: string) => {
-    console.log('🎯 [DAPP] startGameSession called with:', { 
+    console.log('🎯 [DAPP-PUSHER] startGameSession called with:', { 
       userId, 
       authenticated: authData.isAuthenticated, 
       gameId: options.gameId,
       sessionStarted: sessionStartedRef.current,
-      initialized: initializedRef.current,
-      authSent: authSentRef.current
+      initialized: initializedRef.current
     });
     
     if (!authData.isAuthenticated || !userId) {
-      console.log('🚫 [DAPP] Cannot start session - not authenticated or no userId', { authenticated: authData.isAuthenticated, userId });
-      return;
+      console.warn('⚠️ [DAPP-PUSHER] Cannot start session - not authenticated or no userId');
+      return null;
     }
 
-    // Prevent multiple session starts
     if (sessionStartedRef.current) {
-      console.log('🚫 [DAPP] Session already started, skipping...', { sessionStartedRef: sessionStartedRef.current });
-      return;
+      console.log('🔄 [DAPP-PUSHER] Session already started, skipping');
+      return currentSession;
     }
-
-    sessionStartedRef.current = true;
-
-    console.log('🚀 [DAPP] Starting game session for userId:', userId, 'gameId:', options.gameId);
 
     try {
-      console.log('📞 [DAPP] Making API call to /api/games/start-session with:', {
-        userId,
-        gameId: options.gameId,
-        gameVersion: options.gameVersion
-      });
+      // Generate session ID
+      const sessionId = `game_${options.gameId}_${Date.now()}`;
+      
+      console.log('🚀 [DAPP-PUSHER] Creating new game session via API...');
       
       const response = await fetch('/api/games/start-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          userId,
           gameId: options.gameId,
-          gameVersion: options.gameVersion
-        })
+          sessionId,
+          gameVersion: options.gameVersion || '1.0.0'
+        }),
       });
 
-      console.log('📬 [DAPP] API response received:', { status: response.status, ok: response.ok });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       
-      const data = await response.json();
-      console.log('📡 [DAPP] Session API response:', data);
-      
-      if (data.success) {
+      if (result.success) {
+        console.log('✅ [DAPP-PUSHER] Session created:', result);
+        
         const sessionData = {
-          sessionToken: data.sessionToken,
-          sessionId: data.sessionId
+          sessionToken: result.sessionToken,
+          sessionId: result.sessionId,
+          gameId: result.gameId
         };
-        
-        console.log('💾 [DAPP] Setting currentSession to:', {
-          sessionToken: data.sessionToken,
-          sessionId: data.sessionId,
-          gameId: options.gameId
-        });
-        
-        setCurrentSession({
-          sessionToken: data.sessionToken,
-          sessionId: data.sessionId,
-          gameId: options.gameId
-        });
 
-        // Send secure session data to game
-        if (iframeRef.current) {
-          const secureMessage = await createSecureMessage('GAME_SESSION_START', { 
-            gameId: options.gameId, 
-            sessionToken: data.sessionToken, 
-            sessionId: data.sessionId 
-          });
-          
-          console.log('📨 [DAPP] Sending secure session start message to game:', secureMessage);
-          // Get the actual game origin from the iframe src
-          const iframeSrc = iframeRef.current?.src;
-          if (iframeSrc) {
-            try {
-              const gameUrl = new URL(iframeSrc);
-              const gameOrigin = `${gameUrl.protocol}//${gameUrl.host}`;
-              console.log('🎯 [DAPP] Sending message to game origin:', gameOrigin);
-              iframeRef.current?.contentWindow?.postMessage(secureMessage, gameOrigin);
-            } catch (e) {
-              console.error('❌ [DAPP] Failed to parse iframe src:', e);
+        // Store session token in localStorage for Pusher authentication
+        localStorage.setItem(`session_token_${result.sessionId}`, result.sessionToken);
+        console.log('💾 [DAPP-PUSHER] Session token stored in localStorage');
+
+        setCurrentSession(sessionData);
+        sessionStartedRef.current = true;
+
+        // Send session data to game iframe via postMessage (initial handshake)
+        if (iframeRef.current && iframeRef.current.contentWindow) {
+          console.log('📤 [DAPP-PUSHER] Sending session data to game:', sessionData);
+          iframeRef.current.contentWindow.postMessage({
+            type: 'GAME_SESSION_START',
+            payload: {
+              ...sessionData,
+              gameVersion: options.gameVersion || '1.0.0',
+              user: authData.user
             }
-          } else {
-            console.warn('⚠️ [DAPP] No iframe src available');
-          }
-        } else {
-          console.warn('⚠️ [DAPP] No iframe reference available');
+          }, '*');
         }
 
-        options.onSessionStart?.(sessionData);
+        // Notify callback
+        if (options.onSessionStart) {
+          options.onSessionStart(sessionData);
+        }
+
+        return sessionData;
       } else {
-        console.error('❌ [DAPP] Session start failed:', data);
-        sessionStartedRef.current = false; // Reset flag on failure
+        throw new Error(result.error || 'Failed to create session');
       }
     } catch (error) {
-      console.error('❌ [DAPP] Failed to start game session:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      sessionStartedRef.current = false; // Reset flag on error
-    }
-  }, [authData.isAuthenticated, options.gameId, options.gameVersion, options.onSessionStart, iframeRef]);
-
-  // Handle checkpoint from game
-  const handleCheckpoint = useCallback(async (checkpoint: any, events?: any[]) => {
-    if (!currentSession) return;
-
-    try {
-      const response = await fetch('/api/games/checkpoint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionToken: currentSession.sessionToken,
-          checkpoint,
-          events: events || []
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setGameStats(prev => ({
-          ...prev,
-          checkpointsReceived: prev.checkpointsReceived + 1,
-          honeypotEvents: prev.honeypotEvents + (data.honeypotDetected ? 1 : 0),
-          sessionValid: data.sessionValid
-        }));
-
-        if (data.honeypotDetected) {
-          options.onHoneypotDetected?.(checkpoint.event);
-        }
-
-        options.onCheckpoint?.(checkpoint);
-      }
-    } catch (error) {
-      console.error('Failed to process checkpoint:', error);
-    }
-  }, [currentSession, options]);
-
-  // End game session with retry logic
-  const endGameSession = useCallback(async (sessionToken: string, finalScore: number, metadata?: any, retryCount = 0) => {
-    console.log('🏁 [DAPP] endGameSession called with:', { 
-      sessionToken, 
-      finalScore, 
-      metadata, 
-      retryCount,
-      hasSession: !!currentSession, 
-      currentSessionToken: currentSession?.sessionToken 
-    });
-
-    let actualSessionToken = sessionToken;
-
-    // If game sent 'no-session', find the most recent active session for this user and game
-    if (sessionToken === 'no-session' && authData.isAuthenticated && authData.user?.id) {
-      console.log('🔍 [DAPP] Game sent no-session, finding active session via API...');
-      
-      try {
-        const response = await fetch(`/api/games/active-session?userId=${authData.user.id}&gameId=${options.gameId}`);
-        const data = await response.json();
-        
-        if (data.success && data.sessionToken) {
-          actualSessionToken = data.sessionToken;
-          console.log('✅ [DAPP] Found active session:', data.sessionToken);
-        } else {
-          console.log('❌ [DAPP] No active session found via API');
-        }
-      } catch (error) {
-        console.error('❌ [DAPP] Error finding active session:', error);
-      }
-    }
-
-    // Try emergency save if there's no valid session at all
-    if (!actualSessionToken || actualSessionToken === 'no-session') {
-      console.log('⚠️ [DAPP] No valid session found, attempting emergency save...');
-      
-      if (authData.user?.id) {
-        try {
-          const response = await fetch('/api/games/emergency-result', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: authData.user.id,
-              gameId: options.gameId,
-              finalScore,
-              metadata: { ...metadata, reason: 'No session token available' }
-            })
-          });
-
-          const data = await response.json();
-          
-          if (data.success) {
-            console.log('🚨 [DAPP] Emergency save successful:', data);
-            options.onSessionEnd?.({
-              finalScore: data.finalScore,
-              isValid: data.isValid
-            });
-            
-            // Auto-start a new session for the next game
-            setTimeout(() => {
-              startGameSession(authData.user.id);
-            }, 1000);
-          } else {
-            console.error('❌ [DAPP] Emergency save failed:', data);
-            options.onSessionEnd?.({ finalScore, isValid: false });
-          }
-        } catch (error) {
-          console.error('❌ [DAPP] Emergency save error:', error);
-          options.onSessionEnd?.({ finalScore, isValid: false });
-        }
-      } else {
-        console.log('⚠️ [DAPP] No user ID available for emergency save');
-        options.onSessionEnd?.({ finalScore, isValid: false });
-      }
-      return;
-    }
-
-    console.log('🏁 [DAPP] Ending session:', actualSessionToken, 'with score:', finalScore);
-
-    try {
-      const response = await fetch('/api/games/end-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionToken: actualSessionToken,
-          finalScore,
-          metadata
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('✅ [DAPP] Session ended successfully:', {
-          sessionId: data.sessionId,
-          finalScore: data.finalScore,
-          xpEarned: data.xpEarned,
-          retryCount
-        });
-
-        setCurrentSession(null);
-        sessionStartedRef.current = false; // Reset session flag
-        // DON'T reset authSentRef.current = false; // Keep auth flag to avoid re-sending auth
-        setGameStats({
-          checkpointsReceived: 0,
-          honeypotEvents: 0,
-          sessionValid: true
-        });
-
-        options.onSessionEnd?.({
-          finalScore: data.finalScore,
-          isValid: data.isValid
-        });
-
-        // Auto-start a new session for the next game
-        if (authData.user?.id && authData.isAuthenticated) {
-          console.log('🔄 [DAPP] Auto-starting new session after game end');
-          setTimeout(() => {
-            startGameSession(authData.user.id);
-          }, 1000); // Wait 1 second before starting new session
-        }
-      } else {
-        console.error('❌ [DAPP] End session failed:', data);
-        // Retry logic for failed requests (max 2 retries)
-        if (retryCount < 2 && actualSessionToken !== 'no-session') {
-          console.log(`🔄 [DAPP] Retrying end session (attempt ${retryCount + 1}/2)...`);
-          setTimeout(() => {
-            endGameSession(sessionToken, finalScore, metadata, retryCount + 1);
-          }, 1000 * (retryCount + 1)); // Exponential backoff
-        } else {
-          console.error('❌ [DAPP] Max retries reached, giving up on ending session');
-        }
-      }
-    } catch (error) {
-      console.error('❌ [DAPP] Network error ending game session:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionToken: actualSessionToken,
-        finalScore,
-        retryCount
-      });
-      
-      // Retry logic for network errors (max 2 retries)
-      if (retryCount < 2 && actualSessionToken !== 'no-session') {
-        console.log(`🔄 [DAPP] Retrying after network error (attempt ${retryCount + 1}/2)...`);
-        setTimeout(() => {
-          endGameSession(sessionToken, finalScore, metadata, retryCount + 1);
-        }, 2000 * (retryCount + 1)); // Exponential backoff
-      } else {
-        console.error('❌ [DAPP] Max retries reached after network errors, giving up');
-      }
-    }
-  }, [options, authData.user?.id, authData.isAuthenticated, startGameSession, currentSession]);
-
-  // Listen for messages from game
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Log all incoming messages for debugging
-      console.log('📨 [DAPP] Raw message received:', {
-        origin: event.origin,
-        data: event.data,
-        type: typeof event.data,
-        hasType: !!event.data?.type
-      });
-
-      // Filter out non-game messages (MetaMask, etc.)
-      if (!event.data || typeof event.data !== 'object') {
-        console.log('🚫 [DAPP] Filtered: Invalid data structure');
-        return;
-      }
-
-      // Ignore MetaMask messages specifically
-      if (event.data.target === 'metamask-inpage' || 
-          event.data.name === 'metamask-provider' ||
-          event.data.method?.startsWith('metamask_')) {
-        console.log('🚫 [DAPP] Filtered: MetaMask message');
-        return;
-      }
-
-      // Only process messages with a type from game origins
-      if (!event.data.type) {
-        console.log('🚫 [DAPP] Filtered: No message type');
-        return;
-      }
-
-      // Only process messages from game origins
-      const gameOrigins = [
-        process.env.NEXT_PUBLIC_GAME_SYBILSLASH || 'http://localhost:9002',
-        process.env.NEXT_PUBLIC_GAME_HYPPIE_ROAD || 'http://localhost:9003', 
-        process.env.NEXT_PUBLIC_GAME_TOWER_BUILDER || 'http://localhost:9004'
-      ].map(url => url.replace(/\/$/, '')); // Remove trailing slash
-      
-      console.log('🔍 [DAPP] Origin check:', {
-        messageOrigin: event.origin,
-        allowedOrigins: gameOrigins,
-        isAllowed: gameOrigins.includes(event.origin)
-      });
-      
-      if (!gameOrigins.includes(event.origin)) {
-        console.log('🚫 [DAPP] Filtered: Origin not allowed');
-        return;
-      }
-
-      console.log('🎮 [DAPP] Received message from game:', event.data, 'origin:', event.origin);
-      
-      // Validate secure message
-      console.log('🔐 [DAPP] Validating secure message...');
-      const validation = await validateSecureMessage(event.data);
-      console.log('🔐 [DAPP] Validation result:', {
-        isValid: validation.isValid,
-        reason: validation.reason
-      });
-      
-      if (!validation.isValid) {
-        console.error('❌ [DAPP] Message validation failed:', validation.reason);
-        logSecurityEvent('Invalid message received', { 
-          reason: validation.reason, 
-          origin: event.origin,
-          message: event.data 
-        });
-        return;
-      }
-
-      const message = validation.parsedMessage!;
-      const messageData = extractMessageData(message);
-      
-      logSecurityEvent('Valid message received', { 
-        type: messageData.type, 
-        origin: event.origin 
-      });
-      
-      switch (messageData.type) {
-        case 'GAME_CHECKPOINT':
-          console.log('📍 [DAPP] Processing secure checkpoint:', messageData.payload);
-          handleCheckpoint(messageData.payload.checkpoint, messageData.payload.events);
-          break;
-        
-        case 'GAME_SESSION_END':
-          console.log('🏁 [DAPP] Processing secure session end:', messageData.payload);
-          endGameSession(messageData.payload.sessionToken, messageData.payload.finalScore, messageData.payload.metadata);
-          break;
-        
-        case 'HONEYPOT_TRIGGER':
-          console.log('🍯 [DAPP] Honeypot triggered:', messageData.payload);
-          setGameStats(prev => ({
-            ...prev,
-            honeypotEvents: prev.honeypotEvents + 1
-          }));
-          options.onHoneypotDetected?.(messageData.payload.event);
-          break;
-        
-        default:
-          console.log('🔄 [DAPP] Ignored message type:', messageData.type);
-          break;
-      }
-    };
-
-    console.log('🎧 [DAPP] Starting to listen for secure game messages...');
-    window.addEventListener('message', handleMessage);
-    return () => {
-      console.log('🔇 [DAPP] Stopped listening for game messages');
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [handleCheckpoint, endGameSession, options]);
-
-  // Initialize session when user is authenticated (don't wait for iframe)
-  useEffect(() => {
-    console.log('🔄 [DAPP] useEffect - Initialize connection', { 
-      initialized: initializedRef.current, 
-      hasIframe: !!iframeRef.current, 
-      authenticated: authData.isAuthenticated, 
-      userId: authData.user?.id 
-    });
-
-    // Only initialize once
-    if (initializedRef.current) {
-      console.log('🔄 [DAPP] Already initialized, skipping');
-      return;
-    }
-
-    // Start session as soon as user is authenticated (don't wait for iframe)
-    if (!authData.isAuthenticated || !authData.user?.id) {
-      console.log('🔄 [DAPP] User not authenticated yet, waiting...', { 
-        authenticated: authData.isAuthenticated, 
-        userId: authData.user?.id 
-      });
-      return;
-    }
-
-    // Mark as initialized and start session immediately
-    initializedRef.current = true;
-    console.log('✅ [DAPP] User authenticated, starting session immediately...');
-    
-    // Start session immediately for authenticated user
-    startGameSession(authData.user.id);
-  }, [authData.isAuthenticated, authData.user?.id, startGameSession, options.gameId]);
-
-  // Monitor currentSession changes
-  useEffect(() => {
-    console.log('🔄 [DAPP] currentSession state changed:', currentSession);
-  }, [currentSession]);
-
-  // Separate effect to handle iframe communication (optional - for future features)
-  useEffect(() => {
-    // This effect can be used later if we need to send additional data to games
-    // For now, the games work independently without needing auth data from parent
-    console.log('🔗 [DAPP] Iframe reference updated:', { hasIframe: !!iframeRef.current });
-  }, [iframeRef?.current]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
+      console.error('❌ [DAPP-PUSHER] Failed to start game session:', error);
       sessionStartedRef.current = false;
-      authSentRef.current = false;
-      initializedRef.current = false;
+      return null;
+    }
+  }, [authData, options, iframeRef, currentSession]);
+
+  // Handle game authentication and session start
+  useEffect(() => {
+    if (!authData.isAuthenticated || !authData.user?.id || sessionStartedRef.current || !initializedRef.current) {
+      return;
+    }
+
+    console.log('🔐 [DAPP-PUSHER] Auto-starting session for authenticated user:', authData.user.id);
+            startGameSession(authData.user.id);
+  }, [authData, startGameSession]);
+
+  // Handle iframe load and setup postMessage communication for handshake
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleIframeLoad = () => {
+      console.log('🎮 [DAPP-PUSHER] Game iframe loaded, setting up communication');
+      initializedRef.current = true;
+      
+      // Auto-start session if user is authenticated
+      if (authData.isAuthenticated && authData.user?.id && !sessionStartedRef.current) {
+        console.log('🚀 [DAPP-PUSHER] Auto-starting session after iframe load');
+        startGameSession(authData.user.id);
+      }
     };
-  }, []);
+
+    // Handle messages from game for handshake (before Pusher takes over)
+    const handleGameMessage = (event: MessageEvent) => {
+      // Only handle messages from our iframe
+      if (event.source !== iframe.contentWindow) return;
+
+      console.log('📨 [DAPP-PUSHER] Message from game:', event.data);
+
+      if (event.data?.type === 'GAME_READY') {
+        console.log('🎮 [DAPP-PUSHER] Game is ready, can send session data');
+        
+        // Send session data if we have it
+        if (currentSession && iframe.contentWindow) {
+          console.log('📤 [DAPP-PUSHER] Sending session data to game:', currentSession);
+          iframe.contentWindow.postMessage({
+            type: 'GAME_SESSION_START',
+            payload: {
+              ...currentSession,
+              gameVersion: options.gameVersion || '1.0.0',
+              user: authData.user
+            }
+          }, '*');
+        }
+      }
+
+      // Handle Pusher auth requests from the game
+      if (event.data?.type === 'PUSHER_AUTH_REQUEST') {
+        console.log('🔐 [DAPP-PUSHER] Handling Pusher auth request:', event.data.authId);
+        
+        // Use URLSearchParams for better compatibility
+        const params = new URLSearchParams();
+        params.append('socket_id', event.data.socketId);
+        params.append('channel_name', event.data.channelName);
+        params.append('session_token', event.data.sessionToken);
+
+        fetch('/api/pusher/auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        })
+          .then(async response => {
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log('✅ [DAPP-PUSHER] Auth successful, sending to game');
+            if (iframe.contentWindow) {
+              iframe.contentWindow.postMessage({
+                type: 'PUSHER_AUTH_RESPONSE',
+                authId: event.data.authId,
+                success: true,
+                authData: data
+              }, '*');
+            }
+          })
+          .catch(error => {
+            console.error('❌ [DAPP-PUSHER] Auth failed:', error);
+            if (iframe.contentWindow) {
+              iframe.contentWindow.postMessage({
+                type: 'PUSHER_AUTH_RESPONSE',
+                authId: event.data.authId,
+                success: false,
+                error: error.message
+              }, '*');
+            }
+          });
+      }
+    };
+
+    iframe.addEventListener('load', handleIframeLoad);
+    window.addEventListener('message', handleGameMessage);
+
+    return () => {
+      iframe.removeEventListener('load', handleIframeLoad);
+      window.removeEventListener('message', handleGameMessage);
+    };
+  }, [iframeRef, authData, options, currentSession, startGameSession]);
+
+  // Reset session when user changes
+  useEffect(() => {
+    if (!authData.isAuthenticated) {
+      console.log('🔄 [DAPP-PUSHER] User logged out, resetting session');
+      setCurrentSession(null);
+      sessionStartedRef.current = false;
+      initializedRef.current = false;
+    }
+  }, [authData.isAuthenticated]);
 
   return {
+    // Session state
     currentSession,
+    isSessionActive: !!currentSession,
+    
+    // Connection state from Pusher
+    connectionState,
+    isConnected,
+    
+    // Game stats
     gameStats,
+    
+    // Session management
     startGameSession,
-    endGameSession,
-    isSessionActive: !!currentSession
+    
+    // Additional utilities
+    sendGameCommand,
+    sendSessionUpdate
   };
 }

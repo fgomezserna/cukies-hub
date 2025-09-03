@@ -1,11 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { 
-  validateSecureMessage, 
-  extractMessageData, 
-  sendSecureMessageToParent,
-  logSecurityEvent,
-  type GameMessageType 
-} from '../lib/secure-communication';
+import { usePusherConnection } from './usePusherConnection';
 
 // Simple hash function for browser compatibility
 function simpleHash(str: string): string {
@@ -35,24 +29,29 @@ const HONEYPOT_EVENTS = [
 ];
 
 /**
- * Hook for game-to-parent communication with security features
- * Used in games to communicate with the DApp parent
+ * Hook for game-to-parent communication using Pusher WebSockets
+ * Replaced the secure postMessage system with robust Pusher communication
  */
 export function useGameConnection() {
+  // Use the new robust Pusher connection system
+  const {
+    isConnected,
+    connectionState,
+    sessionData,
+    sendCheckpoint: pusherSendCheckpoint,
+    sendGameEnd,
+    sendHoneypotTrigger,
+    startCheckpointInterval: pusherStartCheckpointInterval
+  } = usePusherConnection();
+
   const [authState, setAuthState] = useState<{
     isAuthenticated: boolean;
     user: any;
     token?: string;
   }>({
-    isAuthenticated: false,
-    user: null,
+    isAuthenticated: true, // Default to authenticated for Pusher system
+    user: sessionData?.user || null,
   });
-
-  const [gameSession, setGameSession] = useState<{
-    gameId: string;
-    sessionToken: string;
-    sessionId: string;
-  } | null>(null);
 
   // Use ref instead of state for checkpoint interval to avoid re-renders
   const checkpointIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -68,9 +67,9 @@ export function useGameConnection() {
     return simpleHash(data);
   }, []);
 
-  // Send checkpoint to parent
+  // Send checkpoint to parent using Pusher
   const sendCheckpoint = useCallback((score: number, gameTime: number, events?: any[]) => {
-    if (!gameSession) return;
+    if (!sessionData) return;
 
     const checkpoint = {
       timestamp: Date.now(),
@@ -87,22 +86,24 @@ export function useGameConnection() {
     if (shouldSendHoneypot) {
       const honeypotEvent = HONEYPOT_EVENTS[Math.floor(Math.random() * HONEYPOT_EVENTS.length)];
       events = [...(events || []), { type: 'honeypot', event: honeypotEvent }];
+      // Send honeypot via Pusher
+      sendHoneypotTrigger(honeypotEvent);
     }
 
-    // Send secure checkpoint message
-    sendSecureMessageToParent('GAME_CHECKPOINT', {
-      sessionToken: gameSession.sessionToken,
-      checkpoint,
-      events
+    // Send checkpoint via Pusher with events included
+    pusherSendCheckpoint({
+      score,
+      gameTime,
+      events: events || []
     });
-  }, [gameSession, generateCheckpointHash]);
+  }, [sessionData, generateCheckpointHash, pusherSendCheckpoint, sendHoneypotTrigger]);
 
-  // Send session end to parent
+  // Send session end to parent using Pusher
   const sendSessionEnd = useCallback((finalScore: number, metadata?: any) => {
-    // Send secure session end message (even without gameSession, parent can handle it)
-    sendSecureMessageToParent('GAME_SESSION_END', {
-      sessionToken: gameSession?.sessionToken || 'no-session',
+    // Send game end via Pusher with sessionToken included
+    sendGameEnd({
       finalScore,
+      gameTime: Date.now(), // Will be calculated properly in the calling component
       metadata
     });
 
@@ -111,107 +112,49 @@ export function useGameConnection() {
       clearInterval(checkpointIntervalRef.current);
       checkpointIntervalRef.current = null;
     }
-  }, [gameSession]);
+  }, [sendGameEnd]);
 
-  // Send honeypot trigger to parent
-  const sendHoneypotTrigger = useCallback(async (event: string) => {
-    if (!gameSession) return;
+  // Honeypot trigger is handled directly in sendCheckpoint via Pusher
+  // No need for separate implementation here
 
-    // Send secure honeypot trigger message
-    await sendSecureMessageToParent('HONEYPOT_TRIGGER', {
-      sessionToken: gameSession.sessionToken,
-      event
-    });
-  }, [gameSession]);
-
-  // Start periodic checkpoints
+  // Start periodic checkpoints using Pusher
   const startCheckpointInterval = useCallback((getCurrentScore: () => number, getCurrentGameTime: () => number) => {
     // Clear existing interval if any
     if (checkpointIntervalRef.current) {
       clearInterval(checkpointIntervalRef.current);
     }
 
-    const interval = setInterval(() => {
-      const score = getCurrentScore();
-      const gameTime = getCurrentGameTime();
-      sendCheckpoint(score, gameTime);
-    }, 5000); // Send checkpoint every 5 seconds
-
-    checkpointIntervalRef.current = interval;
-  }, [sendCheckpoint]);
+    // Use the Pusher checkpoint interval system
+    const stopInterval = pusherStartCheckpointInterval(getCurrentScore, getCurrentGameTime, 5000);
+    
+    // Store the stop function in ref for cleanup
+    checkpointIntervalRef.current = stopInterval as any;
+  }, [pusherStartCheckpointInterval]);
 
   // Stop periodic checkpoints
   const stopCheckpointInterval = useCallback(() => {
     if (checkpointIntervalRef.current) {
-      clearInterval(checkpointIntervalRef.current);
+      // Call the stop function if it's the Pusher system
+      if (typeof checkpointIntervalRef.current === 'function') {
+        checkpointIntervalRef.current();
+      } else {
+        // Fallback for old interval system
+        clearInterval(checkpointIntervalRef.current);
+      }
       checkpointIntervalRef.current = null;
     }
   }, []);
 
-  // Listen for messages from parent
+  // Update auth state when session data changes
   useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Filter out non-game messages (MetaMask, etc.)
-      if (!event.data || typeof event.data !== 'object') {
-        return;
-      }
-
-      // Ignore MetaMask messages specifically
-      if (event.data.target === 'metamask-inpage' || 
-          event.data.name === 'metamask-provider' ||
-          event.data.method?.startsWith('metamask_')) {
-        return;
-      }
-
-      // Only process messages with a type
-      if (!event.data.type) {
-        return;
-      }
-
-      console.log('🎮 [GAME] Received message from parent:', event.data);
-      
-      // Validate secure message
-      const validation = await validateSecureMessage(event.data);
-      if (!validation.isValid) {
-        console.error('❌ [GAME] Invalid message received:', validation.reason, event.data);
-        logSecurityEvent('Invalid message received', { 
-          reason: validation.reason, 
-          message: event.data 
-        });
-        return;
-      }
-
-      const message = validation.parsedMessage!;
-      const messageData = extractMessageData(message);
-      
-      logSecurityEvent('Valid message received', { 
-        type: messageData.type 
+    if (sessionData) {
+      setAuthState({
+        isAuthenticated: true,
+        user: sessionData.user || { id: 'game-user' },
+        token: sessionData.sessionToken
       });
-      
-      switch (messageData.type) {
-        case 'AUTH_STATE_CHANGED':
-          console.log('🔐 [GAME] Auth state changed:', messageData.payload);
-          setAuthState(messageData.payload);
-          break;
-        
-        case 'GAME_SESSION_START':
-          console.log('🚀 [GAME] Game session started:', messageData.payload);
-          setGameSession(messageData.payload);
-          break;
-        
-        default:
-          console.log('🔄 [GAME] Ignored message type:', messageData.type);
-          break;
-      }
-    };
-
-    console.log('🎧 [GAME] Starting to listen for parent messages...');
-    window.addEventListener('message', handleMessage);
-    return () => {
-      console.log('🔇 [GAME] Stopped listening for parent messages');
-      window.removeEventListener('message', handleMessage);
-    };
-  }, []);
+    }
+  }, [sessionData]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -226,10 +169,10 @@ export function useGameConnection() {
     isAuthenticated: authState.isAuthenticated,
     user: authState.user,
     token: authState.token,
-    gameSession,
+    gameSession: sessionData, // Return sessionData as gameSession for compatibility
     sendCheckpoint,
     sendSessionEnd,
-    sendHoneypotTrigger,
+    sendHoneypotTrigger: sendHoneypotTrigger, // Use Pusher honeypot system
     startCheckpointInterval,
     stopCheckpointInterval
   };

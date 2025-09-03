@@ -2,10 +2,89 @@
 
 import { useEffect, useRef } from 'react';
 import { ASSETS_CONFIG } from '../lib/assets-config';
+import { usePusherConnection } from '../hooks/usePusherConnection';
 
 const GameContainer = () => {
   const gameRef = useRef<HTMLDivElement>(null);
   const gameInstance = useRef<Phaser.Game | null>(null);
+  
+  // Pusher connection for robust communication
+  const {
+    isConnected,
+    connectionState,
+    sessionData,
+    sendCheckpoint,
+    sendGameEnd,
+    sendHoneypotTrigger,
+    startCheckpointInterval
+  } = usePusherConnection();
+  
+  // Track if we've already sent session end for current game
+  const gameEndSentRef = useRef<string | null>(null);
+
+  // Setup global interface for Phaser to communicate with Pusher
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).towerBuilderGame = {
+        startSession: () => {
+          console.log('🏗️ [TOWER-PUSHER] Session start requested');
+          // Session starts automatically with Pusher, no need for manual start
+        },
+        
+        sendCheckpoint: (score: number, gameTime: number) => {
+          if (!sessionData) {
+            console.warn('⚠️ [TOWER-PUSHER] No session data for checkpoint');
+            return;
+          }
+          
+          console.log(`🏗️ [TOWER-PUSHER] Sending checkpoint - Score: ${score}, Time: ${gameTime}ms`);
+          sendCheckpoint({
+            score,
+            gameTime,
+            events: [] // Add any events if needed
+          });
+        },
+        
+        endSession: (finalScore: number, metadata: any) => {
+          if (!sessionData) {
+            console.warn('⚠️ [TOWER-PUSHER] No session data for game end');
+            return;
+          }
+          
+          // Create unique identifier for this game result
+          const resultId = `${sessionData.sessionId}_${finalScore}_${metadata.gameTime}`;
+          
+          // Check if we already sent this specific result
+          if (gameEndSentRef.current === resultId) {
+            console.log('🚫 [TOWER-PUSHER] Already sent this result, skipping:', resultId);
+            return;
+          }
+          
+          console.log('🏗️ [TOWER-PUSHER] Ending session with score:', finalScore, 'metadata:', metadata);
+          
+          // Mark this result as sent
+          gameEndSentRef.current = resultId;
+          
+          sendGameEnd({
+            finalScore,
+            gameTime: metadata.gameTime,
+            metadata: {
+              gameOverReason: metadata.gameOverReason,
+              finalHeight: metadata.finalHeight,
+              blocksPlaced: metadata.blocksPlaced
+            }
+          });
+        }
+      };
+    }
+    
+    return () => {
+      // Clean up global interface
+      if (typeof window !== 'undefined') {
+        delete (window as any).towerBuilderGame;
+      }
+    };
+  }, [sessionData, sendCheckpoint, sendGameEnd]);
 
   useEffect(() => {
     if (gameInstance.current) {
