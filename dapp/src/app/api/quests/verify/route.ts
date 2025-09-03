@@ -93,6 +93,13 @@ export async function POST(request: Request) {
         break;
 
       case 'email':
+        // If user already has an email and they're trying to verify it
+        if (user.email && value === user.email) {
+          // Just mark the task as completed, no need to update anything
+          verificationResult = true;
+          break;
+        }
+
         if (!value || !isValidEmail(value)) {
           return NextResponse.json({ 
             error: 'Valid email is required' 
@@ -115,6 +122,13 @@ export async function POST(request: Request) {
         break;
 
       case 'profilePicture':
+        // If user already has a profile picture and they're trying to verify it
+        if (user.profilePictureUrl && value === user.profilePictureUrl) {
+          // Just mark the task as completed, no need to update anything
+          verificationResult = true;
+          break;
+        }
+
         if (!value || typeof value !== 'string') {
           return NextResponse.json({ 
             error: 'Profile picture URL is required' 

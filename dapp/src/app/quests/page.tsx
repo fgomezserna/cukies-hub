@@ -227,9 +227,12 @@ function UsernameTask({ task, onVerify, disabled, isLoading = false, user }: { t
   );
 }
 
-function EmailTask({ task, onVerify, disabled, isLoading = false }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; }) {
+function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: any; }) {
   const [email, setEmail] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Check if user already has an email
+  const hasEmail = user?.email && user.email.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -239,6 +242,11 @@ function EmailTask({ task, onVerify, disabled, isLoading = false }: { task: Task
     }
   };
 
+  const handleVerifyExisting = () => {
+    // Verify the existing email to complete the task
+    onVerify(task.id, { type: 'email', value: user.email });
+  };
+
   if (task.completed) {
     return (
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
@@ -246,6 +254,25 @@ function EmailTask({ task, onVerify, disabled, isLoading = false }: { task: Task
         <span className="text-foreground">{getTaskText(task)}</span>
         <Button size="sm" variant="ghost" className="ml-auto" disabled>
           Verified
+        </Button>
+      </div>
+    );
+  }
+
+  // If user already has an email, show verify button
+  if (hasEmail) {
+    return (
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <Circle className="h-5 w-5 text-muted-foreground" />
+        <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
+        <span className="text-sm text-green-500">Email: {user.email}</span>
+        <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verifying
+            </>
+          ) : 'Verify'}
         </Button>
       </div>
     );
@@ -277,16 +304,19 @@ function EmailTask({ task, onVerify, disabled, isLoading = false }: { task: Task
                 />
                                  <Button type="submit" size="sm" disabled={!email.trim() || isLoading}>
                      {isLoading ? 'Verifying...' : 'Verify'}
-                 </Button>
+                </Button>
             </form>
         )}
     </div>
   );
 }
 
-function ProfilePictureTask({ task, onVerify, disabled, isLoading = false }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; }) {
+function ProfilePictureTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: any; }) {
   const [imageUrl, setImageUrl] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Check if user already has a profile picture
+  const hasProfilePicture = user?.profilePictureUrl && user.profilePictureUrl.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,6 +326,11 @@ function ProfilePictureTask({ task, onVerify, disabled, isLoading = false }: { t
     }
   };
 
+  const handleVerifyExisting = () => {
+    // Verify the existing profile picture to complete the task
+    onVerify(task.id, { type: 'profilePicture', value: user.profilePictureUrl });
+  };
+
   if (task.completed) {
     return (
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
@@ -303,6 +338,28 @@ function ProfilePictureTask({ task, onVerify, disabled, isLoading = false }: { t
         <span className="text-foreground">{getTaskText(task)}</span>
         <Button size="sm" variant="ghost" className="ml-auto" disabled>
           Verified
+        </Button>
+      </div>
+    );
+  }
+
+  // If user already has a profile picture, show verify button
+  if (hasProfilePicture) {
+    return (
+      <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
+        <Circle className="h-5 w-5 text-muted-foreground" />
+        <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
+        <div className="flex items-center gap-2">
+          <img src={user.profilePictureUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover" />
+          <span className="text-sm text-green-500">Picture set</span>
+        </div>
+        <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verifying
+            </>
+          ) : 'Verify'}
         </Button>
       </div>
     );
@@ -1221,10 +1278,10 @@ function QuestsView() {
                       return <UsernameTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
                     
                     case 'email':
-                      return <EmailTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} />
+                      return <EmailTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
                     
                     case 'profilePicture':
-                      return <ProfilePictureTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} />
+                      return <ProfilePictureTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
                     
                     case 'discord_join':
                       return <DiscordJoinTask key={task.id} task={task} disabled={starterQuest.isLocked} onVerify={(taskId, payload) => handleVerifyTask(starterQuest.id, taskId, payload)} isLoading={isLoading} user={user} />
@@ -1368,13 +1425,13 @@ function QuestsView() {
                                       {(() => {
                                         switch (taskType) {
                                           case 'username':
-                                            return <UsernameTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                            return <UsernameTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
                                           
                                           case 'email':
-                                            return <EmailTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                            return <EmailTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
                                           
                                           case 'profilePicture':
-                                            return <ProfilePictureTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} />
+                                            return <ProfilePictureTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
                                           
                                           case 'discord_join':
                                             return <DiscordJoinTask key={task.id} task={task} disabled={quest.isLocked || quest.isCompleted} onVerify={(taskId, payload) => handleVerifyTask(quest.id, taskId, payload)} isLoading={isLoading} user={user} />
