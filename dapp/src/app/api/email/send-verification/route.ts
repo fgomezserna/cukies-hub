@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { resend, EMAIL_CONFIG } from '@/lib/resend';
+import { createVerificationEmailTemplate, createVerificationEmailSubject } from '@/lib/email-templates';
 
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -75,17 +77,44 @@ export async function POST(request: Request) {
       }
     });
 
-    // In a real implementation, you would send the email here
-    // For now, we'll return the code for testing purposes
-    console.log(`Email verification code for ${email}: ${verificationCode}`);
+    // Send verification email using Resend
+    console.log('🔍 Attempting to send email with Resend...');
+    console.log('📧 From:', EMAIL_CONFIG.from);
+    console.log('📧 To:', email);
+    console.log('🔑 API Key configured:', !!process.env.RESEND_API_KEY);
+    
+    try {
+      const emailHtml = createVerificationEmailTemplate(verificationCode);
+      const emailSubject = createVerificationEmailSubject();
 
-    // TODO: Integrate with an email service like SendGrid, Nodemailer, etc.
-    // await sendVerificationEmail(email, verificationCode);
+      console.log('📨 Calling resend.emails.send...');
+      const result = await resend.emails.send({
+        from: EMAIL_CONFIG.from,
+        to: email,
+        subject: emailSubject,
+        html: emailHtml,
+      });
+
+      console.log('🎉 Resend response:', result);
+      console.log(`✅ Verification email sent to ${email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      console.error('❌ Error details:', JSON.stringify(emailError, null, 2));
+      
+      // Clean up the verification record since email failed
+      await prisma.emailVerification.deleteMany({
+        where: { email, walletAddress }
+      });
+      
+      return NextResponse.json({
+        error: 'Failed to send verification email. Please try again.'
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Verification code sent to your email',
-      // Remove this in production and actually send the email
+      // Show code in development for easier testing
       verificationCode: process.env.NODE_ENV === 'development' ? verificationCode : undefined,
       expiresAt: expiresAt.getTime()
     });

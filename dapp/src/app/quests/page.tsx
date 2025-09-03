@@ -335,9 +335,51 @@ function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task
     }
   };
 
-  const handleVerifyExisting = () => {
-    // Verify the existing email to complete the task
-    onVerify(task.id, { type: 'email', value: user.email });
+  const handleVerifyExisting = async () => {
+    // For existing emails, we still need to verify ownership via code
+    setEmail(user.email);
+    setIsSending(true);
+    
+    try {
+      const response = await fetch('/api/email/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          walletAddress: user.walletAddress
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to send verification code',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setCodeExpiresAt(data.expiresAt);
+      setStep('code');
+      setIsEditing(true); // Show the verification form
+      
+      toast({
+        title: 'Verification Code Sent',
+        description: `Check your email for the verification code${data.verificationCode ? ` (Dev: ${data.verificationCode})` : ''}`,
+        variant: 'default'
+      });
+
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send verification code',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleBack = () => {
@@ -365,14 +407,19 @@ function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task
   }
 
   // If user already has an email, show verify button
-  if (hasEmail) {
+  if (hasEmail && !isEditing) {
     return (
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
         <Circle className="h-5 w-5 text-muted-foreground" />
         <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
         <span className="text-sm text-green-500">Email: {user.email}</span>
-        <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
-          {isLoading ? (
+        <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading || isSending}>
+          {isSending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Sending Code...
+            </>
+          ) : isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Verifying
@@ -399,7 +446,7 @@ function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task
         </div>
         {isEditing && (
           <div className="space-y-3 pl-8">
-            {step === 'email' && (
+            {step === 'email' && !hasEmail && (
               <form onSubmit={handleSendCode} className="space-y-2">
                 <div className="flex w-full space-x-2">
                   <Input
@@ -448,9 +495,11 @@ function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task
                 </div>
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                   <p>Code sent to: {email}</p>
-                  <Button type="button" variant="link" size="sm" onClick={handleBack} className="h-auto p-0 text-xs">
-                    Change email
-                  </Button>
+                  {!hasEmail && (
+                    <Button type="button" variant="link" size="sm" onClick={handleBack} className="h-auto p-0 text-xs">
+                      Change email
+                    </Button>
+                  )}
                 </div>
               </form>
             )}
