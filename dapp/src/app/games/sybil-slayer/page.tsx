@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useCallback, useRef } from 'react';
-import { useGameConnection } from '@/hooks/use-game-connection';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
 import { useAuth } from '@/providers/auth-provider';
 import { useGameData } from '@/hooks/use-game-data';
 import GameLayout from '@/components/layout/GameLayout';
@@ -11,9 +11,10 @@ export default function SybilSlayerPage() {
   const { user, isLoading } = useAuth();
   const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('sybil-slayer');
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
   // Local game state for real-time updates
-  const [localGameStats, setLocalGameStats] = React.useState({
+  const [localGameStats, setLocalGameStats] = useState({
     currentScore: 0,
     bestScore: 0,
     sessionsPlayed: 0,
@@ -22,30 +23,40 @@ export default function SybilSlayerPage() {
 
   // Game connection callbacks
   const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
-    console.log('Game session started:', sessionData);
+    console.log('🚀 [DAPP-PUSHER] Game session started:', sessionData);
     setLocalGameStats(prev => ({ ...prev, sessionsPlayed: prev.sessionsPlayed + 1 }));
   }, []);
 
   const onCheckpoint = useCallback((checkpoint: any) => {
-    console.log('Checkpoint received:', checkpoint);
+    console.log('📍 [DAPP-PUSHER] Checkpoint received:', checkpoint);
     setLocalGameStats(prev => ({ ...prev, currentScore: checkpoint.score }));
   }, []);
 
   const onSessionEnd = useCallback((result: { finalScore: number; isValid: boolean }) => {
-    console.log('Game session ended:', result);
+    console.log('🏁 [DAPP-PUSHER] Game session ended:', result);
+    
+    // Clean up localStorage
+    if (currentSessionId) {
+      localStorage.removeItem(`session_token_${currentSessionId}`);
+      console.log('🧹 [DAPP-PUSHER] Session token removed from localStorage');
+    }
+    
     setLocalGameStats(prev => ({
       ...prev,
       bestScore: Math.max(prev.bestScore, result.finalScore),
       currentScore: 0,
       validSessions: prev.validSessions + (result.isValid ? 1 : 0)
     }));
-  }, []);
+    
+    // Reset session ID for new game
+    setCurrentSessionId(null);
+  }, [currentSessionId]);
 
   const onHoneypotDetected = useCallback((event: string) => {
-    console.warn('Honeypot detected:', event);
+    console.warn('🍯 [DAPP-PUSHER] Honeypot detected:', event);
   }, []);
 
-  // Set up game connection options
+  // Set up Pusher game connection options
   const gameConnectionOptions = React.useMemo(() => ({
     gameId: 'sybil-slayer',
     gameVersion: '1.0.0',
@@ -60,12 +71,172 @@ export default function SybilSlayerPage() {
     user: user,
   }), [user, isLoading]);
 
-  // Use the game connection hook directly (not in a callback)
-  const gameConnection = useGameConnection(iframeRef, authData, gameConnectionOptions);
+  // Use the Pusher game connection hook
+  const { 
+    channel, 
+    connectionState, 
+    gameStats: pusherGameStats, 
+    isConnected,
+    notifySessionStart,
+    sendGameCommand,
+    sendSessionUpdate
+  } = usePusherGameConnection(currentSessionId, authData, gameConnectionOptions);
+
+  // Listen for game ready signal
+  useEffect(() => {
+    const handleGameMessage = async (event: MessageEvent) => {
+      console.log('📨 [DAPP-PUSHER] Message from game:', event.data);
+      
+      if (event.data?.type === 'GAME_READY') {
+        console.log('🎮 [DAPP-PUSHER] Game is ready, can send session data');
+        // Game is ready to receive messages
+      } else if (event.data?.type === 'PUSHER_AUTH_REQUEST') {
+        console.log('🔐 [DAPP-PUSHER] Handling Pusher auth request:', event.data.authId);
+        
+        try {
+          // Make auth request to our own API
+          const params = new URLSearchParams();
+          params.append('socket_id', event.data.socketId);
+          params.append('channel_name', event.data.channelName);
+          params.append('session_token', event.data.sessionToken);
+
+          const response = await fetch('/api/pusher/auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString()
+          });
+
+          if (response.ok) {
+            const authData = await response.json();
+            console.log('✅ [DAPP-PUSHER] Auth successful, sending to game');
+            
+            // Send success response back to game
+            if (iframeRef.current?.contentWindow) {
+              iframeRef.current.contentWindow.postMessage({
+                type: 'PUSHER_AUTH_RESPONSE',
+                authId: event.data.authId,
+                success: true,
+                authData
+              }, '*');
+            }
+          } else {
+            const errorData = await response.json();
+            console.error('❌ [DAPP-PUSHER] Auth failed:', errorData);
+            
+            // Send error response back to game
+            if (iframeRef.current?.contentWindow) {
+              iframeRef.current.contentWindow.postMessage({
+                type: 'PUSHER_AUTH_RESPONSE',
+                authId: event.data.authId,
+                success: false,
+                error: errorData.error || 'Authentication failed'
+              }, '*');
+            }
+          }
+        } catch (error) {
+          console.error('❌ [DAPP-PUSHER] Auth request error:', error);
+          
+          // Send error response back to game
+          if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({
+              type: 'PUSHER_AUTH_RESPONSE',
+              authId: event.data.authId,
+              success: false,
+              error: 'Authentication request failed'
+            }, '*');
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleGameMessage);
+    return () => window.removeEventListener('message', handleGameMessage);
+  }, [iframeRef]);
+
+  // Start game session when user is authenticated
+  useEffect(() => {
+    const startSession = async () => {
+      if (!authData.isAuthenticated || !user?.id || currentSessionId) return;
+
+      try {
+        console.log('🚀 [DAPP-PUSHER] Starting new game session...');
+        
+        const response = await fetch('/api/games/start-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            gameId: 'sybil-slayer',
+            gameVersion: '1.0.0'
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          console.log('✅ [DAPP-PUSHER] Session created:', data);
+          setCurrentSessionId(data.sessionId);
+          
+          // Store session token in localStorage for Pusher auth
+          localStorage.setItem(`session_token_${data.sessionId}`, data.sessionToken);
+          console.log('💾 [DAPP-PUSHER] Session token stored in localStorage');
+          
+          // Notify the session start callback
+          onSessionStart({
+            sessionToken: data.sessionToken,
+            sessionId: data.sessionId
+          });
+          
+          // Send session data to game via postMessage (initial handshake)
+          // After this, all communication will be via Pusher
+          const sendSessionData = () => {
+            const sessionData = {
+              type: 'GAME_SESSION_START',
+              payload: {
+                gameId: 'sybil-slayer',
+                sessionToken: data.sessionToken,
+                sessionId: data.sessionId,
+                gameVersion: '1.0.0',
+                // Include user info for Pusher auth
+                user: {
+                  id: user.id,
+                  name: user.username || 'Anonymous',
+                  email: user.email
+                }
+              }
+            };
+
+            console.log('📤 [DAPP-PUSHER] Sending session data to game:', sessionData);
+            
+            if (iframeRef.current?.contentWindow) {
+              iframeRef.current.contentWindow.postMessage(sessionData, '*');
+            } else {
+              console.warn('⚠️ [DAPP-PUSHER] iframe contentWindow not available');
+            }
+          };
+
+          // Try immediately
+          sendSessionData();
+          
+          // Also try after a delay in case iframe is still loading
+          setTimeout(sendSessionData, 1000);
+          setTimeout(sendSessionData, 2000);
+        } else {
+          console.error('❌ [DAPP-PUSHER] Failed to create session:', data);
+        }
+      } catch (error) {
+        console.error('❌ [DAPP-PUSHER] Error starting session:', error);
+      }
+    };
+
+    startSession();
+  }, [authData.isAuthenticated, user?.id, currentSessionId, onSessionStart]);
 
   // Handle game connection setup - just pass the ref
   const handleGameConnection = useCallback((iframeRef: React.RefObject<HTMLIFrameElement>) => {
-    // The connection is already set up via the hook above
+    // The Pusher connection is handled by the hook
     // This callback just receives the ref from GameLayout
     return;
   }, []);

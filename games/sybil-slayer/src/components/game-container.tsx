@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { useGameConnection } from '../hooks/useGameConnection';
+import { usePusherConnection } from '../hooks/usePusherConnection';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
 import { useGameState } from '../hooks/useGameState';
@@ -25,14 +25,13 @@ interface GameContainerProps {
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { 
-    isAuthenticated, 
-    user, 
-    gameSession, 
+    isConnected,
+    connectionState,
+    sessionData, 
     sendCheckpoint, 
-    sendSessionEnd, 
-    startCheckpointInterval, 
-    stopCheckpointInterval 
-  } = useGameConnection();
+    sendGameEnd, 
+    startCheckpointInterval 
+  } = usePusherConnection();
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
@@ -254,47 +253,60 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const inputState = useGameInput();
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
-
-  // Log para verificar la recepción de datos de autenticación
+  
+  // Ref para acceder al estado actual del juego en intervalos
+  const gameStateRef = useRef(gameState);
   useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('Game received auth state from Dapp:', { isAuthenticated, user });
-    }
-  }, [isAuthenticated, user]);
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
-  // Handle game session start
+  // Log para verificar el estado de conexión con Pusher
   useEffect(() => {
-    if (gameSession && gameState.status === 'playing') {
-      console.log('🎮 [GAME] Starting checkpoint interval for session:', gameSession.sessionId);
-      startCheckpointInterval(
-        () => gameState.score,
+    console.log('🔗 [GAME-PUSHER] Connection state changed:', {
+      connectionState,
+      isConnected,
+      hasSessionData: !!sessionData
+    });
+  }, [connectionState, isConnected, sessionData]);
+
+  // Handle game session start with Pusher
+  useEffect(() => {
+    if (isConnected && sessionData && gameState.status === 'playing') {
+      console.log('🎮 [GAME-PUSHER] Starting checkpoint interval for session:', sessionData.sessionId);
+      
+      const stopInterval = startCheckpointInterval(
+        () => gameStateRef.current.score,
         () => {
           const now = Date.now();
-          const startTime = gameState.gameStartTime || now;
+          const startTime = gameStateRef.current.gameStartTime || now;
           return now - startTime;
         }
       );
+      
+      return stopInterval;
     }
-    
-    return () => {
-      if (gameState.status !== 'playing') {
-        stopCheckpointInterval();
-      }
-    };
-  }, [gameSession, gameState.status, gameState.score, gameState.gameStartTime, startCheckpointInterval, stopCheckpointInterval]);
+  }, [isConnected, sessionData, gameState.status, startCheckpointInterval]);
 
-  // Handle game session end
+  // Handle game session end with Pusher
   useEffect(() => {
-    if (gameSession && gameState.status === 'gameOver') {
-      console.log('🏁 [GAME] Ending session with score:', gameState.score);
-      sendSessionEnd(gameState.score, {
-        gameOverReason: gameState.gameOverReason,
-        level: gameState.level,
-        hearts: gameState.hearts
+    if (isConnected && sessionData && gameState.status === 'gameOver') {
+      console.log('🏁 [GAME-PUSHER] Ending session with score:', gameState.score);
+      
+      const gameTime = gameState.gameStartTime 
+        ? Date.now() - gameState.gameStartTime 
+        : 0;
+        
+      sendGameEnd({
+        finalScore: gameState.score,
+        gameTime,
+        metadata: {
+          gameOverReason: gameState.gameOverReason,
+          level: gameState.level,
+          hearts: gameState.hearts
+        }
       });
-      stopCheckpointInterval();
     }
-  }, [gameSession, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, sendSessionEnd, stopCheckpointInterval]);
+  }, [isConnected, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
