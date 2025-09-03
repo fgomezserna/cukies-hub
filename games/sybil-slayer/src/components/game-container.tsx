@@ -288,14 +288,24 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isConnected, sessionData, gameState.status, startCheckpointInterval]);
 
   // Handle game session end with Pusher
+  const gameEndSentRef = useRef<string | null>(null); // Track which session already sent game end
+  
   useEffect(() => {
-    if (isConnected && sessionData && gameState.status === 'gameOver') {
+    if (sessionData && gameState.status === 'gameOver') {
+      // Prevent duplicate sends for the same session
+      const sessionKey = `${sessionData.sessionId}_${gameState.score}`;
+      if (gameEndSentRef.current === sessionKey) {
+        console.log('🔄 [GAME-PUSHER] Game end already sent for this session, skipping');
+        return;
+      }
+      
       console.log('🏁 [GAME-PUSHER] Ending session with score:', gameState.score);
       
       const gameTime = gameState.gameStartTime 
         ? Date.now() - gameState.gameStartTime 
         : 0;
-        
+      
+      console.log('📤 [GAME-PUSHER] Attempting to send game end immediately');
       sendGameEnd({
         finalScore: gameState.score,
         gameTime,
@@ -305,8 +315,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           hearts: gameState.hearts
         }
       });
+      
+      // Mark this session as having sent game end
+      gameEndSentRef.current = sessionKey;
     }
-  }, [isConnected, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
+  }, [sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {

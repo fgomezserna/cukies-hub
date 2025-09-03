@@ -16,6 +16,7 @@ interface GameEndData {
   finalScore: number;
   gameTime: number;
   metadata?: any;
+  sessionToken?: string;
 }
 
 interface PusherGameConnectionOptions {
@@ -50,6 +51,7 @@ export function usePusherGameConnection(
   const sessionIdRef = useRef<string | null>(null);
   const customClientRef = useRef<any>(null);
   const isConnectingRef = useRef(false);
+  const connectionPromiseRef = useRef<Promise<void> | null>(null);
 
   // Reset token ready state when sessionId changes
   useEffect(() => {
@@ -76,7 +78,7 @@ export function usePusherGameConnection(
     }
 
     // Prevent concurrent connections
-    if (isConnectingRef.current) {
+    if (isConnectingRef.current || connectionPromiseRef.current) {
       console.log('🔄 [PUSHER] Connection already in progress...');
       return;
     }
@@ -128,7 +130,9 @@ export function usePusherGameConnection(
     isConnectingRef.current = true;
     setConnectionState('connecting');
     
-    try {
+    // Create connection promise to prevent duplicates
+    connectionPromiseRef.current = new Promise(async (resolve, reject) => {
+      try {
       // Create a new Pusher client instance with custom authorizer for this session
       const customPusherClient = new (require('pusher-js'))(
         process.env.NEXT_PUBLIC_PUSHER_KEY!,
@@ -226,11 +230,19 @@ export function usePusherGameConnection(
         
         // Process checkpoint (validate and save to DB)
         try {
+          // Get sessionToken from localStorage for this session
+          const sessionToken = localStorage.getItem(`session_token_${sessionId}`);
+          
+          if (!sessionToken) {
+            console.error('❌ [PUSHER] No session token available for checkpoint');
+            return;
+          }
+          
           const response = await fetch('/api/games/checkpoint', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              sessionToken: authData.sessionToken, // Use actual sessionToken, not sessionId
+              sessionToken: sessionToken,
               checkpoint: data,
               events: data.events || []
             })
@@ -264,13 +276,22 @@ export function usePusherGameConnection(
         
         // Process game end
         try {
+          // Get sessionToken from the data itself or from localStorage
+          const sessionToken = data.sessionToken || localStorage.getItem(`session_token_${sessionId}`);
+          
+          if (!sessionToken) {
+            console.error('❌ [PUSHER] No session token available for game end');
+            return;
+          }
+          
           const response = await fetch('/api/games/end-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              sessionToken: authData.sessionToken, // Use actual sessionToken, not sessionId
+              sessionToken: sessionToken,
               finalScore: data.finalScore,
-              metadata: data.metadata
+              metadata: data.metadata,
+              timestamp: new Date().toISOString()
             })
           });
 
@@ -325,7 +346,7 @@ export function usePusherGameConnection(
         // Trigger session start event to game
         newChannel.trigger('client-session-start', {
           gameId: options.gameId,
-          sessionToken: sessionId,
+          sessionToken: storedSessionToken,
           sessionId: sessionId,
           gameVersion: options.gameVersion || '1.0.0',
           user: authData.user
@@ -333,21 +354,27 @@ export function usePusherGameConnection(
         
         // Also notify the callback
         options.onSessionStart({
-          sessionToken: sessionId,
+          sessionToken: storedSessionToken,
           sessionId: sessionId
         });
       }
 
-    } catch (error) {
-      console.error('❌ [PUSHER] Error connecting to channel:', error);
-      isConnectingRef.current = false;
-      setConnectionState('disconnected');
-    }
+      resolve();
+      } catch (error) {
+        console.error('❌ [PUSHER] Error connecting to channel:', error);
+        isConnectingRef.current = false;
+        setConnectionState('disconnected');
+        reject(error);
+      } finally {
+        connectionPromiseRef.current = null;
+      }
+    });
 
     // Cleanup function
     return () => {
       console.log('🔌 [PUSHER] Cleaning up connection to:', channelName);
       isConnectingRef.current = false;
+      connectionPromiseRef.current = null;
       
       if (customClientRef.current) {
         customClientRef.current.unsubscribe(channelName);
