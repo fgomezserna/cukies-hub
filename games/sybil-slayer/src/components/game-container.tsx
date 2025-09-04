@@ -1211,37 +1211,66 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onError={(e) => console.error('[HACKER UI] Error cargando imagen pay_tariffs:', e)}
                     />
                   </div>
-                  {/* Barra de progreso usando imagen barr dividida en 5 huecos */}
-                  <div className="flex space-x-1">
-                    {[1, 2, 3, 4, 5].map((slot) => (
-                      <div key={slot} className="relative w-6 h-4">
-                        {/* Imagen de fondo (barr vacía) */}
-                        <Image 
-                          src="/assets/collectibles/barr.png" 
-                          alt="Energy Slot" 
-                          width={24} 
-                          height={16}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          style={{ 
-                            filter: slot <= hackerEnergyCollected 
-                              ? 'brightness(1.5) saturate(2) hue-rotate(0deg)' 
-                              : 'brightness(0.4) saturate(0.3) grayscale(0.8)'
+                  {/* Barra de progreso del hacker con progress_barr */}
+                  <div className="flex items-center space-x-2">
+                    <div className="relative w-[120px] h-[30px]">
+                      {/* Imagen de fondo (barr.png) */}
+                      <Image 
+                        src="/assets/ui/game-container/barr.png" 
+                        alt="Hacker Energy Bar Background" 
+                        width={120} 
+                        height={30}
+                        className="absolute inset-0 w-full h-full"
+                        onLoad={() => console.log('[HACKER UI] Imagen barr cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen barr:', e)}
+                      />
+                      
+                      {/* Barra de progreso (progress_barr.png) con 5 saltos */}
+                      <Image 
+                        src="/assets/ui/game-container/progress_barr.png" 
+                        alt="Hacker Energy Progress" 
+                        width={120} 
+                        height={30}
+                        className="absolute inset-0 w-full h-full"
+                        style={{
+                          clipPath: `inset(0 ${100 - (hackerEnergyCollected * 20)}% 0 0)`,
+                          transition: 'clip-path 0.3s ease-in-out'
+                        }}
+                        onLoad={() => console.log('[HACKER UI] Imagen progress_barr cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen progress_barr:', e)}
+                      />
+                      
+                      {/* Efecto de brillo cuando está lleno */}
+                      {hackerEnergyCollected >= 5 && (
+                        <div 
+                          className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-red-500 opacity-40 animate-pulse"
+                          style={{
+                            clipPath: 'inset(0 0% 0 0)'
                           }}
-                          onLoad={() => console.log(`[HACKER UI] Imagen barr cargada para slot ${slot}`)}
-                          onError={(e) => console.error(`[HACKER UI] Error cargando barr para slot ${slot}:`, e)}
                         />
-                        {/* Overlay de relleno cuando está activo */}
-                        {slot <= hackerEnergyCollected && (
-                          <div 
-                            className="absolute inset-0 rounded-sm"
-                            style={{ 
-                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.9))',
-                              boxShadow: 'inset 0 0 2px rgba(255, 255, 255, 0.3), 0 0 4px rgba(239, 68, 68, 0.6)'
-                            }}
-                          />
-                        )}
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                    
+                    {/* Contador de energía */}
+                    <div className="flex items-center space-x-1 h-[30px]">
+                      <span 
+                        className="text-white font-pixellari text-sm leading-none flex items-center justify-center h-full"
+                        style={{ transform: 'translateY(2px)' }}
+                      >
+                        {hackerEnergyCollected}/5
+                      </span>
+                      
+                      {/* Imagen de energía */}
+                      <Image 
+                        src="/assets/ui/game-container/energy_1.png" 
+                        alt="Energy" 
+                        width={20} 
+                        height={20}
+                        className="game-img flex-shrink-0"
+                        onLoad={() => console.log('[HACKER UI] Imagen energy_1 cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen energy_1:', e)}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -1802,37 +1831,66 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onError={(e) => console.error('[HACKER UI] Error cargando imagen pay_tariffs:', e)}
                     />
                   </div>
-                  {/* Barra de progreso usando imagen barr dividida en 5 huecos */}
-                  <div className="flex space-x-1">
-                    {[1, 2, 3, 4, 5].map((slot) => (
-                      <div key={slot} className="relative w-6 h-4">
-                        {/* Imagen de fondo (barr vacía) */}
-                        <Image 
-                          src="/assets/collectibles/barr.png" 
-                          alt="Energy Slot" 
-                          width={24} 
-                          height={16}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          style={{ 
-                            filter: slot <= hackerEnergyCollected 
-                              ? 'brightness(1.5) saturate(2) hue-rotate(0deg)' 
-                              : 'brightness(0.4) saturate(0.3) grayscale(0.8)'
+                  {/* Barra de progreso del hacker con progress_barr */}
+                  <div className="flex items-center space-x-2">
+                    <div className="relative w-[120px] h-[30px]">
+                      {/* Imagen de fondo (barr.png) */}
+                      <Image 
+                        src="/assets/ui/game-container/barr.png" 
+                        alt="Hacker Energy Bar Background" 
+                        width={120} 
+                        height={30}
+                        className="absolute inset-0 w-full h-full"
+                        onLoad={() => console.log('[HACKER UI] Imagen barr cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen barr:', e)}
+                      />
+                      
+                      {/* Barra de progreso (progress_barr.png) con 5 saltos */}
+                      <Image 
+                        src="/assets/ui/game-container/progress_barr.png" 
+                        alt="Hacker Energy Progress" 
+                        width={120} 
+                        height={30}
+                        className="absolute inset-0 w-full h-full"
+                        style={{
+                          clipPath: `inset(0 ${100 - (hackerEnergyCollected * 20)}% 0 0)`,
+                          transition: 'clip-path 0.3s ease-in-out'
+                        }}
+                        onLoad={() => console.log('[HACKER UI] Imagen progress_barr cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen progress_barr:', e)}
+                      />
+                      
+                      {/* Efecto de brillo cuando está lleno */}
+                      {hackerEnergyCollected >= 5 && (
+                        <div 
+                          className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-red-500 opacity-40 animate-pulse"
+                          style={{
+                            clipPath: 'inset(0 0% 0 0)'
                           }}
-                          onLoad={() => console.log(`[HACKER UI] Imagen barr cargada para slot ${slot}`)}
-                          onError={(e) => console.error(`[HACKER UI] Error cargando barr para slot ${slot}:`, e)}
                         />
-                        {/* Overlay de relleno cuando está activo */}
-                        {slot <= hackerEnergyCollected && (
-                          <div 
-                            className="absolute inset-0 rounded-sm"
-                            style={{ 
-                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.9))',
-                              boxShadow: 'inset 0 0 2px rgba(255, 255, 255, 0.3), 0 0 4px rgba(239, 68, 68, 0.6)'
-                            }}
-                          />
-                        )}
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                    
+                    {/* Contador de energía */}
+                    <div className="flex items-center space-x-1 h-[30px]">
+                      <span 
+                        className="text-white font-pixellari text-sm leading-none flex items-center justify-center h-full"
+                        style={{ transform: 'translateY(2px)' }}
+                      >
+                        {hackerEnergyCollected}/5
+                      </span>
+                      
+                      {/* Imagen de energía */}
+                      <Image 
+                        src="/assets/ui/game-container/energy_1.png" 
+                        alt="Energy" 
+                        width={20} 
+                        height={20}
+                        className="game-img flex-shrink-0"
+                        onLoad={() => console.log('[HACKER UI] Imagen energy_1 cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen energy_1:', e)}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
