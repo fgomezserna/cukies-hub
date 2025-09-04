@@ -153,8 +153,8 @@ export const useAudio = () => {
 
     const soundConfig = SOUND_CONFIG[soundType];
     
-    // Si es música y está desactivada, no reproducir (excepto game_over)
-    if (soundConfig.category === 'music' && !musicEnabledRef.current && soundType !== 'game_over') {
+    // Si es música y está desactivada, no reproducir
+    if (soundConfig.category === 'music' && !musicEnabledRef.current) {
       console.log(`🔇 Música desactivada, no reproduciendo: ${soundType}`);
       return;
     }
@@ -398,9 +398,15 @@ export const useAudio = () => {
   }, [stopSound]);
 
   // Función especial para reproducir sonido de game over
-  // Se reproduce independientemente del control de música y puede cortar la música actual
+  // Respeta el control de música - si está deshabilitado, no reproduce el sonido
   const playGameOverSound = useCallback(() => {
-    console.log('💀 Reproduciendo sonido de Game Over (independiente del control de música)');
+    // Verificar si la música está habilitada
+    if (!musicEnabledRef.current) {
+      console.log('🔇 Música desactivada, no reproduciendo sonido de Game Over');
+      return;
+    }
+    
+    console.log('💀 Reproduciendo sonido de Game Over');
     
     // Limpiar fade-out si está activo
     if (fadeIntervalRef.current) {
@@ -420,7 +426,7 @@ export const useAudio = () => {
       }
     }
     
-    // Reproducir game over directamente con playSound (no afectado por musicEnabled)
+    // Reproducir game over directamente con playSound
     const audio = audioInstancesRef.current.get('game_over');
     if (audio) {
       audio.currentTime = 0;

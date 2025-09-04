@@ -254,6 +254,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const inputState = useGameInput();
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
   
+  // Reset flags when starting a new game (moved after gameState initialization)
+  useEffect(() => {
+    if (gameState.status === 'countdown') {
+      setDamageFlag(0);
+      setEnergyCollectedFlag(0);
+    }
+  }, [gameState.status]);
+  
   // Ref para acceder al estado actual del juego en intervalos
   const gameStateRef = useRef(gameState);
   useEffect(() => {

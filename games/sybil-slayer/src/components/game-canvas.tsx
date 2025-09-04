@@ -1894,15 +1894,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [energyCollectedFlag]);
 
-  // Lanzar animación de daño solo cuando damageFlag cambie
+  // Lanzar animación de daño solo cuando damageFlag cambie Y el juego esté en 'playing'
   useEffect(() => {
-    if (damageFlag && damageFlag > 0) {
+    if (damageFlag && damageFlag > 0 && gameState.status === 'playing') {
       // FIJO: Usar Date.now() para que las animaciones funcionen correctamente
       setDamageEffect({ active: true, start: Date.now() });
       console.log('💥 Efecto de daño activado');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [damageFlag]);
+  }, [damageFlag, gameState.status]);
+
+  // Limpiar efecto de daño cuando el juego no esté en 'playing'
+  useEffect(() => {
+    if (gameState.status !== 'playing' && damageEffect) {
+      setDamageEffect(null);
+      console.log('🧹 Efecto de daño limpiado - juego no está en playing');
+    }
+  }, [gameState.status, damageEffect]);
 
   // Función para agregar una nueva explosión verde
   const addGreenExplosion = useCallback((x: number, y: number, type: 'heart' | 'megaNode' | 'purr' | 'vaul') => {
@@ -2411,8 +2419,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Reset shadow
     ctx.shadowBlur = 0;
 
-    // Dibujar efecto de daño si está activo (flash)
-    if (damageEffect && damageEffect.active && damageImgRef.current) {
+    // Dibujar efecto de daño si está activo (flash) - SOLO durante 'playing'
+    if (damageEffect && damageEffect.active && damageImgRef.current && gameState.status === 'playing') {
       const now = Date.now();
       const elapsed = now - damageEffect.start;
       if (elapsed < 1000) {
