@@ -38,6 +38,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Estado para notificar daño
   const [damageFlag, setDamageFlag] = useState(0);
   
+  // Estado para rastrear la energía recolectada por el hacker
+  const [hackerEnergyCollected, setHackerEnergyCollected] = useState(0);
+  const [hackerActive, setHackerActive] = useState(false);
+  
   // Estado para controlar el modal de información
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   
@@ -543,6 +547,32 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       lastLevelRef.current = gameState.level;
     }
   }, [gameState.level, playSound]);
+
+  // Rastrear el estado del hacker y su energía recolectada
+  useEffect(() => {
+    const activeHacker = gameState.obstacles.find(obstacle => 
+      obstacle.type === 'hacker' && 
+      !obstacle.isBanished && 
+      !obstacle.isRetreating
+    );
+    
+    if (activeHacker) {
+      console.log(`[HACKER UI] Hacker activo detectado - Energía recolectada: ${activeHacker.energyCollected || 0}`);
+      setHackerActive(true);
+      setHackerEnergyCollected(activeHacker.energyCollected || 0);
+    } else {
+      console.log(`[HACKER UI] No hay hacker activo`);
+      setHackerActive(false);
+      setHackerEnergyCollected(0);
+    }
+  }, [gameState.obstacles]);
+
+  // Log del estado del hacker para depuración
+  useEffect(() => {
+    if (hackerActive) {
+      console.log(`[HACKER UI] Hacker activo - Energía recolectada: ${hackerEnergyCollected}/5`);
+    }
+  }, [hackerActive, hackerEnergyCollected]);
 
   // Detectar cuando un fee causa daño
   useEffect(() => {
@@ -1134,7 +1164,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             </div>
             
             {/* Botones principales */}
-            <div className="flex space-x-8 mb-3 justify-center">
+            <div className="flex space-x-8 mb-3 justify-center items-center">
               <button 
                 onClick={handleStartPauseClick} 
                 className="focus:outline-none game-button"
@@ -1161,6 +1191,60 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
               </button>
+              
+              {/* Indicador del hacker - solo visible cuando hay un hacker activo */}
+              {hackerActive && (
+                <div className="flex items-center space-x-2 ml-4">
+                  <div className="relative overflow-hidden" style={{ width: 120, height: 50 }}>
+                    <Image 
+                      src="/assets/collectibles/pay_tariffs.png" 
+                      alt="Pay Tariffs" 
+                      width={120} 
+                      height={100}
+                      className="game-img"
+                      style={{ 
+                        objectFit: 'cover',
+                        objectPosition: 'top center',
+                        transform: 'translateY(-25px)'
+                      }}
+                      onLoad={() => console.log('[HACKER UI] Imagen pay_tariffs cargada correctamente')}
+                      onError={(e) => console.error('[HACKER UI] Error cargando imagen pay_tariffs:', e)}
+                    />
+                  </div>
+                  {/* Barra de progreso usando imagen barr dividida en 5 huecos */}
+                  <div className="flex space-x-1">
+                    {[1, 2, 3, 4, 5].map((slot) => (
+                      <div key={slot} className="relative w-6 h-4">
+                        {/* Imagen de fondo (barr vacía) */}
+                        <Image 
+                          src="/assets/collectibles/barr.png" 
+                          alt="Energy Slot" 
+                          width={24} 
+                          height={16}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ 
+                            filter: slot <= hackerEnergyCollected 
+                              ? 'brightness(1.5) saturate(2) hue-rotate(0deg)' 
+                              : 'brightness(0.4) saturate(0.3) grayscale(0.8)'
+                          }}
+                          onLoad={() => console.log(`[HACKER UI] Imagen barr cargada para slot ${slot}`)}
+                          onError={(e) => console.error(`[HACKER UI] Error cargando barr para slot ${slot}:`, e)}
+                        />
+                        {/* Overlay de relleno cuando está activo */}
+                        {slot <= hackerEnergyCollected && (
+                          <div 
+                            className="absolute inset-0 rounded-sm"
+                            style={{ 
+                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.9))',
+                              boxShadow: 'inset 0 0 2px rgba(255, 255, 255, 0.3), 0 0 4px rgba(239, 68, 68, 0.6)'
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1669,7 +1753,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             </div>
             
             {/* Botones principales */}
-            <div className="flex space-x-8 mb-3 justify-center">
+            <div className="flex space-x-8 mb-3 justify-center items-center">
               <button 
                 onClick={handleStartPauseClick} 
                 className="focus:outline-none game-button"
@@ -1698,6 +1782,60 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
               </button>
+              
+              {/* Indicador del hacker - solo visible cuando hay un hacker activo */}
+              {hackerActive && (
+                <div className="flex items-center space-x-2 ml-4">
+                  <div className="relative overflow-hidden" style={{ width: 120, height: 50 }}>
+                    <Image 
+                      src="/assets/collectibles/pay_tariffs.png" 
+                      alt="Pay Tariffs" 
+                      width={120} 
+                      height={100}
+                      className="game-img"
+                      style={{ 
+                        objectFit: 'cover',
+                        objectPosition: 'top center',
+                        transform: 'translateY(-25px)'
+                      }}
+                      onLoad={() => console.log('[HACKER UI] Imagen pay_tariffs cargada correctamente')}
+                      onError={(e) => console.error('[HACKER UI] Error cargando imagen pay_tariffs:', e)}
+                    />
+                  </div>
+                  {/* Barra de progreso usando imagen barr dividida en 5 huecos */}
+                  <div className="flex space-x-1">
+                    {[1, 2, 3, 4, 5].map((slot) => (
+                      <div key={slot} className="relative w-6 h-4">
+                        {/* Imagen de fondo (barr vacía) */}
+                        <Image 
+                          src="/assets/collectibles/barr.png" 
+                          alt="Energy Slot" 
+                          width={24} 
+                          height={16}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ 
+                            filter: slot <= hackerEnergyCollected 
+                              ? 'brightness(1.5) saturate(2) hue-rotate(0deg)' 
+                              : 'brightness(0.4) saturate(0.3) grayscale(0.8)'
+                          }}
+                          onLoad={() => console.log(`[HACKER UI] Imagen barr cargada para slot ${slot}`)}
+                          onError={(e) => console.error(`[HACKER UI] Error cargando barr para slot ${slot}:`, e)}
+                        />
+                        {/* Overlay de relleno cuando está activo */}
+                        {slot <= hackerEnergyCollected && (
+                          <div 
+                            className="absolute inset-0 rounded-sm"
+                            style={{ 
+                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.9))',
+                              boxShadow: 'inset 0 0 2px rgba(255, 255, 255, 0.3), 0 0 4px rgba(239, 68, 68, 0.6)'
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
