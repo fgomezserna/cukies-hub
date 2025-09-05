@@ -1195,22 +1195,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {/* Indicador del hacker - solo visible cuando hay un hacker activo */}
               {hackerActive && (
                 <div className="flex items-center space-x-2 ml-4">
-                  <div className="relative overflow-hidden" style={{ width: 120, height: 50 }}>
-                    <Image 
-                      src="/assets/collectibles/pay_tariffs.png" 
-                      alt="Pay Tariffs" 
-                      width={120} 
-                      height={100}
-                      className="game-img"
-                      style={{ 
-                        objectFit: 'cover',
-                        objectPosition: 'top center',
-                        transform: 'translateY(-25px)'
-                      }}
-                      onLoad={() => console.log('[HACKER UI] Imagen pay_tariffs cargada correctamente')}
-                      onError={(e) => console.error('[HACKER UI] Error cargando imagen pay_tariffs:', e)}
-                    />
-                  </div>
+                                      <div className="relative" style={{ width: 60, height: 25 }}>
+                      <Image 
+                        src="/assets/collectibles/trump_imagen.png" 
+                        alt="Trump" 
+                        width={60} 
+                        height={25}
+                        className="game-img"
+                        style={{ 
+                          objectFit: 'contain',
+                          objectPosition: 'center center',
+                          transform: 'translateY(-12px)'
+                        }}
+                        onLoad={() => console.log('[HACKER UI] Imagen trump_imagen cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen trump_imagen:', e)}
+                      />
+                    </div>
                   {/* Barra de progreso del hacker con progress_barr */}
                   <div className="flex items-center space-x-2">
                     <div className="relative w-[120px] h-[30px]">
@@ -1225,9 +1225,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         onError={(e) => console.error('[HACKER UI] Error cargando imagen barr:', e)}
                       />
                       
-                      {/* Barra de progreso (progress_barr.png) con 5 saltos */}
+                      {/* Barra de progreso (barra_trump.png) con 5 saltos */}
                       <Image 
-                        src="/assets/ui/game-container/progress_barr.png" 
+                        src="/assets/ui/game-container/barra_trump_hacker.png" 
                         alt="Hacker Energy Progress" 
                         width={120} 
                         height={30}
@@ -1236,8 +1236,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                           clipPath: `inset(0 ${100 - (hackerEnergyCollected * 20)}% 0 0)`,
                           transition: 'clip-path 0.3s ease-in-out'
                         }}
-                        onLoad={() => console.log('[HACKER UI] Imagen progress_barr cargada correctamente')}
-                        onError={(e) => console.error('[HACKER UI] Error cargando imagen progress_barr:', e)}
+                        onLoad={() => console.log('[HACKER UI] Imagen barra_trump_hacker cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen barra_trump_hacker:', e)}
                       />
                       
                       {/* Efecto de brillo cuando está lleno */}
@@ -1815,22 +1815,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {/* Indicador del hacker - solo visible cuando hay un hacker activo */}
               {hackerActive && (
                 <div className="flex items-center space-x-2 ml-4">
-                  <div className="relative overflow-hidden" style={{ width: 120, height: 50 }}>
-                    <Image 
-                      src="/assets/collectibles/pay_tariffs.png" 
-                      alt="Pay Tariffs" 
-                      width={120} 
-                      height={100}
-                      className="game-img"
-                      style={{ 
-                        objectFit: 'cover',
-                        objectPosition: 'top center',
-                        transform: 'translateY(-25px)'
-                      }}
-                      onLoad={() => console.log('[HACKER UI] Imagen pay_tariffs cargada correctamente')}
-                      onError={(e) => console.error('[HACKER UI] Error cargando imagen pay_tariffs:', e)}
-                    />
-                  </div>
+                                      <div className="relative" style={{ width: 60, height: 25 }}>
+                      <Image 
+                        src="/assets/collectibles/trump_imagen.png" 
+                        alt="Trump" 
+                        width={60} 
+                        height={25}
+                        className="game-img"
+                        style={{ 
+                          objectFit: 'contain',
+                          objectPosition: 'center center',
+                          transform: 'translateY(-12px)'
+                        }}
+                        onLoad={() => console.log('[HACKER UI] Imagen trump_imagen cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen trump_imagen:', e)}
+                      />
+                    </div>
                   {/* Barra de progreso del hacker con progress_barr */}
                   <div className="flex items-center space-x-2">
                     <div className="relative w-[120px] h-[30px]">
@@ -1845,9 +1845,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         onError={(e) => console.error('[HACKER UI] Error cargando imagen barr:', e)}
                       />
                       
-                      {/* Barra de progreso (progress_barr.png) con 5 saltos */}
+                      {/* Barra de progreso (barra_trump.png) con 5 saltos */}
                       <Image 
-                        src="/assets/ui/game-container/progress_barr.png" 
+                        src="/assets/ui/game-container/barra_trump_hacker.png" 
                         alt="Hacker Energy Progress" 
                         width={120} 
                         height={30}
@@ -1856,8 +1856,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                           clipPath: `inset(0 ${100 - (hackerEnergyCollected * 20)}% 0 0)`,
                           transition: 'clip-path 0.3s ease-in-out'
                         }}
-                        onLoad={() => console.log('[HACKER UI] Imagen progress_barr cargada correctamente')}
-                        onError={(e) => console.error('[HACKER UI] Error cargando imagen progress_barr:', e)}
+                        onLoad={() => console.log('[HACKER UI] Imagen barra_trump_hacker cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen barra_trump_hacker:', e)}
                       />
                       
                       {/* Efecto de brillo cuando está lleno */}
