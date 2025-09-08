@@ -59,15 +59,12 @@ export async function sendMessageToTelegram(
       parse_mode: 'HTML',
     };
 
-    // Add topic threading if available
+    // Add topic threading if available (optional for non-forum groups)
     if (room.telegramTopicId) {
       payload.message_thread_id = room.telegramTopicId;
+      console.log(`📍 Using topic ID: ${room.telegramTopicId}`);
     } else {
-      // For forum groups, we need to specify a topic ID
-      // Use a default topic or create one specifically for games
-      // For now, we'll skip sending to Telegram if no topic is configured
-      console.warn('No topic configured for forum group, skipping Telegram send');
-      return { ok: false, error_code: 400, description: 'No topic configured for forum group' };
+      console.log('⚠️ No topic ID configured, sending to main chat');
     }
 
     // Add reply if specified
@@ -102,12 +99,17 @@ export async function processTelegramMessage(telegramMessage: TelegramMessage): 
       text: telegramMessage.text.slice(0, 50)
     });
 
-    // Find the chat room by Telegram group ID and topic ID
+    // Find the chat room by Telegram group ID and topic ID (if available)
     const room = await prisma.chatRoom.findFirst({
       where: {
         telegramGroupId: telegramMessage.chat.id.toString(),
+        // Match topic ID if both the message and room have topic IDs
+        // If no topic IDs, match the first room for this group
         ...(telegramMessage.message_thread_id && {
-          telegramTopicId: telegramMessage.message_thread_id,
+          OR: [
+            { telegramTopicId: telegramMessage.message_thread_id },
+            { telegramTopicId: null } // Fallback to rooms without topics
+          ]
         }),
       },
     });
