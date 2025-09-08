@@ -1,4 +1,4 @@
-# Pusher Fix Test
+# Pusher Fix Test v1
 
 ## What was fixed:
 1. **Issue**: The dapp was connecting to Pusher without sending the `session_token`, causing authentication failures with "missing" token.
