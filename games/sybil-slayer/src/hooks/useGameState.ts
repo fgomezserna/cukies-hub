@@ -171,9 +171,9 @@ const getHackerAccelerationForLevel = (level: number) => {
 };
 
 // --- FASE 2: ESCALADO DE ENERGÍA ---
-const getInitialEnergyForLevel = (level: number) => Math.max(2, INITIAL_ENERGY_POINTS - (level - 1)); // Disminuye 1 por nivel, mínimo 2
-const getMaxEnergyForLevel = (level: number) => Math.max(3, MAX_ENERGY_POINTS - (level - 1) * 2); // Disminuye 2 por nivel, mínimo 3
-const getEnergyRespawnChanceForLevel = (level: number) => Math.max(0.08, 0.5 - (level - 1) * 0.08); // AUMENTADO: Más probabilidad para más energy manteniendo separación
+const getInitialEnergyForLevel = (level: number) => INITIAL_ENERGY_POINTS; // Siempre 10 energy iniciales, independiente del nivel
+const getMaxEnergyForLevel = (level: number) => MAX_ENERGY_POINTS; // Siempre mantener exactamente 10 energy en pantalla
+const getEnergyRespawnChanceForLevel = (level: number) => 1.0; // Siempre respawn inmediato para mantener 10 energy
 
 // --- FASE 3: ESCALADO DE CHECKPOINTS ---
 const getCheckpointCooldownForLevel = (level: number) => 15 + (level - 1) * 5; // Cooldown en segundos, aumenta 5s por nivel
@@ -2006,13 +2006,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                newToken.boostTimer = MEGA_NODE_BOOST_DURATION_MS; // Duración total
            }
            if (collectible.type === 'energy'){
-                 // MEJORADO: Crear energy de reemplazo con verificación de distancia
+                 // MEJORADO: Crear energy de reemplazo con verificación de distancia, incluyendo obstáculos
                  const replacementEnergy = safeSpawnCollectible(
                    createEnergyCollectible, 
                    generateId(), 
                    prev.canvasSize.width, 
                    prev.canvasSize.height, 
-                   [...remainingCollectibles, newToken]
+                   [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
                  );
                  remainingCollectibles.push(replacementEnergy);
             }
@@ -2028,13 +2028,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            if (checkCollision(newToken, collectible) && collectible.type !== 'vaul') {
              // Si es energía, spawneamos una nueva en otro lugar
              if (collectible.type === 'energy') {
-               // MEJORADO: Crear energy de reemplazo con verificación de distancia
+               // MEJORADO: Crear energy de reemplazo con verificación de distancia, incluyendo obstáculos
                const replacementEnergy = safeSpawnCollectible(
                  createEnergyCollectible, 
                  generateId(), 
                  prev.canvasSize.width, 
                  prev.canvasSize.height, 
-                 [...remainingCollectibles, newToken]
+                 [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
                );
                remainingCollectibles.push(replacementEnergy);
              }
@@ -2282,17 +2282,21 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       // --- Aparición de energía (respawn) ---
       const maxEnergy = getMaxEnergyForLevel(currentLevel);
-      const energyCount = newCollectibles.filter(c => c.type === 'energy').length;
-      if (energyCount < maxEnergy && Math.random() < getEnergyRespawnChanceForLevel(currentLevel)) {
-        // MEJORADO: Crear energy con verificación de distancia para evitar solapamiento
+      let energyCount = remainingCollectibles.filter(c => c.type === 'energy').length;
+      
+      // Siempre mantener exactamente 10 energy en pantalla
+      while (energyCount < maxEnergy) {
+        // MEJORADO: Crear energy con verificación de distancia para evitar solapamiento, incluyendo obstáculos
         const newEnergy = safeSpawnCollectible(
           createEnergyCollectible, 
           generateId(), 
           prev.canvasSize.width, 
           prev.canvasSize.height, 
-          [...remainingCollectibles, newToken] // Verificar distancia con energy existentes y token
+          [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
         );
         remainingCollectibles.push(newEnergy);
+        // Actualizar el contador para el siguiente ciclo
+        energyCount = remainingCollectibles.filter(c => c.type === 'energy').length;
       }
 
       // --- Lógica del multiplicador de vaul ---

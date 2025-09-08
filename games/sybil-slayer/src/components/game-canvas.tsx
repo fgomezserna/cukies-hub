@@ -469,15 +469,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     purrSprite3.src = '/assets/collectibles/purr/purr_3.png';
 
-    const purrSprite4 = new Image();
-    purrSprite4.onload = () => {
-      purrSprite4Ref.current = purrSprite4;
-      console.log('✅ Purr sprite 4 cargado correctamente');
-    };
-    purrSprite4.onerror = (e) => {
-      console.error('❌ Error cargando purr sprite 4:', e);
-    };
-    purrSprite4.src = '/assets/collectibles/purr/purr_4.png';
+    // purrSprite4 no existe, solo tenemos purr_1, purr_2 y purr_3
+    // const purrSprite4 = new Image();
+    // purrSprite4.onload = () => {
+    //   purrSprite4Ref.current = purrSprite4;
+    //   console.log('✅ Purr sprite 4 cargado correctamente');
+    // };
+    // purrSprite4.onerror = (e) => {
+    //   console.error('❌ Error cargando purr sprite 4:', e);
+    // };
+    // purrSprite4.src = '/assets/collectibles/purr/purr_4.png';
     
     // Cargar sprites animados del bug
     const bugSprite1 = new Image();
@@ -1526,7 +1527,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          } else if (frameIndex === 2) {
            spriteImg = purrSprite3Ref.current;
          } else {
-           spriteImg = purrSprite4Ref.current;
+           // Solo tenemos 3 sprites de purr, usar el sprite 3 como fallback
+           spriteImg = purrSprite3Ref.current;
          }
          
          // Usar el sprite si está disponible, de lo contrario usar la imagen estática
@@ -1556,8 +1558,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              console.warn('⚠️ Sprite #2 para purr no disponible');
            } else if (frameIndex === 2 && !purrSprite3Ref.current) {
              console.warn('⚠️ Sprite #3 para purr no disponible');
-           } else if (frameIndex === 3 && !purrSprite4Ref.current) {
-             console.warn('⚠️ Sprite #4 para purr no disponible');
            }
            
            // Dibujar el sprite fallback
@@ -1894,15 +1894,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [energyCollectedFlag]);
 
-  // Lanzar animación de daño solo cuando damageFlag cambie
+  // Lanzar animación de daño solo cuando damageFlag cambie Y el juego esté en 'playing'
   useEffect(() => {
-    if (damageFlag && damageFlag > 0) {
+    if (damageFlag && damageFlag > 0 && gameState.status === 'playing') {
       // FIJO: Usar Date.now() para que las animaciones funcionen correctamente
       setDamageEffect({ active: true, start: Date.now() });
       console.log('💥 Efecto de daño activado');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [damageFlag]);
+  }, [damageFlag, gameState.status]);
+
+  // Limpiar efecto de daño cuando el juego no esté en 'playing'
+  useEffect(() => {
+    if (gameState.status !== 'playing' && damageEffect) {
+      setDamageEffect(null);
+      console.log('🧹 Efecto de daño limpiado - juego no está en playing');
+    }
+  }, [gameState.status, damageEffect]);
 
   // Función para agregar una nueva explosión verde
   const addGreenExplosion = useCallback((x: number, y: number, type: 'heart' | 'megaNode' | 'purr' | 'vaul') => {
@@ -2411,8 +2419,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Reset shadow
     ctx.shadowBlur = 0;
 
-    // Dibujar efecto de daño si está activo (flash)
-    if (damageEffect && damageEffect.active && damageImgRef.current) {
+    // Dibujar efecto de daño si está activo (flash) - SOLO durante 'playing'
+    if (damageEffect && damageEffect.active && damageImgRef.current && gameState.status === 'playing') {
       const now = Date.now();
       const elapsed = now - damageEffect.start;
       if (elapsed < 1000) {
@@ -2476,8 +2484,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       '/assets/collectibles/mega_node_3.png',
       '/assets/collectibles/purr/purr_1.png',
       '/assets/collectibles/purr/purr_2.png',
-      '/assets/collectibles/purr/purr_3.png',
-      '/assets/collectibles/purr/purr_4.png'
+      '/assets/collectibles/purr/purr_3.png'
     ];
     
     sprites.forEach(src => {
@@ -2490,7 +2497,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         else if (src.includes('purr_1')) purrSprite1Ref.current = img;
         else if (src.includes('purr_2')) purrSprite2Ref.current = img;
         else if (src.includes('purr_3')) purrSprite3Ref.current = img;
-        else if (src.includes('purr_4')) purrSprite4Ref.current = img;
         console.log(`✅ Sprite ${src.split('/').pop()} precargado correctamente`);
       };
     });
@@ -2509,8 +2515,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       '/assets/collectibles/mega_node_3.png',
       '/assets/collectibles/purr/purr_1.png',
       '/assets/collectibles/purr/purr_2.png',
-      '/assets/collectibles/purr/purr_3.png',
-      '/assets/collectibles/purr/purr_4.png'
+      '/assets/collectibles/purr/purr_3.png'
     ];
     
     return Promise.all(prioritySprites.map(src => new Promise((resolve, reject) => {
@@ -2523,7 +2528,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         else if (src.includes('purr_1')) purrSprite1Ref.current = img;
         else if (src.includes('purr_2')) purrSprite2Ref.current = img;
         else if (src.includes('purr_3')) purrSprite3Ref.current = img;
-        else if (src.includes('purr_4')) purrSprite4Ref.current = img;
         console.log(`✅ Sprite prioritario ${src.split('/').pop()} precargado`);
         resolve(img);
       };
