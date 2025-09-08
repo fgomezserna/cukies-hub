@@ -50,11 +50,11 @@ export function useGameConnection() {
     token?: string;
   }>({
     isAuthenticated: true, // Default to authenticated for Pusher system
-    user: sessionData?.user || null,
+    user: null, // User data is not available in game context
   });
 
   // Use ref instead of state for checkpoint interval to avoid re-renders
-  const checkpointIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const checkpointIntervalRef = useRef<NodeJS.Timeout | (() => void) | null>(null);
 
   // Generate checkpoint hash
   const generateCheckpointHash = useCallback((checkpoint: any): string => {
@@ -109,7 +109,11 @@ export function useGameConnection() {
 
     // Clear checkpoint interval
     if (checkpointIntervalRef.current) {
-      clearInterval(checkpointIntervalRef.current);
+      if (typeof checkpointIntervalRef.current === 'function') {
+        checkpointIntervalRef.current();
+      } else {
+        clearInterval(checkpointIntervalRef.current);
+      }
       checkpointIntervalRef.current = null;
     }
   }, [sendGameEnd]);
@@ -121,14 +125,18 @@ export function useGameConnection() {
   const startCheckpointInterval = useCallback((getCurrentScore: () => number, getCurrentGameTime: () => number) => {
     // Clear existing interval if any
     if (checkpointIntervalRef.current) {
-      clearInterval(checkpointIntervalRef.current);
+      if (typeof checkpointIntervalRef.current === 'function') {
+        checkpointIntervalRef.current();
+      } else {
+        clearInterval(checkpointIntervalRef.current);
+      }
     }
 
     // Use the Pusher checkpoint interval system
     const stopInterval = pusherStartCheckpointInterval(getCurrentScore, getCurrentGameTime, 5000);
     
     // Store the stop function in ref for cleanup
-    checkpointIntervalRef.current = stopInterval as any;
+    checkpointIntervalRef.current = stopInterval;
   }, [pusherStartCheckpointInterval]);
 
   // Stop periodic checkpoints
@@ -150,7 +158,7 @@ export function useGameConnection() {
     if (sessionData) {
       setAuthState({
         isAuthenticated: true,
-        user: sessionData.user || { id: 'game-user' },
+        user: { id: 'game-user' }, // User data is not available in game context
         token: sessionData.sessionToken
       });
     }
@@ -160,7 +168,11 @@ export function useGameConnection() {
   useEffect(() => {
     return () => {
       if (checkpointIntervalRef.current) {
-        clearInterval(checkpointIntervalRef.current);
+        if (typeof checkpointIntervalRef.current === 'function') {
+          checkpointIntervalRef.current();
+        } else {
+          clearInterval(checkpointIntervalRef.current);
+        }
       }
     };
   }, []);

@@ -427,7 +427,7 @@ export function usePusherConnection() {
           console.log(`🔄 [GAME-PUSHER] Retrying game end in 1s (attempt ${attempt + 1}/${maxAttempts})`);
           setTimeout(() => {
             // Check if we still have the same session before retrying
-            if (sessionDataRef.current?.sessionId === sessionData.sessionId) {
+            if (sessionDataRef.current?.sessionId === sessionData?.sessionId) {
               attemptSend(attempt + 1, maxAttempts);
             } else {
               console.log('🚫 [GAME-PUSHER] Session changed, cancelling retry');
@@ -467,7 +467,7 @@ export function usePusherConnection() {
           console.log(`🔄 [GAME-PUSHER] Retrying game end in 1s (attempt ${attempt + 1}/${maxAttempts})`);
           setTimeout(() => {
             // Check if we still have the same session before retrying
-            if (sessionDataRef.current?.sessionId === sessionData.sessionId) {
+            if (sessionDataRef.current?.sessionId === sessionData?.sessionId) {
               attemptSend(attempt + 1, maxAttempts);
             } else {
               console.log('🚫 [GAME-PUSHER] Session changed, cancelling retry');
@@ -487,7 +487,7 @@ export function usePusherConnection() {
     };
 
     return attemptSend();
-  }, [connectionState, sessionData.sessionId]);
+  }, [connectionState, sessionData?.sessionId]);
 
   // Send honeypot trigger to dapp
   const sendHoneypotTrigger = useCallback((event: string) => {
