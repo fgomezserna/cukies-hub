@@ -86,3 +86,4 @@ Los logs aparecen en la consola del servidor Next.js con prefijos:
 
 ¡El bridge está listo para producción! 🚀
 
+
