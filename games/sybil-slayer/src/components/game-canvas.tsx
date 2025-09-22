@@ -207,6 +207,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   // Estado para controlar la animación de daño
   const [damageEffect, setDamageEffect] = React.useState<{active: boolean, start: number} | null>(null);
   const prevDamageTimeRef = useRef<number>(0);
+  const prevDamageFlagRef = useRef(damageFlag);
   
   // Rastrear los collectibles previos para detectar desapariciones
   const prevCollectiblesRef = useRef<Collectible[]>([]);
@@ -1896,12 +1897,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
   // Lanzar animación de daño solo cuando damageFlag cambie Y el juego esté en 'playing'
   useEffect(() => {
-    if (damageFlag && damageFlag > 0 && gameState.status === 'playing') {
-      // FIJO: Usar Date.now() para que las animaciones funcionen correctamente
-      setDamageEffect({ active: true, start: Date.now() });
-      console.log('💥 Efecto de daño activado');
+    const prevDamageFlag = prevDamageFlagRef.current;
+    if (damageFlag === prevDamageFlag) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    prevDamageFlagRef.current = damageFlag;
+
+    if (!damageFlag || damageFlag <= 0) return;
+    if (gameState.status !== 'playing') return;
+
+    // FIJO: Usar Date.now() para que las animaciones funcionen correctamente
+    setDamageEffect({ active: true, start: Date.now() });
+    console.log('💥 Efecto de daño activado');
   }, [damageFlag, gameState.status]);
 
   // Limpiar efecto de daño cuando el juego no esté en 'playing'
