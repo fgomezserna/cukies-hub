@@ -70,7 +70,7 @@ export interface Obstacle extends GameObject {
   energyCollected?: number; // Cantidad de energy que ha recogido este hacker
 }
 
-export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul';
+export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki';
 
 // Tipos para efectos visuales
 export interface VisualEffect {

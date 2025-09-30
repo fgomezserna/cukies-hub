@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useCallback } from 'react';
+import { assetLoader } from '@/lib/assetLoader';
 import type { GameState, Token, Obstacle, Collectible, DirectionType } from '@/types/game';
 import {
     TOKEN_COLOR, FEE_COLOR, BUG_COLOR, HACKER_COLOR,
@@ -376,33 +377,41 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       }
     });
     
-    // Cargar sprites animados del token (personaje principal)
-    directions.forEach(direction => {
-      for (let i = 1; i <= 6; i++) {
+    // Cargar sprites del nuevo personaje Cukie (8 frames por dirección)
+    const cukieMap: Record<DirectionType, {dir: string, abbr: string}> = {
+      up: { dir: 'north', abbr: 'n' },
+      down: { dir: 'south', abbr: 's' },
+      left: { dir: 'west', abbr: 'w' },
+      right: { dir: 'east', abbr: 'e' }
+    };
+
+    (Object.keys(cukieMap) as DirectionType[]).forEach(direction => {
+      const { dir, abbr } = cukieMap[direction];
+      for (let i = 1; i <= 8; i++) {
         const img = new Image();
-        img.src = `/assets/characters/tokensprites/token_${direction}_${i}.png`;
+        const pad = i.toString().padStart(2, '0');
+        img.src = `/assets/characters/cukiesprites/${dir}/cukie_walk_${abbr}_${pad}.png`;
         img.onload = () => {
           tokenSpritesRef.current[direction][i-1] = img;
-        };
-      }
-    });
-    // Cargar sprites de boost (run)
-    directions.forEach(direction => {
-      for (let i = 1; i <= 6; i++) {
-        const img = new Image();
-        img.src = `/assets/characters/tokensprites/token_run_${direction}_${i}.png`;
-        img.onload = () => {
-          tokenRunSpritesRef.current[direction][i-1] = img;
+          tokenRunSpritesRef.current[direction][i-1] = img; // usar mismos frames para run
         };
       }
     });
     
-    // Cargar sprites animados de energía
+    // Cargar sprites de energía como recurso (usar una sola imagen para todos los frames)
     for (let i = 1; i <= 6; i++) {
       const img = new Image();
-      img.src = `/assets/collectibles/energy/energy_${i}.png`;
+      img.src = '/assets/collectibles/resource_rare_metals.png';
       img.onload = () => {
         energySpritesRef.current[i-1] = img;
+      };
+      img.onerror = () => {
+        // Fallback: usar sprites antiguos si la gema no existe
+        const fallback = new Image();
+        fallback.src = `/assets/collectibles/energy/energy_${i}.png`;
+        fallback.onload = () => {
+          energySpritesRef.current[i-1] = fallback;
+        };
       };
     }
     
@@ -1251,6 +1260,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            break;
          case 'vaul':
            img = vaulImgRef.current;
+           break;
+         case 'uki':
+           // Usar imagen de uki.png
+           img = assetLoader.getAsset('uki');
            break;
          case 'checkpoint':
            // Para checkpoint, usar el primer sprite de energía como fallback

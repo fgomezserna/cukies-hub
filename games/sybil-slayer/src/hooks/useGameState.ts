@@ -8,10 +8,10 @@ import {
   COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
   CHECKPOINT_APPEAR_THRESHOLD, CHECKPOINT_TIME_BONUS_START, CHECKPOINT_TIME_BONUS_STEP, CHECKPOINT_TIME_BONUS_MIN,
   HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_MULTIPLIER, VAUL_DURATION_MS, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
-  COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS,
+  COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS
 } from '../lib/constants';
-import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
+import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
 
 const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
@@ -1979,10 +1979,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              
              continue;
            }
-           if (collectible.type === 'energy') {
-             if (onEnergyCollected) onEnergyCollected();
-           }
-           if (collectible.type === 'heart') {
+          if (collectible.type === 'energy') {
+            if (onEnergyCollected) onEnergyCollected();
+          }
+          if (collectible.type === 'uki') {
+            console.log("Uki collected! +5 points.");
+            onPlaySound?.('energy_collect'); // Usar mismo sonido que energy
+          }
+          if (collectible.type === 'heart') {
              if (hearts < 3) {
                hearts++;
                console.log(`[HEART] ❤️ Corazón recogido! Reproduciendo life.mp3`);
@@ -2016,6 +2020,17 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  );
                  remainingCollectibles.push(replacementEnergy);
             }
+            if (collectible.type === 'uki'){
+                 // Crear uki de reemplazo con verificación de distancia, incluyendo obstáculos
+                 const replacementUki = safeSpawnCollectible(
+                   createUkiCollectible, 
+                   generateId(), 
+                   prev.canvasSize.width, 
+                   prev.canvasSize.height, 
+                   [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+                 );
+                 remainingCollectibles.push(replacementUki);
+            }
          } 
        }
 
@@ -2037,6 +2052,18 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
                );
                remainingCollectibles.push(replacementEnergy);
+             }
+             // Si es uki, spawneamos una nueva en otro lugar
+             if (collectible.type === 'uki') {
+               // Crear uki de reemplazo con verificación de distancia, incluyendo obstáculos
+               const replacementUki = safeSpawnCollectible(
+                 createUkiCollectible, 
+                 generateId(), 
+                 prev.canvasSize.width, 
+                 prev.canvasSize.height, 
+                 [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+               );
+               remainingCollectibles.push(replacementUki);
              }
              // Los otros tipos no se añaden si fueron recogidos
              continue;
@@ -2297,6 +2324,24 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         remainingCollectibles.push(newEnergy);
         // Actualizar el contador para el siguiente ciclo
         energyCount = remainingCollectibles.filter(c => c.type === 'energy').length;
+      }
+
+      // --- Aparición de uki (respawn) ---
+      let ukiCount = remainingCollectibles.filter(c => c.type === 'uki').length;
+      
+      // Siempre mantener exactamente 3 uki en pantalla
+      while (ukiCount < MAX_UKI_POINTS) {
+        // Crear uki con verificación de distancia para evitar solapamiento
+        const newUki = safeSpawnCollectible(
+          createUkiCollectible, 
+          generateId(), 
+          prev.canvasSize.width, 
+          prev.canvasSize.height, 
+          [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+        );
+        remainingCollectibles.push(newUki);
+        // Actualizar el contador para el siguiente ciclo
+        ukiCount = remainingCollectibles.filter(c => c.type === 'uki').length;
       }
 
       // --- Lógica del multiplicador de vaul ---

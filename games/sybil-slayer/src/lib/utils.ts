@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Vector2D, GameObject } from "@/types/game";
 import { Obstacle, ObstacleType, Collectible, CollectibleType } from "@/types/game";
-import { ENERGY_POINT_RADIUS, ENERGY_POINT_COLOR, ENERGY_POINT_VALUE, MEGA_NODE_RADIUS, MEGA_NODE_COLOR, MEGA_NODE_VALUE, PURR_RADIUS, PURR_COLOR, PURR_VALUE, VAUL_RADIUS, VAUL_COLOR, VAUL_VALUE, FEE_RADIUS, BUG_RADIUS, HACKER_RADIUS, BUG_SAFE_ZONE } from "@/lib/constants";
+import { ENERGY_POINT_RADIUS, ENERGY_POINT_COLOR, ENERGY_POINT_VALUE, MEGA_NODE_RADIUS, MEGA_NODE_COLOR, MEGA_NODE_VALUE, PURR_RADIUS, PURR_COLOR, PURR_VALUE, VAUL_RADIUS, VAUL_COLOR, VAUL_VALUE, UKI_RADIUS, UKI_COLOR, UKI_VALUE, FEE_RADIUS, BUG_RADIUS, HACKER_RADIUS, BUG_SAFE_ZONE } from "@/lib/constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -178,6 +178,22 @@ export function createEnergyCollectible(id: string, canvasWidth: number, canvasH
     radius: ENERGY_POINT_RADIUS,
     color: ENERGY_POINT_COLOR,
     value: ENERGY_POINT_VALUE,
+    glow: false,
+  };
+}
+
+/**
+ * Creates a new uki collectible.
+ */
+export function createUkiCollectible(id: string, canvasWidth: number, canvasHeight: number): Collectible {
+  return {
+    id,
+    type: 'uki',
+    x: getRandomFloat(UKI_RADIUS, canvasWidth - UKI_RADIUS),
+    y: getRandomFloat(UKI_RADIUS, canvasHeight - UKI_RADIUS),
+    radius: UKI_RADIUS,
+    color: UKI_COLOR,
+    value: UKI_VALUE,
     glow: false,
   };
 }

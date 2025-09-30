@@ -38,7 +38,7 @@ export const MAX_OBSTACLES = 20; // Límite máximo de obstáculos permitidos
 // Collectible Properties
 export const ENERGY_POINT_RADIUS = 22; // Mantener
 export const ENERGY_POINT_COLOR = 'hsl(120 100% 60%)'; // Neon Green
-export const ENERGY_POINT_VALUE = 10;
+export const ENERGY_POINT_VALUE = 1;
 export const MEGA_NODE_RADIUS = 32; // Reducido de 44 a 32 para mejor homogeneidad
 export const MEGA_NODE_COLOR = 'hsl(210, 100%, 60%)'; // Cambiado de amarillo a azul para coincidir con el sprite (ballena)
 export const MEGA_NODE_VALUE = 0; // Cambiado a 0, solo proporciona boost sin puntos
@@ -53,12 +53,18 @@ export const VAUL_DURATION_MS = 7000; // 7 segundos de duración del multiplicad
 export const VAUL_ACTIVATION_TIME_MS = 3000; // 3 segundos para llenar la barra completamente
 export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 3 segundos exactos
 
+// Uki Properties
+export const UKI_RADIUS = 25; // Tamaño similar a energy
+export const UKI_COLOR = 'hsl(200, 100%, 60%)'; // Color azul para diferenciarlo
+export const UKI_VALUE = 5; // 5 puntos cuando lo recoge el token
+
 // Collectible Spawning
 export const INITIAL_ENERGY_POINTS = 10; // Siempre 10 energy iniciales
 export const MEGA_NODE_SPAWN_CHANCE = 0.0005; // Reducido de 0.002 a 0.0005 (4 veces menos frecuente)
 export const PURR_SPAWN_CHANCE = 0.0003; // Reducido de 0.0015 a 0.0003 (5 veces menos frecuente)
 export const VAUL_SPAWN_CHANCE = 0.0002; // Reducido de 0.001 a 0.0002 (5 veces menos frecuente)
 export const MAX_ENERGY_POINTS = 10; // Siempre mantener exactamente 10 energy en pantalla
+export const MAX_UKI_POINTS = 3; // Siempre mantener exactamente 3 uki en pantalla
 
 // Tiempo de vida en ms para Mega_node y Heart
 export const COLLECTIBLE_LIFETIME_MS = 10000; // 10 segundos

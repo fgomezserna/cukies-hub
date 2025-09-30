@@ -1260,15 +1260,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         {hackerEnergyCollected}/5
                       </span>
                       
-                      {/* Imagen de energía */}
+                      {/* Imagen de energía (resource) */}
                       <Image 
-                        src="/assets/ui/game-container/energy_1.png" 
-                        alt="Energy" 
+                        src="/assets/collectibles/resource_rare_metals.png" 
+                        alt="Resource" 
                         width={20} 
                         height={20}
                         className="game-img flex-shrink-0"
-                        onLoad={() => console.log('[HACKER UI] Imagen energy_1 cargada correctamente')}
-                        onError={(e) => console.error('[HACKER UI] Error cargando imagen energy_1:', e)}
+                        onLoad={() => console.log('[HACKER UI] Imagen resource_rare_metals cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen resource_rare_metals:', e)}
                       />
                     </div>
                   </div>
@@ -1880,15 +1880,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         {hackerEnergyCollected}/5
                       </span>
                       
-                      {/* Imagen de energía */}
+                      {/* Imagen de energía (resource) */}
                       <Image 
-                        src="/assets/ui/game-container/energy_1.png" 
-                        alt="Energy" 
+                        src="/assets/collectibles/resource_rare_metals.png" 
+                        alt="Resource" 
                         width={20} 
                         height={20}
                         className="game-img flex-shrink-0"
-                        onLoad={() => console.log('[HACKER UI] Imagen energy_1 cargada correctamente')}
-                        onError={(e) => console.error('[HACKER UI] Error cargando imagen energy_1:', e)}
+                        onLoad={() => console.log('[HACKER UI] Imagen resource_rare_metals cargada correctamente')}
+                        onError={(e) => console.error('[HACKER UI] Error cargando imagen resource_rare_metals:', e)}
                       />
                     </div>
                   </div>

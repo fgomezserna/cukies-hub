@@ -25,6 +25,7 @@ export type AssetKey =
   | 'energy_point'
   | 'purr'
   | 'vaul'
+  | 'uki'
   
   // Efectos especiales  
   | 'jeff_goit'
@@ -71,7 +72,8 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   megaNode: { path: '/assets/collectibles/mega_node.png', priority: AssetPriority.HIGH, preload: true },
   checkpoint: { path: '/assets/collectibles/checkpoint.png', priority: AssetPriority.HIGH, preload: true },
   heart: { path: '/assets/collectibles/heart.png', priority: AssetPriority.HIGH, preload: true },
-  energy_point: { path: '/assets/collectibles/energy/energy_1.png', priority: AssetPriority.HIGH, preload: true },
+  energy_point: { path: '/assets/collectibles/resource_rare_metals.png', priority: AssetPriority.HIGH, preload: true },
+  uki: { path: '/assets/collectibles/uki.png', priority: AssetPriority.HIGH, preload: true },
   
   // BOTONES ESENCIALES
   play_button: { path: '/assets/ui/buttons/play-button.png', priority: AssetPriority.HIGH, preload: true },

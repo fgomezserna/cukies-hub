@@ -132,6 +132,39 @@ export class SpriteManager {
     return directionalSheets;
   }
 
+  // Cargar sprites del personaje Cukie con esquema propio de archivos
+  public async loadCukieDirectionalSprites(
+    keyPrefix: string,
+    framesPerDirection: number = 8
+  ): Promise<void> {
+    const configs = [
+      { dir: 'north', abbr: 'n', key: `${keyPrefix}_up` },
+      { dir: 'south', abbr: 's', key: `${keyPrefix}_down` },
+      { dir: 'west', abbr: 'w', key: `${keyPrefix}_left` },
+      { dir: 'east', abbr: 'e', key: `${keyPrefix}_right` }
+    ];
+
+    const pad2 = (n: number) => n.toString().padStart(2, '0');
+
+    const tasks = configs.map(async ({ dir, abbr, key }) => {
+      const frames: HTMLImageElement[] = [];
+      for (let i = 1; i <= framesPerDirection; i++) {
+        const path = `/assets/characters/cukiesprites/${dir}/cukie_walk_${abbr}_${pad2(i)}.png`;
+        try {
+          const img = await this.loadSingleSprite(path);
+          frames.push(img);
+        } catch (e) {
+          console.error(`❌ Error cargando Cukie sprite: ${path}`);
+        }
+      }
+      if (frames.length) {
+        this.spriteSheets.set(key, { frames, frameCount: frames.length });
+      }
+    });
+
+    await Promise.all(tasks);
+  }
+
   // Obtener sprite sheet
   public getSpriteSheet(key: string): SpriteSheet | null {
     return this.spriteSheets.get(key) || null;
@@ -201,10 +234,23 @@ export class SpriteManager {
     try {
       // Cargar sprites básicos de personajes
       loadPromises.push(
-        this.loadDirectionalSprites('/assets/characters/tokensprites/token', 6, 'token_normal'),
-        this.loadDirectionalSprites('/assets/characters/tokensprites/token_run', 6, 'token_run'),
+        // Nuevo personaje: Cukie (usa su propio esquema de nombres)
+        this.loadCukieDirectionalSprites('token'),
+        // Para animación de carrera reutilizamos la misma secuencia por ahora
+        this.loadCukieDirectionalSprites('token_run'),
         this.loadDirectionalSprites('/assets/characters/feesprites/fee', 6, 'fee'),
-        this.loadSpriteSequence('/assets/collectibles/energy/energy', 6, 'energy'),
+        (async () => {
+          // Cargar una única imagen de recurso y duplicarla como 6 frames para 'energy'
+          try {
+            const resource = await this.loadSingleSprite('/assets/collectibles/resource_rare_metals.png');
+            const frames = Array.from({ length: 6 }, () => resource);
+            this.spriteSheets.set('energy', { frames, frameCount: 6 });
+            console.log("✅ SpriteSheet 'energy' cargado usando resource_rare_metals.png (6 frames repetidos)");
+          } catch (e) {
+            console.warn('⚠️ resource_rare_metals.png no encontrado, usando sprites antiguos de energy numerados');
+            await this.loadSpriteSequence('/assets/collectibles/energy/energy', 6, 'energy');
+          }
+        })(),
         this.loadSpriteSequence('/assets/collectibles/mega_node/mega_node', 3, 'mega_node'),
         this.loadSpriteSequence('/assets/collectibles/purr/purr', 3, 'purr'),
         this.loadSpriteSequence('/assets/characters/bug/bug', 3, 'bug')
