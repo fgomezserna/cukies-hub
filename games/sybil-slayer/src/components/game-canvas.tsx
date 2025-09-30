@@ -268,9 +268,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // ELIMINADO: Ya no necesitamos cargar la imagen estática de energía
     // porque ahora usamos sprites animados de energía
     
-    // Cargar imagen de mega nodo (coleccionable especial) - respaldo por si fallan los sprites
+    // Cargar imagen de Haku (antes mega node) - respaldo por si fallan los sprites
     const megaNodeImg = new Image();
-    megaNodeImg.src = '/assets/collectibles/mega_node.png';
+    megaNodeImg.src = '/assets/collectibles/haku.png';
     megaNodeImg.onload = () => {
       megaNodeImgRef.current = megaNodeImg;
     };
@@ -1265,6 +1265,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Usar imagen de uki.png
            img = assetLoader.getAsset('uki');
            break;
+        case 'treasure':
+          img = assetLoader.getAsset('treasure');
+          break;
          case 'checkpoint':
            // Para checkpoint, usar el primer sprite de energía como fallback
            img = energySpritesRef.current[0];
@@ -1385,8 +1388,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          
          return; // Importante: salir de la función para evitar redibujado
        }
-       // Animación de sprites para el mega nodo
-       else if ('type' in obj && obj.type === 'megaNode') {
+      // Render Haku (antes mega node) usando imagen estática haku.png
+      else if ('type' in obj && obj.type === 'megaNode') {
          ctx.save();
          ctx.translate(obj.x, obj.y);
          
@@ -1409,99 +1412,21 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          const tiltPeriod = 2200; // Período ligeramente diferente para que no coincida con el float vertical
          const tiltAngle = tiltAmplitude * Math.sin(gameTime / tiltPeriod * Math.PI * 2);
          ctx.rotate(tiltAngle);
-         
-         // Calcular el índice de frame actual para la animación (3 frames)
-         const frameIndex = Math.floor(gameTime / 300) % 3; // Cambio de frame cada 300ms
-         
-         // Tamaño fijo para el mega node
-         const baseSize = obj.radius * 2 * 1.2; // Un poco más grande para mejor visibilidad
-         
-         // Seleccionar el sprite basado en el frameIndex
-         let spriteImg = null;
-         if (frameIndex === 0) {
-           spriteImg = megaNodeSprite1Ref.current;
-         } else if (frameIndex === 1) {
-           spriteImg = megaNodeSprite2Ref.current;
-         } else {
-           spriteImg = megaNodeSprite3Ref.current;
-         }
-         
-         // Usar el sprite si está disponible, de lo contrario usar la imagen estática
-         if (spriteImg) {
-           // EFECTO DE PARPADEO: controlar la opacidad solo para esta imagen
-           if ('isBlinking' in obj && obj.isBlinking) {
-             // Parpadeo rápido: visible 200ms, invisible 200ms
-             const blinkCycle = Math.floor(Date.now() / 200) % 2;
-             const alpha = blinkCycle === 0 ? 0.3 : 1.0;
-             ctx.globalAlpha = alpha;
-           }
-           
-           // Dibujamos el sprite con el tamaño y posición adecuados
-           ctx.drawImage(spriteImg, -baseSize/2, -baseSize/2, baseSize, baseSize);
-           
-           // Restaurar alpha inmediatamente después de dibujar la imagen
-           ctx.globalAlpha = 1.0;
-           
-           // Añadir efecto de brillo / resplandor sutil alrededor para dar sensación submarina
-           ctx.shadowColor = 'rgba(80, 180, 255, 0.5)';
-           ctx.shadowBlur = 10 + 5 * Math.sin(Date.now() / 1000);
-         } else {
-           // Mostrar advertencia solo la primera vez (1 por cada sprite faltante)
-           if (frameIndex === 0 && !megaNodeSprite1Ref.current) {
-             console.warn('⚠️ Sprite #1 para mega_node no disponible');
-             // Intentar cargar en demanda como último recurso
-             const emergencySprite = new Image();
-             emergencySprite.src = '/assets/collectibles/mega_node/mega_node_1.png';
-             emergencySprite.onload = () => {
-               megaNodeSprite1Ref.current = emergencySprite;
-             };
-           } else if (frameIndex === 1 && !megaNodeSprite2Ref.current) {
-             console.warn('⚠️ Sprite #2 para mega_node no disponible');
-             // Intentar cargar en demanda como último recurso
-             const emergencySprite = new Image();
-             emergencySprite.src = '/assets/collectibles/mega_node/mega_node_2.png';
-             emergencySprite.onload = () => {
-               megaNodeSprite2Ref.current = emergencySprite;
-             };
-           } else if (frameIndex === 2 && !megaNodeSprite3Ref.current) {
-             console.warn('⚠️ Sprite #3 para mega_node no disponible');
-             // Intentar cargar en demanda como último recurso
-             const emergencySprite = new Image();
-             emergencySprite.src = '/assets/collectibles/mega_node/mega_node_3.png';
-             emergencySprite.onload = () => {
-               megaNodeSprite3Ref.current = emergencySprite;
-             };
-           }
-           
-           // Dibujar el sprite fallback como siempre (megaNode imagen fija, ya no usamos círculo)
-           if (img) {
-             // EFECTO DE PARPADEO para imagen fallback
-             if ('isBlinking' in obj && obj.isBlinking) {
-               const blinkCycle = Math.floor(Date.now() / 200) % 2;
-               const alpha = blinkCycle === 0 ? 0.3 : 1.0;
-               ctx.globalAlpha = alpha;
-             }
-             
-             ctx.drawImage(img, -baseSize/2, -baseSize/2, baseSize, baseSize);
-             ctx.globalAlpha = 1.0; // Restaurar alpha inmediatamente
-           } else {
-             // Si no tenemos ningún sprite disponible, usamos un sprite específico
-             // en lugar del círculo amarillo
-             const fallbackFrame = frameIndex % 3 + 1;
-             const fallbackSprite = new Image();
-             fallbackSprite.src = `/assets/collectibles/mega_node/mega_node_${fallbackFrame}.png`;
-             
-             // EFECTO DE PARPADEO para sprite fallback
-             if ('isBlinking' in obj && obj.isBlinking) {
-               const blinkCycle = Math.floor(Date.now() / 200) % 2;
-               const alpha = blinkCycle === 0 ? 0.3 : 1.0;
-               ctx.globalAlpha = alpha;
-             }
-             
-             ctx.drawImage(fallbackSprite, -baseSize/2, -baseSize/2, baseSize, baseSize);
-             ctx.globalAlpha = 1.0; // Restaurar alpha inmediatamente
-           }
-         }
+        
+        // Tamaño para Haku
+        const baseSize = obj.radius * 2 * 1.2; // Un poco más grande para mejor visibilidad
+        const hakuImg = megaNodeImgRef.current; // ahora apunta a haku.png
+        if (hakuImg) {
+          if ('isBlinking' in obj && obj.isBlinking) {
+            const blinkCycle = Math.floor(Date.now() / 200) % 2;
+            const alpha = blinkCycle === 0 ? 0.3 : 1.0;
+            ctx.globalAlpha = alpha;
+          }
+          ctx.drawImage(hakuImg, -baseSize/2, -baseSize/2, baseSize, baseSize);
+          ctx.globalAlpha = 1.0;
+          ctx.shadowColor = 'rgba(80, 180, 255, 0.5)';
+          ctx.shadowBlur = 10 + 5 * Math.sin(Date.now() / 1000);
+        }
          
          // Resetear sombra antes de restaurar contexto
          ctx.shadowBlur = 0;

@@ -109,7 +109,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Ref para rastrear si se recolectó un checkpoint
   const lastGlowTimerRef = useRef<number>(0);
   
-  // Ref para rastrear si se recolectó un mega node
+  // Ref para rastrear si se recolectó un Haku (antes mega node)
   const lastBoostTimerRef = useRef<number>(0);
   
   // Ref para rastrear si se recolectó purr
@@ -474,13 +474,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   }, [gameState.token.glow, gameState.token.glowTimer, playSound]);
 
-  // Detectar cuando se recoge un mega node
+  // Detectar cuando se recoge un Haku (antes mega node)
   useEffect(() => {
-    // Verificar si el token tiene boostTimer, lo que indica que se recogió un mega node
+    // Verificar si el token tiene boostTimer, lo que indica que se recogió un Haku
     if (gameState.token.boostTimer && gameState.token.boostTimer > 0) {
       // Si es un valor nuevo de boostTimer, considerarlo como una nueva recolección
       if (lastBoostTimerRef.current === 0 || gameState.token.boostTimer > lastBoostTimerRef.current) {
-        console.log("¡Mega Node recogido! Activando animación de whalechadmode por el lado derecho");
+        console.log("¡Haku recogido! Activando animación de whalechadmode por el lado derecho");
         
         // Reproducir sonidos
         playSound('mega_node_collect');

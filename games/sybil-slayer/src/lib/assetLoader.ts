@@ -26,6 +26,7 @@ export type AssetKey =
   | 'purr'
   | 'vaul'
   | 'uki'
+  | 'treasure'
   
   // Efectos especiales  
   | 'jeff_goit'
@@ -69,11 +70,12 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   fee: { path: '/assets/obstacles/fee.png', priority: AssetPriority.HIGH, preload: true },
   bug: { path: '/assets/obstacles/bug.png', priority: AssetPriority.HIGH, preload: true },
   hacker: { path: '/assets/obstacles/trump.png', priority: AssetPriority.HIGH, preload: true },
-  megaNode: { path: '/assets/collectibles/mega_node.png', priority: AssetPriority.HIGH, preload: true },
+  megaNode: { path: '/assets/collectibles/haku.png', priority: AssetPriority.HIGH, preload: true },
   checkpoint: { path: '/assets/collectibles/checkpoint.png', priority: AssetPriority.HIGH, preload: true },
   heart: { path: '/assets/collectibles/heart.png', priority: AssetPriority.HIGH, preload: true },
   energy_point: { path: '/assets/collectibles/resource_rare_metals.png', priority: AssetPriority.HIGH, preload: true },
   uki: { path: '/assets/collectibles/uki.png', priority: AssetPriority.HIGH, preload: true },
+  treasure: { path: '/assets/collectibles/tesoro.png', priority: AssetPriority.HIGH, preload: true },
   
   // BOTONES ESENCIALES
   play_button: { path: '/assets/ui/buttons/play-button.png', priority: AssetPriority.HIGH, preload: true },

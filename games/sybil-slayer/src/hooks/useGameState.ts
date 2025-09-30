@@ -11,8 +11,21 @@ import {
   COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS
 } from '../lib/constants';
-import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
+import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
+import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_FIRST_APPEAR_MIN_S, TREASURE_FIRST_APPEAR_MAX_S, TREASURE_NEXT_BLOCK_MIN_S, TREASURE_NEXT_BLOCK_MAX_S } from '../lib/constants';
+
+// --- TESORO: Estado de bloque secuencial ---
+const TREASURE_MS = TREASURE_LIFETIME_MS;
+const TREASURE_BLINK_MS = TREASURE_BLINK_WARNING_MS;
+
+interface TreasureBlockState {
+  active: boolean;
+  blockIndex: number; // 0 (ninguno), 1..3
+  blockCompletedCount: number; // bloques completos históricos
+  createdAt: number; // gameTime ms
+  nextBlockStartAt: number | null; // gameTime ms cuando debe aparecer el primer tesoro del próximo bloque
+}
 
 const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
   id: 'token',
@@ -74,9 +87,9 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
   return others.some(o => {
     // MEJORADO: Comprobar colisiones entre assets positivos y bugs
-    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint'].includes((obj as any).type);
+    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki'].includes((obj as any).type);
     const isBug = ('type' in o) && o.type === 'bug';
-    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint'].includes((o as any).type);
+    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki'].includes((o as any).type);
     const isObjBug = ('type' in obj) && (obj as any).type === 'bug';
     
     // Casos a verificar:
@@ -923,6 +936,25 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       }
 
     setGameState(prev => {
+      // --- TESORO: Estado persistente por referencias ---
+      // Guardamos el estado en una propiedad interna de prev para persistir entre frames
+      // @ts-ignore
+      if (!prev.__treasureBlock) {
+        const startNow = getGameTime();
+        (prev as any).__treasureBlock = {
+          active: false,
+          blockIndex: 0,
+          blockCompletedCount: 0,
+          createdAt: startNow,
+          nextBlockStartAt: startNow + (TREASURE_FIRST_APPEAR_MIN_S * 1000 + Math.random() * ((TREASURE_FIRST_APPEAR_MAX_S - TREASURE_FIRST_APPEAR_MIN_S) * 1000)),
+        } as TreasureBlockState;
+      }
+      const treasureState = (prev as any).__treasureBlock as TreasureBlockState;
+      // Si estamos en los primeros 2s de una nueva partida, garantizar que el contador esté a 0
+      const nowForReset = getGameTime();
+      if (prev.gameStartTime && (nowForReset - prev.gameStartTime) < 2000) {
+        treasureState.blockCompletedCount = 0;
+      }
       let lastDamageTime = prev.lastDamageTime;
       let lastDamageSource = prev.lastDamageSource;
       // Usar el ref si tiene valor, sino usar el del estado
@@ -1729,7 +1761,35 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       });
 
        // --- Update Collectibles (e.g., slight movement or effects) ---
-       let newCollectibles = [...prev.collectibles];
+      let newCollectibles = [...prev.collectibles];
+      // --- TESORO: helpers y disparo inicial ---
+      const spawnTreasure = (when: number) => {
+        newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
+        const t = createTreasureCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height, when);
+        newCollectibles.push(t);
+      };
+      const scheduleNextBlock = (nowMs: number) => {
+        const min = TREASURE_NEXT_BLOCK_MIN_S * 1000;
+        const max = TREASURE_NEXT_BLOCK_MAX_S * 1000;
+        treasureState.active = false;
+        treasureState.blockIndex = 0;
+        treasureState.createdAt = nowMs;
+        treasureState.nextBlockStartAt = nowMs + (min + Math.random() * (max - min));
+        newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
+      };
+      // Programar primer bloque anclado al inicio de partida si aún no existe timestamp
+      if (!treasureState.nextBlockStartAt && prev.gameStartTime) {
+        const firstMin = TREASURE_FIRST_APPEAR_MIN_S * 1000;
+        const firstMax = TREASURE_FIRST_APPEAR_MAX_S * 1000;
+        treasureState.nextBlockStartAt = prev.gameStartTime + (firstMin + Math.random() * (firstMax - firstMin));
+      }
+      // Lanzar bloque cuando llegue su momento
+      if (!treasureState.active && treasureState.nextBlockStartAt && now >= treasureState.nextBlockStartAt) {
+        treasureState.active = true;
+        treasureState.blockIndex = 1;
+        treasureState.createdAt = now;
+        spawnTreasure(now);
+      }
        let newVisualEffects = [...prev.visualEffects]; // Mover declaración aquí
        
        // Actualizar efectos visuales (pulsación)
@@ -1793,9 +1853,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              ? obstacle.radius + (currentLevel - 1) * 5 // +5px por nivel para hackers
              : obstacle.radius; // Radio normal para fees
            
-           // Solo quedarse con los coleccionables que NO colisionan con hacker/fee
-           newCollectibles = newCollectibles.filter(collectible => {
-             if (collectible.type === 'energy') {
+          // Solo quedarse con los coleccionables que NO colisionan con hacker/fee
+          newCollectibles = newCollectibles.filter(collectible => {
+            if (collectible.type === 'energy' || collectible.type === 'uki') {
                // Usar radio expandido para colisión
                const distance = Math.sqrt(
                  Math.pow(obstacle.x - collectible.x, 2) + 
@@ -1805,12 +1865,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                if (distance <= collectionRadius + collectible.radius) {
                  // NUEVO: Crear efecto visual según el tipo de obstacle
                  let explosionEffect: VisualEffect;
-                 if (obstacle.type === 'hacker') {
+                if (obstacle.type === 'hacker') {
                    explosionEffect = createHackerExplosionEffect(collectible.x, collectible.y);
                    
-                   // NUEVO: Contar energy recogida por hacker
-                   obstacle.energyCollected = (obstacle.energyCollected || 0) + 1;
-                   console.log(`[HACKER] ¡Ha robado energía con EXPLOSION_(n)! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px) - DEBUG: Estado actual del hacker ID: ${obstacle.id}`);
+                  // NUEVO: Contar energy recogida por hacker (solo energy, no uki)
+                  if (collectible.type === 'energy') {
+                    obstacle.energyCollected = (obstacle.energyCollected || 0) + 1;
+                    console.log(`[HACKER] ¡Ha robado energía con EXPLOSION_(n)! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px) - DEBUG: Estado actual del hacker ID: ${obstacle.id}`);
+                  }
                    
                    // NUEVO: Si recoge 5 energy, activar retroceso automático
                    if (obstacle.energyCollected >= 5) {
@@ -1982,9 +2044,50 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           if (collectible.type === 'energy') {
             if (onEnergyCollected) onEnergyCollected();
           }
+          if (collectible.type === 'treasure') {
+            // Puntuación por bloque:
+            // Bloque 0 (inicial): 5,5,15 (total 25)
+            // Cada bloque COMPLETADO aumenta +25 totales => multiplicador (1 + bloquesCompletados)
+            const base = [5, 5, 15];
+            const idx = Math.max(1, Math.min(3, treasureState.blockIndex)) - 1; // 0..2
+            // Multiplicador basado en bloques COMPLETADOS previamente
+            // Si el bloque está activo, usamos blockCompletedCount tal cual;
+            // si no, también (al inicio de un bloque, active=true). No resetear a 0.
+            const completedBlocks = treasureState.blockCompletedCount || 0;
+            const multiplier = 1 + completedBlocks;
+            const points = base[idx] * multiplier;
+            scoreToAdd += points;
+            onPlaySound?.('energy_collect');
+            // Avanzar secuencia y preparar siguiente tesoro
+            if (treasureState.blockIndex < 3) {
+              treasureState.blockIndex += 1;
+              treasureState.createdAt = now;
+              // Reemplazo inmediato del tesoro
+              const replacementTreasure = safeSpawnCollectible(
+                createTreasureCollectible,
+                generateId(),
+                prev.canvasSize.width,
+                prev.canvasSize.height,
+                [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
+              );
+              // Agregar al conjunto base para que sobreviva al filtrado posterior
+              newCollectibles.push(replacementTreasure);
+            } else {
+              // Bloque completado
+              treasureState.blockCompletedCount += 1;
+              // Programar siguiente bloque
+              const min = TREASURE_NEXT_BLOCK_MIN_S * 1000;
+              const max = TREASURE_NEXT_BLOCK_MAX_S * 1000;
+              treasureState.active = false;
+              treasureState.blockIndex = 0;
+              treasureState.createdAt = now;
+              treasureState.nextBlockStartAt = now + (min + Math.random() * (max - min));
+            }
+          }
           if (collectible.type === 'uki') {
             console.log("Uki collected! +5 points.");
             onPlaySound?.('energy_collect'); // Usar mismo sonido que energy
+            if (onEnergyCollected) onEnergyCollected(); // Disparar mismo efecto visual que energy
           }
           if (collectible.type === 'heart') {
              if (hearts < 3) {
@@ -2016,7 +2119,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                    generateId(), 
                    prev.canvasSize.width, 
                    prev.canvasSize.height, 
-                   [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+                   // Evitar solapar con TODOS los existentes y en proceso (energy, uki, etc.)
+                   [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
                  );
                  remainingCollectibles.push(replacementEnergy);
             }
@@ -2027,10 +2131,37 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                    generateId(), 
                    prev.canvasSize.width, 
                    prev.canvasSize.height, 
-                   [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+                   // Evitar solapar con TODOS los existentes y en proceso (energy, uki, etc.)
+                   [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
                  );
                  remainingCollectibles.push(replacementUki);
             }
+            if (collectible.type === 'treasure'){
+                  // Avanzar secuencia del bloque y respawnear de inmediato si corresponde
+                  if (treasureState.active) {
+                    if (treasureState.blockIndex < 3) {
+                      treasureState.blockIndex += 1;
+                      treasureState.createdAt = currentTime;
+                      const replacementTreasure = safeSpawnCollectible(
+                        createTreasureCollectible,
+                        generateId(),
+                        prev.canvasSize.width,
+                        prev.canvasSize.height,
+                        [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
+                      );
+                      remainingCollectibles.push(replacementTreasure);
+                    } else {
+                      // Bloque completado, programar el siguiente
+                      treasureState.blockCompletedCount += 1;
+                      const min = TREASURE_NEXT_BLOCK_MIN_S * 1000;
+                      const max = TREASURE_NEXT_BLOCK_MAX_S * 1000;
+                      treasureState.active = false;
+                      treasureState.blockIndex = 0;
+                      treasureState.createdAt = currentTime;
+                      treasureState.nextBlockStartAt = currentTime + (min + Math.random() * (max - min));
+                    }
+                  }
+             }
          } 
        }
 
@@ -2041,27 +2172,33 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
          for (const collectible of newCollectibles) {
            // Si el jugador ha recogido este coleccionable, no lo añadimos de nuevo
            if (checkCollision(newToken, collectible) && collectible.type !== 'vaul') {
-             // Si es energía, spawneamos una nueva en otro lugar
-             if (collectible.type === 'energy') {
+            // Si es energía, spawneamos una nueva en otro lugar
+            if (collectible.type === 'energy') {
                // MEJORADO: Crear energy de reemplazo con verificación de distancia, incluyendo obstáculos
                const replacementEnergy = safeSpawnCollectible(
                  createEnergyCollectible, 
                  generateId(), 
                  prev.canvasSize.width, 
                  prev.canvasSize.height, 
-                 [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+                // Evitar solapar con TODOS los existentes y en proceso (energy, uki, etc.)
+                [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
                );
                remainingCollectibles.push(replacementEnergy);
              }
-             // Si es uki, spawneamos una nueva en otro lugar
-             if (collectible.type === 'uki') {
+            // Si es uki, spawneamos una nueva en otro lugar
+            if (collectible.type === 'uki') {
+            // Si es tesoro, no se vuelve a añadir este mismo; el reemplazo ya fue gestionado
+            if (collectible.type === 'treasure') {
+              continue;
+            }
                // Crear uki de reemplazo con verificación de distancia, incluyendo obstáculos
                const replacementUki = safeSpawnCollectible(
                  createUkiCollectible, 
                  generateId(), 
                  prev.canvasSize.width, 
                  prev.canvasSize.height, 
-                 [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+                // Evitar solapar con TODOS los existentes y en proceso (energy, uki, etc.)
+                [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
                );
                remainingCollectibles.push(replacementUki);
              }
@@ -2319,7 +2456,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           generateId(), 
           prev.canvasSize.width, 
           prev.canvasSize.height, 
-          [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+          // Evitar solapar con TODA la lista actual y en proceso (incluye ukis)
+          [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
         );
         remainingCollectibles.push(newEnergy);
         // Actualizar el contador para el siguiente ciclo
@@ -2337,7 +2475,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           generateId(), 
           prev.canvasSize.width, 
           prev.canvasSize.height, 
-          [...remainingCollectibles, newToken, ...newObstacles] // Incluir obstáculos para evitar spawn cerca de bugs
+          // Evitar solapar con TODA la lista actual y en proceso (incluye energy)
+          [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
         );
         remainingCollectibles.push(newUki);
         // Actualizar el contador para el siguiente ciclo
@@ -2712,8 +2851,8 @@ function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameT
     collectible = createFn(id, width, height, gameTime); // ✅ Pasar el tiempo de juego pausable
     attempts++;
     
-    // MEJORADO: Distancia mínima mayor para energy (40px) para evitar solapamiento visual
-    const minDistance = collectible.type === 'energy' ? 40 : 8;
+    // MEJORADO: Distancia mínima mayor para energy y uki (40px) para evitar solapamiento visual entre sí y con otros
+    const minDistance = (collectible.type === 'energy' || collectible.type === 'uki') ? 40 : 8;
     
     // Si no se puede colocar después de muchos intentos, reducir gradualmente la distancia
     const adjustedMinDistance = attempts > 15 ? Math.max(minDistance * 0.5, 4) : minDistance;

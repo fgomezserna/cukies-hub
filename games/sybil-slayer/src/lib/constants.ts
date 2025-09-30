@@ -58,6 +58,19 @@ export const UKI_RADIUS = 25; // Tamaño similar a energy
 export const UKI_COLOR = 'hsl(200, 100%, 60%)'; // Color azul para diferenciarlo
 export const UKI_VALUE = 5; // 5 puntos cuando lo recoge el token
 
+// Treasure (Tesoro) Properties
+export const TREASURE_RADIUS = 26;
+export const TREASURE_COLOR = 'hsl(35, 100%, 55%)';
+export const TREASURE_LIFETIME_MS = 7000; // 7s visibles
+export const TREASURE_BLINK_WARNING_MS = 3000; // Parpadeo últimos 3s
+export const TREASURE_FIRST_APPEAR_MIN_S = 0; // desde inicio
+export const TREASURE_FIRST_APPEAR_MAX_S = 60; // dentro de primeros 60s
+export const TREASURE_NEXT_BLOCK_MIN_S = 45; // entre 45 y 60s después de terminar bloque
+export const TREASURE_NEXT_BLOCK_MAX_S = 60;
+// Puntuación por bloque (3 tesoros). El primer bloque: 5,5,15 = 25.
+export const TREASURE_BLOCK_BASE_POINTS: [number, number, number] = [5, 5, 15];
+export const TREASURE_BLOCK_INCREMENT = 25; // incremento por bloque completado
+
 // Collectible Spawning
 export const INITIAL_ENERGY_POINTS = 10; // Siempre 10 energy iniciales
 export const MEGA_NODE_SPAWN_CHANCE = 0.0005; // Reducido de 0.002 a 0.0005 (4 veces menos frecuente)
