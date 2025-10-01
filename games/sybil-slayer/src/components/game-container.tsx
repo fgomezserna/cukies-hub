@@ -1367,20 +1367,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     Score: {gameState.score}
                   </span>
                 </div>
-                {/* Temporizador de multiplicador x5 - FUERA de la caja */}
-                {(() => {
-                  if (gameState.scoreMultiplier !== 1 || gameState.multiplierEndTime) {
-                    console.log(`[VAULT-ISSUE] UI Condición:
-                      - scoreMultiplier: ${gameState.scoreMultiplier}
-                      - multiplierEndTime: ${gameState.multiplierEndTime}
-                      - multiplierTimeRemaining: ${gameState.multiplierTimeRemaining}
-                      - Condición (>1): ${gameState.scoreMultiplier > 1}
-                      - Condición (endTime): ${!!gameState.multiplierEndTime}
-                      - MOSTRAR x5: ${gameState.scoreMultiplier > 1 && gameState.multiplierEndTime}`);
-                  }
-                  return null;
-                })()}
-                {gameState.scoreMultiplier > 1 && gameState.multiplierEndTime && (
+                {/* Temporizador de multiplicador - FUERA de la caja */}
+                {gameState.scoreMultiplier > 1 && gameState.multiplierTimeRemaining > 0 && (
                   <div 
                     style={{
                       position: 'absolute',
@@ -1396,10 +1384,86 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       padding: '6px 12px',
                       borderRadius: '8px',
                       border: '2px solid #FFD700',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      animation: 'pulse 1s infinite alternate'
                     }}
                   >
-                    x5 {gameState.multiplierTimeRemaining || 0}s
+                    x{gameState.scoreMultiplier} {gameState.multiplierTimeRemaining}s
+                  </div>
+                )}
+                
+                {/* Temporizador para efecto double_collectibles - FUERA de la caja, debajo del multiplicador */}
+                {gameState.activeVaulEffect === 'double_collectibles' && gameState.vaulEffectTimeRemaining > 0 && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: '160px',
+                      top: gameState.scoreMultiplier > 1 ? '80%' : '50%', // Debajo del multiplicador si ambos están activos
+                      transform: 'translateY(-50%)',
+                      color: '#00FFFF',
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      fontFamily: 'Pixellari, monospace',
+                      textShadow: '0 0 10px rgba(0, 255, 255, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '2px solid #00FFFF',
+                      whiteSpace: 'nowrap',
+                      animation: 'pulse 1s infinite alternate'
+                    }}
+                  >
+                    2x Items {gameState.vaulEffectTimeRemaining}s
+                  </div>
+                )}
+                
+                {/* Temporizador para efecto energy_to_uki */}
+                {gameState.activeVaulEffect === 'energy_to_uki' && gameState.vaulEffectTimeRemaining > 0 && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: '160px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#00BFFF',
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      fontFamily: 'Pixellari, monospace',
+                      textShadow: '0 0 10px rgba(0, 191, 255, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '2px solid #00BFFF',
+                      whiteSpace: 'nowrap',
+                      animation: 'pulse 1s infinite alternate'
+                    }}
+                  >
+                    Energy→Uki {gameState.vaulEffectTimeRemaining}s
+                  </div>
+                )}
+                
+                {/* Indicador de enemigos eliminados (temporal, 3 segundos) */}
+                {gameState.eliminateEnemiesDisplay && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: '160px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#FF4500',
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      fontFamily: 'Pixellari, monospace',
+                      textShadow: '0 0 10px rgba(255, 69, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '2px solid #FF4500',
+                      whiteSpace: 'nowrap',
+                      animation: 'pulse 0.8s infinite alternate'
+                    }}
+                  >
+                    💥 {gameState.eliminateEnemiesDisplay.count} Enemigos
                   </div>
                 )}
               </div>

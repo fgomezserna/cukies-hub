@@ -7,7 +7,10 @@ import {
   MEGA_NODE_BOOST_DURATION_MS, PURR_IMMUNITY_DURATION_MS, MAX_OBSTACLES, INITIAL_OBSTACLE_COUNT, OBSTACLE_SPAWN_RATE_INCREASE,
   COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
   CHECKPOINT_APPEAR_THRESHOLD, CHECKPOINT_TIME_BONUS_START, CHECKPOINT_TIME_BONUS_STEP, CHECKPOINT_TIME_BONUS_MIN,
-  HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_MULTIPLIER, VAUL_DURATION_MS, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
+  HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
+  VAUL_EFFECT_TYPES, VAUL_MULTIPLIER_MIN, VAUL_MULTIPLIER_MAX, VAUL_MULTIPLIER_DURATION_MIN_MS, VAUL_MULTIPLIER_DURATION_MAX_MS,
+  VAUL_DOUBLE_ENERGY_COUNT, VAUL_DOUBLE_UKI_COUNT, VAUL_DOUBLE_DURATION_MIN_MS, VAUL_DOUBLE_DURATION_MAX_MS,
+  VAUL_ENERGY_TO_UKI_DURATION_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
   COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS
 } from '../lib/constants';
@@ -25,6 +28,7 @@ interface TreasureBlockState {
   blockCompletedCount: number; // bloques completos históricos
   createdAt: number; // gameTime ms
   nextBlockStartAt: number | null; // gameTime ms cuando debe aparecer el primer tesoro del próximo bloque
+  lastSpawnTime: number; // Timestamp del último spawn para evitar spawns duplicados
 }
 
 const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
@@ -78,6 +82,12 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   lastNegativeSpawnTime: null, // Sin spawns iniciales
   hackerSpawned: false, // No se ha spawneado hacker aún
   vaulCollectedCount: 0, // Inicializar contador de vaults recogidos
+  // Efectos del Vault
+  activeVaulEffect: null, // Tipo de efecto activo del vault
+  vaulEffectStartTime: null, // Tiempo pausable cuando empezó el efecto
+  vaulEffectTimeRemaining: 0, // Tiempo restante en segundos
+  vaulEffectData: null, // Datos del efecto (multiplicador, etc)
+  eliminateEnemiesDisplay: null, // Para mostrar temporalmente enemigos eliminados
   // Efectos visuales
   visualEffects: [], // Sin efectos iniciales
   // Efecto de robo de score por hacker
@@ -852,6 +862,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           lastNegativeSpawnTime: null, // Sin spawns iniciales
           hackerSpawned: false, // No se ha spawneado hacker aún
           vaulCollectedCount: 0, // BUGFIX: Resetear contador de vaults al iniciar nueva partida
+          // Efectos del Vault
+          activeVaulEffect: null, // Resetear efecto del vault
+          vaulEffectStartTime: null, // Resetear tiempo del efecto
+          vaulEffectTimeRemaining: 0, // Resetear tiempo restante
+          vaulEffectData: null, // Resetear datos del efecto
+          eliminateEnemiesDisplay: null, // Resetear display de enemigos eliminados
           // Efectos visuales
           visualEffects: [], // Sin efectos iniciales
           // Efecto de robo de score por hacker
@@ -947,6 +963,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           blockCompletedCount: 0,
           createdAt: startNow,
           nextBlockStartAt: startNow + (TREASURE_FIRST_APPEAR_MIN_S * 1000 + Math.random() * ((TREASURE_FIRST_APPEAR_MAX_S - TREASURE_FIRST_APPEAR_MIN_S) * 1000)),
+          lastSpawnTime: 0,
         } as TreasureBlockState;
       }
       const treasureState = (prev as any).__treasureBlock as TreasureBlockState;
@@ -957,14 +974,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       }
       let lastDamageTime = prev.lastDamageTime;
       let lastDamageSource = prev.lastDamageSource;
-      // Usar el ref si tiene valor, sino usar el del estado
-      let multiplierEndTime = multiplierEndTimeRef.current || prev.multiplierEndTime;
       let scoreStealEffect = prev.scoreStealEffect;
-      
-      console.log(`[VAULT-ISSUE] === INICIO FRAME ===
-        - multiplierEndTime inicial (desde prev): ${prev.multiplierEndTime}
-        - multiplierEndTime desde ref: ${multiplierEndTimeRef.current}
-        - multiplierEndTime usado: ${multiplierEndTime}`);
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -1788,7 +1798,24 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         treasureState.active = true;
         treasureState.blockIndex = 1;
         treasureState.createdAt = now;
+        treasureState.lastSpawnTime = now;
         spawnTreasure(now);
+        console.log(`[TREASURE] 🎯 Iniciando bloque ${treasureState.blockCompletedCount + 1} - Treasure 1 spawneado`);
+      }
+      
+      // Spawnear siguiente treasure del bloque cuando ya existe un bloque activo y no hay treasures en pantalla
+      // Esto ocurre después de recoger el treasure anterior (1→2 o 2→3)
+      if (treasureState.active && treasureState.blockIndex > 0 && treasureState.blockIndex <= 3) {
+        const existingTreasure = newCollectibles.find(c => c.type === 'treasure');
+        // Solo spawnear si no hay treasure en pantalla Y no hemos spawneado este índice todavía
+        // Usamos una diferencia de tiempo mínima para evitar spawns duplicados del mismo frame
+        const timeSinceLastSpawn = now - treasureState.lastSpawnTime;
+        if (!existingTreasure && timeSinceLastSpawn > 50) { // Mínimo 50ms entre spawns
+          // No hay treasure en pantalla, spawnear el siguiente
+          treasureState.lastSpawnTime = now;
+          spawnTreasure(now);
+          console.log(`[TREASURE] ✨ Treasure ${treasureState.blockIndex} del bloque ${treasureState.blockCompletedCount + 1} spawneado`);
+        }
       }
        let newVisualEffects = [...prev.visualEffects]; // Mover declaración aquí
        
@@ -1832,10 +1859,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let scoreToAdd = 0;
       let hearts = prev.hearts;
       let scoreToSubtract = 0; // Para descontar puntos por Hacker
-      let vaulCollectedCount = prev.vaulCollectedCount || 0; // <-- Declarar aquí
+      let vaulCollectedCount = prev.vaulCollectedCount || 0;
       let vaulBonusToAdd = 0; // Bonus directo de vaul (NO debe pasar por multiplicador)
       let remainingCollectibles: Collectible[] = [];
       let vaultJustActivated = false; // Flag para saber si se activó un vault en este frame
+      // Variables para efectos del vault
+      let activeVaulEffect = prev.activeVaulEffect;
+      let vaulEffectStartTime = prev.vaulEffectStartTime;
+      let vaulEffectData = prev.vaulEffectData;
+      let eliminateEnemiesDisplay = prev.eliminateEnemiesDisplay;
 
        // --- NEW: Fees y Hackers roban energía ---
        // Comprobar colisión entre obstáculos y Energy
@@ -1875,7 +1907,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                   }
                    
                    // NUEVO: Si recoge 5 energy, activar retroceso automático
-                   if (obstacle.energyCollected >= 5) {
+                   if ((obstacle.energyCollected || 0) >= 5) {
                      console.log(`[HACKER] 🚀 ¡ESCAPE! ID: ${obstacle.id} - Ha recogido 5 energy! Iniciando retroceso automático hacia el borde...`);
                      
                      // NUEVO: Reproducir sonido especial cuando el hacker escapa por 5 energy
@@ -1963,41 +1995,105 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              
              // Verificar si se ha completado la activación
              if ((collectible.activationProgress || 0) >= 1 && !collectible.isActivated) {
-               // ¡Vault activado!
-               console.log("Vault activated! Score multiplier x5 activated.");
-               onPlaySound?.('vaul_collect');
-               
-               // NUEVO: Crear efecto visual de activación del vault
-               const vaultEffect = createVaultActivationEffect(collectible.x, collectible.y);
-               newVisualEffects.push(vaultEffect);
-               
-               // CORREGIDO: Actualizar la variable local para que afecte el estado final
-               // IMPORTANTE: Para efectos visuales convertir tiempo pausable a timestamp real
-               const realTimeNow = Date.now();
-               const gameTimeDifference = now - (prev.gameStartTime || 0); // Diferencia en tiempo de juego
-               multiplierEndTime = realTimeNow + VAUL_DURATION_MS;
-               multiplierEndTimeRef.current = multiplierEndTime; // Guardar también en el ref
-               
-               console.log(`[VAULT-ISSUE] ⭐ ACTIVACIÓN VAULT:
-                 - multiplierEndTime NUEVO: ${multiplierEndTime}
-                 - realTimeNow: ${realTimeNow}
-                 - VAUL_DURATION_MS: ${VAUL_DURATION_MS}
-                 - prev.multiplierEndTime: ${prev.multiplierEndTime}
-                 - Debe durar hasta: ${new Date(multiplierEndTime).toISOString()}`);
-               
-               // NUEVO: Sumar bonus acumulativo de 50 puntos por cada vault recogido
-               // CORREGIDO: Este bonus NO debe pasar por el multiplicador
-               const newVaulCount = (prev.vaulCollectedCount || 0) + 1;
-               const bonusAmount = 50 * newVaulCount;
-               vaulBonusToAdd += bonusAmount;
-               console.log(`[VAUL] Bonus recogido: ${bonusAmount} puntos (${newVaulCount}° vaul) - SIN multiplicador`);
-               console.log(`[VAUL] Debug: Score actual: ${prev.score}, Multiplicador previo: ${prev.scoreMultiplier > 1 ? `x${prev.scoreMultiplier}` : 'NO'}`);
-               
-               // Marcar el vault como activado para que se elimine del filtrado posterior
+              // ¡Vault activado! Elegir efecto aleatorio
+              const randomIndex = Math.floor(Math.random() * VAUL_EFFECT_TYPES.length);
+              const selectedEffect = VAUL_EFFECT_TYPES[randomIndex];
+              
+              const newVaulCount = (prev.vaulCollectedCount || 0) + 1;
+              
+              // Variables para el logging detallado
+              let effectDetails = '';
+              
+              // Aplicar el efecto seleccionado y preparar detalles para logging
+              if (selectedEffect === 'multiplier') {
+                // Efecto 1: Multiplicador x2-x5 durante 5-10 segundos
+                const multiplier = Math.floor(Math.random() * (VAUL_MULTIPLIER_MAX - VAUL_MULTIPLIER_MIN + 1)) + VAUL_MULTIPLIER_MIN;
+                const duration = Math.floor(Math.random() * (VAUL_MULTIPLIER_DURATION_MAX_MS - VAUL_MULTIPLIER_DURATION_MIN_MS + 1)) + VAUL_MULTIPLIER_DURATION_MIN_MS;
+                
+                // CORREGIDO: Usar tiempo pausable para el multiplicador (igual que MegaNode y Purr)
+                // Guardar datos del efecto usando tiempo pausable
+                vaulEffectData = { multiplier, duration };
+                vaulEffectStartTime = now; // Tiempo pausable cuando empezó
+                activeVaulEffect = 'multiplier';
+                
+                effectDetails = `x${multiplier} durante ${(duration / 1000).toFixed(1)}s`;
+                
+              } else if (selectedEffect === 'double_collectibles') {
+                // Efecto 2: Doble de energy (20) y uki (6) durante 10-30 segundos
+                const duration = Math.floor(Math.random() * (VAUL_DOUBLE_DURATION_MAX_MS - VAUL_DOUBLE_DURATION_MIN_MS + 1)) + VAUL_DOUBLE_DURATION_MIN_MS;
+                
+                // CORREGIDO: Usar tiempo pausable
+                vaulEffectData = { duration };
+                vaulEffectStartTime = now; // Tiempo pausable cuando empezó
+                activeVaulEffect = 'double_collectibles';
+                
+                effectDetails = `durante ${(duration / 1000).toFixed(1)}s`;
+                
+              } else if (selectedEffect === 'energy_to_uki') {
+                // Efecto 3: Energy se convierten en uki durante 30 segundos
+                // CORREGIDO: Usar tiempo pausable
+                vaulEffectData = { duration: VAUL_ENERGY_TO_UKI_DURATION_MS };
+                vaulEffectStartTime = now; // Tiempo pausable cuando empezó
+                activeVaulEffect = 'energy_to_uki';
+                
+                effectDetails = `durante ${(VAUL_ENERGY_TO_UKI_DURATION_MS / 1000).toFixed(1)}s`;
+                
+              } else if (selectedEffect === 'eliminate_enemies') {
+                // Efecto 4: Eliminar 1-3 enemigos aleatorios
+                const randomValue = Math.random();
+                const range = VAUL_ELIMINATE_ENEMIES_MAX - VAUL_ELIMINATE_ENEMIES_MIN + 1;
+                const enemiesToEliminate = Math.floor(randomValue * range) + VAUL_ELIMINATE_ENEMIES_MIN;
+                
+                console.log(`[VAUL] 🎲 Cálculo aleatorio de enemigos:
+                  - Random: ${randomValue.toFixed(4)}
+                  - Rango (MAX-MIN+1): ${range}
+                  - Cálculo: Math.floor(${randomValue.toFixed(4)} * ${range}) + ${VAUL_ELIMINATE_ENEMIES_MIN}
+                  - Resultado: ${enemiesToEliminate} enemigos`);
+                
+                // Filtrar obstáculos que pueden ser eliminados
+                const eliminableObstacles = newObstacles.filter(obs => !obs.isRetreating && !obs.banishTimer);
+                const toEliminate = Math.min(enemiesToEliminate, eliminableObstacles.length);
+                
+                console.log(`[VAUL] Enemigos disponibles: ${eliminableObstacles.length}, a eliminar: ${toEliminate}`);
+                
+                // Seleccionar enemigos aleatorios
+                const shuffled = [...eliminableObstacles].sort(() => Math.random() - 0.5);
+                const eliminated = shuffled.slice(0, toEliminate);
+                
+                // Eliminar los enemigos seleccionados
+                newObstacles = newObstacles.filter(obs => !eliminated.includes(obs));
+                
+                effectDetails = `${toEliminate} enemigos eliminados`;
+                
+                // Guardar para mostrar en UI temporalmente (3 segundos)
+                eliminateEnemiesDisplay = {
+                  count: toEliminate,
+                  timestamp: now // Usar tiempo pausable
+                };
+                
+                // Este efecto es instantáneo, no necesita tracking de tiempo
+                activeVaulEffect = null;
+                vaulEffectStartTime = null;
+                vaulEffectData = null;
+              }
+              
+              // Logging consolidado con todos los detalles
+              console.log(`╔═══════════════════════════════════════════════════╗`);
+              console.log(`║   🎲 VAULT ACTIVADO 🎲                           ║`);
+              console.log(`║   Efecto: ${selectedEffect.padEnd(39)}║`);
+              console.log(`║   Detalles: ${effectDetails.padEnd(37)}║`);
+              console.log(`║   Random Index: ${randomIndex} / ${VAUL_EFFECT_TYPES.length - 1}${' '.repeat(30)}║`);
+              console.log(`╚═══════════════════════════════════════════════════╝`);
+              
+              onPlaySound?.('vaul_collect');
+              
+              // Crear efecto visual de activación del vault
+              const vaultEffect = createVaultActivationEffect(collectible.x, collectible.y);
+              newVisualEffects.push(vaultEffect);
+              
+              // Marcar el vault como activado para que se elimine
                collectible.isActivated = true;
-               // Actualizar el contador de vaults recogidos
                vaulCollectedCount = newVaulCount;
-               // Marcar que se activó un vault en este frame
                vaultJustActivated = true;
                continue;
              }
@@ -2051,38 +2147,35 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const base = [5, 5, 15];
             const idx = Math.max(1, Math.min(3, treasureState.blockIndex)) - 1; // 0..2
             // Multiplicador basado en bloques COMPLETADOS previamente
-            // Si el bloque está activo, usamos blockCompletedCount tal cual;
-            // si no, también (al inicio de un bloque, active=true). No resetear a 0.
             const completedBlocks = treasureState.blockCompletedCount || 0;
             const multiplier = 1 + completedBlocks;
             const points = base[idx] * multiplier;
             scoreToAdd += points;
             onPlaySound?.('energy_collect');
-            // Avanzar secuencia y preparar siguiente tesoro
+            
+            console.log(`[TREASURE] 💰 Recogido treasure ${treasureState.blockIndex} del bloque ${treasureState.blockCompletedCount + 1}. Puntos: ${points}`);
+            
+            // Avanzar secuencia - el siguiente tesoro se spawneará en el próximo frame
             if (treasureState.blockIndex < 3) {
+              // Hay más treasures en este bloque - marcar para crear el siguiente
               treasureState.blockIndex += 1;
               treasureState.createdAt = now;
-              // Reemplazo inmediato del tesoro
-              const replacementTreasure = safeSpawnCollectible(
-                createTreasureCollectible,
-                generateId(),
-                prev.canvasSize.width,
-                prev.canvasSize.height,
-                [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
-              );
-              // Agregar al conjunto base para que sobreviva al filtrado posterior
-              newCollectibles.push(replacementTreasure);
+              console.log(`[TREASURE] ➡️ Treasure ${treasureState.blockIndex} se spawneará en el próximo frame`);
             } else {
-              // Bloque completado
+              // Bloque completado - ESPERAR 45-60 segundos para el siguiente bloque
               treasureState.blockCompletedCount += 1;
-              // Programar siguiente bloque
-              const min = TREASURE_NEXT_BLOCK_MIN_S * 1000;
-              const max = TREASURE_NEXT_BLOCK_MAX_S * 1000;
-              treasureState.active = false;
+              const min = TREASURE_NEXT_BLOCK_MIN_S * 1000; // 45000ms
+              const max = TREASURE_NEXT_BLOCK_MAX_S * 1000; // 60000ms
+              const waitTime = min + Math.random() * (max - min);
+              treasureState.active = false; // CRÍTICO: Desactivar bloque primero
               treasureState.blockIndex = 0;
               treasureState.createdAt = now;
-              treasureState.nextBlockStartAt = now + (min + Math.random() * (max - min));
+              treasureState.nextBlockStartAt = now + waitTime;
+              treasureState.lastSpawnTime = now; // Actualizar para prevenir spawns hasta el próximo bloque
+              console.log(`[TREASURE] ✅ ¡Bloque ${treasureState.blockCompletedCount} completado! Siguiente bloque en ${(waitTime/1000).toFixed(1)}s`);
             }
+            // CRÍTICO: No procesar este treasure nuevamente
+            continue;
           }
           if (collectible.type === 'uki') {
             console.log("Uki collected! +5 points.");
@@ -2136,39 +2229,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  );
                  remainingCollectibles.push(replacementUki);
             }
-            if (collectible.type === 'treasure'){
-                  // Avanzar secuencia del bloque y respawnear de inmediato si corresponde
-                  if (treasureState.active) {
-                    if (treasureState.blockIndex < 3) {
-                      treasureState.blockIndex += 1;
-                      treasureState.createdAt = currentTime;
-                      const replacementTreasure = safeSpawnCollectible(
-                        createTreasureCollectible,
-                        generateId(),
-                        prev.canvasSize.width,
-                        prev.canvasSize.height,
-                        [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
-                      );
-                      remainingCollectibles.push(replacementTreasure);
-                    } else {
-                      // Bloque completado, programar el siguiente
-                      treasureState.blockCompletedCount += 1;
-                      const min = TREASURE_NEXT_BLOCK_MIN_S * 1000;
-                      const max = TREASURE_NEXT_BLOCK_MAX_S * 1000;
-                      treasureState.active = false;
-                      treasureState.blockIndex = 0;
-                      treasureState.createdAt = currentTime;
-                      treasureState.nextBlockStartAt = currentTime + (min + Math.random() * (max - min));
-                    }
-                  }
-             }
+            // NOTA: La lógica de treasure ya se maneja arriba (líneas 2124-2167) con continue
+            // para evitar procesamiento duplicado
          } 
        }
 
        // Filtramos los collectibles basados en el tiempo de vida y colisión
                 // Los Mega_node, Heart, Purr y Vaul desaparecen después de 10 segundos (COLLECTIBLE_LIFETIME_MS)
-         const currentTime = getGameTime();
          remainingCollectibles = []; // Limpiamos la lista para evitar duplicación
+         const currentTime = getGameTime();
          for (const collectible of newCollectibles) {
            // Si el jugador ha recogido este coleccionable, no lo añadimos de nuevo
            if (checkCollision(newToken, collectible) && collectible.type !== 'vaul') {
@@ -2186,11 +2255,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                remainingCollectibles.push(replacementEnergy);
              }
             // Si es uki, spawneamos una nueva en otro lugar
-            if (collectible.type === 'uki') {
-            // Si es tesoro, no se vuelve a añadir este mismo; el reemplazo ya fue gestionado
-            if (collectible.type === 'treasure') {
-              continue;
-            }
+            else if (collectible.type === 'uki') {
                // Crear uki de reemplazo con verificación de distancia, incluyendo obstáculos
                const replacementUki = safeSpawnCollectible(
                  createUkiCollectible, 
@@ -2202,12 +2267,16 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                );
                remainingCollectibles.push(replacementUki);
              }
+             // Si es tesoro, no se vuelve a añadir este mismo; el reemplazo ya fue gestionado
+             else if (collectible.type === 'treasure') {
+              continue;
+             }
              // Los otros tipos no se añaden si fueron recogidos
              continue;
            }
            
-           // Comprobamos el tiempo de vida para Mega_node, Heart, Purr y Vaul
-           if (collectible.type === 'megaNode' || collectible.type === 'heart' || collectible.type === 'purr' || collectible.type === 'vaul') {
+           // Comprobamos el tiempo de vida para Mega_node, Heart, Purr, Vaul y Treasure
+           if (collectible.type === 'megaNode' || collectible.type === 'heart' || collectible.type === 'purr' || collectible.type === 'vaul' || collectible.type === 'treasure') {
              // Lógica especial para vaul que requiere tiempo de contacto para activarse
              if (collectible.type === 'vaul') {
                // Solo agregar si no ha sido activado
@@ -2224,16 +2293,25 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                }
              }
              
+             // Determinar el tiempo de vida según el tipo de coleccionable
+             const lifetimeMs = collectible.type === 'treasure' ? TREASURE_LIFETIME_MS : COLLECTIBLE_LIFETIME_MS;
+             const blinkWarningMs = collectible.type === 'treasure' ? TREASURE_BLINK_WARNING_MS : COLLECTIBLE_BLINK_WARNING_MS;
+             
              // Si tiene tiempo de creación y no ha pasado el tiempo límite
-             if (collectible.createdAt && (currentTime - collectible.createdAt < COLLECTIBLE_LIFETIME_MS)) {
+             if (collectible.createdAt && (currentTime - collectible.createdAt < lifetimeMs)) {
                // Calcular si debe parpadear (últimos 3 segundos)
                const timeAlive = currentTime - collectible.createdAt;
-               const timeRemaining = COLLECTIBLE_LIFETIME_MS - timeAlive;
-               collectible.isBlinking = timeRemaining <= COLLECTIBLE_BLINK_WARNING_MS;
+               const timeRemaining = lifetimeMs - timeAlive;
+               collectible.isBlinking = timeRemaining <= blinkWarningMs;
                
                // Log específico para vault cuando empieza a parpadear
                if (collectible.type === 'vaul' && collectible.isBlinking && !collectible.lifetimePaused) {
                  console.log(`[VAUL] ¡Empezando a parpadear! Tiempo restante: ${(timeRemaining / 1000).toFixed(1)}s`);
+               }
+               
+               // Log específico para treasure cuando empieza a parpadear
+               if (collectible.type === 'treasure' && collectible.isBlinking) {
+                 console.log(`[TREASURE] ¡Empezando a parpadear! Tiempo restante: ${(timeRemaining / 1000).toFixed(1)}s`);
                }
                
                remainingCollectibles.push(collectible);
@@ -2243,6 +2321,18 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.createdAt = currentTime;
                collectible.isBlinking = false; // Recién creado, no debe parpadear
                remainingCollectibles.push(collectible);
+             } else if (collectible.type === 'treasure') {
+               // TREASURE EXPIRÓ: Reiniciar contador de bloques y programar siguiente bloque
+               const min = TREASURE_NEXT_BLOCK_MIN_S * 1000; // 45000ms
+               const max = TREASURE_NEXT_BLOCK_MAX_S * 1000; // 60000ms
+               const waitTime = min + Math.random() * (max - min);
+               console.log(`[TREASURE] ⏰ ¡Tesoro ${treasureState.blockIndex} expiró sin ser recogido! Progreso del bloque ${treasureState.blockCompletedCount + 1} PERDIDO. Siguiente bloque en ${(waitTime/1000).toFixed(1)}s`);
+               treasureState.active = false; // CRÍTICO: Desactivar bloque primero
+               treasureState.blockIndex = 0;
+               treasureState.createdAt = currentTime;
+               treasureState.nextBlockStartAt = currentTime + waitTime;
+               treasureState.lastSpawnTime = currentTime; // Actualizar para prevenir spawns hasta el próximo bloque
+               // No añadir el treasure a los collectibles restantes (se elimina)
              }
              // Si ha expirado, no lo añadimos a los collectibles restantes
            } else {
@@ -2444,11 +2534,91 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time' };
       }
 
-      // --- Aparición de energía (respawn) ---
-      const maxEnergy = getMaxEnergyForLevel(currentLevel);
-      let energyCount = remainingCollectibles.filter(c => c.type === 'energy').length;
+      // --- Verificar y aplicar efectos activos del vault ---
+      // CORREGIDO: Usar tiempo pausable para verificar expiración (igual que MegaNode y Purr)
+      let vaulEffectTimeRemaining = 0;
       
-      // Siempre mantener exactamente 10 energy en pantalla
+      if (activeVaulEffect && vaulEffectStartTime && vaulEffectData?.duration) {
+        const pausableTimeElapsed = now - vaulEffectStartTime;
+        const timeRemaining = vaulEffectData.duration - pausableTimeElapsed;
+        
+        if (timeRemaining <= 0) {
+          console.log(`[VAUL] Efecto ${activeVaulEffect} ha expirado (tiempo pausable)`);
+          activeVaulEffect = null;
+          vaulEffectStartTime = null;
+          vaulEffectData = null;
+          vaulEffectTimeRemaining = 0;
+        } else {
+          // Actualizar tiempo restante en segundos para la UI
+          vaulEffectTimeRemaining = Math.ceil(timeRemaining / 1000);
+          
+          // Log cuando cambia el tiempo restante
+          if (vaulEffectTimeRemaining !== prev.vaulEffectTimeRemaining) {
+            console.log(`[VAUL] Efecto ${activeVaulEffect} - ${vaulEffectTimeRemaining}s restantes`);
+          }
+        }
+      }
+      
+      // Verificar si el display de enemigos eliminados debe ocultarse (después de 3 segundos)
+      if (eliminateEnemiesDisplay && eliminateEnemiesDisplay.timestamp) {
+        const displayDuration = 3000; // 3 segundos en pantalla
+        const displayElapsed = now - eliminateEnemiesDisplay.timestamp;
+        
+        if (displayElapsed >= displayDuration) {
+          console.log(`[VAUL] Ocultando display de enemigos eliminados`);
+          eliminateEnemiesDisplay = null;
+        }
+      }
+
+      // --- Aparición de energía (respawn) ---
+      let maxEnergy = getMaxEnergyForLevel(currentLevel);
+      let maxUki = MAX_UKI_POINTS;
+      
+      // Efecto 2: Doble de collectibles
+      if (activeVaulEffect === 'double_collectibles') {
+        maxEnergy = VAUL_DOUBLE_ENERGY_COUNT; // 20 en vez de 10
+        maxUki = VAUL_DOUBLE_UKI_COUNT; // 6 en vez de 3
+      }
+      
+      // Efecto 3: Energy se convierten en uki
+      if (activeVaulEffect === 'energy_to_uki') {
+        // ELIMINAR todas las energy existentes y convertirlas en uki
+        const existingEnergy = remainingCollectibles.filter(c => c.type === 'energy');
+        if (existingEnergy.length > 0) {
+          console.log(`[VAUL] Eliminando ${existingEnergy.length} energy existentes para convertirlas en uki`);
+          remainingCollectibles = remainingCollectibles.filter(c => c.type !== 'energy');
+        }
+        
+        // No spawear energy, solo uki
+        maxEnergy = 0;
+        maxUki = MAX_UKI_POINTS + getMaxEnergyForLevel(currentLevel); // Combinar ambos (13 total)
+      }
+      
+      let energyCount = remainingCollectibles.filter(c => c.type === 'energy').length;
+      let ukiCount = remainingCollectibles.filter(c => c.type === 'uki').length;
+      
+      // Si hay más collectibles de los necesarios (por ejemplo, cuando un efecto expira), eliminar el exceso aleatoriamente
+      if (energyCount > maxEnergy) {
+        const energyCollectibles = remainingCollectibles.filter(c => c.type === 'energy');
+        const toRemove = energyCount - maxEnergy;
+        const shuffled = [...energyCollectibles].sort(() => Math.random() - 0.5);
+        const toRemoveIds = shuffled.slice(0, toRemove).map(c => c.id);
+        remainingCollectibles = remainingCollectibles.filter(c => !toRemoveIds.includes(c.id));
+        console.log(`[VAUL] Eliminando ${toRemove} energy sobrantes (tenía ${energyCount}, máximo ${maxEnergy})`);
+        energyCount = maxEnergy;
+      }
+      
+      if (ukiCount > maxUki) {
+        const ukiCollectibles = remainingCollectibles.filter(c => c.type === 'uki');
+        const toRemove = ukiCount - maxUki;
+        const shuffled = [...ukiCollectibles].sort(() => Math.random() - 0.5);
+        const toRemoveIds = shuffled.slice(0, toRemove).map(c => c.id);
+        remainingCollectibles = remainingCollectibles.filter(c => !toRemoveIds.includes(c.id));
+        console.log(`[VAUL] Eliminando ${toRemove} uki sobrantes (tenía ${ukiCount}, máximo ${maxUki})`);
+        ukiCount = maxUki;
+      }
+      
+      // Mantener la cantidad correcta de energy en pantalla
       while (energyCount < maxEnergy) {
         // MEJORADO: Crear energy con verificación de distancia para evitar solapamiento, incluyendo obstáculos
         const newEnergy = safeSpawnCollectible(
@@ -2465,10 +2635,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       }
 
       // --- Aparición de uki (respawn) ---
-      let ukiCount = remainingCollectibles.filter(c => c.type === 'uki').length;
-      
-      // Siempre mantener exactamente 3 uki en pantalla
-      while (ukiCount < MAX_UKI_POINTS) {
+      // Mantener la cantidad correcta de uki en pantalla
+      while (ukiCount < maxUki) {
         // Crear uki con verificación de distancia para evitar solapamiento
         const newUki = safeSpawnCollectible(
           createUkiCollectible, 
@@ -2487,32 +2655,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let currentMultiplier = 1;
       let multiplierTimeRemaining = 0;
       
-      // Si se acaba de activar un vault, establecer el multiplicador inmediatamente
-      if (vaultJustActivated) {
-        currentMultiplier = VAUL_MULTIPLIER;
-        multiplierTimeRemaining = Math.ceil(VAUL_DURATION_MS / 1000); // 7 segundos
-        console.log(`[VAULT-ISSUE] 🎯 Vault recién activado - Multiplicador x${currentMultiplier} por ${multiplierTimeRemaining}s`);
-      } else if (multiplierEndTime) {
-        // Solo verificar expiración si NO se acaba de activar un vault
-        const currentTimeForMultiplier = Date.now();
-        if (currentTimeForMultiplier < multiplierEndTime) {
+      // CORREGIDO: Usar tiempo pausable para el multiplicador (igual que MegaNode y Purr)
+      if (activeVaulEffect === 'multiplier' && vaulEffectStartTime && vaulEffectData?.multiplier && vaulEffectData?.duration) {
+        const pausableTimeElapsed = now - vaulEffectStartTime;
+        const timeRemaining = vaulEffectData.duration - pausableTimeElapsed;
+        
+        if (timeRemaining > 0) {
           // El multiplicador está activo
-          currentMultiplier = VAUL_MULTIPLIER;
-          multiplierTimeRemaining = Math.max(0, Math.ceil((multiplierEndTime - currentTimeForMultiplier) / 1000));
-          console.log(`[VAULT-ISSUE] Multiplicador ACTIVO:
-            - currentMultiplier: ${currentMultiplier}
-            - multiplierTimeRemaining: ${multiplierTimeRemaining}s
-            - multiplierEndTime: ${multiplierEndTime}
-            - currentTime: ${currentTimeForMultiplier}`);
-        } else {
-          // El multiplicador ha expirado
-          console.log(`[VAULT-ISSUE] Multiplicador EXPIRADO:
-            - multiplierEndTime: ${multiplierEndTime}
-            - currentTime: ${currentTimeForMultiplier}
-            - diferencia: ${currentTimeForMultiplier - multiplierEndTime}ms tarde`);
-          multiplierEndTime = null; // Limpiar para el siguiente frame
-          multiplierEndTimeRef.current = null; // También limpiar el ref
-          multiplierTimeRemaining = 0;
+          currentMultiplier = vaulEffectData.multiplier;
+          multiplierTimeRemaining = Math.ceil(timeRemaining / 1000);
+          
+          // Log solo cuando cambia el valor o se activa
+          if (vaultJustActivated || multiplierTimeRemaining !== prev.multiplierTimeRemaining) {
+            console.log(`[VAUL] Multiplicador ACTIVO: x${currentMultiplier} - ${multiplierTimeRemaining}s restantes (tiempo pausable)`);
+          }
         }
       }
       
@@ -2797,11 +2953,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       }
       
       // Log para depuración del multiplicador
-      if (currentMultiplier !== prev.scoreMultiplier || multiplierEndTime !== prev.multiplierEndTime) {
-        console.log(`[VAULT-ISSUE] Estado final:
-          - scoreMultiplier: ${prev.scoreMultiplier} -> ${currentMultiplier}
-          - multiplierEndTime: ${prev.multiplierEndTime} -> ${multiplierEndTime}
-          - multiplierTimeRemaining: ${multiplierTimeRemaining}`);
+      if (currentMultiplier !== prev.scoreMultiplier || multiplierTimeRemaining !== prev.multiplierTimeRemaining) {
+        if (currentMultiplier > 1) {
+          console.log(`[VAUL] 🎯 Multiplicador UI actualizado: x${currentMultiplier} - ${multiplierTimeRemaining}s restantes`);
+        } else if (prev.scoreMultiplier > 1) {
+          console.log(`[VAUL] ❌ Multiplicador desactivado (era x${prev.scoreMultiplier})`);
+        }
       }
       
       return {
@@ -2817,7 +2974,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         lastDamageTime,
         lastDamageSource,
         scoreMultiplier: currentMultiplier,
-        multiplierEndTime,
+        multiplierEndTime: null, // Ya no se usa, mantener para compatibilidad
         multiplierTimeRemaining,
         checkpointTimeBonus: prev.checkpointTimeBonus + checkpointBonus,
         timePenalties: prev.timePenalties + timePenaltyAccumulator,
@@ -2836,6 +2993,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         // Efecto de robo de score por hacker
         scoreStealEffect,
         vaulCollectedCount,
+        // Efectos del Vault
+        activeVaulEffect,
+        vaulEffectStartTime,
+        vaulEffectTimeRemaining,
+        vaulEffectData,
+        eliminateEnemiesDisplay,
       };
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures

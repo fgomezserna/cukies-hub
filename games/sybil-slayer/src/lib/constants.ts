@@ -47,11 +47,31 @@ export const PURR_COLOR = 'hsl(300, 100%, 70%)'; // Color púrpura para diferenc
 export const PURR_VALUE = 0; // Solo proporciona inmunidad, sin puntos
 export const VAUL_RADIUS = 35; // Tamaño ligeramente mayor por ser un cofre especial
 export const VAUL_COLOR = 'hsl(45, 100%, 60%)'; // Color dorado para el cofre
-export const VAUL_VALUE = 0; // Solo proporciona multiplicador, sin puntos directos
-export const VAUL_MULTIPLIER = 5; // Multiplicador de score x5
-export const VAUL_DURATION_MS = 7000; // 7 segundos de duración del multiplicador
+export const VAUL_VALUE = 0; // Solo proporciona efectos especiales, sin puntos directos
 export const VAUL_ACTIVATION_TIME_MS = 3000; // 3 segundos para llenar la barra completamente
 export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 3 segundos exactos
+
+// Efectos aleatorios del Vault (se elige uno al activarse)
+export const VAUL_EFFECT_TYPES = ['multiplier', 'double_collectibles', 'energy_to_uki', 'eliminate_enemies'] as const;
+// Efecto 1: Multiplicador aleatorio
+export const VAUL_MULTIPLIER_MIN = 2;
+export const VAUL_MULTIPLIER_MAX = 5;
+export const VAUL_MULTIPLIER_DURATION_MIN_MS = 5000; // 5 segundos
+export const VAUL_MULTIPLIER_DURATION_MAX_MS = 10000; // 10 segundos
+// Efecto 2: Doble de collectibles
+export const VAUL_DOUBLE_ENERGY_COUNT = 20; // 20 energy en vez de 10
+export const VAUL_DOUBLE_UKI_COUNT = 6; // 6 uki en vez de 3
+export const VAUL_DOUBLE_DURATION_MIN_MS = 10000; // 10 segundos
+export const VAUL_DOUBLE_DURATION_MAX_MS = 30000; // 30 segundos
+// Efecto 3: Energy a Uki
+export const VAUL_ENERGY_TO_UKI_DURATION_MS = 30000; // 30 segundos
+// Efecto 4: Eliminar enemigos
+export const VAUL_ELIMINATE_ENEMIES_MIN = 1;
+export const VAUL_ELIMINATE_ENEMIES_MAX = 3;
+
+// Mantener compatibilidad con código antiguo (deprecated)
+export const VAUL_MULTIPLIER = 5; // Multiplicador de score x5
+export const VAUL_DURATION_MS = 7000; // 7 segundos de duración del multiplicador
 
 // Uki Properties
 export const UKI_RADIUS = 25; // Tamaño similar a energy

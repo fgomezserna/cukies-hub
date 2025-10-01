@@ -143,6 +143,20 @@ export interface GameState {
   hackerSpawned: boolean; // Si ya se spawneó el hacker único en el juego
   // NUEVO: Contador de vaults recogidos en la partida
   vaulCollectedCount: number;
+  // Efectos del Vault
+  activeVaulEffect: 'multiplier' | 'double_collectibles' | 'energy_to_uki' | 'eliminate_enemies' | null;
+  vaulEffectStartTime: number | null; // Tiempo pausable cuando empezó el efecto (getGameTime())
+  vaulEffectTimeRemaining: number; // Tiempo restante en segundos para mostrar en UI
+  vaulEffectData: {
+    multiplier?: number;
+    duration?: number;
+    enemiesEliminated?: number; // Para efecto eliminate_enemies
+  } | null;
+  // Para mostrar temporalmente el efecto instantáneo de eliminación
+  eliminateEnemiesDisplay: {
+    count: number;
+    timestamp: number;
+  } | null;
   // Efectos visuales
   visualEffects: VisualEffect[]; // Array de efectos visuales activos
   // Efecto de robo de score por hacker
