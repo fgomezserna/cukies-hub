@@ -626,7 +626,7 @@ const getDynamicSpawnChance = (currentTime: number, periodStartTime: number | nu
 // --- SISTEMA DE APARICIÓN PROGRESIVA DE ASSETS NEGATIVOS ---
 const NEGATIVE_SPAWN_INTERVAL_MS = 10000; // 10 segundos
 
-// Patrón de spawn: 1.fee -> 2.fee -> 3.fee -> 4.bug -> 5.hacker (si no existe) o bug
+// Patrón de spawn: 1.fee -> 2.fee -> 3.fee -> 4.fee -> 5.fee (bugs desactivados temporalmente)
 const getNegativeSpawnPattern = (cycle: number, hackerExists: boolean): { type: ObstacleType; count: number } => {
   const normalizedCycle = ((cycle - 1) % 5) + 1; // Ciclo 1-5 que se repite
   
@@ -638,15 +638,15 @@ const getNegativeSpawnPattern = (cycle: number, hackerExists: boolean): { type: 
     case 3:
       return { type: 'fee', count: 1 }; // 1 fee (cambiado de 2 a 1)
     case 4:
-      return { type: 'bug', count: 1 }; // 1 bug
+      return { type: 'fee', count: 1 }; // 1 fee (antes era bug, ahora fee)
     case 5:
-      // HACKER TEMPORALMENTE DESACTIVADO - Siempre spawn bug en su lugar
+      // BUGS TEMPORALMENTE DESACTIVADOS - Siempre spawn fee en su lugar
       // if (hackerExists) {
       //   return { type: 'bug', count: 1 }; // 1 bug (reemplazo del hacker)
       // } else {
       //   return { type: 'hacker', count: 1 }; // 1 hacker único
       // }
-      return { type: 'bug', count: 1 }; // Siempre bug (hacker desactivado)
+      return { type: 'fee', count: 1 }; // Siempre fee (bugs y hackers desactivados)
     default:
       return { type: 'fee', count: 1 }; // Fallback
   }
@@ -716,27 +716,11 @@ const createObstaclesByPattern = (
   return newObstacles;
 };
 
-// Función para generar bugs adicionales cuando sube el nivel
+// Función para generar bugs adicionales cuando sube el nivel - TEMPORALMENTE DESACTIVADA
 const addBugsForLevelUp = (currentLevel: number, width: number, height: number, existingObstacles: Obstacle[], token: Token, existingCollectibles: any[] = []): Obstacle[] => {
-  // Calcular cuántos bugs adicionales según el nivel de forma más gradual
-  // Nivel 1->2: +1 bug, Nivel 2->3: +1 bug, Nivel 3->4: +2 bugs, etc.
-  const bugsToAdd = Math.floor((currentLevel - 1) * 0.5) + 1;
-  
-  console.log(`Adding ${bugsToAdd} strategic bugs for level ${currentLevel}`);
-  
-  const newBugs: Obstacle[] = [];
-  
-  for (let i = 0; i < bugsToAdd; i++) {
-    // MEJORADO: Pasar también collectibles para evitar spawn sobre assets positivos
-    const bug = createStrategicBug(generateId(), width, height, [...existingObstacles, ...newBugs], currentLevel, existingCollectibles);
-    
-    // Solo agregar si no está demasiado cerca del token (aumentada distancia mínima)
-    if (distanceBetweenPoints(bug, token) >= TOKEN_RADIUS * 10) {
-      newBugs.push(bug);
-    }
-  }
-  
-  return newBugs;
+  // TEMPORALMENTE DESACTIVADO: No agregar bugs cuando sube el nivel
+  console.log(`Bugs desactivados temporalmente - no se agregarán bugs para nivel ${currentLevel}`);
+  return []; // Retornar array vacío
 };
 
 // Función auxiliar para incrementar la velocidad de los fees existentes
@@ -895,17 +879,22 @@ const createSmartHacker = (id: string, width: number, height: number, token: Tok
 
 // Función para obtener la cantidad exacta de obstáculos por nivel y tipo
 const getObstacleCountByTypeAndLevel = (level: number, type: ObstacleType): number => {
+  // TEMPORALMENTE DESACTIVADO: Bugs deshabilitados
+  if (type === 'bug') {
+    return 0; // No spawn bugs
+  }
+  
   switch (level) {
     case 1:
-      return type === 'bug' ? 2 : type === 'fee' ? 2 : 0; // 2 bugs, 2 fees, 0 hackers
+      return type === 'fee' ? 2 : 0; // 0 bugs (desactivados), 2 fees, 0 hackers
     case 2:
-      return type === 'bug' ? 4 : type === 'fee' ? 3 : 1; // 4 bugs, 3 fees, 1 hacker
+      return type === 'fee' ? 3 : 1; // 0 bugs (desactivados), 3 fees, 1 hacker
     case 3:
-      return type === 'bug' ? 6 : type === 'fee' ? 4 : 1; // 6 bugs, 4 fees, 1 hacker (era 3)
+      return type === 'fee' ? 4 : 1; // 0 bugs (desactivados), 4 fees, 1 hacker
     case 4:
-      return type === 'bug' ? 8 : type === 'fee' ? 5 : 1; // 8 bugs, 5 fees, 1 hacker (era 4)
+      return type === 'fee' ? 5 : 1; // 0 bugs (desactivados), 5 fees, 1 hacker
     default:
-      return type === 'bug' ? 8 : type === 'fee' ? 5 : 1; // Nivel 5+ igual que nivel 4, pero solo 1 hacker
+      return type === 'fee' ? 5 : 1; // Nivel 5+ igual que nivel 4, pero solo 1 hacker
   }
 };
 
@@ -2822,25 +2811,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  continue;
              }
              
-             if (checkCollision(newToken, obstacle)) {
-                 // NUEVA LÓGICA SIMPLIFICADA DE COLISIÓN - Reescrita para bugs
-                 const now = getGameTime();
-                 
-                 // Registrar cada colisión detectada para depuración con más detalle
-                 console.log(`[COLISIÓN] ¡Detectada con ${obstacle.type}! Token: (${newToken.x.toFixed(1)}, ${newToken.y.toFixed(1)}) - ${obstacle.type}: (${obstacle.x.toFixed(1)}, ${obstacle.y.toFixed(1)})`);
-                 
-                 // Si es un bug, game over inmediato (a menos que tenga inmunidad de purr)
-                 if (obstacle.type === 'bug') {
-                     if (newToken.immunityTimer > 0) {
-                         console.log('[BUG] ¡Colisión con bug pero inmune por purr! No hay daño.');
-                         // NO continuar con la lógica de daño normal - salir del bucle de colisiones
-                         collidedObstacle = true;
-                         break;
-                     } else {
-                         console.log('[BUG] ¡Colisión con bug! Game over inmediato.');
-                        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: 0, gameOverReason: 'bug', treasureState };
-                     }
-                 }
+            if (checkCollision(newToken, obstacle)) {
+                // TEMPORALMENTE DESACTIVADO: Saltar colisiones con bugs
+                if (obstacle.type === 'bug') {
+                    console.log('[BUG] Colisión con bug ignorada - bugs desactivados temporalmente');
+                    continue; // Saltar esta colisión
+                }
+                
+                // NUEVA LÓGICA SIMPLIFICADA DE COLISIÓN - Reescrita para bugs
+                const now = getGameTime();
+                
+                // Registrar cada colisión detectada para depuración con más detalle
+                console.log(`[COLISIÓN] ¡Detectada con ${obstacle.type}! Token: (${newToken.x.toFixed(1)}, ${newToken.y.toFixed(1)}) - ${obstacle.type}: (${obstacle.x.toFixed(1)}, ${obstacle.y.toFixed(1)})`);
+                
+                // BUGS TEMPORALMENTE DESACTIVADOS - Ya no hay lógica de colisión con bugs
                  
                  // Control de invulnerabilidad para otros obstáculos
                  const timeSinceLastDamage = prev.lastDamageTime ? now - prev.lastDamageTime : Infinity;
