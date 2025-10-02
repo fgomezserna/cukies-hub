@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone, TreasureState } from '@/types/game';
 import type { SoundType } from './useAudio';
 import {
   GAME_DURATION_SECONDS, DIFFICULTY_INCREASE_INTERVAL_SECONDS,
@@ -21,20 +21,7 @@ import {
 } from '../lib/constants';
 import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
-import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_FIRST_APPEAR_MIN_S, TREASURE_FIRST_APPEAR_MAX_S, TREASURE_NEXT_BLOCK_MIN_S, TREASURE_NEXT_BLOCK_MAX_S } from '../lib/constants';
-
-// --- TESORO: Estado de bloque secuencial ---
-const TREASURE_MS = TREASURE_LIFETIME_MS;
-const TREASURE_BLINK_MS = TREASURE_BLINK_WARNING_MS;
-
-interface TreasureBlockState {
-  active: boolean;
-  blockIndex: number; // 0 (ninguno), 1..3
-  blockCompletedCount: number; // bloques completos históricos
-  createdAt: number; // gameTime ms
-  nextBlockStartAt: number | null; // gameTime ms cuando debe aparecer el primer tesoro del próximo bloque
-  lastSpawnTime: number; // Timestamp del último spawn para evitar spawns duplicados
-}
+import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_NEXT_BLOCK_MIN_S, TREASURE_NEXT_BLOCK_MAX_S, TREASURE_BLOCK_BASE_POINTS } from '../lib/constants';
 
 const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
   id: 'token',
@@ -116,6 +103,7 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   },
   redZones: [],
   nextRedZoneSpawnTime: null,
+  treasureState: createInitialTreasureState(),
 });
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
@@ -448,8 +436,8 @@ const createRayInZone = (
     }
 
     const width = Math.min(RAY_THICKNESS, canvasSize.width);
-    const globalMinCenter = canvasSize.width * 0.1;
-    const globalMaxCenter = canvasSize.width * 0.9;
+    const globalMinCenter = canvasSize.width * 0.2;
+    const globalMaxCenter = canvasSize.width * 0.8;
     const zoneMinCenter = zone.xMin;
     const zoneMaxCenter = zone.xMax;
 
@@ -482,8 +470,8 @@ const createRayInZone = (
   }
 
   const height = Math.min(RAY_THICKNESS, canvasSize.height);
-  const globalMinCenter = canvasSize.height * 0.1;
-  const globalMaxCenter = canvasSize.height * 0.9;
+  const globalMinCenter = canvasSize.height * 0.2;
+  const globalMaxCenter = canvasSize.height * 0.8;
   const zoneMinCenter = zone.yMin;
   const zoneMaxCenter = zone.yMax;
 
@@ -555,6 +543,14 @@ const isTokenInsideRedZone = (token: Token, zone: RedZone): boolean => {
   const dy = token.y - closestY;
   return dx * dx + dy * dy <= token.radius * token.radius;
 };
+
+const createInitialTreasureState = (): TreasureState => ({
+  activeTreasureId: null,
+  activeSpawnTime: null,
+  nextSpawnTime: null,
+  treasuresCollectedInBlock: 0,
+  successfulBlocks: 0,
+});
 
 // --- FUNCIONES HELPER PARA SISTEMA DE TIMING INDEPENDIENTE ---
 // Función para generar intervalo aleatorio entre min y max
@@ -1053,6 +1049,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       setGameState(prev => {
         const countdownStartTime = getGameTime();
         const { obstacles, collectibles } = initializeGameObjects(1, prev.canvasSize.width, prev.canvasSize.height); // Obtener datos
+        const initialTreasureState = createInitialTreasureState();
+        initialTreasureState.nextSpawnTime = countdownStartTime + getRandomFloat(0, 60000);
         return {
           ...prev, // Keep the newly initialized objects
           status: 'countdown',
@@ -1113,6 +1111,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           },
           redZones: [],
           nextRedZoneSpawnTime: null,
+          treasureState: initialTreasureState,
         };
       });
     }
@@ -1193,26 +1192,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       }
 
     setGameState(prev => {
-      // --- TESORO: Estado persistente por referencias ---
-      // Guardamos el estado en una propiedad interna de prev para persistir entre frames
-      // @ts-ignore
-      if (!prev.__treasureBlock) {
-        const startNow = getGameTime();
-        (prev as any).__treasureBlock = {
-          active: false,
-          blockIndex: 0,
-          blockCompletedCount: 0,
-          createdAt: startNow,
-          nextBlockStartAt: startNow + (TREASURE_FIRST_APPEAR_MIN_S * 1000 + Math.random() * ((TREASURE_FIRST_APPEAR_MAX_S - TREASURE_FIRST_APPEAR_MIN_S) * 1000)),
-          lastSpawnTime: 0,
-        } as TreasureBlockState;
-      }
-      const treasureState = (prev as any).__treasureBlock as TreasureBlockState;
-      // Si estamos en los primeros 2s de una nueva partida, garantizar que el contador esté a 0
-      const nowForReset = getGameTime();
-      if (prev.gameStartTime && (nowForReset - prev.gameStartTime) < 2000) {
-        treasureState.blockCompletedCount = 0;
-      }
       let lastDamageTime = prev.lastDamageTime;
       let lastDamageSource = prev.lastDamageSource;
       let scoreStealEffect = prev.scoreStealEffect;
@@ -1220,6 +1199,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let rayCycle = { ...prev.rayCycle };
       let redZones = prev.redZones.map(zone => ({ ...zone }));
       let nextRedZoneSpawnTime = prev.nextRedZoneSpawnTime;
+      let treasureState = prev.treasureState ? { ...prev.treasureState } : createInitialTreasureState();
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -2032,54 +2012,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         return newObs;
       });
 
-       // --- Update Collectibles (e.g., slight movement or effects) ---
+      // --- Update Collectibles (e.g., slight movement or effects) ---
       let newCollectibles = [...prev.collectibles];
-      // --- TESORO: helpers y disparo inicial ---
-      const spawnTreasure = (when: number) => {
-        newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
-        const t = createTreasureCollectible(generateId(), prev.canvasSize.width, prev.canvasSize.height, when);
-        newCollectibles.push(t);
-      };
-      const scheduleNextBlock = (nowMs: number) => {
-        const min = TREASURE_NEXT_BLOCK_MIN_S * 1000;
-        const max = TREASURE_NEXT_BLOCK_MAX_S * 1000;
-        treasureState.active = false;
-        treasureState.blockIndex = 0;
-        treasureState.createdAt = nowMs;
-        treasureState.nextBlockStartAt = nowMs + (min + Math.random() * (max - min));
-        newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
-      };
-      // Programar primer bloque anclado al inicio de partida si aún no existe timestamp
-      if (!treasureState.nextBlockStartAt && prev.gameStartTime) {
-        const firstMin = TREASURE_FIRST_APPEAR_MIN_S * 1000;
-        const firstMax = TREASURE_FIRST_APPEAR_MAX_S * 1000;
-        treasureState.nextBlockStartAt = prev.gameStartTime + (firstMin + Math.random() * (firstMax - firstMin));
-      }
-      // Lanzar bloque cuando llegue su momento
-      if (!treasureState.active && treasureState.nextBlockStartAt && now >= treasureState.nextBlockStartAt) {
-        treasureState.active = true;
-        treasureState.blockIndex = 1;
-        treasureState.createdAt = now;
-        treasureState.lastSpawnTime = now;
-        spawnTreasure(now);
-        console.log(`[TREASURE] 🎯 Iniciando bloque ${treasureState.blockCompletedCount + 1} - Treasure 1 spawneado`);
-      }
-      
-      // Spawnear siguiente treasure del bloque cuando ya existe un bloque activo y no hay treasures en pantalla
-      // Esto ocurre después de recoger el treasure anterior (1→2 o 2→3)
-      if (treasureState.active && treasureState.blockIndex > 0 && treasureState.blockIndex <= 3) {
-        const existingTreasure = newCollectibles.find(c => c.type === 'treasure');
-        // Solo spawnear si no hay treasure en pantalla Y no hemos spawneado este índice todavía
-        // Usamos una diferencia de tiempo mínima para evitar spawns duplicados del mismo frame
-        const timeSinceLastSpawn = now - treasureState.lastSpawnTime;
-        if (!existingTreasure && timeSinceLastSpawn > 50) { // Mínimo 50ms entre spawns
-          // No hay treasure en pantalla, spawnear el siguiente
-          treasureState.lastSpawnTime = now;
-          spawnTreasure(now);
-          console.log(`[TREASURE] ✨ Treasure ${treasureState.blockIndex} del bloque ${treasureState.blockCompletedCount + 1} spawneado`);
-        }
-      }
-       let newVisualEffects = [...prev.visualEffects]; // Mover declaración aquí
+      let newVisualEffects = [...prev.visualEffects]; // Mover declaración aquí
        
        // Actualizar efectos visuales (pulsación)
        newCollectibles = newCollectibles.map(collectible => {
@@ -2296,6 +2231,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 rayCycle,
                 lastDamageSource: 'redZone',
                 lastDamageTime: now,
+                treasureState,
               };
             }
           }
@@ -2319,6 +2255,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 rayCycle,
                 lastDamageSource: 'redZone',
                 lastDamageTime: now,
+                treasureState,
               };
             }
           }
@@ -2337,6 +2274,44 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           redZones.push(newZone);
           nextRedZoneSpawnTime = now + getRandomFloat(RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS);
           console.log(`[RED ZONE] Nueva zona en (${newZone.x.toFixed(1)}, ${newZone.y.toFixed(1)}) - ${newZone.width.toFixed(1)}x${newZone.height.toFixed(1)}px`);
+        }
+
+        if (
+          treasureState.activeTreasureId &&
+          treasureState.activeSpawnTime !== null &&
+          now - treasureState.activeSpawnTime >= TREASURE_LIFETIME_MS
+        ) {
+          newCollectibles = newCollectibles.filter(c => c.id !== treasureState.activeTreasureId);
+          treasureState.activeTreasureId = null;
+          treasureState.activeSpawnTime = null;
+          treasureState.treasuresCollectedInBlock = 0;
+          treasureState.successfulBlocks = 0;
+          treasureState.nextSpawnTime = now + getRandomFloat(
+            TREASURE_NEXT_BLOCK_MIN_S * 1000,
+            TREASURE_NEXT_BLOCK_MAX_S * 1000
+          );
+          console.log('[TREASURE] 🛑 Tesoro expirado sin recoger. Reiniciando bloque.');
+        }
+
+        if (
+          !treasureState.activeTreasureId &&
+          treasureState.nextSpawnTime !== null &&
+          now >= treasureState.nextSpawnTime
+        ) {
+          const treasureId = generateId();
+          const treasureCollectible = createTreasureCollectible(
+            treasureId,
+            prev.canvasSize.width,
+            prev.canvasSize.height,
+            now
+          );
+          treasureCollectible.createdAt = now;
+          newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
+          newCollectibles.push(treasureCollectible);
+          treasureState.activeTreasureId = treasureId;
+          treasureState.activeSpawnTime = now;
+          treasureState.nextSpawnTime = null;
+          console.log(`[TREASURE] ✨ Tesoro ${treasureState.treasuresCollectedInBlock + 1} del bloque actual spawneado`);
         }
       }
 
@@ -2448,11 +2423,51 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
        let timePenaltyAccumulator = 0;
        
        // Procesar cada collectible individualmente
-       for (const collectible of newCollectibles) {
-         const isColliding = checkCollision(newToken, collectible);
-         
-         // Lógica especial para vaul (sistema de barra de progreso acumulativa)
-         if (collectible.type === 'vaul') {
+      for (const collectible of newCollectibles) {
+        const isColliding = checkCollision(newToken, collectible);
+
+        if (collectible.type === 'treasure') {
+          if (treasureState.activeTreasureId !== collectible.id) {
+            // Tesoro obsoleto, eliminarlo silenciosamente
+            continue;
+          }
+
+          const createdAt = collectible.createdAt ?? treasureState.activeSpawnTime ?? now;
+          const timeAlive = now - createdAt;
+          const timeRemaining = TREASURE_LIFETIME_MS - timeAlive;
+          collectible.isBlinking = timeRemaining <= TREASURE_BLINK_WARNING_MS && timeRemaining > 0;
+
+          if (isColliding) {
+            const currentIndex = treasureState.treasuresCollectedInBlock;
+            const basePoints = TREASURE_BLOCK_BASE_POINTS[Math.min(currentIndex, TREASURE_BLOCK_BASE_POINTS.length - 1)];
+            const multiplier = treasureState.successfulBlocks + 1;
+            const treasurePoints = basePoints * multiplier;
+            scoreToAdd += treasurePoints;
+            onPlaySound?.('energy_collect');
+            treasureState.treasuresCollectedInBlock = currentIndex + 1;
+            treasureState.activeTreasureId = null;
+            treasureState.activeSpawnTime = null;
+
+            if (treasureState.treasuresCollectedInBlock >= 3) {
+              treasureState.successfulBlocks += 1;
+              treasureState.treasuresCollectedInBlock = 0;
+              treasureState.nextSpawnTime = now + getRandomFloat(
+                TREASURE_NEXT_BLOCK_MIN_S * 1000,
+                TREASURE_NEXT_BLOCK_MAX_S * 1000
+              );
+              console.log(`[TREASURE] ✅ Bloque completado. Siguiente bloque en ${(treasureState.nextSpawnTime - now) / 1000}s`);
+            } else {
+              treasureState.nextSpawnTime = now;
+              console.log(`[TREASURE] 🎯 Tesoro ${currentIndex + 1} recogido. Próximo en ${treasureState.treasuresCollectedInBlock + 1}`);
+            }
+
+            continue;
+          }
+          continue;
+        }
+
+        // Lógica especial para vaul (sistema de barra de progreso acumulativa)
+        if (collectible.type === 'vaul') {
            if (isColliding) {
              // Token está tocando el vaul
              if (!collectible.isBeingTouched) {
@@ -2625,43 +2640,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           if (collectible.type === 'energy') {
             if (onEnergyCollected) onEnergyCollected();
           }
-          if (collectible.type === 'treasure') {
-            // Puntuación por bloque:
-            // Bloque 0 (inicial): 5,5,15 (total 25)
-            // Cada bloque COMPLETADO aumenta +25 totales => multiplicador (1 + bloquesCompletados)
-            const base = [5, 5, 15];
-            const idx = Math.max(1, Math.min(3, treasureState.blockIndex)) - 1; // 0..2
-            // Multiplicador basado en bloques COMPLETADOS previamente
-            const completedBlocks = treasureState.blockCompletedCount || 0;
-            const multiplier = 1 + completedBlocks;
-            const points = base[idx] * multiplier;
-            scoreToAdd += points;
-            onPlaySound?.('energy_collect');
-            
-            console.log(`[TREASURE] 💰 Recogido treasure ${treasureState.blockIndex} del bloque ${treasureState.blockCompletedCount + 1}. Puntos: ${points}`);
-            
-            // Avanzar secuencia - el siguiente tesoro se spawneará en el próximo frame
-            if (treasureState.blockIndex < 3) {
-              // Hay más treasures en este bloque - marcar para crear el siguiente
-              treasureState.blockIndex += 1;
-              treasureState.createdAt = now;
-              console.log(`[TREASURE] ➡️ Treasure ${treasureState.blockIndex} se spawneará en el próximo frame`);
-            } else {
-              // Bloque completado - ESPERAR 45-60 segundos para el siguiente bloque
-              treasureState.blockCompletedCount += 1;
-              const min = TREASURE_NEXT_BLOCK_MIN_S * 1000; // 45000ms
-              const max = TREASURE_NEXT_BLOCK_MAX_S * 1000; // 60000ms
-              const waitTime = min + Math.random() * (max - min);
-              treasureState.active = false; // CRÍTICO: Desactivar bloque primero
-              treasureState.blockIndex = 0;
-              treasureState.createdAt = now;
-              treasureState.nextBlockStartAt = now + waitTime;
-              treasureState.lastSpawnTime = now; // Actualizar para prevenir spawns hasta el próximo bloque
-              console.log(`[TREASURE] ✅ ¡Bloque ${treasureState.blockCompletedCount} completado! Siguiente bloque en ${(waitTime/1000).toFixed(1)}s`);
-            }
-            // CRÍTICO: No procesar este treasure nuevamente
-            continue;
-          }
           if (collectible.type === 'uki') {
             console.log("Uki collected! +5 points.");
             onPlaySound?.('energy_collect'); // Usar mismo sonido que energy
@@ -2753,20 +2731,32 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  prev.canvasSize.width, 
                  prev.canvasSize.height, 
                 // Evitar solapar con TODOS los existentes y en proceso (energy, uki, etc.)
-                [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
-               );
-               remainingCollectibles.push(replacementUki);
-             }
-             // Si es tesoro, no se vuelve a añadir este mismo; el reemplazo ya fue gestionado
-             else if (collectible.type === 'treasure') {
+               [...remainingCollectibles, ...newCollectibles, newToken, ...newObstacles]
+              );
+              remainingCollectibles.push(replacementUki);
+            }
+            // Los otros tipos no se añaden si fueron recogidos
+            continue;
+          }
+
+          if (collectible.type === 'treasure') {
+            if (treasureState.activeTreasureId !== collectible.id) {
               continue;
-             }
-             // Los otros tipos no se añaden si fueron recogidos
-             continue;
-           }
-           
-           // Comprobamos el tiempo de vida para Mega_node, Heart, Purr, Vaul y Treasure
-           if (collectible.type === 'megaNode' || collectible.type === 'heart' || collectible.type === 'purr' || collectible.type === 'vaul' || collectible.type === 'treasure') {
+            }
+
+            const createdAt = collectible.createdAt ?? treasureState.activeSpawnTime ?? currentTime;
+            const timeAlive = currentTime - createdAt;
+            if (timeAlive >= TREASURE_LIFETIME_MS) {
+              continue;
+            }
+            const timeRemaining = TREASURE_LIFETIME_MS - timeAlive;
+            collectible.isBlinking = timeRemaining <= TREASURE_BLINK_WARNING_MS && timeRemaining > 0;
+            remainingCollectibles.push(collectible);
+            continue;
+          }
+
+          // Comprobamos el tiempo de vida para Mega_node, Heart, Purr y Vaul
+          if (collectible.type === 'megaNode' || collectible.type === 'heart' || collectible.type === 'purr' || collectible.type === 'vaul') {
              // Lógica especial para vaul que requiere tiempo de contacto para activarse
              if (collectible.type === 'vaul') {
                // Solo agregar si no ha sido activado
@@ -2783,9 +2773,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                }
              }
              
-             // Determinar el tiempo de vida según el tipo de coleccionable
-             const lifetimeMs = collectible.type === 'treasure' ? TREASURE_LIFETIME_MS : COLLECTIBLE_LIFETIME_MS;
-             const blinkWarningMs = collectible.type === 'treasure' ? TREASURE_BLINK_WARNING_MS : COLLECTIBLE_BLINK_WARNING_MS;
+            // Determinar el tiempo de vida según el tipo de coleccionable
+            const isTreasure = (collectible.type as CollectibleType) === 'treasure';
+            const lifetimeMs = isTreasure ? TREASURE_LIFETIME_MS : COLLECTIBLE_LIFETIME_MS;
+            const blinkWarningMs = isTreasure ? TREASURE_BLINK_WARNING_MS : COLLECTIBLE_BLINK_WARNING_MS;
              
              // Si tiene tiempo de creación y no ha pasado el tiempo límite
              if (collectible.createdAt && (currentTime - collectible.createdAt < lifetimeMs)) {
@@ -2799,10 +2790,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  console.log(`[VAUL] ¡Empezando a parpadear! Tiempo restante: ${(timeRemaining / 1000).toFixed(1)}s`);
                }
                
-               // Log específico para treasure cuando empieza a parpadear
-               if (collectible.type === 'treasure' && collectible.isBlinking) {
-                 console.log(`[TREASURE] ¡Empezando a parpadear! Tiempo restante: ${(timeRemaining / 1000).toFixed(1)}s`);
-               }
+              // Log específico para treasure cuando empieza a parpadear
+              if (isTreasure && collectible.isBlinking) {
+                console.log(`[TREASURE] ¡Empezando a parpadear! Tiempo restante: ${(timeRemaining / 1000).toFixed(1)}s`);
+              }
                
                remainingCollectibles.push(collectible);
              } else if (!collectible.createdAt) {
@@ -2811,18 +2802,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.createdAt = currentTime;
                collectible.isBlinking = false; // Recién creado, no debe parpadear
                remainingCollectibles.push(collectible);
-             } else if (collectible.type === 'treasure') {
-               // TREASURE EXPIRÓ: Reiniciar contador de bloques y programar siguiente bloque
-               const min = TREASURE_NEXT_BLOCK_MIN_S * 1000; // 45000ms
-               const max = TREASURE_NEXT_BLOCK_MAX_S * 1000; // 60000ms
-               const waitTime = min + Math.random() * (max - min);
-               console.log(`[TREASURE] ⏰ ¡Tesoro ${treasureState.blockIndex} expiró sin ser recogido! Progreso del bloque ${treasureState.blockCompletedCount + 1} PERDIDO. Siguiente bloque en ${(waitTime/1000).toFixed(1)}s`);
-               treasureState.active = false; // CRÍTICO: Desactivar bloque primero
-               treasureState.blockIndex = 0;
-               treasureState.createdAt = currentTime;
-               treasureState.nextBlockStartAt = currentTime + waitTime;
-               treasureState.lastSpawnTime = currentTime; // Actualizar para prevenir spawns hasta el próximo bloque
-               // No añadir el treasure a los collectibles restantes (se elimina)
              }
              // Si ha expirado, no lo añadimos a los collectibles restantes
            } else {
@@ -2859,7 +2838,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          break;
                      } else {
                          console.log('[BUG] ¡Colisión con bug! Game over inmediato.');
-                         return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: 0, gameOverReason: 'bug' };
+                        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: 0, gameOverReason: 'bug', treasureState };
                      }
                  }
                  
@@ -2941,7 +2920,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          // Verificar si el juego debe terminar inmediatamente
                          if (hearts <= 0) {
                              console.log(`[GAME OVER] ¡Sin corazones! Terminando juego inmediatamente.`);
-                             return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts' };
+                            return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts', treasureState };
                          }
                          
                          // Activar efecto visual de daño
@@ -3077,13 +3056,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       // Game over si se queda sin vidas
       if (hearts <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts' };
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts', treasureState };
       }
 
       // Ya no necesitamos aplicar aquí porque se aplica en el cálculo de tiempo real arriba
 
       if (remainingTime <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time' };
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time', treasureState };
       }
 
       // --- Verificar y aplicar efectos activos del vault ---
@@ -3533,6 +3512,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         rayCycle,
         redZones,
         nextRedZoneSpawnTime,
+        treasureState,
       };
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures

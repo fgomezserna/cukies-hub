@@ -146,6 +146,14 @@ export interface RedZone {
   height: number;
 }
 
+export interface TreasureState {
+  activeTreasureId: string | null;
+  activeSpawnTime: number | null;
+  nextSpawnTime: number | null;
+  treasuresCollectedInBlock: number;
+  successfulBlocks: number;
+}
+
 export interface GameState {
   status: GameStatus;
   token: Token;
@@ -215,4 +223,6 @@ export interface GameState {
   // Zonas rojas temporales
   redZones: RedZone[];
   nextRedZoneSpawnTime: number | null;
+  // Sistema de tesoros
+  treasureState: TreasureState;
 }
