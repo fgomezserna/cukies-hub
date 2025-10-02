@@ -435,12 +435,13 @@ const getNegativeSpawnPattern = (cycle: number, hackerExists: boolean): { type: 
     case 4:
       return { type: 'bug', count: 1 }; // 1 bug
     case 5:
-      // Si ya existe hacker, spawn bug en su lugar. Si no existe, spawn 1 hacker
-      if (hackerExists) {
-        return { type: 'bug', count: 1 }; // 1 bug (reemplazo del hacker)
-      } else {
-        return { type: 'hacker', count: 1 }; // 1 hacker único
-      }
+      // HACKER TEMPORALMENTE DESACTIVADO - Siempre spawn bug en su lugar
+      // if (hackerExists) {
+      //   return { type: 'bug', count: 1 }; // 1 bug (reemplazo del hacker)
+      // } else {
+      //   return { type: 'hacker', count: 1 }; // 1 hacker único
+      // }
+      return { type: 'bug', count: 1 }; // Siempre bug (hacker desactivado)
     default:
       return { type: 'fee', count: 1 }; // Fallback
   }
@@ -2822,12 +2823,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         
         // Verificar si es tiempo de hacer spawn progresivo
         if (shouldSpawnNegativeAssets(currentTime, newLastNegativeSpawnTime, prev.gameStartTime)) {
-          // Verificar si ya existe un hacker en el juego
-          const existingHacker = obstaclesToSpawn.find(obs => obs.type === 'hacker');
-          const hackerExists = existingHacker !== undefined || newHackerSpawned;
+          // HACKER TEMPORALMENTE DESACTIVADO - No verificar existencia de hacker
+          // const existingHacker = obstaclesToSpawn.find(obs => obs.type === 'hacker');
+          // const hackerExists = existingHacker !== undefined || newHackerSpawned;
           
-          // Obtener el patrón de spawn para el ciclo actual
-          const spawnPattern = getNegativeSpawnPattern(newNegativeSpawnCycle, hackerExists);
+          // Obtener el patrón de spawn para el ciclo actual (hackerExists siempre false)
+          const spawnPattern = getNegativeSpawnPattern(newNegativeSpawnCycle, false);
           
           // Crear los obstáculos según el patrón
           const newObstaclesFromPattern = createObstaclesByPattern(
@@ -2845,9 +2846,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           
           // Actualizar el tracking
           newLastNegativeSpawnTime = currentTime;
-          if (spawnPattern.type === 'hacker') {
-            newHackerSpawned = true;
-          }
+          // HACKER TEMPORALMENTE DESACTIVADO - No actualizar hackerSpawned
+          // if (spawnPattern.type === 'hacker') {
+          //   newHackerSpawned = true;
+          // }
           
           // Log detallado del spawn
           const timeFromStart = prev.gameStartTime ? (currentTime - prev.gameStartTime) / 1000 : 0;
