@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation } from '@/types/game';
 import type { SoundType } from './useAudio';
 import {
   GAME_DURATION_SECONDS, DIFFICULTY_INCREASE_INTERVAL_SECONDS,
@@ -13,7 +13,8 @@ import {
   VAUL_DOUBLE_ENERGY_COUNT, VAUL_DOUBLE_UKI_COUNT, VAUL_DOUBLE_DURATION_MIN_MS, VAUL_DOUBLE_DURATION_MAX_MS,
   VAUL_ENERGY_TO_UKI_DURATION_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
   COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
-  HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS
+  HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS,
+  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_CYCLE_COOLDOWN_MS, RAY_THICKNESS
 } from '../lib/constants';
 import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
@@ -99,6 +100,17 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   visualEffects: [], // Sin efectos iniciales
   // Efecto de robo de score por hacker
   scoreStealEffect: null,
+  // Rayos
+  rays: [],
+  rayCycle: {
+    stage: 'idle',
+    stageStartTime: null,
+    nextCycleStartTime: null,
+    lastCycleEndTime: null,
+    firstOrientation: null,
+    secondOrientation: null,
+    thirdOrientation: null,
+  },
 });
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
@@ -345,6 +357,164 @@ const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): Visual
       return newEffect;
     })
     .filter(effect => effect.elapsedTime < effect.duration); // Remover efectos terminados
+};
+
+interface ZoneBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+const getRandomOrientation = (): RayOrientation => (Math.random() < 0.5 ? 'vertical' : 'horizontal');
+
+const computeTokenZone = (
+  token: Token,
+  rays: RayHazard[],
+  canvasSize: { width: number; height: number }
+): ZoneBounds => {
+  const verticalRays = rays
+    .filter(ray => ray.orientation === 'vertical' && ray.phase === 'active')
+    .sort((a, b) => a.x - b.x);
+  const horizontalRays = rays
+    .filter(ray => ray.orientation === 'horizontal' && ray.phase === 'active')
+    .sort((a, b) => a.y - b.y);
+
+  let xMin = 0;
+  let xMax = canvasSize.width;
+
+  for (const ray of verticalRays) {
+    if (token.x < ray.x) {
+      xMax = Math.min(xMax, ray.x);
+      break;
+    }
+    if (token.x > ray.x + ray.width) {
+      xMin = Math.max(xMin, ray.x + ray.width);
+      continue;
+    }
+    // Token dentro del rayo (raro), limitar a la anchura del rayo
+    xMin = Math.max(xMin, ray.x);
+    xMax = Math.min(xMax, ray.x + ray.width);
+    break;
+  }
+
+  let yMin = 0;
+  let yMax = canvasSize.height;
+
+  for (const ray of horizontalRays) {
+    if (token.y < ray.y) {
+      yMax = Math.min(yMax, ray.y);
+      break;
+    }
+    if (token.y > ray.y + ray.height) {
+      yMin = Math.max(yMin, ray.y + ray.height);
+      continue;
+    }
+    yMin = Math.max(yMin, ray.y);
+    yMax = Math.min(yMax, ray.y + ray.height);
+    break;
+  }
+
+  if (xMax - xMin <= 0) {
+    const fallback = clamp(token.x, 0, canvasSize.width);
+    xMin = Math.max(0, fallback - 10);
+    xMax = Math.min(canvasSize.width, fallback + 10);
+  }
+
+  if (yMax - yMin <= 0) {
+    const fallback = clamp(token.y, 0, canvasSize.height);
+    yMin = Math.max(0, fallback - 10);
+    yMax = Math.min(canvasSize.height, fallback + 10);
+  }
+
+  return { xMin, xMax, yMin, yMax };
+};
+
+const createRayInZone = (
+  orientation: RayOrientation,
+  zone: ZoneBounds,
+  canvasSize: { width: number; height: number },
+  warningStartTime: number
+): RayHazard | null => {
+  if (orientation === 'vertical') {
+    const availableWidth = zone.xMax - zone.xMin;
+    if (availableWidth <= 0) {
+      return null;
+    }
+
+    const width = Math.min(RAY_THICKNESS, canvasSize.width);
+    const globalMinCenter = canvasSize.width * 0.1;
+    const globalMaxCenter = canvasSize.width * 0.9;
+    const zoneMinCenter = zone.xMin;
+    const zoneMaxCenter = zone.xMax;
+
+    const minCenter = Math.max(zoneMinCenter, globalMinCenter);
+    const maxCenter = Math.min(zoneMaxCenter, globalMaxCenter);
+
+    if (maxCenter < minCenter) {
+      return null;
+    }
+
+    const center = getRandomFloat(minCenter, maxCenter);
+    let x = center - width / 2;
+    x = clamp(x, 0, Math.max(0, canvasSize.width - width));
+
+    return {
+      id: generateId(),
+      orientation,
+      phase: 'warning',
+      warningStartTime,
+      x,
+      y: 0,
+      width,
+      height: canvasSize.height,
+    };
+  }
+
+  const availableHeight = zone.yMax - zone.yMin;
+  if (availableHeight <= 0) {
+    return null;
+  }
+
+  const height = Math.min(RAY_THICKNESS, canvasSize.height);
+  const globalMinCenter = canvasSize.height * 0.1;
+  const globalMaxCenter = canvasSize.height * 0.9;
+  const zoneMinCenter = zone.yMin;
+  const zoneMaxCenter = zone.yMax;
+
+  const minCenter = Math.max(zoneMinCenter, globalMinCenter);
+  const maxCenter = Math.min(zoneMaxCenter, globalMaxCenter);
+
+  if (maxCenter < minCenter) {
+    return null;
+  }
+
+  const center = getRandomFloat(minCenter, maxCenter);
+  let y = center - height / 2;
+  y = clamp(y, 0, Math.max(0, canvasSize.height - height));
+
+  return {
+    id: generateId(),
+    orientation,
+    phase: 'warning',
+    warningStartTime,
+    x: 0,
+    y,
+    width: canvasSize.width,
+    height,
+  };
+};
+
+const isTokenCollidingWithRay = (token: Token, ray: RayHazard): boolean => {
+  if (ray.phase !== 'active') {
+    return false;
+  }
+
+  const closestX = clamp(token.x, ray.x, ray.x + ray.width);
+  const closestY = clamp(token.y, ray.y, ray.y + ray.height);
+  const dx = token.x - closestX;
+  const dy = token.y - closestY;
+  return dx * dx + dy * dy <= token.radius * token.radius;
 };
 
 // --- FUNCIONES HELPER PARA SISTEMA DE TIMING INDEPENDIENTE ---
@@ -892,6 +1062,16 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           visualEffects: [], // Sin efectos iniciales
           // Efecto de robo de score por hacker
           scoreStealEffect: null,
+          rays: [],
+          rayCycle: {
+            stage: 'idle',
+            stageStartTime: null,
+            nextCycleStartTime: null,
+            lastCycleEndTime: null,
+            firstOrientation: null,
+            secondOrientation: null,
+            thirdOrientation: null,
+          },
         };
       });
     }
@@ -995,6 +1175,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let lastDamageTime = prev.lastDamageTime;
       let lastDamageSource = prev.lastDamageSource;
       let scoreStealEffect = prev.scoreStealEffect;
+      let rays = prev.rays.map(ray => ({ ...ray }));
+      let rayCycle = { ...prev.rayCycle };
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -1867,13 +2049,166 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
        newVisualEffects = updateVisualEffects(newVisualEffects, deltaTime);
 
        // Actualizar efecto de aura roja del marcador de score
-       if (scoreStealEffect && scoreStealEffect.active) {
-         const timeSinceSteal = now - scoreStealEffect.startTime;
-         if (timeSinceSteal >= 3000) { // 3 segundos de duración
-           scoreStealEffect = null; // Desactivar el efecto
-           console.log('[SCORE STEAL] Efecto de aura roja terminado');
-         }
-       }
+      if (scoreStealEffect && scoreStealEffect.active) {
+        const timeSinceSteal = now - scoreStealEffect.startTime;
+        if (timeSinceSteal >= 3000) { // 3 segundos de duración
+          scoreStealEffect = null; // Desactivar el efecto
+          console.log('[SCORE STEAL] Efecto de aura roja terminado');
+        }
+      }
+
+      // --- Update Ray Cycle ---
+      if (prev.status === 'playing') {
+        if (rays.length > 0) {
+          rays = rays.map(ray => {
+            const width = Math.min(ray.width, prev.canvasSize.width);
+            const height = Math.min(ray.height, prev.canvasSize.height);
+            const x = clamp(ray.x, 0, Math.max(0, prev.canvasSize.width - width));
+            const y = clamp(ray.y, 0, Math.max(0, prev.canvasSize.height - height));
+            return {
+              ...ray,
+              x,
+              y,
+              width,
+              height,
+            };
+          });
+        }
+
+        if (rayCycle.stage === 'idle') {
+          if (rayCycle.nextCycleStartTime === null) {
+            if (rayCycle.lastCycleEndTime) {
+              rayCycle.nextCycleStartTime = rayCycle.lastCycleEndTime + RAY_CYCLE_COOLDOWN_MS;
+            } else if (prev.gameStartTime) {
+              rayCycle.nextCycleStartTime = prev.gameStartTime + RAY_CYCLE_COOLDOWN_MS;
+            }
+          } else if (now >= rayCycle.nextCycleStartTime) {
+            const orientation = getRandomOrientation();
+            const firstRay = createRayInZone(
+              orientation,
+              { xMin: 0, xMax: prev.canvasSize.width, yMin: 0, yMax: prev.canvasSize.height },
+              prev.canvasSize,
+              now
+            );
+
+            if (firstRay) {
+              rays = [firstRay];
+              rayCycle.stage = 'warning1';
+              rayCycle.stageStartTime = now;
+              rayCycle.nextCycleStartTime = null;
+              rayCycle.firstOrientation = orientation;
+              rayCycle.secondOrientation = null;
+              rayCycle.thirdOrientation = null;
+              console.log(`[RAY] Inicio de ciclo - aviso ${orientation} en (${firstRay.x.toFixed(1)}, ${firstRay.y.toFixed(1)})`);
+            } else {
+              console.warn('[RAY] No se pudo crear el primer rayo, reintentando en 1s');
+              rayCycle.nextCycleStartTime = now + 1000;
+            }
+          }
+        } else if (rayCycle.stage === 'warning1') {
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_WARNING_DURATION_MS) {
+            rays = rays.map(ray => (
+              ray.phase === 'warning'
+                ? { ...ray, phase: 'active', activeStartTime: now }
+                : ray
+            ));
+            rayCycle.stage = 'active1';
+            rayCycle.stageStartTime = now;
+            console.log('[RAY] Activación del primer rayo');
+          }
+        } else if (rayCycle.stage === 'active1') {
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_STAGE_INTERVAL_MS) {
+            const zone = computeTokenZone(newToken, rays, prev.canvasSize);
+            const preferredOrientation: RayOrientation = (rayCycle.firstOrientation === 'vertical') ? 'horizontal' : 'vertical';
+            const fallbackOrientation: RayOrientation = preferredOrientation === 'vertical' ? 'horizontal' : 'vertical';
+            const orientations: RayOrientation[] = [preferredOrientation, fallbackOrientation];
+
+            let secondRay: RayHazard | null = null;
+            let chosenOrientation: RayOrientation | null = null;
+            for (const option of orientations) {
+              const candidate = createRayInZone(option, zone, prev.canvasSize, now);
+              if (candidate) {
+                secondRay = candidate;
+                chosenOrientation = option;
+                break;
+              }
+            }
+
+            if (secondRay && chosenOrientation) {
+              rays = [...rays, secondRay];
+              rayCycle.stage = 'warning2';
+              rayCycle.stageStartTime = now;
+              rayCycle.secondOrientation = chosenOrientation;
+              console.log(`[RAY] Aviso del segundo rayo ${chosenOrientation} en (${secondRay.x.toFixed(1)}, ${secondRay.y.toFixed(1)})`);
+            } else {
+              console.warn('[RAY] No se pudo posicionar el segundo rayo dentro de la zona del token');
+              rayCycle.stageStartTime = now; // Reintentar tras siguiente intervalo
+            }
+          }
+        } else if (rayCycle.stage === 'warning2') {
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_WARNING_DURATION_MS) {
+            rays = rays.map(ray => (
+              ray.phase === 'warning'
+                ? { ...ray, phase: 'active', activeStartTime: now }
+                : ray
+            ));
+            rayCycle.stage = 'active2';
+            rayCycle.stageStartTime = now;
+            console.log('[RAY] Activación del segundo rayo');
+          }
+        } else if (rayCycle.stage === 'active2') {
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_STAGE_INTERVAL_MS) {
+            const zone = computeTokenZone(newToken, rays, prev.canvasSize);
+            const orientations: RayOrientation[] = [getRandomOrientation()];
+            orientations.push(orientations[0] === 'vertical' ? 'horizontal' : 'vertical');
+
+            let thirdRay: RayHazard | null = null;
+            let chosenOrientation: RayOrientation | null = null;
+            for (const option of orientations) {
+              const candidate = createRayInZone(option, zone, prev.canvasSize, now);
+              if (candidate) {
+                thirdRay = candidate;
+                chosenOrientation = option;
+                break;
+              }
+            }
+
+            if (thirdRay && chosenOrientation) {
+              rays = [...rays, thirdRay];
+              rayCycle.stage = 'warning3';
+              rayCycle.stageStartTime = now;
+              rayCycle.thirdOrientation = chosenOrientation;
+              console.log(`[RAY] Aviso del tercer rayo ${chosenOrientation} en (${thirdRay.x.toFixed(1)}, ${thirdRay.y.toFixed(1)})`);
+            } else {
+              console.warn('[RAY] No se pudo posicionar el tercer rayo dentro de la zona del token');
+              rayCycle.stageStartTime = now; // Reintentar tras siguiente intervalo
+            }
+          }
+        } else if (rayCycle.stage === 'warning3') {
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_WARNING_DURATION_MS) {
+            rays = rays.map(ray => (
+              ray.phase === 'warning'
+                ? { ...ray, phase: 'active', activeStartTime: now }
+                : ray
+            ));
+            rayCycle.stage = 'active3';
+            rayCycle.stageStartTime = now;
+            console.log('[RAY] Activación del tercer rayo');
+          }
+        } else if (rayCycle.stage === 'active3') {
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_STAGE_INTERVAL_MS) {
+            rays = [];
+            rayCycle.stage = 'idle';
+            rayCycle.stageStartTime = null;
+            rayCycle.lastCycleEndTime = now;
+            rayCycle.nextCycleStartTime = now + RAY_CYCLE_COOLDOWN_MS;
+            rayCycle.firstOrientation = null;
+            rayCycle.secondOrientation = null;
+            rayCycle.thirdOrientation = null;
+            console.log('[RAY] Ciclo finalizado, entrando en enfriamiento');
+          }
+        }
+      }
 
       // --- Collision Detection ---
       let scoreToAdd = 0;
@@ -2542,11 +2877,73 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  newToken.x = clamp(newToken.x, newToken.radius, prev.canvasSize.width - newToken.radius);
                  newToken.y = clamp(newToken.y, newToken.radius, prev.canvasSize.height - newToken.radius);
                  
-                 collidedObstacle = true;
-                 break; // Solo manejar una colisión por frame
-             }
+                collidedObstacle = true;
+                break; // Solo manejar una colisión por frame
+            }
         }
-       } // Cerrar el bloque if para las colisiones durante 'playing'
+        if (!collidedObstacle && rays.length > 0) {
+          for (const ray of rays) {
+            if (ray.phase !== 'active') {
+              continue;
+            }
+
+            if (isTokenCollidingWithRay(newToken, ray)) {
+              const timeSinceLastDamage = lastDamageTime ? now - lastDamageTime : Infinity;
+
+              if (timeSinceLastDamage >= 500) {
+                hearts--;
+                console.log(`[RAY] Impacto en rayo ${ray.orientation} (${ray.x.toFixed(1)}, ${ray.y.toFixed(1)}) - corazones restantes: ${hearts}`);
+
+                if (onDamage) onDamage();
+                lastDamageTime = now;
+                lastDamageSource = 'ray';
+                tokenFrozenUntilRef.current = now + TOKEN_FREEZE_TIME_MS;
+
+                if (ray.orientation === 'vertical') {
+                  const rayLeft = ray.x;
+                  const rayRight = ray.x + ray.width;
+                  const rayCenter = (rayLeft + rayRight) / 2;
+                  if (newToken.x <= rayCenter) {
+                    newToken.x = rayLeft - newToken.radius;
+                  } else {
+                    newToken.x = rayRight + newToken.radius;
+                  }
+                  newToken.x = clamp(newToken.x, newToken.radius, prev.canvasSize.width - newToken.radius);
+                } else {
+                  const rayTop = ray.y;
+                  const rayBottom = ray.y + ray.height;
+                  const rayCenter = (rayTop + rayBottom) / 2;
+                  if (newToken.y <= rayCenter) {
+                    newToken.y = rayTop - newToken.radius;
+                  } else {
+                    newToken.y = rayBottom + newToken.radius;
+                  }
+                  newToken.y = clamp(newToken.y, newToken.radius, prev.canvasSize.height - newToken.radius);
+                }
+
+                if (hearts <= 0) {
+                  return {
+                    ...prev,
+                    status: 'gameOver',
+                    timer: 0,
+                    isFrenzyMode: false,
+                    score: prev.score + scoreToAdd,
+                    hearts,
+                    gameOverReason: 'hearts',
+                    rays,
+                    rayCycle,
+                  };
+                }
+              } else {
+                console.log('[RAY] Impacto durante invulnerabilidad, sin pérdida de corazón');
+              }
+
+              collidedObstacle = true;
+              break;
+            }
+          }
+        }
+      } // Cerrar el bloque if para las colisiones durante 'playing'
 
       // Game over si se queda sin vidas
       if (hearts <= 0) {
@@ -3002,6 +3399,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         vaulEffectTimeRemaining,
         vaulEffectData,
         eliminateEnemiesDisplay,
+        rays,
+        rayCycle,
       };
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
@@ -3030,4 +3429,3 @@ function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameT
   
   return collectible;
 }
-

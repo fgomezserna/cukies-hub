@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { assetLoader } from '@/lib/assetLoader';
-import type { GameState, Token, Obstacle, Collectible, DirectionType } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, DirectionType, RayHazard } from '@/types/game';
 import {
     TOKEN_COLOR, FEE_COLOR, BUG_COLOR, HACKER_COLOR,
     ENERGY_POINT_COLOR, MEGA_NODE_COLOR, SCORE_FONT, TIMER_FONT,
@@ -617,6 +617,74 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     } else {
       return velocity.y > 0 ? 'down' : 'up';
     }
+  };
+
+  const drawRay = (ctx: CanvasRenderingContext2D, ray: RayHazard, timestamp: number) => {
+    ctx.save();
+
+    const flicker = 0.5 + 0.5 * Math.sin(timestamp / 120);
+
+    if (ray.phase === 'warning') {
+      const baseAlpha = 0.25 + 0.35 * flicker;
+      ctx.globalAlpha = baseAlpha;
+      ctx.globalCompositeOperation = 'lighter';
+
+      if (ray.orientation === 'vertical') {
+        const gradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
+        gradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.6)');
+        gradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+        ctx.fillStyle = gradient;
+      } else {
+        const gradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
+        gradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.6)');
+        gradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+        ctx.fillStyle = gradient;
+      }
+
+      ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
+    } else {
+      const intensity = 0.75 + 0.25 * Math.sin(timestamp / 90);
+      ctx.globalAlpha = 0.85;
+      ctx.globalCompositeOperation = 'lighter';
+
+      if (ray.orientation === 'vertical') {
+        const gradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
+        gradient.addColorStop(0, 'rgba(80, 200, 255, 0.6)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
+        gradient.addColorStop(1, 'rgba(80, 200, 255, 0.6)');
+        ctx.fillStyle = gradient;
+      } else {
+        const gradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
+        gradient.addColorStop(0, 'rgba(80, 200, 255, 0.6)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
+        gradient.addColorStop(1, 'rgba(80, 200, 255, 0.6)');
+        ctx.fillStyle = gradient;
+      }
+
+      ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
+
+      // Núcleo brillante
+      ctx.globalAlpha = intensity;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      if (ray.orientation === 'vertical') {
+        const coreWidth = Math.max(6, ray.width * 0.25);
+        ctx.fillRect(ray.x + (ray.width - coreWidth) / 2, ray.y, coreWidth, ray.height);
+      } else {
+        const coreHeight = Math.max(6, ray.height * 0.25);
+        ctx.fillRect(ray.x, ray.y + (ray.height - coreHeight) / 2, ray.width, coreHeight);
+      }
+    }
+
+    ctx.restore();
+  };
+
+  const drawRays = (ctx: CanvasRenderingContext2D, rays: RayHazard[] | undefined, timestamp: number) => {
+    if (!rays || rays.length === 0) {
+      return;
+    }
+    rays.forEach(ray => drawRay(ctx, ray, timestamp));
   };
 
   const drawObject = (ctx: CanvasRenderingContext2D, obj: Token | Obstacle | Collectible) => {
@@ -1920,6 +1988,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
+    const timestamp = Date.now();
 
     // Dibujar fondo con imagen
     if (gridImgRef.current) {
@@ -2021,6 +2090,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.restore();
       });
     }
+
+    // Draw Rays (warnings and active beams)
+    drawRays(ctx, gameState.rays, timestamp);
 
     // Draw Token
     if (gameState.token) {

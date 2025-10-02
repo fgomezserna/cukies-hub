@@ -6,6 +6,10 @@ export const FPS = 60;
 export const FRAME_TIME_MS = 1000 / FPS;
 export const MEGA_NODE_BOOST_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos para coincidir con purr
 export const PURR_IMMUNITY_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos
+export const RAY_WARNING_DURATION_MS = 3000; // Tiempo que dura la luz de aviso antes de que aparezca el rayo
+export const RAY_STAGE_INTERVAL_MS = 5000; // Tiempo entre la activación de cada rayo consecutivo dentro del ciclo
+export const RAY_CYCLE_COOLDOWN_MS = 60000; // Tiempo de espera entre ciclos completos de rayos
+export const RAY_THICKNESS = 120; // Grosor del rayo en píxeles para cubrir un borde completo
 
 // Token Properties
 export const TOKEN_RADIUS = 24; // 48x48px - Mantener este como base

@@ -107,6 +107,31 @@ export interface Collectible extends GameObject {
 
 export type GameStatus = 'idle' | 'countdown' | 'playing' | 'paused' | 'gameOver';
 
+export type RayOrientation = 'vertical' | 'horizontal';
+export type RayPhase = 'warning' | 'active';
+
+export interface RayHazard {
+  id: string;
+  orientation: RayOrientation;
+  phase: RayPhase;
+  warningStartTime: number; // Tiempo cuando empezó el aviso
+  activeStartTime?: number; // Tiempo cuando se activó el rayo
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface RayCycleState {
+  stage: 'idle' | 'warning1' | 'active1' | 'warning2' | 'active2' | 'warning3' | 'active3';
+  stageStartTime: number | null;
+  nextCycleStartTime: number | null;
+  lastCycleEndTime: number | null;
+  firstOrientation: RayOrientation | null;
+  secondOrientation: RayOrientation | null;
+  thirdOrientation: RayOrientation | null;
+}
+
 export interface GameState {
   status: GameStatus;
   token: Token;
@@ -120,7 +145,7 @@ export interface GameState {
   canvasSize: { width: number; height: number };
   hearts: number; // Vidas del token
   lastDamageTime?: number | null; // Tiempo del último daño
-  lastDamageSource?: ObstacleType | null; // Tipo de obstáculo que causó el último daño
+  lastDamageSource?: ObstacleType | 'ray' | null; // Tipo de obstáculo que causó el último daño
   gameOverReason?: 'bug' | 'time' | 'hearts'; // Razón del game over
   countdown?: number; // Número actual de la cuenta atrás (3, 2, 1)
   countdownStartTime?: number; // Timestamp cuando empezó la cuenta atrás
@@ -170,4 +195,7 @@ export interface GameState {
     active: boolean;
     startTime: number;
   } | null;
+  // Rayos (hazards periódicos)
+  rays: RayHazard[];
+  rayCycle: RayCycleState;
 }
