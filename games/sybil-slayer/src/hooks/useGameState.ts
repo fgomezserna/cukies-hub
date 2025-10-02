@@ -8,6 +8,7 @@ import {
   COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
   CHECKPOINT_APPEAR_THRESHOLD, CHECKPOINT_TIME_BONUS_START, CHECKPOINT_TIME_BONUS_STEP, CHECKPOINT_TIME_BONUS_MIN,
   HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
+  MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, HEART_BONUS_POINTS, VAUL_SPAWN_INTERVAL_MS,
   VAUL_EFFECT_TYPES, VAUL_MULTIPLIER_MIN, VAUL_MULTIPLIER_MAX, VAUL_MULTIPLIER_DURATION_MIN_MS, VAUL_MULTIPLIER_DURATION_MAX_MS,
   VAUL_DOUBLE_ENERGY_COUNT, VAUL_DOUBLE_UKI_COUNT, VAUL_DOUBLE_DURATION_MIN_MS, VAUL_DOUBLE_DURATION_MAX_MS,
   VAUL_ENERGY_TO_UKI_DURATION_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
@@ -71,12 +72,18 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   checkpointTimeBonus: 0, // Tiempo extra acumulado por checkpoints
   timePenalties: 0, // Penalizaciones de tiempo acumuladas
   // Sistema de rondas equilibradas para assets positivos
-  positiveAssetsRound: ['megaNode', 'heart', 'purr', 'vaul'], // Todos disponibles al inicio
+  positiveAssetsRound: ['megaNode', 'heart', 'vaul'], // Purr temporalmente desactivado
   currentRoundNumber: 1, // Empezar en ronda 1
   // Sistema de garantía mínima de assets positivos
   lastPositiveAssetTime: null, // Sin assets spawneados inicialmente
   positiveAssetsIn30s: 0, // Contador inicial en 0
   periodStartTime: null, // Se establecerá cuando empiece el juego
+  // Nuevo sistema de timing independiente
+  lastMegaNodeSpawn: null, // Última vez que spawneó un megaNode
+  nextMegaNodeInterval: null, // Próximo intervalo aleatorio para meganode
+  lastHeartSpawn: null, // Última vez que spawneó un heart
+  nextHeartInterval: null, // Próximo intervalo aleatorio para heart
+  lastVaulSpawn: null, // Última vez que spawneó un vaul
   // Sistema de aparición progresiva de assets negativos (cada 10s)
   negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
   lastNegativeSpawnTime: null, // Sin spawns iniciales
@@ -340,6 +347,12 @@ const updateVisualEffects = (effects: VisualEffect[], deltaTime: number): Visual
     .filter(effect => effect.elapsedTime < effect.duration); // Remover efectos terminados
 };
 
+// --- FUNCIONES HELPER PARA SISTEMA DE TIMING INDEPENDIENTE ---
+// Función para generar intervalo aleatorio entre min y max
+const getRandomInterval = (minMs: number, maxMs: number): number => {
+  return getRandomInt(minMs, maxMs + 1); // +1 para incluir maxMs
+};
+
 // --- SISTEMA DE RONDAS EQUILIBRADAS PARA ASSETS POSITIVOS ---
 // Función para obtener un asset disponible de la ronda actual
 const getNextPositiveAsset = (availableAssets: ('megaNode' | 'heart' | 'purr' | 'vaul')[]): ('megaNode' | 'heart' | 'purr' | 'vaul') | null => {
@@ -359,7 +372,7 @@ const removeAssetFromRound = (availableAssets: ('megaNode' | 'heart' | 'purr' | 
 
 // Función para resetear la ronda cuando se completa
 const resetPositiveAssetsRound = (): ('megaNode' | 'heart' | 'purr' | 'vaul')[] => {
-  return ['megaNode', 'heart', 'purr', 'vaul'];
+  return ['megaNode', 'heart', 'vaul']; // Purr temporalmente desactivado
 };
 
 // --- SISTEMA DE GARANTÍA MÍNIMA DE ASSETS POSITIVOS ---
@@ -851,12 +864,18 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           lastDamageTime: null, // Resetear último daño
           lastDamageSource: null, // Resetear fuente de daño
           // Sistema de rondas equilibradas para assets positivos
-          positiveAssetsRound: ['megaNode', 'heart', 'purr', 'vaul'], // Resetear ronda completa
+          positiveAssetsRound: ['megaNode', 'heart', 'vaul'], // Resetear ronda completa (Purr temporalmente desactivado)
           currentRoundNumber: 1, // Empezar en ronda 1
           // Sistema de garantía mínima de assets positivos
           lastPositiveAssetTime: null, // Sin assets spawneados inicialmente
           positiveAssetsIn30s: 0, // Contador inicial en 0
           periodStartTime: null, // Se establecerá cuando empiece el juego
+          // Nuevo sistema de timing independiente
+          lastMegaNodeSpawn: null, // Última vez que spawneó un megaNode
+          nextMegaNodeInterval: null, // Próximo intervalo aleatorio para meganode
+          lastHeartSpawn: null, // Última vez que spawneó un heart
+          nextHeartInterval: null, // Próximo intervalo aleatorio para heart
+          lastVaulSpawn: null, // Última vez que spawneó un vaul
           // Sistema de aparición progresiva de assets negativos (cada 10s)
           negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
           lastNegativeSpawnTime: null, // Sin spawns iniciales
@@ -2185,8 +2204,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           if (collectible.type === 'heart') {
              if (hearts < 3) {
                hearts++;
-               console.log(`[HEART] ❤️ Corazón recogido! Reproduciendo life.mp3`);
+               console.log(`[HEART] ❤️ Corazón recogido! +1 vida. Reproduciendo life.mp3`);
                console.log(`[HEART] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
+               onPlaySound?.('heart_collect');
+             } else {
+               // Si ya tiene 3 vidas, otorgar 10 puntos
+               scoreToAdd += HEART_BONUS_POINTS;
+               console.log(`[HEART] ❤️ Corazón recogido con 3 vidas! +${HEART_BONUS_POINTS} puntos`);
                onPlaySound?.('heart_collect');
              }
              continue; // No añadir el heart a los restantes
@@ -2833,101 +2857,72 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           newNegativeSpawnCycle++;
         }
 
-        // --- SISTEMA DE RONDAS EQUILIBRADAS PARA ASSETS POSITIVOS ---
-        // En lugar de spawn individual, usar un sistema unificado
-        let newPositiveAssetsRound = [...prev.positiveAssetsRound];
-        let newRoundNumber = prev.currentRoundNumber;
-        let newLastPositiveAssetTime = prev.lastPositiveAssetTime;
-        let newPositiveAssetsIn30s = prev.positiveAssetsIn30s;
-        let newPeriodStartTime = prev.periodStartTime;
-        
-        // Inicializar período si es la primera vez
-        if (!newPeriodStartTime && prev.gameStartTime) {
-          newPeriodStartTime = currentTime;
-          console.log(`[GARANTÍA] Iniciando primer período de 30s de tracking de assets positivos`);
-        }
-        
-        // Verificar si necesitamos resetear el contador de período (cada 30s)
-        if (newPeriodStartTime && (currentTime - newPeriodStartTime >= PERIOD_DURATION_MS)) {
-          const assetsInCompletedPeriod = newPositiveAssetsIn30s;
-          newPeriodStartTime = currentTime;
-          newPositiveAssetsIn30s = 0;
-          console.log(`[GARANTÍA] Período completado - Assets spawneados: ${assetsInCompletedPeriod}/${MINIMUM_ASSETS_PER_30S} (nuevo período iniciado)`);
-        }
+        // --- NUEVO SISTEMA DE TIMING INDEPENDIENTE CON INTERVALOS ALEATORIOS ---
+        let newLastMegaNodeSpawn = prev.lastMegaNodeSpawn;
+        let newNextMegaNodeInterval = prev.nextMegaNodeInterval;
+        let newLastHeartSpawn = prev.lastHeartSpawn;
+        let newNextHeartInterval = prev.nextHeartInterval;
+        let newLastVaulSpawn = prev.lastVaulSpawn;
         
         // Verificar si ya existe alguno de estos collectibles
         const hasMegaNode = remainingCollectibles.some(c => c.type === 'megaNode');
         const hasHeart = remainingCollectibles.some(c => c.type === 'heart');
-        const hasPurr = remainingCollectibles.some(c => c.type === 'purr');
         const hasVaul = remainingCollectibles.some(c => c.type === 'vaul');
         
-        // Solo intentar spawn si no hay ningún asset positivo activo
-        const hasAnyPositiveAsset = hasMegaNode || hasHeart || hasPurr || hasVaul;
+        // SPAWN MEGANODE - Intervalo aleatorio entre 30-45s
+        if (!hasMegaNode) {
+          // Generar primer intervalo si no existe
+          if (newNextMegaNodeInterval === null) {
+            newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+            console.log(`[MEGANODE] Primer intervalo generado: ${newNextMegaNodeInterval/1000}s`);
+          }
+          
+          // Verificar si es hora de spawnear
+          const timeSinceLastSpawn = newLastMegaNodeSpawn ? (currentTime - newLastMegaNodeSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
+          if (timeSinceLastSpawn >= newNextMegaNodeInterval) {
+            const newCollectible = safeSpawnCollectible(createMegaNodeCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+            if (newCollectible) {
+              remainingCollectibles.push(newCollectible);
+              newLastMegaNodeSpawn = currentTime;
+              // Generar próximo intervalo aleatorio
+              newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+              console.log(`[MEGANODE] Spawned independientemente - próximo en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
+            }
+          }
+        }
         
-        if (!hasAnyPositiveAsset && newPositiveAssetsRound.length > 0) {
-          // Determinar si forzar spawn o usar probabilidad
-          const shouldForceSpawn = shouldForcePositiveAssetSpawn(currentTime, newPeriodStartTime, newPositiveAssetsIn30s);
-          const dynamicSpawnChance = getDynamicSpawnChance(currentTime, newPeriodStartTime, newPositiveAssetsIn30s);
+        // SPAWN HEART - Intervalo aleatorio entre 30-45s - Siempre aparece
+        if (!hasHeart) {
+          // Generar primer intervalo si no existe
+          if (newNextHeartInterval === null) {
+            newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS);
+            console.log(`[HEART] Primer intervalo generado: ${newNextHeartInterval/1000}s`);
+          }
           
-          const shouldSpawn = shouldForceSpawn || Math.random() < dynamicSpawnChance;
-          
-          if (shouldSpawn) {
-            // Seleccionar el próximo asset de la ronda actual
-            const nextAsset = getNextPositiveAsset(newPositiveAssetsRound);
-            
-            if (nextAsset) {
-              // Crear el asset seleccionado
-              let newCollectible: Collectible | null = null;
-              
-              switch (nextAsset) {
-                case 'megaNode':
-                  newCollectible = safeSpawnCollectible(createMegaNodeCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
-                  break;
-                case 'heart':
-                  // Solo crear heart si no tiene ya 3 corazones
-                  if (hearts < 3) {
-                    newCollectible = safeSpawnCollectible(createHeartCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
-                  }
-                  break;
-                case 'purr':
-                  newCollectible = safeSpawnCollectible(createPurrCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
-                  break;
-                case 'vaul':
-                  newCollectible = safeSpawnCollectible(createVaulCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
-                  break;
-              }
-              
-              // Si se creó exitosamente, añadirlo y quitar de la ronda
-              if (newCollectible) {
-                remainingCollectibles.push(newCollectible);
-                newPositiveAssetsRound = removeAssetFromRound(newPositiveAssetsRound, nextAsset);
-                
-                // Actualizar tracking de garantía mínima
-                newLastPositiveAssetTime = currentTime;
-                newPositiveAssetsIn30s++;
-                
-                const spawnReason = shouldForceSpawn ? "FORZADO" : "PROBABILIDAD";
-                const timeInPeriod = newPeriodStartTime ? (currentTime - newPeriodStartTime) / 1000 : 0;
-                console.log(`[RONDA ${newRoundNumber}] Spawning ${nextAsset} (${spawnReason}) - Assets en período: ${newPositiveAssetsIn30s}/${MINIMUM_ASSETS_PER_30S} - Tiempo: ${timeInPeriod.toFixed(1)}s`);
-                
-                // Si se completó la ronda, resetear para la siguiente
-                if (newPositiveAssetsRound.length === 0) {
-                  newPositiveAssetsRound = resetPositiveAssetsRound();
-                  newRoundNumber++;
-                  console.log(`[RONDA COMPLETADA] Empezando ronda ${newRoundNumber} con todos los assets disponibles`);
-                }
-              } else {
-                // Si no se pudo crear (ej: heart cuando ya tiene 3), quitar de la ronda de todas formas
-                newPositiveAssetsRound = removeAssetFromRound(newPositiveAssetsRound, nextAsset);
-                console.log(`[RONDA ${newRoundNumber}] Asset ${nextAsset} no se pudo crear, saltando (assets restantes: ${newPositiveAssetsRound.length})`);
-                
-                // Si se completó la ronda, resetear
-                if (newPositiveAssetsRound.length === 0) {
-                  newPositiveAssetsRound = resetPositiveAssetsRound();
-                  newRoundNumber++;
-                  console.log(`[RONDA COMPLETADA] Empezando ronda ${newRoundNumber} con todos los assets disponibles`);
-                }
-              }
+          // Verificar si es hora de spawnear
+          const timeSinceLastSpawn = newLastHeartSpawn ? (currentTime - newLastHeartSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
+          if (timeSinceLastSpawn >= newNextHeartInterval) {
+            const newCollectible = safeSpawnCollectible(createHeartCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+            if (newCollectible) {
+              remainingCollectibles.push(newCollectible);
+              newLastHeartSpawn = currentTime;
+              // Generar próximo intervalo aleatorio
+              newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS);
+              console.log(`[HEART] Spawned independientemente - próximo en ${newNextHeartInterval/1000}s (aleatorio)`);
+            }
+          }
+        }
+        
+        // SPAWN VAULT - Cada 60s (fijo)
+        if (!hasVaul) {
+          // Verificar si es hora de spawnear
+          const timeSinceLastSpawn = newLastVaulSpawn ? (currentTime - newLastVaulSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
+          if (timeSinceLastSpawn >= VAUL_SPAWN_INTERVAL_MS) {
+            const newCollectible = safeSpawnCollectible(createVaulCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+            if (newCollectible) {
+              remainingCollectibles.push(newCollectible);
+              newLastVaulSpawn = currentTime;
+              console.log(`[VAULT] Spawned independientemente - próximo en ${VAUL_SPAWN_INTERVAL_MS/1000}s`);
             }
           }
         }
@@ -2978,13 +2973,19 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         multiplierTimeRemaining,
         checkpointTimeBonus: prev.checkpointTimeBonus + checkpointBonus,
         timePenalties: prev.timePenalties + timePenaltyAccumulator,
-        // Sistema de rondas equilibradas para assets positivos
-        positiveAssetsRound: newPositiveAssetsRound,
-        currentRoundNumber: newRoundNumber,
-        // Sistema de garantía mínima de assets positivos
-        lastPositiveAssetTime: newLastPositiveAssetTime, // Sin assets spawneados inicialmente
-        positiveAssetsIn30s: newPositiveAssetsIn30s, // Contador inicial en 0
-        periodStartTime: newPeriodStartTime, // Se establecerá cuando empiece el juego
+        // Sistema de rondas equilibradas para assets positivos (mantenido para compatibilidad)
+        positiveAssetsRound: prev.positiveAssetsRound, // Ya no se usa activamente
+        currentRoundNumber: prev.currentRoundNumber, // Ya no se usa activamente
+        // Sistema de garantía mínima de assets positivos (mantenido para compatibilidad)
+        lastPositiveAssetTime: prev.lastPositiveAssetTime, // Ya no se usa activamente
+        positiveAssetsIn30s: prev.positiveAssetsIn30s, // Ya no se usa activamente
+        periodStartTime: prev.periodStartTime, // Ya no se usa activamente
+        // Nuevo sistema de timing independiente
+        lastMegaNodeSpawn: newLastMegaNodeSpawn,
+        nextMegaNodeInterval: newNextMegaNodeInterval,
+        lastHeartSpawn: newLastHeartSpawn,
+        nextHeartInterval: newNextHeartInterval,
+        lastVaulSpawn: newLastVaulSpawn,
         // Sistema de aparición progresiva de assets negativos
         negativeSpawnCycle: newNegativeSpawnCycle,
         lastNegativeSpawnTime: newLastNegativeSpawnTime,

@@ -137,6 +137,12 @@ export interface GameState {
   lastPositiveAssetTime: number | null; // Timestamp del último asset positivo spawneado
   positiveAssetsIn30s: number; // Contador de assets positivos aparecidos en los últimos 30s
   periodStartTime: number | null; // Inicio del período actual de 30s
+  // Nuevo sistema de timing independiente
+  lastMegaNodeSpawn: number | null; // Última vez que spawneó un megaNode
+  nextMegaNodeInterval: number | null; // Próximo intervalo aleatorio para meganode
+  lastHeartSpawn: number | null; // Última vez que spawneó un heart
+  nextHeartInterval: number | null; // Próximo intervalo aleatorio para heart
+  lastVaulSpawn: number | null; // Última vez que spawneó un vaul
   // Sistema de aparición progresiva de assets negativos (cada 10s)
   negativeSpawnCycle: number; // Posición actual en el ciclo (1-5)
   lastNegativeSpawnTime: number | null; // Timestamp del último spawn de asset negativo

@@ -91,13 +91,21 @@ export const TREASURE_NEXT_BLOCK_MAX_S = 60;
 export const TREASURE_BLOCK_BASE_POINTS: [number, number, number] = [5, 5, 15];
 export const TREASURE_BLOCK_INCREMENT = 25; // incremento por bloque completado
 
-// Collectible Spawning
+// Collectible Spawning - Sistema de timing independiente
 export const INITIAL_ENERGY_POINTS = 10; // Siempre 10 energy iniciales
 export const MEGA_NODE_SPAWN_CHANCE = 0.0005; // Reducido de 0.002 a 0.0005 (4 veces menos frecuente)
 export const PURR_SPAWN_CHANCE = 0.0003; // Reducido de 0.0015 a 0.0003 (5 veces menos frecuente)
 export const VAUL_SPAWN_CHANCE = 0.0002; // Reducido de 0.001 a 0.0002 (5 veces menos frecuente)
 export const MAX_ENERGY_POINTS = 10; // Siempre mantener exactamente 10 energy en pantalla
 export const MAX_UKI_POINTS = 3; // Siempre mantener exactamente 3 uki en pantalla
+
+// Nuevo sistema de timing independiente
+export const MEGA_NODE_SPAWN_INTERVAL_MIN_MS = 30000; // 30s mínimo
+export const MEGA_NODE_SPAWN_INTERVAL_MAX_MS = 45000; // 45s máximo
+export const HEART_SPAWN_INTERVAL_MIN_MS = 30000; // 30s mínimo
+export const HEART_SPAWN_INTERVAL_MAX_MS = 45000; // 45s máximo
+export const HEART_BONUS_POINTS = 10; // Puntos cuando se recolecta con 3 vidas
+export const VAUL_SPAWN_INTERVAL_MS = 60000; // 60s fijo
 
 // Tiempo de vida en ms para Mega_node y Heart
 export const COLLECTIBLE_LIFETIME_MS = 10000; // 10 segundos
