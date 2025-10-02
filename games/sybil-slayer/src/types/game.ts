@@ -25,7 +25,7 @@ export type Token = GameObject & {
 
 export type ObstacleType = 'fee' | 'bug' | 'hacker';
 
-export type DirectionType = 'up' | 'down' | 'left' | 'right';
+export type DirectionType = 'up' | 'down' | 'left' | 'right' | 'north_east' | 'north_west' | 'south_east' | 'south_west';
 
 export interface Obstacle extends GameObject {
   type: ObstacleType;

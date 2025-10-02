@@ -169,14 +169,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     up: [],
     down: [],
     left: [],
-    right: []
+    right: [],
+    north_east: [],
+    north_west: [],
+    south_east: [],
+    south_west: []
   });
   // Referencias para los sprites de boost (run)
   const tokenRunSpritesRef = useRef<Record<DirectionType, HTMLImageElement[]>>({
     up: [],
     down: [],
     left: [],
-    right: []
+    right: [],
+    north_east: [],
+    north_west: [],
+    south_east: [],
+    south_west: []
   });
   // Contador de frames para la animación del token
   const tokenFrameCounterRef = useRef<number>(0);
@@ -382,7 +390,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       up: { dir: 'north', abbr: 'n' },
       down: { dir: 'south', abbr: 's' },
       left: { dir: 'west', abbr: 'w' },
-      right: { dir: 'east', abbr: 'e' }
+      right: { dir: 'east', abbr: 'e' },
+      north_east: { dir: 'north_east', abbr: 'ne' },
+      north_west: { dir: 'north_west', abbr: 'nw' },
+      south_east: { dir: 'south_east', abbr: 'se' },
+      south_west: { dir: 'south_west', abbr: 'sw' }
     };
 
     (Object.keys(cukieMap) as DirectionType[]).forEach(direction => {
@@ -611,7 +623,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
   // Función para determinar la dirección basada en el vector de velocidad
   const getDirection = (velocity: { x: number, y: number }): DirectionType => {
-    // Si el movimiento horizontal es mayor que el vertical
+    // Detectar movimiento diagonal
+    const isDiagonal = Math.abs(velocity.x) > 0 && Math.abs(velocity.y) > 0;
+    
+    if (isDiagonal) {
+      // Movimiento diagonal
+      if (velocity.x > 0 && velocity.y < 0) {
+        return 'north_east';
+      } else if (velocity.x < 0 && velocity.y < 0) {
+        return 'north_west';
+      } else if (velocity.x > 0 && velocity.y > 0) {
+        return 'south_east';
+      } else if (velocity.x < 0 && velocity.y > 0) {
+        return 'south_west';
+      }
+    }
+    
+    // Movimiento cardinal
     if (Math.abs(velocity.x) > Math.abs(velocity.y)) {
       return velocity.x > 0 ? 'right' : 'left';
     } else {

@@ -141,7 +141,11 @@ export class SpriteManager {
       { dir: 'north', abbr: 'n', key: `${keyPrefix}_up` },
       { dir: 'south', abbr: 's', key: `${keyPrefix}_down` },
       { dir: 'west', abbr: 'w', key: `${keyPrefix}_left` },
-      { dir: 'east', abbr: 'e', key: `${keyPrefix}_right` }
+      { dir: 'east', abbr: 'e', key: `${keyPrefix}_right` },
+      { dir: 'north_east', abbr: 'ne', key: `${keyPrefix}_north_east` },
+      { dir: 'north_west', abbr: 'nw', key: `${keyPrefix}_north_west` },
+      { dir: 'south_east', abbr: 'se', key: `${keyPrefix}_south_east` },
+      { dir: 'south_west', abbr: 'sw', key: `${keyPrefix}_south_west` }
     ];
 
     const pad2 = (n: number) => n.toString().padStart(2, '0');

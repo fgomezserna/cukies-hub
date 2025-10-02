@@ -1261,12 +1261,29 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (!isFrozen) {
         newToken.velocity = { x: direction.x, y: direction.y };
 
-        // Calcular dirección del token (igual que fee)
+        // Calcular dirección del token con soporte para direcciones diagonales
         if (direction.x !== 0 || direction.y !== 0) {
-          if (Math.abs(direction.x) > Math.abs(direction.y)) {
-            newToken.direction = direction.x > 0 ? 'right' : 'left';
+          // Detectar movimiento diagonal
+          const isDiagonal = Math.abs(direction.x) > 0 && Math.abs(direction.y) > 0;
+          
+          if (isDiagonal) {
+            // Movimiento diagonal
+            if (direction.x > 0 && direction.y < 0) {
+              newToken.direction = 'north_east';
+            } else if (direction.x < 0 && direction.y < 0) {
+              newToken.direction = 'north_west';
+            } else if (direction.x > 0 && direction.y > 0) {
+              newToken.direction = 'south_east';
+            } else if (direction.x < 0 && direction.y > 0) {
+              newToken.direction = 'south_west';
+            }
           } else {
-            newToken.direction = direction.y > 0 ? 'down' : 'up';
+            // Movimiento cardinal
+            if (Math.abs(direction.x) > Math.abs(direction.y)) {
+              newToken.direction = direction.x > 0 ? 'right' : 'left';
+            } else {
+              newToken.direction = direction.y > 0 ? 'down' : 'up';
+            }
           }
         }
 
