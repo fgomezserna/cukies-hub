@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { assetLoader } from '@/lib/assetLoader';
-import type { GameState, Token, Obstacle, Collectible, DirectionType, RayHazard } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, DirectionType, RayHazard, RedZone } from '@/types/game';
 import {
     TOKEN_COLOR, FEE_COLOR, BUG_COLOR, HACKER_COLOR,
     ENERGY_POINT_COLOR, MEGA_NODE_COLOR, SCORE_FONT, TIMER_FONT,
@@ -685,6 +685,35 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       return;
     }
     rays.forEach(ray => drawRay(ctx, ray, timestamp));
+  };
+
+  const drawRedZone = (ctx: CanvasRenderingContext2D, zone: RedZone, timestamp: number) => {
+    ctx.save();
+
+    if (zone.phase === 'warning') {
+      const flicker = 0.5 + 0.5 * Math.sin(timestamp / 150);
+      ctx.globalAlpha = 0.25 + 0.35 * flicker;
+      ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+      ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+    } else {
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = 'rgba(220, 30, 30, 0.85)';
+      ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+    }
+
+    ctx.restore();
+  };
+
+  const drawRedZones = (ctx: CanvasRenderingContext2D, zones: RedZone[] | undefined, timestamp: number) => {
+    if (!zones || zones.length === 0) {
+      return;
+    }
+    zones.forEach(zone => drawRedZone(ctx, zone, timestamp));
   };
 
   const drawObject = (ctx: CanvasRenderingContext2D, obj: Token | Obstacle | Collectible) => {
@@ -2093,6 +2122,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Draw Rays (warnings and active beams)
     drawRays(ctx, gameState.rays, timestamp);
+
+    // Draw Red Zones
+    drawRedZones(ctx, gameState.redZones, timestamp);
 
     // Draw Token
     if (gameState.token) {

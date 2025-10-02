@@ -11,6 +11,18 @@ export const RAY_STAGE_INTERVAL_MS = 5000; // Tiempo entre la activación de cad
 export const RAY_CYCLE_COOLDOWN_MS = 60000; // Tiempo de espera entre ciclos completos de rayos
 export const RAY_THICKNESS = 120; // Grosor del rayo en píxeles para cubrir un borde completo
 
+// Red Zone Properties
+export const RED_ZONE_WARNING_DURATION_MS = 3000; // Tiempo de aviso parpadeando
+export const RED_ZONE_ACTIVE_DURATION_MIN_MS = 5000; // Duración mínima activa
+export const RED_ZONE_ACTIVE_DURATION_MAX_MS = 10000; // Duración máxima activa
+export const RED_ZONE_SPAWN_INTERVAL_MIN_MS = 7000; // Tiempo mínimo entre spawns
+export const RED_ZONE_SPAWN_INTERVAL_MAX_MS = 14000; // Tiempo máximo entre spawns
+export const RED_ZONE_MAX_COUNT = 3; // Máximo de zonas simultáneas
+export const RED_ZONE_MIN_WIDTH_RATIO = 0.18; // Cobertura mínima del ancho del canvas
+export const RED_ZONE_MAX_WIDTH_RATIO = 0.32; // Cobertura máxima del ancho del canvas
+export const RED_ZONE_MIN_HEIGHT_RATIO = 0.18; // Cobertura mínima del alto del canvas
+export const RED_ZONE_MAX_HEIGHT_RATIO = 0.32; // Cobertura máxima del alto del canvas
+
 // Token Properties
 export const TOKEN_RADIUS = 24; // 48x48px - Mantener este como base
 export const TOKEN_BASE_SPEED = 5;

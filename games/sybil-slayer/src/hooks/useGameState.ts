@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone } from '@/types/game';
 import type { SoundType } from './useAudio';
 import {
   GAME_DURATION_SECONDS, DIFFICULTY_INCREASE_INTERVAL_SECONDS,
@@ -14,7 +14,10 @@ import {
   VAUL_ENERGY_TO_UKI_DURATION_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
   COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS,
-  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_CYCLE_COOLDOWN_MS, RAY_THICKNESS
+  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_CYCLE_COOLDOWN_MS, RAY_THICKNESS,
+  RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
+  RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
+  RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO
 } from '../lib/constants';
 import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
@@ -111,6 +114,8 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
     secondOrientation: null,
     thirdOrientation: null,
   },
+  redZones: [],
+  nextRedZoneSpawnTime: null,
 });
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
@@ -512,6 +517,40 @@ const isTokenCollidingWithRay = (token: Token, ray: RayHazard): boolean => {
 
   const closestX = clamp(token.x, ray.x, ray.x + ray.width);
   const closestY = clamp(token.y, ray.y, ray.y + ray.height);
+  const dx = token.x - closestX;
+  const dy = token.y - closestY;
+  return dx * dx + dy * dy <= token.radius * token.radius;
+};
+
+const createRedZone = (
+  canvasSize: { width: number; height: number },
+  warningStartTime: number
+): RedZone => {
+  const widthRatio = getRandomFloat(RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO);
+  const heightRatio = getRandomFloat(RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO);
+  const width = Math.max(20, Math.min(canvasSize.width * widthRatio, canvasSize.width));
+  const height = Math.max(20, Math.min(canvasSize.height * heightRatio, canvasSize.height));
+  const maxX = Math.max(0, canvasSize.width - width);
+  const maxY = Math.max(0, canvasSize.height - height);
+  const x = getRandomFloat(0, maxX);
+  const y = getRandomFloat(0, maxY);
+  const activeDuration = getRandomFloat(RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS);
+
+  return {
+    id: generateId(),
+    phase: 'warning',
+    warningStartTime,
+    activeDuration,
+    x,
+    y,
+    width,
+    height,
+  };
+};
+
+const isTokenInsideRedZone = (token: Token, zone: RedZone): boolean => {
+  const closestX = clamp(token.x, zone.x, zone.x + zone.width);
+  const closestY = clamp(token.y, zone.y, zone.y + zone.height);
   const dx = token.x - closestX;
   const dy = token.y - closestY;
   return dx * dx + dy * dy <= token.radius * token.radius;
@@ -1072,6 +1111,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             secondOrientation: null,
             thirdOrientation: null,
           },
+          redZones: [],
+          nextRedZoneSpawnTime: null,
         };
       });
     }
@@ -1177,6 +1218,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let scoreStealEffect = prev.scoreStealEffect;
       let rays = prev.rays.map(ray => ({ ...ray }));
       let rayCycle = { ...prev.rayCycle };
+      let redZones = prev.redZones.map(zone => ({ ...zone }));
+      let nextRedZoneSpawnTime = prev.nextRedZoneSpawnTime;
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -2207,6 +2250,76 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             rayCycle.thirdOrientation = null;
             console.log('[RAY] Ciclo finalizado, entrando en enfriamiento');
           }
+        }
+
+        // --- Update Red Zones ---
+        if (nextRedZoneSpawnTime === null) {
+          nextRedZoneSpawnTime = now + getRandomFloat(RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS);
+        }
+
+        const updatedRedZones: RedZone[] = [];
+        for (const zone of redZones) {
+          const zoneCopy: RedZone = { ...zone };
+
+          if (zoneCopy.phase === 'warning' && now - zoneCopy.warningStartTime >= RED_ZONE_WARNING_DURATION_MS) {
+            zoneCopy.phase = 'active';
+            zoneCopy.activeStartTime = now;
+
+            if (isTokenInsideRedZone(newToken, zoneCopy)) {
+              return {
+                ...prev,
+                status: 'gameOver',
+                timer: 0,
+                isFrenzyMode: false,
+                hearts: 0,
+                gameOverReason: 'redZone',
+                redZones: [...updatedRedZones, zoneCopy],
+                nextRedZoneSpawnTime: null,
+                rays,
+                rayCycle,
+                lastDamageSource: 'redZone',
+                lastDamageTime: now,
+              };
+            }
+          }
+
+          if (zoneCopy.phase === 'active' && zoneCopy.activeStartTime !== undefined) {
+            if (now - zoneCopy.activeStartTime >= zoneCopy.activeDuration) {
+              continue; // Remove expired zone
+            }
+
+            if (isTokenInsideRedZone(newToken, zoneCopy)) {
+              return {
+                ...prev,
+                status: 'gameOver',
+                timer: 0,
+                isFrenzyMode: false,
+                hearts: 0,
+                gameOverReason: 'redZone',
+                redZones: [...updatedRedZones, zoneCopy],
+                nextRedZoneSpawnTime: null,
+                rays,
+                rayCycle,
+                lastDamageSource: 'redZone',
+                lastDamageTime: now,
+              };
+            }
+          }
+
+          updatedRedZones.push(zoneCopy);
+        }
+
+        redZones = updatedRedZones;
+
+        if (
+          redZones.length < RED_ZONE_MAX_COUNT &&
+          nextRedZoneSpawnTime !== null &&
+          now >= nextRedZoneSpawnTime
+        ) {
+          const newZone = createRedZone(prev.canvasSize, now);
+          redZones.push(newZone);
+          nextRedZoneSpawnTime = now + getRandomFloat(RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS);
+          console.log(`[RED ZONE] Nueva zona en (${newZone.x.toFixed(1)}, ${newZone.y.toFixed(1)}) - ${newZone.width.toFixed(1)}x${newZone.height.toFixed(1)}px`);
         }
       }
 
@@ -3401,6 +3514,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         eliminateEnemiesDisplay,
         rays,
         rayCycle,
+        redZones,
+        nextRedZoneSpawnTime,
       };
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures

@@ -132,6 +132,20 @@ export interface RayCycleState {
   thirdOrientation: RayOrientation | null;
 }
 
+export type HazardPhase = 'warning' | 'active';
+
+export interface RedZone {
+  id: string;
+  phase: HazardPhase;
+  warningStartTime: number;
+  activeStartTime?: number;
+  activeDuration: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface GameState {
   status: GameStatus;
   token: Token;
@@ -145,8 +159,8 @@ export interface GameState {
   canvasSize: { width: number; height: number };
   hearts: number; // Vidas del token
   lastDamageTime?: number | null; // Tiempo del último daño
-  lastDamageSource?: ObstacleType | 'ray' | null; // Tipo de obstáculo que causó el último daño
-  gameOverReason?: 'bug' | 'time' | 'hearts'; // Razón del game over
+  lastDamageSource?: ObstacleType | 'ray' | 'redZone' | null; // Tipo de obstáculo que causó el último daño
+  gameOverReason?: 'bug' | 'time' | 'hearts' | 'redZone'; // Razón del game over
   countdown?: number; // Número actual de la cuenta atrás (3, 2, 1)
   countdownStartTime?: number; // Timestamp cuando empezó la cuenta atrás
   // Propiedades para el multiplicador de vaul
@@ -198,4 +212,7 @@ export interface GameState {
   // Rayos (hazards periódicos)
   rays: RayHazard[];
   rayCycle: RayCycleState;
+  // Zonas rojas temporales
+  redZones: RedZone[];
+  nextRedZoneSpawnTime: number | null;
 }
