@@ -9,7 +9,7 @@ export const PURR_IMMUNITY_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7
 export const RAY_WARNING_DURATION_MS = 3000; // Tiempo que dura la luz de aviso antes de que aparezca el rayo
 export const RAY_STAGE_INTERVAL_MS = 5000; // Tiempo entre la activación de cada rayo consecutivo dentro del ciclo
 export const RAY_CYCLE_COOLDOWN_MS = 60000; // Tiempo de espera entre ciclos completos de rayos
-export const RAY_THICKNESS = 120; // Grosor del rayo en píxeles para cubrir un borde completo
+export const RAY_THICKNESS = 60; // Grosor del rayo en píxeles para cubrir un borde completo
 
 // Red Zone Properties
 export const RED_ZONE_WARNING_DURATION_MS = 3000; // Tiempo de aviso parpadeando
