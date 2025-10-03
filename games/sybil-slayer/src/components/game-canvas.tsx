@@ -8,7 +8,7 @@ import {
     ENERGY_POINT_COLOR, MEGA_NODE_COLOR, SCORE_FONT, TIMER_FONT,
     MESSAGE_FONT, PAUSE_FONT, PRIMARY_COLOR_CSS, FOREGROUND_COLOR_CSS,
     DESTRUCTIVE_COLOR_CSS, ACCENT_COLOR_CSS,
-    FEE_RADIUS
+    FEE_RADIUS, RUNE_CONFIG
 } from '@/lib/constants';
 
 interface GameCanvasProps {
@@ -1179,6 +1179,54 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        return;
      }
      
+     // Dibujar runas del tótem
+     if ('type' in obj && obj.type === 'rune') {
+       const runeCollectible = obj as Collectible;
+       const runeColor = runeCollectible.color || '#9fa8da';
+       const runeRadius = runeCollectible.radius * 1.1;
+       const runeLabel = runeCollectible.runeType && RUNE_CONFIG[runeCollectible.runeType] 
+         ? RUNE_CONFIG[runeCollectible.runeType].label.charAt(0).toUpperCase() 
+         : 'R';
+
+       ctx.save();
+       ctx.shadowColor = runeColor;
+       ctx.shadowBlur = 18;
+
+       // Aura exterior
+       const gradient = ctx.createRadialGradient(obj.x, obj.y, runeRadius * 0.2, obj.x, obj.y, runeRadius);
+       gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
+       gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+       gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+       ctx.beginPath();
+       ctx.fillStyle = gradient;
+       ctx.arc(obj.x, obj.y, runeRadius * 1.4, 0, Math.PI * 2);
+       ctx.fill();
+
+       // Núcleo de la runa
+       ctx.beginPath();
+       ctx.fillStyle = runeColor;
+       ctx.globalAlpha = 0.9;
+       ctx.arc(obj.x, obj.y, runeRadius, 0, Math.PI * 2);
+       ctx.fill();
+       ctx.globalAlpha = 1;
+
+       ctx.lineWidth = 3;
+       ctx.strokeStyle = 'rgba(15, 15, 25, 0.85)';
+       ctx.stroke();
+
+       // Símbolo central
+       ctx.shadowBlur = 0;
+       ctx.fillStyle = 'rgba(10, 10, 22, 0.95)';
+       ctx.font = 'bold 18px Pixellari';
+       ctx.textAlign = 'center';
+       ctx.textBaseline = 'middle';
+       ctx.fillText(runeLabel, obj.x, obj.y + 1);
+
+       ctx.restore();
+       return;
+     }
+
      // Dibujar heart (vida extra)
      if ('type' in obj && obj.type === 'heart') {
        const heartImg = heartImgRef.current;
@@ -2332,8 +2380,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.font = '32px Pixellari'; // Más grande que SCORE_FONT
         ctx.textAlign = 'center';
         // Dibujar texto con borde
-        ctx.strokeText(`Final Score: ${gameState.score}`, width / 2, imageBottom + 60);
-        ctx.fillText(`Final Score: ${gameState.score}`, width / 2, imageBottom + 60);
+        ctx.strokeText(`Final Score: ${gameState.score.toFixed(1)}`, width / 2, imageBottom + 60);
+        ctx.fillText(`Final Score: ${gameState.score.toFixed(1)}`, width / 2, imageBottom + 60);
         
         ctx.font = '24px Pixellari'; // Más grande que TIMER_FONT
         ctx.strokeText('Press SPACE to Restart', width / 2, imageBottom + 100);
@@ -2364,7 +2412,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         }
         
         ctx.font = SCORE_FONT;
-        ctx.fillText(`Final Score: ${gameState.score}`, width / 2, height / 2 + 60);
+        ctx.fillText(`Final Score: ${gameState.score.toFixed(1)}`, width / 2, height / 2 + 60);
         ctx.font = TIMER_FONT;
         ctx.fillText('Press SPACE to Restart', width / 2, height / 2 + 120);
       }

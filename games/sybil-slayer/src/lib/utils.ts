@@ -1,8 +1,33 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Vector2D, GameObject } from "@/types/game";
+import type { Vector2D, GameObject, RuneType } from "@/types/game";
 import { Obstacle, ObstacleType, Collectible, CollectibleType } from "@/types/game";
-import { ENERGY_POINT_RADIUS, ENERGY_POINT_COLOR, ENERGY_POINT_VALUE, MEGA_NODE_RADIUS, MEGA_NODE_COLOR, MEGA_NODE_VALUE, PURR_RADIUS, PURR_COLOR, PURR_VALUE, VAUL_RADIUS, VAUL_COLOR, VAUL_VALUE, UKI_RADIUS, UKI_COLOR, UKI_VALUE, TREASURE_RADIUS, TREASURE_COLOR, FEE_RADIUS, BUG_RADIUS, HACKER_RADIUS, BUG_SAFE_ZONE } from "@/lib/constants";
+import {
+  ENERGY_POINT_RADIUS,
+  ENERGY_POINT_COLOR,
+  ENERGY_POINT_VALUE,
+  MEGA_NODE_RADIUS,
+  MEGA_NODE_COLOR,
+  MEGA_NODE_VALUE,
+  PURR_RADIUS,
+  PURR_COLOR,
+  PURR_VALUE,
+  VAUL_RADIUS,
+  VAUL_COLOR,
+  VAUL_VALUE,
+  UKI_RADIUS,
+  UKI_COLOR,
+  UKI_VALUE,
+  TREASURE_RADIUS,
+  TREASURE_COLOR,
+  FEE_RADIUS,
+  BUG_RADIUS,
+  HACKER_RADIUS,
+  BUG_SAFE_ZONE,
+  RUNE_RADIUS,
+  RUNE_CONFIG,
+  RUNE_TYPES,
+} from "@/lib/constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -266,6 +291,33 @@ export function createHeartCollectible(id: string, canvasWidth: number, canvasHe
     value: 0, // No da puntos, solo vida
     glow: false,
     createdAt: gameTime ?? Date.now(), // ✅ Usar tiempo de juego pausable si está disponible
+  };
+}
+
+/**
+ * Creates a new rune collectible for the level totem.
+ */
+export function createRuneCollectible(
+  id: string,
+  canvasWidth: number,
+  canvasHeight: number,
+  runeType?: RuneType,
+  gameTime?: number
+): Collectible {
+  const selectedRune = runeType ?? RUNE_TYPES[Math.floor(Math.random() * RUNE_TYPES.length)];
+  const runeConfig = RUNE_CONFIG[selectedRune];
+
+  return {
+    id,
+    type: 'rune',
+    runeType: selectedRune,
+    x: getRandomFloat(RUNE_RADIUS, canvasWidth - RUNE_RADIUS),
+    y: getRandomFloat(RUNE_RADIUS, canvasHeight - RUNE_RADIUS),
+    radius: RUNE_RADIUS,
+    color: runeConfig?.color ?? '#ffffff',
+    value: 0,
+    glow: false,
+    createdAt: gameTime ?? Date.now(),
   };
 }
 

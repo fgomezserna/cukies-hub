@@ -1,6 +1,10 @@
+import type { RuneType } from '@/types/game';
+
 // Game Timing
 export const GAME_DURATION_SECONDS = 30; // Duración inicial: 30 segundos (el jugador debe extenderla con checkpoints)
 export const DIFFICULTY_INCREASE_INTERVAL_SECONDS = 30; // Cambio de nivel cada 30 segundos (4 niveles en total)
+export const MAX_LEVEL_WITH_TOTEM = 4;
+export const MAX_LEVEL = 5;
 
 export const FPS = 60;
 export const FRAME_TIME_MS = 1000 / FPS;
@@ -122,6 +126,19 @@ export const HEART_SPAWN_INTERVAL_MIN_MS = 30000; // 30s mínimo
 export const HEART_SPAWN_INTERVAL_MAX_MS = 45000; // 45s máximo
 export const HEART_BONUS_POINTS = 10; // Puntos cuando se recolecta con 3 vidas
 export const VAUL_SPAWN_INTERVAL_MS = 60000; // 60s fijo
+
+// Rune system
+export const RUNE_SPAWN_INTERVAL_MS = 20000; // Una runa cada 20 segundos
+export const RUNE_SCORE_INCREMENT = 10; // Incremento base de puntuación por runa
+export const RUNE_RADIUS = 26;
+export const RUNE_TYPES: RuneType[] = ['ember', 'tide', 'gale', 'stone', 'void'];
+export const RUNE_CONFIG: Record<RuneType, { color: string; label: string }> = {
+  ember: { color: '#ff7043', label: 'Miner' },
+  tide: { color: '#29b6f6', label: 'Engineer' },
+  gale: { color: '#9ccc65', label: 'Chef' },
+  stone: { color: '#8d6e63', label: 'Farmer' },
+  void: { color: '#ab47bc', label: 'Gatherer' },
+};
 
 // Tiempo de vida en ms para Mega_node y Heart
 export const COLLECTIBLE_LIFETIME_MS = 10000; // 10 segundos

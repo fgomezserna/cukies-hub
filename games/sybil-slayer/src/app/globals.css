@@ -341,6 +341,122 @@ body {
   color: #4A90E2 !important;
 }
 
+.rune-totem {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.72);
+  border: 2px solid rgba(148, 86, 35, 0.8);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rune-totem__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Pixellari', monospace;
+  font-size: 20px;
+  color: #f5f3ff;
+  letter-spacing: 1px;
+}
+
+.rune-totem__multiplier {
+  color: #facc15;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.6);
+}
+
+.rune-totem__slots {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.rune-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 2px dashed rgba(148, 163, 184, 0.4);
+  transition: all 0.2s ease;
+  background: rgba(15, 23, 42, 0.4);
+  flex: 1;
+  min-width: 0;
+}
+
+.rune-slot--active {
+  border-style: solid;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.35);
+}
+
+.rune-slot__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Pixellari', monospace;
+  font-size: 18px;
+  border: 2px solid currentColor;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rune-slot--active .rune-slot__icon {
+  border-color: rgba(15, 23, 42, 0.85);
+}
+
+.rune-slot__label {
+  font-family: 'Pixellari', monospace;
+  font-size: 16px;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.rune-totem__footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Pixellari', monospace;
+  font-size: 14px;
+  color: #cbd5f5;
+}
+
+.rune-totem__footer span:first-child {
+  color: #facc15;
+}
+
+.rune-totem--inactive {
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.rune-totem__title {
+  font-family: 'Pixellari', monospace;
+  font-size: 20px;
+  color: #f5f3ff;
+}
+
+.rune-totem__text {
+  font-family: 'Pixellari', monospace;
+  font-size: 16px;
+  color: #cbd5f5;
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .rune-totem__slots {
+    gap: 8px;
+  }
+}
+
 /* Animación para el efecto de aura roja cuando el hacker roba score */
 @keyframes redAuraExpand {
   0% {

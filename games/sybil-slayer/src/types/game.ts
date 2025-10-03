@@ -70,7 +70,23 @@ export interface Obstacle extends GameObject {
   energyCollected?: number; // Cantidad de energy que ha recogido este hacker
 }
 
-export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki' | 'treasure';
+export type RuneType = 'ember' | 'tide' | 'gale' | 'stone' | 'void';
+
+export interface RuneSlot {
+  type: RuneType;
+  collected: boolean;
+}
+
+export interface RuneState {
+  active: boolean;
+  slots: RuneSlot[];
+  collectedTypes: RuneType[];
+  runePickupCount: number;
+  lastSpawnTime: number | null;
+  nextSpawnTime: number | null;
+}
+
+export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki' | 'treasure' | 'rune';
 
 // Tipos para efectos visuales
 export interface VisualEffect {
@@ -89,6 +105,7 @@ export interface VisualEffect {
 export interface Collectible extends GameObject {
   type: CollectibleType;
   value: number; // Score value
+  runeType?: RuneType; // Tipo de runa cuando corresponde
   // Propiedades para animación de pulsación
   pulseEffect?: boolean; // Si debe pulsar
   pulseScale?: number; // Escala actual de pulsación
@@ -225,4 +242,6 @@ export interface GameState {
   nextRedZoneSpawnTime: number | null;
   // Sistema de tesoros
   treasureState: TreasureState;
+  // Sistema de runas y tótem
+  runeState: RuneState;
 }

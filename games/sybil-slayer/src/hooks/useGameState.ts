@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone, TreasureState } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone, TreasureState, RuneState, RuneType } from '@/types/game';
 import type { SoundType } from './useAudio';
 import {
-  GAME_DURATION_SECONDS, DIFFICULTY_INCREASE_INTERVAL_SECONDS,
+  GAME_DURATION_SECONDS,
   TOKEN_RADIUS, TOKEN_BASE_SPEED, TOKEN_COLOR, TOKEN_BOOST_MULTIPLIER,
   MEGA_NODE_BOOST_DURATION_MS, PURR_IMMUNITY_DURATION_MS, MAX_OBSTACLES, INITIAL_OBSTACLE_COUNT, OBSTACLE_SPAWN_RATE_INCREASE,
   COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
@@ -17,9 +17,10 @@ import {
   RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_CYCLE_COOLDOWN_MS, RAY_THICKNESS,
   RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
-  RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO
+  RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
+  RUNE_SPAWN_INTERVAL_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES
 } from '../lib/constants';
-import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug } from '@/lib/utils';
+import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug, createRuneCollectible } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
 import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_NEXT_BLOCK_MIN_S, TREASURE_NEXT_BLOCK_MAX_S, TREASURE_BLOCK_BASE_POINTS } from '../lib/constants';
 
@@ -41,6 +42,18 @@ const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => 
   frameIndex: 0,
   frameTimer: 0,
 });
+
+const createInitialRuneState = (level: number): RuneState => {
+  const active = level <= MAX_LEVEL_WITH_TOTEM;
+  return {
+    active,
+    slots: RUNE_TYPES.map(type => ({ type, collected: false })),
+    collectedTypes: [],
+    runePickupCount: 0,
+    lastSpawnTime: null,
+    nextSpawnTime: null,
+  };
+};
 
 const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: number = 1): GameState => ({
   status: 'idle',
@@ -104,6 +117,7 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   redZones: [],
   nextRedZoneSpawnTime: null,
   treasureState: createInitialTreasureState(),
+  runeState: createInitialRuneState(level),
 });
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
@@ -221,6 +235,14 @@ const getInitialHeartsForLevel = (level: number) => Math.max(1, 3 - Math.floor((
 // --- FASE 5: ESCALADO DE PENALIZACIONES ---
 const getCollisionPenaltySecondsForLevel = (level: number) => COLLISION_PENALTY_SECONDS + (level - 1) * 2; // Penalización de tiempo sube 2s por nivel
 const getCollisionHeartLossForLevel = (level: number) => Math.min(3, 1 + Math.floor((level - 1) / 3)); // Pierde más corazones cada 3 niveles, máximo 3
+
+const getLevelScoreMultiplier = (level: number): number => {
+  if (level >= 5) return 3;
+  if (level === 4) return 2.5;
+  if (level === 3) return 2;
+  if (level === 2) return 1.5;
+  return 1;
+};
 
 // Referencia para controlar el tiempo de congelamiento del token después de un impacto
 const TOKEN_FREEZE_TIME_MS = 500; // Tiempo en ms que el token queda congelado tras ser tocado
@@ -1078,6 +1100,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           lastNegativeSpawnTime: null, // Sin spawns iniciales
           hackerSpawned: false, // No se ha spawneado hacker aún
           vaulCollectedCount: 0, // BUGFIX: Resetear contador de vaults al iniciar nueva partida
+          runeState: {
+            ...createInitialRuneState(1),
+            nextSpawnTime: countdownStartTime + RUNE_SPAWN_INTERVAL_MS,
+          },
           // Efectos del Vault
           activeVaulEffect: null, // Resetear efecto del vault
           vaulEffectStartTime: null, // Resetear tiempo del efecto
@@ -1189,6 +1215,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let redZones = prev.redZones.map(zone => ({ ...zone }));
       let nextRedZoneSpawnTime = prev.nextRedZoneSpawnTime;
       let treasureState = prev.treasureState ? { ...prev.treasureState } : createInitialTreasureState();
+      let runeState: RuneState = {
+        ...prev.runeState,
+        slots: prev.runeState.slots.map(slot => ({ ...slot })),
+        collectedTypes: [...prev.runeState.collectedTypes],
+      };
       // --- Timer basado en tiempo pausable ---
       // IMPORTANTE: Usar getGameTime() garantiza que TODOS los timers se pausan correctamente
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
@@ -1212,10 +1243,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         const gameTimeElapsed = prev.gameStartTime ? (now - prev.gameStartTime) / 1000 : 0;
       }
       
-      // Calcular nivel basado en el tiempo transcurrido pausable desde el inicio del juego,
-      // no en el tiempo restante, para que los checkpoints no afecten el nivel
+      // Tiempo transcurrido pausable desde el inicio del juego (para logs e IA)
       const gameTimeElapsed = prev.gameStartTime ? (now - prev.gameStartTime) / 1000 : 0;
-      const currentLevel = Math.min(4, Math.floor(gameTimeElapsed / DIFFICULTY_INCREASE_INTERVAL_SECONDS) + 1);
+      let currentLevel = prev.level;
+      runeState.active = currentLevel <= MAX_LEVEL_WITH_TOTEM;
+      const levelMultiplier = getLevelScoreMultiplier(prev.level);
       
 
 
@@ -2025,9 +2057,50 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            }
            
            collectible.pulseScale = newScale;
-         }
-         return collectible;
-       });
+       }
+        return collectible;
+      });
+
+      const runeSystemActive = currentLevel <= MAX_LEVEL_WITH_TOTEM;
+      runeState.active = runeSystemActive;
+
+      const runeOnField = newCollectibles.some(collectible => collectible.type === 'rune');
+
+      if (runeSystemActive) {
+        if (runeState.nextSpawnTime === null) {
+          runeState.nextSpawnTime = now + RUNE_SPAWN_INTERVAL_MS;
+        }
+
+        if (!runeOnField && runeState.nextSpawnTime !== null && now >= runeState.nextSpawnTime) {
+          const missingRunes = runeState.slots.filter(slot => !slot.collected).map(slot => slot.type);
+          let candidatePool: RuneType[] = RUNE_TYPES;
+          if (missingRunes.length > 0) {
+            candidatePool = Math.random() < 0.7 ? missingRunes : RUNE_TYPES;
+          }
+          const selectedRuneType = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+          const runeFactory = (id: string, width: number, height: number, gameTime?: number) =>
+            createRuneCollectible(id, width, height, selectedRuneType, gameTime);
+          const runeCollectible = safeSpawnCollectible(
+            runeFactory,
+            generateId(),
+            prev.canvasSize.width,
+            prev.canvasSize.height,
+            [...newCollectibles, prev.token, ...newObstacles],
+            now
+          );
+
+          newCollectibles.push(runeCollectible);
+          runeState.lastSpawnTime = now;
+          runeState.nextSpawnTime = now + RUNE_SPAWN_INTERVAL_MS;
+          console.log(`[RUNE] Nueva runa ${selectedRuneType} generada. Próxima en ${(RUNE_SPAWN_INTERVAL_MS / 1000)}s`);
+        }
+      } else {
+        if (runeOnField) {
+          newCollectibles = newCollectibles.filter(collectible => collectible.type !== 'rune');
+        }
+        runeState.lastSpawnTime = null;
+        runeState.nextSpawnTime = null;
+      }
 
        // Actualizar efectos visuales de explosión
        newVisualEffects = updateVisualEffects(newVisualEffects, deltaTime);
@@ -2310,6 +2383,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let scoreToSubtract = 0; // Para descontar puntos por Hacker
       let vaulCollectedCount = prev.vaulCollectedCount || 0;
       let vaulBonusToAdd = 0; // Bonus directo de vaul (NO debe pasar por multiplicador)
+      let runeCompletionBonus = 0; // Bonus directo por completar tótem
+      let levelShouldIncrease = false;
+      let nextLevelTarget = currentLevel;
       let remainingCollectibles: Collectible[] = [];
       let vaultJustActivated = false; // Flag para saber si se activó un vault en este frame
       // Variables para efectos del vault
@@ -2612,11 +2688,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
          
          // Lógica normal para otros collectibles
          if (isColliding) {
-           if (collectible.type === 'checkpoint') {
-             let bonus = CHECKPOINT_TIME_BONUS_START - checkpointCountRef.current * CHECKPOINT_TIME_BONUS_STEP;
-             if (bonus < CHECKPOINT_TIME_BONUS_MIN) bonus = CHECKPOINT_TIME_BONUS_MIN;
-             checkpointBonus += bonus;
-             checkpointCountRef.current++;
+         if (collectible.type === 'checkpoint') {
+            let bonus = CHECKPOINT_TIME_BONUS_START - checkpointCountRef.current * CHECKPOINT_TIME_BONUS_STEP;
+            if (bonus < CHECKPOINT_TIME_BONUS_MIN) bonus = CHECKPOINT_TIME_BONUS_MIN;
+            checkpointBonus += bonus;
+            checkpointCountRef.current++;
              
              // Añadir efecto visual similar al mega node (solo visual, sin funcionalidad de boost)
              console.log("Checkpoint collected! Visual effect activated.");
@@ -2624,11 +2700,41 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              // Usar un temporizador de brillo (1 segundo) sin cambiar la velocidad
              newToken.glowTimer = 1000; // 1 segundo de brillo
              
-             continue;
-           }
-          if (collectible.type === 'energy') {
-            if (onEnergyCollected) onEnergyCollected();
+            continue;
           }
+          if (collectible.type === 'rune') {
+            runeState.runePickupCount += 1;
+            const runePoints = RUNE_SCORE_INCREMENT * runeState.runePickupCount;
+            scoreToAdd += runePoints;
+            onPlaySound?.('energy_collect');
+
+            if (
+              runeState.active &&
+              collectible.runeType &&
+              !runeState.collectedTypes.includes(collectible.runeType)
+            ) {
+              runeState.collectedTypes.push(collectible.runeType);
+              runeState.slots = runeState.slots.map(slot =>
+                slot.type === collectible.runeType ? { ...slot, collected: true } : slot
+              );
+
+              if (!levelShouldIncrease) {
+                const allCollected = runeState.slots.every(slot => slot.collected);
+                if (allCollected && currentLevel < MAX_LEVEL) {
+                  levelShouldIncrease = true;
+                  nextLevelTarget = Math.min(MAX_LEVEL, currentLevel + 1);
+                  const safeRemainingTime = Math.max(0, remainingTime);
+                  runeCompletionBonus += Math.ceil(safeRemainingTime) * RUNE_SCORE_INCREMENT;
+                  runeState.active = false;
+                  console.log(`[RUNE] Tótem completado en nivel ${currentLevel}. Bono: ${runeCompletionBonus} puntos`);
+                }
+              }
+            }
+            continue;
+          }
+         if (collectible.type === 'energy') {
+           if (onEnergyCollected) onEnergyCollected();
+         }
           if (collectible.type === 'uki') {
             console.log("Uki collected! +5 points.");
             onPlaySound?.('energy_collect'); // Usar mismo sonido que energy
@@ -2688,8 +2794,24 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             }
             // NOTA: La lógica de treasure ya se maneja arriba (líneas 2124-2167) con continue
             // para evitar procesamiento duplicado
-         } 
-       }
+        } 
+      }
+
+      if (levelShouldIncrease) {
+        currentLevel = nextLevelTarget;
+        console.log(`[RUNE] Avanzando al nivel ${currentLevel}`);
+        runeState = createInitialRuneState(currentLevel);
+        if (runeState.active) {
+          runeState.lastSpawnTime = now;
+          runeState.nextSpawnTime = now + RUNE_SPAWN_INTERVAL_MS;
+        } else {
+          runeState.slots = RUNE_TYPES.map(type => ({ type, collected: true }));
+          runeState.collectedTypes = [...RUNE_TYPES];
+          runeState.runePickupCount = 0;
+          runeState.lastSpawnTime = null;
+          runeState.nextSpawnTime = null;
+        }
+      }
 
        // Filtramos los collectibles basados en el tiempo de vida y colisión
                 // Los Mega_node, Heart, Purr y Vaul desaparecen después de 10 segundos (COLLECTIBLE_LIFETIME_MS)
@@ -2840,7 +2962,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                      if (newToken.immunityTimer > 0) {
                          console.log(`[HACKER] ¡Colisión con hacker pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No roba monedas.`);
                      } else if (timeSinceLastDamage >= 500) { // Período de invulnerabilidad
-                         const scoreToSteal = Math.floor(prev.score * 0.2); // 20% del score actual
+                         const scoreToSteal = Number((prev.score * 0.2).toFixed(1)); // 20% del score actual con decimales
                          scoreToSubtract = scoreToSteal;
                          console.log(`[HACKER] ¡Colisión con hacker! Robó ${scoreToSteal} monedas (20% del score).`);
                          console.log(`[HACKER] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
@@ -3025,6 +3147,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                     gameOverReason: 'hearts',
                     rays,
                     rayCycle,
+                    runeState,
                   };
                 }
               } else {
@@ -3040,13 +3163,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       // Game over si se queda sin vidas
       if (hearts <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts', treasureState };
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts', treasureState, runeState };
       }
 
       // Ya no necesitamos aplicar aquí porque se aplica en el cálculo de tiempo real arriba
 
       if (remainingTime <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time', treasureState };
+        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time', treasureState, runeState };
       }
 
       // --- Verificar y aplicar efectos activos del vault ---
@@ -3187,12 +3310,16 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
       }
       
-      // Aplicar el multiplicador SOLO a los puntos de energy (NO al bonus de vaul)
-      const finalScoreToAdd = scoreToAdd * currentMultiplier;
+      if (levelMultiplier !== 1 && scoreToAdd > 0) {
+        console.log(`[LEVEL] Multiplicador de nivel (${prev.level}) x${levelMultiplier} aplicado a ${scoreToAdd} puntos base`);
+      }
+
+      // Aplicar multiplicadores de nivel y vaul a los puntos obtenidos este frame
+      const finalScoreToAdd = scoreToAdd * levelMultiplier * currentMultiplier;
       
-      // Log para depuración de multiplicador
+      // Log para depuración de multiplicador del vaul
       if (currentMultiplier > 1 && scoreToAdd > 0) {
-        console.log(`[VAUL MULTIPLIER] Aplicando x${currentMultiplier} a ${scoreToAdd} puntos de energy = ${finalScoreToAdd} puntos`);
+        console.log(`[VAUL MULTIPLIER] Multiplicando puntuación ajustada por nivel: x${currentMultiplier}`);
       }
 
        // --- Spawning Logic ---
@@ -3453,7 +3580,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         token: newToken,
         obstacles: obstaclesToSpawn,
         collectibles: remainingCollectibles,
-        score: Math.max(0, prev.score + finalScoreToAdd + vaulBonusToAdd - scoreToSubtract), // Sumamos bonus de vaul SIN multiplicador
+        score: Math.max(0, prev.score + finalScoreToAdd + vaulBonusToAdd + runeCompletionBonus - scoreToSubtract), // Sumamos bonus directos sin multiplicadores
         timer: remainingTime,
         level: currentLevel,
         isFrenzyMode: false,
@@ -3497,6 +3624,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         redZones,
         nextRedZoneSpawnTime,
         treasureState,
+        runeState,
       };
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
