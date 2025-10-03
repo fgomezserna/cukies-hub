@@ -1477,7 +1477,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       borderRadius: '8px',
                       border: '2px solid #FFD700',
                       whiteSpace: 'nowrap',
-                      animation: 'pulse 1s infinite alternate'
+                      animation: 'pulse 1s infinite alternate',
+                      zIndex: 1000
                     }}
                   >
                     x{gameState.scoreMultiplier} {gameState.multiplierTimeRemaining ?? 0}s
@@ -1502,7 +1503,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       borderRadius: '8px',
                       border: '2px solid #00FFFF',
                       whiteSpace: 'nowrap',
-                      animation: 'pulse 1s infinite alternate'
+                      animation: 'pulse 1s infinite alternate',
+                      zIndex: 1000
                     }}
                   >
                     2x Items {gameState.vaulEffectTimeRemaining}s
@@ -1527,7 +1529,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       borderRadius: '8px',
                       border: '2px solid #00BFFF',
                       whiteSpace: 'nowrap',
-                      animation: 'pulse 1s infinite alternate'
+                      animation: 'pulse 1s infinite alternate',
+                      zIndex: 1000
                     }}
                   >
                     Energy→Uki {gameState.vaulEffectTimeRemaining}s
@@ -1552,7 +1555,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       borderRadius: '8px',
                       border: '2px solid #FF4500',
                       whiteSpace: 'nowrap',
-                      animation: 'pulse 0.8s infinite alternate'
+                      animation: 'pulse 0.8s infinite alternate',
+                      zIndex: 1000
                     }}
                   >
                     💥 {gameState.eliminateEnemiesDisplay.count} Enemigos
