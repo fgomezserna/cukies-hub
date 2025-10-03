@@ -1102,7 +1102,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           vaulCollectedCount: 0, // BUGFIX: Resetear contador de vaults al iniciar nueva partida
           runeState: {
             ...createInitialRuneState(1),
-            nextSpawnTime: countdownStartTime + RUNE_SPAWN_INTERVAL_MS,
+            nextSpawnTime: null, // No spawn runes during countdown
           },
           // Efectos del Vault
           activeVaulEffect: null, // Resetear efecto del vault
@@ -1183,12 +1183,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const gameStartTime = now;
             gameStartInvulnRef.current = gameStartTime;
             console.log("Countdown finished! Starting game...");
+            
+            // Initialize rune spawn timer when game actually starts playing
+            const updatedRuneState = {
+              ...prev.runeState,
+              nextSpawnTime: now + RUNE_SPAWN_INTERVAL_MS,
+            };
+            
             return {
               ...prev,
               status: 'playing',
               gameStartTime,
               countdown: undefined,
               countdownStartTime: undefined,
+              runeState: updatedRuneState,
             };
           } else {
             // Actualizar countdown
