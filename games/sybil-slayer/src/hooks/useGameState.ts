@@ -18,7 +18,7 @@ import {
   RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
   RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
-  RUNE_SPAWN_INTERVAL_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES
+  RUNE_FIRST_SPAWN_MS, RUNE_NEXT_SPAWN_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES
 } from '../lib/constants';
 import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug, createRuneCollectible } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
@@ -1189,7 +1189,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             // Initialize rune spawn timer when game actually starts playing
             const updatedRuneState = {
               ...prev.runeState,
-              nextSpawnTime: now + RUNE_SPAWN_INTERVAL_MS,
+              nextSpawnTime: now + RUNE_FIRST_SPAWN_MS,
             };
             
             return {
@@ -2082,8 +2082,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       const runeOnField = newCollectibles.some(collectible => collectible.type === 'rune');
 
       if (runeSystemActive) {
-        if (runeState.nextSpawnTime === null) {
-          runeState.nextSpawnTime = now + RUNE_SPAWN_INTERVAL_MS;
+        // Inicializar nextSpawnTime si es null (primera runa a los 10s de partida)
+        if (runeState.nextSpawnTime === null && prev.gameStartTime) {
+          runeState.nextSpawnTime = prev.gameStartTime + RUNE_FIRST_SPAWN_MS;
+          console.log(`[RUNE] Primera runa programada para ${(RUNE_FIRST_SPAWN_MS / 1000)}s de partida`);
         }
 
         if (!runeOnField && runeState.nextSpawnTime !== null && now >= runeState.nextSpawnTime) {
@@ -2106,8 +2108,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
           newCollectibles.push(runeCollectible);
           runeState.lastSpawnTime = now;
-          runeState.nextSpawnTime = now + RUNE_SPAWN_INTERVAL_MS;
-          console.log(`[RUNE] Nueva runa ${selectedRuneType} generada. Próxima en ${(RUNE_SPAWN_INTERVAL_MS / 1000)}s`);
+          // NO establecer nextSpawnTime aquí - se establecerá cuando se recoja la runa
+          runeState.nextSpawnTime = null;
+          console.log(`[RUNE] Nueva runa ${selectedRuneType} generada. Siguiente aparecerá ${(RUNE_NEXT_SPAWN_MS / 1000)}s después de recoger esta`);
         }
       } else {
         if (runeOnField) {
@@ -2735,6 +2738,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             scoreToAdd += runePoints;
             onPlaySound?.('energy_collect');
 
+            // Programar la siguiente runa 10s después de recoger esta
+            runeState.nextSpawnTime = now + RUNE_NEXT_SPAWN_MS;
+            console.log(`[RUNE] Runa recogida! Siguiente runa en ${(RUNE_NEXT_SPAWN_MS / 1000)}s`);
+
             if (
               runeState.active &&
               collectible.runeType &&
@@ -2837,7 +2844,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         runeState = createInitialRuneState(currentLevel);
         if (runeState.active) {
           runeState.lastSpawnTime = now;
-          runeState.nextSpawnTime = now + RUNE_SPAWN_INTERVAL_MS;
+          runeState.nextSpawnTime = now + RUNE_FIRST_SPAWN_MS;
         } else {
           runeState.slots = RUNE_TYPES.map(type => ({ type, collected: true }));
           runeState.collectedTypes = [...RUNE_TYPES];

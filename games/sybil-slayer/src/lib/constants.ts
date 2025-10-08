@@ -127,7 +127,8 @@ export const VAUL_FIRST_SPAWN_MS = 30000; // 30s para el primer Vaul
 export const VAUL_NEXT_SPAWN_MS = 30000; // 30s después de terminar efecto o expirar
 
 // Rune system
-export const RUNE_SPAWN_INTERVAL_MS = 20000; // Una runa cada 20 segundos
+export const RUNE_FIRST_SPAWN_MS = 10000; // Primera runa a los 10s de partida
+export const RUNE_NEXT_SPAWN_MS = 10000; // Siguientes runas 10s después de recoger la anterior
 export const RUNE_SCORE_INCREMENT = 10; // Incremento base de puntuación por runa
 export const RUNE_RADIUS = 26;
 export const RUNE_TYPES: RuneType[] = ['ember', 'tide', 'gale', 'stone', 'void'];
