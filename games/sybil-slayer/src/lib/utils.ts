@@ -15,6 +15,9 @@ import {
   VAUL_RADIUS,
   VAUL_COLOR,
   VAUL_VALUE,
+  GOAT_SKIN_RADIUS,
+  GOAT_SKIN_COLOR,
+  GOAT_SKIN_VALUE,
   UKI_RADIUS,
   UKI_COLOR,
   UKI_VALUE,
@@ -291,6 +294,25 @@ export function createHeartCollectible(id: string, canvasWidth: number, canvasHe
     value: 0, // No da puntos, solo vida
     glow: false,
     createdAt: gameTime ?? Date.now(), // ✅ Usar tiempo de juego pausable si está disponible
+  };
+}
+
+/**
+ * Creates a new GOAT skin collectible (special power-up).
+ */
+export function createGoatSkinCollectible(id: string, canvasWidth: number, canvasHeight: number, _gameTime?: number): Collectible {
+  return {
+    id,
+    type: 'goatSkin',
+    x: getRandomFloat(GOAT_SKIN_RADIUS, canvasWidth - GOAT_SKIN_RADIUS),
+    y: getRandomFloat(GOAT_SKIN_RADIUS, canvasHeight - GOAT_SKIN_RADIUS),
+    radius: GOAT_SKIN_RADIUS,
+    color: GOAT_SKIN_COLOR,
+    value: GOAT_SKIN_VALUE,
+    glow: false,
+    pulseEffect: true,
+    pulseScale: 1.0,
+    pulseDirection: 1,
   };
 }
 

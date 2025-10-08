@@ -8,7 +8,8 @@ import {
     ENERGY_POINT_COLOR, MEGA_NODE_COLOR, SCORE_FONT, TIMER_FONT,
     MESSAGE_FONT, PAUSE_FONT, PRIMARY_COLOR_CSS, FOREGROUND_COLOR_CSS,
     DESTRUCTIVE_COLOR_CSS, ACCENT_COLOR_CSS,
-    FEE_RADIUS, RUNE_CONFIG
+    FEE_RADIUS, RUNE_CONFIG,
+    GOAT_ELIMINATION_DURATION_MS, GOAT_SKIN_COLOR
 } from '@/lib/constants';
 
 interface GameCanvasProps {
@@ -807,6 +808,64 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     zones.forEach(zone => drawRedZone(ctx, zone, timestamp));
   };
 
+  const drawGoatAura = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    baseSize: number,
+    blink: boolean,
+    eliminationRatio: number
+  ) => {
+    ctx.save();
+    const time = Date.now();
+    const pulse = 1 + 0.08 * Math.sin(time / 160);
+    const blinkFactor = blink ? (0.55 + 0.45 * Math.sin(time / 90)) : 1;
+    const intensity = 0.4 + 0.6 * eliminationRatio;
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Capa exterior suave
+    ctx.beginPath();
+    ctx.arc(x, y, (baseSize / 2) * 1.35 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 215, 0, ${0.18 * blinkFactor * intensity})`;
+    ctx.fill();
+
+    // Capa media brillante
+    ctx.beginPath();
+    ctx.arc(x, y, (baseSize / 2) * 1.05 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 235, 120, ${0.22 * blinkFactor * intensity})`;
+    ctx.fill();
+
+    // Núcleo luminoso
+    ctx.beginPath();
+    ctx.arc(x, y, (baseSize / 2) * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 200, ${0.28 * blinkFactor * intensity})`;
+    ctx.fill();
+
+    // Trazos que simulan cuernos
+    const hornHeight = baseSize * 0.4;
+    const hornWidth = baseSize * 0.18;
+    const hornYOffset = baseSize * 0.45;
+
+    ctx.fillStyle = `rgba(255, 230, 160, ${0.7 * blinkFactor})`;
+
+    ctx.beginPath();
+    ctx.moveTo(x - hornWidth, y - hornYOffset);
+    ctx.lineTo(x - hornWidth * 1.4, y - hornYOffset + hornHeight * 0.4);
+    ctx.lineTo(x - hornWidth * 0.3, y - hornYOffset + hornHeight * 0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x + hornWidth, y - hornYOffset);
+    ctx.lineTo(x + hornWidth * 1.4, y - hornYOffset + hornHeight * 0.4);
+    ctx.lineTo(x + hornWidth * 0.3, y - hornYOffset + hornHeight * 0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  };
+
   const drawObject = (ctx: CanvasRenderingContext2D, obj: Token | Obstacle | Collectible) => {
      // Determinar qué imagen usar basado en el tipo de objeto
      let img = null;
@@ -818,6 +877,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        // Si está en boost, usar sprites de run
        const isBoost = obj.boostTimer && obj.boostTimer > 0;
        const isImmune = obj.immunityTimer && obj.immunityTimer > 0;
+       const goatEliminationActive = !!(obj.goatEliminationTimer && obj.goatEliminationTimer > 0);
+       const goatImmunityActive = !!(obj.goatImmunityTimer && obj.goatImmunityTimer > 0);
+       const goatEliminationRatio = goatEliminationActive
+         ? Math.max(0, Math.min(1, (obj.goatEliminationTimer || 0) / GOAT_ELIMINATION_DURATION_MS))
+         : 0;
        const sprites = isBoost ? tokenRunSpritesRef.current : tokenSpritesRef.current;
        if (sprites[direction] && sprites[direction][frameIndex]) {
          const tokenImg = sprites[direction][frameIndex];
@@ -891,6 +955,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Dibujar el sprite con brillo combinado (púrpura dominante)
            ctx.shadowColor = `rgba(160, 32, 255, ${1.0 * blinkIntensity * fadeAlpha})`;
            ctx.shadowBlur = shouldBlink ? 35 : 25;
+           if (goatEliminationActive) {
+             drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+           }
            ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
            
          } else if (isBoost) {
@@ -912,6 +979,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Dibujar el sprite con brillo
            ctx.shadowColor = 'rgba(0, 255, 255, 0.8)';
            ctx.shadowBlur = 15;
+           if (goatEliminationActive) {
+             drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+           }
            ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
            
          } else if (isImmune) {
@@ -979,10 +1049,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Dibujar el sprite con brillo púrpura mejorado
            ctx.shadowColor = `rgba(160, 32, 255, ${1.0 * blinkIntensity * fadeAlpha})`;
            ctx.shadowBlur = shouldBlink ? 30 : 20;
+           if (goatEliminationActive) {
+             drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+           }
            ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
            
-         } else {
+        } else {
            // Dibujo normal sin efectos
+           if (goatEliminationActive) {
+             drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+           }
            ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
          }
          
@@ -1063,6 +1139,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
                // Dibujar el sprite con brillo combinado (púrpura dominante)
                ctx.shadowColor = `rgba(160, 32, 255, ${1.0 * blinkIntensity * fadeAlpha})`;
                ctx.shadowBlur = shouldBlink ? 35 : 25;
+               if (goatEliminationActive) {
+                 drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+               }
                ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
              
            } else if (isBoost) {
@@ -1084,6 +1163,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              // Dibujar el sprite con brillo
              ctx.shadowColor = 'rgba(0, 255, 255, 0.8)';
              ctx.shadowBlur = 15;
+             if (goatEliminationActive) {
+               drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+             }
+             if (goatEliminationActive) {
+               drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+             }
              ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
              
            } else if (isImmune) {
@@ -1151,6 +1236,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              // Dibujar el sprite con brillo púrpura mejorado
              ctx.shadowColor = `rgba(160, 32, 255, ${1.0 * blinkIntensity * fadeAlpha})`;
              ctx.shadowBlur = shouldBlink ? 30 : 20;
+             if (goatEliminationActive) {
+               drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
+             }
              ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
              
            } else {
@@ -1319,6 +1407,75 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          ctx.shadowBlur = 12;
          ctx.restore();
        }
+       return;
+     }
+
+     if ('type' in obj && obj.type === 'goatSkin') {
+       ctx.save();
+       ctx.translate(obj.x, obj.y);
+
+       const time = Date.now();
+       const pulse = 0.92 + 0.1 * Math.sin(time / 220);
+       const rotation = (time / 900) % (Math.PI * 2);
+       const baseRadius = obj.radius * 1.4;
+
+       // Aura dorada pulsante
+       const aura = ctx.createRadialGradient(0, 0, baseRadius * 0.4, 0, 0, baseRadius * 1.6);
+       aura.addColorStop(0, 'rgba(255, 255, 210, 0.85)');
+       aura.addColorStop(0.5, 'rgba(255, 220, 120, 0.4)');
+       aura.addColorStop(1, 'rgba(255, 215, 0, 0)');
+       ctx.globalCompositeOperation = 'lighter';
+       ctx.beginPath();
+       ctx.arc(0, 0, baseRadius * 1.6 * pulse, 0, Math.PI * 2);
+       ctx.fillStyle = aura;
+       ctx.fill();
+
+       ctx.globalCompositeOperation = 'source-over';
+       ctx.rotate(rotation);
+
+       // Hexágono principal
+       ctx.beginPath();
+       for (let i = 0; i < 6; i++) {
+         const angle = (Math.PI / 3) * i;
+         const px = Math.cos(angle) * baseRadius * pulse;
+         const py = Math.sin(angle) * baseRadius * pulse;
+         if (i === 0) ctx.moveTo(px, py);
+         else ctx.lineTo(px, py);
+       }
+       ctx.closePath();
+       ctx.fillStyle = GOAT_SKIN_COLOR;
+       ctx.fill();
+       ctx.lineWidth = 3;
+       ctx.strokeStyle = 'rgba(255, 245, 200, 0.7)';
+       ctx.stroke();
+
+       // Diamante interior brillante
+       const diamondSize = baseRadius * 0.55;
+       ctx.beginPath();
+       ctx.moveTo(0, -diamondSize);
+       ctx.lineTo(diamondSize, 0);
+       ctx.lineTo(0, diamondSize);
+       ctx.lineTo(-diamondSize, 0);
+       ctx.closePath();
+       ctx.fillStyle = 'rgba(255, 252, 224, 0.9)';
+       ctx.fill();
+
+       // Brillos adicionales
+       ctx.rotate(-rotation);
+       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+       ctx.lineWidth = 2;
+       ctx.beginPath();
+       ctx.moveTo(0, -baseRadius * 1.1);
+       ctx.lineTo(0, -baseRadius * 1.4);
+       ctx.moveTo(0, baseRadius * 1.1);
+       ctx.lineTo(0, baseRadius * 1.4);
+       ctx.moveTo(-baseRadius * 1.1, 0);
+       ctx.lineTo(-baseRadius * 1.4, 0);
+       ctx.moveTo(baseRadius * 1.1, 0);
+       ctx.lineTo(baseRadius * 1.4, 0);
+       ctx.stroke();
+
+       ctx.restore();
        return;
      }
 

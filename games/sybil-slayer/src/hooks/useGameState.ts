@@ -18,9 +18,10 @@ import {
   RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
   RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
-  RUNE_FIRST_SPAWN_MS, RUNE_NEXT_SPAWN_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES
+  RUNE_FIRST_SPAWN_MS, RUNE_NEXT_SPAWN_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES,
+  GOAT_ELIMINATION_DURATION_MS, GOAT_IMMUNITY_DURATION_MS
 } from '../lib/constants';
-import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug, createRuneCollectible } from '@/lib/utils';
+import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug, createRuneCollectible, createGoatSkinCollectible } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
 import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_NEXT_BLOCK_MIN_S, TREASURE_NEXT_BLOCK_MAX_S, TREASURE_BLOCK_BASE_POINTS } from '../lib/constants';
 
@@ -36,6 +37,10 @@ const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => 
   boostStartTime: undefined, // Inicialmente sin boost
   immunityTimer: 0,
   immunityStartTime: undefined, // Inicialmente sin inmunidad
+  goatEliminationTimer: 0,
+  goatEliminationStartTime: undefined,
+  goatImmunityTimer: 0,
+  goatImmunityStartTime: undefined,
   glowTimer: 0,
   glow: false,
   direction: 'down',
@@ -67,6 +72,7 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   isFrenzyMode: false,
   canvasSize: { width: canvasWidth, height: canvasHeight },
   hearts: getInitialHeartsForLevel(level), // Corazones iniciales escalados
+  maxHearts: getMaxHeartsForLevel(level), // Máximo de corazones basado en el nivel
   lastDamageTime: null, // Inicializar
   lastDamageSource: null, // Inicializar el tipo de obstáculo que causó el último daño
   gameOverReason: undefined,
@@ -124,9 +130,9 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
   return others.some(o => {
     // MEJORADO: Comprobar colisiones entre assets positivos y bugs
-    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki'].includes((obj as any).type);
+    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin'].includes((obj as any).type);
     const isBug = ('type' in o) && o.type === 'bug';
-    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki'].includes((o as any).type);
+    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin'].includes((o as any).type);
     const isObjBug = ('type' in obj) && (obj as any).type === 'bug';
     
     // Casos a verificar:
@@ -232,6 +238,7 @@ let lastCheckpointTime = 0;
 // --- FASE 4: ESCALADO DE CORAZONES ---
 const getHeartSpawnChanceForLevel = (level: number) => Math.max(0.005, 0.02 - (level - 1) * 0.003); // Baja 0.3% por nivel, mínimo 0.5%
 const getInitialHeartsForLevel = (level: number) => Math.max(1, 3 - Math.floor((level - 1) / 2)); // Baja 1 cada 2 niveles, mínimo 1
+const getMaxHeartsForLevel = (level: number) => 3 + (level - 1); // Nivel 1 = 3 max, Nivel 2 = 4 max, Nivel 3 = 5 max, etc.
 
 // --- FASE 5: ESCALADO DE PENALIZACIONES ---
 const getCollisionPenaltySecondsForLevel = (level: number) => COLLISION_PENALTY_SECONDS + (level - 1) * 2; // Penalización de tiempo sube 2s por nivel
@@ -1077,6 +1084,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           obstacles, // Usar los generados
           collectibles, // Usar los generados
           hearts: getInitialHeartsForLevel(1), // Reiniciar corazones
+          maxHearts: getMaxHeartsForLevel(1), // Reiniciar max corazones (nivel 1 = 3 max)
           checkpointTimeBonus: 0, // Resetear bonus de checkpoints
           timePenalties: 0, // Resetear penalizaciones de tiempo
           scoreMultiplier: 1, // Resetear multiplicador
@@ -1299,7 +1307,17 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
 
         // Apply boost
-        const currentSpeed = newToken.boostTimer > 0 ? TOKEN_BASE_SPEED * TOKEN_BOOST_MULTIPLIER : TOKEN_BASE_SPEED;
+        let currentSpeed = newToken.boostTimer > 0 ? TOKEN_BASE_SPEED * TOKEN_BOOST_MULTIPLIER : TOKEN_BASE_SPEED;
+        
+        // Check if token is inside an active red zone and apply speed reduction
+        const isInRedZone = redZones.some(zone => 
+          zone.phase === 'active' && isTokenInsideRedZone(newToken, zone)
+        );
+        
+        if (isInRedZone) {
+          currentSpeed *= 0.5; // Reduce speed to 50% when inside red zone
+        }
+        
         newToken.x += newToken.velocity.x * currentSpeed * (deltaTime / (1000 / 60)); // Scale movement by deltaTime
         newToken.y += newToken.velocity.y * currentSpeed * (deltaTime / (1000 / 60));
 
@@ -1386,6 +1404,49 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           if (newToken.immunityTimer <= 0) {
               newToken.immunityTimer = 0;
               console.log("[PURR] Inmunidad terminada (fallback)");
+          }
+      }
+      
+      // Update GOAT elimination timer (tiempo pausable)
+      if ((newToken.goatEliminationTimer || 0) > 0) {
+          if (newToken.goatEliminationStartTime) {
+              const elapsed = now - newToken.goatEliminationStartTime;
+              const remaining = GOAT_ELIMINATION_DURATION_MS - elapsed;
+              
+              if (remaining <= 0) {
+                  newToken.goatEliminationTimer = 0;
+                  newToken.goatEliminationStartTime = undefined;
+                  console.log("[GOAT] Efecto de eliminación finalizado");
+              } else {
+                  newToken.goatEliminationTimer = remaining;
+              }
+          } else {
+              // Fallback para compatibilidad si no hay startTime
+              newToken.goatEliminationTimer = Math.max(0, (newToken.goatEliminationTimer || 0) - deltaTime);
+              if ((newToken.goatEliminationTimer || 0) === 0) {
+                  console.log("[GOAT] Efecto de eliminación terminado (fallback)");
+              }
+          }
+      }
+      
+      // Update GOAT immunity timer (tiempo pausable, solo contra fees)
+      if ((newToken.goatImmunityTimer || 0) > 0) {
+          if (newToken.goatImmunityStartTime) {
+              const elapsed = now - newToken.goatImmunityStartTime;
+              const remaining = GOAT_IMMUNITY_DURATION_MS - elapsed;
+              
+              if (remaining <= 0) {
+                  newToken.goatImmunityTimer = 0;
+                  newToken.goatImmunityStartTime = undefined;
+                  console.log("[GOAT] Inmunidad contra fees finalizada");
+              } else {
+                  newToken.goatImmunityTimer = remaining;
+              }
+          } else {
+              newToken.goatImmunityTimer = Math.max(0, (newToken.goatImmunityTimer || 0) - deltaTime);
+              if ((newToken.goatImmunityTimer || 0) === 0) {
+                  console.log("[GOAT] Inmunidad contra fees finalizada (fallback)");
+              }
           }
       }
       
@@ -2047,6 +2108,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
         return newObs;
       });
+      const obstaclesMarkedForRemoval = new Set<string>();
 
       // --- Update Collectibles (e.g., slight movement or effects) ---
       let newCollectibles = [...prev.collectibles];
@@ -2302,48 +2364,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           if (zoneCopy.phase === 'warning' && now - zoneCopy.warningStartTime >= RED_ZONE_WARNING_DURATION_MS) {
             zoneCopy.phase = 'active';
             zoneCopy.activeStartTime = now;
-
-            if (isTokenInsideRedZone(newToken, zoneCopy)) {
-              return {
-                ...prev,
-                status: 'gameOver',
-                timer: 0,
-                isFrenzyMode: false,
-                hearts: 0,
-                gameOverReason: 'redZone',
-                redZones: [...updatedRedZones, zoneCopy],
-                nextRedZoneSpawnTime: null,
-                rays,
-                rayCycle,
-                lastDamageSource: 'redZone',
-                lastDamageTime: now,
-                treasureState,
-              };
-            }
+            console.log('[RED ZONE] Zona activada - reduce velocidad del token a 50%');
           }
 
           if (zoneCopy.phase === 'active' && zoneCopy.activeStartTime !== undefined) {
             if (now - zoneCopy.activeStartTime >= zoneCopy.activeDuration) {
+              console.log('[RED ZONE] Zona expirada y eliminada');
               continue; // Remove expired zone
             }
-
-            if (isTokenInsideRedZone(newToken, zoneCopy)) {
-              return {
-                ...prev,
-                status: 'gameOver',
-                timer: 0,
-                isFrenzyMode: false,
-                hearts: 0,
-                gameOverReason: 'redZone',
-                redZones: [...updatedRedZones, zoneCopy],
-                nextRedZoneSpawnTime: null,
-                rays,
-                rayCycle,
-                lastDamageSource: 'redZone',
-                lastDamageTime: now,
-                treasureState,
-              };
-            }
+            // La zona activa solo reduce la velocidad, ya no mata al token
           }
 
           updatedRedZones.push(zoneCopy);
@@ -2410,6 +2439,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let runeCompletionBonus = 0; // Bonus directo por completar tótem
       let levelShouldIncrease = false;
       let nextLevelTarget = currentLevel;
+      let levelJustIncreased = false;
       let remainingCollectibles: Collectible[] = [];
       let vaultJustActivated = false; // Flag para saber si se activó un vault en este frame
       let vaultExpired = false; // Detectar si un vault expiró sin activarse
@@ -2776,9 +2806,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           }
           if (collectible.type === 'heart') {
              heartCollected = true; // Marcar que se recogió un corazón
-             if (hearts < 3) {
+             if (hearts < prev.maxHearts) {
                hearts++;
-               console.log(`[HEART] ❤️ Corazón recogido! +1 vida. Reproduciendo life.mp3`);
+               console.log(`[HEART] ❤️ Corazón recogido! +1 vida (${hearts}/${prev.maxHearts}). Reproduciendo life.mp3`);
                console.log(`[HEART] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
                onPlaySound?.('heart_collect');
                // Resetear contador de corazones con vida completa al recuperar vida
@@ -2786,11 +2816,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  console.log(`[HEART] Contador de bonos reseteado (tenías ${prev.heartsCollectedWithFullLife} acumulados)`);
                }
              } else {
-               // Si ya tiene 3 vidas, otorgar puntos progresivos
+               // Si ya tiene máximo de vidas, otorgar puntos progresivos
                const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
                const heartPoints = HEART_BONUS_POINTS_BASE * heartCount;
                scoreToAdd += heartPoints;
-               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con 3 vidas! +${heartPoints} puntos`);
+               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos`);
                onPlaySound?.('heart_collect');
              }
              continue; // No añadir el heart a los restantes
@@ -2801,6 +2831,16 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                newToken.immunityStartTime = now; // Tiempo de juego pausable (now = getGameTime())
                newToken.immunityTimer = PURR_IMMUNITY_DURATION_MS; // Duración total
                onPlaySound?.('purr_collect');
+               continue;
+           }
+           if (collectible.type === 'goatSkin') {
+               console.log("[GOAT] Piel GOAT recogida. Habilidad activada.");
+               newToken.goatEliminationStartTime = now;
+               newToken.goatEliminationTimer = GOAT_ELIMINATION_DURATION_MS;
+               newToken.goatImmunityStartTime = now;
+               newToken.goatImmunityTimer = GOAT_IMMUNITY_DURATION_MS;
+               onPlaySound?.('mega_node_collect');
+               continue;
            }
            scoreToAdd += collectible.value;
            if (collectible.type === 'megaNode') {
@@ -2840,6 +2880,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       if (levelShouldIncrease) {
         currentLevel = nextLevelTarget;
+        levelJustIncreased = currentLevel > prev.level;
         console.log(`[RUNE] Avanzando al nivel ${currentLevel}`);
         runeState = createInitialRuneState(currentLevel);
         if (runeState.active) {
@@ -2980,6 +3021,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
        
        // BUGFIX: Solo procesar colisiones durante 'playing', NO durante 'countdown'
        if (prev.status === 'playing') {
+         const goatEliminateActive = (newToken.goatEliminationTimer || 0) > 0;
+         const goatImmunityActive = (newToken.goatImmunityTimer || 0) > 0;
          for (const obstacle of newObstacles) {
              // Saltar hackers desterrados o en retroceso - no pueden colisionar
              if (obstacle.type === 'hacker' && (obstacle.isBanished || obstacle.isRetreating)) {
@@ -2987,6 +3030,25 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              }
              
             if (checkCollision(newToken, obstacle)) {
+                if (obstacle.type === 'fee' && goatEliminateActive) {
+                    obstaclesMarkedForRemoval.add(obstacle.id);
+                    newVisualEffects.push(createExplosionEffect(obstacle.x, obstacle.y));
+                    onPlaySound?.('auch');
+                    console.log(`[GOAT] Fee eliminado por contacto (ID: ${obstacle.id})`);
+                    continue;
+                }
+                
+                if (obstacle.type === 'fee' && goatImmunityActive) {
+                    const separation = 12;
+                    const angleFromFee = Math.atan2(newToken.y - obstacle.y, newToken.x - obstacle.x);
+                    newToken.x += Math.cos(angleFromFee) * separation;
+                    newToken.y += Math.sin(angleFromFee) * separation;
+                    newToken.x = clamp(newToken.x, newToken.radius, prev.canvasSize.width - newToken.radius);
+                    newToken.y = clamp(newToken.y, newToken.radius, prev.canvasSize.height - newToken.radius);
+                    console.log(`[GOAT] Inmunidad activa: Fee ${obstacle.id} no causa daño`);
+                    continue;
+                }
+
                 // TEMPORALMENTE DESACTIVADO: Saltar colisiones con bugs
                 if (obstacle.type === 'bug') {
                     console.log('[BUG] Colisión con bug ignorada - bugs desactivados temporalmente');
@@ -3376,6 +3438,28 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         console.log(`[VAUL MULTIPLIER] Multiplicando puntuación ajustada por nivel: x${currentMultiplier}`);
       }
 
+       if (obstaclesMarkedForRemoval.size > 0) {
+       newObstacles = newObstacles.filter(obs => !obstaclesMarkedForRemoval.has(obs.id));
+      }
+
+      if (levelJustIncreased) {
+        const goatOnField = remainingCollectibles.some(c => c.type === 'goatSkin');
+        if (!goatOnField) {
+          const goatCollectible = safeSpawnCollectible(
+            createGoatSkinCollectible,
+            generateId(),
+            prev.canvasSize.width,
+            prev.canvasSize.height,
+            [...remainingCollectibles, newToken, ...newObstacles],
+            currentTime
+          );
+          remainingCollectibles.push(goatCollectible);
+          console.log(`[GOAT] Piel GOAT generada para nivel ${currentLevel}`);
+        } else {
+          console.log('[GOAT] Nivel aumentado sin generar nueva piel (ya existe una en el mapa)');
+        }
+      }
+
        // --- Spawning Logic ---
        // Spawn new obstacles if level increased
        let obstaclesToSpawn = [...newObstacles];
@@ -3675,6 +3759,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         level: currentLevel,
         isFrenzyMode: false,
         hearts,
+        maxHearts: getMaxHeartsForLevel(currentLevel), // Actualizar maxHearts según el nivel actual
         lastDamageTime,
         lastDamageSource,
         scoreMultiplier: currentMultiplier,
@@ -3694,7 +3779,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         nextMegaNodeInterval: newNextMegaNodeInterval,
         lastHeartSpawn: newLastHeartSpawn,
         nextHeartInterval: newNextHeartInterval,
-        heartsCollectedWithFullLife: heartCollected && hearts >= 3 ? (prev.heartsCollectedWithFullLife || 0) + 1 : (hearts < 3 ? 0 : prev.heartsCollectedWithFullLife || 0),
+        heartsCollectedWithFullLife: heartCollected && hearts >= prev.maxHearts ? (prev.heartsCollectedWithFullLife || 0) + 1 : (hearts < prev.maxHearts ? 0 : prev.heartsCollectedWithFullLife || 0),
         lastVaulSpawn: newLastVaulSpawn,
         // Sistema de aparición progresiva de assets negativos
         negativeSpawnCycle: newNegativeSpawnCycle,

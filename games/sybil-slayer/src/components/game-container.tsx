@@ -1196,19 +1196,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <Image 
                   src="/assets/ui/buttons/box_letters.png"
                   alt="Hearts box"
-                  width={150}
+                  width={Math.max(120, 60 + gameState.maxHearts * 32)}
                   height={50}
                   className="game-img"
+                  style={{ objectFit: 'fill' }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-primary text-shadow">
-                  {Array.from({ length: gameState.hearts }).map((_, i) => (
+                  {Array.from({ length: gameState.maxHearts }).map((_, i) => (
                     <Image
                       key={i}
                       src="/assets/collectibles/heart.png"
-                      alt="Heart"
+                      alt={i < gameState.hearts ? "Full Heart" : "Empty Heart"}
                       width={28}
                       height={28}
-                      className="inline-block mr-1 align-middle"
+                      className={`inline-block mr-1 align-middle ${i < gameState.hearts ? 'opacity-100' : 'opacity-30'}`}
                     />
                   ))}
                 </div>
@@ -1582,19 +1583,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <Image 
                   src="/assets/ui/buttons/box_letters.png"
                   alt="Hearts box"
-                  width={150}
+                  width={Math.max(120, 60 + gameState.maxHearts * 32)}
                   height={50}
                   className="game-img"
+                  style={{ objectFit: 'fill' }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-primary text-shadow">
-                  {Array.from({ length: gameState.hearts }).map((_, i) => (
+                  {Array.from({ length: gameState.maxHearts }).map((_, i) => (
                     <Image
                       key={i}
                       src="/assets/collectibles/heart.png"
-                      alt="Heart"
+                      alt={i < gameState.hearts ? "Full Heart" : "Empty Heart"}
                       width={28}
                       height={28}
-                      className="inline-block mr-1 align-middle"
+                      className={`inline-block mr-1 align-middle ${i < gameState.hearts ? 'opacity-100' : 'opacity-30'}`}
                     />
                   ))}
                 </div>

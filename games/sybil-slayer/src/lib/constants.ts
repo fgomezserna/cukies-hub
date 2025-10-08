@@ -72,6 +72,11 @@ export const VAUL_COLOR = 'hsl(45, 100%, 60%)'; // Color dorado para el cofre
 export const VAUL_VALUE = 0; // Solo proporciona efectos especiales, sin puntos directos
 export const VAUL_ACTIVATION_TIME_MS = 3000; // 3 segundos para llenar la barra completamente
 export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 3 segundos exactos
+export const GOAT_SKIN_RADIUS = 30; // Tamaño base para la piel GOAT
+export const GOAT_SKIN_COLOR = 'hsl(45, 100%, 60%)'; // Dorado brillante
+export const GOAT_SKIN_VALUE = 0; // No otorga puntos directos, solo poder temporal
+export const GOAT_ELIMINATION_DURATION_MS = 5000; // 5 segundos eliminando fees al contacto
+export const GOAT_IMMUNITY_DURATION_MS = 3000; // 3 segundos de inmunidad frente a fees
 
 // Efectos aleatorios del Vault (se elige uno al activarse)
 export const VAUL_EFFECT_TYPES = ['multiplier', 'double_collectibles', 'energy_to_uki', 'eliminate_enemies'] as const;

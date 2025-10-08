@@ -17,6 +17,10 @@ export type Token = GameObject & {
   boostStartTime?: number; // Tiempo pausable cuando se activó el boost (getGameTime())
   immunityTimer: number; // Timer for purr immunity (en ms, calculado en tiempo pausable)
   immunityStartTime?: number; // Tiempo pausable cuando se activó la inmunidad (getGameTime())
+  goatEliminationTimer?: number; // Duración restante del efecto GOAT para eliminar fees
+  goatEliminationStartTime?: number; // Tiempo pausable cuando se activó el efecto GOAT
+  goatImmunityTimer?: number; // Duración restante de la inmunidad GOAT (solo contra fees)
+  goatImmunityStartTime?: number; // Tiempo pausable cuando comenzó la inmunidad GOAT
   glowTimer?: number; // Temporizador para el efecto de brillo
   direction?: DirectionType; // Dirección actual para sprites direccionales
   frameIndex?: number; // Para animación de sprites
@@ -86,7 +90,7 @@ export interface RuneState {
   nextSpawnTime: number | null;
 }
 
-export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki' | 'treasure' | 'rune';
+export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki' | 'treasure' | 'rune' | 'goatSkin';
 
 // Tipos para efectos visuales
 export interface VisualEffect {
@@ -183,6 +187,7 @@ export interface GameState {
   isFrenzyMode: boolean;
   canvasSize: { width: number; height: number };
   hearts: number; // Vidas del token
+  maxHearts: number; // Máximo de corazones permitidos (aumenta con el nivel)
   lastDamageTime?: number | null; // Tiempo del último daño
   lastDamageSource?: ObstacleType | 'ray' | 'redZone' | null; // Tipo de obstáculo que causó el último daño
   gameOverReason?: 'bug' | 'time' | 'hearts' | 'redZone'; // Razón del game over
