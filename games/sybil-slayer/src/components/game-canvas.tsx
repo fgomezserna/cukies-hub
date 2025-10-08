@@ -2443,8 +2443,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.font = '32px Pixellari'; // Más grande que SCORE_FONT
         ctx.textAlign = 'center';
         // Dibujar texto con borde
-        ctx.strokeText(`Final Score: ${gameState.score.toFixed(1)}`, width / 2, imageBottom + 60);
-        ctx.fillText(`Final Score: ${gameState.score.toFixed(1)}`, width / 2, imageBottom + 60);
+        ctx.strokeText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 60);
+        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 60);
         
         ctx.font = '24px Pixellari'; // Más grande que TIMER_FONT
         ctx.strokeText('Press SPACE to Restart', width / 2, imageBottom + 100);
@@ -2475,7 +2475,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         }
         
         ctx.font = SCORE_FONT;
-        ctx.fillText(`Final Score: ${gameState.score.toFixed(1)}`, width / 2, height / 2 + 60);
+        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, height / 2 + 60);
         ctx.font = TIMER_FONT;
         ctx.fillText('Press SPACE to Restart', width / 2, height / 2 + 120);
       }

@@ -19,11 +19,9 @@ import type { Collectible, RuneState } from '@/types/game';
 
 
 const getLevelScoreMultiplier = (level: number): number => {
-  if (level >= 5) return 3;
-  if (level === 4) return 2.5;
-  if (level === 3) return 2;
-  if (level === 2) return 1.5;
-  return 1;
+  // Multiplicador basado en el nivel: nivel 2 = x2, nivel 3 = x3, nivel 4 = x4, nivel 5 = x5
+  if (level >= 2) return level;
+  return 1; // Nivel 1 = x1
 };
 
 const RuneTotemPanel: React.FC<{
@@ -1173,7 +1171,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span className="text-primary">
-                    Score: {gameState.score.toFixed(1)}
+                    Score: {Math.floor(gameState.score)}
                   </span>
                 </div>
               </div>
@@ -1456,7 +1454,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       animation: gameState.scoreMultiplier > 1 ? 'pulse 1s infinite alternate' : 'none'
                     }}
                   >
-                    Score: {gameState.score.toFixed(1)}
+                    Score: {Math.floor(gameState.score)}
                   </span>
                 </div>
                 {/* Temporizador de multiplicador - FUERA de la caja */}

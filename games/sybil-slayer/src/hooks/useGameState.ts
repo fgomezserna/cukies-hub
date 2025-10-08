@@ -3010,7 +3010,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                      if (newToken.immunityTimer > 0) {
                          console.log(`[HACKER] ¡Colisión con hacker pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No roba monedas.`);
                      } else if (timeSinceLastDamage >= 500) { // Período de invulnerabilidad
-                         const scoreToSteal = Number((prev.score * 0.2).toFixed(1)); // 20% del score actual con decimales
+                         const scoreToSteal = Math.floor(prev.score * 0.2); // 20% del score actual redondeado a entero
                          scoreToSubtract = scoreToSteal;
                          console.log(`[HACKER] ¡Colisión con hacker! Robó ${scoreToSteal} monedas (20% del score).`);
                          console.log(`[HACKER] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
