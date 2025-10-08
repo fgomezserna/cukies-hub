@@ -1416,7 +1416,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               if (remaining <= 0) {
                   newToken.goatEliminationTimer = 0;
                   newToken.goatEliminationStartTime = undefined;
-                  console.log("[GOAT] Efecto de eliminación finalizado");
+                  // Activar inmunidad cuando termine la eliminación
+                  newToken.goatImmunityStartTime = now;
+                  newToken.goatImmunityTimer = GOAT_IMMUNITY_DURATION_MS;
+                  console.log("[GOAT] Efecto de eliminación finalizado. Inmunidad activada.");
               } else {
                   newToken.goatEliminationTimer = remaining;
               }
@@ -1424,7 +1427,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               // Fallback para compatibilidad si no hay startTime
               newToken.goatEliminationTimer = Math.max(0, (newToken.goatEliminationTimer || 0) - deltaTime);
               if ((newToken.goatEliminationTimer || 0) === 0) {
-                  console.log("[GOAT] Efecto de eliminación terminado (fallback)");
+                  // Activar inmunidad cuando termine la eliminación (fallback)
+                  newToken.goatImmunityStartTime = now;
+                  newToken.goatImmunityTimer = GOAT_IMMUNITY_DURATION_MS;
+                  console.log("[GOAT] Efecto de eliminación terminado (fallback). Inmunidad activada.");
               }
           }
       }
@@ -2834,11 +2840,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                continue;
            }
            if (collectible.type === 'goatSkin') {
-               console.log("[GOAT] Piel GOAT recogida. Habilidad activada.");
+               console.log("[GOAT] Piel GOAT recogida. Habilidad de eliminación activada.");
                newToken.goatEliminationStartTime = now;
                newToken.goatEliminationTimer = GOAT_ELIMINATION_DURATION_MS;
-               newToken.goatImmunityStartTime = now;
-               newToken.goatImmunityTimer = GOAT_IMMUNITY_DURATION_MS;
+               // La inmunidad se activará después de que termine la eliminación
+               newToken.goatImmunityStartTime = undefined;
+               newToken.goatImmunityTimer = 0;
                onPlaySound?.('mega_node_collect');
                continue;
            }

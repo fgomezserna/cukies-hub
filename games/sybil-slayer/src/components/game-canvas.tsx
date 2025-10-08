@@ -1054,6 +1054,72 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            }
            ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
            
+        } else if (goatImmunityActive && !goatEliminationActive && !isImmune) {
+           // Solo inmunidad GOAT activa - usar mismo efecto que Purr
+           const timeRemaining = obj.goatImmunityTimer || 0;
+           const shouldBlink = timeRemaining <= 1000; // Parpadear en los últimos 1 segundo
+           const blinkIntensity = shouldBlink ? (0.5 + 0.5 * Math.sin(Date.now() / 100)) : 1.0;
+           
+           // Efecto de desaparición gradual
+           const fadeAlpha = Math.max(0.1, Math.min(1.0, timeRemaining / 1000)); // Desaparece gradualmente
+           
+           // Aura principal violeta con múltiples capas (igual que Purr)
+           ctx.shadowColor = `rgba(128, 0, 255, ${0.9 * blinkIntensity * fadeAlpha})`;
+           ctx.shadowBlur = 25;
+           
+           // Capa exterior - Aura grande violeta
+           ctx.beginPath();
+           ctx.arc(obj.x, obj.y, tokenImgSize/1.3, 0, Math.PI * 2);
+           ctx.fillStyle = `rgba(128, 0, 255, ${0.4 * blinkIntensity * fadeAlpha})`;
+           ctx.fill();
+           
+           // Capa media - Aura intermedia más intensa
+           ctx.beginPath();
+           ctx.arc(obj.x, obj.y, tokenImgSize/1.6, 0, Math.PI * 2);
+           ctx.fillStyle = `rgba(160, 32, 255, ${0.5 * blinkIntensity * fadeAlpha})`;
+           ctx.fill();
+           
+           // Capa interna - Aura cerca del token
+           ctx.beginPath();
+           ctx.arc(obj.x, obj.y, tokenImgSize/2.2, 0, Math.PI * 2);
+           ctx.fillStyle = `rgba(200, 100, 255, ${0.6 * blinkIntensity * fadeAlpha})`;
+           ctx.fill();
+           
+           // Círculo exterior pulsante violeta
+           const baseTime = shouldBlink ? Date.now() / 150 : Date.now() / 300;
+           const pulseSize = tokenImgSize * (1.4 + 0.4 * Math.sin(baseTime) * blinkIntensity);
+           ctx.beginPath();
+           ctx.arc(obj.x, obj.y, pulseSize/2, 0, Math.PI * 2);
+           ctx.fillStyle = `rgba(128, 0, 255, ${0.2 * blinkIntensity * fadeAlpha})`;
+           ctx.fill();
+           
+           // Segundo círculo pulsante más rápido cuando parpadea
+           if (shouldBlink) {
+             const fastPulseSize = tokenImgSize * (1.1 + 0.3 * Math.sin(Date.now() / 80));
+             ctx.beginPath();
+             ctx.arc(obj.x, obj.y, fastPulseSize/2, 0, Math.PI * 2);
+             ctx.fillStyle = `rgba(255, 100, 255, ${0.3 * blinkIntensity * fadeAlpha})`;
+             ctx.fill();
+           }
+           
+           // Partículas violetas brillantes alrededor del token
+           for (let i = 0; i < 8; i++) {
+             const angle = (Date.now() / 1000 + i * Math.PI / 4) % (Math.PI * 2);
+             const distance = tokenImgSize/1.8 + 10 * Math.sin(Date.now() / 200 + i);
+             const particleX = obj.x + Math.cos(angle) * distance;
+             const particleY = obj.y + Math.sin(angle) * distance;
+             
+             ctx.beginPath();
+             ctx.arc(particleX, particleY, 3 * blinkIntensity * fadeAlpha, 0, Math.PI * 2);
+             ctx.fillStyle = `rgba(255, 150, 255, ${0.8 * blinkIntensity * fadeAlpha})`;
+             ctx.fill();
+           }
+           
+           // Dibujar el sprite con brillo púrpura (igual que Purr)
+           ctx.shadowColor = `rgba(160, 32, 255, ${1.0 * blinkIntensity * fadeAlpha})`;
+           ctx.shadowBlur = shouldBlink ? 30 : 20;
+           ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
+           
         } else {
            // Dibujo normal sin efectos
            if (goatEliminationActive) {
@@ -1239,6 +1305,72 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              if (goatEliminationActive) {
                drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
              }
+             ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
+             
+           } else if (goatImmunityActive && !goatEliminationActive && !isImmune) {
+             // Solo inmunidad GOAT activa - usar mismo efecto que Purr (fallback)
+             const timeRemaining = obj.goatImmunityTimer || 0;
+             const shouldBlink = timeRemaining <= 1000; // Parpadear en los últimos 1 segundo
+             const blinkIntensity = shouldBlink ? (0.5 + 0.5 * Math.sin(Date.now() / 100)) : 1.0;
+             
+             // Efecto de desaparición gradual
+             const fadeAlpha = Math.max(0.1, Math.min(1.0, timeRemaining / 1000)); // Desaparece gradualmente
+             
+             // Aura principal violeta con múltiples capas (igual que Purr)
+             ctx.shadowColor = `rgba(128, 0, 255, ${0.9 * blinkIntensity * fadeAlpha})`;
+             ctx.shadowBlur = 25;
+             
+             // Capa exterior - Aura grande violeta
+             ctx.beginPath();
+             ctx.arc(obj.x, obj.y, tokenImgSize/1.3, 0, Math.PI * 2);
+             ctx.fillStyle = `rgba(128, 0, 255, ${0.4 * blinkIntensity * fadeAlpha})`;
+             ctx.fill();
+             
+             // Capa media - Aura intermedia más intensa
+             ctx.beginPath();
+             ctx.arc(obj.x, obj.y, tokenImgSize/1.6, 0, Math.PI * 2);
+             ctx.fillStyle = `rgba(160, 32, 255, ${0.5 * blinkIntensity * fadeAlpha})`;
+             ctx.fill();
+             
+             // Capa interna - Aura cerca del token
+             ctx.beginPath();
+             ctx.arc(obj.x, obj.y, tokenImgSize/2.2, 0, Math.PI * 2);
+             ctx.fillStyle = `rgba(200, 100, 255, ${0.6 * blinkIntensity * fadeAlpha})`;
+             ctx.fill();
+             
+             // Círculo exterior pulsante violeta
+             const baseTime = shouldBlink ? Date.now() / 150 : Date.now() / 300;
+             const pulseSize = tokenImgSize * (1.4 + 0.4 * Math.sin(baseTime) * blinkIntensity);
+             ctx.beginPath();
+             ctx.arc(obj.x, obj.y, pulseSize/2, 0, Math.PI * 2);
+             ctx.fillStyle = `rgba(128, 0, 255, ${0.2 * blinkIntensity * fadeAlpha})`;
+             ctx.fill();
+             
+             // Segundo círculo pulsante más rápido cuando parpadea
+             if (shouldBlink) {
+               const fastPulseSize = tokenImgSize * (1.1 + 0.3 * Math.sin(Date.now() / 80));
+               ctx.beginPath();
+               ctx.arc(obj.x, obj.y, fastPulseSize/2, 0, Math.PI * 2);
+               ctx.fillStyle = `rgba(255, 100, 255, ${0.3 * blinkIntensity * fadeAlpha})`;
+               ctx.fill();
+             }
+             
+             // Partículas violetas brillantes alrededor del token
+             for (let i = 0; i < 8; i++) {
+               const angle = (Date.now() / 1000 + i * Math.PI / 4) % (Math.PI * 2);
+               const distance = tokenImgSize/1.8 + 10 * Math.sin(Date.now() / 200 + i);
+               const particleX = obj.x + Math.cos(angle) * distance;
+               const particleY = obj.y + Math.sin(angle) * distance;
+               
+               ctx.beginPath();
+               ctx.arc(particleX, particleY, 3 * blinkIntensity * fadeAlpha, 0, Math.PI * 2);
+               ctx.fillStyle = `rgba(255, 150, 255, ${0.8 * blinkIntensity * fadeAlpha})`;
+               ctx.fill();
+             }
+             
+             // Dibujar el sprite con brillo púrpura (igual que Purr)
+             ctx.shadowColor = `rgba(160, 32, 255, ${1.0 * blinkIntensity * fadeAlpha})`;
+             ctx.shadowBlur = shouldBlink ? 30 : 20;
              ctx.drawImage(tokenImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
              
            } else {
