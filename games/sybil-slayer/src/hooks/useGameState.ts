@@ -238,11 +238,9 @@ const getCollisionPenaltySecondsForLevel = (level: number) => COLLISION_PENALTY_
 const getCollisionHeartLossForLevel = (level: number) => Math.min(3, 1 + Math.floor((level - 1) / 3)); // Pierde más corazones cada 3 niveles, máximo 3
 
 const getLevelScoreMultiplier = (level: number): number => {
-  if (level >= 5) return 3;
-  if (level === 4) return 2.5;
-  if (level === 3) return 2;
-  if (level === 2) return 1.5;
-  return 1;
+  // Multiplicador basado en el nivel: nivel 2 = x2, nivel 3 = x3, nivel 4 = x4, nivel 5 = x5
+  if (level >= 2) return level;
+  return 1; // Nivel 1 = x1
 };
 
 // Referencia para controlar el tiempo de congelamiento del token después de un impacto
