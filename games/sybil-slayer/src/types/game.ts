@@ -206,6 +206,7 @@ export interface GameState {
   nextMegaNodeInterval: number | null; // Próximo intervalo aleatorio para meganode
   lastHeartSpawn: number | null; // Última vez que spawneó un heart
   nextHeartInterval: number | null; // Próximo intervalo aleatorio para heart
+  heartsCollectedWithFullLife: number; // Contador de corazones recogidos con 3 vidas (para puntuación progresiva)
   lastVaulSpawn: number | null; // Última vez que spawneó un vaul
   // Sistema de aparición progresiva de assets negativos (cada 10s)
   negativeSpawnCycle: number; // Posición actual en el ciclo (1-5)

@@ -8,13 +8,13 @@ import {
   COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
   CHECKPOINT_APPEAR_THRESHOLD, CHECKPOINT_TIME_BONUS_START, CHECKPOINT_TIME_BONUS_STEP, CHECKPOINT_TIME_BONUS_MIN,
   HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
-  MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, HEART_BONUS_POINTS, VAUL_SPAWN_INTERVAL_MS,
-  VAUL_EFFECT_TYPES, VAUL_MULTIPLIER_MIN, VAUL_MULTIPLIER_MAX, VAUL_MULTIPLIER_DURATION_MIN_MS, VAUL_MULTIPLIER_DURATION_MAX_MS,
+  MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, HEART_BONUS_POINTS_BASE, VAUL_FIRST_SPAWN_MS, VAUL_NEXT_SPAWN_MS,
+  VAUL_EFFECT_TYPES, VAUL_MULTIPLIER, VAUL_MULTIPLIER_DURATION_MIN_MS, VAUL_MULTIPLIER_DURATION_MAX_MS,
   VAUL_DOUBLE_ENERGY_COUNT, VAUL_DOUBLE_UKI_COUNT, VAUL_DOUBLE_DURATION_MIN_MS, VAUL_DOUBLE_DURATION_MAX_MS,
-  VAUL_ENERGY_TO_UKI_DURATION_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
+  VAUL_ENERGY_TO_UKI_DURATION_MIN_MS, VAUL_ENERGY_TO_UKI_DURATION_MAX_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
   COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS,
-  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_CYCLE_COOLDOWN_MS, RAY_THICKNESS,
+  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_BLOCK_DISAPPEAR_DELAY_MS, RAY_FIRST_BLOCK_START_MS, RAY_BLOCK_INTERVAL_MS, RAY_THICKNESS,
   RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
   RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
@@ -87,6 +87,7 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   nextMegaNodeInterval: null, // Próximo intervalo aleatorio para meganode
   lastHeartSpawn: null, // Última vez que spawneó un heart
   nextHeartInterval: null, // Próximo intervalo aleatorio para heart
+  heartsCollectedWithFullLife: 0, // Contador de corazones recogidos con 3 vidas (para puntuación progresiva)
   lastVaulSpawn: null, // Última vez que spawneó un vaul
   // Sistema de aparición progresiva de assets negativos (cada 10s)
   negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
@@ -1061,7 +1062,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         const countdownStartTime = getGameTime();
         const { obstacles, collectibles } = initializeGameObjects(1, prev.canvasSize.width, prev.canvasSize.height); // Obtener datos
         const initialTreasureState = createInitialTreasureState();
-        initialTreasureState.nextSpawnTime = countdownStartTime + getRandomFloat(0, 60000);
+        initialTreasureState.nextSpawnTime = countdownStartTime + getRandomFloat(0, 30000);
+        // Configurar primer spawn del corazón entre 25-35s
+        const initialHeartInterval = getRandomFloat(25000, 35000);
         return {
           ...prev, // Keep the newly initialized objects
           status: 'countdown',
@@ -1093,7 +1096,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           lastMegaNodeSpawn: null, // Última vez que spawneó un megaNode
           nextMegaNodeInterval: null, // Próximo intervalo aleatorio para meganode
           lastHeartSpawn: null, // Última vez que spawneó un heart
-          nextHeartInterval: null, // Próximo intervalo aleatorio para heart
+          nextHeartInterval: initialHeartInterval, // Primer intervalo especial 25-35s
+          heartsCollectedWithFullLife: 0, // Contador de corazones recogidos con 3 vidas (para puntuación progresiva)
           lastVaulSpawn: null, // Última vez que spawneó un vaul
           // Sistema de aparición progresiva de assets negativos (cada 10s)
           negativeSpawnCycle: 1, // Empezar en paso 1 (fee)
@@ -1320,6 +1324,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         newToken.frameTimer = 0;
       }
 
+      // Variable para detectar si el boost acaba de terminar
+      let boostJustEnded = false;
+      
       // Update boost timer - CORREGIDO: usar tiempo pausable como todos los demás timers
       if (newToken.boostTimer > 0 && newToken.boostStartTime) {
           // Calcular tiempo transcurrido en tiempo pausable desde la activación
@@ -1330,6 +1337,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               // El boost ha terminado
               newToken.boostTimer = 0;
               newToken.boostStartTime = undefined;
+              boostJustEnded = true;
               console.log("[MEGA_NODE] Boost terminado (tiempo pausable)");
           } else {
               // Actualizar el timer con el tiempo restante pausable
@@ -1347,6 +1355,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           newToken.boostTimer -= deltaTime;
           if (newToken.boostTimer <= 0) {
               newToken.boostTimer = 0;
+              boostJustEnded = true;
               console.log("[MEGA_NODE] Boost terminado (fallback)");
           }
       }
@@ -2140,12 +2149,15 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           });
         }
 
+        // --- Ray System Logic ---
         if (rayCycle.stage === 'idle') {
           if (rayCycle.nextCycleStartTime === null) {
             if (rayCycle.lastCycleEndTime) {
-              rayCycle.nextCycleStartTime = rayCycle.lastCycleEndTime + RAY_CYCLE_COOLDOWN_MS;
+              // Bloques subsecuentes: 44s después de que termine el bloque anterior
+              rayCycle.nextCycleStartTime = rayCycle.lastCycleEndTime + RAY_BLOCK_INTERVAL_MS;
             } else if (prev.gameStartTime) {
-              rayCycle.nextCycleStartTime = prev.gameStartTime + RAY_CYCLE_COOLDOWN_MS;
+              // Primer bloque: 32s después del inicio de partida
+              rayCycle.nextCycleStartTime = prev.gameStartTime + RAY_FIRST_BLOCK_START_MS;
             }
           } else if (now >= rayCycle.nextCycleStartTime) {
             const orientation = getRandomOrientation();
@@ -2164,7 +2176,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               rayCycle.firstOrientation = orientation;
               rayCycle.secondOrientation = null;
               rayCycle.thirdOrientation = null;
-              console.log(`[RAY] Inicio de ciclo - aviso ${orientation} en (${firstRay.x.toFixed(1)}, ${firstRay.y.toFixed(1)})`);
+              console.log(`[RAY] Inicio de bloque - aviso rayo 1 ${orientation} en (${firstRay.x.toFixed(1)}, ${firstRay.y.toFixed(1)})`);
             } else {
               console.warn('[RAY] No se pudo crear el primer rayo, reintentando en 1s');
               rayCycle.nextCycleStartTime = now + 1000;
@@ -2182,6 +2194,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             console.log('[RAY] Activación del primer rayo');
           }
         } else if (rayCycle.stage === 'active1') {
+          // Ray 2 empieza a parpadear 2s después de que salga el ray 1
           if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_STAGE_INTERVAL_MS) {
             const zone = computeTokenZone(newToken, rays, prev.canvasSize);
             const preferredOrientation: RayOrientation = (rayCycle.firstOrientation === 'vertical') ? 'horizontal' : 'vertical';
@@ -2204,7 +2217,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               rayCycle.stage = 'warning2';
               rayCycle.stageStartTime = now;
               rayCycle.secondOrientation = chosenOrientation;
-              console.log(`[RAY] Aviso del segundo rayo ${chosenOrientation} en (${secondRay.x.toFixed(1)}, ${secondRay.y.toFixed(1)})`);
+              console.log(`[RAY] Aviso rayo 2 ${chosenOrientation} en (${secondRay.x.toFixed(1)}, ${secondRay.y.toFixed(1)})`);
             } else {
               console.warn('[RAY] No se pudo posicionar el segundo rayo dentro de la zona del token');
               rayCycle.stageStartTime = now; // Reintentar tras siguiente intervalo
@@ -2222,6 +2235,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             console.log('[RAY] Activación del segundo rayo');
           }
         } else if (rayCycle.stage === 'active2') {
+          // Ray 3 empieza a parpadear 2s después de que salga el ray 2
           if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_STAGE_INTERVAL_MS) {
             const zone = computeTokenZone(newToken, rays, prev.canvasSize);
             const orientations: RayOrientation[] = [getRandomOrientation()];
@@ -2243,7 +2257,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               rayCycle.stage = 'warning3';
               rayCycle.stageStartTime = now;
               rayCycle.thirdOrientation = chosenOrientation;
-              console.log(`[RAY] Aviso del tercer rayo ${chosenOrientation} en (${thirdRay.x.toFixed(1)}, ${thirdRay.y.toFixed(1)})`);
+              console.log(`[RAY] Aviso rayo 3 ${chosenOrientation} en (${thirdRay.x.toFixed(1)}, ${thirdRay.y.toFixed(1)})`);
             } else {
               console.warn('[RAY] No se pudo posicionar el tercer rayo dentro de la zona del token');
               rayCycle.stageStartTime = now; // Reintentar tras siguiente intervalo
@@ -2258,19 +2272,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             ));
             rayCycle.stage = 'active3';
             rayCycle.stageStartTime = now;
-            console.log('[RAY] Activación del tercer rayo');
+            console.log('[RAY] Activación del tercer rayo - bloque completo activo');
           }
         } else if (rayCycle.stage === 'active3') {
-          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_STAGE_INTERVAL_MS) {
+          // Los 3 rayos desaparecen 3s después de que aparezca el 3º rayo
+          if (rayCycle.stageStartTime && now - rayCycle.stageStartTime >= RAY_BLOCK_DISAPPEAR_DELAY_MS) {
             rays = [];
             rayCycle.stage = 'idle';
             rayCycle.stageStartTime = null;
             rayCycle.lastCycleEndTime = now;
-            rayCycle.nextCycleStartTime = now + RAY_CYCLE_COOLDOWN_MS;
+            rayCycle.nextCycleStartTime = null; // Se establecerá en el próximo frame
             rayCycle.firstOrientation = null;
             rayCycle.secondOrientation = null;
             rayCycle.thirdOrientation = null;
-            console.log('[RAY] Ciclo finalizado, entrando en enfriamiento');
+            console.log('[RAY] Bloque finalizado, los 3 rayos han desaparecido');
           }
         }
 
@@ -2396,6 +2411,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let nextLevelTarget = currentLevel;
       let remainingCollectibles: Collectible[] = [];
       let vaultJustActivated = false; // Flag para saber si se activó un vault en este frame
+      let vaultExpired = false; // Detectar si un vault expiró sin activarse
+      let vaultEffectJustEnded = false; // Detectar si un efecto del vault acaba de terminar
+      let heartCollected = false; // Detectar si un heart fue recogido
+      let heartExpired = false; // Detectar si un heart expiró sin ser recogido
       // Variables para efectos del vault
       let activeVaulEffect = prev.activeVaulEffect;
       let vaulEffectStartTime = prev.vaulEffectStartTime;
@@ -2579,8 +2598,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               
               // Aplicar el efecto seleccionado y preparar detalles para logging
               if (selectedEffect === 'multiplier') {
-                // Efecto 1: Multiplicador x2-x5 durante 5-10 segundos
-                const multiplier = Math.floor(Math.random() * (VAUL_MULTIPLIER_MAX - VAUL_MULTIPLIER_MIN + 1)) + VAUL_MULTIPLIER_MIN;
+                // Efecto 1: Multiplicador x5 fijo durante 10-15 segundos
+                const multiplier = VAUL_MULTIPLIER; // x5 fijo
                 const duration = Math.floor(Math.random() * (VAUL_MULTIPLIER_DURATION_MAX_MS - VAUL_MULTIPLIER_DURATION_MIN_MS + 1)) + VAUL_MULTIPLIER_DURATION_MIN_MS;
                 
                 // CORREGIDO: Usar tiempo pausable para el multiplicador (igual que MegaNode y Purr)
@@ -2592,7 +2611,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 effectDetails = `x${multiplier} durante ${(duration / 1000).toFixed(1)}s`;
                 
               } else if (selectedEffect === 'double_collectibles') {
-                // Efecto 2: Doble de energy (20) y uki (6) durante 10-30 segundos
+                // Efecto 2: Doble de energy (20) y uki (6) durante 10-15 segundos
                 const duration = Math.floor(Math.random() * (VAUL_DOUBLE_DURATION_MAX_MS - VAUL_DOUBLE_DURATION_MIN_MS + 1)) + VAUL_DOUBLE_DURATION_MIN_MS;
                 
                 // CORREGIDO: Usar tiempo pausable
@@ -2603,16 +2622,18 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 effectDetails = `durante ${(duration / 1000).toFixed(1)}s`;
                 
               } else if (selectedEffect === 'energy_to_uki') {
-                // Efecto 3: Energy se convierten en uki durante 30 segundos
+                // Efecto 3: Energy se convierten en uki durante 10-15 segundos
+                const duration = Math.floor(Math.random() * (VAUL_ENERGY_TO_UKI_DURATION_MAX_MS - VAUL_ENERGY_TO_UKI_DURATION_MIN_MS + 1)) + VAUL_ENERGY_TO_UKI_DURATION_MIN_MS;
+                
                 // CORREGIDO: Usar tiempo pausable
-                vaulEffectData = { duration: VAUL_ENERGY_TO_UKI_DURATION_MS };
+                vaulEffectData = { duration };
                 vaulEffectStartTime = now; // Tiempo pausable cuando empezó
                 activeVaulEffect = 'energy_to_uki';
                 
-                effectDetails = `durante ${(VAUL_ENERGY_TO_UKI_DURATION_MS / 1000).toFixed(1)}s`;
+                effectDetails = `durante ${(duration / 1000).toFixed(1)}s`;
                 
               } else if (selectedEffect === 'eliminate_enemies') {
-                // Efecto 4: Eliminar 1-3 enemigos aleatorios
+                // Efecto 4: Eliminar 3-5 enemigos aleatorios
                 const randomValue = Math.random();
                 const range = VAUL_ELIMINATE_ENEMIES_MAX - VAUL_ELIMINATE_ENEMIES_MIN + 1;
                 const enemiesToEliminate = Math.floor(randomValue * range) + VAUL_ELIMINATE_ENEMIES_MIN;
@@ -2749,15 +2770,22 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             if (onEnergyCollected) onEnergyCollected(); // Disparar mismo efecto visual que energy
           }
           if (collectible.type === 'heart') {
+             heartCollected = true; // Marcar que se recogió un corazón
              if (hearts < 3) {
                hearts++;
                console.log(`[HEART] ❤️ Corazón recogido! +1 vida. Reproduciendo life.mp3`);
                console.log(`[HEART] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
                onPlaySound?.('heart_collect');
+               // Resetear contador de corazones con vida completa al recuperar vida
+               if (prev.heartsCollectedWithFullLife > 0) {
+                 console.log(`[HEART] Contador de bonos reseteado (tenías ${prev.heartsCollectedWithFullLife} acumulados)`);
+               }
              } else {
-               // Si ya tiene 3 vidas, otorgar 10 puntos
-               scoreToAdd += HEART_BONUS_POINTS;
-               console.log(`[HEART] ❤️ Corazón recogido con 3 vidas! +${HEART_BONUS_POINTS} puntos`);
+               // Si ya tiene 3 vidas, otorgar puntos progresivos
+               const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
+               const heartPoints = HEART_BONUS_POINTS_BASE * heartCount;
+               scoreToAdd += heartPoints;
+               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con 3 vidas! +${heartPoints} puntos`);
                onPlaySound?.('heart_collect');
              }
              continue; // No añadir el heart a los restantes
@@ -2825,6 +2853,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 // Los Mega_node, Heart, Purr y Vaul desaparecen después de 10 segundos (COLLECTIBLE_LIFETIME_MS)
          remainingCollectibles = []; // Limpiamos la lista para evitar duplicación
          const currentTime = getGameTime();
+         let megaNodeExpired = false; // Detectar si un megaNode expiró sin ser recogido
          for (const collectible of newCollectibles) {
            // Si el jugador ha recogido este coleccionable, no lo añadimos de nuevo
            if (checkCollision(newToken, collectible) && collectible.type !== 'vaul') {
@@ -2921,8 +2950,19 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                collectible.createdAt = currentTime;
                collectible.isBlinking = false; // Recién creado, no debe parpadear
                remainingCollectibles.push(collectible);
+             } else {
+               // Si ha expirado, no lo añadimos a los collectibles restantes
+               if (collectible.type === 'megaNode') {
+                 megaNodeExpired = true;
+                 console.log('[MEGANODE] Haku expiró sin ser recogido');
+               } else if (collectible.type === 'heart') {
+                 heartExpired = true;
+                 console.log('[HEART] Corazón expiró sin ser recogido');
+               } else if (collectible.type === 'vaul') {
+                 vaultExpired = true;
+                 console.log('[VAUL] Vault expiró sin ser activado');
+               }
              }
-             // Si ha expirado, no lo añadimos a los collectibles restantes
            } else {
              // Otros tipos de collectibles (energy, checkpoint) no tienen tiempo de vida
              remainingCollectibles.push(collectible);
@@ -3190,6 +3230,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         
         if (timeRemaining <= 0) {
           console.log(`[VAUL] Efecto ${activeVaulEffect} ha expirado (tiempo pausable)`);
+          vaultEffectJustEnded = true; // Marcar que el efecto terminó
           activeVaulEffect = null;
           vaulEffectStartTime = null;
           vaulEffectData = null;
@@ -3491,12 +3532,44 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         let newNextHeartInterval = prev.nextHeartInterval;
         let newLastVaulSpawn = prev.lastVaulSpawn;
         
+        // Si el boost acaba de terminar, actualizar el timestamp para el próximo spawn
+        if (boostJustEnded) {
+          newLastMegaNodeSpawn = currentTime;
+          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+          console.log(`[MEGANODE] Boost terminado. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
+        }
+        
+        // Si un megaNode expiró sin ser recogido, actualizar el timestamp para el próximo spawn
+        if (megaNodeExpired) {
+          newLastMegaNodeSpawn = currentTime;
+          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+          console.log(`[MEGANODE] Haku expiró. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
+        }
+        
+        // Si un corazón fue recogido o expiró, actualizar el timestamp para el próximo spawn
+        if (heartCollected || heartExpired) {
+          newLastHeartSpawn = currentTime;
+          newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS);
+          const action = heartCollected ? 'recogido' : 'expiró';
+          console.log(`[HEART] Corazón ${action}. Próximo corazón en ${newNextHeartInterval/1000}s (aleatorio)`);
+        }
+        
+        // Si un vault fue activado, expiró, o su efecto terminó, actualizar el timestamp para el próximo spawn
+        if (vaultJustActivated || vaultExpired || vaultEffectJustEnded) {
+          newLastVaulSpawn = currentTime;
+          let reason = 'desconocida';
+          if (vaultJustActivated) reason = 'activado';
+          else if (vaultExpired) reason = 'expirado';
+          else if (vaultEffectJustEnded) reason = 'efecto terminado';
+          console.log(`[VAUL] Vault ${reason}. Próximo Vault en ${VAUL_NEXT_SPAWN_MS/1000}s`);
+        }
+        
         // Verificar si ya existe alguno de estos collectibles
         const hasMegaNode = remainingCollectibles.some(c => c.type === 'megaNode');
         const hasHeart = remainingCollectibles.some(c => c.type === 'heart');
         const hasVaul = remainingCollectibles.some(c => c.type === 'vaul');
         
-        // SPAWN MEGANODE - Intervalo aleatorio entre 30-45s
+        // SPAWN MEGANODE - Intervalo aleatorio entre 15-25s
         if (!hasMegaNode) {
           // Generar primer intervalo si no existe
           if (newNextMegaNodeInterval === null) {
@@ -3518,7 +3591,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           }
         }
         
-        // SPAWN HEART - Intervalo aleatorio entre 30-45s - Siempre aparece
+        // SPAWN HEART - Intervalo aleatorio entre 20-30s - Siempre aparece
         if (!hasHeart) {
           // Generar primer intervalo si no existe
           if (newNextHeartInterval === null) {
@@ -3540,16 +3613,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           }
         }
         
-        // SPAWN VAULT - Cada 60s (fijo)
+        // SPAWN VAULT - 30s para el primero, 30s después de terminar efecto o expirar
         if (!hasVaul) {
+          // Determinar el intervalo correcto según si es el primero o no
+          const spawnInterval = newLastVaulSpawn === null ? VAUL_FIRST_SPAWN_MS : VAUL_NEXT_SPAWN_MS;
+          
           // Verificar si es hora de spawnear
           const timeSinceLastSpawn = newLastVaulSpawn ? (currentTime - newLastVaulSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
-          if (timeSinceLastSpawn >= VAUL_SPAWN_INTERVAL_MS) {
+          if (timeSinceLastSpawn >= spawnInterval) {
             const newCollectible = safeSpawnCollectible(createVaulCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
             if (newCollectible) {
               remainingCollectibles.push(newCollectible);
               newLastVaulSpawn = currentTime;
-              console.log(`[VAULT] Spawned independientemente - próximo en ${VAUL_SPAWN_INTERVAL_MS/1000}s`);
+              const nextInterval = VAUL_NEXT_SPAWN_MS / 1000;
+              console.log(`[VAULT] Spawned - próximo en ${nextInterval}s (después de terminar efecto o expirar)`);
             }
           }
         }
@@ -3612,6 +3689,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         nextMegaNodeInterval: newNextMegaNodeInterval,
         lastHeartSpawn: newLastHeartSpawn,
         nextHeartInterval: newNextHeartInterval,
+        heartsCollectedWithFullLife: heartCollected && hearts >= 3 ? (prev.heartsCollectedWithFullLife || 0) + 1 : (hearts < 3 ? 0 : prev.heartsCollectedWithFullLife || 0),
         lastVaulSpawn: newLastVaulSpawn,
         // Sistema de aparición progresiva de assets negativos
         negativeSpawnCycle: newNegativeSpawnCycle,

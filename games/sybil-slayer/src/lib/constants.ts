@@ -11,9 +11,11 @@ export const FRAME_TIME_MS = 1000 / FPS;
 export const MEGA_NODE_BOOST_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos para coincidir con purr
 export const PURR_IMMUNITY_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos
 export const RAY_WARNING_DURATION_MS = 3000; // Tiempo que dura la luz de aviso antes de que aparezca el rayo
-export const RAY_STAGE_INTERVAL_MS = 5000; // Tiempo entre la activación de cada rayo consecutivo dentro del ciclo
-export const RAY_CYCLE_COOLDOWN_MS = 60000; // Tiempo de espera entre ciclos completos de rayos
-export const RAY_THICKNESS = 60; // Grosor del rayo en píxeles para cubrir un borde completo
+export const RAY_STAGE_INTERVAL_MS = 2000; // Tiempo entre la activación de cada rayo consecutivo dentro del ciclo (ray 2&3 empiezan a parpadear 2s después del anterior)
+export const RAY_BLOCK_DISAPPEAR_DELAY_MS = 3000; // Tiempo que tardan en desaparecer los 3 rayos después de que aparezca el 3º
+export const RAY_FIRST_BLOCK_START_MS = 32000; // Primer bloque de rayos a los 32s de partida
+export const RAY_BLOCK_INTERVAL_MS = 44000; // Intervalo entre bloques: 44s después de que termine el bloque anterior
+export const RAY_THICKNESS = 8; // Grosor del rayo en píxeles (solo línea blanca central)
 
 // Red Zone Properties
 export const RED_ZONE_WARNING_DURATION_MS = 3000; // Tiempo de aviso parpadeando
@@ -73,25 +75,21 @@ export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 3 segundos exactos
 
 // Efectos aleatorios del Vault (se elige uno al activarse)
 export const VAUL_EFFECT_TYPES = ['multiplier', 'double_collectibles', 'energy_to_uki', 'eliminate_enemies'] as const;
-// Efecto 1: Multiplicador aleatorio
-export const VAUL_MULTIPLIER_MIN = 2;
-export const VAUL_MULTIPLIER_MAX = 5;
-export const VAUL_MULTIPLIER_DURATION_MIN_MS = 5000; // 5 segundos
-export const VAUL_MULTIPLIER_DURATION_MAX_MS = 10000; // 10 segundos
+// Efecto 1: Multiplicador fijo x5
+export const VAUL_MULTIPLIER = 5; // x5 fijo (no aleatorio)
+export const VAUL_MULTIPLIER_DURATION_MIN_MS = 10000; // 10 segundos
+export const VAUL_MULTIPLIER_DURATION_MAX_MS = 15000; // 15 segundos
 // Efecto 2: Doble de collectibles
 export const VAUL_DOUBLE_ENERGY_COUNT = 20; // 20 energy en vez de 10
 export const VAUL_DOUBLE_UKI_COUNT = 6; // 6 uki en vez de 3
 export const VAUL_DOUBLE_DURATION_MIN_MS = 10000; // 10 segundos
-export const VAUL_DOUBLE_DURATION_MAX_MS = 30000; // 30 segundos
+export const VAUL_DOUBLE_DURATION_MAX_MS = 15000; // 15 segundos
 // Efecto 3: Energy a Uki
-export const VAUL_ENERGY_TO_UKI_DURATION_MS = 30000; // 30 segundos
+export const VAUL_ENERGY_TO_UKI_DURATION_MIN_MS = 10000; // 10 segundos
+export const VAUL_ENERGY_TO_UKI_DURATION_MAX_MS = 15000; // 15 segundos
 // Efecto 4: Eliminar enemigos
-export const VAUL_ELIMINATE_ENEMIES_MIN = 1;
-export const VAUL_ELIMINATE_ENEMIES_MAX = 3;
-
-// Mantener compatibilidad con código antiguo (deprecated)
-export const VAUL_MULTIPLIER = 5; // Multiplicador de score x5
-export const VAUL_DURATION_MS = 7000; // 7 segundos de duración del multiplicador
+export const VAUL_ELIMINATE_ENEMIES_MIN = 3;
+export const VAUL_ELIMINATE_ENEMIES_MAX = 5;
 
 // Uki Properties
 export const UKI_RADIUS = 25; // Tamaño similar a energy
@@ -104,12 +102,12 @@ export const TREASURE_COLOR = 'hsl(35, 100%, 55%)';
 export const TREASURE_LIFETIME_MS = 7000; // 7s visibles
 export const TREASURE_BLINK_WARNING_MS = 3000; // Parpadeo últimos 3s
 export const TREASURE_FIRST_APPEAR_MIN_S = 0; // desde inicio
-export const TREASURE_FIRST_APPEAR_MAX_S = 60; // dentro de primeros 60s
-export const TREASURE_NEXT_BLOCK_MIN_S = 45; // entre 45 y 60s después de terminar bloque
-export const TREASURE_NEXT_BLOCK_MAX_S = 60;
-// Puntuación por bloque (3 tesoros). El primer bloque: 5,5,15 = 25.
-export const TREASURE_BLOCK_BASE_POINTS: [number, number, number] = [5, 5, 15];
-export const TREASURE_BLOCK_INCREMENT = 25; // incremento por bloque completado
+export const TREASURE_FIRST_APPEAR_MAX_S = 30; // dentro de primeros 30s
+export const TREASURE_NEXT_BLOCK_MIN_S = 15; // entre 15 y 25s después de terminar bloque
+export const TREASURE_NEXT_BLOCK_MAX_S = 25;
+// Puntuación por bloque (3 tesoros). Bloque 1: 10,15,25 = 50. Bloque 2: 20,30,50 = 100. Bloque 3: 30,45,75 = 150.
+export const TREASURE_BLOCK_BASE_POINTS: [number, number, number] = [10, 15, 25];
+export const TREASURE_BLOCK_INCREMENT = 50; // incremento por bloque completado
 
 // Collectible Spawning - Sistema de timing independiente
 export const INITIAL_ENERGY_POINTS = 10; // Siempre 10 energy iniciales
@@ -120,12 +118,13 @@ export const MAX_ENERGY_POINTS = 10; // Siempre mantener exactamente 10 energy e
 export const MAX_UKI_POINTS = 3; // Siempre mantener exactamente 3 uki en pantalla
 
 // Nuevo sistema de timing independiente
-export const MEGA_NODE_SPAWN_INTERVAL_MIN_MS = 30000; // 30s mínimo
-export const MEGA_NODE_SPAWN_INTERVAL_MAX_MS = 45000; // 45s máximo
-export const HEART_SPAWN_INTERVAL_MIN_MS = 30000; // 30s mínimo
-export const HEART_SPAWN_INTERVAL_MAX_MS = 45000; // 45s máximo
-export const HEART_BONUS_POINTS = 10; // Puntos cuando se recolecta con 3 vidas
-export const VAUL_SPAWN_INTERVAL_MS = 60000; // 60s fijo
+export const MEGA_NODE_SPAWN_INTERVAL_MIN_MS = 15000; // 15s mínimo
+export const MEGA_NODE_SPAWN_INTERVAL_MAX_MS = 25000; // 25s máximo
+export const HEART_SPAWN_INTERVAL_MIN_MS = 20000; // 20s mínimo
+export const HEART_SPAWN_INTERVAL_MAX_MS = 30000; // 30s máximo
+export const HEART_BONUS_POINTS_BASE = 10; // Puntos base cuando se recolecta con 3 vidas (progresivo: 10, 20, 30...)
+export const VAUL_FIRST_SPAWN_MS = 30000; // 30s para el primer Vaul
+export const VAUL_NEXT_SPAWN_MS = 30000; // 30s después de terminar efecto o expirar
 
 // Rune system
 export const RUNE_SPAWN_INTERVAL_MS = 20000; // Una runa cada 20 segundos

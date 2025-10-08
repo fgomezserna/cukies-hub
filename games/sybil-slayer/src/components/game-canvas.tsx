@@ -650,58 +650,121 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   const drawRay = (ctx: CanvasRenderingContext2D, ray: RayHazard, timestamp: number) => {
     ctx.save();
 
-    const flicker = 0.5 + 0.5 * Math.sin(timestamp / 120);
-
     if (ray.phase === 'warning') {
-      const baseAlpha = 0.25 + 0.35 * flicker;
+      // FASE DE ADVERTENCIA: Parpadeo amarillo MÁS VISIBLE
+      const flicker = 0.5 + 0.5 * Math.sin(timestamp / 120);
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Capa exterior más ancha para advertencia (más visible que el rayo activo)
+      const warningWidth = ray.width * 5; // 5x el grosor del rayo para que sea bien visible
+      const warningHeight = ray.height * 5;
+      const baseAlpha = 0.3 + 0.4 * flicker; // Parpadeo más intenso (0.3 a 0.7)
+      
       ctx.globalAlpha = baseAlpha;
-      ctx.globalCompositeOperation = 'lighter';
-
       if (ray.orientation === 'vertical') {
-        const gradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
-        gradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.6)');
-        gradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
-        ctx.fillStyle = gradient;
+        const warningGradient = ctx.createLinearGradient(
+          ray.x - (warningWidth - ray.width) / 2, 
+          0, 
+          ray.x + ray.width + (warningWidth - ray.width) / 2, 
+          0
+        );
+        warningGradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
+        warningGradient.addColorStop(0.3, 'rgba(255, 255, 100, 0.4)');
+        warningGradient.addColorStop(0.5, 'rgba(255, 255, 150, 0.8)');
+        warningGradient.addColorStop(0.7, 'rgba(255, 255, 100, 0.4)');
+        warningGradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+        ctx.fillStyle = warningGradient;
+        ctx.fillRect(
+          ray.x - (warningWidth - ray.width) / 2, 
+          ray.y, 
+          warningWidth, 
+          ray.height
+        );
       } else {
-        const gradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
-        gradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.6)');
-        gradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
-        ctx.fillStyle = gradient;
+        const warningGradient = ctx.createLinearGradient(
+          0, 
+          ray.y - (warningHeight - ray.height) / 2, 
+          0, 
+          ray.y + ray.height + (warningHeight - ray.height) / 2
+        );
+        warningGradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
+        warningGradient.addColorStop(0.3, 'rgba(255, 255, 100, 0.4)');
+        warningGradient.addColorStop(0.5, 'rgba(255, 255, 150, 0.8)');
+        warningGradient.addColorStop(0.7, 'rgba(255, 255, 100, 0.4)');
+        warningGradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+        ctx.fillStyle = warningGradient;
+        ctx.fillRect(
+          ray.x, 
+          ray.y - (warningHeight - ray.height) / 2, 
+          ray.width, 
+          warningHeight
+        );
       }
-
-      ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
     } else {
-      const intensity = 0.75 + 0.25 * Math.sin(timestamp / 90);
-      ctx.globalAlpha = 0.85;
+      // FASE ACTIVA: SIN parpadeo, intensidad constante
       ctx.globalCompositeOperation = 'lighter';
 
+      // Capa de difuminado sutil alrededor del rayo (más ancha)
+      const blurWidth = ray.width * 3; // 3x el grosor del rayo central
+      const blurHeight = ray.height * 3;
+      
+      ctx.globalAlpha = 0.15; // Muy sutil
       if (ray.orientation === 'vertical') {
-        const gradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
-        gradient.addColorStop(0, 'rgba(80, 200, 255, 0.6)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
-        gradient.addColorStop(1, 'rgba(80, 200, 255, 0.6)');
-        ctx.fillStyle = gradient;
+        const blurGradient = ctx.createLinearGradient(
+          ray.x - (blurWidth - ray.width) / 2, 
+          0, 
+          ray.x + ray.width + (blurWidth - ray.width) / 2, 
+          0
+        );
+        blurGradient.addColorStop(0, 'rgba(80, 200, 255, 0.0)');
+        blurGradient.addColorStop(0.3, 'rgba(120, 220, 255, 0.3)');
+        blurGradient.addColorStop(0.5, 'rgba(200, 240, 255, 0.4)');
+        blurGradient.addColorStop(0.7, 'rgba(120, 220, 255, 0.3)');
+        blurGradient.addColorStop(1, 'rgba(80, 200, 255, 0.0)');
+        ctx.fillStyle = blurGradient;
+        ctx.fillRect(
+          ray.x - (blurWidth - ray.width) / 2, 
+          ray.y, 
+          blurWidth, 
+          ray.height
+        );
       } else {
-        const gradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
-        gradient.addColorStop(0, 'rgba(80, 200, 255, 0.6)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
-        gradient.addColorStop(1, 'rgba(80, 200, 255, 0.6)');
-        ctx.fillStyle = gradient;
+        const blurGradient = ctx.createLinearGradient(
+          0, 
+          ray.y - (blurHeight - ray.height) / 2, 
+          0, 
+          ray.y + ray.height + (blurHeight - ray.height) / 2
+        );
+        blurGradient.addColorStop(0, 'rgba(80, 200, 255, 0.0)');
+        blurGradient.addColorStop(0.3, 'rgba(120, 220, 255, 0.3)');
+        blurGradient.addColorStop(0.5, 'rgba(200, 240, 255, 0.4)');
+        blurGradient.addColorStop(0.7, 'rgba(120, 220, 255, 0.3)');
+        blurGradient.addColorStop(1, 'rgba(80, 200, 255, 0.0)');
+        ctx.fillStyle = blurGradient;
+        ctx.fillRect(
+          ray.x, 
+          ray.y - (blurHeight - ray.height) / 2, 
+          ray.width, 
+          blurHeight
+        );
       }
 
-      ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
-
-      // Núcleo brillante
-      ctx.globalAlpha = intensity;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      // Línea blanca central brillante (núcleo principal) - SIN PARPADEO
+      ctx.globalAlpha = 0.95; // Intensidad constante
       if (ray.orientation === 'vertical') {
-        const coreWidth = Math.max(6, ray.width * 0.25);
-        ctx.fillRect(ray.x + (ray.width - coreWidth) / 2, ray.y, coreWidth, ray.height);
+        const gradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
+        gradient.addColorStop(0, 'rgba(200, 230, 255, 0.0)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
+        gradient.addColorStop(1, 'rgba(200, 230, 255, 0.0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
       } else {
-        const coreHeight = Math.max(6, ray.height * 0.25);
-        ctx.fillRect(ray.x, ray.y + (ray.height - coreHeight) / 2, ray.width, coreHeight);
+        const gradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
+        gradient.addColorStop(0, 'rgba(200, 230, 255, 0.0)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
+        gradient.addColorStop(1, 'rgba(200, 230, 255, 0.0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
       }
     }
 
