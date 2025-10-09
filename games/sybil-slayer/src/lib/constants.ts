@@ -10,12 +10,13 @@ export const FPS = 60;
 export const FRAME_TIME_MS = 1000 / FPS;
 export const MEGA_NODE_BOOST_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos para coincidir con purr
 export const PURR_IMMUNITY_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos
+export const TOKEN_DAMAGE_IMMUNITY_MS = 1000; // 1 segundo de inmunidad después de recibir daño
 export const RAY_WARNING_DURATION_MS = 3000; // Tiempo que dura la luz de aviso antes de que aparezca el rayo
 export const RAY_STAGE_INTERVAL_MS = 2000; // Tiempo entre la activación de cada rayo consecutivo dentro del ciclo (ray 2&3 empiezan a parpadear 2s después del anterior)
 export const RAY_BLOCK_DISAPPEAR_DELAY_MS = 3000; // Tiempo que tardan en desaparecer los 3 rayos después de que aparezca el 3º
 export const RAY_FIRST_BLOCK_START_MS = 32000; // Primer bloque de rayos a los 32s de partida
 export const RAY_BLOCK_INTERVAL_MS = 44000; // Intervalo entre bloques: 44s después de que termine el bloque anterior
-export const RAY_THICKNESS = 8; // Grosor del rayo en píxeles (solo línea blanca central)
+export const RAY_THICKNESS = 18; // Grosor del rayo en píxeles (solo línea blanca central)
 
 // Red Zone Properties
 export const RED_ZONE_WARNING_DURATION_MS = 3000; // Tiempo de aviso parpadeando
@@ -75,8 +76,8 @@ export const VAUL_PROGRESS_RATE = 1.0; // Correcto: 1.0 para 3 segundos exactos
 export const GOAT_SKIN_RADIUS = 30; // Tamaño base para la piel GOAT
 export const GOAT_SKIN_COLOR = 'hsl(45, 100%, 60%)'; // Dorado brillante
 export const GOAT_SKIN_VALUE = 0; // No otorga puntos directos, solo poder temporal
-export const GOAT_ELIMINATION_DURATION_MS = 5000; // 5 segundos eliminando fees al contacto
-export const GOAT_IMMUNITY_DURATION_MS = 3000; // 3 segundos de inmunidad frente a fees
+export const GOAT_ELIMINATION_DURATION_MS = 3000; // 3 segundos eliminando fees al contacto
+export const GOAT_IMMUNITY_DURATION_MS = 3000; // 3 segundos de inmunidad frente a fees (después de la eliminación)
 
 // Efectos aleatorios del Vault (se elige uno al activarse)
 export const VAUL_EFFECT_TYPES = ['multiplier', 'double_collectibles', 'energy_to_uki', 'eliminate_enemies'] as const;

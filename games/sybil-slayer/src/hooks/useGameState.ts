@@ -21,7 +21,7 @@ import {
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
   RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
   RUNE_FIRST_SPAWN_MS, RUNE_NEXT_SPAWN_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES,
-  GOAT_ELIMINATION_DURATION_MS, GOAT_IMMUNITY_DURATION_MS
+  GOAT_ELIMINATION_DURATION_MS, GOAT_IMMUNITY_DURATION_MS, TOKEN_DAMAGE_IMMUNITY_MS
 } from '../lib/constants';
 import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, distanceBetweenPoints, createObstacle, generateId, getRandomObstacleType, createEnergyCollectible, createUkiCollectible, createTreasureCollectible, createMegaNodeCollectible, createPurrCollectible, createVaulCollectible, createCheckpointCollectible, createHeartCollectible, createStrategicBug, createRuneCollectible, createGoatSkinCollectible } from '@/lib/utils';
 import { useGameTime } from './useGameTime';
@@ -3081,7 +3081,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  
                  // Control de invulnerabilidad para otros obstáculos
                  const timeSinceLastDamage = prev.lastDamageTime ? now - prev.lastDamageTime : Infinity;
-                 console.log(`[DEBUG] Tiempo desde último daño: ${timeSinceLastDamage}ms (invulnerable si < 500ms)`);
+                 console.log(`[DEBUG] Tiempo desde último daño: ${timeSinceLastDamage}ms (invulnerable si < ${TOKEN_DAMAGE_IMMUNITY_MS}ms)`);
                  
                  // El hacker ROBA 20% de las monedas del jugador
                  if (obstacle.type === 'hacker') {
@@ -3092,7 +3092,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                      // Verificar inmunidad de purr para hacker
                      if (newToken.immunityTimer > 0) {
                          console.log(`[HACKER] ¡Colisión con hacker pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No roba monedas.`);
-                     } else if (timeSinceLastDamage >= 500) { // Período de invulnerabilidad
+                     } else if (timeSinceLastDamage >= TOKEN_DAMAGE_IMMUNITY_MS) { // Período de invulnerabilidad
                          const scoreToSteal = Math.floor(prev.score * 0.2); // 20% del score actual redondeado a entero
                          scoreToSubtract = scoreToSteal;
                          console.log(`[HACKER] ¡Colisión con hacker! Robó ${scoreToSteal} monedas (20% del score).`);
@@ -3139,14 +3139,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                      } else {
                          console.log(`[HACKER] ¡Colisión con hacker en invulnerabilidad! No roba monedas.`);
                      }
-                 } else if (timeSinceLastDamage >= 500) { // Período de invulnerabilidad para otros obstáculos
+                 } else if (timeSinceLastDamage >= TOKEN_DAMAGE_IMMUNITY_MS) { // Período de invulnerabilidad para otros obstáculos
                      // Verificar inmunidad de purr para fee
                      if (obstacle.type === 'fee' && newToken.immunityTimer > 0) {
                          console.log(`[FEE] ¡Colisión con fee pero inmune por purr! Inmunidad restante: ${newToken.immunityTimer}ms - No hay daño.`);
                      } else {
                          // FEE CAUSA DAÑO - LOG DETALLADO para fees
                          if (obstacle.type === 'fee') {
-                             console.log(`[FEE] ¡FEE CAUSA DAÑO! Invulnerabilidad OK (${timeSinceLastDamage}ms >= 500ms), Sin inmunidad purr (${newToken.immunityTimer || 0}ms)`);
+                             console.log(`[FEE] ¡FEE CAUSA DAÑO! Invulnerabilidad OK (${timeSinceLastDamage}ms >= ${TOKEN_DAMAGE_IMMUNITY_MS}ms), Sin inmunidad purr (${newToken.immunityTimer || 0}ms)`);
                          }
                          
                          // Lógica de daño de vida - SOLO para fees y otros obstáculos (NO hacker)
@@ -3203,7 +3203,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          }
                      }
                  } else {
-                     console.log(`[INVULNERABLE] Jugador en invulnerabilidad (${500 - timeSinceLastDamage}ms restantes)`);
+                     console.log(`[INVULNERABLE] Jugador en invulnerabilidad (${TOKEN_DAMAGE_IMMUNITY_MS - timeSinceLastDamage}ms restantes)`);
                  }
                  
                  // Siempre aplicar pushback aunque esté en invulnerabilidad
@@ -3236,7 +3236,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             if (isTokenCollidingWithRay(newToken, ray)) {
               const timeSinceLastDamage = lastDamageTime ? now - lastDamageTime : Infinity;
 
-              if (timeSinceLastDamage >= 500) {
+              if (timeSinceLastDamage >= TOKEN_DAMAGE_IMMUNITY_MS) {
                 hearts--;
                 console.log(`[RAY] Impacto en rayo ${ray.orientation} (${ray.x.toFixed(1)}, ${ray.y.toFixed(1)}) - corazones restantes: ${hearts}`);
 

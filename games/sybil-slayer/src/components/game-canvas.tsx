@@ -702,69 +702,163 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         );
       }
     } else {
-      // FASE ACTIVA: SIN parpadeo, intensidad constante
+      // FASE ACTIVA: Efecto láser con múltiples capas de difuminado
       ctx.globalCompositeOperation = 'lighter';
 
-      // Capa de difuminado sutil alrededor del rayo (más ancha)
-      const blurWidth = ray.width * 3; // 3x el grosor del rayo central
-      const blurHeight = ray.height * 3;
+      // Capa exterior más amplia (aura láser)
+      const outerBlurWidth = ray.width * 6; // 6x el grosor del rayo central
+      const outerBlurHeight = ray.height * 6;
       
-      ctx.globalAlpha = 0.15; // Muy sutil
+      ctx.globalAlpha = 0.25; // Más visible para debugging
       if (ray.orientation === 'vertical') {
-        const blurGradient = ctx.createLinearGradient(
-          ray.x - (blurWidth - ray.width) / 2, 
+        const outerGradient = ctx.createLinearGradient(
+          ray.x - (outerBlurWidth - ray.width) / 2, 
           0, 
-          ray.x + ray.width + (blurWidth - ray.width) / 2, 
+          ray.x + ray.width + (outerBlurWidth - ray.width) / 2, 
           0
         );
-        blurGradient.addColorStop(0, 'rgba(80, 200, 255, 0.0)');
-        blurGradient.addColorStop(0.3, 'rgba(120, 220, 255, 0.3)');
-        blurGradient.addColorStop(0.5, 'rgba(200, 240, 255, 0.4)');
-        blurGradient.addColorStop(0.7, 'rgba(120, 220, 255, 0.3)');
-        blurGradient.addColorStop(1, 'rgba(80, 200, 255, 0.0)');
-        ctx.fillStyle = blurGradient;
+        outerGradient.addColorStop(0, 'rgba(255, 100, 100, 0.0)');
+        outerGradient.addColorStop(0.3, 'rgba(255, 150, 150, 0.15)');
+        outerGradient.addColorStop(0.5, 'rgba(255, 200, 200, 0.2)');
+        outerGradient.addColorStop(0.7, 'rgba(255, 150, 150, 0.15)');
+        outerGradient.addColorStop(1, 'rgba(255, 100, 100, 0.0)');
+        ctx.fillStyle = outerGradient;
         ctx.fillRect(
-          ray.x - (blurWidth - ray.width) / 2, 
+          ray.x - (outerBlurWidth - ray.width) / 2, 
           ray.y, 
-          blurWidth, 
+          outerBlurWidth, 
           ray.height
         );
       } else {
-        const blurGradient = ctx.createLinearGradient(
+        const outerGradient = ctx.createLinearGradient(
           0, 
-          ray.y - (blurHeight - ray.height) / 2, 
+          ray.y - (outerBlurHeight - ray.height) / 2, 
           0, 
-          ray.y + ray.height + (blurHeight - ray.height) / 2
+          ray.y + ray.height + (outerBlurHeight - ray.height) / 2
         );
-        blurGradient.addColorStop(0, 'rgba(80, 200, 255, 0.0)');
-        blurGradient.addColorStop(0.3, 'rgba(120, 220, 255, 0.3)');
-        blurGradient.addColorStop(0.5, 'rgba(200, 240, 255, 0.4)');
-        blurGradient.addColorStop(0.7, 'rgba(120, 220, 255, 0.3)');
-        blurGradient.addColorStop(1, 'rgba(80, 200, 255, 0.0)');
-        ctx.fillStyle = blurGradient;
+        outerGradient.addColorStop(0, 'rgba(255, 100, 100, 0.0)');
+        outerGradient.addColorStop(0.3, 'rgba(255, 150, 150, 0.15)');
+        outerGradient.addColorStop(0.5, 'rgba(255, 200, 200, 0.2)');
+        outerGradient.addColorStop(0.7, 'rgba(255, 150, 150, 0.15)');
+        outerGradient.addColorStop(1, 'rgba(255, 100, 100, 0.0)');
+        ctx.fillStyle = outerGradient;
         ctx.fillRect(
           ray.x, 
-          ray.y - (blurHeight - ray.height) / 2, 
+          ray.y - (outerBlurHeight - ray.height) / 2, 
           ray.width, 
-          blurHeight
+          outerBlurHeight
         );
       }
 
-      // Línea blanca central brillante (núcleo principal) - SIN PARPADEO
-      ctx.globalAlpha = 0.95; // Intensidad constante
+      // Capa intermedia (halo láser)
+      const midBlurWidth = ray.width * 4; // 4x el grosor del rayo central
+      const midBlurHeight = ray.height * 4;
+      
+      ctx.globalAlpha = 0.4; // Más visible para debugging
       if (ray.orientation === 'vertical') {
-        const gradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
-        gradient.addColorStop(0, 'rgba(200, 230, 255, 0.0)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
-        gradient.addColorStop(1, 'rgba(200, 230, 255, 0.0)');
-        ctx.fillStyle = gradient;
+        const midGradient = ctx.createLinearGradient(
+          ray.x - (midBlurWidth - ray.width) / 2, 
+          0, 
+          ray.x + ray.width + (midBlurWidth - ray.width) / 2, 
+          0
+        );
+        midGradient.addColorStop(0, 'rgba(255, 180, 180, 0.0)');
+        midGradient.addColorStop(0.3, 'rgba(255, 220, 220, 0.25)');
+        midGradient.addColorStop(0.5, 'rgba(255, 240, 240, 0.35)');
+        midGradient.addColorStop(0.7, 'rgba(255, 220, 220, 0.25)');
+        midGradient.addColorStop(1, 'rgba(255, 180, 180, 0.0)');
+        ctx.fillStyle = midGradient;
+        ctx.fillRect(
+          ray.x - (midBlurWidth - ray.width) / 2, 
+          ray.y, 
+          midBlurWidth, 
+          ray.height
+        );
+      } else {
+        const midGradient = ctx.createLinearGradient(
+          0, 
+          ray.y - (midBlurHeight - ray.height) / 2, 
+          0, 
+          ray.y + ray.height + (midBlurHeight - ray.height) / 2
+        );
+        midGradient.addColorStop(0, 'rgba(255, 180, 180, 0.0)');
+        midGradient.addColorStop(0.3, 'rgba(255, 220, 220, 0.25)');
+        midGradient.addColorStop(0.5, 'rgba(255, 240, 240, 0.35)');
+        midGradient.addColorStop(0.7, 'rgba(255, 220, 220, 0.25)');
+        midGradient.addColorStop(1, 'rgba(255, 180, 180, 0.0)');
+        ctx.fillStyle = midGradient;
+        ctx.fillRect(
+          ray.x, 
+          ray.y - (midBlurHeight - ray.height) / 2, 
+          ray.width, 
+          midBlurHeight
+        );
+      }
+
+      // Capa interior (core del láser)
+      const innerBlurWidth = ray.width * 2.5; // 2.5x el grosor del rayo central
+      const innerBlurHeight = ray.height * 2.5;
+      
+      ctx.globalAlpha = 0.6; // Más visible para debugging
+      if (ray.orientation === 'vertical') {
+        const innerGradient = ctx.createLinearGradient(
+          ray.x - (innerBlurWidth - ray.width) / 2, 
+          0, 
+          ray.x + ray.width + (innerBlurWidth - ray.width) / 2, 
+          0
+        );
+        innerGradient.addColorStop(0, 'rgba(255, 220, 220, 0.0)');
+        innerGradient.addColorStop(0.3, 'rgba(255, 240, 240, 0.4)');
+        innerGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
+        innerGradient.addColorStop(0.7, 'rgba(255, 240, 240, 0.4)');
+        innerGradient.addColorStop(1, 'rgba(255, 220, 220, 0.0)');
+        ctx.fillStyle = innerGradient;
+        ctx.fillRect(
+          ray.x - (innerBlurWidth - ray.width) / 2, 
+          ray.y, 
+          innerBlurWidth, 
+          ray.height
+        );
+      } else {
+        const innerGradient = ctx.createLinearGradient(
+          0, 
+          ray.y - (innerBlurHeight - ray.height) / 2, 
+          0, 
+          ray.y + ray.height + (innerBlurHeight - ray.height) / 2
+        );
+        innerGradient.addColorStop(0, 'rgba(255, 220, 220, 0.0)');
+        innerGradient.addColorStop(0.3, 'rgba(255, 240, 240, 0.4)');
+        innerGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
+        innerGradient.addColorStop(0.7, 'rgba(255, 240, 240, 0.4)');
+        innerGradient.addColorStop(1, 'rgba(255, 220, 220, 0.0)');
+        ctx.fillStyle = innerGradient;
+        ctx.fillRect(
+          ray.x, 
+          ray.y - (innerBlurHeight - ray.height) / 2, 
+          ray.width, 
+          innerBlurHeight
+        );
+      }
+
+      // Núcleo central brillante (línea láser principal)
+      ctx.globalAlpha = 1.0; // Máxima intensidad
+      if (ray.orientation === 'vertical') {
+        const coreGradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
+        coreGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        coreGradient.addColorStop(0.3, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(1, 'rgba(255, 255, 255, 0.8)');
+        ctx.fillStyle = coreGradient;
         ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
       } else {
-        const gradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
-        gradient.addColorStop(0, 'rgba(200, 230, 255, 0.0)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
-        gradient.addColorStop(1, 'rgba(200, 230, 255, 0.0)');
-        ctx.fillStyle = gradient;
+        const coreGradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
+        coreGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        coreGradient.addColorStop(0.3, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(1, 'rgba(255, 255, 255, 0.8)');
+        ctx.fillStyle = coreGradient;
         ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
       }
     }
@@ -1761,8 +1855,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
      if ('type' in obj) {
        switch(obj.type) {
          case 'fee':
-           img = feeImgRef.current; // Fallback a la imagen estática
-           break;
+           // Los fees no deben usar imagen estática, siempre sprites animados
+           return; // Saltar renderizado fallback para fees
          case 'bug':
            img = bugImgRef.current;
            break;
@@ -2218,11 +2312,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            ctx.globalAlpha = alpha;
          }
          
-         // Para el fee estático (fallback), también aplicamos un factor de escala mayor
+         // Los fees siempre usan sprites animados, no imagen estática
          if ('type' in obj && obj.type === 'fee') {
-           // TAMAÑO FIJO: Usar FEE_RADIUS constante para garantizar tamaño uniforme
-           const feeImgSize = FEE_RADIUS * 2 * 1.155; // 26 * 2 * 1.155 = 60.06px (5% más grande)
-           ctx.drawImage(img, obj.x - feeImgSize/2, obj.y - feeImgSize/2, feeImgSize, feeImgSize);
+           // Saltar renderizado de fee aquí - se maneja arriba con sprites
+           return;
          } else {
            // Si es el token (no tiene 'type'), usar el factor de escala aumentado
            if (!('type' in obj)) {
@@ -2245,9 +2338,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        if (!('type' in obj)) {
          fallbackImg = tokenImgRef.current;
        } 
-       // Para obstáculos, usar las imágenes estáticas correspondientes
+       // Para obstáculos, usar las imágenes estáticas correspondientes (excepto fee que usa sprites)
        else if (obj.type === 'fee') {
-         fallbackImg = feeImgRef.current;
+         // Los fees no deben usar imagen estática, siempre sprites animados
+         return; // Saltar renderizado fallback para fees
        } else if (obj.type === 'bug') {
          fallbackImg = bugImgRef.current;
        } else if (obj.type === 'hacker') {
@@ -2283,9 +2377,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            const tokenImgSize = imgSize * 1.46;
            ctx.drawImage(fallbackImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
          } else if (obj.type === 'fee') {
-           // Fee con tamaño específico
-           const feeImgSize = imgSize * 1.155;
-           ctx.drawImage(fallbackImg, obj.x - feeImgSize/2, obj.y - feeImgSize/2, feeImgSize, feeImgSize);
+           // Los fees no deben usar imagen estática, siempre sprites animados
+           return; // Saltar renderizado fallback para fees
          } else {
            // Otros elementos con tamaño estándar
            const standardImgSize = imgSize * 0.9;
