@@ -13,6 +13,8 @@ import {
   VAUL_DOUBLE_ENERGY_COUNT, VAUL_DOUBLE_UKI_COUNT, VAUL_DOUBLE_DURATION_MIN_MS, VAUL_DOUBLE_DURATION_MAX_MS,
   VAUL_ENERGY_TO_UKI_DURATION_MIN_MS, VAUL_ENERGY_TO_UKI_DURATION_MAX_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
   COLLECTIBLE_LIFETIME_MS, COLLECTIBLE_BLINK_WARNING_MS, MAX_ENERGY_POINTS, INITIAL_ENERGY_POINTS, MAX_UKI_POINTS,
+  ENERGY_POINT_RADIUS, ENERGY_POINT_COLOR, ENERGY_POINT_VALUE,
+  UKI_RADIUS, UKI_COLOR, UKI_VALUE,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS,
   RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_BLOCK_DISAPPEAR_DELAY_MS, RAY_FIRST_BLOCK_START_MS, RAY_BLOCK_INTERVAL_MS, RAY_THICKNESS,
   RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
@@ -3334,6 +3336,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       // --- Aparición de energía (respawn) ---
       let maxEnergy = getMaxEnergyForLevel(currentLevel);
       let maxUki = MAX_UKI_POINTS;
+      const energyToUkiJustActivated = activeVaulEffect === 'energy_to_uki' && prev.activeVaulEffect !== 'energy_to_uki';
+      const energyToUkiJustEnded = prev.activeVaulEffect === 'energy_to_uki' && activeVaulEffect !== 'energy_to_uki';
       
       // Efecto 2: Doble de collectibles
       if (activeVaulEffect === 'double_collectibles') {
@@ -3341,16 +3345,49 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         maxUki = VAUL_DOUBLE_UKI_COUNT; // 6 en vez de 3
       }
       
+      // Restaurar los energy cuando termina el efecto 3
+      if (energyToUkiJustEnded) {
+        let restoredCount = 0;
+        remainingCollectibles = remainingCollectibles.map(collectible => {
+          if (collectible.type === 'uki' && collectible.convertedFromEnergy) {
+            restoredCount++;
+            const { convertedFromEnergy: _flag, ...rest } = collectible;
+            return {
+              ...rest,
+              type: 'energy',
+              radius: ENERGY_POINT_RADIUS,
+              color: ENERGY_POINT_COLOR,
+              value: ENERGY_POINT_VALUE,
+            };
+          }
+          return collectible;
+        });
+        if (restoredCount > 0) {
+          console.log(`[VAUL] Restaurando ${restoredCount} energy tras finalizar el efecto energy_to_uki`);
+        }
+      }
+
       // Efecto 3: Energy se convierten en uki
       if (activeVaulEffect === 'energy_to_uki') {
-        // ELIMINAR todas las energy existentes y convertirlas en uki
-        const existingEnergy = remainingCollectibles.filter(c => c.type === 'energy');
-        if (existingEnergy.length > 0) {
-          console.log(`[VAUL] Eliminando ${existingEnergy.length} energy existentes para convertirlas en uki`);
-          remainingCollectibles = remainingCollectibles.filter(c => c.type !== 'energy');
+        let conversions = 0;
+        remainingCollectibles = remainingCollectibles.map(collectible => {
+          if (collectible.type !== 'energy') {
+            return collectible;
+          }
+          conversions++;
+          return {
+            ...collectible,
+            type: 'uki',
+            radius: UKI_RADIUS,
+            color: UKI_COLOR,
+            value: UKI_VALUE,
+            convertedFromEnergy: true,
+          };
+        });
+        if (conversions > 0 && energyToUkiJustActivated) {
+          console.log(`[VAUL] Convertidas ${conversions} energy a uki manteniendo posiciones originales`);
         }
-        
-        // No spawear energy, solo uki
+        // No spawear energy adicionales, solo uki
         maxEnergy = 0;
         maxUki = MAX_UKI_POINTS + getMaxEnergyForLevel(currentLevel); // Combinar ambos (13 total)
       }

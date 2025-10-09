@@ -110,6 +110,7 @@ export interface Collectible extends GameObject {
   type: CollectibleType;
   value: number; // Score value
   runeType?: RuneType; // Tipo de runa cuando corresponde
+  convertedFromEnergy?: boolean; // Flag para saber si proviene de la conversión energy->uki del vaul
   // Propiedades para animación de pulsación
   pulseEffect?: boolean; // Si debe pulsar
   pulseScale?: number; // Escala actual de pulsación
