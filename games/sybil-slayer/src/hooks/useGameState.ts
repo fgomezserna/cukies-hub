@@ -2408,12 +2408,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           treasureState.activeTreasureId = null;
           treasureState.activeSpawnTime = null;
           treasureState.treasuresCollectedInBlock = 0;
-          treasureState.successfulBlocks = 0;
+          // CORREGIDO: NO resetear successfulBlocks - mantener el progreso de bloques completados
           treasureState.nextSpawnTime = now + getRandomFloat(
             TREASURE_NEXT_BLOCK_MIN_S * 1000,
             TREASURE_NEXT_BLOCK_MAX_S * 1000
           );
-          console.log('[TREASURE] 🛑 Tesoro expirado sin recoger. Reiniciando bloque.');
+          console.log(`[TREASURE] 🛑 Tesoro expirado sin recoger. Reiniciando bloque (multiplicador mantiene: ${treasureState.successfulBlocks + 1}).`);
         }
 
         if (
