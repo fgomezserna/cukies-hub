@@ -127,7 +127,7 @@ export const MEGA_NODE_SPAWN_INTERVAL_MIN_MS = 15000; // 15s mínimo
 export const MEGA_NODE_SPAWN_INTERVAL_MAX_MS = 25000; // 25s máximo
 export const HEART_SPAWN_INTERVAL_MIN_MS = 20000; // 20s mínimo
 export const HEART_SPAWN_INTERVAL_MAX_MS = 30000; // 30s máximo
-export const HEART_BONUS_POINTS_BASE = 10; // Puntos base cuando se recolecta con 3 vidas (progresivo: 10, 20, 30...)
+export const HEART_BONUS_POINTS_BASE = 10; // Puntos base cuando se recolecta con vida máxima (fórmula: base * heartCount * nivel, ej: nivel 3, corazón 3 = 10 * 3 * 3 = 90)
 export const VAUL_FIRST_SPAWN_MS = 30000; // 30s para el primer Vaul
 export const VAUL_NEXT_SPAWN_MS = 30000; // 30s después de terminar efecto o expirar
 

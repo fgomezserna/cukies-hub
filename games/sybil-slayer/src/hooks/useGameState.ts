@@ -2824,9 +2824,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              } else {
                // Si ya tiene máximo de vidas, otorgar puntos progresivos
                const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
-               const heartPoints = HEART_BONUS_POINTS_BASE * heartCount;
+               const heartPoints = HEART_BONUS_POINTS_BASE * heartCount * prev.level;
                scoreToAdd += heartPoints;
-               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos`);
+               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos (${HEART_BONUS_POINTS_BASE} * ${heartCount} * nivel ${prev.level})`);
                onPlaySound?.('heart_collect');
              }
              continue; // No añadir el heart a los restantes
