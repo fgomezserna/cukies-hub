@@ -239,8 +239,8 @@ let lastCheckpointTime = 0;
 
 // --- FASE 4: ESCALADO DE CORAZONES ---
 const getHeartSpawnChanceForLevel = (level: number) => Math.max(0.005, 0.02 - (level - 1) * 0.003); // Baja 0.3% por nivel, mínimo 0.5%
-const getInitialHeartsForLevel = (level: number) => Math.max(1, 3 - Math.floor((level - 1) / 2)); // Baja 1 cada 2 niveles, mínimo 1
-const getMaxHeartsForLevel = (level: number) => 3 + (level - 1); // Nivel 1 = 3 max, Nivel 2 = 4 max, Nivel 3 = 5 max, etc.
+const getInitialHeartsForLevel = (level: number) => 3; // Siempre 3 corazones iniciales en todos los niveles
+const getMaxHeartsForLevel = (level: number) => 3; // Siempre 3 huecos máximos en todos los niveles
 
 // --- FASE 5: ESCALADO DE PENALIZACIONES ---
 const getCollisionPenaltySecondsForLevel = (level: number) => COLLISION_PENALTY_SECONDS + (level - 1) * 2; // Penalización de tiempo sube 2s por nivel
@@ -2440,6 +2440,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       // --- Collision Detection ---
       let scoreToAdd = 0;
+      let scoreToAddWithVaultMultiplier = 0; // Puntuación de energy/uki (recibe multiplicador del vault)
+      let scoreToAddWithoutVaultMultiplier = 0; // Puntuación de otros coleccionables (NO recibe multiplicador del vault)
       let hearts = prev.hearts;
       let scoreToSubtract = 0; // Para descontar puntos por Hacker
       let vaulCollectedCount = prev.vaulCollectedCount || 0;
@@ -2573,7 +2575,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const basePoints = TREASURE_BLOCK_BASE_POINTS[Math.min(currentIndex, TREASURE_BLOCK_BASE_POINTS.length - 1)];
             const multiplier = treasureState.successfulBlocks + 1;
             const treasurePoints = basePoints * multiplier;
-            scoreToAdd += treasurePoints;
+            scoreToAddWithoutVaultMultiplier += treasurePoints; // Treasures NO reciben multiplicador del vault
             onPlaySound?.('energy_collect');
             treasureState.treasuresCollectedInBlock = currentIndex + 1;
             treasureState.activeTreasureId = null;
@@ -2773,7 +2775,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           if (collectible.type === 'rune') {
             runeState.runePickupCount += 1;
             const runePoints = RUNE_SCORE_INCREMENT * runeState.runePickupCount;
-            scoreToAdd += runePoints;
+            scoreToAddWithoutVaultMultiplier += runePoints; // Runas NO reciben multiplicador del vault
             onPlaySound?.('energy_collect');
 
             // Programar la siguiente runa 10s después de recoger esta
@@ -2823,14 +2825,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                if (prev.heartsCollectedWithFullLife > 0) {
                  console.log(`[HEART] Contador de bonos reseteado (tenías ${prev.heartsCollectedWithFullLife} acumulados)`);
                }
-             } else {
-               // Si ya tiene máximo de vidas, otorgar puntos progresivos
-               const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
-               const heartPoints = HEART_BONUS_POINTS_BASE * heartCount * prev.level;
-               scoreToAdd += heartPoints;
-               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos (${HEART_BONUS_POINTS_BASE} * ${heartCount} * nivel ${prev.level})`);
-               onPlaySound?.('heart_collect');
-             }
+            } else {
+              // Si ya tiene máximo de vidas, otorgar puntos progresivos
+              const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
+              const heartPoints = HEART_BONUS_POINTS_BASE * heartCount * prev.level;
+              scoreToAddWithoutVaultMultiplier += heartPoints; // Hearts NO reciben multiplicador del vault
+              console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos (${HEART_BONUS_POINTS_BASE} * ${heartCount} * nivel ${prev.level})`);
+              onPlaySound?.('heart_collect');
+            }
              continue; // No añadir el heart a los restantes
            }
            if (collectible.type === 'purr') {
@@ -2851,7 +2853,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                onPlaySound?.('mega_node_collect');
                continue;
            }
-           scoreToAdd += collectible.value;
+           // Separar puntos según si reciben o no el multiplicador del vault
+           if (collectible.type === 'energy' || collectible.type === 'uki') {
+             scoreToAddWithVaultMultiplier += collectible.value; // Energy y Uki SÍ reciben multiplicador del vault
+           } else {
+             scoreToAddWithoutVaultMultiplier += collectible.value; // Resto NO recibe multiplicador del vault
+           }
            if (collectible.type === 'megaNode') {
                console.log("Mega Node collected! Boost activated.");
                // ✅ CORREGIDO: Usar tiempo de juego pausable para el boost del mega_node
@@ -3470,16 +3477,26 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
       }
       
+      // Calcular score total antes de multiplicadores
+      scoreToAdd = scoreToAddWithVaultMultiplier + scoreToAddWithoutVaultMultiplier;
+      
       if (levelMultiplier !== 1 && scoreToAdd > 0) {
-        console.log(`[LEVEL] Multiplicador de nivel (${prev.level}) x${levelMultiplier} aplicado a ${scoreToAdd} puntos base`);
+        console.log(`[LEVEL] Multiplicador de nivel (${prev.level}) x${levelMultiplier} - Energy/Uki: ${scoreToAddWithVaultMultiplier}, Otros: ${scoreToAddWithoutVaultMultiplier}`);
       }
 
-      // Aplicar multiplicadores de nivel y vaul a los puntos obtenidos este frame
-      const finalScoreToAdd = scoreToAdd * levelMultiplier * currentMultiplier;
+      // Aplicar multiplicadores:
+      // - Energy/Uki: reciben multiplicador de nivel Y multiplicador del vault
+      // - Otros coleccionables: solo reciben multiplicador de nivel
+      const finalScoreEnergyUki = scoreToAddWithVaultMultiplier * levelMultiplier * currentMultiplier;
+      const finalScoreOthers = scoreToAddWithoutVaultMultiplier * levelMultiplier;
+      const finalScoreToAdd = finalScoreEnergyUki + finalScoreOthers;
       
       // Log para depuración de multiplicador del vaul
-      if (currentMultiplier > 1 && scoreToAdd > 0) {
-        console.log(`[VAUL MULTIPLIER] Multiplicando puntuación ajustada por nivel: x${currentMultiplier}`);
+      if (currentMultiplier > 1 && scoreToAddWithVaultMultiplier > 0) {
+        console.log(`[VAUL MULTIPLIER] x${currentMultiplier} aplicado SOLO a Energy/Uki: ${scoreToAddWithVaultMultiplier} -> ${finalScoreEnergyUki} pts (nivel x${levelMultiplier})`);
+        if (scoreToAddWithoutVaultMultiplier > 0) {
+          console.log(`[VAUL MULTIPLIER] Otros coleccionables SIN multiplicador vault: ${scoreToAddWithoutVaultMultiplier} -> ${finalScoreOthers} pts (solo nivel x${levelMultiplier})`);
+        }
       }
 
        if (obstaclesMarkedForRemoval.size > 0) {
