@@ -46,7 +46,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   const barrImgRef = useRef<HTMLImageElement | null>(null);
   const progressBarrImgRef = useRef<HTMLImageElement | null>(null);
   const checkpointImgRef = useRef<HTMLImageElement | null>(null);
-  const pauseOverlayImgRef = useRef<HTMLImageElement | null>(null);
+  // ELIMINADO: pauseOverlayImgRef ya no se usa (overlay manejado en game-container.tsx)
   const gameOverImgRef = useRef<HTMLImageElement | null>(null);
   const walletGameOverImgRef = useRef<HTMLImageElement | null>(null); // Nueva ref para wallet_gameover.png
   const containerRef = useRef<HTMLDivElement>(null);
@@ -513,15 +513,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     bugSprite3.src = '/assets/characters/bug/bug_3.png';
     
-    // Cargar imagen de overlay de pausa (usando botón de pausa como fallback)
-    const pauseOverlayImg = new Image();
-    pauseOverlayImg.src = '/assets/ui/buttons/pause-button.png';
-    pauseOverlayImg.onload = () => {
-      pauseOverlayImgRef.current = pauseOverlayImg;
-    };
-    pauseOverlayImg.onerror = (e) => {
-      console.error('❌ Error cargando pause-overlay:', e);
-    };
+    // ELIMINADO: Carga de imagen de overlay de pausa (ya no se usa)
+    // El overlay de pausa se maneja en game-container.tsx
     
     // Cargar imagen de game over
     const gameOverImg = new Image();
@@ -2701,12 +2694,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     ctx.shadowBlur = 0;
 
     // Dibujar overlay para estados especiales
-    if (gameState.status === 'paused' && pauseOverlayImgRef.current) {
-      // Usar imagen de overlay para pausa
-      ctx.globalAlpha = 0.7; // Hacer semi-transparente
-      ctx.drawImage(pauseOverlayImgRef.current, 0, 0, width, height);
-      ctx.globalAlpha = 1.0; // Restaurar opacidad
-    }
+    // CORREGIDO: Removido el botón de pause del fondo durante pausa
+    // El overlay de pausa se maneja en game-container.tsx
     
     // Game Over Message
     if (gameState.status === 'gameOver') {
