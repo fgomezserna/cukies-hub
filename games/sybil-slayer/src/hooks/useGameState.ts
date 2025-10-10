@@ -2442,6 +2442,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let scoreToAdd = 0;
       let scoreToAddWithVaultMultiplier = 0; // Puntuación de energy/uki (recibe multiplicador del vault)
       let scoreToAddWithoutVaultMultiplier = 0; // Puntuación de otros coleccionables (NO recibe multiplicador del vault)
+      let heartScoreToAdd = 0; // Puntuación de corazones (YA tiene multiplicador de nivel aplicado)
       let hearts = prev.hearts;
       let scoreToSubtract = 0; // Para descontar puntos por Hacker
       let vaulCollectedCount = prev.vaulCollectedCount || 0;
@@ -2816,21 +2817,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           }
           if (collectible.type === 'heart') {
              heartCollected = true; // Marcar que se recogió un corazón
-             if (hearts < prev.maxHearts) {
-               hearts++;
-               console.log(`[HEART] ❤️ Corazón recogido! +1 vida (${hearts}/${prev.maxHearts}). Reproduciendo life.mp3`);
-               console.log(`[HEART] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
-               onPlaySound?.('heart_collect');
-               // Resetear contador de corazones con vida completa al recuperar vida
-               if (prev.heartsCollectedWithFullLife > 0) {
-                 console.log(`[HEART] Contador de bonos reseteado (tenías ${prev.heartsCollectedWithFullLife} acumulados)`);
-               }
+            if (hearts < prev.maxHearts) {
+              hearts++;
+              console.log(`[HEART] ❤️ Corazón recogido! +1 vida (${hearts}/${prev.maxHearts}). Reproduciendo life.mp3`);
+              console.log(`[HEART] 🚨 Función onPlaySound disponible: ${onPlaySound ? 'SÍ' : 'NO'}`);
+              onPlaySound?.('heart_collect');
+              // NOTA: El contador de corazones con vida llena NO se resetea al recuperar vida
             } else {
               // Si ya tiene máximo de vidas, otorgar puntos progresivos
+              // NOTA: Usamos el contador actual + 1 para calcular puntos, pero el contador real se incrementa en la línea 3840
               const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
               const heartPoints = HEART_BONUS_POINTS_BASE * heartCount * prev.level;
-              scoreToAddWithoutVaultMultiplier += heartPoints; // Hearts NO reciben multiplicador del vault
+              heartScoreToAdd += heartPoints; // Hearts YA tienen multiplicador de nivel aplicado
               console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos (${HEART_BONUS_POINTS_BASE} * ${heartCount} * nivel ${prev.level})`);
+              console.log(`[HEART] 🔍 DEBUG: Contador anterior: ${prev.heartsCollectedWithFullLife}, Contador temporal: ${heartCount}, Nivel: ${prev.level}`);
               onPlaySound?.('heart_collect');
             }
              continue; // No añadir el heart a los restantes
@@ -3486,6 +3486,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
       // Aplicar multiplicadores:
       // - Energy/Uki: reciben multiplicador de nivel Y multiplicador del vault
+      // - Corazones: YA tienen multiplicador de nivel aplicado, NO aplicar de nuevo
       // - Otros coleccionables: solo reciben multiplicador de nivel
       const finalScoreEnergyUki = scoreToAddWithVaultMultiplier * levelMultiplier * currentMultiplier;
       const finalScoreOthers = scoreToAddWithoutVaultMultiplier * levelMultiplier;
@@ -3815,7 +3816,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         token: newToken,
         obstacles: obstaclesToSpawn,
         collectibles: remainingCollectibles,
-        score: Math.max(0, prev.score + finalScoreToAdd + vaulBonusToAdd + runeCompletionBonus - scoreToSubtract), // Sumamos bonus directos sin multiplicadores
+        score: Math.max(0, prev.score + finalScoreToAdd + heartScoreToAdd + vaulBonusToAdd + runeCompletionBonus - scoreToSubtract), // Sumamos bonus directos sin multiplicadores
         timer: remainingTime,
         level: currentLevel,
         isFrenzyMode: false,
@@ -3840,7 +3841,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         nextMegaNodeInterval: newNextMegaNodeInterval,
         lastHeartSpawn: newLastHeartSpawn,
         nextHeartInterval: newNextHeartInterval,
-        heartsCollectedWithFullLife: heartCollected && hearts >= prev.maxHearts ? (prev.heartsCollectedWithFullLife || 0) + 1 : (hearts < prev.maxHearts ? 0 : prev.heartsCollectedWithFullLife || 0),
+        heartsCollectedWithFullLife: heartCollected && prev.hearts >= prev.maxHearts ? (prev.heartsCollectedWithFullLife || 0) + 1 : (prev.heartsCollectedWithFullLife || 0),
         lastVaulSpawn: newLastVaulSpawn,
         // Sistema de aparición progresiva de assets negativos
         negativeSpawnCycle: newNegativeSpawnCycle,

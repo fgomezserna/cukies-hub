@@ -286,54 +286,33 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar sprites animados del mega nodo
     const megaNodeSprite1 = new Image();
-    megaNodeSprite1.src = '/assets/collectibles/mega_node_1.png';
+    megaNodeSprite1.src = '/assets/collectibles/mega_node/mega_node_1.png';
     megaNodeSprite1.onload = () => {
       console.log('✅ Sprite mega_node_1.png cargado EXITOSAMENTE');
       megaNodeSprite1Ref.current = megaNodeSprite1;
     };
     megaNodeSprite1.onerror = (e) => {
       console.error('❌ Error cargando mega_node_1.png:', e);
-      // Intentar cargar desde la carpeta alternativa
-      const altSprite = new Image();
-      altSprite.src = '/assets/collectibles/mega_node/mega_node_1.png';
-      altSprite.onload = () => {
-        console.log('✅ Sprite alternativo mega_node/mega_node_1.png cargado EXITOSAMENTE');
-        megaNodeSprite1Ref.current = altSprite;
-      };
     };
     
     const megaNodeSprite2 = new Image();
-    megaNodeSprite2.src = '/assets/collectibles/mega_node_2.png';
+    megaNodeSprite2.src = '/assets/collectibles/mega_node/mega_node_2.png';
     megaNodeSprite2.onload = () => {
       console.log('✅ Sprite mega_node_2.png cargado EXITOSAMENTE');
       megaNodeSprite2Ref.current = megaNodeSprite2;
     };
     megaNodeSprite2.onerror = (e) => {
       console.error('❌ Error cargando mega_node_2.png:', e);
-      // Intentar cargar desde la carpeta alternativa
-      const altSprite = new Image();
-      altSprite.src = '/assets/collectibles/mega_node/mega_node_2.png';
-      altSprite.onload = () => {
-        console.log('✅ Sprite alternativo mega_node/mega_node_2.png cargado EXITOSAMENTE');
-        megaNodeSprite2Ref.current = altSprite;
-      };
     };
     
     const megaNodeSprite3 = new Image();
-    megaNodeSprite3.src = '/assets/collectibles/mega_node_3.png';
+    megaNodeSprite3.src = '/assets/collectibles/mega_node/mega_node_3.png';
     megaNodeSprite3.onload = () => {
       console.log('✅ Sprite mega_node_3.png cargado EXITOSAMENTE');
       megaNodeSprite3Ref.current = megaNodeSprite3;
     };
     megaNodeSprite3.onerror = (e) => {
       console.error('❌ Error cargando mega_node_3.png:', e);
-      // Intentar cargar desde la carpeta alternativa
-      const altSprite = new Image();
-      altSprite.src = '/assets/collectibles/mega_node/mega_node_3.png';
-      altSprite.onload = () => {
-        console.log('✅ Sprite alternativo mega_node/mega_node_3.png cargado EXITOSAMENTE');
-        megaNodeSprite3Ref.current = altSprite;
-      };
     };
     
     // Cargar sprites animados de fee
@@ -534,16 +513,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     bugSprite3.src = '/assets/characters/bug/bug_3.png';
     
-    // Cargar imagen de overlay de pausa
+    // Cargar imagen de overlay de pausa (usando botón de pausa como fallback)
     const pauseOverlayImg = new Image();
-    pauseOverlayImg.src = '/assets/ui/effects/pause-overlay.png';
+    pauseOverlayImg.src = '/assets/ui/buttons/pause-button.png';
     pauseOverlayImg.onload = () => {
       pauseOverlayImgRef.current = pauseOverlayImg;
+    };
+    pauseOverlayImg.onerror = (e) => {
+      console.error('❌ Error cargando pause-overlay:', e);
     };
     
     // Cargar imagen de game over
     const gameOverImg = new Image();
-    gameOverImg.src = '/assets/collectibles/gameover_trump .png';
+    gameOverImg.src = '/assets/collectibles/gameover_trump .png'; // Nota: el archivo tiene un espacio extra
     gameOverImg.onload = () => {
       console.log('✅ Imagen gameover_trump .png cargada EXITOSAMENTE');
       gameOverImgRef.current = gameOverImg;
@@ -3050,9 +3032,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   // Precarga optimizada de sprites
   const preloadSprites = useCallback(() => {
     const sprites = [
-      '/assets/collectibles/mega_node_1.png',
-      '/assets/collectibles/mega_node_2.png',
-      '/assets/collectibles/mega_node_3.png',
+      '/assets/collectibles/mega_node/mega_node_1.png',
+      '/assets/collectibles/mega_node/mega_node_2.png',
+      '/assets/collectibles/mega_node/mega_node_3.png',
       '/assets/collectibles/purr/purr_1.png',
       '/assets/collectibles/purr/purr_2.png',
       '/assets/collectibles/purr/purr_3.png'
@@ -3081,9 +3063,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   const preloadPrioritySprites = useCallback(() => {
     console.log('🚀 Iniciando precarga de sprites prioritarios...');
     const prioritySprites = [
-      '/assets/collectibles/mega_node_1.png',
-      '/assets/collectibles/mega_node_2.png',
-      '/assets/collectibles/mega_node_3.png',
+      '/assets/collectibles/mega_node/mega_node_1.png',
+      '/assets/collectibles/mega_node/mega_node_2.png',
+      '/assets/collectibles/mega_node/mega_node_3.png',
       '/assets/collectibles/purr/purr_1.png',
       '/assets/collectibles/purr/purr_2.png',
       '/assets/collectibles/purr/purr_3.png'
