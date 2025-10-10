@@ -2422,10 +2422,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           now >= treasureState.nextSpawnTime
         ) {
           const treasureId = generateId();
-          const treasureCollectible = createTreasureCollectible(
+          // CORREGIDO: Usar safeSpawnCollectible para evitar spawn encima del token
+          const treasureCollectible = safeSpawnCollectible(
+            createTreasureCollectible,
             treasureId,
             prev.canvasSize.width,
             prev.canvasSize.height,
+            [...prev.collectibles, ...newCollectibles, prev.token, ...newObstacles],
             now
           );
           treasureCollectible.createdAt = now;
@@ -3522,12 +3525,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (levelJustIncreased) {
         const goatOnField = remainingCollectibles.some(c => c.type === 'goatSkin');
         if (!goatOnField) {
+          // CORREGIDO: Incluir token en la lista de objetos a evitar
           const goatCollectible = safeSpawnCollectible(
             createGoatSkinCollectible,
             generateId(),
             prev.canvasSize.width,
             prev.canvasSize.height,
-            [...remainingCollectibles, newToken, ...newObstacles],
+            [...remainingCollectibles, prev.token, ...newObstacles],
             currentTime
           );
           remainingCollectibles.push(goatCollectible);
@@ -3746,7 +3750,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           // Verificar si es hora de spawnear
           const timeSinceLastSpawn = newLastMegaNodeSpawn ? (currentTime - newLastMegaNodeSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
           if (timeSinceLastSpawn >= newNextMegaNodeInterval) {
-            const newCollectible = safeSpawnCollectible(createMegaNodeCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+            // CORREGIDO: Incluir token en la lista de objetos a evitar
+            const newCollectible = safeSpawnCollectible(createMegaNodeCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn, prev.token], currentTime);
             if (newCollectible) {
               remainingCollectibles.push(newCollectible);
               newLastMegaNodeSpawn = currentTime;
@@ -3768,7 +3773,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           // Verificar si es hora de spawnear
           const timeSinceLastSpawn = newLastHeartSpawn ? (currentTime - newLastHeartSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
           if (timeSinceLastSpawn >= newNextHeartInterval) {
-            const newCollectible = safeSpawnCollectible(createHeartCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+            // CORREGIDO: Incluir token en la lista de objetos a evitar
+            const newCollectible = safeSpawnCollectible(createHeartCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn, prev.token], currentTime);
             if (newCollectible) {
               remainingCollectibles.push(newCollectible);
               newLastHeartSpawn = currentTime;
@@ -3894,7 +3900,12 @@ function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameT
     attempts++;
     
     // MEJORADO: Distancia mínima mayor para energy y uki (40px) para evitar solapamiento visual entre sí y con otros
-    const minDistance = (collectible.type === 'energy' || collectible.type === 'uki') ? 40 : 8;
+    let minDistance = (collectible.type === 'energy' || collectible.type === 'uki') ? 40 : 8;
+    
+    // CORREGIDO: Distancia mínima especial para elementos especiales para evitar spawn encima del token
+    if (collectible.type === 'treasure' || collectible.type === 'heart' || collectible.type === 'megaNode' || collectible.type === 'goatSkin' || collectible.type === 'rune') {
+      minDistance = 60; // Distancia mayor para elementos especiales
+    }
     
     // Si no se puede colocar después de muchos intentos, reducir gradualmente la distancia
     const adjustedMinDistance = attempts > 15 ? Math.max(minDistance * 0.5, 4) : minDistance;
