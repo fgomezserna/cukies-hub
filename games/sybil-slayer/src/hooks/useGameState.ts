@@ -2629,9 +2629,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              
              // Verificar si se ha completado la activación
              if ((collectible.activationProgress || 0) >= 1 && !collectible.isActivated) {
-              // ¡Vault activado! Elegir efecto aleatorio
-              const randomIndex = Math.floor(Math.random() * VAUL_EFFECT_TYPES.length);
-              const selectedEffect = VAUL_EFFECT_TYPES[randomIndex];
+             // ¡Vault activado! Elegir efecto aleatorio
+             const randomIndex = Math.floor(Math.random() * VAUL_EFFECT_TYPES.length);
+             const selectedEffect = VAUL_EFFECT_TYPES[randomIndex];
               
               const newVaulCount = (prev.vaulCollectedCount || 0) + 1;
               
@@ -3354,23 +3354,38 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       
       // Restaurar los energy cuando termina el efecto 3
       if (energyToUkiJustEnded) {
-        let restoredCount = 0;
-        remainingCollectibles = remainingCollectibles.map(collectible => {
-          if (collectible.type === 'uki' && collectible.convertedFromEnergy) {
-            restoredCount++;
-            const { convertedFromEnergy: _flag, ...rest } = collectible;
-            return {
-              ...rest,
-              type: 'energy',
-              radius: ENERGY_POINT_RADIUS,
-              color: ENERGY_POINT_COLOR,
-              value: ENERGY_POINT_VALUE,
-            };
-          }
-          return collectible;
-        });
-        if (restoredCount > 0) {
-          console.log(`[VAUL] Restaurando ${restoredCount} energy tras finalizar el efecto energy_to_uki`);
+        // Obtener TODOS los uki en pantalla (tanto convertidos como originales)
+        const allUkis = remainingCollectibles.filter(c => c.type === 'uki');
+        const totalUkis = allUkis.length;
+        
+        if (totalUkis > 0) {
+          // Seleccionar aleatoriamente 3 uki para mantener como uki
+          const ukisToKeep = Math.min(3, totalUkis);
+          const shuffledUkis = [...allUkis].sort(() => Math.random() - 0.5);
+          const ukisToKeepList = shuffledUkis.slice(0, ukisToKeep);
+          const ukiIdsToKeep = new Set(ukisToKeepList.map(u => u.id));
+          
+          let convertedToEnergyCount = 0;
+          remainingCollectibles = remainingCollectibles.map(collectible => {
+            if (collectible.type === 'uki' && !ukiIdsToKeep.has(collectible.id)) {
+              // Convertir este uki a energy (manteniendo posición)
+              convertedToEnergyCount++;
+              const { convertedFromEnergy: _flag, ...rest } = collectible;
+              return {
+                ...rest,
+                type: 'energy',
+                radius: ENERGY_POINT_RADIUS,
+                color: ENERGY_POINT_COLOR,
+                value: ENERGY_POINT_VALUE,
+              };
+            }
+            // Mantener como uki (tanto originales como los 3 seleccionados)
+            return collectible;
+          });
+          
+          console.log(`[VAUL] Efecto energy_to_uki terminado: ${convertedToEnergyCount} uki → energy, ${ukisToKeep} uki mantenidos (de ${totalUkis} total)`);
+          // CORREGIDO: Ajustar maxEnergy temporalmente para evitar eliminación/creación de energy
+          maxEnergy = convertedToEnergyCount;
         }
       }
 
