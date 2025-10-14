@@ -17,6 +17,9 @@ export type SoundType =
   | 'hacker_collision'
   | 'hacker_escape' // NUEVO: Cuando hacker recoge 5 energy y escapa
   | 'level_up'
+  | 'treasure_collect'
+  | 'rune_collect'
+  | 'goat_collect'
   // UI
   | 'button_click'
   | 'game_start'
@@ -39,20 +42,23 @@ const SOUND_CONFIG: Record<SoundType, {
   category: 'effect' | 'music' | 'ui' | 'voice';
 }> = {
   // Effects
-  energy_collect: { path: '/assets/sounds/effects/coin.mp3', volume: 0.6, category: 'effect' },
-  mega_node_collect: { path: '/assets/sounds/effects/power_up.mp3', volume: 0.7, category: 'effect' },
-  purr_collect: { path: '/assets/sounds/effects/meow-4.mp3', volume: 0.8, category: 'effect' },
-  vaul_collect: { path: '/assets/sounds/effects/vaul_collect.mp3', volume: 0.8, category: 'effect' },
-  checkpoint_collect: { path: '/assets/sounds/effects/checkpoint_collect.mp3', volume: 0.7, category: 'effect' },
-  checkpoint: { path: '/assets/sounds/effects/checkpoint.mp3', volume: 0.8, category: 'effect' },
-  heart_collect: { path: '/assets/sounds/effects/life.mp3', volume: 0.8, category: 'effect' },
-  life: { path: '/assets/sounds/effects/life.wav', volume: 0.8, category: 'effect' },
-  collision_damage: { path: '/assets/sounds/effects/collision_damage.mp3', volume: 0.5, category: 'effect' },
+  energy_collect: { path: '/assets/sounds/Sonidos/Gemas/Gemas 1.wav', volume: 0.6, category: 'effect' },
+  mega_node_collect: { path: '/assets/sounds/Sonidos/Haku/Haku 1.wav', volume: 0.7, category: 'effect' },
+  purr_collect: { path: '/assets/sounds/Sonidos/Token/Token 1.mp3', volume: 0.8, category: 'effect' },
+  vaul_collect: { path: '/assets/sounds/Sonidos/Cofre/Cofre 1.wav', volume: 0.8, category: 'effect' },
+  checkpoint_collect: { path: '/assets/sounds/Sonidos/Checkpoint/Checkpoint 1.wav', volume: 0.7, category: 'effect' },
+  checkpoint: { path: '/assets/sounds/Sonidos/Checkpoint/Aparece Checkpoint.wav', volume: 0.8, category: 'effect' },
+  heart_collect: { path: '/assets/sounds/Sonidos/Corazon/Corazon 1.wav', volume: 0.8, category: 'effect' },
+  life: { path: '/assets/sounds/Sonidos/Corazon/Corazon 1.wav', volume: 0.8, category: 'effect' },
+  collision_damage: { path: '/assets/sounds/Sonidos/Golpe Recibido/Golpe 1.wav', volume: 0.5, category: 'effect' },
   auch: { path: '/assets/sounds/effects/auch.mp3', volume: 0.7, category: 'effect' },
   bug_collision: { path: '/assets/sounds/effects/bug_collision.mp3', volume: 0.8, category: 'effect' },
   hacker_collision: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.7, category: 'voice' },
   hacker_escape: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' }, // NUEVO: Mismo sonido pero diferente evento
-  level_up: { path: '/assets/sounds/effects/level_up.mp3', volume: 0.7, category: 'effect' },
+  level_up: { path: '/assets/sounds/Sonidos/Level Up/Level up 1.wav', volume: 0.7, category: 'effect' },
+  treasure_collect: { path: '/assets/sounds/Sonidos/Tesoros/sfx_coin_single1.wav', volume: 0.7, category: 'effect' },
+  rune_collect: { path: '/assets/sounds/Sonidos/Skill/Skill 1.wav', volume: 0.7, category: 'effect' },
+  goat_collect: { path: '/assets/sounds/Sonidos/Goat/Goat 1.wav', volume: 0.7, category: 'effect' },
   
   // UI
   button_click: { path: '/assets/sounds/ui/button-click-01.mp3', volume: 0.5, category: 'ui' },
@@ -68,7 +74,7 @@ const SOUND_CONFIG: Record<SoundType, {
   background_music: { path: '/assets/sounds/music/HoliznaCC0 - Game BOI 4.mp3', volume: 0.2, loop: true, category: 'music' },
   background_music_alt: { path: '/assets/sounds/music/HoliznaCC0 - Track 1.mp3', volume: 0.2, loop: true, category: 'music' },
   frenzy_mode: { path: '/assets/sounds/music/frenzy_mode.mp3', volume: 0.4, loop: true, category: 'music' },
-  game_over: { path: '/assets/sounds/music/game_over.wav', volume: 0.6, category: 'music' },
+  game_over: { path: '/assets/sounds/Sonidos/Muerte/Muerte 1.wav', volume: 0.6, category: 'music' },
 };
 
 export const useAudio = () => {

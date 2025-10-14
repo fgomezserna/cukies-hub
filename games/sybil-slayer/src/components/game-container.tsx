@@ -436,8 +436,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Callback para explosion
   const handleEnergyCollected = useCallback(() => {
     setEnergyCollectedFlag(flag => flag + 1);
-    playSound('energy_collect');
-  }, [playSound]);
+    // Sonido se reproduce directamente en useGameState.ts según el tipo de coleccionable
+  }, []);
 
   // Callback para daño
   const handleDamage = useCallback(() => {

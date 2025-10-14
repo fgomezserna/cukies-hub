@@ -2807,7 +2807,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             treasureCollectedThisFrame += 1;
             treasureBasePointsThisFrame += treasurePoints;
             scoreToAddWithoutVaultMultiplier += treasurePoints; // Treasures NO reciben multiplicador del vault
-            onPlaySound?.('energy_collect');
+            onPlaySound?.('treasure_collect');
             treasureState.treasuresCollectedInBlock = currentIndex + 1;
             treasureState.activeTreasureId = null;
             treasureState.activeSpawnTime = null;
@@ -3009,7 +3009,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const runePoints = RUNE_SCORE_INCREMENT * runeState.runePickupCount;
             runeBasePointsThisFrame += runePoints;
             scoreToAddWithoutVaultMultiplier += runePoints; // Runas NO reciben multiplicador del vault
-            onPlaySound?.('energy_collect');
+            onPlaySound?.('rune_collect');
 
             // Programar la siguiente runa 10s después de recoger esta
             runeState.nextSpawnTime = now + RUNE_NEXT_SPAWN_MS;
@@ -3044,13 +3044,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
          if (collectible.type === 'energy') {
            energyCollectedThisFrame += 1;
            energyValueSumThisFrame += collectible.value;
+           onPlaySound?.('energy_collect');
            if (onEnergyCollected) onEnergyCollected();
          }
           if (collectible.type === 'uki') {
             ukiCollectedThisFrame += 1;
             ukiValueSumThisFrame += collectible.value;
             console.log("Uki collected! +5 points.");
-            onPlaySound?.('energy_collect'); // Usar mismo sonido que energy
+            onPlaySound?.('purr_collect'); // Sonido Token 1.mp3
             if (onEnergyCollected) onEnergyCollected(); // Disparar mismo efecto visual que energy
           }
           if (collectible.type === 'heart') {
@@ -3094,7 +3095,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                goatSkinCollected = true;
                console.log("[GOAT] Resetear timer de Haku - empezará a contar desde ahora");
                
-               onPlaySound?.('mega_node_collect');
+               onPlaySound?.('goat_collect');
                continue;
            }
            // Separar puntos según si reciben o no el multiplicador del vault
