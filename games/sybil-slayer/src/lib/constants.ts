@@ -17,6 +17,7 @@ export const RAY_BLOCK_DISAPPEAR_DELAY_MS = 3000; // Tiempo que tardan en desapa
 export const RAY_FIRST_BLOCK_START_MS = 32000; // Primer bloque de rayos a los 32s de partida
 export const RAY_BLOCK_INTERVAL_MS = 44000; // Intervalo entre bloques: 44s después de que termine el bloque anterior
 export const RAY_THICKNESS = 18; // Grosor del rayo en píxeles (solo línea blanca central)
+export const RAY_MIN_SEPARATION = 36; // Separación mínima entre rayos del mismo tipo (2x RAY_THICKNESS)
 
 // Red Zone Properties
 export const RED_ZONE_WARNING_DURATION_MS = 3000; // Tiempo de aviso parpadeando
@@ -29,6 +30,7 @@ export const RED_ZONE_MIN_WIDTH_RATIO = 0.18; // Cobertura mínima del ancho del
 export const RED_ZONE_MAX_WIDTH_RATIO = 0.32; // Cobertura máxima del ancho del canvas
 export const RED_ZONE_MIN_HEIGHT_RATIO = 0.18; // Cobertura mínima del alto del canvas
 export const RED_ZONE_MAX_HEIGHT_RATIO = 0.32; // Cobertura máxima del alto del canvas
+export const RED_ZONE_MIN_SEPARATION = 100; // Distancia mínima entre zonas rojas para permitir paso del token
 
 // Token Properties
 export const TOKEN_RADIUS = 24; // 48x48px - Mantener este como base
@@ -80,7 +82,8 @@ export const GOAT_ELIMINATION_DURATION_MS = 3000; // 3 segundos eliminando fees 
 export const GOAT_IMMUNITY_DURATION_MS = 3000; // 3 segundos de inmunidad frente a fees (después de la eliminación)
 
 // Efectos aleatorios del Vault (se elige uno al activarse)
-export const VAUL_EFFECT_TYPES = ['multiplier', 'double_collectibles', 'energy_to_uki', 'eliminate_enemies'] as const;
+// NOTA: 'eliminate_enemies' está temporalmente deshabilitado - se puede reactivar en el futuro
+export const VAUL_EFFECT_TYPES = ['multiplier', 'double_collectibles', 'energy_to_uki'/*, 'eliminate_enemies'*/] as const;
 // Efecto 1: Multiplicador fijo x5
 export const VAUL_MULTIPLIER = 5; // x5 fijo (no aleatorio)
 export const VAUL_MULTIPLIER_DURATION_MIN_MS = 10000; // 10 segundos
@@ -149,6 +152,8 @@ export const RUNE_CONFIG: Record<RuneType, { color: string; label: string }> = {
 // Tiempo de vida en ms para Mega_node y Heart
 export const COLLECTIBLE_LIFETIME_MS = 10000; // 10 segundos
 export const COLLECTIBLE_BLINK_WARNING_MS = 3000; // 3 segundos de parpadeo antes de desaparecer
+export const HEART_LIFETIME_MS = 7000; // 7 segundos - específico para corazones
+export const HEART_BLINK_WARNING_MS = 3000; // Parpadeo desde el segundo 4 hasta el 7 (últimos 3 segundos)
 
 // Frases del hacker (Trump) y sus configuraciones
 export const HACKER_PHRASES = [

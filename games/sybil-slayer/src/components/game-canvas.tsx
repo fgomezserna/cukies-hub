@@ -2413,6 +2413,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     if (energyCollectedFlag && energyCollectedFlag > 0) {
       // Guardar la posición actual del token
       lastEnergyPosRef.current = { x: gameState.token.x, y: gameState.token.y };
+      // TEMPORALMENTE DESHABILITADO: Explosión amarilla/dorada al recoger energy/uki
+      // Para reactivar en el futuro, descomentar las siguientes líneas:
+      /*
       // FIJO: Usar Date.now() en lugar del tiempo del juego para que las animaciones funcionen correctamente
       setEnExplosion({
         active: true,
@@ -2422,6 +2425,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         start: Date.now()
       });
       console.log('🎆 Explosión de energía activada en posición:', gameState.token.x, gameState.token.y);
+      */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [energyCollectedFlag]);
@@ -2492,10 +2496,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           // De lo contrario, asumimos que expiró por tiempo
           if (distance < gameState.token.radius + prevObj.radius + 10) {
             // Fue recolectado - agregamos la explosión verde en la posición del token
-            addGreenExplosion(tokenPos.x, tokenPos.y, prevObj.type as 'heart' | 'megaNode' | 'purr' | 'vaul');
+            // TEMPORALMENTE DESHABILITADO para heart y megaNode: Explosión verde
+            // Para reactivar en el futuro, quitar la condición del if
+            if (prevObj.type !== 'heart' && prevObj.type !== 'megaNode') {
+              addGreenExplosion(tokenPos.x, tokenPos.y, prevObj.type as 'heart' | 'megaNode' | 'purr' | 'vaul');
+            }
           } else {
             // Expiró por tiempo - agregamos la explosión verde en la posición del objeto
-            addGreenExplosion(prevObj.x, prevObj.y, prevObj.type as 'heart' | 'megaNode' | 'purr' | 'vaul');
+            // TEMPORALMENTE DESHABILITADO para heart y megaNode: Explosión verde
+            // Para reactivar en el futuro, quitar la condición del if
+            if (prevObj.type !== 'heart' && prevObj.type !== 'megaNode') {
+              addGreenExplosion(prevObj.x, prevObj.y, prevObj.type as 'heart' | 'megaNode' | 'purr' | 'vaul');
+            }
           }
         }
       }

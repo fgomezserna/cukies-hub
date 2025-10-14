@@ -15,7 +15,7 @@ import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/cons
 import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
-import type { Collectible, RuneState } from '@/types/game';
+import type { Collectible, RuneState, LevelStatsEntry } from '@/types/game';
 
 
 const getLevelScoreMultiplier = (level: number): number => {
@@ -83,6 +83,145 @@ const RuneTotemPanel: React.FC<{
   );
 };
 
+const numberFormatter = new Intl.NumberFormat('es-ES');
+
+const formatDuration = (ms?: number | null): string => {
+  if (!ms || ms <= 0) {
+    return '0:00';
+  }
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => void }> = ({ stats, onClose }) => {
+  const sortedStats = [...stats].sort((a, b) => a.level - b.level);
+
+  const hasStats = sortedStats.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
+      <div className="w-full max-w-5xl rounded-xl border border-cyan-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-cyan-500/10 relative">
+        {/* Botón de cierre */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+        <h2 className="mb-4 text-center text-3xl font-pixellari text-cyan-200 tracking-wide">
+          Estadísticas por nivel
+        </h2>
+        {hasStats ? (
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid gap-4 md:grid-cols-2">
+              {sortedStats.map(entry => {
+                const rows = [
+                  {
+                    key: 'gems',
+                    label: 'Gemas',
+                    count: entry.counts.gems,
+                    points: entry.points.gems,
+                  },
+                  {
+                    key: 'gemsX5',
+                    label: 'Gemas x5',
+                    count: entry.counts.gemsX5,
+                    points: entry.points.gemsX5,
+                  },
+                  {
+                    key: 'ukis',
+                    label: 'UKIs',
+                    count: entry.counts.ukis,
+                    points: entry.points.ukis,
+                  },
+                  {
+                    key: 'ukisX5',
+                    label: 'UKIs x5',
+                    count: entry.counts.ukisX5,
+                    points: entry.points.ukisX5,
+                  },
+                  {
+                    key: 'treasures',
+                    label: 'Tesoros',
+                    count: entry.counts.treasures,
+                    points: entry.points.treasures,
+                  },
+                  {
+                    key: 'hearts',
+                    label: 'Corazones',
+                    count: entry.counts.hearts,
+                    points: entry.points.hearts,
+                  },
+                  {
+                    key: 'runes',
+                    label: 'Runas',
+                    count: entry.counts.runes,
+                    points: entry.points.runes,
+                  },
+                ];
+                const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
+
+                return (
+                  <div
+                    key={entry.level}
+                    className="rounded-lg border border-cyan-400/40 bg-slate-800/60 p-4 shadow-lg shadow-cyan-500/10"
+                  >
+                    <h3 className="mb-3 text-center text-xl font-pixellari text-cyan-100">
+                      Nivel {entry.level}
+                    </h3>
+                    <table className="w-full text-sm font-pixellari text-cyan-100">
+                      <thead className="text-xs uppercase tracking-wide text-cyan-300">
+                        <tr>
+                          <th className="px-2 py-1 text-left">Elemento</th>
+                          <th className="px-2 py-1 text-right">Recogidos</th>
+                          <th className="px-2 py-1 text-right">Puntos</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(row => (
+                          <tr key={row.key} className="odd:bg-slate-900/40">
+                            <td className="px-2 py-1">{row.label}</td>
+                            <td className="px-2 py-1 text-right">
+                              {numberFormatter.format(row.count)}
+                            </td>
+                            <td className="px-2 py-1 text-right text-amber-200">
+                              {numberFormatter.format(Math.round(row.points || 0))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-cyan-400/40 text-cyan-200">
+                          <td className="px-2 pt-2 text-sm font-semibold">Total</td>
+                          <td className="px-2 pt-2" />
+                          <td className="px-2 pt-2 text-right text-amber-300 font-semibold">
+                            {numberFormatter.format(totalPoints)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    <div className="mt-3 flex items-center justify-between text-xs font-pixellari text-cyan-200 uppercase tracking-wide">
+                      <span>Tiempo:</span>
+                      <span className="text-sky-200">{formatDuration(entry.durationMs)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <p className="text-center font-pixellari text-cyan-200">
+            No se registraron estadísticas en esta partida.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 interface GameContainerProps {
   width?: number;
@@ -111,6 +250,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Estado para controlar el modal de información
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  
+  // Estado para controlar el popup de estadísticas por nivel
+  const [isLevelStatsVisible, setIsLevelStatsVisible] = useState(false);
   
   // Estado para controlar la animación de jeff_goit
   const [jeffGoitAnimation, setJeffGoitAnimation] = useState<{
@@ -614,6 +756,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       lastLevelRef.current = gameState.level;
     }
   }, [gameState.level, playSound]);
+
+  // Mostrar popup de estadísticas cuando el juego termine
+  useEffect(() => {
+    if (gameState.status === 'gameOver') {
+      setIsLevelStatsVisible(true);
+    }
+  }, [gameState.status]);
 
   // Rastrear el estado del hacker y su energía recolectada
   useEffect(() => {
@@ -2144,6 +2293,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           />
         </button>
       </div>
+
+      {gameState.status === 'gameOver' && isLevelStatsVisible && (
+        <LevelStatsOverlay 
+          stats={gameState.levelStats} 
+          onClose={() => setIsLevelStatsVisible(false)}
+        />
+      )}
     </div>
   );
 };

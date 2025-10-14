@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone, TreasureState, RuneState, RuneType } from '@/types/game';
+import type { GameState, Token, Obstacle, Collectible, Vector2D, ObstacleType, GameStatus, CollectibleType, GameObject, VisualEffect, RayHazard, RayCycleState, RayOrientation, RedZone, TreasureState, RuneState, RuneType, LevelStatsEntry } from '@/types/game';
 import type { SoundType } from './useAudio';
 import {
   GAME_DURATION_SECONDS,
@@ -8,7 +8,7 @@ import {
   COLLISION_PENALTY_SECONDS, FEE_SPEED, HACKER_BASE_SPEED, HACKER_ACCELERATION, BUG_ANGULAR_VELOCITY, FRAME_TIME_MS,
   CHECKPOINT_APPEAR_THRESHOLD, CHECKPOINT_TIME_BONUS_START, CHECKPOINT_TIME_BONUS_STEP, CHECKPOINT_TIME_BONUS_MIN,
   HACKER_RADIUS, FEE_RADIUS, BUG_RADIUS, MEGA_NODE_SPAWN_CHANCE, PURR_SPAWN_CHANCE, VAUL_SPAWN_CHANCE, VAUL_ACTIVATION_TIME_MS, VAUL_PROGRESS_RATE,
-  MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, HEART_BONUS_POINTS_BASE, VAUL_FIRST_SPAWN_MS, VAUL_NEXT_SPAWN_MS,
+  MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, HEART_BONUS_POINTS_BASE, HEART_LIFETIME_MS, HEART_BLINK_WARNING_MS, VAUL_FIRST_SPAWN_MS, VAUL_NEXT_SPAWN_MS,
   VAUL_EFFECT_TYPES, VAUL_MULTIPLIER, VAUL_MULTIPLIER_DURATION_MIN_MS, VAUL_MULTIPLIER_DURATION_MAX_MS,
   VAUL_DOUBLE_ENERGY_COUNT, VAUL_DOUBLE_UKI_COUNT, VAUL_DOUBLE_DURATION_MIN_MS, VAUL_DOUBLE_DURATION_MAX_MS,
   VAUL_ENERGY_TO_UKI_DURATION_MIN_MS, VAUL_ENERGY_TO_UKI_DURATION_MAX_MS, VAUL_ELIMINATE_ENEMIES_MIN, VAUL_ELIMINATE_ENEMIES_MAX,
@@ -16,10 +16,11 @@ import {
   ENERGY_POINT_RADIUS, ENERGY_POINT_COLOR, ENERGY_POINT_VALUE,
   UKI_RADIUS, UKI_COLOR, UKI_VALUE,
   HACKER_PHRASES, HACKER_PHRASE_DURATION_MS, HACKER_PHRASE_PAUSE_MS, HACKER_STUN_DURATION_MS, HACKER_BANISH_DURATION_MS,
-  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_BLOCK_DISAPPEAR_DELAY_MS, RAY_FIRST_BLOCK_START_MS, RAY_BLOCK_INTERVAL_MS, RAY_THICKNESS,
+  RAY_WARNING_DURATION_MS, RAY_STAGE_INTERVAL_MS, RAY_BLOCK_DISAPPEAR_DELAY_MS, RAY_FIRST_BLOCK_START_MS, RAY_BLOCK_INTERVAL_MS, RAY_THICKNESS, RAY_MIN_SEPARATION,
   RED_ZONE_WARNING_DURATION_MS, RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS,
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
   RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
+  RED_ZONE_MIN_SEPARATION,
   RUNE_FIRST_SPAWN_MS, RUNE_NEXT_SPAWN_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES,
   GOAT_ELIMINATION_DURATION_MS, GOAT_IMMUNITY_DURATION_MS, TOKEN_DAMAGE_IMMUNITY_MS
 } from '../lib/constants';
@@ -61,6 +62,31 @@ const createInitialRuneState = (level: number): RuneState => {
     nextSpawnTime: null,
   };
 };
+
+const createEmptyLevelStatsEntry = (level: number, startTime: number | null = null): LevelStatsEntry => ({
+  level,
+  startTime,
+  endTime: null,
+  durationMs: 0,
+  counts: {
+    gems: 0,
+    gemsX5: 0,
+    ukis: 0,
+    ukisX5: 0,
+    treasures: 0,
+    hearts: 0,
+    runes: 0,
+  },
+  points: {
+    gems: 0,
+    gemsX5: 0,
+    ukis: 0,
+    ukisX5: 0,
+    treasures: 0,
+    hearts: 0,
+    runes: 0,
+  },
+});
 
 const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: number = 1): GameState => ({
   status: 'idle',
@@ -127,6 +153,8 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
   nextRedZoneSpawnTime: null,
   treasureState: createInitialTreasureState(),
   runeState: createInitialRuneState(level),
+  levelStats: [],
+  currentLevelStartTime: null,
 });
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
@@ -453,6 +481,63 @@ const computeTokenZone = (
   return { xMin, xMax, yMin, yMax };
 };
 
+// Verifica si dos rayos del mismo tipo están demasiado cerca
+const areRaysTooClose = (ray1: RayHazard, ray2: RayHazard, minSeparation: number = RAY_MIN_SEPARATION): boolean => {
+  // Solo verificar si son del mismo tipo (misma orientación)
+  if (ray1.orientation !== ray2.orientation) {
+    return false;
+  }
+
+  if (ray1.orientation === 'vertical') {
+    // Para rayos verticales, verificar distancia horizontal entre sus centros
+    const center1 = ray1.x + ray1.width / 2;
+    const center2 = ray2.x + ray2.width / 2;
+    const distance = Math.abs(center1 - center2);
+    return distance < minSeparation;
+  } else {
+    // Para rayos horizontales, verificar distancia vertical entre sus centros
+    const center1 = ray1.y + ray1.height / 2;
+    const center2 = ray2.y + ray2.height / 2;
+    const distance = Math.abs(center1 - center2);
+    return distance < minSeparation;
+  }
+};
+
+// Crea un rayo evitando que esté demasiado cerca de otros rayos del mismo tipo
+const safeCreateRayInZone = (
+  orientation: RayOrientation,
+  zone: ZoneBounds,
+  canvasSize: { width: number; height: number },
+  warningStartTime: number,
+  existingRays: RayHazard[],
+  maxAttempts: number = 20
+): RayHazard | null => {
+  let attempts = 0;
+  
+  while (attempts < maxAttempts) {
+    const candidate = createRayInZone(orientation, zone, canvasSize, warningStartTime);
+    
+    if (!candidate) {
+      return null; // No se puede crear el rayo en esta zona
+    }
+    
+    // Verificar si este rayo está demasiado cerca de otros rayos del mismo tipo
+    const isTooClose = existingRays.some(existingRay => 
+      areRaysTooClose(candidate, existingRay)
+    );
+    
+    if (!isTooClose) {
+      return candidate;
+    }
+    
+    attempts++;
+  }
+  
+  // Si después de muchos intentos no se puede colocar, retornar null
+  console.warn(`[RAY] No se pudo encontrar una posición válida para rayo ${orientation} sin solapamiento`);
+  return null;
+};
+
 const createRayInZone = (
   orientation: RayOrientation,
   zone: ZoneBounds,
@@ -564,6 +649,70 @@ const createRedZone = (
     width,
     height,
   };
+};
+
+// Verifica si dos zonas rojas se solapan o están demasiado cerca
+const doRedZonesOverlap = (zone1: RedZone, zone2: RedZone, minSeparation: number = RED_ZONE_MIN_SEPARATION): boolean => {
+  // Calculamos la distancia mínima necesaria considerando el margen de separación
+  // Si las zonas están más cerca que minSeparation, consideramos que hay solapamiento
+  
+  // Encontrar el punto más cercano de zone2 a zone1
+  const closestX = clamp(zone1.x + zone1.width / 2, zone2.x, zone2.x + zone2.width);
+  const closestY = clamp(zone1.y + zone1.height / 2, zone2.y, zone2.y + zone2.height);
+  
+  // Encontrar el punto más cercano de zone1 a zone2
+  const closestX2 = clamp(zone2.x + zone2.width / 2, zone1.x, zone1.x + zone1.width);
+  const closestY2 = clamp(zone2.y + zone2.height / 2, zone1.y, zone1.y + zone1.height);
+  
+  // Calcular distancia entre los bordes más cercanos
+  const dx = Math.abs((zone1.x + zone1.width / 2) - closestX);
+  const dy = Math.abs((zone1.y + zone1.height / 2) - closestY);
+  const distance1 = Math.sqrt(dx * dx + dy * dy);
+  
+  const dx2 = Math.abs((zone2.x + zone2.width / 2) - closestX2);
+  const dy2 = Math.abs((zone2.y + zone2.height / 2) - closestY2);
+  const distance2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+  
+  const minDistance = Math.min(distance1, distance2);
+  
+  // También verificar solapamiento directo de rectángulos
+  const overlap = !(
+    zone1.x + zone1.width < zone2.x ||
+    zone2.x + zone2.width < zone1.x ||
+    zone1.y + zone1.height < zone2.y ||
+    zone2.y + zone2.height < zone1.y
+  );
+  
+  return overlap || minDistance < minSeparation;
+};
+
+// Crea una zona roja evitando solapamientos con otras zonas existentes
+const safeCreateRedZone = (
+  canvasSize: { width: number; height: number },
+  existingZones: RedZone[],
+  warningStartTime: number,
+  maxAttempts: number = 30
+): RedZone | null => {
+  let attempts = 0;
+  
+  while (attempts < maxAttempts) {
+    const newZone = createRedZone(canvasSize, warningStartTime);
+    
+    // Verificar si esta zona se solapa con alguna zona existente
+    const hasOverlap = existingZones.some(existingZone => 
+      doRedZonesOverlap(newZone, existingZone)
+    );
+    
+    if (!hasOverlap) {
+      return newZone;
+    }
+    
+    attempts++;
+  }
+  
+  // Si después de muchos intentos no se puede colocar, retornar null
+  console.warn('[RED ZONE] No se pudo encontrar una posición válida sin solapamiento');
+  return null;
 };
 
 const isTokenInsideRedZone = (token: Token, zone: RedZone): boolean => {
@@ -1139,6 +1288,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           redZones: [],
           nextRedZoneSpawnTime: null,
           treasureState: initialTreasureState,
+          levelStats: [],
+          currentLevelStartTime: null,
         };
       });
     }
@@ -1195,6 +1346,24 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const gameStartTime = now;
             gameStartInvulnRef.current = gameStartTime;
             console.log("Countdown finished! Starting game...");
+
+            const existingLevelStats = prev.levelStats.map(stat => ({
+              ...stat,
+              counts: { ...stat.counts },
+              points: { ...stat.points },
+            }));
+            const levelStatsIndex = existingLevelStats.findIndex(stat => stat.level === prev.level);
+            let levelStats: LevelStatsEntry[];
+            if (levelStatsIndex === -1) {
+              levelStats = [...existingLevelStats, createEmptyLevelStatsEntry(prev.level, gameStartTime)];
+            } else {
+              const updatedEntry = {
+                ...existingLevelStats[levelStatsIndex],
+                startTime: existingLevelStats[levelStatsIndex].startTime ?? gameStartTime,
+              };
+              existingLevelStats[levelStatsIndex] = updatedEntry;
+              levelStats = existingLevelStats;
+            }
             
             // Initialize rune spawn timer when game actually starts playing
             const updatedRuneState = {
@@ -1209,6 +1378,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               countdown: undefined,
               countdownStartTime: undefined,
               runeState: updatedRuneState,
+              currentLevelStartTime: gameStartTime,
+              levelStats,
             };
           } else {
             // Actualizar countdown
@@ -1269,7 +1440,39 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       runeState.active = currentLevel <= MAX_LEVEL_WITH_TOTEM;
       const levelMultiplier = getLevelScoreMultiplier(prev.level);
       
+      let gameOver = false;
+      let gameOverReason: GameState['gameOverReason'] | undefined = undefined;
+      let currentLevelStartTime = prev.currentLevelStartTime;
 
+      let levelStats = prev.levelStats.map(stat => ({
+        ...stat,
+        counts: { ...stat.counts },
+        points: { ...stat.points },
+      }));
+      let currentLevelStatsIndex = levelStats.findIndex(stat => stat.level === prev.level);
+      if (currentLevelStatsIndex === -1) {
+        const startTime = currentLevelStartTime ?? now;
+        const newEntry = createEmptyLevelStatsEntry(prev.level, startTime);
+        levelStats = [...levelStats, newEntry];
+        currentLevelStatsIndex = levelStats.length - 1;
+      } else if (currentLevelStartTime && levelStats[currentLevelStatsIndex].startTime === null) {
+        levelStats[currentLevelStatsIndex] = {
+          ...levelStats[currentLevelStatsIndex],
+          startTime: currentLevelStartTime,
+        };
+      }
+      let currentLevelStats = currentLevelStatsIndex >= 0 ? levelStats[currentLevelStatsIndex] : null;
+
+      let energyCollectedThisFrame = 0;
+      let energyValueSumThisFrame = 0;
+      let ukiCollectedThisFrame = 0;
+      let ukiValueSumThisFrame = 0;
+      let treasureCollectedThisFrame = 0;
+      let treasureBasePointsThisFrame = 0;
+      let heartsCollectedThisFrame = 0;
+      let runeCollectedThisFrame = 0;
+      let runeBasePointsThisFrame = 0;
+      let runeCompletionBonusThisFrame = 0;
 
       // --- Update Token ---
       const { direction } = inputRef.current;
@@ -2232,11 +2435,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             }
           } else if (now >= rayCycle.nextCycleStartTime) {
             const orientation = getRandomOrientation();
-            const firstRay = createRayInZone(
+            const firstRay = safeCreateRayInZone(
               orientation,
               { xMin: 0, xMax: prev.canvasSize.width, yMin: 0, yMax: prev.canvasSize.height },
               prev.canvasSize,
-              now
+              now,
+              rays
             );
 
             if (firstRay) {
@@ -2275,7 +2479,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             let secondRay: RayHazard | null = null;
             let chosenOrientation: RayOrientation | null = null;
             for (const option of orientations) {
-              const candidate = createRayInZone(option, zone, prev.canvasSize, now);
+              const candidate = safeCreateRayInZone(option, zone, prev.canvasSize, now, rays);
               if (candidate) {
                 secondRay = candidate;
                 chosenOrientation = option;
@@ -2315,7 +2519,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             let thirdRay: RayHazard | null = null;
             let chosenOrientation: RayOrientation | null = null;
             for (const option of orientations) {
-              const candidate = createRayInZone(option, zone, prev.canvasSize, now);
+              const candidate = safeCreateRayInZone(option, zone, prev.canvasSize, now, rays);
               if (candidate) {
                 thirdRay = candidate;
                 chosenOrientation = option;
@@ -2393,10 +2597,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           nextRedZoneSpawnTime !== null &&
           now >= nextRedZoneSpawnTime
         ) {
-          const newZone = createRedZone(prev.canvasSize, now);
-          redZones.push(newZone);
+          const newZone = safeCreateRedZone(prev.canvasSize, redZones, now);
+          if (newZone) {
+            redZones.push(newZone);
+            console.log(`[RED ZONE] Nueva zona en (${newZone.x.toFixed(1)}, ${newZone.y.toFixed(1)}) - ${newZone.width.toFixed(1)}x${newZone.height.toFixed(1)}px`);
+          } else {
+            console.log('[RED ZONE] No se pudo crear zona sin solapamiento, se reintentará en el siguiente ciclo');
+          }
           nextRedZoneSpawnTime = now + getRandomFloat(RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS);
-          console.log(`[RED ZONE] Nueva zona en (${newZone.x.toFixed(1)}, ${newZone.y.toFixed(1)}) - ${newZone.width.toFixed(1)}x${newZone.height.toFixed(1)}px`);
         }
 
         if (
@@ -2460,6 +2668,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let vaultEffectJustEnded = false; // Detectar si un efecto del vault acaba de terminar
       let heartCollected = false; // Detectar si un heart fue recogido
       let heartExpired = false; // Detectar si un heart expiró sin ser recogido
+      let goatSkinCollected = false; // Detectar si se recogió la piel de GOAT
+      // Variables para timing de spawns independientes
+      let newLastMegaNodeSpawn = prev.lastMegaNodeSpawn;
+      let newNextMegaNodeInterval = prev.nextMegaNodeInterval;
+      let newLastHeartSpawn = prev.lastHeartSpawn;
+      let newNextHeartInterval = prev.nextHeartInterval;
+      let newLastVaulSpawn = prev.lastVaulSpawn;
       // Variables para efectos del vault
       let activeVaulEffect = prev.activeVaulEffect;
       let vaulEffectStartTime = prev.vaulEffectStartTime;
@@ -2470,6 +2685,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
        // Comprobar colisión entre obstáculos y Energy
        
        for (const obstacle of newObstacles) {
+         if (gameOver) {
+           break;
+         }
          // Saltar hackers desterrados - no pueden robar energía
          if (obstacle.type === 'hacker' && obstacle.isBanished) {
              continue;
@@ -2492,19 +2710,27 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                );
                
                if (distance <= collectionRadius + collectible.radius) {
+                 // TEMPORALMENTE DESHABILITADO: Explosiones cuando enemigos recogen energy
+                 // Para reactivar en el futuro, descomentar las siguientes líneas:
+                 /*
                  // NUEVO: Crear efecto visual según el tipo de obstacle
                  let explosionEffect: VisualEffect;
                 if (obstacle.type === 'hacker') {
                    explosionEffect = createHackerExplosionEffect(collectible.x, collectible.y);
+                 } else {
+                   explosionEffect = createExplosionEffect(collectible.x, collectible.y);
+                 }
+                 newVisualEffects.push(explosionEffect);
+                 */
                    
                   // NUEVO: Contar energy recogida por hacker (solo energy, no uki)
-                  if (collectible.type === 'energy') {
+                  if (collectible.type === 'energy' && obstacle.type === 'hacker') {
                     obstacle.energyCollected = (obstacle.energyCollected || 0) + 1;
-                    console.log(`[HACKER] ¡Ha robado energía con EXPLOSION_(n)! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px) - DEBUG: Estado actual del hacker ID: ${obstacle.id}`);
+                    console.log(`[HACKER] ¡Ha robado energía! Energy recogidas: ${obstacle.energyCollected}/5 (Nivel ${currentLevel}, radio: ${collectionRadius}px) - DEBUG: Estado actual del hacker ID: ${obstacle.id}`);
                   }
                    
                    // NUEVO: Si recoge 5 energy, activar retroceso automático
-                   if ((obstacle.energyCollected || 0) >= 5) {
+                   if (obstacle.type === 'hacker' && (obstacle.energyCollected || 0) >= 5) {
                      console.log(`[HACKER] 🚀 ¡ESCAPE! ID: ${obstacle.id} - Ha recogido 5 energy! Iniciando retroceso automático hacia el borde...`);
                      
                      // NUEVO: Reproducir sonido especial cuando el hacker escapa por 5 energy
@@ -2540,10 +2766,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                      obstacle.retreatTimer = -1; // Sin límite de tiempo, hasta que toque el borde
                      
                    }
-                 } else {
-                   explosionEffect = createExplosionEffect(collectible.x, collectible.y);
-                 }
-                 newVisualEffects.push(explosionEffect);
                  
                  // ELIMINADO: No ejecutar callback de energía para enemigos para evitar sonido de coin.mp3
                  // if (onEnergyCollected) onEnergyCollected();
@@ -2561,6 +2783,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
        
        // Procesar cada collectible individualmente
       for (const collectible of newCollectibles) {
+        if (gameOver) {
+          break;
+        }
         const isColliding = checkCollision(newToken, collectible);
 
         if (collectible.type === 'treasure') {
@@ -2579,6 +2804,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const basePoints = TREASURE_BLOCK_BASE_POINTS[Math.min(currentIndex, TREASURE_BLOCK_BASE_POINTS.length - 1)];
             const multiplier = treasureState.successfulBlocks + 1;
             const treasurePoints = basePoints * multiplier;
+            treasureCollectedThisFrame += 1;
+            treasureBasePointsThisFrame += treasurePoints;
             scoreToAddWithoutVaultMultiplier += treasurePoints; // Treasures NO reciben multiplicador del vault
             onPlaySound?.('energy_collect');
             treasureState.treasuresCollectedInBlock = currentIndex + 1;
@@ -2777,8 +3004,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             continue;
           }
           if (collectible.type === 'rune') {
+            runeCollectedThisFrame += 1;
             runeState.runePickupCount += 1;
             const runePoints = RUNE_SCORE_INCREMENT * runeState.runePickupCount;
+            runeBasePointsThisFrame += runePoints;
             scoreToAddWithoutVaultMultiplier += runePoints; // Runas NO reciben multiplicador del vault
             onPlaySound?.('energy_collect');
 
@@ -2802,7 +3031,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                   levelShouldIncrease = true;
                   nextLevelTarget = Math.min(MAX_LEVEL, currentLevel + 1);
                   const safeRemainingTime = Math.max(0, remainingTime);
-                  runeCompletionBonus += Math.ceil(safeRemainingTime) * RUNE_SCORE_INCREMENT;
+                  const completionBonus = Math.ceil(safeRemainingTime) * RUNE_SCORE_INCREMENT;
+                  runeCompletionBonus += completionBonus;
+                  runeCompletionBonusThisFrame += completionBonus;
                   runeState.active = false;
                   console.log(`[RUNE] Tótem completado en nivel ${currentLevel}. Bono: ${runeCompletionBonus} puntos`);
                 }
@@ -2811,15 +3042,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             continue;
           }
          if (collectible.type === 'energy') {
+           energyCollectedThisFrame += 1;
+           energyValueSumThisFrame += collectible.value;
            if (onEnergyCollected) onEnergyCollected();
          }
           if (collectible.type === 'uki') {
+            ukiCollectedThisFrame += 1;
+            ukiValueSumThisFrame += collectible.value;
             console.log("Uki collected! +5 points.");
             onPlaySound?.('energy_collect'); // Usar mismo sonido que energy
             if (onEnergyCollected) onEnergyCollected(); // Disparar mismo efecto visual que energy
           }
           if (collectible.type === 'heart') {
              heartCollected = true; // Marcar que se recogió un corazón
+            heartsCollectedThisFrame += 1;
             if (hearts < prev.maxHearts) {
               hearts++;
               console.log(`[HEART] ❤️ Corazón recogido! +1 vida (${hearts}/${prev.maxHearts}). Reproduciendo life.mp3`);
@@ -2853,6 +3089,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                // La inmunidad se activará después de que termine la eliminación
                newToken.goatImmunityStartTime = undefined;
                newToken.goatImmunityTimer = 0;
+               
+               // NUEVA LÓGICA: Al recoger piel de GOAT, resetear timer del Haku para que empiece a contar de nuevo
+               goatSkinCollected = true;
+               console.log("[GOAT] Resetear timer de Haku - empezará a contar desde ahora");
+               
                onPlaySound?.('mega_node_collect');
                continue;
            }
@@ -2988,8 +3229,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              
             // Determinar el tiempo de vida según el tipo de coleccionable
             const isTreasure = (collectible.type as CollectibleType) === 'treasure';
-            const lifetimeMs = isTreasure ? TREASURE_LIFETIME_MS : COLLECTIBLE_LIFETIME_MS;
-            const blinkWarningMs = isTreasure ? TREASURE_BLINK_WARNING_MS : COLLECTIBLE_BLINK_WARNING_MS;
+            const isHeart = (collectible.type as CollectibleType) === 'heart';
+            const lifetimeMs = isTreasure ? TREASURE_LIFETIME_MS : (isHeart ? HEART_LIFETIME_MS : COLLECTIBLE_LIFETIME_MS);
+            const blinkWarningMs = isTreasure ? TREASURE_BLINK_WARNING_MS : (isHeart ? HEART_BLINK_WARNING_MS : COLLECTIBLE_BLINK_WARNING_MS);
              
              // Si tiene tiempo de creación y no ha pasado el tiempo límite
              if (collectible.createdAt && (currentTime - collectible.createdAt < lifetimeMs)) {
@@ -3043,15 +3285,20 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
          const goatEliminateActive = (newToken.goatEliminationTimer || 0) > 0;
          const goatImmunityActive = (newToken.goatImmunityTimer || 0) > 0;
          for (const obstacle of newObstacles) {
-             // Saltar hackers desterrados o en retroceso - no pueden colisionar
-             if (obstacle.type === 'hacker' && (obstacle.isBanished || obstacle.isRetreating)) {
-                 continue;
-             }
+            if (gameOver) {
+                break;
+            }
+            // Saltar hackers desterrados o en retroceso - no pueden colisionar
+            if (obstacle.type === 'hacker' && (obstacle.isBanished || obstacle.isRetreating)) {
+                continue;
+            }
              
             if (checkCollision(newToken, obstacle)) {
                 if (obstacle.type === 'fee' && goatEliminateActive) {
                     obstaclesMarkedForRemoval.add(obstacle.id);
-                    newVisualEffects.push(createExplosionEffect(obstacle.x, obstacle.y));
+                    // TEMPORALMENTE DESHABILITADO: Explosión amarilla cuando goat elimina fee
+                    // Para reactivar en el futuro, descomentar la siguiente línea:
+                    // newVisualEffects.push(createExplosionEffect(obstacle.x, obstacle.y));
                     onPlaySound?.('auch');
                     console.log(`[GOAT] Fee eliminado por contacto (ID: ${obstacle.id})`);
                     continue;
@@ -3158,10 +3405,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          console.log(`[DEBUG HEARTS] Estado anterior: ${prev.hearts}, nueva variable local: ${hearts}`);
                          
                          // Verificar si el juego debe terminar inmediatamente
-                         if (hearts <= 0) {
-                             console.log(`[GAME OVER] ¡Sin corazones! Terminando juego inmediatamente.`);
-                            return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts', treasureState };
-                         }
+                        if (hearts <= 0) {
+                            console.log(`[GAME OVER] ¡Sin corazones! Terminando juego inmediatamente.`);
+                            hearts = 0;
+                            gameOver = true;
+                            gameOverReason = 'hearts';
+                            collidedObstacle = true;
+                            break;
+                        }
                          
                          // Activar efecto visual de daño
                          if (onDamage) onDamage();
@@ -3271,18 +3522,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 }
 
                 if (hearts <= 0) {
-                  return {
-                    ...prev,
-                    status: 'gameOver',
-                    timer: 0,
-                    isFrenzyMode: false,
-                    score: prev.score + scoreToAdd,
-                    hearts,
-                    gameOverReason: 'hearts',
-                    rays,
-                    rayCycle,
-                    runeState,
-                  };
+                  hearts = 0;
+                  gameOver = true;
+                  gameOverReason = 'hearts';
+                  collidedObstacle = true;
+                  break;
                 }
               } else {
                 console.log('[RAY] Impacto durante invulnerabilidad, sin pérdida de corazón');
@@ -3295,15 +3539,17 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
       } // Cerrar el bloque if para las colisiones durante 'playing'
 
-      // Game over si se queda sin vidas
-      if (hearts <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts: hearts, gameOverReason: 'hearts', treasureState, runeState };
+      // Game over flags tras colisiones y tiempo
+      if (hearts <= 0 && !gameOver) {
+        hearts = 0;
+        gameOver = true;
+        gameOverReason = 'hearts';
       }
 
-      // Ya no necesitamos aplicar aquí porque se aplica en el cálculo de tiempo real arriba
-
-      if (remainingTime <= 0) {
-        return { ...prev, status: 'gameOver', timer: 0, isFrenzyMode: false, score: prev.score + scoreToAdd, hearts, gameOverReason: 'time', treasureState, runeState };
+      if (!gameOver && remainingTime <= 0) {
+        remainingTime = 0;
+        gameOver = true;
+        gameOverReason = 'time';
       }
 
       // --- Verificar y aplicar efectos activos del vault ---
@@ -3518,6 +3764,70 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
       }
 
+      const heartPointsThisFrame = heartScoreToAdd;
+      const treasurePointsThisFrame = treasureBasePointsThisFrame; // Treasures NO reciben multiplicador de nivel
+      const runePointsWithLevel = runeBasePointsThisFrame * levelMultiplier;
+      const runePointsTotalThisFrame = runePointsWithLevel + runeCompletionBonusThisFrame;
+      const multiplierIsX5 = currentMultiplier >= VAUL_MULTIPLIER;
+      const energyPointsThisFrame = energyValueSumThisFrame * levelMultiplier * currentMultiplier;
+      const ukiPointsThisFrame = ukiValueSumThisFrame * levelMultiplier * currentMultiplier;
+
+      if (currentLevelStats) {
+        if (currentLevelStats.startTime === null) {
+          currentLevelStats.startTime = currentLevelStartTime ?? now;
+        }
+        if (currentLevelStats.startTime !== null) {
+          currentLevelStats.durationMs = Math.max(0, now - currentLevelStats.startTime);
+        }
+
+        if (multiplierIsX5) {
+          currentLevelStats.counts.gemsX5 += energyCollectedThisFrame;
+          currentLevelStats.points.gemsX5 += energyPointsThisFrame;
+          currentLevelStats.counts.ukisX5 += ukiCollectedThisFrame;
+          currentLevelStats.points.ukisX5 += ukiPointsThisFrame;
+        } else {
+          currentLevelStats.counts.gems += energyCollectedThisFrame;
+          currentLevelStats.points.gems += energyPointsThisFrame;
+          currentLevelStats.counts.ukis += ukiCollectedThisFrame;
+          currentLevelStats.points.ukis += ukiPointsThisFrame;
+        }
+
+        currentLevelStats.counts.treasures += treasureCollectedThisFrame;
+        currentLevelStats.points.treasures += treasurePointsThisFrame;
+        currentLevelStats.counts.hearts += heartsCollectedThisFrame;
+        currentLevelStats.points.hearts += heartPointsThisFrame;
+        currentLevelStats.counts.runes += runeCollectedThisFrame;
+        currentLevelStats.points.runes += runePointsTotalThisFrame;
+      }
+
+      if (levelJustIncreased) {
+        if (currentLevelStats) {
+          if (currentLevelStats.startTime === null) {
+            currentLevelStats.startTime = currentLevelStartTime ?? now;
+          }
+          if (currentLevelStats.startTime !== null) {
+            currentLevelStats.endTime = now;
+            currentLevelStats.durationMs = Math.max(0, now - currentLevelStats.startTime);
+          }
+        }
+        const newEntry = createEmptyLevelStatsEntry(currentLevel, now);
+        levelStats = [...levelStats, newEntry];
+        currentLevelStatsIndex = levelStats.length - 1;
+        currentLevelStats = newEntry;
+        currentLevelStartTime = now;
+      }
+
+      if (gameOver && currentLevelStatsIndex >= 0) {
+        const entry = levelStats[currentLevelStatsIndex];
+        if (entry.startTime === null) {
+          entry.startTime = currentLevelStartTime ?? now;
+        }
+        entry.endTime = now;
+        if (entry.startTime !== null) {
+          entry.durationMs = Math.max(0, now - entry.startTime);
+        }
+      }
+
        if (obstaclesMarkedForRemoval.size > 0) {
        newObstacles = newObstacles.filter(obs => !obstaclesMarkedForRemoval.has(obs.id));
       }
@@ -3536,6 +3846,17 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           );
           remainingCollectibles.push(goatCollectible);
           console.log(`[GOAT] Piel GOAT generada para nivel ${currentLevel}`);
+          
+          // NUEVA LÓGICA: Si cuando aparece la piel de GOAT hay un Haku en pantalla o el token tiene poder del Haku
+          const hasMegaNodeOnField = remainingCollectibles.some(c => c.type === 'megaNode');
+          const tokenHasHakuPower = newToken.boostTimer > 0;
+          
+          if (hasMegaNodeOnField || tokenHasHakuPower) {
+            // Pausar el spawn del Haku estableciendo lastMegaNodeSpawn a null
+            // Esto evita que cuente el tiempo hasta que se recoja la piel de GOAT
+            newLastMegaNodeSpawn = null;
+            console.log(`[GOAT] Piel GOAT apareció con Haku activo (en pantalla: ${hasMegaNodeOnField}, poder activo: ${tokenHasHakuPower}). Timer del Haku pausado hasta que se recoja la piel.`);
+          }
         } else {
           console.log('[GOAT] Nivel aumentado sin generar nueva piel (ya existe una en el mapa)');
         }
@@ -3696,11 +4017,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
 
         // --- NUEVO SISTEMA DE TIMING INDEPENDIENTE CON INTERVALOS ALEATORIOS ---
-        let newLastMegaNodeSpawn = prev.lastMegaNodeSpawn;
-        let newNextMegaNodeInterval = prev.nextMegaNodeInterval;
-        let newLastHeartSpawn = prev.lastHeartSpawn;
-        let newNextHeartInterval = prev.nextHeartInterval;
-        let newLastVaulSpawn = prev.lastVaulSpawn;
+        // (Variables ya declaradas al inicio del bloque)
         
         // Si el boost acaba de terminar, actualizar el timestamp para el próximo spawn
         if (boostJustEnded) {
@@ -3714,6 +4031,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           newLastMegaNodeSpawn = currentTime;
           newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
           console.log(`[MEGANODE] Haku expiró. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
+        }
+        
+        // NUEVA LÓGICA: Si se recogió la piel de GOAT, resetear timer del Haku
+        if (goatSkinCollected) {
+          newLastMegaNodeSpawn = currentTime;
+          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+          console.log(`[MEGANODE] Piel GOAT recogida. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
         }
         
         // Si un corazón fue recogido o expiró, actualizar el timestamp para el próximo spawn
@@ -3738,9 +4062,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         const hasMegaNode = remainingCollectibles.some(c => c.type === 'megaNode');
         const hasHeart = remainingCollectibles.some(c => c.type === 'heart');
         const hasVaul = remainingCollectibles.some(c => c.type === 'vaul');
+        const hasGoatSkin = remainingCollectibles.some(c => c.type === 'goatSkin');
         
         // SPAWN MEGANODE - Intervalo aleatorio entre 15-25s
-        if (!hasMegaNode) {
+        // NUEVA LÓGICA: El Haku no aparece mientras esté la piel de GOAT en pantalla
+        if (!hasMegaNode && !hasGoatSkin) {
           // Generar primer intervalo si no existe
           if (newNextMegaNodeInterval === null) {
             newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
@@ -3760,6 +4086,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               console.log(`[MEGANODE] Spawned independientemente - próximo en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
             }
           }
+        } else if (!hasMegaNode && hasGoatSkin) {
+          // Si hay piel de GOAT en pantalla, el Haku no puede aparecer
+          console.log(`[MEGANODE] Spawn bloqueado - piel de GOAT en pantalla`);
         }
         
         // SPAWN HEART - Intervalo aleatorio entre 20-30s - Siempre aparece
@@ -3834,11 +4163,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       
       return {
         ...prev,
+        status: gameOver ? 'gameOver' : 'playing',
         token: newToken,
         obstacles: obstaclesToSpawn,
         collectibles: remainingCollectibles,
         score: Math.max(0, prev.score + finalScoreToAdd + heartScoreToAdd + vaulBonusToAdd + runeCompletionBonus - scoreToSubtract), // Sumamos bonus directos sin multiplicadores
-        timer: remainingTime,
+        timer: gameOver ? 0 : Math.max(0, remainingTime),
         level: currentLevel,
         isFrenzyMode: false,
         hearts,
@@ -3884,6 +4214,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         nextRedZoneSpawnTime,
         treasureState,
         runeState,
+        gameOverReason: gameOver ? (gameOverReason ?? prev.gameOverReason) : undefined,
+        levelStats,
+        currentLevelStartTime,
       };
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
@@ -3903,8 +4236,11 @@ function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameT
     let minDistance = (collectible.type === 'energy' || collectible.type === 'uki') ? 40 : 8;
     
     // CORREGIDO: Distancia mínima especial para elementos especiales para evitar spawn encima del token
-    if (collectible.type === 'treasure' || collectible.type === 'heart' || collectible.type === 'megaNode' || collectible.type === 'goatSkin' || collectible.type === 'rune') {
-      minDistance = 60; // Distancia mayor para elementos especiales
+    // Treasure y Vault con margen mucho mayor (200px) para dar más tiempo de reacción
+    if (collectible.type === 'treasure' || collectible.type === 'vaul') {
+      minDistance = 200; // Margen amplio para elementos de alto valor
+    } else if (collectible.type === 'heart' || collectible.type === 'megaNode' || collectible.type === 'goatSkin' || collectible.type === 'rune') {
+      minDistance = 60; // Distancia mayor para otros elementos especiales
     }
     
     // Si no se puede colocar después de muchos intentos, reducir gradualmente la distancia

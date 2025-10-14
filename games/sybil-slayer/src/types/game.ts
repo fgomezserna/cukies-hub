@@ -176,6 +176,35 @@ export interface TreasureState {
   successfulBlocks: number;
 }
 
+export interface LevelStatCounts {
+  gems: number;
+  gemsX5: number;
+  ukis: number;
+  ukisX5: number;
+  treasures: number;
+  hearts: number;
+  runes: number;
+}
+
+export interface LevelStatPoints {
+  gems: number;
+  gemsX5: number;
+  ukis: number;
+  ukisX5: number;
+  treasures: number;
+  hearts: number;
+  runes: number;
+}
+
+export interface LevelStatsEntry {
+  level: number;
+  startTime: number | null;
+  endTime: number | null;
+  durationMs: number;
+  counts: LevelStatCounts;
+  points: LevelStatPoints;
+}
+
 export interface GameState {
   status: GameStatus;
   token: Token;
@@ -251,4 +280,7 @@ export interface GameState {
   treasureState: TreasureState;
   // Sistema de runas y tótem
   runeState: RuneState;
+  // Estadísticas acumuladas por nivel
+  levelStats: LevelStatsEntry[];
+  currentLevelStartTime: number | null;
 }
