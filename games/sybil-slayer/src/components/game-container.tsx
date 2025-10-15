@@ -473,6 +473,26 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const inputState = useGameInput();
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
   
+  // Handle pause toggle from keyboard (P key)
+  useEffect(() => {
+    if (inputState.pauseToggled && (gameState.status === 'playing' || gameState.status === 'paused')) {
+      if (gameState.status === 'playing') {
+        playSound('pause');
+      } else if (gameState.status === 'paused') {
+        playSound('resume');
+      }
+      togglePause();
+    }
+  }, [inputState.pauseToggled, gameState.status, togglePause, playSound]);
+
+  // Handle start game from keyboard (Space key)
+  useEffect(() => {
+    if (inputState.startToggled && gameState.status === 'idle') {
+      playSound('game_start');
+      startGame();
+    }
+  }, [inputState.startToggled, gameState.status, startGame, playSound]);
+  
   // Reset flags when starting a new game (moved after gameState initialization)
   useEffect(() => {
     if (gameState.status === 'countdown') {
@@ -666,19 +686,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.token.glow && gameState.token.glowTimer && gameState.token.glowTimer > 0) {
       // Si es un valor nuevo de glowTimer, considerarlo como una nueva recolección
       if (lastGlowTimerRef.current === 0 || gameState.token.glowTimer > lastGlowTimerRef.current) {
-        console.log("¡Checkpoint recogido! Activando animación de jeff_goit por el lado izquierdo");
+        console.log("¡Checkpoint recogido!");
         
         // Reproducir sonidos
         playSound('checkpoint_collect');
         playSound('checkpoint');
         playSound('jeff_goit');
         
-        // Activar la animación sin importar si ya hay una activa
-        setJeffGoitAnimation({
-          active: true,
-          start: Date.now(),
-          phase: 'entering'
-        });
+        // DESACTIVADO: Animación de jeff_goit
+        // setJeffGoitAnimation({
+        //   active: true,
+        //   start: Date.now(),
+        //   phase: 'entering'
+        // });
         
         // Actualizar el valor del último glowTimer
         lastGlowTimerRef.current = gameState.token.glowTimer;
@@ -695,18 +715,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.token.boostTimer && gameState.token.boostTimer > 0) {
       // Si es un valor nuevo de boostTimer, considerarlo como una nueva recolección
       if (lastBoostTimerRef.current === 0 || gameState.token.boostTimer > lastBoostTimerRef.current) {
-        console.log("¡Haku recogido! Activando animación de whalechadmode por el lado derecho");
+        console.log("¡Haku recogido!");
         
         // Reproducir sonidos
         playSound('mega_node_collect');
         playSound('whale_chad');
         
-        // Activar la animación sin importar si ya hay una activa
-        setWhaleChadAnimation({
-          active: true,
-          start: Date.now(),
-          phase: 'entering'
-        });
+        // DESACTIVADO: Animación de whalechadmode
+        // setWhaleChadAnimation({
+        //   active: true,
+        //   start: Date.now(),
+        //   phase: 'entering'
+        // });
         
         // Actualizar el valor del último boostTimer
         lastBoostTimerRef.current = gameState.token.boostTimer;
