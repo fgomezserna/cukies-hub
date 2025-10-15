@@ -3311,9 +3311,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             if (checkCollision(newToken, obstacle)) {
                 if (obstacle.type === 'fee' && goatEliminateActive) {
                     obstaclesMarkedForRemoval.add(obstacle.id);
-                    // TEMPORALMENTE DESHABILITADO: Explosión amarilla cuando goat elimina fee
-                    // Para reactivar en el futuro, descomentar la siguiente línea:
-                    // newVisualEffects.push(createExplosionEffect(obstacle.x, obstacle.y));
+                    // Explosión amarilla cuando goat elimina fee
+                    newVisualEffects.push(createExplosionEffect(obstacle.x, obstacle.y));
                     onPlaySound?.('auch');
                     console.log(`[GOAT] Fee eliminado por contacto (ID: ${obstacle.id})`);
                     continue;
