@@ -57,7 +57,7 @@ const SOUND_CONFIG: Record<SoundType, {
   bug_collision: { path: '/assets/sounds/effects/bug_collision.mp3', volume: 0.8, category: 'effect' },
   hacker_collision: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.7, category: 'voice' },
   hacker_escape: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' }, // NUEVO: Mismo sonido pero diferente evento
-  level_up: { path: '/assets/sounds/Sonidos/Level Up/Level up 1.wav', volume: 0.7, category: 'effect' },
+  level_up: { path: '/assets/sounds/Sonidos/Level Up/Level up 1.wav', volume: 1.0, category: 'effect' },
   treasure_collect_1: { path: '/assets/sounds/Sonidos/Tesoros/tesoro1.wav', volume: 0.7, category: 'effect' },
   treasure_collect_2: { path: '/assets/sounds/Sonidos/Tesoros/tesoro2.wav', volume: 0.7, category: 'effect' },
   treasure_collect_3: { path: '/assets/sounds/Sonidos/Tesoros/tesoro3.wav', volume: 0.7, category: 'effect' },
