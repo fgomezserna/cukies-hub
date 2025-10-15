@@ -324,6 +324,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Ref para rastrear si se recolectó un checkpoint
   const lastGlowTimerRef = useRef<number>(0);
   
+  // Ref para rastrear si apareció un checkpoint en pantalla
+  const checkpointOnFieldRef = useRef<boolean>(false);
+  
   // Ref para rastrear si se recolectó un Haku (antes mega node)
   const lastBoostTimerRef = useRef<number>(0);
   
@@ -448,7 +451,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Callback para daño
   const handleDamage = useCallback(() => {
     setDamageFlag(flag => flag + 1);
-    playSound('auch');
+    playSound('collision_damage');
   }, [playSound]);
 
   // Initialize gameState AFTER determining canvas size
@@ -498,6 +501,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.status === 'countdown') {
       setDamageFlag(0);
       setEnergyCollectedFlag(0);
+    }
+    // Reset checkpoint ref when game is idle (restarted)
+    if (gameState.status === 'idle') {
+      checkpointOnFieldRef.current = false;
     }
   }, [gameState.status]);
   
@@ -688,9 +695,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (lastGlowTimerRef.current === 0 || gameState.token.glowTimer > lastGlowTimerRef.current) {
         console.log("¡Checkpoint recogido!");
         
-        // Reproducir sonidos
-        playSound('checkpoint_collect');
-        playSound('checkpoint');
+        // Reproducir sonidos al recoger checkpoint
+        playSound('checkpoint_collect'); // Sonido "Checkpoint 1"
         playSound('jeff_goit');
         
         // DESACTIVADO: Animación de jeff_goit
@@ -736,6 +742,21 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       lastBoostTimerRef.current = 0;
     }
   }, [gameState.token.boostTimer, playSound]);
+
+  // Detectar cuando aparece un checkpoint en pantalla
+  useEffect(() => {
+    const hasCheckpoint = gameState.collectibles.some(c => c.type === 'checkpoint');
+    
+    if (hasCheckpoint && !checkpointOnFieldRef.current) {
+      // Nuevo checkpoint apareció en pantalla
+      console.log("¡Checkpoint apareció en pantalla!");
+      playSound('checkpoint'); // Sonido "Aparece Checkpoint"
+      checkpointOnFieldRef.current = true;
+    } else if (!hasCheckpoint && checkpointOnFieldRef.current) {
+      // Checkpoint desapareció (fue recogido)
+      checkpointOnFieldRef.current = false;
+    }
+  }, [gameState.collectibles, playSound]);
 
   // Detectar cuando se recoge purr
   useEffect(() => {
@@ -825,8 +846,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       // Este es un nuevo daño causado por un fee, activar animación de unlisted
       console.log("¡Fee causó daño! Activando animación de unlisted");
       
-      // Reproducir sonido específico para fee damage
-      playSound('auch');
+      // El sonido ya se reproduce en handleDamage (collision_damage)
       
       // Activar la animación de unlisted
       setUnlistedAnimation({

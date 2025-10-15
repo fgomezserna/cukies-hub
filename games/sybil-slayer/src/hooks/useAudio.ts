@@ -17,7 +17,9 @@ export type SoundType =
   | 'hacker_collision'
   | 'hacker_escape' // NUEVO: Cuando hacker recoge 5 energy y escapa
   | 'level_up'
-  | 'treasure_collect'
+  | 'treasure_collect_1'
+  | 'treasure_collect_2'
+  | 'treasure_collect_3'
   | 'rune_collect'
   | 'goat_collect'
   // UI
@@ -45,25 +47,27 @@ const SOUND_CONFIG: Record<SoundType, {
   energy_collect: { path: '/assets/sounds/Sonidos/Gemas/Gemas 1.wav', volume: 0.6, category: 'effect' },
   mega_node_collect: { path: '/assets/sounds/Sonidos/Haku/Haku 1.wav', volume: 0.7, category: 'effect' },
   purr_collect: { path: '/assets/sounds/Sonidos/Token/Token 1.mp3', volume: 0.8, category: 'effect' },
-  vaul_collect: { path: '/assets/sounds/Sonidos/Cofre/Cofre 1.wav', volume: 0.8, category: 'effect' },
+  vaul_collect: { path: '/assets/sounds/Sonidos/Cofre/Cofre 2.wav', volume: 0.8, category: 'effect' },
   checkpoint_collect: { path: '/assets/sounds/Sonidos/Checkpoint/Checkpoint 1.wav', volume: 0.7, category: 'effect' },
   checkpoint: { path: '/assets/sounds/Sonidos/Checkpoint/Aparece Checkpoint.wav', volume: 0.8, category: 'effect' },
   heart_collect: { path: '/assets/sounds/Sonidos/Corazon/Corazon 1.wav', volume: 0.8, category: 'effect' },
   life: { path: '/assets/sounds/Sonidos/Corazon/Corazon 1.wav', volume: 0.8, category: 'effect' },
-  collision_damage: { path: '/assets/sounds/Sonidos/Golpe Recibido/Golpe 1.wav', volume: 0.5, category: 'effect' },
+  collision_damage: { path: '/assets/sounds/Sonidos/Golpe Recibido/547344__legnalegna55__ouch.mp3', volume: 0.5, category: 'effect' },
   auch: { path: '/assets/sounds/effects/auch.mp3', volume: 0.7, category: 'effect' },
   bug_collision: { path: '/assets/sounds/effects/bug_collision.mp3', volume: 0.8, category: 'effect' },
   hacker_collision: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.7, category: 'voice' },
   hacker_escape: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' }, // NUEVO: Mismo sonido pero diferente evento
   level_up: { path: '/assets/sounds/Sonidos/Level Up/Level up 1.wav', volume: 0.7, category: 'effect' },
-  treasure_collect: { path: '/assets/sounds/Sonidos/Tesoros/sfx_coin_single1.wav', volume: 0.7, category: 'effect' },
+  treasure_collect_1: { path: '/assets/sounds/Sonidos/Tesoros/tesoro1.wav', volume: 0.7, category: 'effect' },
+  treasure_collect_2: { path: '/assets/sounds/Sonidos/Tesoros/tesoro2.wav', volume: 0.7, category: 'effect' },
+  treasure_collect_3: { path: '/assets/sounds/Sonidos/Tesoros/tesoro3.wav', volume: 0.7, category: 'effect' },
   rune_collect: { path: '/assets/sounds/Sonidos/Skill/Skill 1.wav', volume: 0.7, category: 'effect' },
   goat_collect: { path: '/assets/sounds/Sonidos/Goat/Goat 1.wav', volume: 0.7, category: 'effect' },
   
   // UI
   button_click: { path: '/assets/sounds/ui/button-click-01.mp3', volume: 0.5, category: 'ui' },
   game_start: { path: '/assets/sounds/ui/game_start.mp3', volume: 0.6, category: 'ui' },
-  pause: { path: '/assets/sounds/ui/pause.mp3', volume: 0.5, category: 'ui' },
+  pause: { path: '/assets/sounds/Sonidos/Boton Pause/Pause 1.wav', volume: 0.5, category: 'ui' },
   resume: { path: '/assets/sounds/ui/resume.mp3', volume: 0.5, category: 'ui' },
   
   // Voice
@@ -71,8 +75,8 @@ const SOUND_CONFIG: Record<SoundType, {
   whale_chad: { path: '/assets/sounds/voice/whale_chad.mp3', volume: 0.8, category: 'voice' },
   
   // Music
-  background_music: { path: '/assets/sounds/music/HoliznaCC0 - Game BOI 4.mp3', volume: 0.2, loop: true, category: 'music' },
-  background_music_alt: { path: '/assets/sounds/music/HoliznaCC0 - Track 1.mp3', volume: 0.2, loop: true, category: 'music' },
+  background_music: { path: '/assets/sounds/Sonidos/Musica/musica1.mp3', volume: 0.2, loop: true, category: 'music' },
+  background_music_alt: { path: '/assets/sounds/Sonidos/Musica/musica1.mp3', volume: 0.2, loop: true, category: 'music' },
   frenzy_mode: { path: '/assets/sounds/music/frenzy_mode.mp3', volume: 0.4, loop: true, category: 'music' },
   game_over: { path: '/assets/sounds/Sonidos/Muerte/Muerte 1.wav', volume: 0.6, category: 'music' },
 };

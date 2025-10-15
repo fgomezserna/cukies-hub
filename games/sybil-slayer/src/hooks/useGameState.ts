@@ -2821,7 +2821,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             treasureCollectedThisFrame += 1;
             treasureBasePointsThisFrame += treasurePoints;
             // Los treasures NO reciben multiplicador de nivel ni de vault, se suman directamente
-            onPlaySound?.('treasure_collect');
+            // Reproducir sonido según el tesoro del bloque (1, 2 o 3)
+            const treasureSoundMap: Record<number, 'treasure_collect_1' | 'treasure_collect_2' | 'treasure_collect_3'> = {
+              0: 'treasure_collect_1',
+              1: 'treasure_collect_2',
+              2: 'treasure_collect_3'
+            };
+            onPlaySound?.(treasureSoundMap[currentIndex] || 'treasure_collect_1');
             treasureState.treasuresCollectedInBlock = currentIndex + 1;
             treasureState.activeTreasureId = null;
             treasureState.activeSpawnTime = null;
