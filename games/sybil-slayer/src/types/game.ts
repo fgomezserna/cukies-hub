@@ -184,6 +184,7 @@ export interface LevelStatCounts {
   treasures: number;
   hearts: number;
   runes: number;
+  levelCompletionBonus: number;
 }
 
 export interface LevelStatPoints {
@@ -194,6 +195,7 @@ export interface LevelStatPoints {
   treasures: number;
   hearts: number;
   runes: number;
+  levelCompletionBonus: number;
 }
 
 export interface LevelStatsEntry {

@@ -161,6 +161,12 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                     count: entry.counts.runes,
                     points: entry.points.runes,
                   },
+                  {
+                    key: 'levelCompletionBonus',
+                    label: 'Bonificación nivel',
+                    count: entry.counts.levelCompletionBonus,
+                    points: entry.points.levelCompletionBonus,
+                  },
                 ];
                 const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
 

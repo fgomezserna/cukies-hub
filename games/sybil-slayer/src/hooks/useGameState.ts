@@ -76,6 +76,7 @@ const createEmptyLevelStatsEntry = (level: number, startTime: number | null = nu
     treasures: 0,
     hearts: 0,
     runes: 0,
+    levelCompletionBonus: 0,
   },
   points: {
     gems: 0,
@@ -85,6 +86,7 @@ const createEmptyLevelStatsEntry = (level: number, startTime: number | null = nu
     treasures: 0,
     hearts: 0,
     runes: 0,
+    levelCompletionBonus: 0,
   },
 });
 
@@ -160,26 +162,38 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
   return others.some(o => {
     // MEJORADO: Comprobar colisiones entre assets positivos y bugs
-    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin'].includes((obj as any).type);
+    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure'].includes((obj as any).type);
     const isBug = ('type' in o) && o.type === 'bug';
-    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin'].includes((o as any).type);
+    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure'].includes((o as any).type);
     const isObjBug = ('type' in obj) && (obj as any).type === 'bug';
+    const isToken = !('type' in o) && 'speed' in o; // Token no tiene 'type' pero tiene 'speed'
     
     // Casos a verificar:
     // 1. Asset positivo vs Bug (evitar que assets aparezcan sobre bugs)
     // 2. Bug vs Asset positivo (evitar que bugs aparezcan sobre assets)
     // 3. Assets positivos entre sí (como antes)
     // 4. Bugs entre sí (como antes)
+    // 5. Asset positivo vs Token (NUEVO: evitar que assets aparezcan sobre el token)
     const shouldCheck = (isAssetPositive && isBug) || 
                        (isObjBug && isOtherAssetPositive) ||
                        (isAssetPositive && isOtherAssetPositive) ||
-                       (isObjBug && ('type' in o) && o.type === 'bug');
+                       (isObjBug && ('type' in o) && o.type === 'bug') ||
+                       (isAssetPositive && isToken); // NUEVO: verificar colisión con token
     
     if (shouldCheck) {
       const dx = obj.x - o.x;
       const dy = obj.y - o.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
-      return dist < (obj.radius + o.radius + minDist);
+      const isOverlappingResult = dist < (obj.radius + o.radius + minDist);
+      
+      // DEBUG: Log para verificar colisiones con token
+      if ('type' in obj && ((obj as any).type === 'heart' || (obj as any).type === 'treasure')) {
+        if (isToken) {
+          console.log(`[OVERLAP DEBUG] ${(obj as any).type} vs token - Distance: ${dist.toFixed(1)}px, Required: ${(obj.radius + o.radius + minDist).toFixed(1)}px, Overlapping: ${isOverlappingResult}`);
+        }
+      }
+      
+      return isOverlappingResult;
     }
     return false;
   });
@@ -2806,7 +2820,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             const treasurePoints = basePoints * multiplier;
             treasureCollectedThisFrame += 1;
             treasureBasePointsThisFrame += treasurePoints;
-            scoreToAddWithoutVaultMultiplier += treasurePoints; // Treasures NO reciben multiplicador del vault
+            // Los treasures NO reciben multiplicador de nivel ni de vault, se suman directamente
             onPlaySound?.('treasure_collect');
             treasureState.treasuresCollectedInBlock = currentIndex + 1;
             treasureState.activeTreasureId = null;
@@ -3753,9 +3767,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       // - Energy/Uki: reciben multiplicador de nivel Y multiplicador del vault
       // - Corazones: YA tienen multiplicador de nivel aplicado, NO aplicar de nuevo
       // - Otros coleccionables: solo reciben multiplicador de nivel
+      // - Treasures: NO reciben ningún multiplicador, se suman directamente
       const finalScoreEnergyUki = scoreToAddWithVaultMultiplier * levelMultiplier * currentMultiplier;
       const finalScoreOthers = scoreToAddWithoutVaultMultiplier * levelMultiplier;
-      const finalScoreToAdd = finalScoreEnergyUki + finalScoreOthers;
+      const finalScoreTreasures = treasureBasePointsThisFrame; // Sin multiplicadores
+      const finalScoreToAdd = finalScoreEnergyUki + finalScoreOthers + finalScoreTreasures;
       
       // Log para depuración de multiplicador del vaul
       if (currentMultiplier > 1 && scoreToAddWithVaultMultiplier > 0) {
@@ -3798,7 +3814,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         currentLevelStats.counts.hearts += heartsCollectedThisFrame;
         currentLevelStats.points.hearts += heartPointsThisFrame;
         currentLevelStats.counts.runes += runeCollectedThisFrame;
-        currentLevelStats.points.runes += runePointsTotalThisFrame;
+        currentLevelStats.points.runes += runePointsWithLevel; // Solo puntos de runas individuales
+        currentLevelStats.counts.levelCompletionBonus += runeCompletionBonusThisFrame > 0 ? 1 : 0; // Contar completaciones
+        currentLevelStats.points.levelCompletionBonus += runeCompletionBonusThisFrame; // Bonus por completar tótem
       }
 
       if (levelJustIncreased) {
@@ -4237,17 +4255,35 @@ function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameT
     let minDistance = (collectible.type === 'energy' || collectible.type === 'uki') ? 40 : 8;
     
     // CORREGIDO: Distancia mínima especial para elementos especiales para evitar spawn encima del token
-    // Treasure y Vault con margen mucho mayor (200px) para dar más tiempo de reacción
-    if (collectible.type === 'treasure' || collectible.type === 'vaul') {
+    // Treasure, Heart y Vault con margen mucho mayor (200px) para dar más tiempo de reacción
+    if (collectible.type === 'treasure' || collectible.type === 'vaul' || collectible.type === 'heart') {
       minDistance = 200; // Margen amplio para elementos de alto valor
-    } else if (collectible.type === 'heart' || collectible.type === 'megaNode' || collectible.type === 'goatSkin' || collectible.type === 'rune') {
+    } else if (collectible.type === 'megaNode' || collectible.type === 'goatSkin' || collectible.type === 'rune') {
       minDistance = 60; // Distancia mayor para otros elementos especiales
     }
     
     // Si no se puede colocar después de muchos intentos, reducir gradualmente la distancia
-    const adjustedMinDistance = attempts > 15 ? Math.max(minDistance * 0.5, 4) : minDistance;
+    // Para elementos especiales (heart, treasure, vaul), mantener una distancia mínima más alta
+    let adjustedMinDistance = minDistance;
+    if (attempts > 15) {
+      if (collectible.type === 'heart' || collectible.type === 'treasure' || collectible.type === 'vaul') {
+        adjustedMinDistance = Math.max(minDistance * 0.7, 100); // Reducir menos para elementos especiales, mínimo 100px
+      } else {
+        adjustedMinDistance = Math.max(minDistance * 0.5, 4);
+      }
+    }
     
     const overlapping = isOverlapping(collectible, others, adjustedMinDistance);
+    
+    // DEBUG: Log para entender qué está pasando
+    if (collectible.type === 'heart' || collectible.type === 'treasure') {
+      const token = others.find(o => !('type' in o) && 'speed' in o); // Token no tiene 'type' pero tiene 'speed'
+      if (token) {
+        const distance = Math.sqrt((collectible.x - token.x) ** 2 + (collectible.y - token.y) ** 2);
+        console.log(`[SPAWN DEBUG] ${collectible.type} - Attempt ${attempts}, Distance to token: ${distance.toFixed(1)}px, Min required: ${adjustedMinDistance}px, Overlapping: ${overlapping}`);
+      }
+    }
+    
     if (!overlapping) break;
     
   } while (attempts < 25); // Más intentos para energy
