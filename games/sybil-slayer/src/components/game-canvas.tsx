@@ -2442,9 +2442,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     if (!damageFlag || damageFlag <= 0) return;
     if (gameState.status !== 'playing') return;
 
-    // FIJO: Usar Date.now() para que las animaciones funcionen correctamente
-    setDamageEffect({ active: true, start: Date.now() });
-    console.log('💥 Efecto de daño activado');
+    // ✅ CORREGIDO: Forzar reinicio de la animación incluso si ya hay una activa
+    // Esto asegura que golpes consecutivos rápidos siempre muestren la animación
+    const now = Date.now();
+    setDamageEffect({ active: true, start: now });
+    console.log(`💥 Efecto de daño activado (damageFlag: ${damageFlag}, timestamp: ${now})`);
   }, [damageFlag, gameState.status]);
 
   // Limpiar efecto de daño cuando el juego no esté en 'playing'
@@ -2978,11 +2980,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       const now = Date.now();
       const elapsed = now - damageEffect.start;
       if (elapsed < 1000) {
-        // Flash: visible 100ms, invisible 100ms
-        const flash = Math.floor(elapsed / 100) % 2 === 0;
+        // ✅ CORREGIDO: Flash más rápido y siempre empieza visible
+        // Visible 80ms, invisible 80ms para un efecto más notorio
+        const cycleTime = 160; // Duración de un ciclo completo (visible + invisible)
+        const flash = Math.floor(elapsed / 80) % 2 === 0;
         if (flash) {
           const size = gameState.token.radius * 4;
+          // Aumentar opacidad para hacer el efecto más visible
+          ctx.globalAlpha = 0.9;
           ctx.drawImage(damageImgRef.current, gameState.token.x - size/2, gameState.token.y - size/2, size, size);
+          ctx.globalAlpha = 1.0;
         }
       } else if (damageEffect.active) {
         setDamageEffect(null);

@@ -468,13 +468,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Handle pause toggle from keyboard (P key)
   useEffect(() => {
-    if (inputState.pauseToggled && (gameState.status === 'playing' || gameState.status === 'paused')) {
+    if (inputState.pauseToggled) {
+      // Ejecutar exactamente la misma lógica que el botón de pausa
       if (gameState.status === 'playing') {
         playSound('pause');
+        togglePause();
       } else if (gameState.status === 'paused') {
         playSound('resume');
+        togglePause();
       }
-      togglePause();
     }
   }, [inputState.pauseToggled, gameState.status, togglePause, playSound]);
 

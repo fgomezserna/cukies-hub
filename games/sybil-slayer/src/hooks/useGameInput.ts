@@ -17,6 +17,8 @@ const initialInputState: InputState = {
 export function useGameInput(): InputState {
   const [inputState, setInputState] = useState<InputState>(initialInputState);
   const pressedKeys = new Set<string>();
+  const pauseKeyPressed = { current: false }; // Flag para rastrear si P está presionada
+  const startKeyPressed = { current: false }; // Flag para rastrear si Space está presionada
 
   const updateDirection = useCallback(() => {
     let dx = 0;
@@ -44,12 +46,16 @@ export function useGameInput(): InputState {
              updateDirection();
         }
     }
-     if (event.code === KEY_PAUSE) {
-         setInputState(prev => ({ ...prev, pauseToggled: true }));
-     }
-      if (event.code === KEY_START) {
-         setInputState(prev => ({ ...prev, startToggled: true }));
-     }
+    // Solo procesar pausa si la tecla no ha sido presionada antes
+    if (event.code === KEY_PAUSE && !pauseKeyPressed.current) {
+        pauseKeyPressed.current = true;
+        setInputState(prev => ({ ...prev, pauseToggled: true }));
+    }
+    // Solo procesar start si la tecla no ha sido presionada antes
+    if (event.code === KEY_START && !startKeyPressed.current) {
+        startKeyPressed.current = true;
+        setInputState(prev => ({ ...prev, startToggled: true }));
+    }
     // Prevent default browser behavior for arrow keys, space, etc.
     if ([KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_START].includes(event.code)) {
         event.preventDefault();
@@ -64,9 +70,11 @@ export function useGameInput(): InputState {
      }
     // Reset toggle states on key up to require a fresh press
      if (event.code === KEY_PAUSE) {
+         pauseKeyPressed.current = false;
          setInputState(prev => ({ ...prev, pauseToggled: false }));
      }
      if (event.code === KEY_START) {
+        startKeyPressed.current = false;
         setInputState(prev => ({ ...prev, startToggled: false }));
      }
   }, [updateDirection]);
@@ -75,7 +83,14 @@ export function useGameInput(): InputState {
   // Función para limpiar teclas presionadas cuando se pierde el foco
   const clearPressedKeys = useCallback(() => {
     pressedKeys.clear();
-    setInputState(prev => ({ ...prev, direction: { x: 0, y: 0 } }));
+    pauseKeyPressed.current = false;
+    startKeyPressed.current = false;
+    setInputState(prev => ({ 
+      ...prev, 
+      direction: { x: 0, y: 0 },
+      pauseToggled: false,
+      startToggled: false
+    }));
   }, []);
 
   // Función para prevenir menú contextual y recuperar foco
