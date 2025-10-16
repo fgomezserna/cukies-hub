@@ -161,24 +161,25 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
 
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
   return others.some(o => {
-    // MEJORADO: Comprobar colisiones entre assets positivos y bugs
-    const isAssetPositive = ('type' in obj) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure'].includes((obj as any).type);
+    // MEJORADO: Lista completa de elementos recogibles incluyendo rune
+    const collectibleTypes = ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure', 'rune'];
+    const isAssetPositive = ('type' in obj) && collectibleTypes.includes((obj as any).type);
     const isBug = ('type' in o) && o.type === 'bug';
-    const isOtherAssetPositive = ('type' in o) && ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure'].includes((o as any).type);
+    const isOtherAssetPositive = ('type' in o) && collectibleTypes.includes((o as any).type);
     const isObjBug = ('type' in obj) && (obj as any).type === 'bug';
     const isToken = !('type' in o) && 'speed' in o; // Token no tiene 'type' pero tiene 'speed'
     
     // Casos a verificar:
     // 1. Asset positivo vs Bug (evitar que assets aparezcan sobre bugs)
     // 2. Bug vs Asset positivo (evitar que bugs aparezcan sobre assets)
-    // 3. Assets positivos entre sí (como antes)
+    // 3. Assets positivos entre sí (IMPORTANTE: evitar solapamiento entre recogibles)
     // 4. Bugs entre sí (como antes)
-    // 5. Asset positivo vs Token (NUEVO: evitar que assets aparezcan sobre el token)
+    // 5. Asset positivo vs Token (evitar que assets aparezcan sobre el token)
     const shouldCheck = (isAssetPositive && isBug) || 
                        (isObjBug && isOtherAssetPositive) ||
                        (isAssetPositive && isOtherAssetPositive) ||
                        (isObjBug && ('type' in o) && o.type === 'bug') ||
-                       (isAssetPositive && isToken); // NUEVO: verificar colisión con token
+                       (isAssetPositive && isToken);
     
     if (shouldCheck) {
       const dx = obj.x - o.x;
@@ -186,11 +187,10 @@ const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 
       const dist = Math.sqrt(dx*dx + dy*dy);
       const isOverlappingResult = dist < (obj.radius + o.radius + minDist);
       
-      // DEBUG: Log para verificar colisiones con token
-      if ('type' in obj && ((obj as any).type === 'heart' || (obj as any).type === 'treasure')) {
-        if (isToken) {
-          console.log(`[OVERLAP DEBUG] ${(obj as any).type} vs token - Distance: ${dist.toFixed(1)}px, Required: ${(obj.radius + o.radius + minDist).toFixed(1)}px, Overlapping: ${isOverlappingResult}`);
-        }
+      // DEBUG: Log para verificar colisiones entre recogibles
+      if ('type' in obj && collectibleTypes.includes((obj as any).type) && 
+          'type' in o && collectibleTypes.includes((o as any).type)) {
+        console.log(`[OVERLAP DEBUG] ${(obj as any).type} vs ${(o as any).type} - Distance: ${dist.toFixed(1)}px, Required: ${(obj.radius + o.radius + minDist).toFixed(1)}px, Overlapping: ${isOverlappingResult}`);
       }
       
       return isOverlappingResult;
@@ -1194,23 +1194,25 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
      // Todo el código comentado anterior...
      */
 
-     const collectibles: Collectible[] = [];
-     const initialEnergy = getInitialEnergyForLevel(level);
-     for (let i = 0; i < initialEnergy; i++) {
-         // MEJORADO: Usar safeSpawnCollectible para evitar solapamiento entre energy iniciales
-         const newEnergy = safeSpawnCollectible(
-           createEnergyCollectible, 
-           generateId(), 
-           width, 
-           height, 
-           collectibles // Verificar distancia con energy ya creados
-         );
-         collectibles.push(newEnergy);
-     }
+    const collectibles: Collectible[] = [];
+    const initialEnergy = getInitialEnergyForLevel(level);
+    const tokenObj = initialTokenState(width, height);
+    
+    for (let i = 0; i < initialEnergy; i++) {
+        // MEJORADO: Verificar distancia con todos los objetos (energy ya creados, token, y obstáculos)
+        const newEnergy = safeSpawnCollectible(
+          createEnergyCollectible, 
+          generateId(), 
+          width, 
+          height, 
+          [...collectibles, tokenObj, ...obstacles] // Verificar con todos los objetos
+        );
+        collectibles.push(newEnergy);
+    }
 
-     console.log(`Juego inicializado con 1 fee inicial. Más enemigos aparecerán progresivamente cada 10s. Energía inicial: ${initialEnergy}`);
-     
-     return { obstacles, collectibles, level };
+    console.log(`Juego inicializado con 1 fee inicial. Más enemigos aparecerán progresivamente cada 10s. Energía inicial: ${initialEnergy}`);
+    
+    return { obstacles, collectibles, level };
  }, []);
 
 
@@ -2667,7 +2669,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let scoreToAdd = 0;
       let scoreToAddWithVaultMultiplier = 0; // Puntuación de energy/uki (recibe multiplicador del vault)
       let scoreToAddWithoutVaultMultiplier = 0; // Puntuación de otros coleccionables (NO recibe multiplicador del vault)
-      let heartScoreToAdd = 0; // Puntuación de corazones (YA tiene multiplicador de nivel aplicado)
+      let heartScoreToAdd = 0; // Puntuación de corazones (NO recibe multiplicador de nivel ni de vault)
       let hearts = prev.hearts;
       let scoreToSubtract = 0; // Para descontar puntos por Hacker
       let vaulCollectedCount = prev.vaulCollectedCount || 0;
@@ -3087,10 +3089,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               // Si ya tiene máximo de vidas, otorgar puntos progresivos
               // NOTA: Usamos el contador actual + 1 para calcular puntos, pero el contador real se incrementa en la línea 3840
               const heartCount = (prev.heartsCollectedWithFullLife || 0) + 1;
-              const heartPoints = HEART_BONUS_POINTS_BASE * heartCount * prev.level;
-              heartScoreToAdd += heartPoints; // Hearts YA tienen multiplicador de nivel aplicado
-              console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos (${HEART_BONUS_POINTS_BASE} * ${heartCount} * nivel ${prev.level})`);
-              console.log(`[HEART] 🔍 DEBUG: Contador anterior: ${prev.heartsCollectedWithFullLife}, Contador temporal: ${heartCount}, Nivel: ${prev.level}`);
+              const heartPoints = HEART_BONUS_POINTS_BASE * heartCount;
+              heartScoreToAdd += heartPoints; // Hearts NO reciben multiplicador de nivel
+              console.log(`[HEART] ❤️ Corazón #${heartCount} recogido con vida máxima (${prev.maxHearts})! +${heartPoints} puntos (${HEART_BONUS_POINTS_BASE} * ${heartCount})`);
+              console.log(`[HEART] 🔍 DEBUG: Contador anterior: ${prev.heartsCollectedWithFullLife}, Contador temporal: ${heartCount}`);
               onPlaySound?.('heart_collect');
             }
              continue; // No añadir el heart a los restantes
@@ -4146,7 +4148,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           // Verificar si es hora de spawnear
           const timeSinceLastSpawn = newLastVaulSpawn ? (currentTime - newLastVaulSpawn) : (prev.gameStartTime ? (currentTime - prev.gameStartTime) : 0);
           if (timeSinceLastSpawn >= spawnInterval) {
-            const newCollectible = safeSpawnCollectible(createVaulCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime);
+            // CORREGIDO: Incluir token en la lista de objetos a evitar
+            const newCollectible = safeSpawnCollectible(createVaulCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn, prev.token], currentTime);
             if (newCollectible) {
               remainingCollectibles.push(newCollectible);
               newLastVaulSpawn = currentTime;
@@ -4165,7 +4168,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     
       
       if (!hasCheckpoint && remainingTime <= CHECKPOINT_APPEAR_THRESHOLD) {
-        remainingCollectibles.push(safeSpawnCollectible(createCheckpointCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn], currentTime)); // ✅ Pasar tiempo aunque no se use en checkpoint
+        // CORREGIDO: Incluir token en la lista de objetos a evitar
+        remainingCollectibles.push(safeSpawnCollectible(createCheckpointCollectible, generateId(), prev.canvasSize.width, prev.canvasSize.height, [...remainingCollectibles, ...obstaclesToSpawn, prev.token], currentTime));
         lastCheckpointTime = nowTime;
       }
 
@@ -4252,46 +4256,75 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameTime?: number) => Collectible, id: string, width: number, height: number, others: GameObject[], gameTime?: number): Collectible {
   let collectible;
   let attempts = 0;
+  const maxAttempts = 50; // Aumentado a 50 intentos para mejor distribución
+  
   do {
-    collectible = createFn(id, width, height, gameTime); // ✅ Pasar el tiempo de juego pausable
+    collectible = createFn(id, width, height, gameTime);
     attempts++;
     
-    // MEJORADO: Distancia mínima mayor para energy y uki (40px) para evitar solapamiento visual entre sí y con otros
-    let minDistance = (collectible.type === 'energy' || collectible.type === 'uki') ? 40 : 8;
+    // MEJORADO: Distancias mínimas ajustadas para evitar solapamiento entre elementos recogibles
+    // El radio típico de los elementos es ~20-30px, así que aseguramos suficiente separación
+    let minDistance: number;
     
-    // CORREGIDO: Distancia mínima especial para elementos especiales para evitar spawn encima del token
-    // Treasure, Heart y Vault con margen mucho mayor (200px) para dar más tiempo de reacción
-    if (collectible.type === 'treasure' || collectible.type === 'vaul' || collectible.type === 'heart') {
-      minDistance = 200; // Margen amplio para elementos de alto valor
-    } else if (collectible.type === 'megaNode' || collectible.type === 'goatSkin' || collectible.type === 'rune') {
-      minDistance = 60; // Distancia mayor para otros elementos especiales
+    switch (collectible.type) {
+      case 'treasure':
+      case 'heart':
+        // Elementos de alto valor: máxima distancia del token y otros elementos
+        minDistance = 400;
+        break;
+      case 'vaul':
+        // Vaul: buena distancia para destacar
+        minDistance = 200;
+        break;
+      case 'megaNode':
+      case 'goatSkin':
+      case 'rune':
+      case 'checkpoint':
+      case 'purr':
+        // Elementos especiales: distancia media-alta para evitar solapamiento
+        minDistance = 80;
+        break;
+      case 'energy':
+      case 'uki':
+        // Elementos comunes: distancia suficiente para que no se solapen visualmente
+        // Aumentado de 40 a 60 para mejor separación
+        minDistance = 60;
+        break;
+      default:
+        minDistance = 50;
     }
     
-    // Si no se puede colocar después de muchos intentos, reducir gradualmente la distancia
-    // Para elementos especiales (heart, treasure, vaul), mantener una distancia mínima más alta
+    // Reducción progresiva de distancia si no se encuentra ubicación
     let adjustedMinDistance = minDistance;
     if (attempts > 15) {
+      // Para elementos especiales, mantener siempre una distancia mínima decente
       if (collectible.type === 'heart' || collectible.type === 'treasure' || collectible.type === 'vaul') {
-        adjustedMinDistance = Math.max(minDistance * 0.7, 100); // Reducir menos para elementos especiales, mínimo 100px
+        adjustedMinDistance = Math.max(minDistance * 0.6, 120); // Mínimo 120px
+      } else if (collectible.type === 'megaNode' || collectible.type === 'goatSkin' || 
+                 collectible.type === 'rune' || collectible.type === 'checkpoint' || collectible.type === 'purr') {
+        adjustedMinDistance = Math.max(minDistance * 0.5, 50); // Mínimo 50px
       } else {
-        adjustedMinDistance = Math.max(minDistance * 0.5, 4);
+        // Energy y uki: pueden estar más cerca después de muchos intentos pero nunca solapados
+        adjustedMinDistance = Math.max(minDistance * 0.4, 35); // Mínimo 35px
       }
     }
     
     const overlapping = isOverlapping(collectible, others, adjustedMinDistance);
     
-    // DEBUG: Log para entender qué está pasando
-    if (collectible.type === 'heart' || collectible.type === 'treasure') {
-      const token = others.find(o => !('type' in o) && 'speed' in o); // Token no tiene 'type' pero tiene 'speed'
-      if (token) {
-        const distance = Math.sqrt((collectible.x - token.x) ** 2 + (collectible.y - token.y) ** 2);
-        console.log(`[SPAWN DEBUG] ${collectible.type} - Attempt ${attempts}, Distance to token: ${distance.toFixed(1)}px, Min required: ${adjustedMinDistance}px, Overlapping: ${overlapping}`);
-      }
+    // DEBUG: Log detallado para elementos recogibles
+    if (attempts % 10 === 0 || !overlapping) {
+      const collectibles = others.filter(o => 'type' in o);
+      console.log(`[SPAWN DEBUG] ${collectible.type} - Attempt ${attempts}/${maxAttempts}, Min distance: ${adjustedMinDistance.toFixed(0)}px, Overlapping: ${overlapping}, Nearby collectibles: ${collectibles.length}`);
     }
     
     if (!overlapping) break;
     
-  } while (attempts < 25); // Más intentos para energy
+  } while (attempts < maxAttempts);
+  
+  // Advertencia si se alcanzó el máximo de intentos
+  if (attempts >= maxAttempts) {
+    console.warn(`[SPAWN WARNING] ${collectible.type} spawned after ${maxAttempts} attempts - may be close to other elements`);
+  }
   
   return collectible;
 }

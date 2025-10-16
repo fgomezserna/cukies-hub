@@ -282,12 +282,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     immunityDuration: number; // Duración total de la inmunidad
   } | null>(null);
   
-  // Estado para controlar la animación de unlisted (fee damage effect)
-  const [unlistedAnimation, setUnlistedAnimation] = useState<{
-    active: boolean;
-    start: number;
-    phase: 'entering' | 'visible' | 'exiting';
-  } | null>(null);
   
   // Estado para controlar la animación de giga vault (vaul effect)
   const [gigaVaultAnimation, setGigaVaultAnimation] = useState<{
@@ -312,8 +306,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Ref para la imagen de meow
   const meowImgRef = useRef<HTMLImageElement | null>(null);
   
-  // Ref para la imagen de unlisted
-  const unlistedImgRef = useRef<HTMLImageElement | null>(null);
   
   // Ref para la imagen de giga vault
   const gigaVaultImgRef = useRef<HTMLImageElement | null>(null);
@@ -336,8 +328,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Ref para rastrear el nivel actual y detectar cambios
   const lastLevelRef = useRef<number>(1);
   
-  // Ref para rastrear el último daño por fee
-  const lastFeeDamageTimeRef = useRef<number>(0);
   
   // Ref para rastrear cuando se recoge un vaul
   const lastVaulCollectionTimeRef = useRef<number>(0);
@@ -837,28 +827,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   }, [hackerActive, hackerEnergyCollected]);
 
-  // Detectar cuando un fee causa daño
-  useEffect(() => {
-    // Verificar si hubo daño reciente por un fee específicamente
-    if (gameState.lastDamageTime && 
-        gameState.lastDamageTime > lastFeeDamageTimeRef.current &&
-        gameState.lastDamageSource === 'fee') {
-      // Este es un nuevo daño causado por un fee, activar animación de unlisted
-      console.log("¡Fee causó daño! Activando animación de unlisted");
-      
-      // El sonido ya se reproduce en handleDamage (collision_damage)
-      
-      // Activar la animación de unlisted
-      setUnlistedAnimation({
-        active: true,
-        start: Date.now(),
-        phase: 'entering'
-      });
-      
-      // Actualizar el tiempo del último daño por fee
-      lastFeeDamageTimeRef.current = gameState.lastDamageTime;
-    }
-  }, [gameState.lastDamageTime, gameState.lastDamageSource, playSound]);
 
   // Detectar cuando se recoge un vaul
   useEffect(() => {
@@ -1076,49 +1044,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     return () => clearInterval(intervalId);
   }, [meowAnimation, gameState.status, gameState.token.immunityTimer]);
   
-  // Manejar las fases de la animación de unlisted (fee damage effect)
-  useEffect(() => {
-    if (!unlistedAnimation || !unlistedAnimation.active) return;
-    // Pausar animaciones cuando el juego está pausado
-    if (gameState.status === 'paused') return;
-    
-    const intervalId = setInterval(() => {
-      // No ejecutar animaciones si el juego está pausado
-      if (gameState.status === 'paused') return;
-      
-      const now = Date.now();
-      const elapsed = now - unlistedAnimation.start;
-      
-      // Fases de la animación iguales a whalechadmode pero desde el lado izquierdo superior:
-      // 1. entering - 800ms - deslizándose desde fuera izquierda hacia dentro
-      // 2. visible - 2000ms - visible completamente PARADO  
-      // 3. exiting - 800ms - retrocediendo hacia fuera izquierda
-      
-      if (unlistedAnimation.phase === 'entering' && elapsed >= 800) {
-        // Cambiar a fase visible
-        console.log("Unlisted: Cambiando a fase VISIBLE");
-        setUnlistedAnimation({
-          active: true,
-          start: now,
-          phase: 'visible'
-        });
-      } else if (unlistedAnimation.phase === 'visible' && elapsed >= 2000) {
-        // Cambiar a fase saliente
-        console.log("Unlisted: Cambiando a fase EXITING");
-        setUnlistedAnimation({
-          active: true,
-          start: now,
-          phase: 'exiting'
-        });
-      } else if (unlistedAnimation.phase === 'exiting' && elapsed >= 800) {
-        // Terminar la animación
-        console.log("Unlisted: Terminando animación");
-        setUnlistedAnimation(null);
-      }
-    }, 50);
-    
-    return () => clearInterval(intervalId);
-  }, [unlistedAnimation, gameState.status]);
 
   // Manejar las fases de la animación de giga vault (vaul effect)
   useEffect(() => {
@@ -1215,7 +1140,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       jeffGoitImgRef.current = assetLoader.getAsset('jeff_goit');
       whaleChadImgRef.current = assetLoader.getAsset('whalechadmode');
       meowImgRef.current = assetLoader.getAsset('meow');
-      unlistedImgRef.current = assetLoader.getAsset('unlisted');
       gigaVaultImgRef.current = assetLoader.getAsset('giga_vault');
       hackerTrumpImgRef.current = assetLoader.getAsset('pay_tariffs');
     };
@@ -1229,8 +1153,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       
       // Detener cuando todos los assets críticos estén disponibles
       if (jeffGoitImgRef.current && whaleChadImgRef.current && 
-          meowImgRef.current && unlistedImgRef.current && 
-          gigaVaultImgRef.current && hackerTrumpImgRef.current) {
+          meowImgRef.current && gigaVaultImgRef.current && hackerTrumpImgRef.current) {
         clearInterval(interval);
         console.log('✅ Todas las referencias de imágenes actualizadas desde AssetLoader');
       }
@@ -1987,52 +1910,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </div>
               )}
 
-              {/* Animación de unlisted (fee damage effect) al lado izquierdo del grid */}
-              {unlistedAnimation && unlistedAnimation.active && (
-                <div 
-                  className="absolute" 
-                  style={{
-                    top: '20px', // Arriba del grid (posición similar a meow pero del lado izquierdo)
-                    left: (() => {
-                      const imageWidth = 250;
-                      const stopDistance = 100; // Misma distancia que jeff
-                      
-                      if (unlistedAnimation.phase === 'entering') {
-                        // Entra desde fuera izquierda
-                        const progress = (Date.now() - unlistedAnimation.start) / 800;
-                        const startPos = -imageWidth;
-                        const endPos = -stopDistance;
-                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
-                      } else if (unlistedAnimation.phase === 'visible') {
-                        return `${-stopDistance}px`;
-                      } else {
-                        // Retrocede hacia fuera izquierda
-                        const progress = (Date.now() - unlistedAnimation.start) / 800;
-                        const startPos = -stopDistance;
-                        const endPos = -imageWidth;
-                        return `${startPos + (endPos - startPos) * Math.min(progress, 1)}px`;
-                      }
-                    })(),
-                    width: '250px',
-                    height: '250px',
-                    transition: 'none',
-                    filter: 'drop-shadow(0 0 15px rgba(220, 20, 60, 0.8))' // Rojo carmesí para el daño
-                  }}
-                >
-                  <img 
-                    src="/assets/collectibles/unlisted.png" 
-                    alt="¡Unlisted! Daño recibido" 
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      animation: unlistedAnimation.phase === 'visible' 
-                        ? 'pulse 0.5s infinite alternate'
-                        : 'none'
-                    }}
-                  />
-                </div>
-              )}
 
               {/* Animación de giga_vault al lado izquierdo del grid - NUEVA */}
               {gigaVaultAnimation && gigaVaultAnimation.active && (

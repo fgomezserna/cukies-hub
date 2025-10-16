@@ -114,9 +114,9 @@ export const TREASURE_FIRST_APPEAR_MIN_S = 0; // desde inicio
 export const TREASURE_FIRST_APPEAR_MAX_S = 30; // dentro de primeros 30s
 export const TREASURE_NEXT_BLOCK_MIN_S = 15; // entre 15 y 25s después de terminar bloque
 export const TREASURE_NEXT_BLOCK_MAX_S = 25;
-// Puntuación por bloque (3 tesoros). Bloque 1: 10,15,25 = 50. Bloque 2: 20,30,50 = 100. Bloque 3: 30,45,75 = 150.
-export const TREASURE_BLOCK_BASE_POINTS: [number, number, number] = [10, 15, 25];
-export const TREASURE_BLOCK_INCREMENT = 50; // incremento por bloque completado
+// Puntuación por bloque (3 tesoros). Bloque 1: 5,5,15 = 25. Bloque 2: 10,10,30 = 50. Bloque 3: 15,15,45 = 75.
+export const TREASURE_BLOCK_BASE_POINTS: [number, number, number] = [5, 5, 15];
+export const TREASURE_BLOCK_INCREMENT = 25; // incremento por bloque completado
 
 // Collectible Spawning - Sistema de timing independiente
 export const INITIAL_ENERGY_POINTS = 10; // Siempre 10 energy iniciales
@@ -131,7 +131,7 @@ export const MEGA_NODE_SPAWN_INTERVAL_MIN_MS = 15000; // 15s mínimo
 export const MEGA_NODE_SPAWN_INTERVAL_MAX_MS = 25000; // 25s máximo
 export const HEART_SPAWN_INTERVAL_MIN_MS = 20000; // 20s mínimo
 export const HEART_SPAWN_INTERVAL_MAX_MS = 30000; // 30s máximo
-export const HEART_BONUS_POINTS_BASE = 10; // Puntos base cuando se recolecta con vida máxima (fórmula: base * heartCount * nivel, ej: nivel 3, corazón 3 = 10 * 3 * 3 = 90)
+export const HEART_BONUS_POINTS_BASE = 20; // Puntos base cuando se recolecta con vida máxima (fórmula: base * heartCount, ej: corazón 3 = 20 * 3 = 60)
 export const VAUL_FIRST_SPAWN_MS = 30000; // 30s para el primer Vaul
 export const VAUL_NEXT_SPAWN_MS = 30000; // 30s después de terminar efecto o expirar
 
