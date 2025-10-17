@@ -20,6 +20,7 @@ export type SoundType =
   | 'treasure_collect_1'
   | 'treasure_collect_2'
   | 'treasure_collect_3'
+  | '3bis'
   | 'rune_collect'
   | 'goat_collect'
   // UI
@@ -61,6 +62,7 @@ const SOUND_CONFIG: Record<SoundType, {
   treasure_collect_1: { path: '/assets/sounds/Sonidos/Tesoros/tesoro1.wav', volume: 0.7, category: 'effect' },
   treasure_collect_2: { path: '/assets/sounds/Sonidos/Tesoros/tesoro2.wav', volume: 0.7, category: 'effect' },
   treasure_collect_3: { path: '/assets/sounds/Sonidos/Tesoros/tesoro3.wav', volume: 0.7, category: 'effect' },
+  '3bis': { path: '/assets/sounds/Sonidos/Tesoros/3bis.wav', volume: 0.7, category: 'effect' },
   rune_collect: { path: '/assets/sounds/Sonidos/Skill/Skill 1.wav', volume: 0.7, category: 'effect' },
   goat_collect: { path: '/assets/sounds/Sonidos/Goat/Goat 1.wav', volume: 0.7, category: 'effect' },
   
