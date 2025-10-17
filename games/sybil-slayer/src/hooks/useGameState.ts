@@ -743,6 +743,7 @@ const createInitialTreasureState = (): TreasureState => ({
   nextSpawnTime: null,
   treasuresCollectedInBlock: 0,
   successfulBlocks: 0,
+  lastTreasurePosition: null,
 });
 
 // --- FUNCIONES HELPER PARA SISTEMA DE TIMING INDEPENDIENTE ---
@@ -2632,6 +2633,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           treasureState.activeTreasureId = null;
           treasureState.activeSpawnTime = null;
           treasureState.treasuresCollectedInBlock = 0;
+          treasureState.lastTreasurePosition = null; // Resetear posición al reiniciar bloque
           // CORREGIDO: NO resetear successfulBlocks - mantener el progreso de bloques completados
           treasureState.nextSpawnTime = now + getRandomFloat(
             TREASURE_NEXT_BLOCK_MIN_S * 1000,
@@ -2646,14 +2648,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           now >= treasureState.nextSpawnTime
         ) {
           const treasureId = generateId();
-          // CORREGIDO: Usar safeSpawnCollectible para evitar spawn encima del token
-          const treasureCollectible = safeSpawnCollectible(
-            createTreasureCollectible,
+          // Usar safeSpawnTreasure para asegurar distancia mínima entre tesoros del mismo bloque
+          const treasureCollectible = safeSpawnTreasure(
             treasureId,
             prev.canvasSize.width,
             prev.canvasSize.height,
             [...prev.collectibles, ...newCollectibles, prev.token, ...newObstacles],
-            now
+            now,
+            treasureState.lastTreasurePosition // Pasar la posición del tesoro anterior
           );
           treasureCollectible.createdAt = now;
           newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
@@ -2661,7 +2663,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           treasureState.activeTreasureId = treasureId;
           treasureState.activeSpawnTime = now;
           treasureState.nextSpawnTime = null;
-          console.log(`[TREASURE] ✨ Tesoro ${treasureState.treasuresCollectedInBlock + 1} del bloque actual spawneado`);
+          // Guardar la posición del tesoro spawneado para el siguiente del bloque
+          treasureState.lastTreasurePosition = { x: treasureCollectible.x, y: treasureCollectible.y };
+          console.log(`[TREASURE] ✨ Tesoro ${treasureState.treasuresCollectedInBlock + 1} del bloque actual spawneado en (${treasureCollectible.x.toFixed(0)}, ${treasureCollectible.y.toFixed(0)})`);
         }
       }
 
@@ -2837,6 +2841,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             if (treasureState.treasuresCollectedInBlock >= 3) {
               treasureState.successfulBlocks += 1;
               treasureState.treasuresCollectedInBlock = 0;
+              treasureState.lastTreasurePosition = null; // Resetear posición al completar bloque
               treasureState.nextSpawnTime = now + getRandomFloat(
                 TREASURE_NEXT_BLOCK_MIN_S * 1000,
                 TREASURE_NEXT_BLOCK_MAX_S * 1000
@@ -4250,6 +4255,56 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
 
   return { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame };
+}
+
+// Función específica para spawnear tesoros con distancia mínima entre ellos en el mismo bloque
+function safeSpawnTreasure(
+  id: string, 
+  width: number, 
+  height: number, 
+  others: GameObject[], 
+  gameTime: number,
+  lastTreasurePosition: { x: number; y: number } | null
+): Collectible {
+  let treasure;
+  let attempts = 0;
+  const maxAttempts = 100; // Más intentos para tesoros ya que tienen restricciones adicionales
+  const MIN_DISTANCE_BETWEEN_TREASURES = 300; // Distancia mínima entre tesoros del mismo bloque
+  
+  do {
+    treasure = createTreasureCollectible(id, width, height, gameTime);
+    attempts++;
+    
+    // Verificar solapamiento con otros elementos (usa la lógica normal de 400px)
+    const overlapping = isOverlapping(treasure, others, 400);
+    
+    // Verificar distancia con el tesoro anterior del bloque (si existe)
+    let tooCloseToLastTreasure = false;
+    if (lastTreasurePosition) {
+      const distanceToLastTreasure = Math.sqrt(
+        Math.pow(treasure.x - lastTreasurePosition.x, 2) + 
+        Math.pow(treasure.y - lastTreasurePosition.y, 2)
+      );
+      tooCloseToLastTreasure = distanceToLastTreasure < MIN_DISTANCE_BETWEEN_TREASURES;
+      
+      if (attempts % 10 === 0 || (!overlapping && !tooCloseToLastTreasure)) {
+        console.log(`[TREASURE SPAWN] Attempt ${attempts}/${maxAttempts}, Distance to last treasure: ${distanceToLastTreasure.toFixed(0)}px (min: ${MIN_DISTANCE_BETWEEN_TREASURES}px), Overlapping: ${overlapping}`);
+      }
+    }
+    
+    // Debe cumplir ambas condiciones: no solapar con otros Y estar lejos del tesoro anterior
+    if (!overlapping && !tooCloseToLastTreasure) break;
+    
+  } while (attempts < maxAttempts);
+  
+  // Advertencia si se alcanzó el máximo de intentos
+  if (attempts >= maxAttempts) {
+    console.warn(`[TREASURE SPAWN WARNING] Treasure spawned after ${maxAttempts} attempts - may not meet distance requirements`);
+  } else {
+    console.log(`[TREASURE SPAWN] ✅ Treasure spawned successfully after ${attempts} attempts`);
+  }
+  
+  return treasure;
 }
 
 // Al crear collectibles, evitar solapamiento con otros objetos

@@ -174,6 +174,7 @@ export interface TreasureState {
   nextSpawnTime: number | null;
   treasuresCollectedInBlock: number;
   successfulBlocks: number;
+  lastTreasurePosition: { x: number; y: number } | null; // Posición del último tesoro spawneado en el bloque
 }
 
 export interface LevelStatCounts {
