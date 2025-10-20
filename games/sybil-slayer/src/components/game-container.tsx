@@ -466,19 +466,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const inputState = useGameInput();
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
   
-  // Handle pause toggle from keyboard (P key)
-  useEffect(() => {
-    if (inputState.pauseToggled) {
-      // Ejecutar exactamente la misma lógica que el botón de pausa
-      if (gameState.status === 'playing') {
-        playSound('pause');
-        togglePause();
-      } else if (gameState.status === 'paused') {
-        playSound('resume');
-        togglePause();
-      }
-    }
-  }, [inputState.pauseToggled, gameState.status, togglePause, playSound]);
+  // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
+  // useEffect(() => {
+  //   if (inputState.pauseToggled) {
+  //     // Ejecutar exactamente la misma lógica que el botón de pausa
+  //     if (gameState.status === 'playing') {
+  //       playSound('pause');
+  //       togglePause();
+  //     } else if (gameState.status === 'paused') {
+  //       playSound('resume');
+  //       togglePause();
+  //     }
+  //   }
+  // }, [inputState.pauseToggled, gameState.status, togglePause, playSound]);
 
   // Handle start game from keyboard (Space key)
   useEffect(() => {
@@ -2025,7 +2025,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {gameState.status === 'paused' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
                   <h2 className="text-3xl font-bold text-primary mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
-                  <p className="text-xl text-primary font-pixellari text-shadow">Press P to Resume</p>
+                  <p className="text-xl text-primary font-pixellari text-shadow">Use the Pause button to Resume</p>
                   <p className="text-sm text-primary/70 font-pixellari text-shadow mt-2">Game auto-pauses when switching tabs</p>
                 </div>
               )}

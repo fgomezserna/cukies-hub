@@ -138,7 +138,7 @@ export const VAUL_NEXT_SPAWN_MS = 30000; // 30s después de terminar efecto o ex
 // Rune system
 export const RUNE_FIRST_SPAWN_MS = 10000; // Primera runa a los 10s de partida
 export const RUNE_NEXT_SPAWN_MS = 10000; // Siguientes runas 10s después de recoger la anterior
-export const RUNE_SCORE_INCREMENT = 10; // Incremento base de puntuación por runa
+export const RUNE_SCORE_INCREMENT = 5; // Incremento base de puntuación por runa (5 × número_runa × nivel)
 export const RUNE_RADIUS = 26;
 export const RUNE_TYPES: RuneType[] = ['ember', 'tide', 'gale', 'stone', 'void'];
 export const RUNE_CONFIG: Record<RuneType, { color: string; label: string }> = {
