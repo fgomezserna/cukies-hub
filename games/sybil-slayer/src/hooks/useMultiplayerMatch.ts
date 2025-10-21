@@ -310,16 +310,28 @@ export function useMultiplayerMatch({
       setSuddenDeath(null);
     };
 
+    const handleSuddenDeath = (data: any) => {
+      if (!data?.chasingPlayerId || !data?.leaderId) return;
+      setSuddenDeath({
+        chasingPlayerId: data.chasingPlayerId,
+        leaderId: data.leaderId,
+        targetScore: data.targetScore ?? 0,
+      });
+      setStatus('sudden_death');
+    };
+
     channel.bind('client-match-join', handleJoin);
     channel.bind('client-match-state', handleState);
     channel.bind('client-match-config', handleConfig);
     channel.bind('client-match-ended', handleEnd);
+    channel.bind('client-match-sudden-death', handleSuddenDeath);
 
     return () => {
       channel.unbind('client-match-join', handleJoin);
       channel.unbind('client-match-state', handleState);
       channel.unbind('client-match-config', handleConfig);
       channel.unbind('client-match-ended', handleEnd);
+      channel.unbind('client-match-sudden-death', handleSuddenDeath);
     };
   }, [channel, registerPlayer, targetDifference]);
 
@@ -357,9 +369,9 @@ export function useMultiplayerMatch({
     if (status !== 'countdown') return;
     if (startTimeoutRef.current) return;
 
+    // Iniciar exactamente en startAt; el overlay muestra la cuenta atrás
     const now = safeNow();
-    const countdownStart = matchConfig.startAt - MATCH_COUNTDOWN_MS;
-    const delay = Math.max(0, countdownStart - now);
+    const delay = Math.max(0, matchConfig.startAt - now);
     startTimeoutRef.current = setTimeout(() => {
       setStatus('running');
       setStartSignal(safeNow());
@@ -422,12 +434,15 @@ export function useMultiplayerMatch({
       if (self.score <= rival.score) {
         attemptFinalize(opponentId, 'elimination');
       } else {
-        setSuddenDeath({
+        const sd = {
           chasingPlayerId: opponentId,
           leaderId: localId,
           targetScore: self.score,
-        });
+        } as const;
+        setSuddenDeath(sd);
         setStatus('sudden_death');
+        // Avisar a ambos clientes del modo muerte súbita
+        broadcast('client-match-sudden-death', sd as unknown as Record<string, unknown>);
       }
       return;
     }
@@ -436,12 +451,15 @@ export function useMultiplayerMatch({
       if (rival.score <= self.score) {
         attemptFinalize(localId, 'elimination');
       } else {
-        setSuddenDeath({
+        const sd = {
           chasingPlayerId: localId,
-          leaderId: opponentId,
+          leaderId: opponentId!,
           targetScore: rival.score,
-        });
+        } as const;
+        setSuddenDeath(sd);
         setStatus('sudden_death');
+        // Avisar a ambos clientes del modo muerte súbita
+        broadcast('client-match-sudden-death', sd as unknown as Record<string, unknown>);
       }
       return;
     }

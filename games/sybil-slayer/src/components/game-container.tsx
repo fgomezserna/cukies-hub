@@ -246,9 +246,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     sendGameEnd, 
     startCheckpointInterval,
     channel,
-  } = usePusherConnection();
+    matchChannel,
+  } = usePusherConnection({ matchRoomId });
   const multiplayer = useMultiplayerMatch({
-    channel,
+    channel: matchChannel ?? channel,
     sessionData,
     isConnected,
     targetDifference: 500,

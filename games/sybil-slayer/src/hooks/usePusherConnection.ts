@@ -36,9 +36,10 @@ export interface SessionData {
  * Hook for Pusher communication from game side
  * Replaces the postMessage communication with reliable WebSockets
  */
-export function usePusherConnection() {
+export function usePusherConnection(options?: { matchRoomId?: string | null }) {
   const [pusher, setPusher] = useState<Pusher | null>(null);
   const [channel, setChannel] = useState<Channel | null>(null);
+  const [matchChannel, setMatchChannel] = useState<Channel | null>(null);
   const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   
   // Ref to track cleanup timeout
@@ -60,6 +61,7 @@ export function usePusherConnection() {
   // Refs to prevent stale closures
   const pusherRef = useRef<Pusher | null>(null);
   const channelRef = useRef<Channel | null>(null);
+  const matchChannelRef = useRef<Channel | null>(null);
   const sessionDataRef = useRef<SessionData | null>(sessionData);
   const isConnectingRef = useRef(false);
 
@@ -408,6 +410,12 @@ export function usePusherConnection() {
           pusherRef.current?.unsubscribe(channelName);
         }
 
+        if (matchChannelRef.current) {
+          try {
+            pusherRef.current?.unsubscribe(matchChannelRef.current.name);
+          } catch {}
+        }
+
         if (pusherRef.current) {
           pusherRef.current.disconnect();
         }
@@ -415,16 +423,65 @@ export function usePusherConnection() {
         console.log('🧹 [GAME-PUSHER] Clearing all refs');
         pusherRef.current = null;
         channelRef.current = null;
+        matchChannelRef.current = null;
         sessionDataRef.current = null;
         
         setPusher(null);
         setChannel(null);
+        setMatchChannel(null);
         setConnectionState('disconnected');
         cleanupTimeoutRef.current = null;
       }, 2000); // 2 second delay to allow game end to complete
     };
 
   }, [sessionData]);
+
+  // Subscribe/unsubscribe to a shared match channel when we have a room id
+  useEffect(() => {
+    const resolvedRoomId = options?.matchRoomId ?? sessionDataRef.current?.roomId ?? sessionData?.roomId;
+    const ready = !!pusherRef.current && connectionState === 'connected';
+
+    if (!ready || !resolvedRoomId) {
+      if (matchChannelRef.current) {
+        try { pusherRef.current?.unsubscribe(matchChannelRef.current.name); } catch {}
+        matchChannelRef.current = null;
+        setMatchChannel(null);
+      }
+      return;
+    }
+
+    const desiredName = `private-game-match-${resolvedRoomId}`;
+    if (matchChannelRef.current?.name === desiredName) return;
+
+    if (matchChannelRef.current) {
+      try { pusherRef.current?.unsubscribe(matchChannelRef.current.name); } catch {}
+      matchChannelRef.current = null;
+      setMatchChannel(null);
+    }
+
+    console.log('🔗 [GAME-PUSHER] Subscribing to match channel:', desiredName);
+    try {
+      const ch = pusherRef.current!.subscribe(desiredName);
+      ch.bind('pusher:subscription_succeeded', () => {
+        console.log('✅ [GAME-PUSHER] Subscribed to match channel:', desiredName);
+      });
+      ch.bind('pusher:subscription_error', (error: any) => {
+        console.error('❌ [GAME-PUSHER] Match channel subscription error:', error);
+      });
+      matchChannelRef.current = ch;
+      setMatchChannel(ch);
+    } catch (e) {
+      console.error('❌ [GAME-PUSHER] Failed to subscribe to match channel:', e);
+    }
+
+    return () => {
+      if (matchChannelRef.current?.name === desiredName) {
+        try { pusherRef.current?.unsubscribe(desiredName); } catch {}
+        matchChannelRef.current = null;
+        setMatchChannel(null);
+      }
+    };
+  }, [options?.matchRoomId, sessionData?.roomId, connectionState]);
 
   // Send checkpoint to dapp
   const sendCheckpoint = useCallback((checkpointData: Omit<GameCheckpoint, 'timestamp'>) => {
@@ -624,7 +681,8 @@ export function usePusherConnection() {
     
     // Low-level access
     pusher,
-    channel
+    channel,
+    matchChannel,
   };
 }
 
