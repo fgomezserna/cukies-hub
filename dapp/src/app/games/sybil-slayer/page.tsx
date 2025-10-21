@@ -12,6 +12,7 @@ export default function SybilSlayerPage() {
   const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('sybil-slayer');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
   
   // Local game state for real-time updates
   const [localGameStats, setLocalGameStats] = useState({
@@ -20,6 +21,19 @@ export default function SybilSlayerPage() {
     sessionsPlayed: 0,
     validSessions: 0
   });
+
+  // Detect room parameter from URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    
+    if (roomParam) {
+      console.log('🏠 [DAPP] Room parameter detected:', roomParam);
+      setRoomId(roomParam);
+    }
+  }, []);
 
   // Game connection callbacks
   const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
@@ -100,7 +114,7 @@ export default function SybilSlayerPage() {
           params.append('channel_name', event.data.channelName);
           params.append('session_token', event.data.sessionToken);
 
-          const response = await fetch('/api/pusher/auth', {
+          const response = await fetch('/api/pusher/auth-simple', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
@@ -199,6 +213,8 @@ export default function SybilSlayerPage() {
                 sessionToken: data.sessionToken,
                 sessionId: data.sessionId,
                 gameVersion: '1.0.0',
+                // Include room ID for multiplayer matches
+                roomId: roomId,
                 // Include user info for Pusher auth
                 user: {
                   id: user.id,
@@ -232,7 +248,7 @@ export default function SybilSlayerPage() {
     };
 
     startSession();
-  }, [authData.isAuthenticated, user?.id, currentSessionId, onSessionStart]);
+  }, [authData.isAuthenticated, user?.id, currentSessionId, onSessionStart, roomId]);
 
   // Handle game connection setup - just pass the ref
   const handleGameConnection = useCallback((iframeRef: React.RefObject<HTMLIFrameElement>) => {

@@ -223,7 +223,7 @@ export interface GameState {
   maxHearts: number; // Máximo de corazones permitidos (aumenta con el nivel)
   lastDamageTime?: number | null; // Tiempo del último daño
   lastDamageSource?: ObstacleType | 'ray' | 'redZone' | null; // Tipo de obstáculo que causó el último daño
-  gameOverReason?: 'bug' | 'time' | 'hearts' | 'redZone'; // Razón del game over
+  gameOverReason?: 'bug' | 'time' | 'hearts' | 'redZone' | 'multiplayer'; // Razón del game over
   countdown?: number; // Número actual de la cuenta atrás (3, 2, 1)
   countdownStartTime?: number; // Timestamp cuando empezó la cuenta atrás
   // Propiedades para el multiplicador de vaul

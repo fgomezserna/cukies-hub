@@ -5,17 +5,19 @@ import Image from 'next/image';
 import { usePusherConnection } from '../hooks/usePusherConnection';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
+import ModeSelectModal, { GameMode } from './mode-select-modal';
 import { useGameState } from '../hooks/useGameState';
 import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
+import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
 import { Button } from "./ui/button";
 import { Github, Play, Pause, RotateCcw } from 'lucide-react';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
-import type { Collectible, RuneState, LevelStatsEntry } from '@/types/game';
+import type { Collectible, RuneState, LevelStatsEntry, GameState } from '@/types/game';
 
 
 const getLevelScoreMultiplier = (level: number): number => {
@@ -242,8 +244,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     sessionData, 
     sendCheckpoint, 
     sendGameEnd, 
-    startCheckpointInterval 
+    startCheckpointInterval,
+    channel,
   } = usePusherConnection();
+  const multiplayer = useMultiplayerMatch({
+    channel,
+    sessionData,
+    isConnected,
+    targetDifference: 500,
+  });
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
@@ -341,6 +350,40 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Estado para controlar el botón de música
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
+  const [modeSelectOpen, setModeSelectOpen] = useState(false);
+  const [currentMode, setCurrentMode] = useState<GameMode>('single');
+  const [matchRoomId, setMatchRoomId] = useState<string | null>(null);
+  const isMultiplayerMode = currentMode === 'multiplayer';
+  const lastPublishedSnapshotRef = useRef<{
+    score: number;
+    hearts: number;
+    status: 'waiting' | 'ready' | 'playing' | 'eliminated' | 'finished';
+    gameStatus: GameState['status'];
+    gameOverReason?: GameState['gameOverReason'];
+  } | null>(null);
+
+  const resolveLifecycleStatus = useCallback((state: GameState): 'waiting' | 'ready' | 'playing' | 'eliminated' | 'finished' => {
+    switch (state.status) {
+      case 'idle':
+        return 'waiting';
+      case 'countdown':
+        return 'ready';
+      case 'playing':
+      case 'paused':
+        return 'playing';
+      case 'gameOver':
+        return state.hearts > 0 ? 'finished' : 'eliminated';
+      default:
+        return 'waiting';
+    }
+  }, []);
+
+  // Generar ID único para la sala de partida
+  const generateMatchRoomId = useCallback(() => {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 8);
+    return `room-${timestamp}-${random}`;
+  }, []);
   
   // Sincronizar estado inicial con el hook de audio
   useEffect(() => {
@@ -464,7 +507,220 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [width, height, canvasSize.width, canvasSize.height]);
 
   const inputState = useGameInput();
-  const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+  const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+  const localScore = Math.floor(gameState.score);
+  const opponentScore = Math.floor(multiplayer.opponent?.score ?? 0);
+  const scoreDifference = isMultiplayerMode ? multiplayer.scoreDifference : 0;
+  const advantageTarget = multiplayer.targetDifference;
+  const advantageProgress = isMultiplayerMode
+    ? Math.min(Math.max((scoreDifference + advantageTarget) / (advantageTarget * 2), 0), 1)
+    : 0.5;
+  const advantageLeader = scoreDifference === 0 ? null : scoreDifference > 0 ? 'local' : 'opponent';
+  const matchStatus = multiplayer.status;
+  
+  // Debug multiplayer status changes
+  useEffect(() => {
+    console.log('🎮 [MULTIPLAYER] Status changed:', {
+      status: matchStatus,
+      isMultiplayerMode,
+      hasOpponent: multiplayer.hasOpponent,
+      isHost: multiplayer.isHost,
+      isConnected,
+      hasChannel: !!channel
+    });
+  }, [matchStatus, isMultiplayerMode, multiplayer.hasOpponent, multiplayer.isHost, isConnected, channel]);
+
+  const showWaitingOverlay = isMultiplayerMode && ['searching', 'waiting', 'configuring'].includes(matchStatus) && !multiplayer.matchConfig;
+  const now = Date.now();
+  const countdownMs = multiplayer.matchConfig ? multiplayer.matchConfig.startAt - now : null;
+  const countdownSeconds = countdownMs !== null ? Math.max(0, Math.ceil(countdownMs / 1000)) : null;
+  const showCountdownOverlay = isMultiplayerMode && matchStatus === 'countdown' && gameState.status === 'idle';
+  const showSuddenDeathBanner = isMultiplayerMode && matchStatus === 'sudden_death';
+  const opponentHearts = multiplayer.opponent?.hearts ?? 0;
+  const opponentColor = 'rgba(244, 63, 94, 0.65)';
+  const localColor = 'rgba(16, 185, 129, 0.75)';
+  const advantageGradient = `linear-gradient(90deg, ${opponentColor} 0%, ${opponentColor} ${advantageProgress * 100}%, ${localColor} ${advantageProgress * 100}%, ${localColor} 100%)`;
+  const localSessionId = sessionData?.sessionId ?? 'local';
+  const matchResult = multiplayer.matchResult;
+  const localIsWinner = matchResult ? matchResult.winnerId === localSessionId : null;
+  const opponentId = multiplayer.opponentId;
+  const localFinalScore = matchResult?.finalScores?.[localSessionId] ?? localScore;
+  const opponentFinalScore = opponentId ? (matchResult?.finalScores?.[opponentId] ?? opponentScore) : opponentScore;
+  const advantageBar = isMultiplayerMode && multiplayer.opponent ? (
+    <div className="w-full mt-3 space-y-2" style={{ width: BASE_GAME_WIDTH }}>
+      <div className="flex justify-between text-xs font-pixellari uppercase tracking-wide text-cyan-100/80">
+        <span>Tu score: {localScore}</span>
+        <span>Objetivo: {advantageTarget}</span>
+        <span>Rival: {opponentScore}</span>
+      </div>
+      <div className="relative h-4 rounded-full border border-cyan-500/60 bg-slate-900/80 shadow-inner shadow-cyan-500/20 overflow-hidden">
+        <div className="absolute inset-0 transition-all duration-500" style={{ background: advantageGradient }} />
+        <div className="absolute inset-y-0 left-1/2 w-[1px] bg-cyan-200/60" />
+        <div className="absolute inset-0 flex items-center justify-between px-3 text-[11px] font-pixellari uppercase tracking-wide">
+          <span className="text-emerald-200">{scoreDifference >= 0 ? `+${scoreDifference}` : scoreDifference} pts</span>
+          <span className="text-rose-200">{scoreDifference <= 0 ? `+${Math.abs(scoreDifference)}` : `-${scoreDifference}`} pts</span>
+        </div>
+      </div>
+      {showSuddenDeathBanner ? (
+        <div className="rounded-md border border-amber-400/70 bg-amber-500/10 px-3 py-1 text-xs font-pixellari uppercase tracking-wide text-amber-200">
+          Sudden Death · El rival debe superar {multiplayer.suddenDeath?.targetScore ?? localScore} pts
+        </div>
+      ) : (
+        <div className="flex justify-between text-[11px] font-pixellari uppercase tracking-wide text-cyan-100/70">
+          <span>Ventaja actual: {scoreDifference >= 0 ? `+${scoreDifference}` : scoreDifference}</span>
+          <span>Hearts rival: {opponentHearts}</span>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  const waitingOverlay = isMultiplayerMode && showWaitingOverlay ? (
+    <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm px-6 text-center">
+      <div className="rounded-xl border border-cyan-500/60 bg-slate-900/90 px-6 py-5 shadow-2xl shadow-cyan-500/20 space-y-4">
+        <p className="text-2xl font-pixellari text-cyan-100">Buscando oponente...</p>
+        <p className="text-sm font-pixellari text-cyan-200/70">
+          Comparte el enlace de la partida o espera a que otro jugador se conecte.
+        </p>
+        
+        {/* Botón para generar enlace de invitación */}
+        <div className="space-y-3">
+          <button
+            onClick={() => {
+              if (!matchRoomId) {
+                console.warn('⚠️ [MULTIPLAYER] No room ID available yet');
+                return;
+              }
+              
+              // Generar URL del dapp con el juego embebido y sala específica
+              const baseUrl = process.env.NODE_ENV === 'development' 
+                ? 'http://localhost:3000/games/sybil-slayer'
+                : 'https://hyppieliquid.com/games/sybil-slayer';
+              const invitationUrl = `${baseUrl}?room=${matchRoomId}`;
+              
+              // Copiar al clipboard
+              navigator.clipboard.writeText(invitationUrl).then(() => {
+                console.log('🔗 [MULTIPLAYER] Invitation link copied to clipboard:', invitationUrl);
+                // Mostrar feedback visual (opcional)
+                const button = document.querySelector('[data-invite-button]') as HTMLElement;
+                if (button) {
+                  const originalText = button.textContent;
+                  button.textContent = '¡Copiado!';
+                  button.className = button.className.replace('border-cyan-500/50', 'border-emerald-500/50');
+                  setTimeout(() => {
+                    button.textContent = originalText;
+                    button.className = button.className.replace('border-emerald-500/50', 'border-cyan-500/50');
+                  }, 2000);
+                }
+              }).catch(err => {
+                console.error('❌ [MULTIPLAYER] Failed to copy link:', err);
+                // Fallback: mostrar en alert
+                alert(`Comparte este enlace:\n${invitationUrl}`);
+              });
+            }}
+            data-invite-button
+            disabled={!matchRoomId}
+            className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-pixellari transition-colors ${
+              matchRoomId 
+                ? 'border-cyan-500/50 bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30' 
+                : 'border-gray-500/50 bg-gray-500/20 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {matchRoomId ? '📋 Copiar enlace de invitación' : '⏳ Generando sala...'}
+          </button>
+          
+          {matchRoomId && (
+            <div className="space-y-2">
+              <p className="text-xs text-cyan-200/60">
+                El segundo jugador debe abrir este enlace en un perfil diferente del navegador
+              </p>
+              <p className="text-xs text-cyan-300/80 font-mono">
+                ID de sala: {matchRoomId}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const countdownOverlay = isMultiplayerMode && showCountdownOverlay ? (
+    <div className="absolute inset-0 z-[58] flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur">
+      <div className="rounded-xl border border-emerald-400/60 bg-slate-900/90 px-6 py-4 shadow-emerald-400/30">
+        <p className="text-xl font-pixellari text-emerald-200">
+          La partida comienza en {countdownSeconds ?? 0}s
+        </p>
+      </div>
+    </div>
+  ) : null;
+
+  const resultOverlay = isMultiplayerMode && matchResult ? (
+    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-sm px-4">
+      <div className="w-full max-w-md rounded-2xl border border-cyan-500/50 bg-slate-900/95 p-6 text-center shadow-[0_30px_80px_rgba(8,145,178,0.35)] space-y-4">
+        <h3 className={`text-2xl font-pixellari ${localIsWinner ? 'text-emerald-300' : 'text-rose-300'}`}>
+          {localIsWinner ? '¡Victoria!' : 'Derrota'}
+        </h3>
+        <div className="space-y-2 text-sm font-pixellari text-cyan-100">
+          <p>Tu puntuación: {localFinalScore}</p>
+          <p>Puntuación rival: {opponentFinalScore}</p>
+          <p className="text-cyan-200/70 capitalize">Motivo: {matchResult.reason.replace('_', ' ')}</p>
+        </div>
+        <button
+          onClick={() => {
+            multiplayer.reset();
+            setCurrentMode('single');
+            resetGame();
+          }}
+          className="mx-auto inline-flex items-center justify-center rounded-lg border border-cyan-500/50 bg-cyan-500/20 px-4 py-2 text-sm font-pixellari text-cyan-100 hover:bg-cyan-500/30"
+        >
+          Salir a Single Player
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const opponentStatusLabel = (() => {
+    if (!isMultiplayerMode) return '';
+    if (!multiplayer.opponent) return 'Esperando rival';
+    switch (multiplayer.opponent.status) {
+      case 'waiting':
+        return 'Preparando';
+      case 'ready':
+        return 'Listo';
+      case 'playing':
+        return 'Jugando';
+      case 'eliminated':
+        return 'Eliminado';
+      case 'finished':
+        return 'Finalizado';
+      default:
+        return 'Activo';
+    }
+  })();
+
+  const opponentInfoBox = isMultiplayerMode ? (
+    <div className="relative">
+      <Image
+        src="/assets/ui/buttons/box_letters.png"
+        alt="Opponent box"
+        width={200}
+        height={60}
+        className="game-img"
+      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-pixellari text-shadow text-cyan-100">
+        <span className="text-primary text-base">
+          {multiplayer.opponent ? `Rival: ${opponentScore}` : 'Rival: ---'}
+        </span>
+        <span className="text-cyan-200/80 uppercase tracking-wide mt-1">
+          Estado: {opponentStatusLabel}
+        </span>
+        {multiplayer.opponent && (
+          <span className="text-cyan-200/70 uppercase tracking-wide mt-1">
+            Hearts: {opponentHearts}
+          </span>
+        )}
+      </div>
+    </div>
+  ) : null;
   
   // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
   // useEffect(() => {
@@ -482,11 +738,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Handle start game from keyboard (Space key)
   useEffect(() => {
-    if (inputState.startToggled && gameState.status === 'idle') {
-      playSound('game_start');
-      startGame();
-    }
-  }, [inputState.startToggled, gameState.status, startGame, playSound]);
+    if (!inputState.startToggled) return;
+    if (gameState.status !== 'idle') return;
+    if (modeSelectOpen) return;
+    if (currentMode !== 'single') return;
+    playSound('game_start');
+    startGame();
+  }, [inputState.startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
   
   // Reset flags when starting a new game (moved after gameState initialization)
   useEffect(() => {
@@ -511,9 +769,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     console.log('🔗 [GAME-PUSHER] Connection state changed:', {
       connectionState,
       isConnected,
-      hasSessionData: !!sessionData
+      hasSessionData: !!sessionData,
+      sessionId: sessionData?.sessionId,
+      hasChannel: !!channel
     });
-  }, [connectionState, isConnected, sessionData]);
+  }, [connectionState, isConnected, sessionData, channel]);
 
   // Handle game session start with Pusher
   useEffect(() => {
@@ -569,8 +829,111 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
-    updateInputRef(inputState);
-  }, [inputState, updateInputRef]);
+    const nextInputState = { ...inputState };
+    if (
+      inputState.startToggled &&
+      (gameState.status === 'idle' || gameState.status === 'gameOver')
+    ) {
+      setModeSelectOpen(true);
+      nextInputState.startToggled = false;
+    }
+    updateInputRef(nextInputState);
+  }, [inputState, updateInputRef, gameState.status]);
+
+  const hasStartedMultiplayerRef = useRef(false);
+  useEffect(() => {
+    if (!isMultiplayerMode) {
+      hasStartedMultiplayerRef.current = false;
+      return;
+    }
+    if (!multiplayer.startSignal) return;
+    if (hasStartedMultiplayerRef.current) return;
+
+    if (gameState.status !== 'idle') {
+      resetGame();
+    }
+
+    hasStartedMultiplayerRef.current = true;
+    playSound('game_start');
+    startGame();
+  }, [isMultiplayerMode, multiplayer.startSignal, gameState.status, resetGame, playSound, startGame]);
+
+  useEffect(() => {
+    if (!isMultiplayerMode) {
+      lastPublishedSnapshotRef.current = null;
+      return;
+    }
+    const lifecycle = resolveLifecycleStatus(gameState);
+    const snapshot = {
+      score: Math.floor(gameState.score),
+      hearts: gameState.hearts,
+      status: lifecycle,
+      gameStatus: gameState.status,
+      gameOverReason: gameState.gameOverReason,
+    };
+
+    const lastSnapshot = lastPublishedSnapshotRef.current;
+    const hasChanged = !lastSnapshot
+      || lastSnapshot.score !== snapshot.score
+      || lastSnapshot.hearts !== snapshot.hearts
+      || lastSnapshot.status !== snapshot.status
+      || lastSnapshot.gameStatus !== snapshot.gameStatus
+      || lastSnapshot.gameOverReason !== snapshot.gameOverReason;
+
+    if (!hasChanged) {
+      return;
+    }
+
+    multiplayer.publishLocalSnapshot(snapshot);
+    lastPublishedSnapshotRef.current = snapshot;
+  }, [
+    isMultiplayerMode,
+    gameState.score,
+    gameState.hearts,
+    gameState.status,
+    gameState.gameOverReason,
+    resolveLifecycleStatus,
+    multiplayer,
+  ]);
+
+  const hasAnnouncedStartRef = useRef(false);
+  useEffect(() => {
+    if (!isMultiplayerMode || gameState.status === 'idle') {
+      hasAnnouncedStartRef.current = false;
+      return;
+    }
+    if (gameState.status === 'playing' && !hasAnnouncedStartRef.current) {
+      multiplayer.notifyGameStart();
+      hasAnnouncedStartRef.current = true;
+    }
+  }, [isMultiplayerMode, gameState.status, multiplayer]);
+
+  const hasAnnouncedGameOverRef = useRef(false);
+  useEffect(() => {
+    if (!isMultiplayerMode || gameState.status === 'idle') {
+      hasAnnouncedGameOverRef.current = false;
+      return;
+    }
+    if (gameState.status === 'gameOver' && !hasAnnouncedGameOverRef.current) {
+      const lifecycleStatus = gameState.hearts > 0 ? 'finished' : 'eliminated';
+      multiplayer.notifyGameOver(gameState.gameOverReason ?? 'multiplayer', Math.floor(gameState.score), lifecycleStatus);
+      hasAnnouncedGameOverRef.current = true;
+    }
+  }, [isMultiplayerMode, gameState.status, gameState.gameOverReason, gameState.score, gameState.hearts, multiplayer]);
+
+  useEffect(() => {
+    if (!isMultiplayerMode) return;
+    if (!multiplayer.matchResult) return;
+    if (gameState.status === 'gameOver') return;
+
+    forceGameOver('multiplayer');
+  }, [isMultiplayerMode, multiplayer.matchResult, gameState.status, forceGameOver]);
+
+  useEffect(() => {
+    return () => {
+      multiplayer.reset();
+    };
+  }, []);
 
   // Helper para obtener tiempo pausable para animaciones
   const getPausableTime = useCallback(() => {
@@ -625,24 +988,86 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // UI Button Handlers
   const handleStartPauseClick = () => {
-      if (gameState.status === 'playing') {
-          playSound('pause');
-          togglePause();
-      } else if (gameState.status === 'paused') {
-          playSound('resume');
-          togglePause();
-      } else {
-          playSound('game_start');
-          
-          // Si estamos en game over, detener el sonido de game over antes de empezar
-          if (gameState.status === 'gameOver') {
-            console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
-            stopMusic();
-          }
-          
-          startGame();
-      }
+    if (gameState.status === 'playing') {
+      playSound('pause');
+      togglePause();
+      return;
+    }
+
+    if (gameState.status === 'paused') {
+      playSound('resume');
+      togglePause();
+      return;
+    }
+
+    if (gameState.status === 'idle' || gameState.status === 'gameOver') {
+      setModeSelectOpen(true);
+    }
   };
+
+  const startMultiplayerGame = useCallback(() => {
+    // Generar ID único para esta partida
+    const roomId = generateMatchRoomId();
+    setMatchRoomId(roomId);
+    
+    console.log('🎮 [MULTIPLAYER] Starting multiplayer game...', {
+      hasSessionData: !!sessionData,
+      sessionId: sessionData?.sessionId,
+      isConnected,
+      hasChannel: !!channel,
+      roomId
+    });
+    
+    console.log('🎮 [MULTIPLAYER] Resetting game and multiplayer state...');
+    resetGame();
+    multiplayer.reset();
+    
+    console.log('🎮 [MULTIPLAYER] Initiating match...');
+    // Even if session isn't ready yet, call initiateMatch so it enters 'searching'
+    // and will auto-continue once the connection/session is available
+    multiplayer.initiateMatch();
+  }, [multiplayer, resetGame, sessionData, isConnected, channel, generateMatchRoomId]);
+
+  const handleModeSelected = useCallback((mode: GameMode) => {
+    console.log('🎮 [MODE] Mode selected:', mode);
+    setModeSelectOpen(false);
+    setCurrentMode(mode);
+
+    if (mode === 'single') {
+      console.log('🎮 [MODE] Starting single player mode');
+      multiplayer.reset();
+      setMatchRoomId(null); // Limpiar room ID al cambiar a single
+      if (gameState.status === 'gameOver') {
+        console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
+        stopMusic();
+      }
+      playSound('game_start');
+      startGame();
+      return;
+    }
+
+    console.log('🎮 [MODE] Starting multiplayer mode');
+    playSound('button_click');
+    startMultiplayerGame();
+  }, [gameState.status, playSound, startGame, startMultiplayerGame, stopMusic, multiplayer]);
+
+  // Detectar si se está uniendo a una sala específica
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    
+    if (roomParam && !matchRoomId) {
+      console.log('🎮 [MULTIPLAYER] Joining existing room:', roomParam);
+      setMatchRoomId(roomParam);
+      // Si hay un room ID en la URL, automáticamente iniciar multiplayer
+      if (!isMultiplayerMode) {
+        setCurrentMode('multiplayer');
+        startMultiplayerGame();
+      }
+    }
+  }, [matchRoomId, isMultiplayerMode, startMultiplayerGame]);
 
    const handleResetClick = () => {
       playSound('button_click');
@@ -1215,6 +1640,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center min-h-screen">
+      <ModeSelectModal
+        open={modeSelectOpen}
+        onClose={() => setModeSelectOpen(false)}
+        onSelectMode={handleModeSelected}
+        defaultMode={currentMode}
+      />
+      {waitingOverlay}
+      {countdownOverlay}
+      {resultOverlay}
       {/* Menú de bienvenida */}
       {gameState.status === 'idle' ? (
         <>
@@ -1291,7 +1725,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span className="text-primary">
-                    Score: {Math.floor(gameState.score)}
+                    Score: {localScore}
                   </span>
                 </div>
               </div>
@@ -1350,6 +1784,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </div>
               </div>
             </div>
+            {opponentInfoBox}
+            {advantageBar}
             
             {/* Canvas del juego y tótem (totem debajo del canvas) */}
             <div className="w-full flex flex-col items-center justify-center gap-4">
@@ -1575,7 +2011,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       animation: gameState.scoreMultiplier > 1 ? 'pulse 1s infinite alternate' : 'none'
                     }}
                   >
-                    Score: {Math.floor(gameState.score)}
+                    Score: {localScore}
                   </span>
                 </div>
                 {/* Temporizador de multiplicador - FUERA de la caja */}
@@ -1737,7 +2173,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </div>
               </div>
             </div>
-            
+            {opponentInfoBox}
+            {advantageBar}
+
             {/* Canvas del juego - con tótem debajo para centrar el layout */}
             <div className="w-full flex flex-col items-center justify-center gap-4">
               <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">

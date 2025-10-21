@@ -6,6 +6,7 @@ import {
   logSecurityEvent,
   type GameMessageType 
 } from '../lib/secure-communication';
+import { randomManager } from '@/lib/random';
 
 // Simple hash function for browser compatibility
 function simpleHash(str: string): string {
@@ -75,16 +76,16 @@ export function useGameConnection() {
       timestamp: Date.now(),
       score,
       gameTime,
-      nonce: Math.random().toString(36).substring(2, 15),
+      nonce: Math.floor(randomManager.random('checkpoint-nonce') * Number.MAX_SAFE_INTEGER).toString(36),
       hash: ''
     };
 
     checkpoint.hash = generateCheckpointHash(checkpoint);
 
     // Randomly send honeypot events
-    const shouldSendHoneypot = Math.random() < 0.1; // 10% chance
+    const shouldSendHoneypot = randomManager.random('honeypot-check') < 0.1; // 10% chance
     if (shouldSendHoneypot) {
-      const honeypotEvent = HONEYPOT_EVENTS[Math.floor(Math.random() * HONEYPOT_EVENTS.length)];
+      const honeypotEvent = HONEYPOT_EVENTS[Math.floor(randomManager.random('honeypot-event') * HONEYPOT_EVENTS.length)];
       events = [...(events || []), { type: 'honeypot', event: honeypotEvent }];
     }
 

@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Vector2D, GameObject, RuneType } from "@/types/game";
 import { Obstacle, ObstacleType, Collectible, CollectibleType } from "@/types/game";
+import { randomManager } from "@/lib/random";
 import {
   ENERGY_POINT_RADIUS,
   ENERGY_POINT_COLOR,
@@ -42,14 +43,14 @@ export function cn(...inputs: ClassValue[]) {
 export function getRandomInt(min: number, max: number): number {
   min = Math.ceil(min);
   max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min) + min);
+  return Math.floor(randomManager.random() * (max - min) + min);
 }
 
 /**
  * Generates a random float between min (inclusive) and max (exclusive).
  */
 export function getRandomFloat(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
+  return randomManager.random() * (max - min) + min;
 }
 
 
@@ -114,22 +115,22 @@ export function getRandomObstacleType(level: number = 1): ObstacleType {
   // Ajustar probabilidades para que coincidan con la dificultad de cada nivel
   if (level === 1) {
     // Nivel 1: principalmente fees y bugs (no hackers)
-    return Math.random() < 0.5 ? 'fee' : 'bug';
+    return randomManager.random('obstacleType-l1') < 0.5 ? 'fee' : 'bug';
   } else if (level === 2) {
     // Nivel 2: más bugs que fees, pocos hackers
-    const rand = Math.random();
+    const rand = randomManager.random('obstacleType-l2');
     if (rand < 0.4) return 'fee';
     if (rand < 0.9) return 'bug';
     return 'hacker';
   } else if (level === 3) {
     // Nivel 3: distribución más equilibrada
-    const rand = Math.random();
+    const rand = randomManager.random('obstacleType-l3');
     if (rand < 0.35) return 'fee';
     if (rand < 0.75) return 'bug';
     return 'hacker';
   } else {
     // Nivel 4+: más hackers
-    const rand = Math.random();
+    const rand = randomManager.random('obstacleType-l4');
     if (rand < 0.3) return 'fee';
     if (rand < 0.7) return 'bug';
     return 'hacker';
@@ -154,8 +155,8 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         radius: FEE_RADIUS,
         color: `hsl(${getRandomInt(0, 30)} 100% 60%)`, // Red/Orange hues
         velocity: {
-          x: getRandomFloat(-2, 2) || (Math.random() > 0.5 ? 1 : -1), // Ensure non-zero initial velocity
-          y: getRandomFloat(-2, 2) || (Math.random() > 0.5 ? 1 : -1),
+          x: getRandomFloat(-2, 2) || (randomManager.random('fee-velocity') > 0.5 ? 1 : -1), // Ensure non-zero initial velocity
+          y: getRandomFloat(-2, 2) || (randomManager.random('fee-velocity') > 0.5 ? 1 : -1),
         },
          glow: false,
       };
@@ -171,7 +172,7 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         radius: BUG_RADIUS,
         color: `hsl(${getRandomInt(45, 75)} 100% 60%)`, // Yellow hues
         rotation: getRandomFloat(0, Math.PI * 2),
-        angularVelocity: getRandomFloat(0.03, 0.07) * (Math.random() > 0.5 ? 1 : -1), // Random direction
+        angularVelocity: getRandomFloat(0.03, 0.07) * (randomManager.random('bug-rotation') > 0.5 ? 1 : -1), // Random direction
         glow: false,
       };
     case 'hacker':
@@ -190,8 +191,14 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
 /**
  * Generates a unique ID string.
  */
-export function generateId(): string {
-  return Math.random().toString(36).substring(2, 15);
+let generatedIdCounter = 0;
+export function generateId(prefix: string = 'obj'): string {
+  generatedIdCounter += 1;
+  return `${prefix}-${generatedIdCounter}`;
+}
+
+export function resetIdCounter() {
+  generatedIdCounter = 0;
 }
 
 /**
@@ -326,7 +333,7 @@ export function createRuneCollectible(
   runeType?: RuneType,
   gameTime?: number
 ): Collectible {
-  const selectedRune = runeType ?? RUNE_TYPES[Math.floor(Math.random() * RUNE_TYPES.length)];
+  const selectedRune = runeType ?? RUNE_TYPES[Math.floor(randomManager.random('rune-type') * RUNE_TYPES.length)];
   const runeConfig = RUNE_CONFIG[selectedRune];
 
   return {
@@ -423,7 +430,7 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
   
   if (freeCells.length > 0) {
     // Seleccionar aleatoriamente una celda libre
-    const randomCell = freeCells[Math.floor(Math.random() * freeCells.length)];
+    const randomCell = freeCells[Math.floor(randomManager.random('grid-cell') * freeCells.length)];
     
     // Posicionar en el centro de la celda con una pequeña variación
     // CORREGIDO: Convertir coordenadas de zona segura a coordenadas globales
@@ -472,7 +479,7 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
     radius: BUG_RADIUS,
     color: `hsl(${getRandomInt(45, 75)} 100% 60%)`, // Yellow hues
     rotation: getRandomFloat(0, Math.PI * 2),
-    angularVelocity: angularVelocityBase * (Math.random() > 0.5 ? 1 : -1), // Random direction
+    angularVelocity: angularVelocityBase * (randomManager.random('bug-aoe') > 0.5 ? 1 : -1), // Random direction
     glow: false,
   };
   

@@ -155,7 +155,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     up: [],
     down: [],
     left: [],
-    right: []
+    right: [],
+    north_east: [],
+    north_west: [],
+    south_east: [],
+    south_west: [],
   });
   
   // Referencias para los sprites del hacker (Trump)
@@ -218,6 +222,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   const [damageEffect, setDamageEffect] = React.useState<{active: boolean, start: number} | null>(null);
   const prevDamageTimeRef = useRef<number>(0);
   const prevDamageFlagRef = useRef(damageFlag);
+  
+  // Referencia para la imagen de arenas movedizas
+  const quicksandImgRef = useRef<HTMLImageElement | null>(null);
   
   // Rastrear los collectibles previos para detectar desapariciones
   const prevCollectiblesRef = useRef<Collectible[]>([]);
@@ -315,16 +322,41 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando mega_node_3.png:', e);
     };
     
-    // Cargar sprites animados de fee
+    // Cargar sprites animados de águila (reemplaza al fee original)
     const directions: DirectionType[] = ['up', 'down', 'left', 'right'];
     directions.forEach(direction => {
-      for (let i = 1; i <= 6; i++) {
-        const img = new Image();
-        img.src = `/assets/characters/feesprites/fee_${direction}_${i}.png`;
-        img.onload = () => {
-          feeSpritesRef.current[direction][i-1] = img;
-        };
+      // Mapear direcciones a los sprites del águila
+      let spriteDirection: string;
+      switch(direction) {
+        case 'up':
+          spriteDirection = 'north';
+          break;
+        case 'down':
+          spriteDirection = 'south';
+          break;
+        case 'left':
+          spriteDirection = 'west';
+          break;
+        case 'right':
+          spriteDirection = 'east';
+          break;
+        default:
+          spriteDirection = 'south';
       }
+      
+      // Cargar el sprite del águila para esta dirección
+      const img = new Image();
+      img.src = `/assets/characters/aguila/aguila_${spriteDirection}.png`;
+      img.onload = () => {
+        // Usar el mismo sprite para todos los frames (no hay animación en el águila)
+        for (let i = 0; i < 6; i++) {
+          feeSpritesRef.current[direction][i] = img;
+        }
+        console.log(`✅ Sprite de águila cargado para dirección ${direction} (${spriteDirection})`);
+      };
+      img.onerror = (e) => {
+        console.error(`❌ Error cargando sprite de águila para ${direction}:`, e);
+      };
     });
     
     // Cargar sprites animados del hacker (Trump)
@@ -435,9 +467,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar sprite de daño
     const damageImg = new Image();
-    damageImg.src = '/assets/effects/damage.png';
+    damageImg.src = '/assets/effects/damagecukie.png';
     damageImg.onload = () => {
       damageImgRef.current = damageImg;
+    };
+    
+    // Cargar imagen de arenas movedizas
+    const quicksandImg = new Image();
+    quicksandImg.src = '/assets/obstacles/arenasmovedizas.png';
+    quicksandImg.onload = () => {
+      quicksandImgRef.current = quicksandImg;
+      console.log('✅ Imagen de arenas movedizas cargada correctamente');
+    };
+    quicksandImg.onerror = (e) => {
+      console.error('❌ Error cargando imagen de arenas movedizas:', e);
     };
     
     // Cargar sprites animados de purr (gato)
@@ -852,19 +895,47 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     ctx.save();
 
     if (zone.phase === 'warning') {
+      // Fase de advertencia: parpadeo con imagen de arenas movedizas
       const flicker = 0.5 + 0.5 * Math.sin(timestamp / 150);
       ctx.globalAlpha = 0.25 + 0.35 * flicker;
-      ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
-      ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+      
+      if (quicksandImgRef.current) {
+        // Dibujar imagen de arenas movedizas con tinte rojo para advertencia
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
+        
+        // Agregar overlay rojo semi-transparente para indicar advertencia
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
+        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        // Fallback si la imagen no está cargada
+        ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+      }
     } else {
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = 'rgba(220, 30, 30, 0.85)';
-      ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+      // Fase activa: arenas movedizas completamente visible
+      if (quicksandImgRef.current) {
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
+        
+        // Borde sutil para definir mejor la zona
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = 'rgba(139, 90, 43, 0.8)'; // Borde marrón arena
+        ctx.lineWidth = 3;
+        ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+      } else {
+        // Fallback si la imagen no está cargada
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = 'rgba(220, 30, 30, 0.85)';
+        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
 
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+      }
     }
 
     ctx.restore();
@@ -1462,10 +1533,21 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        // Actualizado para manejo de 6 frames en lugar de 4
        const frameArrayIndex = frameIndex % 6; // Modificado de 4 a 6 frames
        if (feeSpritesRef.current[direction] && feeSpritesRef.current[direction][frameArrayIndex]) {
-         const feeImg = feeSpritesRef.current[direction][frameArrayIndex];
-         // TAMAÑO FIJO: Usar FEE_RADIUS constante para garantizar tamaño uniforme
-         const feeImgSize = FEE_RADIUS * 2 * 1.155; // 26 * 2 * 1.155 = 60.06px (5% más grande)
-         ctx.drawImage(feeImg, obj.x - feeImgSize/2, obj.y - feeImgSize/2, feeImgSize, feeImgSize);
+         const eagleImg = feeSpritesRef.current[direction][frameArrayIndex];
+         
+         // Mantener las dimensiones naturales del águila
+         const eagleWidth = eagleImg.naturalWidth;
+         const eagleHeight = eagleImg.naturalHeight;
+         
+         // Calcular el factor de escala para que el águila tenga un tamaño apropiado
+         // Usar la altura como referencia y mantener la proporción
+         const targetHeight = FEE_RADIUS * 2 * 1.2; // Un poco más grande que el fee original
+         const scale = targetHeight / eagleHeight;
+         const scaledWidth = eagleWidth * scale;
+         const scaledHeight = eagleHeight * scale;
+         
+         // Centrar el águila en la posición del objeto
+         ctx.drawImage(eagleImg, obj.x - scaledWidth/2, obj.y - scaledHeight/2, scaledWidth, scaledHeight);
          return; // Salir de la función, ya dibujamos el objeto
        }
      }
