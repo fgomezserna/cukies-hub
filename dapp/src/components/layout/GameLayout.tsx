@@ -129,6 +129,7 @@ export default function GameLayout({
               src={gameConfig.gameUrl}
               className="w-full h-full border-0 min-h-[480px] lg:min-h-0"
               title={gameConfig.name}
+              allow="clipboard-read; clipboard-write"
               allowFullScreen
             />
             <Button

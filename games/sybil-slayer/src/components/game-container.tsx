@@ -238,6 +238,7 @@ interface GameContainerProps {
 
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [matchRoomId, setMatchRoomId] = useState<string | null>(null);
   const { 
     isConnected,
     connectionState,
@@ -353,7 +354,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
-  const [matchRoomId, setMatchRoomId] = useState<string | null>(null);
   const isMultiplayerMode = currentMode === 'multiplayer';
   const lastPublishedSnapshotRef = useRef<{
     score: number;
@@ -586,7 +586,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {/* Botón para generar enlace de invitación */}
         <div className="space-y-3">
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!matchRoomId) {
                 console.warn('⚠️ [MULTIPLAYER] No room ID available yet');
                 return;
@@ -598,10 +598,34 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 : 'https://hyppieliquid.com/games/sybil-slayer';
               const invitationUrl = `${baseUrl}?room=${matchRoomId}`;
               
-              // Copiar al clipboard
-              navigator.clipboard.writeText(invitationUrl).then(() => {
-                console.log('🔗 [MULTIPLAYER] Invitation link copied to clipboard:', invitationUrl);
-                // Mostrar feedback visual (opcional)
+              // Copiar al portapapeles con fallbacks por políticas/iframes
+              const legacyCopy = (text: string) => {
+                try {
+                  const textarea = document.createElement('textarea');
+                  textarea.value = text;
+                  textarea.setAttribute('readonly', '');
+                  textarea.style.position = 'absolute';
+                  textarea.style.left = '-9999px';
+                  document.body.appendChild(textarea);
+                  textarea.select();
+                  const ok = document.execCommand('copy');
+                  document.body.removeChild(textarea);
+                  return ok;
+                } catch {
+                  return false;
+                }
+              };
+
+              const showManual = () => {
+                try {
+                  window.prompt('Copia este enlace de invitación:', invitationUrl);
+                } catch {
+                  alert(`Comparte este enlace:\n${invitationUrl}`);
+                }
+              };
+
+              const onSuccessUI = () => {
+                // Feedback visual en el botón
                 const button = document.querySelector('[data-invite-button]') as HTMLElement;
                 if (button) {
                   const originalText = button.textContent;
@@ -612,11 +636,36 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     button.className = button.className.replace('border-emerald-500/50', 'border-cyan-500/50');
                   }, 2000);
                 }
-              }).catch(err => {
-                console.error('❌ [MULTIPLAYER] Failed to copy link:', err);
-                // Fallback: mostrar en alert
-                alert(`Comparte este enlace:\n${invitationUrl}`);
-              });
+              };
+
+              let copied = false;
+              // 1) Intento con API moderna si está disponible y en contexto seguro
+              try {
+                if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
+                  await navigator.clipboard.writeText(invitationUrl);
+                  console.log('🔗 [MULTIPLAYER] Link copiado con Clipboard API');
+                  onSuccessUI();
+                  copied = true;
+                }
+              } catch (err) {
+                console.warn('⚠️ [MULTIPLAYER] Clipboard API bloqueada o falló:', err);
+              }
+
+              // 2) Fallback legacy (execCommand)
+              if (!copied) {
+                const ok = legacyCopy(invitationUrl);
+                if (ok) {
+                  console.log('🔗 [MULTIPLAYER] Link copiado con execCommand');
+                  onSuccessUI();
+                  copied = true;
+                }
+              }
+
+              // 3) Último recurso: mostrar manual
+              if (!copied) {
+                console.error('❌ [MULTIPLAYER] No se pudo copiar automáticamente, mostrando manual.');
+                showManual();
+              }
             }}
             data-invite-button
             disabled={!matchRoomId}
@@ -1006,9 +1055,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   };
 
-  const startMultiplayerGame = useCallback(() => {
-    // Generar ID único para esta partida
-    const roomId = generateMatchRoomId();
+  const startMultiplayerGame = useCallback((roomIdOverride?: string | null) => {
+    // Permitir reutilizar una sala existente (invitación) o crear una nueva
+    const roomId = roomIdOverride ?? generateMatchRoomId();
     setMatchRoomId(roomId);
     
     console.log('🎮 [MULTIPLAYER] Starting multiplayer game...', {
@@ -1065,7 +1114,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       // Si hay un room ID en la URL, automáticamente iniciar multiplayer
       if (!isMultiplayerMode) {
         setCurrentMode('multiplayer');
-        startMultiplayerGame();
+        startMultiplayerGame(roomParam);
+      } else {
+        startMultiplayerGame(roomParam);
       }
     }
   }, [matchRoomId, isMultiplayerMode, startMultiplayerGame]);

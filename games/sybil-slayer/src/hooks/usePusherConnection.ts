@@ -436,6 +436,19 @@ export function usePusherConnection(options?: { matchRoomId?: string | null }) {
 
   }, [sessionData]);
 
+  // Ensure session data carries the current match room id (used by multiplayer flows)
+  useEffect(() => {
+    const roomId = options?.matchRoomId;
+    const baseSession = sessionDataRef.current ?? sessionData;
+    if (!roomId || !baseSession) return;
+
+    if (baseSession.roomId === roomId) return;
+
+    const updatedSession = { ...baseSession, roomId };
+    sessionDataRef.current = updatedSession;
+    setSessionData(updatedSession);
+  }, [options?.matchRoomId, sessionData]);
+
   // Subscribe/unsubscribe to a shared match channel when we have a room id
   useEffect(() => {
     const resolvedRoomId = options?.matchRoomId ?? sessionDataRef.current?.roomId ?? sessionData?.roomId;
