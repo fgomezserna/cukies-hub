@@ -236,10 +236,18 @@ export function createUkiCollectible(id: string, canvasWidth: number, canvasHeig
 /**
  * Creates a new treasure collectible (tesoro).
  */
-export function createTreasureCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number): Collectible {
+export function createTreasureCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number, treasureNumber?: number): Collectible {
+  // Determinar el tipo de tesoro según el número en el bloque (1, 2, o 3)
+  let treasureType: 'treasure' | 'treasure2' | 'treasure3' = 'treasure';
+  if (treasureNumber === 2) {
+    treasureType = 'treasure2';
+  } else if (treasureNumber === 3) {
+    treasureType = 'treasure3';
+  }
+
   return {
     id,
-    type: 'treasure',
+    type: treasureType,
     x: getRandomFloat(TREASURE_RADIUS, canvasWidth - TREASURE_RADIUS),
     y: getRandomFloat(TREASURE_RADIUS, canvasHeight - TREASURE_RADIUS),
     radius: TREASURE_RADIUS,

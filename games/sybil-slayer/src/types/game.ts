@@ -90,7 +90,7 @@ export interface RuneState {
   nextSpawnTime: number | null;
 }
 
-export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki' | 'treasure' | 'rune' | 'goatSkin';
+export type CollectibleType = 'energy' | 'megaNode' | 'checkpoint' | 'heart' | 'purr' | 'vaul' | 'uki' | 'treasure' | 'treasure2' | 'treasure3' | 'rune' | 'goatSkin';
 
 // Tipos para efectos visuales
 export interface VisualEffect {

@@ -163,7 +163,7 @@ const getInitialGameState = (canvasWidth: number, canvasHeight: number, level: n
 const isOverlapping = (obj: GameObject, others: GameObject[], minDist: number = 0) => {
   return others.some(o => {
     // MEJORADO: Lista completa de elementos recogibles incluyendo rune
-    const collectibleTypes = ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure', 'rune'];
+    const collectibleTypes = ['energy', 'megaNode', 'purr', 'vaul', 'heart', 'checkpoint', 'uki', 'goatSkin', 'treasure', 'treasure2', 'treasure3', 'rune'];
     const isAssetPositive = ('type' in obj) && collectibleTypes.includes((obj as any).type);
     const isBug = ('type' in o) && o.type === 'bug';
     const isOtherAssetPositive = ('type' in o) && collectibleTypes.includes((o as any).type);
@@ -2673,7 +2673,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             prev.canvasSize.height,
             [...prev.collectibles, ...newCollectibles, prev.token, ...newObstacles],
             now,
-            treasureState.lastTreasurePosition // Pasar la posición del tesoro anterior
+            treasureState.lastTreasurePosition, // Pasar la posición del tesoro anterior
+            treasureState.treasuresCollectedInBlock + 1 // Pasar el número del tesoro en el bloque
           );
           treasureCollectible.createdAt = now;
           newCollectibles = newCollectibles.filter(c => c.type !== 'treasure');
@@ -2826,7 +2827,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         }
         const isColliding = checkCollision(newToken, collectible);
 
-        if (collectible.type === 'treasure') {
+        if (collectible.type === 'treasure' || collectible.type === 'treasure2' || collectible.type === 'treasure3') {
           if (treasureState.activeTreasureId !== collectible.id) {
             // Tesoro obsoleto, eliminarlo silenciosamente
             continue;
@@ -3239,7 +3240,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
             continue;
           }
 
-          if (collectible.type === 'treasure') {
+          if (collectible.type === 'treasure' || collectible.type === 'treasure2' || collectible.type === 'treasure3') {
             if (treasureState.activeTreasureId !== collectible.id) {
               continue;
             }
@@ -4282,7 +4283,8 @@ function safeSpawnTreasure(
   height: number, 
   others: GameObject[], 
   gameTime: number,
-  lastTreasurePosition: { x: number; y: number } | null
+  lastTreasurePosition: { x: number; y: number } | null,
+  treasureNumber: number
 ): Collectible {
   let treasure;
   let attempts = 0;
@@ -4290,7 +4292,7 @@ function safeSpawnTreasure(
   const MIN_DISTANCE_BETWEEN_TREASURES = 300; // Distancia mínima entre tesoros del mismo bloque
   
   do {
-    treasure = createTreasureCollectible(id, width, height, gameTime);
+    treasure = createTreasureCollectible(id, width, height, gameTime, treasureNumber);
     attempts++;
     
     // Verificar solapamiento con otros elementos (usa la lógica normal de 400px)
@@ -4371,7 +4373,7 @@ function safeSpawnCollectible(createFn: (id: string, w: number, h: number, gameT
     let adjustedMinDistance = minDistance;
     if (attempts > 15) {
       // Para elementos especiales, mantener siempre una distancia mínima decente
-      if (collectible.type === 'heart' || collectible.type === 'treasure' || collectible.type === 'vaul') {
+      if (collectible.type === 'heart' || collectible.type === 'treasure' || collectible.type === 'treasure2' || collectible.type === 'treasure3' || collectible.type === 'vaul') {
         adjustedMinDistance = Math.max(minDistance * 0.6, 120); // Mínimo 120px
       } else if (collectible.type === 'megaNode' || collectible.type === 'goatSkin' || 
                  collectible.type === 'rune' || collectible.type === 'checkpoint' || collectible.type === 'purr') {

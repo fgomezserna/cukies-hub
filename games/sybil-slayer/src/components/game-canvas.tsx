@@ -616,13 +616,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Cargar imagen del checkpoint
     const checkpointImg = new Image();
-    checkpointImg.src = '/assets/collectibles/checkpoint.png';
+    checkpointImg.src = '/assets/collectibles/checkpointcukies.png';
     checkpointImg.onload = () => {
-      console.log('✅ Imagen checkpoint.png cargada EXITOSAMENTE');
+      console.log('✅ Imagen checkpointcukies.png cargada EXITOSAMENTE');
       checkpointImgRef.current = checkpointImg;
     };
     checkpointImg.onerror = (e) => {
-      console.error('❌ Error cargando checkpoint.png:', e);
+      console.error('❌ Error cargando checkpointcukies.png:', e);
     };
 
     // Cargar imágenes al inicio
@@ -1571,10 +1571,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
      if ('type' in obj && obj.type === 'checkpoint') {
        // Usar la referencia cargada para evitar parpadeo
        const checkpointImg = checkpointImgRef.current;
-       if (checkpointImg) {
-         // Tamaños fijos para el checkpoint rectangular (48x98) - SIN efecto de pulso
-         const checkpointWidth = 48;
-         const checkpointHeight = 98;
+      if (checkpointImg) {
+        // Usar el tamaño natural de la imagen del checkpoint
+        const checkpointWidth = checkpointImg.naturalWidth;
+        const checkpointHeight = checkpointImg.naturalHeight;
          
          ctx.save();
          ctx.translate(obj.x, obj.y);
@@ -1597,7 +1597,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
          ctx.shadowBlur = 15;
          
-         // Dibujar con tamaño fijo, centrando la imagen
+         // Dibujar con tamaño natural de la imagen, centrando la imagen
          ctx.drawImage(
            checkpointImg, 
            -checkpointWidth/2, 
@@ -1943,6 +1943,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            break;
         case 'treasure':
           img = assetLoader.getAsset('treasure');
+          break;
+        case 'treasure2':
+          img = assetLoader.getAsset('treasure2');
+          break;
+        case 'treasure3':
+          img = assetLoader.getAsset('treasure3');
           break;
          case 'checkpoint':
            // Para checkpoint, usar el primer sprite de energía como fallback
