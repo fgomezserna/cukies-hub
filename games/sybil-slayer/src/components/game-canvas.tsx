@@ -694,14 +694,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     ctx.save();
 
     if (ray.phase === 'warning') {
-      // FASE DE ADVERTENCIA: Parpadeo amarillo MÁS VISIBLE
+      // FASE DE ADVERTENCIA: Parpadeo azul cian
       const flicker = 0.5 + 0.5 * Math.sin(timestamp / 120);
       ctx.globalCompositeOperation = 'lighter';
 
-      // Capa exterior más ancha para advertencia (más visible que el rayo activo)
-      const warningWidth = ray.width * 5; // 5x el grosor del rayo para que sea bien visible
+      // Capa exterior más ancha para advertencia
+      const warningWidth = ray.width * 5;
       const warningHeight = ray.height * 5;
-      const baseAlpha = 0.3 + 0.4 * flicker; // Parpadeo más intenso (0.3 a 0.7)
+      const baseAlpha = 0.3 + 0.4 * flicker;
       
       ctx.globalAlpha = baseAlpha;
       if (ray.orientation === 'vertical') {
@@ -711,11 +711,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ray.x + ray.width + (warningWidth - ray.width) / 2, 
           0
         );
-        warningGradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
-        warningGradient.addColorStop(0.3, 'rgba(255, 255, 100, 0.4)');
-        warningGradient.addColorStop(0.5, 'rgba(255, 255, 150, 0.8)');
-        warningGradient.addColorStop(0.7, 'rgba(255, 255, 100, 0.4)');
-        warningGradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+        warningGradient.addColorStop(0, 'rgba(0, 200, 255, 0.0)');
+        warningGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.4)');
+        warningGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.8)');
+        warningGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.4)');
+        warningGradient.addColorStop(1, 'rgba(0, 200, 255, 0.0)');
         ctx.fillStyle = warningGradient;
         ctx.fillRect(
           ray.x - (warningWidth - ray.width) / 2, 
@@ -730,11 +730,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           0, 
           ray.y + ray.height + (warningHeight - ray.height) / 2
         );
-        warningGradient.addColorStop(0, 'rgba(255, 255, 200, 0.0)');
-        warningGradient.addColorStop(0.3, 'rgba(255, 255, 100, 0.4)');
-        warningGradient.addColorStop(0.5, 'rgba(255, 255, 150, 0.8)');
-        warningGradient.addColorStop(0.7, 'rgba(255, 255, 100, 0.4)');
-        warningGradient.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+        warningGradient.addColorStop(0, 'rgba(0, 200, 255, 0.0)');
+        warningGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.4)');
+        warningGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.8)');
+        warningGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.4)');
+        warningGradient.addColorStop(1, 'rgba(0, 200, 255, 0.0)');
         ctx.fillStyle = warningGradient;
         ctx.fillRect(
           ray.x, 
@@ -744,14 +744,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         );
       }
     } else {
-      // FASE ACTIVA: Efecto láser con múltiples capas de difuminado
+      // FASE ACTIVA: Rayo azul brillante con chispas
       ctx.globalCompositeOperation = 'lighter';
 
-      // Capa exterior más amplia (aura láser)
-      const outerBlurWidth = ray.width * 6; // 6x el grosor del rayo central
-      const outerBlurHeight = ray.height * 6;
+      // Aura exterior azul cian
+      const outerBlurWidth = ray.width * 8;
+      const outerBlurHeight = ray.height * 8;
       
-      ctx.globalAlpha = 0.25; // Más visible para debugging
+      ctx.globalAlpha = 0.3;
       if (ray.orientation === 'vertical') {
         const outerGradient = ctx.createLinearGradient(
           ray.x - (outerBlurWidth - ray.width) / 2, 
@@ -759,11 +759,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ray.x + ray.width + (outerBlurWidth - ray.width) / 2, 
           0
         );
-        outerGradient.addColorStop(0, 'rgba(255, 100, 100, 0.0)');
-        outerGradient.addColorStop(0.3, 'rgba(255, 150, 150, 0.15)');
-        outerGradient.addColorStop(0.5, 'rgba(255, 200, 200, 0.2)');
-        outerGradient.addColorStop(0.7, 'rgba(255, 150, 150, 0.15)');
-        outerGradient.addColorStop(1, 'rgba(255, 100, 100, 0.0)');
+        outerGradient.addColorStop(0, 'rgba(0, 100, 255, 0.0)');
+        outerGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.2)');
+        outerGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.3)');
+        outerGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.2)');
+        outerGradient.addColorStop(1, 'rgba(0, 100, 255, 0.0)');
         ctx.fillStyle = outerGradient;
         ctx.fillRect(
           ray.x - (outerBlurWidth - ray.width) / 2, 
@@ -778,11 +778,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           0, 
           ray.y + ray.height + (outerBlurHeight - ray.height) / 2
         );
-        outerGradient.addColorStop(0, 'rgba(255, 100, 100, 0.0)');
-        outerGradient.addColorStop(0.3, 'rgba(255, 150, 150, 0.15)');
-        outerGradient.addColorStop(0.5, 'rgba(255, 200, 200, 0.2)');
-        outerGradient.addColorStop(0.7, 'rgba(255, 150, 150, 0.15)');
-        outerGradient.addColorStop(1, 'rgba(255, 100, 100, 0.0)');
+        outerGradient.addColorStop(0, 'rgba(0, 100, 255, 0.0)');
+        outerGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.2)');
+        outerGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.3)');
+        outerGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.2)');
+        outerGradient.addColorStop(1, 'rgba(0, 100, 255, 0.0)');
         ctx.fillStyle = outerGradient;
         ctx.fillRect(
           ray.x, 
@@ -792,11 +792,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         );
       }
 
-      // Capa intermedia (halo láser)
-      const midBlurWidth = ray.width * 4; // 4x el grosor del rayo central
+      // Halo intermedio azul brillante
+      const midBlurWidth = ray.width * 4;
       const midBlurHeight = ray.height * 4;
       
-      ctx.globalAlpha = 0.4; // Más visible para debugging
+      ctx.globalAlpha = 0.6;
       if (ray.orientation === 'vertical') {
         const midGradient = ctx.createLinearGradient(
           ray.x - (midBlurWidth - ray.width) / 2, 
@@ -804,11 +804,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ray.x + ray.width + (midBlurWidth - ray.width) / 2, 
           0
         );
-        midGradient.addColorStop(0, 'rgba(255, 180, 180, 0.0)');
-        midGradient.addColorStop(0.3, 'rgba(255, 220, 220, 0.25)');
-        midGradient.addColorStop(0.5, 'rgba(255, 240, 240, 0.35)');
-        midGradient.addColorStop(0.7, 'rgba(255, 220, 220, 0.25)');
-        midGradient.addColorStop(1, 'rgba(255, 180, 180, 0.0)');
+        midGradient.addColorStop(0, 'rgba(0, 200, 255, 0.0)');
+        midGradient.addColorStop(0.3, 'rgba(0, 220, 255, 0.4)');
+        midGradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.6)');
+        midGradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.4)');
+        midGradient.addColorStop(1, 'rgba(0, 200, 255, 0.0)');
         ctx.fillStyle = midGradient;
         ctx.fillRect(
           ray.x - (midBlurWidth - ray.width) / 2, 
@@ -823,11 +823,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           0, 
           ray.y + ray.height + (midBlurHeight - ray.height) / 2
         );
-        midGradient.addColorStop(0, 'rgba(255, 180, 180, 0.0)');
-        midGradient.addColorStop(0.3, 'rgba(255, 220, 220, 0.25)');
-        midGradient.addColorStop(0.5, 'rgba(255, 240, 240, 0.35)');
-        midGradient.addColorStop(0.7, 'rgba(255, 220, 220, 0.25)');
-        midGradient.addColorStop(1, 'rgba(255, 180, 180, 0.0)');
+        midGradient.addColorStop(0, 'rgba(0, 200, 255, 0.0)');
+        midGradient.addColorStop(0.3, 'rgba(0, 220, 255, 0.4)');
+        midGradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.6)');
+        midGradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.4)');
+        midGradient.addColorStop(1, 'rgba(0, 200, 255, 0.0)');
         ctx.fillStyle = midGradient;
         ctx.fillRect(
           ray.x, 
@@ -837,71 +837,64 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         );
       }
 
-      // Capa interior (core del láser)
-      const innerBlurWidth = ray.width * 2.5; // 2.5x el grosor del rayo central
-      const innerBlurHeight = ray.height * 2.5;
-      
-      ctx.globalAlpha = 0.6; // Más visible para debugging
-      if (ray.orientation === 'vertical') {
-        const innerGradient = ctx.createLinearGradient(
-          ray.x - (innerBlurWidth - ray.width) / 2, 
-          0, 
-          ray.x + ray.width + (innerBlurWidth - ray.width) / 2, 
-          0
-        );
-        innerGradient.addColorStop(0, 'rgba(255, 220, 220, 0.0)');
-        innerGradient.addColorStop(0.3, 'rgba(255, 240, 240, 0.4)');
-        innerGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
-        innerGradient.addColorStop(0.7, 'rgba(255, 240, 240, 0.4)');
-        innerGradient.addColorStop(1, 'rgba(255, 220, 220, 0.0)');
-        ctx.fillStyle = innerGradient;
-        ctx.fillRect(
-          ray.x - (innerBlurWidth - ray.width) / 2, 
-          ray.y, 
-          innerBlurWidth, 
-          ray.height
-        );
-      } else {
-        const innerGradient = ctx.createLinearGradient(
-          0, 
-          ray.y - (innerBlurHeight - ray.height) / 2, 
-          0, 
-          ray.y + ray.height + (innerBlurHeight - ray.height) / 2
-        );
-        innerGradient.addColorStop(0, 'rgba(255, 220, 220, 0.0)');
-        innerGradient.addColorStop(0.3, 'rgba(255, 240, 240, 0.4)');
-        innerGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
-        innerGradient.addColorStop(0.7, 'rgba(255, 240, 240, 0.4)');
-        innerGradient.addColorStop(1, 'rgba(255, 220, 220, 0.0)');
-        ctx.fillStyle = innerGradient;
-        ctx.fillRect(
-          ray.x, 
-          ray.y - (innerBlurHeight - ray.height) / 2, 
-          ray.width, 
-          innerBlurHeight
-        );
-      }
-
-      // Núcleo central brillante (línea láser principal)
-      ctx.globalAlpha = 1.0; // Máxima intensidad
+      // Núcleo central azul brillante
+      ctx.globalAlpha = 1.0;
       if (ray.orientation === 'vertical') {
         const coreGradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
-        coreGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        coreGradient.addColorStop(0, 'rgba(0, 200, 255, 0.8)');
         coreGradient.addColorStop(0.3, 'rgba(255, 255, 255, 1.0)');
         coreGradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
         coreGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1.0)');
-        coreGradient.addColorStop(1, 'rgba(255, 255, 255, 0.8)');
+        coreGradient.addColorStop(1, 'rgba(0, 200, 255, 0.8)');
         ctx.fillStyle = coreGradient;
         ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
       } else {
         const coreGradient = ctx.createLinearGradient(0, ray.y, 0, ray.y + ray.height);
-        coreGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        coreGradient.addColorStop(0, 'rgba(0, 200, 255, 0.8)');
         coreGradient.addColorStop(0.3, 'rgba(255, 255, 255, 1.0)');
         coreGradient.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
         coreGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1.0)');
-        coreGradient.addColorStop(1, 'rgba(255, 255, 255, 0.8)');
+        coreGradient.addColorStop(1, 'rgba(0, 200, 255, 0.8)');
         ctx.fillStyle = coreGradient;
         ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
+      }
+
+      // Dibujar chispas/partículas
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      
+      // Generar chispas basadas en el timestamp para animación
+      const sparkCount = 8;
+      const sparkSize = 2;
+      
+      for (let i = 0; i < sparkCount; i++) {
+        const sparkTime = (timestamp + i * 200) % 1000;
+        const sparkPhase = sparkTime / 1000;
+        
+        let sparkX, sparkY;
+        if (ray.orientation === 'vertical') {
+          // Chispas a los lados del rayo vertical
+          sparkX = ray.x + ray.width + (Math.sin(sparkPhase * Math.PI * 4) * 15);
+          sparkY = ray.y + (ray.height * sparkPhase) + (Math.cos(sparkPhase * Math.PI * 3) * 8);
+        } else {
+          // Chispas arriba/abajo del rayo horizontal
+          sparkX = ray.x + (ray.width * sparkPhase) + (Math.cos(sparkPhase * Math.PI * 3) * 8);
+          sparkY = ray.y + ray.height + (Math.sin(sparkPhase * Math.PI * 4) * 15);
+        }
+        
+        // Dibujar chispa
+        ctx.beginPath();
+        ctx.arc(sparkX, sparkY, sparkSize * (1 - sparkPhase), 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Chispas azules más pequeñas
+        if (i % 2 === 0) {
+          ctx.fillStyle = 'rgba(0, 200, 255, 0.7)';
+          ctx.beginPath();
+          ctx.arc(sparkX + 3, sparkY + 2, sparkSize * 0.6 * (1 - sparkPhase), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        }
       }
     }
 
