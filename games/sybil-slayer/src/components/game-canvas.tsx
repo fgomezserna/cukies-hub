@@ -49,6 +49,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   // ELIMINADO: pauseOverlayImgRef ya no se usa (overlay manejado en game-container.tsx)
   const gameOverImgRef = useRef<HTMLImageElement | null>(null);
   const walletGameOverImgRef = useRef<HTMLImageElement | null>(null); // Nueva ref para wallet_gameover.png
+  const gameOverTimeImgRef = useRef<HTMLImageElement | null>(null); // Ref para gameover_time.png
+  const gameOverVidasImgRef = useRef<HTMLImageElement | null>(null); // Ref para gameover_vidas.png
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = React.useState({ width, height });
   
@@ -231,9 +233,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   
   // Cargar imágenes una vez al montar el componente
   useEffect(() => {
-    // Cargar imagen de fondo (grid)
+    // Cargar imagen de fondo (pantallajuego)
     const gridImg = new Image();
-    gridImg.src = '/assets/ui/game-container/grid-background.png';
+    gridImg.src = '/assets/ui/game-container/pantallajuego.png';
     gridImg.onload = () => {
       gridImgRef.current = gridImg;
     };
@@ -580,6 +582,28 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     walletGameOverImg.onerror = (e) => {
       console.error('❌ Error cargando wallet_gameover.png:', e);
     };
+
+    // Cargar imagen de game over por tiempo
+    const gameOverTimeImg = new Image();
+    gameOverTimeImg.src = '/assets/collectibles/gameover_time.png';
+    gameOverTimeImg.onload = () => {
+      console.log('✅ Imagen gameover_time.png cargada EXITOSAMENTE');
+      gameOverTimeImgRef.current = gameOverTimeImg;
+    };
+    gameOverTimeImg.onerror = (e) => {
+      console.error('❌ Error cargando gameover_time.png:', e);
+    };
+
+    // Cargar imagen de game over por vidas
+    const gameOverVidasImg = new Image();
+    gameOverVidasImg.src = '/assets/collectibles/gameover_vidas.png';
+    gameOverVidasImg.onload = () => {
+      console.log('✅ Imagen gameover_vidas.png cargada EXITOSAMENTE');
+      gameOverVidasImgRef.current = gameOverVidasImg;
+    };
+    gameOverVidasImg.onerror = (e) => {
+      console.error('❌ Error cargando gameover_vidas.png:', e);
+    };
     
     // Cargar imagen del heart
     const heartImg = new Image();
@@ -592,15 +616,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando heart.png:', e);
     };
 
-    // Cargar imagen del vaul
+    // Cargar imagen del vault
     const vaulImg = new Image();
-    vaulImg.src = '/assets/collectibles/vaul_close.png';
+    vaulImg.src = '/assets/collectibles/vault.png';
     vaulImg.onload = () => {
-      console.log('✅ Imagen vaul_close.png cargada EXITOSAMENTE');
+      console.log('✅ Imagen vault.png cargada EXITOSAMENTE');
       vaulImgRef.current = vaulImg;
     };
     vaulImg.onerror = (e) => {
-      console.error('❌ Error cargando vaul_close.png:', e);
+      console.error('❌ Error cargando vault.png:', e);
     };
 
     // Cargar imagen del watch_sand (efecto encima del vaul)
@@ -1663,7 +1687,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
      // Dibujar heart (vida extra)
      if ('type' in obj && obj.type === 'heart') {
-       const heartImg = heartImgRef.current;
+       const heartImg = assetLoader.getAsset('corazoncukies');
        if (heartImg) {
          // Efecto de pulsación igual que mega_node
          const pulseScale = 0.9 + 0.2 * Math.sin((Date.now() % 2000) / 2000 * Math.PI * 2);
@@ -1693,74 +1717,85 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        return;
      }
 
-     if ('type' in obj && obj.type === 'goatSkin') {
-       ctx.save();
-       ctx.translate(obj.x, obj.y);
+    if ('type' in obj && obj.type === 'goatSkin') {
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
 
-       const time = Date.now();
-       const pulse = 0.92 + 0.1 * Math.sin(time / 220);
-       const rotation = (time / 900) % (Math.PI * 2);
-       const baseRadius = obj.radius * 1.4;
+      const time = Date.now();
+      const pulse = 0.92 + 0.1 * Math.sin(time / 220);
+      const baseRadius = obj.radius * 1.4;
 
-       // Aura dorada pulsante
-       const aura = ctx.createRadialGradient(0, 0, baseRadius * 0.4, 0, 0, baseRadius * 1.6);
-       aura.addColorStop(0, 'rgba(255, 255, 210, 0.85)');
-       aura.addColorStop(0.5, 'rgba(255, 220, 120, 0.4)');
-       aura.addColorStop(1, 'rgba(255, 215, 0, 0)');
-       ctx.globalCompositeOperation = 'lighter';
-       ctx.beginPath();
-       ctx.arc(0, 0, baseRadius * 1.6 * pulse, 0, Math.PI * 2);
-       ctx.fillStyle = aura;
-       ctx.fill();
+      // Aura dorada pulsante
+      const aura = ctx.createRadialGradient(0, 0, baseRadius * 0.4, 0, 0, baseRadius * 1.6);
+      aura.addColorStop(0, 'rgba(255, 255, 210, 0.85)');
+      aura.addColorStop(0.5, 'rgba(255, 220, 120, 0.4)');
+      aura.addColorStop(1, 'rgba(255, 215, 0, 0)');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius * 1.6 * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = aura;
+      ctx.fill();
 
-       ctx.globalCompositeOperation = 'source-over';
-       ctx.rotate(rotation);
+      ctx.globalCompositeOperation = 'source-over';
+      // Removido: ctx.rotate(rotation); - El goatskin ya no rota
 
-       // Hexágono principal
-       ctx.beginPath();
-       for (let i = 0; i < 6; i++) {
-         const angle = (Math.PI / 3) * i;
-         const px = Math.cos(angle) * baseRadius * pulse;
-         const py = Math.sin(angle) * baseRadius * pulse;
-         if (i === 0) ctx.moveTo(px, py);
-         else ctx.lineTo(px, py);
-       }
-       ctx.closePath();
-       ctx.fillStyle = GOAT_SKIN_COLOR;
-       ctx.fill();
-       ctx.lineWidth = 3;
-       ctx.strokeStyle = 'rgba(255, 245, 200, 0.7)';
-       ctx.stroke();
+      // Usar la imagen de goatskin en lugar del hexágono dibujado
+      const goatskinImg = assetLoader.getAsset('goatskin');
+      if (goatskinImg) {
+        const imgSize = baseRadius * 2 * pulse; // Tamaño basado en el radio con efecto de pulso
+        ctx.drawImage(
+          goatskinImg,
+          -imgSize / 2,
+          -imgSize / 2,
+          imgSize,
+          imgSize
+        );
+      } else {
+        // Fallback al hexágono original si la imagen no está cargada
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i;
+          const px = Math.cos(angle) * baseRadius * pulse;
+          const py = Math.sin(angle) * baseRadius * pulse;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = GOAT_SKIN_COLOR;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 245, 200, 0.7)';
+        ctx.stroke();
 
-       // Diamante interior brillante
-       const diamondSize = baseRadius * 0.55;
-       ctx.beginPath();
-       ctx.moveTo(0, -diamondSize);
-       ctx.lineTo(diamondSize, 0);
-       ctx.lineTo(0, diamondSize);
-       ctx.lineTo(-diamondSize, 0);
-       ctx.closePath();
-       ctx.fillStyle = 'rgba(255, 252, 224, 0.9)';
-       ctx.fill();
+        // Diamante interior brillante
+        const diamondSize = baseRadius * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(0, -diamondSize);
+        ctx.lineTo(diamondSize, 0);
+        ctx.lineTo(0, diamondSize);
+        ctx.lineTo(-diamondSize, 0);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 252, 224, 0.9)';
+        ctx.fill();
 
-       // Brillos adicionales
-       ctx.rotate(-rotation);
-       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-       ctx.lineWidth = 2;
-       ctx.beginPath();
-       ctx.moveTo(0, -baseRadius * 1.1);
-       ctx.lineTo(0, -baseRadius * 1.4);
-       ctx.moveTo(0, baseRadius * 1.1);
-       ctx.lineTo(0, baseRadius * 1.4);
-       ctx.moveTo(-baseRadius * 1.1, 0);
-       ctx.lineTo(-baseRadius * 1.4, 0);
-       ctx.moveTo(baseRadius * 1.1, 0);
-       ctx.lineTo(baseRadius * 1.4, 0);
-       ctx.stroke();
+        // Brillos adicionales (sin rotación)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -baseRadius * 1.1);
+        ctx.lineTo(0, -baseRadius * 1.4);
+        ctx.moveTo(0, baseRadius * 1.1);
+        ctx.lineTo(0, baseRadius * 1.4);
+        ctx.moveTo(-baseRadius * 1.1, 0);
+        ctx.lineTo(-baseRadius * 1.4, 0);
+        ctx.moveTo(baseRadius * 1.1, 0);
+        ctx.lineTo(baseRadius * 1.4, 0);
+        ctx.stroke();
+      }
 
-       ctx.restore();
-       return;
-     }
+      ctx.restore();
+      return;
+    }
 
      // Dibujar vaul (cofre con multiplicador)
      if ('type' in obj && obj.type === 'vaul') {
@@ -1932,7 +1967,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            img = purrSprite1Ref.current;
            break;
          case 'heart':
-           img = heartImgRef.current;
+           img = assetLoader.getAsset('corazoncukies');
            break;
          case 'vaul':
            img = vaulImgRef.current;
@@ -2418,7 +2453,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        } else if (obj.type === 'purr') {
          fallbackImg = purrSprite1Ref.current || megaNodeImgRef.current; // Usar purr_1 o mega_node como backup
        } else if (obj.type === 'heart') {
-         fallbackImg = heartImgRef.current;
+         fallbackImg = assetLoader.getAsset('corazoncukies');
        } else if (obj.type === 'vaul') {
          fallbackImg = vaulImgRef.current;
        }
@@ -2648,7 +2683,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       }
     }
 
-    // Draw Collectibles
+    // Draw Red Zones FIRST (arenas movedizas) - deben estar detrás de los collectibles
+    drawRedZones(ctx, gameState.redZones, timestamp);
+
+    // Draw Collectibles (checkpoints aparecen por encima de las arenas movedizas)
     gameState.collectibles.forEach(collectible => drawObject(ctx, collectible));
 
     // Draw Obstacles in specific order (fees first, then bugs, then hackers)
@@ -2721,8 +2759,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Draw Rays (warnings and active beams)
     drawRays(ctx, gameState.rays, timestamp);
 
-    // Draw Red Zones
-    drawRedZones(ctx, gameState.redZones, timestamp);
+    // Red Zones ya se dibujaron antes de los collectibles
 
     // Draw Token
     if (gameState.token) {
@@ -2806,8 +2843,27 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       ctx.fillRect(0, 0, width, height);
 
       // Determinar qué imagen usar según la razón del game over
-      const shouldUseWalletGameOver = gameState.gameOverReason === 'bug';
-      const currentGameOverImg = shouldUseWalletGameOver ? walletGameOverImgRef.current : gameOverImgRef.current;
+      let currentGameOverImg: HTMLImageElement | null = null;
+      let gameOverType = '';
+      
+      switch (gameState.gameOverReason) {
+        case 'bug':
+          currentGameOverImg = walletGameOverImgRef.current;
+          gameOverType = 'wallet';
+          break;
+        case 'time':
+          currentGameOverImg = gameOverTimeImgRef.current;
+          gameOverType = 'time';
+          break;
+        case 'hearts':
+          currentGameOverImg = gameOverVidasImgRef.current;
+          gameOverType = 'vidas';
+          break;
+        default:
+          currentGameOverImg = gameOverImgRef.current;
+          gameOverType = 'default';
+          break;
+      }
 
       if (currentGameOverImg) {
         // Mostrar imagen de game over (wallet_gameover.png para bugs, gameover_trump.png para otros)
@@ -2830,7 +2886,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         const imgY = (height - imgHeight) / 2 - 40; // Centrar verticalmente con pequeño offset
         
         // Añadir efecto de glow violeta por detrás SOLO para wallet_gameover.png
-        if (shouldUseWalletGameOver) {
+        if (gameOverType === 'wallet') {
           ctx.save();
           
           // Crear múltiples capas de glow violeta con diferentes intensidades
@@ -2880,10 +2936,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.drawImage(gameOverImg, imgX, imgY, imgWidth, imgHeight);
         
         // Log para debugging
-        if (shouldUseWalletGameOver) {
-          console.log('🐛 Mostrando wallet_gameover.png por muerte por bug');
-        } else {
-          console.log('💀 Mostrando gameover_trump.png por muerte normal');
+        switch (gameOverType) {
+          case 'wallet':
+            console.log('🐛 Mostrando wallet_gameover.png por muerte por bug');
+            break;
+          case 'time':
+            console.log('⏰ Mostrando gameover_time.png por muerte por tiempo');
+            break;
+          case 'vidas':
+            console.log('❤️ Mostrando gameover_vidas.png por muerte por vidas');
+            break;
+          default:
+            console.log('💀 Mostrando gameover_trump.png por muerte normal');
+            break;
         }
         
         // Calcular la parte inferior de la imagen para posicionar el texto debajo

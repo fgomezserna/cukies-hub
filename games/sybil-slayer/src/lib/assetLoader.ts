@@ -34,12 +34,23 @@ export type AssetKey =
   | 'jeff_goit'
   | 'whalechadmode'
   | 'meow'
+  
+  // Game over images
+  | 'gameover_time'
+  | 'gameover_vidas'
+  
+  // Goat skin image
+  | 'goatskin'
+  
+  // Heart image
+  | 'corazoncukies'
   | 'unlisted'
   | 'giga_vault'
   | 'pay_tariffs'
   
   // UI básica
   | 'grid_background'
+  | 'pantallajuego'
   | 'main_background'
   | 'clouds_background'
   | 'box_letters'
@@ -65,6 +76,7 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   // CRÍTICOS - Necesarios para iniciar el juego
   token: { path: '/assets/characters/token.png', priority: AssetPriority.CRITICAL, preload: true },
   grid_background: { path: '/assets/ui/game-container/grid-background.png', priority: AssetPriority.CRITICAL, preload: true },
+  pantallajuego: { path: '/assets/ui/game-container/pantallajuego.png', priority: AssetPriority.CRITICAL, preload: true },
   main_background: { path: '/assets/ui/game-container/background-playing.png', priority: AssetPriority.CRITICAL, preload: true },
   box_letters: { path: '/assets/ui/buttons/box_letters.png', priority: AssetPriority.CRITICAL, preload: true },
   
@@ -94,7 +106,17 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   giga_vault: { path: '/assets/collectibles/giga_vault.png', priority: AssetPriority.MEDIUM },
   pay_tariffs: { path: '/assets/collectibles/pay_tariffs.png', priority: AssetPriority.MEDIUM },
   purr: { path: '/assets/collectibles/purr/purr_1.png', priority: AssetPriority.MEDIUM },
-  vaul: { path: '/assets/collectibles/wallet_2.png', priority: AssetPriority.MEDIUM },
+  vaul: { path: '/assets/collectibles/vault.png', priority: AssetPriority.MEDIUM },
+  
+  // Game over images
+  gameover_time: { path: '/assets/collectibles/gameover_time.png', priority: AssetPriority.HIGH, preload: true },
+  gameover_vidas: { path: '/assets/collectibles/gameover_vidas.png', priority: AssetPriority.HIGH, preload: true },
+  
+  // Goat skin image
+  goatskin: { path: '/assets/collectibles/goatskin.png', priority: AssetPriority.HIGH, preload: true },
+  
+  // Heart image
+  corazoncukies: { path: '/assets/collectibles/corazoncukies.png', priority: AssetPriority.HIGH, preload: true },
   
   // BAJA PRIORIDAD - Elementos decorativos
   clouds_background: { path: '/assets/ui/game-container/clouds-background.png', priority: AssetPriority.LOW },

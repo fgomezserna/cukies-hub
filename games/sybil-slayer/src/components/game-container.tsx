@@ -1273,12 +1273,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   }, [gameState.level, playSound]);
 
-  // Mostrar popup de estadísticas cuando el juego termine
-  useEffect(() => {
-    if (gameState.status === 'gameOver') {
-      setIsLevelStatsVisible(true);
-    }
-  }, [gameState.status]);
+  // Removido: Ya no mostramos automáticamente las estadísticas al terminar el juego
 
   // Rastrear el estado del hacker y su energía recolectada
   useEffect(() => {
@@ -1811,7 +1806,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   {Array.from({ length: gameState.maxHearts }).map((_, i) => (
                     <Image
                       key={i}
-                      src="/assets/collectibles/heart.png"
+                      src="/assets/collectibles/corazoncukies.png"
                       alt={i < gameState.hearts ? "Full Heart" : "Empty Heart"}
                       width={28}
                       height={28}
@@ -1844,13 +1839,30 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
                 {/* Render canvas only when size is determined */}
                 {canvasSize.width > 0 && canvasSize.height > 0 && (
-                  <GameCanvas
-                    gameState={gameState}
-                    width={canvasSize.width}
-                    height={canvasSize.height}
-                    energyCollectedFlag={energyCollectedFlag}
-                    damageFlag={damageFlag}
-                  />
+                  <div className="relative">
+                    <GameCanvas
+                      gameState={gameState}
+                      width={canvasSize.width}
+                      height={canvasSize.height}
+                      energyCollectedFlag={energyCollectedFlag}
+                      damageFlag={damageFlag}
+                    />
+                    
+                    {/* Botón "Ver estadísticas" que aparece arriba de la imagen de game over */}
+                    {gameState.status === 'gameOver' && (
+                      <div className="absolute inset-0 flex items-start justify-center pointer-events-auto pt-8">
+                        <div className="flex flex-col items-center gap-4">
+                          {/* Botón de estadísticas */}
+                          <button
+                            onClick={() => setIsLevelStatsVisible(true)}
+                            className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
+                          >
+                            📊 Ver estadísticas
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex justify-center" style={{ width: canvasSize.width }}>
@@ -2200,7 +2212,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   {Array.from({ length: gameState.maxHearts }).map((_, i) => (
                     <Image
                       key={i}
-                      src="/assets/collectibles/heart.png"
+                      src="/assets/collectibles/corazoncukies.png"
                       alt={i < gameState.hearts ? "Full Heart" : "Empty Heart"}
                       width={28}
                       height={28}
@@ -2502,13 +2514,30 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               
               {/* Render canvas only when size is determined */}
               {canvasSize.width > 0 && canvasSize.height > 0 && (
-                <GameCanvas
-                  gameState={gameState}
-                  width={canvasSize.width}
-                  height={canvasSize.height}
-                  energyCollectedFlag={energyCollectedFlag}
-                  damageFlag={damageFlag}
-                />
+                <div className="relative">
+                  <GameCanvas
+                    gameState={gameState}
+                    width={canvasSize.width}
+                    height={canvasSize.height}
+                    energyCollectedFlag={energyCollectedFlag}
+                    damageFlag={damageFlag}
+                  />
+                  
+                  {/* Botón "Ver estadísticas" que aparece arriba de la imagen de game over */}
+                  {gameState.status === 'gameOver' && (
+                    <div className="absolute inset-0 flex items-start justify-center pointer-events-auto pt-8">
+                      <div className="flex flex-col items-center gap-4">
+                        {/* Botón de estadísticas */}
+                        <button
+                          onClick={() => setIsLevelStatsVisible(true)}
+                          className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
+                        >
+                          📊 Ver estadísticas
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               
               {/* Mensaje de pausa como overlay sobre el grid */}
