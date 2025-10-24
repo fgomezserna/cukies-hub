@@ -140,13 +140,13 @@ export const RUNE_FIRST_SPAWN_MS = 10000; // Primera runa a los 10s de partida
 export const RUNE_NEXT_SPAWN_MS = 10000; // Siguientes runas 10s después de recoger la anterior
 export const RUNE_SCORE_INCREMENT = 5; // Incremento base de puntuación por runa (5 × número_runa × nivel)
 export const RUNE_RADIUS = 26;
-export const RUNE_TYPES: RuneType[] = ['ember', 'tide', 'gale', 'stone', 'void'];
+export const RUNE_TYPES: RuneType[] = ['miner', 'chef', 'engineer', 'farmer', 'gatherer'];
 export const RUNE_CONFIG: Record<RuneType, { color: string; label: string }> = {
-  ember: { color: '#ff7043', label: 'Miner' },
-  tide: { color: '#29b6f6', label: 'Engineer' },
-  gale: { color: '#9ccc65', label: 'Chef' },
-  stone: { color: '#8d6e63', label: 'Farmer' },
-  void: { color: '#ab47bc', label: 'Gatherer' },
+  miner: { color: '#ff7043', label: 'Miner' },
+  chef: { color: '#29b6f6', label: 'Chef' },
+  engineer: { color: '#9ccc65', label: 'Engineer' },
+  farmer: { color: '#8d6e63', label: 'Farmer' },
+  gatherer: { color: '#ab47bc', label: 'Gatherer' },
 };
 
 // Tiempo de vida en ms para Mega_node y Heart

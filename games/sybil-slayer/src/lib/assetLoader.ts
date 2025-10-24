@@ -44,6 +44,13 @@ export type AssetKey =
   
   // Heart image
   | 'corazoncukies'
+  
+  // Rune images
+  | 'runa_miner'
+  | 'runa_chef'
+  | 'runa_engineer'
+  | 'runa_farmer'
+  | 'runa_gatherer'
   | 'unlisted'
   | 'giga_vault'
   | 'pay_tariffs'
@@ -117,6 +124,13 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   
   // Heart image
   corazoncukies: { path: '/assets/collectibles/corazoncukies.png', priority: AssetPriority.HIGH, preload: true },
+  
+  // Rune images
+  runa_miner: { path: '/assets/collectibles/runa_miner.png', priority: AssetPriority.HIGH, preload: true },
+  runa_chef: { path: '/assets/collectibles/runa_chef.png', priority: AssetPriority.HIGH, preload: true },
+  runa_engineer: { path: '/assets/collectibles/runa_engineer.png', priority: AssetPriority.HIGH, preload: true },
+  runa_farmer: { path: '/assets/collectibles/runa_farmer.png', priority: AssetPriority.HIGH, preload: true },
+  runa_gatherer: { path: '/assets/collectibles/runa_gatherer.png', priority: AssetPriority.HIGH, preload: true },
   
   // BAJA PRIORIDAD - Elementos decorativos
   clouds_background: { path: '/assets/ui/game-container/clouds-background.png', priority: AssetPriority.LOW },

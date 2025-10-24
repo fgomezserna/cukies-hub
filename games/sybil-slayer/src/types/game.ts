@@ -74,7 +74,7 @@ export interface Obstacle extends GameObject {
   energyCollected?: number; // Cantidad de energy que ha recogido este hacker
 }
 
-export type RuneType = 'ember' | 'tide' | 'gale' | 'stone' | 'void';
+export type RuneType = 'miner' | 'chef' | 'engineer' | 'farmer' | 'gatherer';
 
 export interface RuneSlot {
   type: RuneType;

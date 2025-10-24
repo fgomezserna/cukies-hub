@@ -1635,44 +1635,83 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        const runeCollectible = obj as Collectible;
        const runeColor = runeCollectible.color || '#9fa8da';
        const runeRadius = runeCollectible.radius * 1.1;
-       const runeLabel = runeCollectible.runeType && RUNE_CONFIG[runeCollectible.runeType] 
-         ? RUNE_CONFIG[runeCollectible.runeType].label.charAt(0).toUpperCase() 
-         : 'R';
+       
+       // Mapear tipo de runa a imagen
+       let runeImageKey: string;
+       switch (runeCollectible.runeType) {
+         case 'miner':
+           runeImageKey = 'runa_miner';
+           break;
+         case 'chef':
+           runeImageKey = 'runa_chef';
+           break;
+         case 'engineer':
+           runeImageKey = 'runa_engineer';
+           break;
+         case 'farmer':
+           runeImageKey = 'runa_farmer';
+           break;
+         case 'gatherer':
+           runeImageKey = 'runa_gatherer';
+           break;
+         default:
+           runeImageKey = 'runa_miner'; // Fallback
+           break;
+       }
 
+       const runeImg = assetLoader.getAsset(runeImageKey as any);
+       
        ctx.save();
-       ctx.shadowColor = runeColor;
-       ctx.shadowBlur = 18;
+       
+       if (runeImg) {
+         // Usar la imagen de la runa
+         const imgSize = runeRadius * 2; // Tamaño basado en el radio
+         ctx.drawImage(
+           runeImg,
+           obj.x - imgSize / 2,
+           obj.y - imgSize / 2,
+           imgSize,
+           imgSize
+         );
+       } else {
+         // Fallback al renderizado original si la imagen no está cargada
+         ctx.shadowColor = runeColor;
+         ctx.shadowBlur = 18;
 
-       // Aura exterior
-       const gradient = ctx.createRadialGradient(obj.x, obj.y, runeRadius * 0.2, obj.x, obj.y, runeRadius);
-       gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
-       gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
-       gradient.addColorStop(1, 'rgba(0,0,0,0)');
+         // Aura exterior
+         const gradient = ctx.createRadialGradient(obj.x, obj.y, runeRadius * 0.2, obj.x, obj.y, runeRadius);
+         gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
+         gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+         gradient.addColorStop(1, 'rgba(0,0,0,0)');
 
-       ctx.beginPath();
-       ctx.fillStyle = gradient;
-       ctx.arc(obj.x, obj.y, runeRadius * 1.4, 0, Math.PI * 2);
-       ctx.fill();
+         ctx.beginPath();
+         ctx.fillStyle = gradient;
+         ctx.arc(obj.x, obj.y, runeRadius * 1.4, 0, Math.PI * 2);
+         ctx.fill();
 
-       // Núcleo de la runa
-       ctx.beginPath();
-       ctx.fillStyle = runeColor;
-       ctx.globalAlpha = 0.9;
-       ctx.arc(obj.x, obj.y, runeRadius, 0, Math.PI * 2);
-       ctx.fill();
-       ctx.globalAlpha = 1;
+         // Núcleo de la runa
+         ctx.beginPath();
+         ctx.fillStyle = runeColor;
+         ctx.globalAlpha = 0.9;
+         ctx.arc(obj.x, obj.y, runeRadius, 0, Math.PI * 2);
+         ctx.fill();
+         ctx.globalAlpha = 1;
 
-       ctx.lineWidth = 3;
-       ctx.strokeStyle = 'rgba(15, 15, 25, 0.85)';
-       ctx.stroke();
+         ctx.lineWidth = 3;
+         ctx.strokeStyle = 'rgba(15, 15, 25, 0.85)';
+         ctx.stroke();
 
-       // Símbolo central
-       ctx.shadowBlur = 0;
-       ctx.fillStyle = 'rgba(10, 10, 22, 0.95)';
-       ctx.font = 'bold 18px Pixellari';
-       ctx.textAlign = 'center';
-       ctx.textBaseline = 'middle';
-       ctx.fillText(runeLabel, obj.x, obj.y + 1);
+         // Símbolo central
+         ctx.shadowBlur = 0;
+         ctx.fillStyle = 'rgba(10, 10, 22, 0.95)';
+         ctx.font = 'bold 18px Pixellari';
+         ctx.textAlign = 'center';
+         ctx.textBaseline = 'middle';
+         const runeLabel = runeCollectible.runeType && RUNE_CONFIG[runeCollectible.runeType] 
+           ? RUNE_CONFIG[runeCollectible.runeType].label.charAt(0).toUpperCase() 
+           : 'R';
+         ctx.fillText(runeLabel, obj.x, obj.y + 1);
+       }
 
        ctx.restore();
        return;
