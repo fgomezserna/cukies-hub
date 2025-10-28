@@ -235,7 +235,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   useEffect(() => {
     // Cargar imagen de fondo (pantallajuego)
     const gridImg = new Image();
-    gridImg.src = '/assets/ui/game-container/pantallajuego.png';
+    gridImg.src = '/assets/ui/game-container/pantallajuego3.png';
     gridImg.onload = () => {
       gridImgRef.current = gridImg;
     };

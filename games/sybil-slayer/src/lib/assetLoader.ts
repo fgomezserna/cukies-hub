@@ -83,7 +83,7 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   // CRÍTICOS - Necesarios para iniciar el juego
   token: { path: '/assets/characters/token.png', priority: AssetPriority.CRITICAL, preload: true },
   grid_background: { path: '/assets/ui/game-container/grid-background.png', priority: AssetPriority.CRITICAL, preload: true },
-  pantallajuego: { path: '/assets/ui/game-container/pantallajuego.png', priority: AssetPriority.CRITICAL, preload: true },
+  pantallajuego: { path: '/assets/ui/game-container/pantallajuego3.png', priority: AssetPriority.CRITICAL, preload: true },
   main_background: { path: '/assets/ui/game-container/background-playing.png', priority: AssetPriority.CRITICAL, preload: true },
   box_letters: { path: '/assets/ui/buttons/box_letters.png', priority: AssetPriority.CRITICAL, preload: true },
   
