@@ -1848,16 +1848,32 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       damageFlag={damageFlag}
                     />
                     
-                    {/* Botón "Ver estadísticas" que aparece arriba de la imagen de game over */}
+                    {/* Botones de game over */}
                     {gameState.status === 'gameOver' && (
-                      <div className="absolute inset-0 flex items-start justify-center pointer-events-auto pt-8">
-                        <div className="flex flex-col items-center gap-4">
-                          {/* Botón de estadísticas */}
+                      <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
+                        <div className="flex flex-row items-center gap-4">
+                          {/* Botón Score Details */}
                           <button
                             onClick={() => setIsLevelStatsVisible(true)}
                             className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
                           >
-                            📊 Ver estadísticas
+                            📊 Score Details
+                          </button>
+                          
+                          {/* Botón Play Again */}
+                          <button
+                            onClick={() => {
+                              playSound('button_click');
+                              if (gameState.status === 'gameOver') {
+                                console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
+                                stopMusic();
+                              }
+                              resetGame();
+                              setModeSelectOpen(true);
+                            }}
+                            className="px-6 py-3 bg-slate-900/90 border border-green-500/50 rounded-lg text-green-100 font-pixellari text-lg hover:bg-green-500/30 transition-colors shadow-lg"
+                          >
+                            ▶️ Play Again
                           </button>
                         </div>
                       </div>
@@ -2523,16 +2539,32 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     damageFlag={damageFlag}
                   />
                   
-                  {/* Botón "Ver estadísticas" que aparece arriba de la imagen de game over */}
+                  {/* Botones de game over */}
                   {gameState.status === 'gameOver' && (
-                    <div className="absolute inset-0 flex items-start justify-center pointer-events-auto pt-8">
-                      <div className="flex flex-col items-center gap-4">
-                        {/* Botón de estadísticas */}
+                    <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
+                      <div className="flex flex-row items-center gap-4">
+                        {/* Botón Score Details */}
                         <button
                           onClick={() => setIsLevelStatsVisible(true)}
                           className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
                         >
-                          📊 Ver estadísticas
+                          📊 Score Details
+                        </button>
+                        
+                        {/* Botón Play Again */}
+                        <button
+                          onClick={() => {
+                            playSound('button_click');
+                            if (gameState.status === 'gameOver') {
+                              console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
+                              stopMusic();
+                            }
+                            resetGame();
+                            setModeSelectOpen(true);
+                          }}
+                          className="px-6 py-3 bg-slate-900/90 border border-green-500/50 rounded-lg text-green-100 font-pixellari text-lg hover:bg-green-500/30 transition-colors shadow-lg"
+                        >
+                          ▶️ Play Again
                         </button>
                       </div>
                     </div>

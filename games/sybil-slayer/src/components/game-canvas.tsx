@@ -1757,18 +1757,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       const pulse = 0.92 + 0.1 * Math.sin(time / 220);
       const baseRadius = obj.radius * 1.4;
 
-      // Aura dorada pulsante
-      const aura = ctx.createRadialGradient(0, 0, baseRadius * 0.4, 0, 0, baseRadius * 1.6);
-      aura.addColorStop(0, 'rgba(255, 255, 210, 0.85)');
-      aura.addColorStop(0.5, 'rgba(255, 220, 120, 0.4)');
-      aura.addColorStop(1, 'rgba(255, 215, 0, 0)');
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius * 1.6 * pulse, 0, Math.PI * 2);
-      ctx.fillStyle = aura;
-      ctx.fill();
-
-      ctx.globalCompositeOperation = 'source-over';
+      // Efecto amarillo eliminado - solo mostrar la imagen
       // Removido: ctx.rotate(rotation); - El goatskin ya no rota
 
       // Usar la imagen de goatskin en lugar del hexágono dibujado
@@ -2994,13 +2983,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         // Hacer el texto más grande
         ctx.font = '32px Pixellari'; // Más grande que SCORE_FONT
         ctx.textAlign = 'center';
-        // Dibujar texto con borde
-        ctx.strokeText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 60);
-        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 60);
+        // Dibujar texto con borde (subido para dejar espacio a los botones)
+        ctx.strokeText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 20);
+        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 20);
         
-        ctx.font = '24px Pixellari'; // Más grande que TIMER_FONT
-        ctx.strokeText('Press SPACE to Restart', width / 2, imageBottom + 100);
-        ctx.fillText('Press SPACE to Restart', width / 2, imageBottom + 100);
+        // Texto de reinicio eliminado - ahora se usan botones
         
         // Resetear stroke
         ctx.lineWidth = 1;
@@ -3027,9 +3014,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         }
         
         ctx.font = SCORE_FONT;
-        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, height / 2 + 60);
-        ctx.font = TIMER_FONT;
-        ctx.fillText('Press SPACE to Restart', width / 2, height / 2 + 120);
+        // Subido para no solapar con los botones de Game Over
+        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, height / 2 + 40);
+        // Texto de reinicio eliminado - ahora se usan botones
       }
     }
 

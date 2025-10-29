@@ -23,6 +23,8 @@ import {
   UKI_COLOR,
   UKI_VALUE,
   TREASURE_RADIUS,
+  TREASURE2_RADIUS,
+  TREASURE3_RADIUS,
   TREASURE_COLOR,
   FEE_RADIUS,
   BUG_RADIUS,
@@ -239,18 +241,22 @@ export function createUkiCollectible(id: string, canvasWidth: number, canvasHeig
 export function createTreasureCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number, treasureNumber?: number): Collectible {
   // Determinar el tipo de tesoro según el número en el bloque (1, 2, o 3)
   let treasureType: 'treasure' | 'treasure2' | 'treasure3' = 'treasure';
+  let treasureRadius = TREASURE_RADIUS; // Default para tesoro 1
+  
   if (treasureNumber === 2) {
     treasureType = 'treasure2';
+    treasureRadius = TREASURE2_RADIUS;
   } else if (treasureNumber === 3) {
     treasureType = 'treasure3';
+    treasureRadius = TREASURE3_RADIUS;
   }
 
   return {
     id,
     type: treasureType,
-    x: getRandomFloat(TREASURE_RADIUS, canvasWidth - TREASURE_RADIUS),
-    y: getRandomFloat(TREASURE_RADIUS, canvasHeight - TREASURE_RADIUS),
-    radius: TREASURE_RADIUS,
+    radius: treasureRadius,
+    x: getRandomFloat(treasureRadius, canvasWidth - treasureRadius),
+    y: getRandomFloat(treasureRadius, canvasHeight - treasureRadius),
     color: TREASURE_COLOR,
     value: 0, // valor dinámico por bloque, se suma en lógica
     glow: false,

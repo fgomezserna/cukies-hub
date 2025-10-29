@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Vector2D } from '@/types/game';
-import { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_PAUSE, KEY_START } from '@/lib/constants';
+import { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_START } from '@/lib/constants';
 
 interface InputState {
   direction: Vector2D;
@@ -17,7 +17,6 @@ const initialInputState: InputState = {
 export function useGameInput(): InputState {
   const [inputState, setInputState] = useState<InputState>(initialInputState);
   const pressedKeys = new Set<string>();
-  const pauseKeyPressed = { current: false }; // Flag para rastrear si P está presionada
   const startKeyPressed = { current: false }; // Flag para rastrear si Space está presionada
 
   const updateDirection = useCallback(() => {
@@ -46,11 +45,6 @@ export function useGameInput(): InputState {
              updateDirection();
         }
     }
-    // Solo procesar pausa si la tecla no ha sido presionada antes
-    if (event.code === KEY_PAUSE && !pauseKeyPressed.current) {
-        pauseKeyPressed.current = true;
-        setInputState(prev => ({ ...prev, pauseToggled: true }));
-    }
     // Solo procesar start si la tecla no ha sido presionada antes
     if (event.code === KEY_START && !startKeyPressed.current) {
         startKeyPressed.current = true;
@@ -69,10 +63,6 @@ export function useGameInput(): InputState {
         updateDirection();
      }
     // Reset toggle states on key up to require a fresh press
-     if (event.code === KEY_PAUSE) {
-         pauseKeyPressed.current = false;
-         setInputState(prev => ({ ...prev, pauseToggled: false }));
-     }
      if (event.code === KEY_START) {
         startKeyPressed.current = false;
         setInputState(prev => ({ ...prev, startToggled: false }));
@@ -83,7 +73,6 @@ export function useGameInput(): InputState {
   // Función para limpiar teclas presionadas cuando se pierde el foco
   const clearPressedKeys = useCallback(() => {
     pressedKeys.clear();
-    pauseKeyPressed.current = false;
     startKeyPressed.current = false;
     setInputState(prev => ({ 
       ...prev, 

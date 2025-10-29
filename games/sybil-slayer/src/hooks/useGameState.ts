@@ -1363,11 +1363,6 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         inputRef.current.startToggled = false; // Consume the toggle
         return; // Exit early as state is changing
       }
-      if (inputRef.current.pauseToggled && (status === 'playing' || status === 'paused')) {
-        togglePause();
-        inputRef.current.pauseToggled = false; // Consume the toggle
-        // No early exit needed for pause/resume, just update status
-      }
 
       // Handle countdown logic
       if (gameState.status === 'countdown') {

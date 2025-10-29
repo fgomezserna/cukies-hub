@@ -106,7 +106,9 @@ export const UKI_COLOR = 'hsl(200, 100%, 60%)'; // Color azul para diferenciarlo
 export const UKI_VALUE = 5; // 5 puntos cuando lo recoge el token
 
 // Treasure (Tesoro) Properties
-export const TREASURE_RADIUS = 26;
+export const TREASURE_RADIUS = 26; // Tesoro 1 (base)
+export const TREASURE2_RADIUS = 32; // Tesoro 2 (más grande que el 1)
+export const TREASURE3_RADIUS = 38; // Tesoro 3 (más grande que el 2)
 export const TREASURE_COLOR = 'hsl(35, 100%, 55%)';
 export const TREASURE_LIFETIME_MS = 7000; // 7s visibles
 export const TREASURE_BLINK_WARNING_MS = 3000; // Parpadeo últimos 3s
