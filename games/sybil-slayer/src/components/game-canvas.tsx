@@ -2908,8 +2908,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Game Over Message
     if (gameState.status === 'gameOver') {
-      // Dibujar fondo negro con alpha 60% detrás de todo el contenido
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      // Dibujar fondo negro con alpha 85% detrás de todo el contenido
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillRect(0, 0, width, height);
 
       // Determinar qué imagen usar según la razón del game over
