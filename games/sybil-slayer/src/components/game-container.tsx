@@ -1891,9 +1891,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                             {/* Botón Score Details */}
                             <button
                               onClick={() => setIsLevelStatsVisible(true)}
-                              className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
+                              className="focus:outline-none game-button relative"
+                              aria-label="Score Details"
                             >
-                              📊 Score Details
+                              <Image 
+                                src="/assets/ui/buttons/caja-texto2.png"
+                                alt="Score Details" 
+                                width={180} 
+                                height={50}
+                                className="game-img"
+                              />
+                              <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                                SCORE DETAILS
+                              </span>
                             </button>
                             
                             {/* Botón Play Again */}
@@ -1907,9 +1917,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                                 resetGame();
                                 setModeSelectOpen(true);
                               }}
-                              className="px-6 py-3 bg-slate-900/90 border border-green-500/50 rounded-lg text-green-100 font-pixellari text-lg hover:bg-green-500/30 transition-colors shadow-lg"
+                              className="focus:outline-none game-button relative"
+                              aria-label="Play Again"
                             >
-                              ▶️ Play Again
+                              <Image 
+                                src="/assets/ui/buttons/caja-texto2.png" 
+                                alt="Play Again" 
+                                width={180} 
+                                height={50}
+                                className="game-img"
+                              />
+                              <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                                PLAY AGAIN
+                              </span>
                             </button>
                           </div>
                         </div>
@@ -2576,9 +2596,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         {/* Botón Score Details */}
                         <button
                           onClick={() => setIsLevelStatsVisible(true)}
-                          className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
+                          className="focus:outline-none game-button relative"
+                          aria-label="Score Details"
                         >
-                          📊 Score Details
+                          <Image 
+                            src="/assets/ui/buttons/caja-texto2.png"
+                            alt="Score Details" 
+                            width={180} 
+                            height={50}
+                            className="game-img"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                            SCORE DETAILS
+                          </span>
                         </button>
                         
                         {/* Botón Play Again */}
@@ -2592,9 +2622,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                             resetGame();
                             setModeSelectOpen(true);
                           }}
-                          className="px-6 py-3 bg-slate-900/90 border border-green-500/50 rounded-lg text-green-100 font-pixellari text-lg hover:bg-green-500/30 transition-colors shadow-lg"
+                          className="focus:outline-none game-button relative"
+                          aria-label="Play Again"
                         >
-                          ▶️ Play Again
+                          <Image 
+                            src="/assets/ui/buttons/caja-texto2.png" 
+                            alt="Play Again" 
+                            width={180} 
+                            height={50}
+                            className="game-img"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                            PLAY AGAIN
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -2604,7 +2644,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               
               {/* Mensaje de pausa como overlay sobre el grid */}
               {gameState.status === 'paused' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm rounded-lg">
                   <h2 className="text-3xl font-bold text-white mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
                   <p className="text-xl text-white font-pixellari text-shadow">Use the Pause button to Resume</p>
                   <p className="text-sm text-white/80 font-pixellari text-shadow mt-2">Game auto-pauses when switching tabs</p>
