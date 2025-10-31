@@ -134,11 +134,11 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   
   // BAJA PRIORIDAD - Elementos decorativos
   clouds_background: { path: '/assets/ui/game-container/clouds-background.png', priority: AssetPriority.LOW },
-  music_on: { path: '/assets/ui/buttons/music_on.png', priority: AssetPriority.LOW },
-  music_off: { path: '/assets/ui/buttons/music_off.png', priority: AssetPriority.LOW },
-  sounds_on: { path: '/assets/ui/buttons/sounds_on.png', priority: AssetPriority.LOW },
-  sounds_off: { path: '/assets/ui/buttons/sounds_off.png', priority: AssetPriority.LOW },
-  button_info: { path: '/assets/ui/buttons/button_info.png', priority: AssetPriority.LOW },
+  music_on: { path: '/assets/ui/buttons/musicasi.png', priority: AssetPriority.LOW },
+  music_off: { path: '/assets/ui/buttons/musicano.png', priority: AssetPriority.LOW },
+  sounds_on: { path: '/assets/ui/buttons/efectossi.png', priority: AssetPriority.LOW },
+  sounds_off: { path: '/assets/ui/buttons/efectosno.png', priority: AssetPriority.LOW },
+  button_info: { path: '/assets/ui/buttons/botoninfo.png', priority: AssetPriority.LOW },
 };
 
 // Para backward compatibility

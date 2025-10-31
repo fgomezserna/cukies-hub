@@ -2759,8 +2759,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         >
           <Image 
             src={musicEnabled 
-              ? "/assets/ui/buttons/music_on.png" 
-              : "/assets/ui/buttons/music_off.png"}
+              ? "/assets/ui/buttons/musicasi.png" 
+              : "/assets/ui/buttons/musicano.png"}
             alt={musicEnabled ? "Music On" : "Music Off"} 
             width={50} 
             height={50}
@@ -2776,8 +2776,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         >
           <Image 
             src={soundsEnabled 
-              ? "/assets/ui/buttons/sounds_on.png" 
-              : "/assets/ui/buttons/sounds_off.png"}
+              ? "/assets/ui/buttons/efectossi.png" 
+              : "/assets/ui/buttons/efectosno.png"}
             alt={soundsEnabled ? "Sounds On" : "Sounds Off"} 
             width={50} 
             height={50}
@@ -2792,7 +2792,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           aria-label="Información del juego"
         >
           <Image 
-            src="/assets/ui/buttons/button_info.png"
+            src="/assets/ui/buttons/botoninfo.png"
             alt="Información" 
             width={50} 
             height={50}
