@@ -1743,27 +1743,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       {/* Menú de bienvenida */}
       {gameState.status === 'idle' ? (
         <>
-          {/* Fondo animado igual que en el juego */}
-           {/* Fondo del juego */}
+          {/* Fondo del juego */}
            <div 
             className="fixed inset-0 w-full h-full overflow-hidden -z-10"
             style={{
-              backgroundImage: "url('/assets/ui/game-container/background-playing.png')",
+              backgroundImage: "url('/assets/ui/game-container/fondo1.PNG')",
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundAttachment: 'fixed',
               backgroundRepeat: 'no-repeat'
-            }}
-          ></div>
-          
-          {/* Capa de nubes con animación */}
-          <div 
-            className="fixed top-0 left-0 w-full h-[400px] overflow-hidden -z-[9] cloud-animation"
-            style={{
-              backgroundImage: "url('/assets/ui/game-container/clouds-background.png')",
-              backgroundSize: '3300px 400px',
-              backgroundRepeat: 'repeat-x',
-              pointerEvents: 'none'
             }}
           ></div>
           <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm">
@@ -1772,25 +1760,28 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
             >
               <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
-                SYBIL SLAYER
+                TREASURE HUNT
               </h1>
               <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center max-w-xl select-none">
-                Welcome to SYBIL SLAYER!<br/>
+                Welcome to TREASURE HUNT!<br/>
                 Dodge obstacles, collect energy and achieve the highest score.<br/>
                 Ready to play?
               </p>
               <button 
                 onClick={handleStartPauseClick} 
-                className="focus:outline-none game-button mb-4"
+                className="focus:outline-none game-button mb-4 relative"
                 aria-label="Start game"
               >
                 <Image 
-                  src="/assets/ui/buttons/play-button.png"
+                  src="/assets/ui/buttons/caja-texto2.png"
                   alt="Play"
                   width={160}
                   height={60}
                   className="game-img"
                 />
+                <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-xl" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                  PLAY
+                </span>
               </button>
             </div>
           </div>
@@ -1879,9 +1870,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             {advantageBar}
             
             {/* Canvas del juego con tótem lateral y panel inferior */}
-            <div className="w-full flex flex-col items-center justify-center gap-4">
-              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6">
-                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
+            <div className="w-full flex flex-col items-center justify-center gap-0">
+              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-0">
+                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 relative">
                   {/* Render canvas only when size is determined */}
                   {canvasSize.width > 0 && canvasSize.height > 0 && (
                     <div className="relative">
@@ -1926,16 +1917,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     </div>
                   )}
                 </div>
-                <div className="mt-2 lg:mt-0 lg:ml-4">
+                <div className="mt-0 lg:mt-0 lg:-ml-6">
                   <RuneTotemSidebar runeState={gameState.runeState} height={canvasSize.height} />
                 </div>
-              </div>
-              <div className="flex justify-center" style={{ width: canvasSize.width }}>
-                <RuneTotemPanel
-                  runeState={gameState.runeState}
-                  level={gameState.level}
-                  collectibles={gameState.collectibles}
-                />
               </div>
             </div>
             
@@ -1943,29 +1927,35 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             <div className="flex space-x-8 mb-3 justify-center items-center">
               <button 
                 onClick={handleStartPauseClick} 
-                className="focus:outline-none game-button"
+                className="focus:outline-none game-button relative"
                 aria-label="Start"
               >
                 <Image 
-                  src="/assets/ui/buttons/play-button.png"
+                  src="/assets/ui/buttons/caja-texto2.png"
                   alt="Play" 
                   width={120} 
                   height={50}
                   className="game-img"
                 />
+                <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                  PLAY
+                </span>
               </button>
               <button 
                 onClick={handleResetClick} 
-                className="focus:outline-none game-button"
+                className="focus:outline-none game-button relative"
                 aria-label="Reset game"
               >
                 <Image 
-                  src="/assets/ui/buttons/reset-button.png" 
+                  src="/assets/ui/buttons/caja-texto2.png" 
                   alt="Reset" 
                   width={120} 
                   height={50}
                   className="game-img"
                 />
+                <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                  RESET
+                </span>
               </button>
               
               {/* Indicador del hacker - solo visible cuando hay un hacker activo */}
@@ -2063,22 +2053,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <div 
             className="fixed inset-0 w-full h-full overflow-hidden -z-10"
             style={{
-              backgroundImage: "url('/assets/ui/game-container/background-playing.png')",
+              backgroundImage: "url('/assets/ui/game-container/fondo1.PNG')",
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundAttachment: 'fixed',
               backgroundRepeat: 'no-repeat'
-            }}
-          ></div>
-          
-          {/* Capa de nubes con animación */}
-          <div 
-            className="fixed top-0 left-0 w-full h-[400px] overflow-hidden -z-[9] cloud-animation"
-            style={{
-              backgroundImage: "url('/assets/ui/game-container/clouds-background.png')",
-              backgroundSize: '3300px 400px',
-              backgroundRepeat: 'repeat-x',
-              pointerEvents: 'none'
             }}
           ></div>
           
@@ -2307,9 +2286,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             {advantageBar}
 
             {/* Canvas del juego con tótem lateral y panel inferior */}
-            <div className="w-full flex flex-col items-center justify-center gap-4">
-              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6">
-                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
+            <div className="w-full flex flex-col items-center justify-center gap-0">
+              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-0">
+                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 relative">
 
               {/* Animación de jeff_goit al lado izquierdo del grid */}
               {jeffGoitAnimation && jeffGoitAnimation.active && (
@@ -2632,16 +2611,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </div>
               )}
                 </div>
-                <div className="mt-2 lg:mt-0 lg:ml-4">
+                <div className="mt-0 lg:mt-0 lg:-ml-6">
                   <RuneTotemSidebar runeState={gameState.runeState} height={canvasSize.height} />
                 </div>
-              </div>
-              <div className="flex justify-center" style={{ width: canvasSize.width }}>
-                <RuneTotemPanel
-                  runeState={gameState.runeState}
-                  level={gameState.level}
-                  collectibles={gameState.collectibles}
-                />
               </div>
             </div>
             
@@ -2649,31 +2621,35 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             <div className="flex space-x-8 mb-3 justify-center items-center">
               <button 
                 onClick={handleStartPauseClick} 
-                className="focus:outline-none game-button"
+                className="focus:outline-none game-button relative"
                 aria-label={gameState.status === 'playing' ? 'Pause' : gameState.status === 'paused' ? 'Resume' : 'Start'}
               >
                 <Image 
-                  src={gameState.status === 'playing' 
-                    ? "/assets/ui/buttons/pause-button.png" 
-                    : "/assets/ui/buttons/play-button.png"}
+                  src="/assets/ui/buttons/caja-texto2.png"
                   alt={gameState.status === 'playing' ? "Pause" : "Play"} 
                   width={120} 
                   height={50}
                   className="game-img"
                 />
+                <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                  {gameState.status === 'playing' ? 'PAUSE' : 'PLAY'}
+                </span>
               </button>
               <button 
                 onClick={handleResetClick} 
-                className="focus:outline-none game-button"
+                className="focus:outline-none game-button relative"
                 aria-label="Reset game"
               >
                 <Image 
-                  src="/assets/ui/buttons/reset-button.png" 
+                  src="/assets/ui/buttons/caja-texto2.png" 
                   alt="Reset" 
                   width={120} 
                   height={50}
                   className="game-img"
                 />
+                <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                  RESET
+                </span>
               </button>
               
               {/* Indicador del hacker - solo visible cuando hay un hacker activo */}

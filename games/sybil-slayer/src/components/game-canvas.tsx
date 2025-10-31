@@ -1712,9 +1712,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        
        ctx.save();
        
-       if (runeImg) {
-         // Usar la imagen de la runa
-         const imgSize = runeRadius * 2; // Tamaño basado en el radio
+      if (runeImg) {
+        // Usar la imagen de la runa
+        const imgSize = runeRadius * 2; // Tamaño basado en el radio
          ctx.drawImage(
            runeImg,
            obj.x - imgSize / 2,
