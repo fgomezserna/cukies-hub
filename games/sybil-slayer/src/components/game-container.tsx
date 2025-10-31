@@ -17,7 +17,7 @@ import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/cons
 import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
-import type { Collectible, RuneState, LevelStatsEntry, GameState } from '@/types/game';
+import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
 
 const getLevelScoreMultiplier = (level: number): number => {
@@ -81,6 +81,50 @@ const RuneTotemPanel: React.FC<{
         <span>Runas recogidas: {runeState.runePickupCount}</span>
         <span>{hasRuneOnField ? '¡Runa disponible en el mapa!' : 'Una runa aparece cada 20s'}</span>
       </div>
+    </div>
+  );
+};
+
+const RUNE_TOTEM_ORDER: RuneType[] = ['miner', 'engineer', 'farmer', 'gatherer', 'chef'];
+
+const RUNE_TOTEM_OVERLAY_IMAGES: Record<RuneType, string> = {
+  miner: '/assets/totem/miner_totem.png',
+  engineer: '/assets/totem/engineer_totem.png',
+  farmer: '/assets/totem/farmer_totem.png',
+  gatherer: '/assets/totem/gatherer_totem.png',
+  chef: '/assets/totem/chef_totem.png',
+};
+
+const RuneTotemSidebar: React.FC<{ runeState: RuneState; height: number }> = ({ runeState, height }) => {
+  const collectedTypes = new Set<RuneType>();
+
+  if (runeState.active) {
+    runeState.slots.forEach(slot => {
+      if (slot.collected) {
+        collectedTypes.add(slot.type);
+      }
+    });
+  }
+
+  return (
+    <div className="rune-totem-sidebar" style={{ height: `${height}px` }}>
+      <img
+        src="/assets/totem/totemlateral.png"
+        alt="Tótem lateral"
+        className="rune-totem-sidebar__image"
+        loading="lazy"
+      />
+      {RUNE_TOTEM_ORDER.map(type =>
+        collectedTypes.has(type) ? (
+          <img
+            key={type}
+            src={RUNE_TOTEM_OVERLAY_IMAGES[type]}
+            alt={`Runa ${type}`}
+            className="rune-totem-sidebar__overlay"
+            loading="lazy"
+          />
+        ) : null
+      )}
     </div>
   );
 };
@@ -750,7 +794,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const opponentInfoBox = isMultiplayerMode ? (
     <div className="relative">
       <Image
-        src="/assets/ui/buttons/box_letters.png"
+        src="/assets/ui/buttons/CartelMadera.png"
         alt="Opponent box"
         width={200}
         height={60}
@@ -1763,30 +1807,30 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             {/* Score, Level, Hearts y Timer con cajas */}
             <div className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" style={{ width: BASE_GAME_WIDTH }}>
               <div className="relative">
-                <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+               <Image 
+                 src="/assets/ui/buttons/CartelMadera.png"
                   alt="Score box"
                   width={150}
                   height={50}
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-primary">
+                  <span className="text-white">
                     Score: {localScore}
                   </span>
                 </div>
               </div>
 
               <div className="relative">
-                <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+               <Image 
+                 src="/assets/ui/buttons/CartelMadera.png"
                   alt="Level box"
                   width={150}
                   height={50}
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-primary">
+                  <span className="text-white">
                     Nivel: {gameState.level}
                   </span>
                 </div>
@@ -1794,8 +1838,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
               {/* Caja de corazones centrada */}
               <div className="relative">
-                <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+               <Image 
+                 src="/assets/ui/buttons/CartelMadera.png"
                   alt="Hearts box"
                   width={Math.max(120, 60 + gameState.maxHearts * 32)}
                   height={50}
@@ -1817,15 +1861,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
 
               <div className="relative">
-                <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+               <Image 
+                 src="/assets/ui/buttons/CartelMadera.png"
                   alt="Time box"
                   width={150}
                   height={50}
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-primary">
+                  <span className="text-white">
                     Time: {Math.ceil(gameState.timer)}
                   </span>
                 </div>
@@ -1834,52 +1878,57 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             {opponentInfoBox}
             {advantageBar}
             
-            {/* Canvas del juego y tótem (totem debajo del canvas) */}
+            {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-4">
-              <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
-                {/* Render canvas only when size is determined */}
-                {canvasSize.width > 0 && canvasSize.height > 0 && (
-                  <div className="relative">
-                    <GameCanvas
-                      gameState={gameState}
-                      width={canvasSize.width}
-                      height={canvasSize.height}
-                      energyCollectedFlag={energyCollectedFlag}
-                      damageFlag={damageFlag}
-                    />
-                    
-                    {/* Botones de game over */}
-                    {gameState.status === 'gameOver' && (
-                      <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
-                        <div className="flex flex-row items-center gap-4">
-                          {/* Botón Score Details */}
-                          <button
-                            onClick={() => setIsLevelStatsVisible(true)}
-                            className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
-                          >
-                            📊 Score Details
-                          </button>
-                          
-                          {/* Botón Play Again */}
-                          <button
-                            onClick={() => {
-                              playSound('button_click');
-                              if (gameState.status === 'gameOver') {
-                                console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
-                                stopMusic();
-                              }
-                              resetGame();
-                              setModeSelectOpen(true);
-                            }}
-                            className="px-6 py-3 bg-slate-900/90 border border-green-500/50 rounded-lg text-green-100 font-pixellari text-lg hover:bg-green-500/30 transition-colors shadow-lg"
-                          >
-                            ▶️ Play Again
-                          </button>
+              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6">
+                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
+                  {/* Render canvas only when size is determined */}
+                  {canvasSize.width > 0 && canvasSize.height > 0 && (
+                    <div className="relative">
+                      <GameCanvas
+                        gameState={gameState}
+                        width={canvasSize.width}
+                        height={canvasSize.height}
+                        energyCollectedFlag={energyCollectedFlag}
+                        damageFlag={damageFlag}
+                      />
+                      
+                      {/* Botones de game over */}
+                      {gameState.status === 'gameOver' && (
+                        <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
+                          <div className="flex flex-row items-center gap-4">
+                            {/* Botón Score Details */}
+                            <button
+                              onClick={() => setIsLevelStatsVisible(true)}
+                              className="px-6 py-3 bg-slate-900/90 border border-cyan-500/50 rounded-lg text-cyan-100 font-pixellari text-lg hover:bg-cyan-500/30 transition-colors shadow-lg"
+                            >
+                              📊 Score Details
+                            </button>
+                            
+                            {/* Botón Play Again */}
+                            <button
+                              onClick={() => {
+                                playSound('button_click');
+                                if (gameState.status === 'gameOver') {
+                                  console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
+                                  stopMusic();
+                                }
+                                resetGame();
+                                setModeSelectOpen(true);
+                              }}
+                              className="px-6 py-3 bg-slate-900/90 border border-green-500/50 rounded-lg text-green-100 font-pixellari text-lg hover:bg-green-500/30 transition-colors shadow-lg"
+                            >
+                              ▶️ Play Again
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 lg:mt-0 lg:ml-4">
+                  <RuneTotemSidebar runeState={gameState.runeState} height={canvasSize.height} />
+                </div>
               </div>
               <div className="flex justify-center" style={{ width: canvasSize.width }}>
                 <RuneTotemPanel
@@ -2074,8 +2123,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </>
                 )}
                 
-                <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+               <Image 
+                 src="/assets/ui/buttons/CartelMadera.png"
                   alt="Score box"
                   width={150}
                   height={50}
@@ -2084,11 +2133,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span 
                     style={{
-                      color: gameState.scoreMultiplier > 1 ? '#FFD700' : '#00FFFF',
+                      color: gameState.scoreMultiplier > 1 ? '#FFD700' : '#FFFFFF',
                       textShadow: gameState.scoreMultiplier > 1 
                         ? '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)' 
                         : '2px 2px 4px rgba(0, 0, 0, 0.8)',
-                      animation: gameState.scoreMultiplier > 1 ? 'pulse 1s infinite alternate' : 'none'
+                      animation: gameState.scoreMultiplier > 1 ? 'pulse 1s infinite alternate' : 'none',
+                      WebkitTextStroke: '1px #000000'
                     }}
                   >
                     Score: {localScore}
@@ -2105,7 +2155,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       color: '#FFD700',
                       fontSize: '20px',
                       fontWeight: 'bold',
-                      fontFamily: 'Pixellari, monospace',
+                      fontFamily: 'Mitr-Bold, monospace',
                       textShadow: '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
@@ -2131,7 +2181,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       color: '#00FFFF',
                       fontSize: '18px',
                       fontWeight: 'bold',
-                      fontFamily: 'Pixellari, monospace',
+                      fontFamily: 'Mitr-Bold, monospace',
                       textShadow: '0 0 10px rgba(0, 255, 255, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
@@ -2157,7 +2207,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       color: '#00BFFF',
                       fontSize: '18px',
                       fontWeight: 'bold',
-                      fontFamily: 'Pixellari, monospace',
+                      fontFamily: 'Mitr-Bold, monospace',
                       textShadow: '0 0 10px rgba(0, 191, 255, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
@@ -2183,7 +2233,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       color: '#FF4500',
                       fontSize: '20px',
                       fontWeight: 'bold',
-                      fontFamily: 'Pixellari, monospace',
+                      fontFamily: 'Mitr-Bold, monospace',
                       textShadow: '0 0 10px rgba(255, 69, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
@@ -2201,14 +2251,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
               <div className="relative">
                 <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Level box"
                   width={150}
                   height={50}
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-primary">
+                  <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     Nivel: {gameState.level}
                   </span>
                 </div>
@@ -2217,7 +2267,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {/* Caja de corazones centrada */}
               <div className="relative">
                 <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Hearts box"
                   width={Math.max(120, 60 + gameState.maxHearts * 32)}
                   height={50}
@@ -2240,14 +2290,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
               <div className="relative">
                 <Image 
-                  src="/assets/ui/buttons/box_letters.png"
+                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Time box"
                   width={150}
                   height={50}
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className={gameState.timer <= 10 ? 'text-destructive' : 'text-primary'}>
+                  <span className={gameState.timer <= 10 ? 'text-destructive' : 'text-white'} style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     Time: {Math.ceil(gameState.timer)}
                   </span>
                 </div>
@@ -2256,9 +2306,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             {opponentInfoBox}
             {advantageBar}
 
-            {/* Canvas del juego - con tótem debajo para centrar el layout */}
+            {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-4">
-              <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
+              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-6">
+                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-4 lg:mb-0 relative">
 
               {/* Animación de jeff_goit al lado izquierdo del grid */}
               {jeffGoitAnimation && jeffGoitAnimation.active && (
@@ -2415,7 +2466,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         color: '#8A2BE2', // CORRECCIÓN: Violeta para coincidir con el resplandor
                         fontSize: '18px',
                         fontWeight: 'bold',
-                        fontFamily: 'Pixellari, monospace',
+                        fontFamily: 'Mitr-Bold, monospace',
                         textShadow: '0 0 10px rgba(138, 43, 226, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)', // CORRECCIÓN: Violeta
                         backgroundColor: 'rgba(0, 0, 0, 0.7)',
                         padding: '4px 8px',
@@ -2575,11 +2626,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {/* Mensaje de pausa como overlay sobre el grid */}
               {gameState.status === 'paused' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
-                  <h2 className="text-3xl font-bold text-primary mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
-                  <p className="text-xl text-primary font-pixellari text-shadow">Use the Pause button to Resume</p>
-                  <p className="text-sm text-primary/70 font-pixellari text-shadow mt-2">Game auto-pauses when switching tabs</p>
+                  <h2 className="text-3xl font-bold text-white mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
+                  <p className="text-xl text-white font-pixellari text-shadow">Use the Pause button to Resume</p>
+                  <p className="text-sm text-white/80 font-pixellari text-shadow mt-2">Game auto-pauses when switching tabs</p>
                 </div>
               )}
+                </div>
+                <div className="mt-2 lg:mt-0 lg:ml-4">
+                  <RuneTotemSidebar runeState={gameState.runeState} height={canvasSize.height} />
+                </div>
               </div>
               <div className="flex justify-center" style={{ width: canvasSize.width }}>
                 <RuneTotemPanel

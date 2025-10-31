@@ -9,7 +9,8 @@ import {
     MESSAGE_FONT, PAUSE_FONT, PRIMARY_COLOR_CSS, FOREGROUND_COLOR_CSS,
     DESTRUCTIVE_COLOR_CSS, ACCENT_COLOR_CSS,
     FEE_RADIUS, RUNE_CONFIG,
-    GOAT_ELIMINATION_DURATION_MS, GOAT_SKIN_COLOR
+    GOAT_ELIMINATION_DURATION_MS, GOAT_SKIN_COLOR,
+    RED_ZONE_WARNING_DURATION_MS
 } from '@/lib/constants';
 
 interface GameCanvasProps {
@@ -324,9 +325,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando mega_node_3.png:', e);
     };
     
-    // Cargar sprites animados de águila (reemplaza al fee original)
+    // Cargar sprites animados para fees
+    // - Por defecto usa águila para todas las direcciones
+    // - EXCEPCIÓN: para dirección 'down' usar sprites de globin (carpeta globinsprites/south)
     const directions: DirectionType[] = ['up', 'down', 'left', 'right'];
     directions.forEach(direction => {
+      // Caso especial: usar sprites de globin para la dirección 'down'
+      if (direction === 'down') {
+        // Tenemos 4 frames: south_1.png a south_4.png. Rellenamos 6 posiciones ciclando.
+        for (let i = 1; i <= 6; i++) {
+          const frameIndexInFolder = ((i - 1) % 4) + 1; // 1..4
+          const img = new Image();
+          img.src = `/assets/characters/globinsprites/south/south_${frameIndexInFolder}.png`;
+          img.onload = () => {
+            feeSpritesRef.current[direction][i - 1] = img;
+            if (i === 6) {
+              console.log('✅ Sprites de globin (south) cargados para fee (6 frames ciclando 4)');
+            }
+          };
+          img.onerror = (e) => {
+            console.error(`❌ Error cargando globin south_${frameIndexInFolder}.png:`, e);
+          };
+        }
+        return; // No cargar águila para 'down'
+      }
+
       // Mapear direcciones a los sprites del águila
       let spriteDirection: string;
       switch(direction) {
@@ -345,12 +368,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         default:
           spriteDirection = 'south';
       }
-      
-      // Cargar el sprite del águila para esta dirección
+
+      // Cargar el sprite del águila para esta dirección (imagen única replicada 6 veces)
       const img = new Image();
       img.src = `/assets/characters/aguila/aguila_${spriteDirection}.png`;
       img.onload = () => {
-        // Usar el mismo sprite para todos los frames (no hay animación en el águila)
         for (let i = 0; i < 6; i++) {
           feeSpritesRef.current[direction][i] = img;
         }
@@ -476,7 +498,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     
     // Cargar imagen de arenas movedizas
     const quicksandImg = new Image();
-    quicksandImg.src = '/assets/obstacles/arenasmovedizas.png';
+    quicksandImg.src = '/assets/obstacles/arenasmovedizas2.png';
     quicksandImg.onload = () => {
       quicksandImgRef.current = quicksandImg;
       console.log('✅ Imagen de arenas movedizas cargada correctamente');
@@ -912,46 +934,73 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     ctx.save();
 
     if (zone.phase === 'warning') {
-      // Fase de advertencia: parpadeo con imagen de arenas movedizas
-      const flicker = 0.5 + 0.5 * Math.sin(timestamp / 150);
-      ctx.globalAlpha = 0.25 + 0.35 * flicker;
-      
+      // Fase de advertencia: efecto de "mancha" que se expande orgánicamente
+      const elapsed = Math.max(0, timestamp - zone.warningStartTime);
+      const progress = Math.max(0, Math.min(1, elapsed / RED_ZONE_WARNING_DURATION_MS));
+      const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+      const p = easeOut(progress);
+      const centerX = zone.x + zone.width / 2;
+      const centerY = zone.y + zone.height / 2;
+      const baseRadius = Math.min(zone.width, zone.height) * (0.35 + 0.55 * p);
+      const timeFactor = timestamp * 0.003;
+
       if (quicksandImgRef.current) {
-        // Dibujar imagen de arenas movedizas con tinte rojo para advertencia
-        ctx.globalCompositeOperation = 'source-over';
+        // Crear máscara irregular tipo mancha y recortar la imagen a esa forma
+        ctx.save();
+        ctx.beginPath();
+        const lobes = 24; // más puntos => borde más orgánico
+        for (let i = 0; i < lobes; i++) {
+          const a = (i / lobes) * Math.PI * 2;
+          const noise = 0.18 * Math.sin(5 * a + timeFactor) + 0.08 * Math.sin(11 * a - timeFactor * 0.66);
+          const r = baseRadius * (1 + noise);
+          const px = centerX + r * Math.cos(a);
+          const py = centerY + r * Math.sin(a);
+          if (i === 0) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.closePath();
+        ctx.clip();
+        // Sutil animación de opacidad para llamar la atención sin color rojo
+        const flicker = 0.85 + 0.15 * Math.sin(timestamp / 180);
+        ctx.globalAlpha = 0.5 + 0.4 * p * flicker;
         ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
-        
-        // Agregar overlay rojo semi-transparente para indicar advertencia
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
-        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
-        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
       } else {
-        // Fallback si la imagen no está cargada
-        ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
-        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+        // Fallback: dibujar una mancha neutra sin rectángulos
+        const lobes = 24;
+        ctx.beginPath();
+        for (let i = 0; i < lobes; i++) {
+          const a = (i / lobes) * Math.PI * 2;
+          const noise = 0.18 * Math.sin(5 * a + timeFactor) + 0.08 * Math.sin(11 * a - timeFactor * 0.66);
+          const r = baseRadius * (1 + noise);
+          const px = centerX + r * Math.cos(a);
+          const py = centerY + r * Math.sin(a);
+          if (i === 0) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.closePath();
+        ctx.globalAlpha = 0.25 + 0.35 * p;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fill();
       }
     } else {
       // Fase activa: arenas movedizas completamente visible
       if (quicksandImgRef.current) {
         ctx.globalAlpha = 0.85;
         ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
-        
-        // Borde sutil para definir mejor la zona
-        ctx.globalAlpha = 0.6;
-        ctx.strokeStyle = 'rgba(139, 90, 43, 0.8)'; // Borde marrón arena
-        ctx.lineWidth = 3;
-        ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+        // Se evita dibujar rectángulos que agreguen bordes cuadrados
       } else {
         // Fallback si la imagen no está cargada
         ctx.globalAlpha = 0.6;
         ctx.fillStyle = 'rgba(220, 30, 30, 0.85)';
         ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
-
-        ctx.globalAlpha = 0.9;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+        // En el fallback no se dibuja borde para evitar el recuadro
       }
     }
 
@@ -1704,7 +1753,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          // Símbolo central
          ctx.shadowBlur = 0;
          ctx.fillStyle = 'rgba(10, 10, 22, 0.95)';
-         ctx.font = 'bold 18px Pixellari';
+         ctx.font = 'bold 18px Mitr-Bold';
          ctx.textAlign = 'center';
          ctx.textBaseline = 'middle';
          const runeLabel = runeCollectible.runeType && RUNE_CONFIG[runeCollectible.runeType] 
@@ -2320,7 +2369,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Dibujar la frase si está en estado "showing" y tiene una frase definida
            if (obj.phraseState === 'showing' && obj.currentPhrase) {
              // Configurar el estilo del texto
-             ctx.font = '16px Pixellari';
+             ctx.font = '16px Mitr-Bold';
              ctx.textAlign = 'center';
              ctx.textBaseline = 'bottom';
              
@@ -2379,7 +2428,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Dibujar la frase si está en estado "showing" y tiene una frase definida
            if (obj.phraseState === 'showing' && obj.currentPhrase) {
              // Configurar el estilo del texto
-             ctx.font = '16px Pixellari';
+             ctx.font = '16px Mitr-Bold';
              ctx.textAlign = 'center';
              ctx.textBaseline = 'bottom';
              
@@ -2981,7 +3030,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.lineWidth = 3; // Borde más grueso
         
         // Hacer el texto más grande
-        ctx.font = '32px Pixellari'; // Más grande que SCORE_FONT
+        ctx.font = '32px Mitr-Bold'; // Más grande que SCORE_FONT
         ctx.textAlign = 'center';
         // Dibujar texto con borde (subido para dejar espacio a los botones)
         ctx.strokeText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 20);
@@ -3050,7 +3099,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       const scaleEffect = 1.5 - (progress * 0.5); // Empieza grande y se reduce un poco
       const finalSize = Math.floor(pulseSize * scaleEffect);
       
-      ctx.font = `${finalSize}px Pixellari`;
+      ctx.font = `${finalSize}px Mitr-Bold`;
       
       // Efecto de múltiples sombras para profundidad épica
       const shadowLayers = [

@@ -174,10 +174,10 @@ export const HACKER_BANISH_DURATION_MS = 15000; // 15 segundos de destierro del 
 export const COLLISION_PENALTY_SECONDS = 5;
 
 // UI
-export const SCORE_FONT = '28px Pixellari';
-export const TIMER_FONT = '28px Pixellari';
-export const MESSAGE_FONT = '42px Pixellari';
-export const PAUSE_FONT = '54px Pixellari';
+export const SCORE_FONT = '28px Mitr-Bold';
+export const TIMER_FONT = '28px Mitr-Bold';
+export const MESSAGE_FONT = '42px Mitr-Bold';
+export const PAUSE_FONT = '54px Mitr-Bold';
 export const PRIMARY_COLOR_CSS = 'hsl(var(--primary))'; // Electric Blue from CSS
 export const FOREGROUND_COLOR_CSS = 'hsl(var(--foreground))';
 export const DESTRUCTIVE_COLOR_CSS = 'hsl(var(--destructive))'; // Neon Red from CSS

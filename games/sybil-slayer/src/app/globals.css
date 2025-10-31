@@ -2,7 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definición de la fuente Pixellari */
+/* Fuente principal del juego: Mitr-Bold */
+@font-face {
+  font-family: 'Mitr-Bold';
+  src: url('/assets/ui/fonts/Mitr-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+/* Fuente alternativa previa por compatibilidad */
 @font-face {
   font-family: 'Pixellari';
   src: url('/assets/ui/fonts/Pixellari.ttf') format('truetype');
@@ -12,7 +20,7 @@
 }
 
 body {
-  font-family: 'Pixellari', 'Geist', sans-serif; /* Usamos Pixellari como fuente principal */
+  font-family: 'Mitr-Bold', 'Geist', sans-serif; /* Usamos Mitr-Bold como fuente principal */
 }
 
 @layer base {
@@ -53,7 +61,7 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
     
     /* Fuente personalizada */
-    --font-pixellari: 'Pixellari', 'Geist', sans-serif;
+    --font-pixellari: 'Mitr-Bold', 'Geist', sans-serif;
   }
 
   .dark {
@@ -357,7 +365,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: 'Pixellari', monospace;
+  font-family: 'Mitr-Bold', monospace;
   font-size: 20px;
   color: #f5f3ff;
   letter-spacing: 1px;
@@ -399,7 +407,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Pixellari', monospace;
+  font-family: 'Mitr-Bold', monospace;
   font-size: 18px;
   border: 2px solid currentColor;
   background: rgba(255, 255, 255, 0.1);
@@ -410,7 +418,7 @@ body {
 }
 
 .rune-slot__label {
-  font-family: 'Pixellari', monospace;
+  font-family: 'Mitr-Bold', monospace;
   font-size: 16px;
   color: #e2e8f0;
   text-transform: uppercase;
@@ -423,7 +431,7 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  font-family: 'Pixellari', monospace;
+  font-family: 'Mitr-Bold', monospace;
   font-size: 14px;
   color: #cbd5f5;
 }
@@ -439,13 +447,13 @@ body {
 }
 
 .rune-totem__title {
-  font-family: 'Pixellari', monospace;
+  font-family: 'Mitr-Bold', monospace;
   font-size: 20px;
   color: #f5f3ff;
 }
 
 .rune-totem__text {
-  font-family: 'Pixellari', monospace;
+  font-family: 'Mitr-Bold', monospace;
   font-size: 16px;
   color: #cbd5f5;
   margin: 0;
@@ -454,6 +462,37 @@ body {
 @media (max-width: 1024px) {
   .rune-totem__slots {
     gap: 8px;
+  }
+}
+
+.rune-totem-sidebar {
+  position: relative;
+  width: 150px;
+  height: 300px;
+  flex-shrink: 0;
+}
+
+.rune-totem-sidebar__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.rune-totem-sidebar__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+@media (min-width: 1280px) {
+  .rune-totem-sidebar {
+    width: 180px;
+    height: 360px;
   }
 }
 

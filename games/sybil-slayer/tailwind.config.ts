@@ -10,7 +10,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        pixellari: ["Pixellari", "monospace"],
+        pixellari: ["Mitr-Bold", "monospace"],
       },
   		colors: {
   			background: 'hsl(var(--background))',
