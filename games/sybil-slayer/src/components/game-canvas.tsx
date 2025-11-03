@@ -2824,9 +2824,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Red Zones ya se dibujaron antes de los collectibles
 
-    // Draw Token
+    // Draw Token (ocultar mientras está activo el efecto de daño)
     if (gameState.token) {
-        drawObject(ctx, gameState.token);
+        const hideTokenDueToDamage = !!(damageEffect && damageEffect.active && gameState.status === 'playing');
+        if (!hideTokenDueToDamage) {
+          drawObject(ctx, gameState.token);
+        }
     }
     // Dibujar explosión boost si está activa
     if (explosion && explosion.active) {
