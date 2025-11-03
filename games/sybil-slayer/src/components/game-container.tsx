@@ -1806,7 +1806,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-white">
+                  <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     Score: {localScore}
                   </span>
                 </div>
@@ -1821,7 +1821,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-white">
+                  <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     Nivel: {gameState.level}
                   </span>
                 </div>
@@ -1860,7 +1860,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className="text-white">
+                  <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     Time: {Math.ceil(gameState.timer)}
                   </span>
                 </div>
@@ -2073,7 +2073,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <div 
             className="fixed inset-0 w-full h-full overflow-hidden -z-10"
             style={{
-              backgroundImage: "url('/assets/ui/game-container/fondo1.PNG')",
+              backgroundImage: "url('/assets/ui/game-container/fondo2.PNG')",
+              backgroundImage: "url('/assets/ui/game-container/fondo2.PNG')",
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundAttachment: 'fixed',

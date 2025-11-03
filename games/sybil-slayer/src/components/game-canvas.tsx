@@ -673,14 +673,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
     // Cargar imágenes al inicio
     const barrImg = new Image();
-    barrImg.src = '/assets/collectibles/barr.png';
+    barrImg.src = '/assets/collectibles/barravault1.png';
     barrImg.onload = () => {
       barrImgRef.current = barrImg;
     };
 
     // Cargar barra de progreso
     const progressBarrImg = new Image();
-    progressBarrImg.src = '/assets/collectibles/progress_barr.png';
+    progressBarrImg.src = '/assets/collectibles/barravault2.png';
     progressBarrImg.onload = () => {
       progressBarrImgRef.current = progressBarrImg;
     };
@@ -1435,9 +1435,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
              // Dibujar el sprite con brillo
              ctx.shadowColor = 'rgba(0, 255, 255, 0.8)';
              ctx.shadowBlur = 15;
-             if (goatEliminationActive) {
-               drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
-             }
              if (goatEliminationActive) {
                drawGoatAura(ctx, obj.x, obj.y, tokenImgSize, goatImmunityActive, goatEliminationRatio);
              }
@@ -2785,42 +2782,37 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           }
           
         } else if (effect.type === 'vault_activation') {
-          // Efecto especial dorado para vault activado
+          // Efecto difuminado en tono #B695D5 para vault activado
+          const duration = 700;
+          const t = Math.min((effect.elapsedTime || 0) / duration, 1);
+          const maxRadius = 140 * effect.scale;
+          const minRadius = 30 * effect.scale;
+          const radius = minRadius + (maxRadius - minRadius) * t;
+          const baseAlpha = 0.6 * (1 - t);
+
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.shadowColor = 'rgba(182, 149, 213, 0.6)';
+          ctx.shadowBlur = 35 * effect.scale;
+
+          const grad = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius);
+          grad.addColorStop(0, `rgba(182, 149, 213, ${Math.min(1, baseAlpha + 0.2)})`);
+          grad.addColorStop(0.5, `rgba(182, 149, 213, ${baseAlpha * 0.7})`);
+          grad.addColorStop(1, 'rgba(182, 149, 213, 0)');
+          ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.strokeStyle = '#FFD700';
-          ctx.lineWidth = 3;
-          ctx.shadowColor = '#FFD700';
-          ctx.shadowBlur = 20 * effect.scale;
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.fill();
           
-          // Dibujar múltiples círculos concéntricos
-          for (let i = 0; i < 3; i++) {
-            ctx.beginPath();
-            ctx.arc(0, 0, (30 + i * 15) * effect.scale, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-          
-          // Dibujar partículas doradas
-          const particleCount = 8;
-          for (let i = 0; i < particleCount; i++) {
-            const angle = (Math.PI * 2 * i) / particleCount + effect.elapsedTime * 0.002;
-            const distance = 50 * effect.scale;
-            const px = Math.cos(angle) * distance;
-            const py = Math.sin(angle) * distance;
-            
-            ctx.fillStyle = '#FFD700';
-            ctx.beginPath();
-            ctx.arc(px, py, 5 * effect.scale, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          
-        } else if (effect.type === 'Explosion_(n)') {
-          // Usar sprites Explosion para hackers (naranja/rojo)
-          if (explosionSpritesRef.current[frameIndex]) {
-            const img = explosionSpritesRef.current[frameIndex];
-            const size = 80; // Tamaño más grande para hacker explosion
-            ctx.drawImage(img, -size/2, -size/2, size, size);
-          }
+          const radius2 = radius * 0.65;
+          const grad2 = ctx.createRadialGradient(0, 0, 0, 0, 0, radius2);
+          grad2.addColorStop(0, `rgba(182, 149, 213, ${baseAlpha * 0.8})`);
+          grad2.addColorStop(1, 'rgba(182, 149, 213, 0)');
+          ctx.fillStyle = grad2;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius2, 0, Math.PI * 2);
+          ctx.fill();
         }
+        // Eliminado: partículas doradas
         
         ctx.restore();
       });
@@ -2870,30 +2862,70 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       const frameDuration = 100; // 100ms por frame
       const now = Date.now();
       
-      // Filtrar y dibujar cada explosión verde activa
+      // Filtrar y dibujar cada explosión activa
       const updatedExplosions = greenExplosions.filter(explosion => {
         const elapsed = now - explosion.start;
+
+        // Efecto DIFUMINADO especial para VAUL con color #B695D5
+        if (explosion.type === 'vaul') {
+          const duration = 700; // ms
+          const t = Math.min(elapsed / duration, 1);
+
+          // Radio animado y opacidad decreciente
+          const maxRadius = 140;
+          const minRadius = 30;
+          const radius = minRadius + (maxRadius - minRadius) * t;
+          const baseAlpha = 0.6 * (1 - t);
+
+          ctx.save();
+          ctx.translate(explosion.x, explosion.y);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.shadowColor = 'rgba(182, 149, 213, 0.6)'; // #B695D5
+          ctx.shadowBlur = 35;
+          
+          // Gradiente radial suave en tono #B695D5
+          const grad = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius);
+          grad.addColorStop(0, `rgba(182, 149, 213, ${Math.min(1, baseAlpha + 0.2)})`);
+          grad.addColorStop(0.5, `rgba(182, 149, 213, ${baseAlpha * 0.7})`);
+          grad.addColorStop(1, 'rgba(182, 149, 213, 0)');
+          ctx.fillStyle = grad;
+
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Capa adicional sutil para mayor difusión
+          const radius2 = radius * 0.65;
+          const grad2 = ctx.createRadialGradient(0, 0, 0, 0, 0, radius2);
+          grad2.addColorStop(0, `rgba(182, 149, 213, ${baseAlpha * 0.8})`);
+          grad2.addColorStop(1, 'rgba(182, 149, 213, 0)');
+          ctx.fillStyle = grad2;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius2, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+          return elapsed < duration; // Mantener mientras dura la animación
+        }
+
+        // Comportamiento por sprites para los demás tipos
         const frame = Math.floor(elapsed / frameDuration);
-        
-        // Si todavía hay frames por mostrar
         if (frame < 10 && greenExplosionSpritesRef.current[frame]) {
           const img = greenExplosionSpritesRef.current[frame];
-          // Tamaño específico según el tipo
           let size: number;
           if (explosion.type === 'megaNode') {
-            size = 120; // Más grande para mega_node
+            size = 120;
           } else if (explosion.type === 'purr') {
-            size = 110; // Tamaño intermedio para purr
+            size = 110;
           } else {
-            size = 100; // Tamaño estándar para heart
+            size = 100;
           }
           ctx.drawImage(img, explosion.x - size/2, explosion.y - size/2, size, size);
-          return true; // Mantener esta explosión
+          return true;
         }
-        return false; // Eliminar esta explosión
+        return false;
       });
       
-      // Actualizar la lista de explosiones activas
       if (updatedExplosions.length !== greenExplosions.length) {
         setGreenExplosions(updatedExplosions);
       }
