@@ -1740,7 +1740,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               // Actualizar timer de frames y cambiar frame si es necesario
               newObs.frameTimer += deltaTime;
               if (newObs.frameTimer >= 150) { // 150ms entre frames (ajustable)
-                newObs.frameIndex = ((newObs.frameIndex || 0) + 1) % 6; // 6 frames por dirección (actualizado de 4 a 6)
+                // Usar 12 frames para fees (south5..south16)
+                const feeMaxFrames = 12;
+                newObs.frameIndex = ((newObs.frameIndex || 0) + 1) % feeMaxFrames;
                 newObs.frameTimer = 0;
               }
             break;

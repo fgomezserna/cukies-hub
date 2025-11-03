@@ -326,61 +326,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     
     // Cargar sprites animados para fees
-    // - Por defecto usa águila para todas las direcciones
-    // - EXCEPCIÓN: para dirección 'down' usar sprites de globin (carpeta globinsprites/south)
+    // - Para todas las direcciones, usar 12 frames (south5..south16) de malvado3/South
     const directions: DirectionType[] = ['up', 'down', 'left', 'right'];
     directions.forEach(direction => {
-      // Caso especial: usar sprites de globin para la dirección 'down'
-      if (direction === 'down') {
-        // Tenemos 4 frames: south_1.png a south_4.png. Rellenamos 6 posiciones ciclando.
-        for (let i = 1; i <= 6; i++) {
-          const frameIndexInFolder = ((i - 1) % 4) + 1; // 1..4
-          const img = new Image();
-          img.src = `/assets/characters/globinsprites/south/south_${frameIndexInFolder}.png`;
-          img.onload = () => {
-            feeSpritesRef.current[direction][i - 1] = img;
-            if (i === 6) {
-              console.log('✅ Sprites de globin (south) cargados para fee (6 frames ciclando 4)');
-            }
-          };
-          img.onerror = (e) => {
-            console.error(`❌ Error cargando globin south_${frameIndexInFolder}.png:`, e);
-          };
-        }
-        return; // No cargar águila para 'down'
+      for (let i = 5; i <= 16; i++) { // 12 frames: 5..16
+        const img = new Image();
+        img.src = `/assets/characters/malvado3/South/south${i}.png`;
+        img.onload = () => {
+          feeSpritesRef.current[direction][i - 5] = img; // normalizar a índice 0..11
+          if (i === 16) {
+            console.log(`✅ Sprites malvado3 (South 5-16) cargados para fee dirección ${direction} (12 frames)`);
+          }
+        };
+        img.onerror = (e) => {
+          console.error(`❌ Error cargando malvado3/South/south${i}.png para dirección ${direction}:`, e);
+        };
       }
-
-      // Mapear direcciones a los sprites del águila
-      let spriteDirection: string;
-      switch(direction) {
-        case 'up':
-          spriteDirection = 'north';
-          break;
-        case 'down':
-          spriteDirection = 'south';
-          break;
-        case 'left':
-          spriteDirection = 'west';
-          break;
-        case 'right':
-          spriteDirection = 'east';
-          break;
-        default:
-          spriteDirection = 'south';
-      }
-
-      // Cargar el sprite del águila para esta dirección (imagen única replicada 6 veces)
-      const img = new Image();
-      img.src = `/assets/characters/aguila/aguila_${spriteDirection}.png`;
-      img.onload = () => {
-        for (let i = 0; i < 6; i++) {
-          feeSpritesRef.current[direction][i] = img;
-        }
-        console.log(`✅ Sprite de águila cargado para dirección ${direction} (${spriteDirection})`);
-      };
-      img.onerror = (e) => {
-        console.error(`❌ Error cargando sprite de águila para ${direction}:`, e);
-      };
     });
     
     // Cargar sprites animados del hacker (Trump)
@@ -1593,9 +1554,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        const direction = obj.direction || getDirection(obj.velocity);
        const frameIndex = obj.frameIndex || 0;
        
-       // Obtener la imagen correcta según dirección y frame
-       // Actualizado para manejo de 6 frames en lugar de 4
-       const frameArrayIndex = frameIndex % 6; // Modificado de 4 a 6 frames
+      // Obtener la imagen correcta según dirección y frame
+      // Usar 12 frames (south5..south16) para todas las direcciones
+      const maxFrames = 12;
+      const frameArrayIndex = frameIndex % maxFrames;
        if (feeSpritesRef.current[direction] && feeSpritesRef.current[direction][frameArrayIndex]) {
          const eagleImg = feeSpritesRef.current[direction][frameArrayIndex];
          
