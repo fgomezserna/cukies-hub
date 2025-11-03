@@ -21,6 +21,7 @@ import {
   RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, RED_ZONE_MAX_COUNT,
   RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO,
   RED_ZONE_MIN_SEPARATION,
+  RED_ZONE_EFFECT_RADIUS_RATIO,
   RUNE_FIRST_SPAWN_MS, RUNE_NEXT_SPAWN_MS, RUNE_SCORE_INCREMENT, MAX_LEVEL_WITH_TOTEM, MAX_LEVEL, RUNE_TYPES,
   GOAT_ELIMINATION_DURATION_MS, GOAT_IMMUNITY_DURATION_MS, TOKEN_DAMAGE_IMMUNITY_MS
 } from '../lib/constants';
@@ -732,11 +733,15 @@ const safeCreateRedZone = (
 };
 
 const isTokenInsideRedZone = (token: Token, zone: RedZone): boolean => {
-  const closestX = clamp(token.x, zone.x, zone.x + zone.width);
-  const closestY = clamp(token.y, zone.y, zone.y + zone.height);
-  const dx = token.x - closestX;
-  const dy = token.y - closestY;
-  return dx * dx + dy * dy <= token.radius * token.radius;
+  // Usar un área circular reducida en el centro de la mancha para la ralentización
+  const centerX = zone.x + zone.width / 2;
+  const centerY = zone.y + zone.height / 2;
+  const effectiveRadius = Math.min(zone.width, zone.height) * RED_ZONE_EFFECT_RADIUS_RATIO;
+  const dx = token.x - centerX;
+  const dy = token.y - centerY;
+  const distanceSq = dx * dx + dy * dy;
+  const combined = effectiveRadius + token.radius;
+  return distanceSq <= combined * combined;
 };
 
 const createInitialTreasureState = (): TreasureState => ({

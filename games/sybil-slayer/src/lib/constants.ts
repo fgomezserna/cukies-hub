@@ -31,6 +31,8 @@ export const RED_ZONE_MAX_WIDTH_RATIO = 0.32; // Cobertura máxima del ancho del
 export const RED_ZONE_MIN_HEIGHT_RATIO = 0.18; // Cobertura mínima del alto del canvas
 export const RED_ZONE_MAX_HEIGHT_RATIO = 0.32; // Cobertura máxima del alto del canvas
 export const RED_ZONE_MIN_SEPARATION = 100; // Distancia mínima entre zonas rojas para permitir paso del token
+// Radio efectivo de colisión para arenas movedizas (proporción del menor lado)
+export const RED_ZONE_EFFECT_RADIUS_RATIO = 0.42;
 
 // Token Properties
 export const TOKEN_RADIUS = 24; // 48x48px - Mantener este como base

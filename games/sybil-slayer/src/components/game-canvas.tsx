@@ -992,7 +992,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     } else {
       // Fase activa: arenas movedizas completamente visible
       if (quicksandImgRef.current) {
-        ctx.globalAlpha = 0.85;
+        // Aumentar opacidad final para que no quede más clara que durante el parpadeo
+        ctx.globalAlpha = 0.95;
         ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
         // Se evita dibujar rectángulos que agreguen bordes cuadrados
       } else {
@@ -2985,7 +2986,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         }
         
         const imgX = (width - imgWidth) / 2;
-        const imgY = (height - imgHeight) / 2 - 40; // Centrar verticalmente con pequeño offset
+        // Centrar verticalmente con pequeño offset; para time/vidas subir 40px adicionales
+        const baseImgY = (height - imgHeight) / 2 - 40;
+        const extraUpOffset = (gameOverType === 'time' || gameOverType === 'vidas') ? 40 : 0;
+        const imgY = baseImgY - extraUpOffset;
         
         // Añadir efecto de glow violeta por detrás SOLO para wallet_gameover.png
         if (gameOverType === 'wallet') {
@@ -3053,10 +3057,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
             break;
         }
         
-        // Calcular la parte inferior de la imagen para posicionar el texto debajo
+        // Calcular la parte inferior de la imagen para posicionar el texto con referencia a imagen y botones
         const imageBottom = imgY + imgHeight;
         
-        // Mantener el texto del puntaje final y la instrucción para reiniciar DEBAJO de la imagen
+        // Mantener el texto del puntaje final equidistante entre la imagen y los botones
         ctx.fillStyle = '#FFFFFF'; // Texto blanco para contraste con fondo negro
         ctx.strokeStyle = '#000000'; // Borde negro para mayor legibilidad
         ctx.lineWidth = 3; // Borde más grueso
@@ -3064,9 +3068,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         // Hacer el texto más grande
         ctx.font = '32px Mitr-Bold'; // Más grande que SCORE_FONT
         ctx.textAlign = 'center';
-        // Dibujar texto con borde (subido para dejar espacio a los botones)
-        ctx.strokeText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 20);
-        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, imageBottom + 20);
+        // Calcular Y objetivo: punto medio entre el borde inferior de la imagen y la parte superior de los botones DOM
+        const BUTTONS_HEIGHT = 50; // altura de las imágenes de botón
+        const BUTTONS_BOTTOM_PADDING = 64; // pb-16 en Tailwind (16 * 4px)
+        const buttonsTopY = height - BUTTONS_BOTTOM_PADDING - BUTTONS_HEIGHT;
+        // Seguridad: margen mínimo de separación respecto a imagen y botones
+        const TEXT_MARGIN = 16;
+        const idealMidY = (imageBottom + buttonsTopY) / 2;
+        const minY = imageBottom + TEXT_MARGIN;
+        const maxY = buttonsTopY - TEXT_MARGIN;
+        const textY = Math.max(minY, Math.min(maxY, idealMidY));
+        // Dibujar texto con borde en la posición calculada
+        ctx.strokeText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, textY);
+        ctx.fillText(`Final Score: ${Math.floor(gameState.score)}`, width / 2, textY);
         
         // Texto de reinicio eliminado - ahora se usan botones
         
