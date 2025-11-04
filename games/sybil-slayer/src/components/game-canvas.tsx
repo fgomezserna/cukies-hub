@@ -842,43 +842,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.fillRect(ray.x, ray.y, ray.width, ray.height);
       }
 
-      // Dibujar chispas/partículas
-      ctx.globalAlpha = 0.8;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      
-      // Generar chispas basadas en el timestamp para animación
-      const sparkCount = 8;
-      const sparkSize = 2;
-      
-      for (let i = 0; i < sparkCount; i++) {
-        const sparkTime = (timestamp + i * 200) % 1000;
-        const sparkPhase = sparkTime / 1000;
-        
-        let sparkX, sparkY;
-        if (ray.orientation === 'vertical') {
-          // Chispas a los lados del rayo vertical
-          sparkX = ray.x + ray.width + (Math.sin(sparkPhase * Math.PI * 4) * 15);
-          sparkY = ray.y + (ray.height * sparkPhase) + (Math.cos(sparkPhase * Math.PI * 3) * 8);
-        } else {
-          // Chispas arriba/abajo del rayo horizontal
-          sparkX = ray.x + (ray.width * sparkPhase) + (Math.cos(sparkPhase * Math.PI * 3) * 8);
-          sparkY = ray.y + ray.height + (Math.sin(sparkPhase * Math.PI * 4) * 15);
-        }
-        
-        // Dibujar chispa
-        ctx.beginPath();
-        ctx.arc(sparkX, sparkY, sparkSize * (1 - sparkPhase), 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Chispas azules más pequeñas
-        if (i % 2 === 0) {
-          ctx.fillStyle = 'rgba(0, 200, 255, 0.7)';
-          ctx.beginPath();
-          ctx.arc(sparkX + 3, sparkY + 2, sparkSize * 0.6 * (1 - sparkPhase), 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        }
-      }
+      // Efecto de puntos/chispas eliminado intencionalmente
     }
 
     ctx.restore();
