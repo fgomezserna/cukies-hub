@@ -326,20 +326,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     };
     
     // Cargar sprites animados para fees
-    // - Para todas las direcciones, usar 12 frames (south5..south16) de malvado3/South
+    // - Para todas las direcciones, usar 14 frames (1..14) de malvado3/South
     const directions: DirectionType[] = ['up', 'down', 'left', 'right'];
     directions.forEach(direction => {
-      for (let i = 5; i <= 16; i++) { // 12 frames: 5..16
+      for (let i = 1; i <= 14; i++) { // 14 frames: 1..14
         const img = new Image();
-        img.src = `/assets/characters/malvado3/South/south${i}.png`;
+        img.src = `/assets/characters/malvado3/South/${i}.png`;
         img.onload = () => {
-          feeSpritesRef.current[direction][i - 5] = img; // normalizar a índice 0..11
-          if (i === 16) {
-            console.log(`✅ Sprites malvado3 (South 5-16) cargados para fee dirección ${direction} (12 frames)`);
+          feeSpritesRef.current[direction][i - 1] = img; // normalizar a índice 0..13
+          if (i === 14) {
+            console.log(`✅ Sprites malvado3 (South 1-14) cargados para fee dirección ${direction} (14 frames)`);
           }
         };
         img.onerror = (e) => {
-          console.error(`❌ Error cargando malvado3/South/south${i}.png para dirección ${direction}:`, e);
+          console.error(`❌ Error cargando malvado3/South/${i}.png para dirección ${direction}:`, e);
         };
       }
     });
@@ -1555,8 +1555,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        const frameIndex = obj.frameIndex || 0;
        
       // Obtener la imagen correcta según dirección y frame
-      // Usar 12 frames (south5..south16) para todas las direcciones
-      const maxFrames = 12;
+      // Usar 14 frames (1..14) para todas las direcciones
+      const maxFrames = 14;
       const frameArrayIndex = frameIndex % maxFrames;
        if (feeSpritesRef.current[direction] && feeSpritesRef.current[direction][frameArrayIndex]) {
          const eagleImg = feeSpritesRef.current[direction][frameArrayIndex];
