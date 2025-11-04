@@ -734,14 +734,20 @@ const safeCreateRedZone = (
 
 const isTokenInsideRedZone = (token: Token, zone: RedZone): boolean => {
   // Usar un área circular reducida en el centro de la mancha para la ralentización
+  // La activación debe ocurrir cuando los "pies" del token (parte inferior del sprite)
+  // entren en el radio efectivo de la zona. Consideramos los pies como el punto en
+  // (token.x, token.y + token.radius).
   const centerX = zone.x + zone.width / 2;
   const centerY = zone.y + zone.height / 2;
   const effectiveRadius = Math.min(zone.width, zone.height) * RED_ZONE_EFFECT_RADIUS_RATIO;
-  const dx = token.x - centerX;
-  const dy = token.y - centerY;
+  const feetX = token.x;
+  const feetY = token.y + token.radius;
+  const dx = feetX - centerX;
+  const dy = feetY - centerY;
   const distanceSq = dx * dx + dy * dy;
-  const combined = effectiveRadius + token.radius;
-  return distanceSq <= combined * combined;
+  // Usar únicamente el radio de la zona (no sumar el radio del token) ya que
+  // queremos que cuente sólo cuando el punto de los pies esté dentro del círculo.
+  return distanceSq <= (effectiveRadius * effectiveRadius);
 };
 
 const createInitialTreasureState = (): TreasureState => ({
