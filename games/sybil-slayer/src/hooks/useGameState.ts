@@ -1746,8 +1746,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               // Actualizar timer de frames y cambiar frame si es necesario
               newObs.frameTimer += deltaTime;
               if (newObs.frameTimer >= 150) { // 150ms entre frames (ajustable)
-                // Usar 11 frames para left, right y up (west/est/north), 14 frames para down (South)
-                const feeMaxFrames = (newObs.direction === 'left' || newObs.direction === 'right' || newObs.direction === 'up') ? 11 : 14;
+                // Usar 11 frames para left y right (west/est), 8 frames para up (north), 14 frames para down (South)
+                const feeMaxFrames = newObs.direction === 'up' ? 8 : (newObs.direction === 'left' || newObs.direction === 'right') ? 11 : 14;
                 newObs.frameIndex = ((newObs.frameIndex || 0) + 1) % feeMaxFrames;
                 newObs.frameTimer = 0;
               }

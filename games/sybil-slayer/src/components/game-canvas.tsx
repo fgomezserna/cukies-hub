@@ -328,7 +328,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Cargar sprites animados para fees
     // - Para right (este), usar sprites de malvado3/est (11 frames: 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36)
     // - Para left (oeste), usar sprites de malvado3/west (11 frames: 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35)
-    // - Para up (norte), usar sprites de malvado3/north (11 frames: 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47)
+    // - Para up (norte), usar sprites de malvado3/north (8 frames: 37, 38, 39, 41, 42, 44, 45, 47)
     // - Para down (sur), usar 14 frames (1..14) de malvado3/South
     const directions: DirectionType[] = ['up', 'down', 'left', 'right'];
     
@@ -366,15 +366,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           };
         });
       } else if (direction === 'up') {
-        // Cargar sprites de north (norte) - 11 frames
-        const northFrames = [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
+        // Cargar sprites de north (norte) - 8 frames
+        const northFrames = [37, 38, 39, 41, 42, 44, 45, 47];
         northFrames.forEach((frameNum, index) => {
           const img = new Image();
           img.src = `/assets/characters/malvado3/north/${frameNum}.png`;
           img.onload = () => {
             feeSpritesRef.current[direction][index] = img;
             if (index === northFrames.length - 1) {
-              console.log(`✅ Sprites malvado3/north cargados para fee dirección ${direction} (11 frames)`);
+              console.log(`✅ Sprites malvado3/north cargados para fee dirección ${direction} (8 frames)`);
             }
           };
           img.onerror = (e) => {
@@ -1574,8 +1574,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        const frameIndex = obj.frameIndex || 0;
        
       // Obtener la imagen correcta según dirección y frame
-      // Usar 11 frames para left, right y up (west/est/north), 14 frames para down (South)
-      const maxFrames = (direction === 'left' || direction === 'right' || direction === 'up') ? 11 : 14;
+      // Usar 11 frames para left y right (west/est), 8 frames para up (north), 14 frames para down (South)
+      const maxFrames = direction === 'up' ? 8 : (direction === 'left' || direction === 'right') ? 11 : 14;
       const frameArrayIndex = frameIndex % maxFrames;
        if (feeSpritesRef.current[direction] && feeSpritesRef.current[direction][frameArrayIndex]) {
          const eagleImg = feeSpritesRef.current[direction][frameArrayIndex];
