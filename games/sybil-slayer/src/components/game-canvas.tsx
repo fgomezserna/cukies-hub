@@ -410,7 +410,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // Cargar sprites de energía como recurso (usar una sola imagen para todos los frames)
     for (let i = 1; i <= 6; i++) {
       const img = new Image();
-      img.src = '/assets/collectibles/resource_rare_metals.png';
+      img.src = '/assets/collectibles/gemas.png';
       img.onload = () => {
         energySpritesRef.current[i-1] = img;
       };
@@ -2657,10 +2657,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
               addGreenExplosion(tokenPos.x, tokenPos.y, prevObj.type as 'heart' | 'megaNode' | 'purr' | 'vaul');
             }
           } else {
-            // Expiró por tiempo - agregamos la explosión verde en la posición del objeto
-            // TEMPORALMENTE DESHABILITADO para heart y megaNode: Explosión verde
-            // Para reactivar en el futuro, quitar la condición del if
-            if (prevObj.type !== 'heart' && prevObj.type !== 'megaNode') {
+            // Expiró por tiempo - deshabilitar efecto para 'vaul'
+            // Mantener explosión verde solo para purr si se desea
+            if (prevObj.type !== 'heart' && prevObj.type !== 'megaNode' && prevObj.type !== 'vaul') {
               addGreenExplosion(prevObj.x, prevObj.y, prevObj.type as 'heart' | 'megaNode' | 'purr' | 'vaul');
             }
           }
@@ -2745,30 +2744,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           }
           
         } else if (effect.type === 'vault_activation') {
-          // Efecto difuminado en tono #B695D5 para vault activado
-          const duration = 700;
+          // Efecto difuminado en tono #B695D5 para vault activado (menos intenso)
+          const duration = 500; // antes 700
           const t = Math.min((effect.elapsedTime || 0) / duration, 1);
-          const maxRadius = 140 * effect.scale;
-          const minRadius = 30 * effect.scale;
+          const maxRadius = 110 * effect.scale; // antes 140
+          const minRadius = 20 * effect.scale; // antes 30
           const radius = minRadius + (maxRadius - minRadius) * t;
-          const baseAlpha = 0.6 * (1 - t);
+          const baseAlpha = 0.35 * (1 - t); // antes 0.6
 
           ctx.globalCompositeOperation = 'lighter';
-          ctx.shadowColor = 'rgba(182, 149, 213, 0.6)';
-          ctx.shadowBlur = 35 * effect.scale;
+          ctx.shadowColor = 'rgba(182, 149, 213, 0.4)'; // antes 0.6
+          ctx.shadowBlur = 20 * effect.scale; // antes 35
 
           const grad = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius);
-          grad.addColorStop(0, `rgba(182, 149, 213, ${Math.min(1, baseAlpha + 0.2)})`);
-          grad.addColorStop(0.5, `rgba(182, 149, 213, ${baseAlpha * 0.7})`);
+          grad.addColorStop(0, `rgba(182, 149, 213, ${Math.min(1, baseAlpha + 0.1)})`);
+          grad.addColorStop(0.5, `rgba(182, 149, 213, ${baseAlpha * 0.55})`);
           grad.addColorStop(1, 'rgba(182, 149, 213, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.arc(0, 0, radius, 0, Math.PI * 2);
           ctx.fill();
           
-          const radius2 = radius * 0.65;
+          const radius2 = radius * 0.6; // antes 0.65
           const grad2 = ctx.createRadialGradient(0, 0, 0, 0, 0, radius2);
-          grad2.addColorStop(0, `rgba(182, 149, 213, ${baseAlpha * 0.8})`);
+          grad2.addColorStop(0, `rgba(182, 149, 213, ${baseAlpha * 0.6})`); // antes *0.8
           grad2.addColorStop(1, 'rgba(182, 149, 213, 0)');
           ctx.fillStyle = grad2;
           ctx.beginPath();
@@ -2834,25 +2833,25 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
         // Efecto DIFUMINADO especial para VAUL con color #B695D5
         if (explosion.type === 'vaul') {
-          const duration = 700; // ms
+          const duration = 500; // ms (menos tiempo)
           const t = Math.min(elapsed / duration, 1);
 
           // Radio animado y opacidad decreciente
-          const maxRadius = 140;
-          const minRadius = 30;
+          const maxRadius = 110; // antes 140
+          const minRadius = 20;  // antes 30
           const radius = minRadius + (maxRadius - minRadius) * t;
-          const baseAlpha = 0.6 * (1 - t);
+          const baseAlpha = 0.35 * (1 - t); // menos opaco
 
           ctx.save();
           ctx.translate(explosion.x, explosion.y);
           ctx.globalCompositeOperation = 'lighter';
-          ctx.shadowColor = 'rgba(182, 149, 213, 0.6)'; // #B695D5
-          ctx.shadowBlur = 35;
+          ctx.shadowColor = 'rgba(182, 149, 213, 0.4)'; // #B695D5
+          ctx.shadowBlur = 20;
           
           // Gradiente radial suave en tono #B695D5
           const grad = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius);
-          grad.addColorStop(0, `rgba(182, 149, 213, ${Math.min(1, baseAlpha + 0.2)})`);
-          grad.addColorStop(0.5, `rgba(182, 149, 213, ${baseAlpha * 0.7})`);
+          grad.addColorStop(0, `rgba(182, 149, 213, ${Math.min(1, baseAlpha + 0.1)})`);
+          grad.addColorStop(0.5, `rgba(182, 149, 213, ${baseAlpha * 0.55})`);
           grad.addColorStop(1, 'rgba(182, 149, 213, 0)');
           ctx.fillStyle = grad;
 
@@ -2861,9 +2860,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ctx.fill();
 
           // Capa adicional sutil para mayor difusión
-          const radius2 = radius * 0.65;
+          const radius2 = radius * 0.6;
           const grad2 = ctx.createRadialGradient(0, 0, 0, 0, 0, radius2);
-          grad2.addColorStop(0, `rgba(182, 149, 213, ${baseAlpha * 0.8})`);
+          grad2.addColorStop(0, `rgba(182, 149, 213, ${baseAlpha * 0.6})`);
           grad2.addColorStop(1, 'rgba(182, 149, 213, 0)');
           ctx.fillStyle = grad2;
           ctx.beginPath();

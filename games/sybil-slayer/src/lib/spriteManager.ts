@@ -246,12 +246,12 @@ export class SpriteManager {
         (async () => {
           // Cargar una única imagen de recurso y duplicarla como 6 frames para 'energy'
           try {
-            const resource = await this.loadSingleSprite('/assets/collectibles/resource_rare_metals.png');
+            const resource = await this.loadSingleSprite('/assets/collectibles/gemas.png');
             const frames = Array.from({ length: 6 }, () => resource);
             this.spriteSheets.set('energy', { frames, frameCount: 6 });
-            console.log("✅ SpriteSheet 'energy' cargado usando resource_rare_metals.png (6 frames repetidos)");
+            console.log("✅ SpriteSheet 'energy' cargado usando gemas.png (6 frames repetidos)");
           } catch (e) {
-            console.warn('⚠️ resource_rare_metals.png no encontrado, usando sprites antiguos de energy numerados');
+            console.warn('⚠️ gemas.png no encontrado, usando sprites antiguos de energy numerados');
             await this.loadSpriteSequence('/assets/collectibles/energy/energy', 6, 'energy');
           }
         })(),
