@@ -1762,27 +1762,47 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
                 TREASURE HUNT
               </h1>
-              <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center max-w-xl select-none">
-                Welcome to TREASURE HUNT!<br/>
-                Dodge obstacles, collect energy and achieve the highest score.<br/>
-                Ready to play?
+              <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center select-none">
+                ¡Te damos la bienvenida a Treasure Hunt!<br/>
+                <br/>
+                Utiliza las teclas ASDW para mover al personaje, y consigue la mayor puntuación posible.<br/>
+                <br/>
+                La partida termina cuando se acaba el tiempo o pierdes las 3 vidas.
               </p>
-              <button 
-                onClick={handleStartPauseClick} 
-                className="focus:outline-none game-button mb-4 relative"
-                aria-label="Start game"
-              >
-                <Image 
-                  src="/assets/ui/buttons/caja-texto2.png"
-                  alt="Play"
-                  width={160}
-                  height={60}
-                  className="game-img"
-                />
-                <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-xl" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                  PLAY
-                </span>
-              </button>
+              <div className="flex flex-row gap-4 mb-4">
+                <button 
+                  onClick={handleStartPauseClick} 
+                  className="focus:outline-none game-button relative"
+                  aria-label="Jugar"
+                >
+                  <Image 
+                    src="/assets/ui/buttons/caja-texto2.png"
+                    alt="Jugar"
+                    width={160}
+                    height={60}
+                    className="game-img"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-xl" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                    Jugar
+                  </span>
+                </button>
+                <button 
+                  onClick={() => setIsInfoModalOpen(true)} 
+                  className="focus:outline-none game-button relative"
+                  aria-label="Reglas"
+                >
+                  <Image 
+                    src="/assets/ui/buttons/caja-texto2.png"
+                    alt="Reglas"
+                    width={160}
+                    height={60}
+                    className="game-img"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-xl" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                    Reglas
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </>
