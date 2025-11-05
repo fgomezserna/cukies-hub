@@ -1736,18 +1736,37 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 newObs.frameIndex = 0;
               }
               
-              // Actualizar la dirección basada en el vector de velocidad
-              if (Math.abs(newObs.velocity.x) > Math.abs(newObs.velocity.y)) {
-                newObs.direction = newObs.velocity.x > 0 ? 'right' : 'left';
+              // Actualizar la dirección basada en el vector de velocidad (incluyendo diagonales)
+              const isDiagonal = Math.abs(newObs.velocity.x) > 0 && Math.abs(newObs.velocity.y) > 0;
+              
+              if (isDiagonal) {
+                // Movimiento diagonal
+                if (newObs.velocity.x > 0 && newObs.velocity.y < 0) {
+                  newObs.direction = 'north_east';
+                } else if (newObs.velocity.x < 0 && newObs.velocity.y < 0) {
+                  newObs.direction = 'north_west';
+                } else if (newObs.velocity.x > 0 && newObs.velocity.y > 0) {
+                  newObs.direction = 'south_east';
+                } else if (newObs.velocity.x < 0 && newObs.velocity.y > 0) {
+                  newObs.direction = 'south_west';
+                }
               } else {
-                newObs.direction = newObs.velocity.y > 0 ? 'down' : 'up';
+                // Movimiento cardinal
+                if (Math.abs(newObs.velocity.x) > Math.abs(newObs.velocity.y)) {
+                  newObs.direction = newObs.velocity.x > 0 ? 'right' : 'left';
+                } else {
+                  newObs.direction = newObs.velocity.y > 0 ? 'down' : 'up';
+                }
               }
               
               // Actualizar timer de frames y cambiar frame si es necesario
               newObs.frameTimer += deltaTime;
               if (newObs.frameTimer >= 150) { // 150ms entre frames (ajustable)
                 // Usar 11 frames para left y right (west/est), 8 frames para up (north), 14 frames para down (South)
-                const feeMaxFrames = newObs.direction === 'up' ? 8 : (newObs.direction === 'left' || newObs.direction === 'right') ? 11 : 14;
+                // Usar 10 frames para direcciones diagonales
+                const isDiagonalDir = newObs.direction === 'north_west' || newObs.direction === 'north_east' || 
+                                      newObs.direction === 'south_west' || newObs.direction === 'south_east';
+                const feeMaxFrames = isDiagonalDir ? 10 : (newObs.direction === 'up' ? 8 : (newObs.direction === 'left' || newObs.direction === 'right') ? 11 : 14);
                 newObs.frameIndex = ((newObs.frameIndex || 0) + 1) % feeMaxFrames;
                 newObs.frameTimer = 0;
               }

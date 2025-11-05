@@ -330,7 +330,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // - Para left (oeste), usar sprites de malvado3/west (11 frames: 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35)
     // - Para up (norte), usar sprites de malvado3/north (8 frames: 37, 38, 39, 41, 42, 44, 45, 47)
     // - Para down (sur), usar 14 frames (1..14) de malvado3/South
-    const directions: DirectionType[] = ['up', 'down', 'left', 'right'];
+    // - Para direcciones diagonales, usar 10 frames cada una:
+    //   - north-west: 68, 70, 72, 74, 76, 78, 80, 82, 84, 86
+    //   - north-est: 69, 71, 73, 75, 77, 79, 81, 83, 85, 87
+    //   - south-west: 48, 50, 52, 54, 56, 58, 60, 62, 64, 66
+    //   - south-est: 49, 51, 53, 55, 57, 59, 61, 63, 65, 67
+    const directions: DirectionType[] = ['up', 'down', 'left', 'right', 'north_west', 'north_east', 'south_west', 'south_east'];
     
     directions.forEach(direction => {
       if (direction === 'right') {
@@ -381,7 +386,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
             console.error(`❌ Error cargando malvado3/north/${frameNum}.png para dirección ${direction}:`, e);
           };
         });
-      } else {
+      } else if (direction === 'down') {
         // Para down, usar South (14 frames)
         for (let i = 1; i <= 14; i++) {
           const img = new Image();
@@ -396,6 +401,70 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
             console.error(`❌ Error cargando malvado3/South/${i}.png para dirección ${direction}:`, e);
           };
         }
+      } else if (direction === 'north_west') {
+        // Cargar sprites de north-west (noroeste) - 10 frames
+        const northWestFrames = [68, 70, 72, 74, 76, 78, 80, 82, 84, 86];
+        northWestFrames.forEach((frameNum, index) => {
+          const img = new Image();
+          img.src = `/assets/characters/malvado3/north-west/${frameNum}.png`;
+          img.onload = () => {
+            feeSpritesRef.current[direction][index] = img;
+            if (index === northWestFrames.length - 1) {
+              console.log(`✅ Sprites malvado3/north-west cargados para fee dirección ${direction} (10 frames)`);
+            }
+          };
+          img.onerror = (e) => {
+            console.error(`❌ Error cargando malvado3/north-west/${frameNum}.png para dirección ${direction}:`, e);
+          };
+        });
+      } else if (direction === 'north_east') {
+        // Cargar sprites de north-est (noreste) - 10 frames
+        const northEastFrames = [69, 71, 73, 75, 77, 79, 81, 83, 85, 87];
+        northEastFrames.forEach((frameNum, index) => {
+          const img = new Image();
+          img.src = `/assets/characters/malvado3/north-est/${frameNum}.png`;
+          img.onload = () => {
+            feeSpritesRef.current[direction][index] = img;
+            if (index === northEastFrames.length - 1) {
+              console.log(`✅ Sprites malvado3/north-est cargados para fee dirección ${direction} (10 frames)`);
+            }
+          };
+          img.onerror = (e) => {
+            console.error(`❌ Error cargando malvado3/north-est/${frameNum}.png para dirección ${direction}:`, e);
+          };
+        });
+      } else if (direction === 'south_west') {
+        // Cargar sprites de south-west (suroeste) - 10 frames
+        const southWestFrames = [48, 50, 52, 54, 56, 58, 60, 62, 64, 66];
+        southWestFrames.forEach((frameNum, index) => {
+          const img = new Image();
+          img.src = `/assets/characters/malvado3/south-west/${frameNum}.png`;
+          img.onload = () => {
+            feeSpritesRef.current[direction][index] = img;
+            if (index === southWestFrames.length - 1) {
+              console.log(`✅ Sprites malvado3/south-west cargados para fee dirección ${direction} (10 frames)`);
+            }
+          };
+          img.onerror = (e) => {
+            console.error(`❌ Error cargando malvado3/south-west/${frameNum}.png para dirección ${direction}:`, e);
+          };
+        });
+      } else if (direction === 'south_east') {
+        // Cargar sprites de south-est (sureste) - 10 frames
+        const southEastFrames = [49, 51, 53, 55, 57, 59, 61, 63, 65, 67];
+        southEastFrames.forEach((frameNum, index) => {
+          const img = new Image();
+          img.src = `/assets/characters/malvado3/south-est/${frameNum}.png`;
+          img.onload = () => {
+            feeSpritesRef.current[direction][index] = img;
+            if (index === southEastFrames.length - 1) {
+              console.log(`✅ Sprites malvado3/south-est cargados para fee dirección ${direction} (10 frames)`);
+            }
+          };
+          img.onerror = (e) => {
+            console.error(`❌ Error cargando malvado3/south-est/${frameNum}.png para dirección ${direction}:`, e);
+          };
+        });
       }
     });
     
@@ -1575,7 +1644,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        
       // Obtener la imagen correcta según dirección y frame
       // Usar 11 frames para left y right (west/est), 8 frames para up (north), 14 frames para down (South)
-      const maxFrames = direction === 'up' ? 8 : (direction === 'left' || direction === 'right') ? 11 : 14;
+      // Usar 10 frames para direcciones diagonales (north-west, north-east, south-west, south-east)
+      const isDiagonal = direction === 'north_west' || direction === 'north_east' || direction === 'south_west' || direction === 'south_east';
+      const maxFrames = isDiagonal ? 10 : (direction === 'up' ? 8 : (direction === 'left' || direction === 'right') ? 11 : 14);
       const frameArrayIndex = frameIndex % maxFrames;
        if (feeSpritesRef.current[direction] && feeSpritesRef.current[direction][frameArrayIndex]) {
          const eagleImg = feeSpritesRef.current[direction][frameArrayIndex];
