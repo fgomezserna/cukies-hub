@@ -148,7 +148,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
-      <div className="w-full max-w-5xl rounded-xl border border-cyan-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-cyan-500/10 relative">
+      <div className="w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10 relative">
         {/* Botón de cierre */}
         <button
           onClick={onClose}
@@ -157,7 +157,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
         >
           ×
         </button>
-        <h2 className="mb-4 text-center text-3xl font-pixellari text-cyan-200 tracking-wide">
+        <h2 className="mb-4 text-center text-3xl font-pixellari text-pink-200 tracking-wide">
           Estadísticas por nivel
         </h2>
         {hasStats ? (
@@ -219,13 +219,13 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                 return (
                   <div
                     key={entry.level}
-                    className="rounded-lg border border-cyan-400/40 bg-slate-800/60 p-4 shadow-lg shadow-cyan-500/10"
+                    className="rounded-lg border border-pink-400/40 bg-slate-800/60 p-4 shadow-lg shadow-pink-500/10"
                   >
-                    <h3 className="mb-3 text-center text-xl font-pixellari text-cyan-100">
+                    <h3 className="mb-3 text-center text-xl font-pixellari text-pink-100">
                       Nivel {entry.level}
                     </h3>
-                    <table className="w-full text-sm font-pixellari text-cyan-100">
-                      <thead className="text-xs uppercase tracking-wide text-cyan-300">
+                    <table className="w-full text-sm font-pixellari text-pink-100">
+                      <thead className="text-xs uppercase tracking-wide text-pink-300">
                         <tr>
                           <th className="px-2 py-1 text-left">Elemento</th>
                           <th className="px-2 py-1 text-right">Recogidos</th>
@@ -246,7 +246,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="border-t border-cyan-400/40 text-cyan-200">
+                        <tr className="border-t border-pink-400/40 text-pink-200">
                           <td className="px-2 pt-2 text-sm font-semibold">Total</td>
                           <td className="px-2 pt-2" />
                           <td className="px-2 pt-2 text-right text-amber-300 font-semibold">
@@ -255,9 +255,9 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                         </tr>
                       </tfoot>
                     </table>
-                    <div className="mt-3 flex items-center justify-between text-xs font-pixellari text-cyan-200 uppercase tracking-wide">
+                    <div className="mt-3 flex items-center justify-between text-xs font-pixellari text-pink-200 uppercase tracking-wide">
                       <span>Tiempo:</span>
-                      <span className="text-sky-200">{formatDuration(entry.durationMs)}</span>
+                      <span className="text-pink-200">{formatDuration(entry.durationMs)}</span>
                     </div>
                   </div>
                 );
@@ -265,7 +265,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
             </div>
           </div>
         ) : (
-          <p className="text-center font-pixellari text-cyan-200">
+          <p className="text-center font-pixellari text-pink-200">
             No se registraron estadísticas en esta partida.
           </p>
         )}
