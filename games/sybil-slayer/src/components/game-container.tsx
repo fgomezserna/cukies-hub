@@ -2823,9 +2823,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               ? "/assets/ui/buttons/musicasi.png" 
               : "/assets/ui/buttons/musicano.png"}
             alt={musicEnabled ? "Music On" : "Music Off"} 
-            width={50} 
-            height={50}
-            className="game-img"
+            width={110} 
+            height={110}
+            quality={100}
+            className="game-img w-[50px] h-[50px]"
           />
         </button>
 
@@ -2840,9 +2841,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               ? "/assets/ui/buttons/efectossi.png" 
               : "/assets/ui/buttons/efectosno.png"}
             alt={soundsEnabled ? "Sounds On" : "Sounds Off"} 
-            width={50} 
-            height={50}
-            className="game-img"
+            width={110} 
+            height={110}
+            quality={100}
+            className="game-img w-[50px] h-[50px]"
           />
         </button>
 
@@ -2855,9 +2857,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <Image 
             src="/assets/ui/buttons/botoninfo.png"
             alt="Información" 
-            width={50} 
-            height={50}
-            className="game-img"
+            width={110} 
+            height={110}
+            quality={100}
+            className="game-img w-[50px] h-[50px]"
           />
         </button>
       </div>

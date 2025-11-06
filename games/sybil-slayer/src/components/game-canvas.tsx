@@ -2767,6 +2767,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Configurar alta calidad de renderizado para sprites
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
     const timestamp = Date.now();

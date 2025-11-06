@@ -110,9 +110,10 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     <Image
                       src="/assets/ui/buttons/I_ButtonRounded.png"
                       alt="1P"
-                      fill
-                      className="object-contain"
-                      sizes="48px"
+                      width={264}
+                      height={272}
+                      quality={100}
+                      className="object-contain w-12 h-12"
                     />
                     <span className="absolute inset-0 flex items-center justify-center font-pixellari text-lg text-white" style={outlinedTextStyle}>1P</span>
                   </div>
@@ -142,7 +143,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             <div
               className={[
                 'group relative flex flex-col p-6 text-left transition-all duration-200',
-                'opacity-90',
+                'opacity-90 grayscale brightness-75 contrast-90 pointer-events-none select-none',
               ].join(' ')}
             >
               {/* Background board image */}
@@ -161,9 +162,10 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     <Image
                       src="/assets/ui/buttons/I_ButtonRounded.png"
                       alt="2P"
-                      fill
-                      className="object-contain"
-                      sizes="48px"
+                      width={264}
+                      height={272}
+                      quality={100}
+                      className="object-contain w-12 h-12"
                     />
                     <span className="absolute inset-0 flex items-center justify-center font-pixellari text-lg text-white" style={outlinedTextStyle}>2P</span>
                   </div>
