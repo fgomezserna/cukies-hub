@@ -95,7 +95,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               ].join(' ')}
             >
               {/* Background board image */}
-              <div className="absolute inset-0 -z-0 pointer-events-none transform origin-center">
+              <div className={['absolute inset-0 -z-0 pointer-events-none transform origin-center scale-125 transition-transform duration-200', hoveredMode === 'single' ? 'scale-[1.3125]' : ''].join(' ')}>
                 <Image
                   src="/assets/ui/buttons/cartel2.png"
                   alt="Card background"
@@ -104,9 +104,9 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
               </div>
-              <div className="relative z-[1] flex flex-col gap-4 pt-8 md:pt-10">
+              <div className={['relative z-[1] flex flex-col gap-4 pt-8 md:pt-10 translate-y-[30px] transition-transform duration-200', hoveredMode === 'single' ? 'scale-105' : ''].join(' ')}>
                 <div className="flex w-full items-center justify-center gap-3 text-center">
-                  <div className={[hoveredMode === 'single' ? 'scale-105' : '', 'relative h-12 w-12 transition-transform duration-200'].join(' ')}>
+                  <div className="relative h-12 w-12">
                     <Image
                       src="/assets/ui/buttons/I_ButtonRounded.png"
                       alt="1P"
@@ -146,7 +146,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               ].join(' ')}
             >
               {/* Background board image */}
-              <div className="absolute inset-0 -z-0 pointer-events-none transform origin-center">
+              <div className="absolute inset-0 -z-0 pointer-events-none transform origin-center scale-125">
                 <Image
                   src="/assets/ui/buttons/cartel2.png"
                   alt="Card background"
@@ -155,7 +155,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
               </div>
-              <div className="relative z-[1] flex flex-col gap-4 pt-8 md:pt-10">
+              <div className="relative z-[1] flex flex-col gap-4 pt-8 md:pt-10 translate-y-[30px]">
                 <div className="flex w-full items-center justify-center gap-3 text-center">
                   <div className="relative h-12 w-12">
                     <Image
@@ -206,4 +206,3 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
 
 export type { GameMode };
 export default ModeSelectModal;
-
