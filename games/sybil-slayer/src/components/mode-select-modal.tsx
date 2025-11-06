@@ -146,6 +146,12 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 'opacity-90 grayscale brightness-75 contrast-90 pointer-events-none select-none',
               ].join(' ')}
             >
+              {/* "Coming soon" badge */}
+              <div className="pointer-events-none absolute left-1/2 top-4 z-[2] flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/30 bg-slate-900/80 px-4 py-1 shadow-[0_0_12px_rgba(0,0,0,0.6)]">
+                <span className="font-pixellari text-sm tracking-[0.35em] text-white" style={outlinedTextStyle}>
+                  PRÓXIMAMENTE
+                </span>
+              </div>
               {/* Background board image */}
               <div className="absolute inset-0 -z-0 pointer-events-none transform origin-center scale-125">
                 <Image
@@ -192,13 +198,6 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="mt-6 flex items-center justify-center gap-3 text-xs text-white/80" style={outlinedTextStyle}>
-            <span>Tip:</span>
-            <span className="rounded-full border border-cyan-500/40 bg-slate-900/60 px-3 py-1 font-pixellari text-white" style={outlinedTextStyle}>
-              Puedes invitar a un amigo con el modo Multiplayer
-            </span>
           </div>
         </div>
       </div>

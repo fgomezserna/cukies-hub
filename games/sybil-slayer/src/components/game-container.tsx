@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { usePusherConnection } from '../hooks/usePusherConnection';
 import GameCanvas from './game-canvas';
@@ -282,6 +282,7 @@ interface GameContainerProps {
 
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const parentContainerRef = useRef<HTMLDivElement | null>(null);
   const [matchRoomId, setMatchRoomId] = useState<string | null>(null);
   const { 
     isConnected,
@@ -300,6 +301,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     targetDifference: 500,
   });
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
+  // Estado para alineación horizontal con el canvas
+  const [canvasHorizontalOffset, setCanvasHorizontalOffset] = useState(0);
   // Estado para notificar recogida de energía
   const [energyCollectedFlag, setEnergyCollectedFlag] = useState(0);
   // Estado para notificar daño
@@ -592,7 +595,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const localFinalScore = matchResult?.finalScores?.[localSessionId] ?? localScore;
   const opponentFinalScore = opponentId ? (matchResult?.finalScores?.[opponentId] ?? opponentScore) : opponentScore;
   const advantageBar = isMultiplayerMode && multiplayer.opponent ? (
-    <div className="w-full mt-3 space-y-2" style={{ width: BASE_GAME_WIDTH }}>
+    <div className="w-full mt-3 space-y-2 lg:pr-[300px] xl:pr-[360px]" style={{ width: BASE_GAME_WIDTH }}>
       <div className="flex justify-between text-xs font-pixellari uppercase tracking-wide text-cyan-100/80">
         <span>Tu score: {localScore}</span>
         <span>Objetivo: {advantageTarget}</span>
@@ -1692,12 +1695,81 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setScale(newScale);
   }, []);
 
+  // Función para calcular el offset horizontal del canvas para alinear elementos
+  const calculateCanvasHorizontalOffset = useCallback(() => {
+    if (!containerRef.current) {
+      setCanvasHorizontalOffset(0);
+      return;
+    }
+
+    const canvasElement = containerRef.current.querySelector('canvas');
+    if (!canvasElement) {
+      setCanvasHorizontalOffset(0);
+      return;
+    }
+
+    // Usar la referencia al contenedor padre si está disponible, sino buscarlo
+    let parentContainer = parentContainerRef.current;
+    if (!parentContainer) {
+      // Buscar el contenedor padre que tiene max-w-[1100px] - subir en el DOM
+      let current = containerRef.current.parentElement;
+      while (current) {
+        // Buscar por clase que contenga max-w o por el estilo transform scale
+        if (current.className && (
+          current.className.includes('max-w') || 
+          current.getAttribute('style')?.includes('scale')
+        )) {
+          parentContainer = current as HTMLDivElement;
+          break;
+        }
+        current = current.parentElement;
+      }
+    }
+    
+    if (!parentContainer) {
+      // Fallback: usar la ventana como referencia
+      const canvasRect = canvasElement.getBoundingClientRect();
+      const windowWidth = window.innerWidth;
+      const canvasCenter = canvasRect.left + canvasRect.width / 2;
+      const windowCenter = windowWidth / 2;
+      setCanvasHorizontalOffset(canvasCenter - windowCenter);
+      return;
+    }
+
+    const canvasRect = canvasElement.getBoundingClientRect();
+    const parentRect = parentContainer.getBoundingClientRect();
+    
+    // Calcular el centro del canvas y el centro del contenedor padre
+    const canvasCenter = canvasRect.left + canvasRect.width / 2;
+    const parentCenter = parentRect.left + parentRect.width / 2;
+    
+    // El offset es la diferencia entre el centro del canvas y el centro del contenedor padre
+    // Esto alineará los elementos (que están centrados en el contenedor) con el canvas
+    const offset = canvasCenter - parentCenter;
+    
+    setCanvasHorizontalOffset(offset);
+  }, []);
+
   // Recalcular al montar y al redimensionar
   useEffect(() => {
-    calculateScale();
-    window.addEventListener('resize', calculateScale);
-    return () => window.removeEventListener('resize', calculateScale);
-  }, [calculateScale]);
+    const handleResize = () => {
+      calculateScale();
+      calculateCanvasHorizontalOffset();
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateScale, calculateCanvasHorizontalOffset]);
+
+  // Recalcular offset cuando cambia el tamaño del canvas - usar useLayoutEffect para medir después del render
+  useLayoutEffect(() => {
+    // Usar requestAnimationFrame para asegurar que el DOM se haya actualizado completamente
+    const frameId = requestAnimationFrame(() => {
+      calculateCanvasHorizontalOffset();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [canvasSize.width, canvasSize.height, calculateCanvasHorizontalOffset, gameState.status]);
 
   // Loading screen optimizado con fases
   if (!criticalAssetsLoaded) {
@@ -1814,9 +1886,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           
           {/* Sin fondos durante countdown - solo el grid del canvas será visible */}
           
-          <div className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2" style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}>
+          <div 
+            ref={parentContainerRef}
+            className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2" 
+            style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
+          >
             {/* Score, Level, Hearts y Timer con cajas */}
-            <div className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" style={{ width: BASE_GAME_WIDTH }}>
+            <div 
+              className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
+              style={{ 
+                width: BASE_GAME_WIDTH,
+                transform: `translateX(${canvasHorizontalOffset}px)`
+              }}
+            >
               <div className="relative">
                <Image 
                  src="/assets/ui/buttons/CartelMadera.png"
@@ -1964,7 +2046,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             </div>
             
             {/* Botones principales */}
-            <div className="flex space-x-8 mb-3 justify-center items-center">
+            <div 
+              className="flex space-x-8 mb-3 justify-center items-center"
+              style={{ transform: `translateX(${canvasHorizontalOffset}px)` }}
+            >
               <button 
                 onClick={handleStartPauseClick} 
                 className="focus:outline-none game-button relative"
@@ -2107,7 +2192,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
           >
             {/* Score, Level, Hearts y Timer con cajas */}
-            <div className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" style={{ width: BASE_GAME_WIDTH }}>
+            <div 
+              className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
+              style={{ 
+                width: BASE_GAME_WIDTH,
+                transform: `translateX(${canvasHorizontalOffset}px)`
+              }}
+            >
               <div className="relative">
                 {/* Aura roja expansiva cuando el hacker roba score */}
                 {gameState.scoreStealEffect && gameState.scoreStealEffect.active && (
@@ -2666,9 +2757,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {/* Mensaje de pausa como overlay sobre el grid */}
               {gameState.status === 'paused' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm rounded-lg">
-                  <h2 className="text-3xl font-bold text-white mb-2 font-pixellari text-shadow-glow">PAUSED</h2>
-                  <p className="text-xl text-white font-pixellari text-shadow">Use the Pause button to Resume</p>
-                  <p className="text-sm text-white/80 font-pixellari text-shadow mt-2">Game auto-pauses when switching tabs</p>
+                  <h2 className="text-3xl font-bold text-white mb-2 font-pixellari text-shadow-glow">PAUSA</h2>
+                  <p className="text-xl text-white font-pixellari text-shadow">Pulsa el botón &quot;Play&quot; para continuar.</p>
+                  <p className="text-sm text-white/80 font-pixellari text-shadow mt-2">El juego se pausa automáticamente al cambiar de ventana.</p>
                 </div>
               )}
                 </div>
@@ -2679,7 +2770,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             </div>
             
             {/* Botones principales */}
-            <div className="flex space-x-8 mb-3 justify-center items-center">
+            <div 
+              className="flex space-x-8 mb-3 justify-center items-center"
+              style={{ transform: `translateX(${canvasHorizontalOffset}px)` }}
+            >
               <button 
                 onClick={handleStartPauseClick} 
                 className="focus:outline-none game-button relative"
