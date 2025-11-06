@@ -10,176 +10,354 @@ interface InfoModalProps {
   onPlaySound?: (soundType: SoundType) => void;
 }
 
+interface InfoGroupItem {
+  name: string;
+  description: string;
+  details?: string[];
+  image: string | string[];
+  imageAlt: string | string[];
+}
+
+interface InfoGroup {
+  title: string;
+  tagline: string;
+  items: InfoGroupItem[];
+}
+
+const infoGroups: InfoGroup[] = [
+  {
+    title: 'Exploración Esencial',
+    tagline: 'Aprende lo básico para sobrevivir en el reino Cukie.',
+    items: [
+      {
+        name: 'Cukie',
+        description: 'El héroe más dulce del reino. Mantén el ritmo para esquivar peligros y sumar puntos.',
+        details: [
+          'Usa las teclas ASDW para moverte por la pantalla.',
+          'Consigue la mayor puntuación posible antes de que se acabe el tiempo o pierdas las 3 vidas.',
+        ],
+        image: '/assets/characters/token.png',
+        imageAlt: 'Cukie, el héroe del juego',
+      },
+      {
+        name: 'Checkpoint',
+        description: 'Un salvavidas temporal que aparece cuando el reloj aprieta.',
+        details: ['Recógelo para sumar 30 segundos al contador y continuar tu partida.'],
+        image: '/assets/collectibles/checkpoint.png',
+        imageAlt: 'Checkpoint brillante',
+      },
+      {
+        name: 'Corazón',
+        description: 'La dulzura que recupera tu energía.',
+        details: [
+          'Si has perdido una vida, la recuperas al instante.',
+          'Si tus vidas están completas, obtienes puntos crecientes: +20, +40, +60 y así sucesivamente.',
+        ],
+        image: '/assets/collectibles/corazoncukies.png',
+        imageAlt: 'Corazón de Cukie',
+      },
+    ],
+  },
+  {
+    title: 'Tesoro Dulce',
+    tagline: 'Colecciona objetos brillantes para disparar tu marcador.',
+    items: [
+      {
+        name: 'Gemas',
+        description: 'Las más codiciadas por los Cukies. ¡Brillan en todas partes!',
+        details: ['Cada gema otorga 1 punto inmediato.'],
+        image: '/assets/collectibles/gemas.png',
+        imageAlt: 'Gemas resplandecientes',
+      },
+      {
+        name: 'Monedas',
+        description: 'Escasas pero poderosas. No las dejes escapar.',
+        details: ['Cada moneda suma 5 puntos a tu marcador.'],
+        image: '/assets/collectibles/uki.png',
+        imageAlt: 'Moneda Uki',
+      },
+      {
+        name: 'Tesoros',
+        description: 'El botín más deseado aparece en bloques de tres. ¡Sé rápido!',
+        details: [
+          'Si no los recoges en unos segundos, desaparecen.',
+          'Bonificación progresiva: 25, 50, 75 puntos y sigue aumentando por cada bloque consecutivo completado.',
+        ],
+        image: [
+          '/assets/collectibles/tesoro.png',
+          '/assets/collectibles/tesoro2.png',
+          '/assets/collectibles/tesoro3.png',
+        ],
+        imageAlt: [
+          'Tesoro dorado',
+          'Tesoro púrpura',
+          'Tesoro verde',
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Poderes y Aliados',
+    tagline: 'Activa ventajas temporales que cambian el curso de la partida.',
+    items: [
+      {
+        name: 'Cofre',
+        description: 'Un artefacto raro que concede un poder temporal de 10-15 segundos.',
+        details: [
+          'Doble cantidad de gemas y UKIs en pantalla.',
+          'Transforma las gemas en UKIs.',
+          'Multiplicador x5 en los puntos de gemas y UKIs.',
+        ],
+        image: '/assets/collectibles/vault.png',
+        imageAlt: 'Cofre mágico',
+      },
+      {
+        name: 'Haku',
+        description: 'El espíritu amigo acelera tu recorrido.',
+        details: ['Duplica tu velocidad durante 7 segundos.'],
+        image: '/assets/collectibles/haku.png',
+        imageAlt: 'Haku espíritu amigo',
+      },
+      {
+        name: 'Piel de Goat',
+        description: 'El poder del GOAT se activa cada vez que subes de nivel.',
+        details: [
+          'Durante 3 segundos eliminas a todos los duendes que toques.',
+          'Durante 3 segundos adicionales eres invulnerable a los duendes.',
+        ],
+        image: '/assets/collectibles/goatskin.png',
+        imageAlt: 'Piel de Goat',
+      },
+    ],
+  },
+  {
+    title: 'Ascenso del Tótem',
+    tagline: 'Completa el tótem y escala multiplicadores de puntos.',
+    items: [
+      {
+        name: 'Runas',
+        description: 'Necesitas las 5 runas diferentes para alimentar el tótem mágico.',
+        details: [
+          'Otorgan puntos escalonados en cada nivel: +5, +10, +15, +20 y +25.',
+          'Colecciónalas todas para avanzar de nivel.',
+        ],
+        image: [
+          '/assets/collectibles/runa_chef.png',
+          '/assets/collectibles/runa_engineer.png',
+          '/assets/collectibles/runa_farmer.png',
+          '/assets/collectibles/runa_gatherer.png',
+          '/assets/collectibles/runa_miner.png',
+        ],
+        imageAlt: [
+          'Runa Chef',
+          'Runa Engineer',
+          'Runa Farmer',
+          'Runa Gatherer',
+          'Runa Miner',
+        ],
+      },
+      {
+        name: 'Tótem mágico',
+        description: 'Cuando completas el tótem accedes a un nuevo nivel con mejores multiplicadores.',
+        details: [
+          'Nivel 2: puntos x2',
+          'Nivel 3: puntos x3',
+          'Nivel 4: puntos x4',
+          'Nivel 5: puntos x5',
+        ],
+        image: '/assets/totem/totemlateral.png',
+        imageAlt: 'Tótem mágico completo',
+      },
+      {
+        name: 'Bonificación de nivel',
+        description: 'El tiempo restante nunca se desperdicia.',
+        details: ['Al completar un nivel, los segundos que quedan se multiplican por 5 y se suman a tu puntuación.'],
+        image: '/assets/collectibles/watch_sand.png',
+        imageAlt: 'Reloj de arena mágico',
+      },
+    ],
+  },
+  {
+    title: 'Peligros en el Camino',
+    tagline: 'Evita perder vidas manteniéndote lejos de las amenazas.',
+    items: [
+      {
+        name: 'Duende',
+        description: 'Siempre al acecho y cada vez más numeroso.',
+        details: ['Cada golpe de un duende te hace perder 1 vida.'],
+        image: '/assets/characters/malvado2.png',
+        imageAlt: 'Duende enemigo',
+      },
+      {
+        name: 'Rayos',
+        description: 'Surgen en bloques de tres. Observa sus avisos luminosos y mantente fuera de su alcance.',
+        details: ['Si un rayo te alcanza, pierdes 1 vida.'],
+        image: '/assets/effects/damagecukie.png',
+        imageAlt: 'Impacto de rayo',
+      },
+      {
+        name: 'Zonas de Barro',
+        description: 'Parecen inofensivas, pero frenan tu avance.',
+        details: ['Si las pisas te moverás más lento, lo que te deja vulnerable a otros peligros.'],
+        image: '/assets/obstacles/arenasmovedizas.png',
+        imageAlt: 'Zona de barro',
+      },
+    ],
+  },
+];
+
 const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) => {
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
 
-  // Array con la información de cada página
-  const pages = [
-    {
-      image: "/assets/ui/buttons/controls_info.png",
-      alt: "Información sobre controles del juego"
-    },
-    {
-      image: "/assets/ui/buttons/coin_info.png",
-      alt: "Información sobre monedas"
-    },
-    {
-      image: "/assets/ui/buttons/hippie_info.png", 
-      alt: "Información sobre Hyppie"
-    },
-    {
-      image: "/assets/ui/buttons/whale_info.png",
-      alt: "Información sobre ballenas"
-    },
-    {
-      image: "/assets/ui/buttons/cz_info.png",
-      alt: "Información sobre CZ"
-    },
-    {
-      image: "/assets/ui/buttons/purr_info.png",
-      alt: "Información sobre Purr"
-    },
-    {
-      image: "/assets/ui/buttons/trump_info.png",
-      alt: "Información sobre Trump"
-    },
-    {
-      image: "/assets/ui/buttons/vaul_info.png",
-      alt: "Información sobre Vaul"
-    },
-    {
-      image: "/assets/ui/buttons/wallet_info.png",
-      alt: "Información sobre Evil Wallet"
-    }
-  ];
-
-  const handlePrevPage = () => {
+  const handlePrevGroup = () => {
     onPlaySound?.('button_click');
-    setCurrentPage((prev) => prev === 0 ? pages.length - 1 : prev - 1);
+    setCurrentGroupIndex(prev => (prev === 0 ? infoGroups.length - 1 : prev - 1));
   };
 
-  const handleNextPage = () => {
+  const handleNextGroup = () => {
     onPlaySound?.('button_click');
-    setCurrentPage((prev) => prev === pages.length - 1 ? 0 : prev + 1);
+    setCurrentGroupIndex(prev => (prev === infoGroups.length - 1 ? 0 : prev + 1));
   };
 
   const handleClose = () => {
     onPlaySound?.('button_click');
-    setCurrentPage(0); // Reset to first page when closing
+    setCurrentGroupIndex(0);
     onClose();
   };
 
   if (!isOpen) return null;
 
+  const currentGroup = infoGroups[currentGroupIndex];
+
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[80] p-4"
-      onClick={handleClose} // Click outside to close
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6"
+      onClick={handleClose}
     >
-      <div 
-        className="relative bg-transparent w-full max-w-5xl h-full max-h-[90vh] flex items-center justify-center"
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+      <div
+        className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/95 p-6 md:p-8 shadow-2xl shadow-pink-500/20"
+        onClick={event => event.stopPropagation()}
       >
-        {/* Contenedor principal con espaciado */}
-        <div className="relative w-full h-full flex items-center justify-center">
-          
-          {/* Botón izquierdo - Página anterior - MÁS SEPARADO */}
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none"
+          aria-label="Cerrar información del juego"
+        >
+          ×
+        </button>
+
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">Guía del Reino Cukie</h2>
+          <p className="mt-2 text-sm font-pixellari text-pink-200/80">
+            Desliza con las flechas para descubrir cada elemento del juego.
+          </p>
+        </div>
+
+        <div className="flex items-stretch gap-4">
           <button
-            onClick={handlePrevPage}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 focus:outline-none hover:scale-110 transition-transform z-20"
-            aria-label="Página anterior"
-            style={{ marginRight: '200px' }} // Aumentado de 120px a 200px
+            onClick={handlePrevGroup}
+            className="flex-shrink-0 self-center focus:outline-none transition-transform duration-200 hover:scale-110"
+            aria-label="Grupo anterior"
           >
             <Image
               src="/assets/ui/buttons/button_left.png"
               alt="Anterior"
               width={80}
               height={80}
-              className="game-img"
+              className="game-img w-16 h-16"
             />
           </button>
 
-          {/* Imagen principal de información - CENTRADA Y FIJA con más espacio */}
-          <div className="flex items-center justify-center w-full h-full px-32"> {/* Añadido padding horizontal */}
-            <div className="relative flex items-center justify-center"> {/* Contenedor fijo sin max-w ni max-h */}
-              {/* Contenedor con tamaño fijo para todas las imágenes */}
-              <div 
-                className="relative bg-transparent flex items-center justify-center"
-                style={{
-                  width: '700px',  // Tamaño fijo horizontal
-                  height: '525px', // Tamaño fijo vertical
-                  overflow: 'hidden' // Para recortar si es necesario
-                }}
-              >
-                <Image
-                  src={pages[currentPage].image}
-                  alt={pages[currentPage].alt}
-                  fill // Usar fill para llenar el contenedor
-                  className="object-contain" // Mantener proporción sin recortar
-                  priority
-                  style={{
-                    objectPosition: 'center' // Centrar la imagen
-                  }}
-                />
+          <div className="flex-1">
+            <div className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {currentGroupIndex + 1}</p>
+                  <h3 className="text-2xl md:text-3xl font-pixellari text-pink-200">{currentGroup.title}</h3>
+                </div>
+                <p className="text-xs md:text-sm font-pixellari text-pink-200/70 text-left md:text-right max-w-md">
+                  {currentGroup.tagline}
+                </p>
               </div>
-              
-              {/* Botón de cerrar (esquina superior derecha del contenedor fijo) */}
-              <button
-                onClick={handleClose}
-                className="absolute focus:outline-none hover:scale-110 transition-transform z-30 bg-black bg-opacity-50 rounded-full p-2"
-                aria-label="Cerrar información"
-                style={{ 
-                  top: '-60px',    // Más separación hacia arriba 
-                  right: '-60px',  // Más separación hacia la derecha
-                  margin: '8px'    // Margen adicional
-                }}
-              >
-                <Image
-                  src="/assets/ui/buttons/out.png"
-                  alt="Cerrar"
-                  width={50}
-                  height={50}
-                  className="game-img"
-                />
-              </button>
+
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentGroup.items.map(item => {
+                  const images = Array.isArray(item.image) ? item.image : [item.image];
+                  const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
+
+                  return (
+                    <div
+                      key={item.name}
+                      className="group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {images.map((src, index) => (
+                            <div
+                              key={`${item.name}-${index}`}
+                              className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800/60 p-1"
+                            >
+                              <Image
+                                src={src}
+                                alt={imageAlts[index] ?? item.name}
+                                width={64}
+                                height={64}
+                                quality={100}
+                                className="game-img h-full w-full object-contain"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                        </div>
+                      </div>
+                      <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">
+                        {item.description}
+                      </p>
+                      {item.details && (
+                        <ul className="ml-4 list-disc space-y-1 text-xs md:text-sm text-pink-100/80 font-pixellari">
+                          {item.details.map(detail => (
+                            <li key={detail}>{detail}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Botón derecho - Página siguiente - MÁS SEPARADO */}
           <button
-            onClick={handleNextPage}
-            className="absolute right-4 top-1/2 transform -translate-y-1/2 focus:outline-none hover:scale-110 transition-transform z-20"
-            aria-label="Página siguiente"
-            style={{ marginLeft: '200px' }} // Aumentado de 120px a 200px
+            onClick={handleNextGroup}
+            className="flex-shrink-0 self-center focus:outline-none transition-transform duration-200 hover:scale-110"
+            aria-label="Grupo siguiente"
           >
             <Image
               src="/assets/ui/buttons/button_right.png"
               alt="Siguiente"
               width={80}
               height={80}
-              className="game-img"
+              className="game-img w-16 h-16"
             />
           </button>
-
         </div>
 
-        {/* Indicador de página - SEPARADO con margen */}
-        <div 
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 z-20"
-          style={{ marginTop: '24px' }} // Margen adicional desde la imagen
-        >
-          {pages.map((_, index) => (
-            <div
-              key={index}
-              className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                index === currentPage 
-                  ? 'bg-white border-2 border-blue-400 shadow-lg scale-125' 
-                  : 'bg-gray-500 border-2 border-gray-400 hover:bg-gray-400'
-              }`}
-              style={{ 
-                margin: '0 4px',
-                boxShadow: index === currentPage ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
+        <div className="mt-6 flex items-center justify-center gap-3">
+          {infoGroups.map((_, index) => (
+            <button
+              key={`indicator-${index}`}
+              onClick={() => {
+                onPlaySound?.('button_click');
+                setCurrentGroupIndex(index);
               }}
+              className={`h-3 w-3 rounded-full border-2 transition-all ${
+                index === currentGroupIndex
+                  ? 'border-pink-400 bg-white shadow-[0_0_8px_rgba(236,72,153,0.6)] scale-110'
+                  : 'border-pink-500/40 bg-pink-500/30 hover:bg-pink-400/60'
+              }`}
+              aria-label={`Ir al grupo ${index + 1}`}
             />
           ))}
         </div>
@@ -188,4 +366,4 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   );
 };
 
-export default InfoModal; 
+export default InfoModal;
