@@ -1956,12 +1956,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            ctx.globalAlpha = alpha;
          }
          
-         // Añadir aura dorada especial para el vaul
+         // Añadir aura rosada especial para el vaul
          const auraRadius = vaulImgSize * 0.8;
          const gradientAura = ctx.createRadialGradient(0, 0, auraRadius * 0.3, 0, 0, auraRadius);
-         gradientAura.addColorStop(0, 'rgba(255, 215, 0, 0.6)');
-         gradientAura.addColorStop(0.5, 'rgba(255, 165, 0, 0.3)');
-         gradientAura.addColorStop(1, 'rgba(255, 215, 0, 0)');
+         gradientAura.addColorStop(0, 'rgba(236, 72, 153, 0.6)'); // pink-500
+         gradientAura.addColorStop(0.5, 'rgba(244, 114, 182, 0.3)'); // pink-400
+         gradientAura.addColorStop(1, 'rgba(236, 72, 153, 0)'); // pink-500 transparente
          
          // Dibujar aura con pulso
          const auraPulse = 1.0 + 0.3 * Math.sin((Date.now() % 1500) / 1500 * Math.PI * 2);
@@ -1970,8 +1970,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
          ctx.arc(0, 0, auraRadius * auraPulse, 0, Math.PI * 2);
          ctx.fill();
          
-         // Añadir sombra dorada
-         ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+         // Añadir sombra rosada
+         ctx.shadowColor = 'rgba(236, 72, 153, 0.8)'; // pink-500
          ctx.shadowBlur = 20;
          
          ctx.drawImage(vaulImg, -vaulImgSize/2, -vaulImgSize/2, vaulImgSize, vaulImgSize);
