@@ -36,14 +36,14 @@ const infoGroups: InfoGroup[] = [
           'Usa las teclas ASDW para moverte por la pantalla.',
           'Consigue la mayor puntuación posible antes de que se acabe el tiempo o pierdas las 3 vidas.',
         ],
-        image: '/assets/characters/token.png',
+        image: '/assets/characters/cukiesprites/south/cukie_walk_s_06.png',
         imageAlt: 'Cukie, el héroe del juego',
       },
       {
         name: 'Checkpoint',
         description: 'Un salvavidas temporal que aparece cuando el reloj aprieta.',
         details: ['Recógelo para sumar 30 segundos al contador y continuar tu partida.'],
-        image: '/assets/collectibles/checkpoint.png',
+        image: '/assets/collectibles/checkpointcukies.png',
         imageAlt: 'Checkpoint brillante',
       },
       {
@@ -185,7 +185,7 @@ const infoGroups: InfoGroup[] = [
         name: 'Duende',
         description: 'Siempre al acecho y cada vez más numeroso.',
         details: ['Cada golpe de un duende te hace perder 1 vida.'],
-        image: '/assets/characters/malvado2.png',
+        image: '/assets/characters/malvado3.png',
         imageAlt: 'Duende enemigo',
       },
       {
@@ -199,7 +199,7 @@ const infoGroups: InfoGroup[] = [
         name: 'Zonas de Barro',
         description: 'Parecen inofensivas, pero frenan tu avance.',
         details: ['Si las pisas te moverás más lento, lo que te deja vulnerable a otros peligros.'],
-        image: '/assets/obstacles/arenasmovedizas.png',
+        image: '/assets/obstacles/arenasmovedizas2.png',
         imageAlt: 'Zona de barro',
       },
     ],
@@ -298,23 +298,39 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                     >
                       <div className="flex items-center gap-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          {images.map((src, index) => (
-                            <div
-                              key={`${item.name}-${index}`}
-                              className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800/60 p-1"
-                            >
-                              <Image
-                                src={src}
-                                alt={typeof imageAlts[index] === 'string' ? imageAlts[index] : item.name}
-                                width={224}
-                                height={224}
-                                quality={100}
-                                unoptimized={false}
-                                priority={false}
-                                className="info-modal-img h-full w-full object-contain"
-                              />
+                          {item.name === 'Bonificación de nivel' ? (
+                            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800/60 p-1">
+                              <svg
+                                className="h-full w-full text-pink-400"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M12 19V5M5 12l7-7 7 7" />
+                              </svg>
                             </div>
-                          ))}
+                          ) : (
+                            images.map((src, index) => (
+                              <div
+                                key={`${item.name}-${index}`}
+                                className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800/60 p-1"
+                              >
+                                <Image
+                                  src={src}
+                                  alt={typeof imageAlts[index] === 'string' ? imageAlts[index] : item.name}
+                                  width={224}
+                                  height={224}
+                                  quality={100}
+                                  unoptimized={false}
+                                  priority={false}
+                                  className="info-modal-img h-full w-full object-contain"
+                                />
+                              </div>
+                            ))
+                          )}
                         </div>
                         <div className="flex-1">
                           <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
