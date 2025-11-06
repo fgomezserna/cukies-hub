@@ -256,16 +256,22 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
         <div className="flex items-stretch gap-4">
           <button
             onClick={handlePrevGroup}
-            className="flex-shrink-0 self-center focus:outline-none transition-transform duration-200 hover:scale-110"
+            className="flex-shrink-0 self-center focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95"
             aria-label="Grupo anterior"
           >
-            <Image
-              src="/assets/ui/buttons/button_left.png"
-              alt="Anterior"
-              width={80}
-              height={80}
-              className="game-img w-16 h-16"
-            />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+              <svg
+                className="h-8 w-8 text-pink-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </div>
           </button>
 
           <div className="flex-1">
@@ -331,16 +337,22 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
 
           <button
             onClick={handleNextGroup}
-            className="flex-shrink-0 self-center focus:outline-none transition-transform duration-200 hover:scale-110"
+            className="flex-shrink-0 self-center focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95"
             aria-label="Grupo siguiente"
           >
-            <Image
-              src="/assets/ui/buttons/button_right.png"
-              alt="Siguiente"
-              width={80}
-              height={80}
-              className="game-img w-16 h-16"
-            />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+              <svg
+                className="h-8 w-8 text-pink-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
           </button>
         </div>
 
