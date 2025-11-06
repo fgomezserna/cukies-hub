@@ -1779,18 +1779,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <div className="w-3/4 mb-4">
             <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className="h-4 bg-primary rounded-full transition-all duration-300"
+                className="h-4 bg-pink-500 rounded-full transition-all duration-300"
                 style={{ width: `${Math.round(loadingProgress * 100)}%` }}
               ></div>
             </div>
           </div>
-          <p className="text-muted-foreground text-lg font-pixellari mt-2">
+          <p className="text-pink-200 text-lg font-pixellari mt-2">
             {loadingPhase === 'preload' 
               ? `Cargando elementos esenciales: ${Math.round(loadingProgress * 100)}%`
               : `Optimizando experiencia: ${Math.round(loadingProgress * 100)}%`
             }
           </p>
-          <p className="text-muted-foreground text-sm font-pixellari mt-1 opacity-70">
+          <p className="text-pink-200/70 text-sm font-pixellari mt-1">
             {loadingPhase === 'preload' 
               ? 'Preparando juego...'
               : 'Cargando efectos especiales...'
