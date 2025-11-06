@@ -168,7 +168,7 @@ body {
 
 .game-button:hover {
   transform: scale(1.05);
-  filter: brightness(1.2) drop-shadow(0 0 5px hsl(var(--primary)));
+  filter: brightness(1.2) drop-shadow(0 0 5px rgb(236, 72, 153));
 }
 
 .game-button:active {

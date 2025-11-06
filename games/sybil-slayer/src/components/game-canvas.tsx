@@ -3236,7 +3236,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       }
     }
 
-    // COUNTDOWN ÉPICO con efectos visuales en turquesa brillante
+    // COUNTDOWN ÉPICO con efectos visuales en rosado brillante
     if (gameState.status === 'countdown' && gameState.countdown !== undefined) {
       // Fondo oscuro semi-transparente
       ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -3250,9 +3250,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       // Calcular el número a mostrar
       const displayNumber = gameState.countdown === 0 ? "GO!" : gameState.countdown.toString();
       
-      // Colores turquesa brillantes con variación temporal
+      // Colores rosado brillantes con variación temporal
       const time = gameTime * 0.01; // Para efectos de tiempo
-      const hue = 180 + Math.sin(time * 0.1) * 20; // Variación de turquesa (160-200)
+      const hue = 330 + Math.sin(time * 0.1) * 20; // Variación de rosado (310-350)
       const saturation = 90 + Math.sin(time * 0.15) * 10; // 80-100%
       const lightness = 60 + Math.sin(time * 0.2) * 15; // 45-75%
       
@@ -3302,12 +3302,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         ctx.fillText(displayNumber, width / 2, height / 2);
       });
       
-      // Texto principal con gradiente turquesa brillante
+      // Texto principal con gradiente rosado brillante
       const gradient = ctx.createLinearGradient(0, height / 2 - finalSize / 2, 0, height / 2 + finalSize / 2);
-      gradient.addColorStop(0, `hsl(${hue + 10}, ${saturation + 10}%, ${lightness + 25}%)`); // Turquesa muy claro arriba
-      gradient.addColorStop(0.3, `hsl(${hue}, ${saturation}%, ${lightness + 15}%)`); // Turquesa brillante
-      gradient.addColorStop(0.7, `hsl(${hue - 5}, ${saturation}%, ${lightness}%)`); // Turquesa medio
-      gradient.addColorStop(1, `hsl(${hue - 10}, ${saturation - 10}%, ${lightness - 20}%)`); // Turquesa oscuro abajo
+      gradient.addColorStop(0, `hsl(${hue + 10}, ${saturation + 10}%, ${lightness + 25}%)`); // Rosado muy claro arriba
+      gradient.addColorStop(0.3, `hsl(${hue}, ${saturation}%, ${lightness + 15}%)`); // Rosado brillante
+      gradient.addColorStop(0.7, `hsl(${hue - 5}, ${saturation}%, ${lightness}%)`); // Rosado medio
+      gradient.addColorStop(1, `hsl(${hue - 10}, ${saturation - 10}%, ${lightness - 20}%)`); // Rosado oscuro abajo
       
       // Resetear sombras para texto principal
       ctx.shadowColor = `hsla(${hue}, ${saturation}%, ${lightness + 30}%, 0.9)`;
