@@ -10,6 +10,7 @@ interface ModeSelectModalProps {
   onClose: () => void;
   onSelectMode: (mode: GameMode) => void;
   defaultMode?: GameMode;
+  onRulesClick?: () => void;
 }
 
 const modeCopy: Record<GameMode, { title: string; description: string }> = {
@@ -28,6 +29,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   onClose,
   onSelectMode,
   defaultMode = 'single',
+  onRulesClick,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
 
@@ -45,7 +47,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-5xl rounded-xl border border-cyan-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-cyan-500/10"
+        className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -56,10 +58,10 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           ×
         </button>
         <div className="text-center mb-6">
-          <h2 className="text-3xl font-pixellari text-cyan-200 tracking-wide">
+          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">
             Selecciona modo de juego
           </h2>
-          <p className="mt-2 text-sm font-pixellari text-cyan-200/80">
+          <p className="mt-2 text-sm font-pixellari text-pink-200/80">
             Elige cómo quieres jugar.
           </p>
         </div>
@@ -70,18 +72,18 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             onClick={() => onSelectMode('single')}
             onMouseEnter={() => setHoveredMode('single')}
             onMouseLeave={() => setHoveredMode(null)}
-            className="group relative flex flex-col p-6 rounded-lg border border-cyan-400/40 bg-slate-800/60 shadow-lg shadow-cyan-500/10 hover:border-cyan-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-[280px]"
+            className="group relative flex flex-col p-6 rounded-lg border border-pink-400/40 bg-slate-800/60 shadow-lg shadow-pink-500/10 hover:border-pink-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-[280px]"
           >
             <div className="flex flex-col gap-4 items-center">
               <div className="flex items-center justify-center gap-3 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-cyan-400/20">
-                  <span className="font-pixellari text-lg font-bold text-cyan-200">1P</span>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-400/20">
+                  <span className="font-pixellari text-lg font-bold text-pink-200">1P</span>
                 </div>
                 <div>
-                  <h3 className="font-pixellari text-2xl text-cyan-200">
+                  <h3 className="font-pixellari text-2xl text-pink-200">
                     {modeCopy.single.title}
                   </h3>
-                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-cyan-300/80">
+                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-pink-300/80">
                     MODO CLÁSICO
                   </p>
                 </div>
@@ -96,27 +98,45 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   className="object-contain w-[100px] h-[100px]"
                 />
               </div>
-              {/* Texto explicativo - debajo de la imagen */}
-              <p className="text-sm font-pixellari text-cyan-200/80 text-center">
-                {modeCopy.single.description}
-              </p>
+              {/* Botón de Reglas - debajo de la imagen */}
+              {onRulesClick && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRulesClick();
+                  }}
+                  className="focus:outline-none game-button relative mt-2"
+                  aria-label="Reglas"
+                >
+                  <Image 
+                    src="/assets/ui/buttons/caja-texto2.png"
+                    alt="Reglas"
+                    width={120}
+                    height={50}
+                    className="game-img"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                    REGLAS
+                  </span>
+                </button>
+              )}
             </div>
           </button>
 
           {/* Multiplayer Mode */}
           <div
-            className="group relative flex flex-col p-6 rounded-lg border border-cyan-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none w-[280px]"
+            className="group relative flex flex-col p-6 rounded-lg border border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none w-[280px]"
           >
             <div className="flex flex-col gap-4 items-center">
               <div className="flex items-center justify-center gap-3 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-400/30 bg-cyan-400/10 opacity-60">
-                  <span className="font-pixellari text-lg font-bold text-cyan-200/60">2P</span>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/30 bg-pink-400/10 opacity-60">
+                  <span className="font-pixellari text-lg font-bold text-pink-200/60">2P</span>
                 </div>
                 <div>
-                  <h3 className="font-pixellari text-2xl text-cyan-200/60">
+                  <h3 className="font-pixellari text-2xl text-pink-200/60">
                     {modeCopy.multiplayer.title}
                   </h3>
-                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-cyan-300/50">
+                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-pink-300/50">
                     NUEVO DESAFÍO
                   </p>
                 </div>
@@ -134,8 +154,8 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 </div>
               </div>
               {/* "Coming soon" badge - debajo de todo */}
-              <div className="flex items-center justify-center gap-2 rounded-full border border-cyan-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-cyan-500/20">
-                <span className="font-pixellari text-sm tracking-[0.35em] text-cyan-200">
+              <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
+                <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
                   PRÓXIMAMENTE
                 </span>
               </div>

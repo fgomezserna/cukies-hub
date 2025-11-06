@@ -1808,6 +1808,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         onClose={() => setModeSelectOpen(false)}
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
+        onRulesClick={() => setIsInfoModalOpen(true)}
       />
       {waitingOverlay}
       {countdownOverlay}
@@ -1826,22 +1827,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               backgroundRepeat: 'no-repeat'
             }}
           ></div>
-          <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 bg-background/30 backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 px-4 py-6">
             <div
-              className="flex flex-col items-center justify-center"
+              className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
               style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
             >
-              <h1 className="text-6xl md:text-8xl font-pixellari text-white drop-shadow-lg mb-8 text-center select-none tracking-wide">
+              <h1 className="text-4xl md:text-6xl font-pixellari text-pink-200 mb-6 text-center select-none tracking-wide">
                 TREASURE HUNT
               </h1>
-              <p className="text-lg md:text-xl font-pixellari text-primary-foreground mb-8 text-center select-none">
-                ¡Te damos la bienvenida a Treasure Hunt!<br/>
-                <br/>
+              <p className="text-base md:text-lg font-pixellari text-pink-200/80 mb-6 text-center select-none">
                 Utiliza las teclas ASDW para mover al personaje, y consigue la mayor puntuación posible.<br/>
                 <br/>
                 La partida termina cuando se acaba el tiempo o pierdes las 3 vidas.
               </p>
-              <div className="flex flex-row gap-4 mb-4">
+              <div className="flex flex-row justify-center gap-4">
                 <button 
                   onClick={handleStartPauseClick} 
                   className="focus:outline-none game-button relative"
