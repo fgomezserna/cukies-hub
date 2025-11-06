@@ -2243,9 +2243,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span 
                     style={{
-                      color: gameState.scoreMultiplier > 1 ? '#FFD700' : '#FFFFFF',
+                      color: gameState.scoreMultiplier > 1 ? '#EC4899' : '#FFFFFF', // pink-500 cuando multiplicador activo
                       textShadow: gameState.scoreMultiplier > 1 
-                        ? '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)' 
+                        ? '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)' 
                         : '2px 2px 4px rgba(0, 0, 0, 0.8)',
                       animation: gameState.scoreMultiplier > 1 ? 'pulse 1s infinite alternate' : 'none',
                       WebkitTextStroke: '1px #000000'
@@ -2262,15 +2262,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       left: '160px', // Al lado derecho de la caja
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      color: '#FFD700',
+                      color: '#EC4899', // pink-500
                       fontSize: '20px',
                       fontWeight: 'bold',
                       fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      textShadow: '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      border: '2px solid #FFD700',
+                      border: '2px solid #EC4899', // pink-500
                       whiteSpace: 'nowrap',
                       animation: 'pulse 1s infinite alternate',
                       zIndex: 1000
@@ -2288,15 +2288,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       left: '160px',
                       top: gameState.scoreMultiplier > 1 ? '80%' : '50%', // Debajo del multiplicador si ambos están activos
                       transform: 'translateY(-50%)',
-                      color: '#00FFFF',
+                      color: '#EC4899', // pink-500
                       fontSize: '18px',
                       fontWeight: 'bold',
                       fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(0, 255, 255, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      textShadow: '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      border: '2px solid #00FFFF',
+                      border: '2px solid #EC4899', // pink-500
                       whiteSpace: 'nowrap',
                       animation: 'pulse 1s infinite alternate',
                       zIndex: 1000
@@ -2314,21 +2314,21 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       left: '160px',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      color: '#00BFFF',
+                      color: '#EC4899', // pink-500
                       fontSize: '18px',
                       fontWeight: 'bold',
                       fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(0, 191, 255, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                      textShadow: '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      border: '2px solid #00BFFF',
+                      border: '2px solid #EC4899', // pink-500
                       whiteSpace: 'nowrap',
                       animation: 'pulse 1s infinite alternate',
                       zIndex: 1000
                     }}
                   >
-                    Energy→Uki {gameState.vaulEffectTimeRemaining}s
+                    Gemas→Monedas {gameState.vaulEffectTimeRemaining}s
                   </div>
                 )}
                 
