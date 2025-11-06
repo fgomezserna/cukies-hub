@@ -984,26 +984,40 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   const drawRedZone = (ctx: CanvasRenderingContext2D, zone: RedZone, timestamp: number) => {
     ctx.save();
 
-    if (zone.phase === 'warning') {
-      // Fase de advertencia: efecto de "mancha" que se expande orgánicamente
+    const centerX = zone.x + zone.width / 2;
+    const centerY = zone.y + zone.height / 2;
+    const maxRadius = Math.max(zone.width, zone.height) * 0.7; // Radio máximo para cubrir toda la zona
+    const timeFactor = timestamp * 0.003;
+
+    // Calcular el progreso de expansión de la mancha
+    // Siempre usar warningStartTime si existe, independientemente de la fase
+    // Esto asegura que la mancha siempre se expanda desde el centro hacia afuera
+    let expansionProgress = 1.0; // Por defecto, completamente expandida
+    
+    if (zone.warningStartTime) {
+      // Calcular el tiempo transcurrido desde que empezó la advertencia
       const elapsed = Math.max(0, timestamp - zone.warningStartTime);
       const progress = Math.max(0, Math.min(1, elapsed / RED_ZONE_WARNING_DURATION_MS));
+      // Usar easeOut para que empiece rápido y termine suave
       const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
-      const p = easeOut(progress);
-      const centerX = zone.x + zone.width / 2;
-      const centerY = zone.y + zone.height / 2;
-      const baseRadius = Math.min(zone.width, zone.height) * (0.35 + 0.55 * p);
-      const timeFactor = timestamp * 0.003;
+      expansionProgress = easeOut(progress);
+    }
+    // Si no hay warningStartTime o ya pasó el tiempo, expansionProgress es 1.0 (completamente expandida)
 
-      if (quicksandImgRef.current) {
-        // Crear máscara irregular tipo mancha y recortar la imagen a esa forma
+    // Calcular el radio actual basado en el progreso (desde 0 hasta maxRadius)
+    const currentRadius = maxRadius * expansionProgress;
+
+    if (quicksandImgRef.current) {
+      // Si la mancha aún no ha alcanzado el tamaño completo, usar el efecto de mancha
+      if (expansionProgress < 1.0) {
+        // Crear máscara irregular tipo mancha que se expande desde el centro
         ctx.save();
         ctx.beginPath();
         const lobes = 24; // más puntos => borde más orgánico
         for (let i = 0; i < lobes; i++) {
           const a = (i / lobes) * Math.PI * 2;
           const noise = 0.18 * Math.sin(5 * a + timeFactor) + 0.08 * Math.sin(11 * a - timeFactor * 0.66);
-          const r = baseRadius * (1 + noise);
+          const r = currentRadius * (1 + noise);
           const px = centerX + r * Math.cos(a);
           const py = centerY + r * Math.sin(a);
           if (i === 0) {
@@ -1014,19 +1028,26 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         }
         ctx.closePath();
         ctx.clip();
-        // Sutil animación de opacidad para llamar la atención sin color rojo
+        // Sutil animación de opacidad para llamar la atención
         const flicker = 0.85 + 0.15 * Math.sin(timestamp / 180);
-        ctx.globalAlpha = 0.5 + 0.4 * p * flicker;
+        ctx.globalAlpha = 0.5 + 0.4 * expansionProgress * flicker;
         ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
         ctx.restore();
       } else {
-        // Fallback: dibujar una mancha neutra sin rectángulos
+        // Cuando está completamente expandida, mostrar la imagen completa sin máscara
+        ctx.globalAlpha = 0.95;
+        ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
+      }
+    } else {
+      // Fallback: dibujar una mancha sin imagen
+      if (expansionProgress < 1.0) {
+        // Mancha en expansión
         const lobes = 24;
         ctx.beginPath();
         for (let i = 0; i < lobes; i++) {
           const a = (i / lobes) * Math.PI * 2;
           const noise = 0.18 * Math.sin(5 * a + timeFactor) + 0.08 * Math.sin(11 * a - timeFactor * 0.66);
-          const r = baseRadius * (1 + noise);
+          const r = currentRadius * (1 + noise);
           const px = centerX + r * Math.cos(a);
           const py = centerY + r * Math.sin(a);
           if (i === 0) {
@@ -1036,23 +1057,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           }
         }
         ctx.closePath();
-        ctx.globalAlpha = 0.25 + 0.35 * p;
+        ctx.globalAlpha = 0.25 + 0.35 * expansionProgress;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
         ctx.fill();
-      }
-    } else {
-      // Fase activa: arenas movedizas completamente visible
-      if (quicksandImgRef.current) {
-        // Aumentar opacidad final para que no quede más clara que durante el parpadeo
-        ctx.globalAlpha = 0.95;
-        ctx.drawImage(quicksandImgRef.current, zone.x, zone.y, zone.width, zone.height);
-        // Se evita dibujar rectángulos que agreguen bordes cuadrados
       } else {
-        // Fallback si la imagen no está cargada
+        // Completamente expandida
         ctx.globalAlpha = 0.6;
         ctx.fillStyle = 'rgba(220, 30, 30, 0.85)';
         ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
-        // En el fallback no se dibuja borde para evitar el recuadro
       }
     }
 
