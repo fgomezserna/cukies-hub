@@ -31,15 +31,6 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
 
-  // Estilo de texto blanco con borde negro como en HUD (score/nivel)
-  const outlinedTextStyle: React.CSSProperties = React.useMemo(
-    () => ({
-      WebkitTextStroke: '1px #000000',
-      textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
-    }),
-    []
-  );
-
   React.useEffect(() => {
     if (!open) {
       setHoveredMode(null);
@@ -50,152 +41,103 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-md px-4 py-6"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl"
+        className="relative w-full max-w-5xl rounded-xl border border-cyan-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-cyan-500/10"
         onClick={event => event.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute -right-3 -top-3 z-[20] flex h-10 w-10 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg hover:bg-red-500 focus:outline-none"
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50 focus:outline-none"
           aria-label="Cerrar selector de modo"
         >
           ×
         </button>
-        <Image
-          src="/assets/ui/game-container/tableromodojuego.png"
-          alt="Selector de modo de juego"
-          width={1080}
-          height={720}
-          className="h-auto w-full select-none"
-          priority
-        />
-        {/* Overlay content on top of the board image */}
-        <div className="absolute inset-0 z-[10] flex flex-col justify-center p-6">
-          <div className="text-center">
-            <h2 className="font-pixellari text-3xl text-white tracking-wide" style={outlinedTextStyle}>
-              Selecciona modo de juego
-            </h2>
-            <p className="mt-2 text-sm text-white/90" style={outlinedTextStyle}>
-              Elige cómo quieres jugar.
-            </p>
-          </div>
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-pixellari text-cyan-200 tracking-wide">
+            Selecciona modo de juego
+          </h2>
+          <p className="mt-2 text-sm font-pixellari text-cyan-200/80">
+            Elige cómo quieres jugar.
+          </p>
+        </div>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-            {/* Single Player Mode */}
-            <button
-              onClick={() => onSelectMode('single')}
-              onMouseEnter={() => setHoveredMode('single')}
-              onMouseLeave={() => setHoveredMode(null)}
-              className={[
-                'group relative flex flex-col p-6 text-left transition-all duration-200 focus:outline-none',
-                defaultMode === 'single' ? 'scale-[1.01]' : '',
-              ].join(' ')}
-            >
-              {/* Background board image */}
-              <div className={['absolute inset-0 -z-0 pointer-events-none transform origin-center scale-125 transition-transform duration-200', hoveredMode === 'single' ? 'scale-[1.3125]' : ''].join(' ')}>
+        <div className="flex flex-wrap justify-center gap-6">
+          {/* Single Player Mode */}
+          <button
+            onClick={() => onSelectMode('single')}
+            onMouseEnter={() => setHoveredMode('single')}
+            onMouseLeave={() => setHoveredMode(null)}
+            className="group relative flex flex-col p-6 rounded-lg border border-cyan-400/40 bg-slate-800/60 shadow-lg shadow-cyan-500/10 hover:border-cyan-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-[280px]"
+          >
+            <div className="flex flex-col gap-4 items-center">
+              <div className="flex items-center justify-center gap-3 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-cyan-400/20">
+                  <span className="font-pixellari text-lg font-bold text-cyan-200">1P</span>
+                </div>
+                <div>
+                  <h3 className="font-pixellari text-2xl text-cyan-200">
+                    {modeCopy.single.title}
+                  </h3>
+                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-cyan-300/80">
+                    MODO CLÁSICO
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-center">
                 <Image
-                  src="/assets/ui/buttons/cartel2.png"
-                  alt="Card background"
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  src="/assets/characters/1p.png"
+                  alt="1P"
+                  width={300}
+                  height={300}
+                  quality={100}
+                  className="object-contain w-[100px] h-[100px]"
                 />
               </div>
-              <div className={['relative z-[1] flex flex-col gap-4 pt-8 md:pt-10 translate-y-[30px] transition-transform duration-200', hoveredMode === 'single' ? 'scale-105' : ''].join(' ')}>
-                <div className="flex w-full items-center justify-center gap-3 text-center">
-                  <div className="relative h-12 w-12">
-                    <Image
-                      src="/assets/ui/buttons/I_ButtonRounded.png"
-                      alt="1P"
-                      width={264}
-                      height={272}
-                      quality={100}
-                      className="object-contain w-12 h-12"
-                    />
-                    <span className="absolute inset-0 flex items-center justify-center font-pixellari text-lg text-white" style={outlinedTextStyle}>1P</span>
-                  </div>
-                  <div>
-                    <h3 className="font-pixellari text-2xl text-white" style={outlinedTextStyle}>
-                      {modeCopy.single.title}
-                    </h3>
-                    <p className="text-xs uppercase tracking-[0.25em] text-white/80" style={outlinedTextStyle}>
-                      MODO CLÁSICO
-                    </p>
-                  </div>
+              {/* Texto explicativo - debajo de la imagen */}
+              <p className="text-sm font-pixellari text-cyan-200/80 text-center">
+                {modeCopy.single.description}
+              </p>
+            </div>
+          </button>
+
+          {/* Multiplayer Mode */}
+          <div
+            className="group relative flex flex-col p-6 rounded-lg border border-cyan-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none w-[280px]"
+          >
+            <div className="flex flex-col gap-4 items-center">
+              <div className="flex items-center justify-center gap-3 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-400/30 bg-cyan-400/10 opacity-60">
+                  <span className="font-pixellari text-lg font-bold text-cyan-200/60">2P</span>
                 </div>
-                <div className="flex justify-center">
+                <div>
+                  <h3 className="font-pixellari text-2xl text-cyan-200/60">
+                    {modeCopy.multiplayer.title}
+                  </h3>
+                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-cyan-300/50">
+                    NUEVO DESAFÍO
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-row items-center justify-center">
                   <Image
-                    src="/assets/characters/1p.png"
-                    alt="1P"
-                    width={300}
+                    src="/assets/characters/vs.png"
+                    alt="VS"
+                    width={600}
                     height={300}
                     quality={100}
-                    className="object-contain w-[100px] h-[100px]"
+                    className="object-contain w-[240px] h-[120px] opacity-60"
                   />
                 </div>
               </div>
-            </button>
-
-            {/* Multiplayer Mode */}
-            <div
-              className={[
-                'group relative flex flex-col p-6 text-left transition-all duration-200',
-                'opacity-90 grayscale brightness-75 contrast-90 pointer-events-none select-none',
-              ].join(' ')}
-            >
-              {/* "Coming soon" badge */}
-              <div className="pointer-events-none absolute left-1/2 top-4 z-[2] flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/30 bg-slate-900/80 px-4 py-1 shadow-[0_0_12px_rgba(0,0,0,0.6)]">
-                <span className="font-pixellari text-sm tracking-[0.35em] text-white" style={outlinedTextStyle}>
+              {/* "Coming soon" badge - debajo de todo */}
+              <div className="flex items-center justify-center gap-2 rounded-full border border-cyan-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-cyan-500/20">
+                <span className="font-pixellari text-sm tracking-[0.35em] text-cyan-200">
                   PRÓXIMAMENTE
                 </span>
-              </div>
-              {/* Background board image */}
-              <div className="absolute inset-0 -z-0 pointer-events-none transform origin-center scale-125">
-                <Image
-                  src="/assets/ui/buttons/cartel2.png"
-                  alt="Card background"
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                />
-              </div>
-              <div className="relative z-[1] flex flex-col gap-4 pt-8 md:pt-10 translate-y-[30px]">
-                <div className="flex w-full items-center justify-center gap-3 text-center">
-                  <div className="relative h-12 w-12">
-                    <Image
-                      src="/assets/ui/buttons/I_ButtonRounded.png"
-                      alt="2P"
-                      width={264}
-                      height={272}
-                      quality={100}
-                      className="object-contain w-12 h-12"
-                    />
-                    <span className="absolute inset-0 flex items-center justify-center font-pixellari text-lg text-white" style={outlinedTextStyle}>2P</span>
-                  </div>
-                  <div>
-                    <h3 className="font-pixellari text-2xl text-white" style={outlinedTextStyle}>
-                      {modeCopy.multiplayer.title}
-                    </h3>
-                    <p className="text-xs uppercase tracking-[0.25em] text-white/80" style={outlinedTextStyle}>
-                      NUEVO DESAFÍO
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex flex-row items-center justify-center">
-                    <Image
-                      src="/assets/characters/vs.png"
-                      alt="VS"
-                      width={600}
-                      height={300}
-                      quality={100}
-                      className="object-contain w-[240px] h-[120px]"
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </div>
