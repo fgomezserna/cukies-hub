@@ -852,13 +852,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       }
     } else {
       // FASE ACTIVA: Rayo azul brillante con chispas
-      ctx.globalCompositeOperation = 'lighter';
+      // Usar 'lighten' para el halo - preserva el color más claro (azul) sobre fondos oscuros (redzone)
+      ctx.globalCompositeOperation = 'lighten';
 
-      // Aura exterior azul cian
+      // Aura exterior azul cian - colores más intensos y opacos para que se vean sobre cualquier fondo
       const outerBlurWidth = ray.width * 8;
       const outerBlurHeight = ray.height * 8;
       
-      ctx.globalAlpha = 0.3;
+      ctx.globalAlpha = 0.5;
       if (ray.orientation === 'vertical') {
         const outerGradient = ctx.createLinearGradient(
           ray.x - (outerBlurWidth - ray.width) / 2, 
@@ -867,9 +868,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           0
         );
         outerGradient.addColorStop(0, 'rgba(0, 100, 255, 0.0)');
-        outerGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.2)');
-        outerGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.3)');
-        outerGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.2)');
+        outerGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.4)');
+        outerGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.6)');
+        outerGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.4)');
         outerGradient.addColorStop(1, 'rgba(0, 100, 255, 0.0)');
         ctx.fillStyle = outerGradient;
         ctx.fillRect(
@@ -886,9 +887,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ray.y + ray.height + (outerBlurHeight - ray.height) / 2
         );
         outerGradient.addColorStop(0, 'rgba(0, 100, 255, 0.0)');
-        outerGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.2)');
-        outerGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.3)');
-        outerGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.2)');
+        outerGradient.addColorStop(0.3, 'rgba(0, 150, 255, 0.4)');
+        outerGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.6)');
+        outerGradient.addColorStop(0.7, 'rgba(0, 150, 255, 0.4)');
         outerGradient.addColorStop(1, 'rgba(0, 100, 255, 0.0)');
         ctx.fillStyle = outerGradient;
         ctx.fillRect(
@@ -899,11 +900,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         );
       }
 
-      // Halo intermedio azul brillante
+      // Halo intermedio azul brillante - colores más intensos
       const midBlurWidth = ray.width * 4;
       const midBlurHeight = ray.height * 4;
       
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.8;
       if (ray.orientation === 'vertical') {
         const midGradient = ctx.createLinearGradient(
           ray.x - (midBlurWidth - ray.width) / 2, 
@@ -912,9 +913,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           0
         );
         midGradient.addColorStop(0, 'rgba(0, 200, 255, 0.0)');
-        midGradient.addColorStop(0.3, 'rgba(0, 220, 255, 0.4)');
-        midGradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.6)');
-        midGradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.4)');
+        midGradient.addColorStop(0.3, 'rgba(0, 220, 255, 0.6)');
+        midGradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.9)');
+        midGradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.6)');
         midGradient.addColorStop(1, 'rgba(0, 200, 255, 0.0)');
         ctx.fillStyle = midGradient;
         ctx.fillRect(
@@ -931,9 +932,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ray.y + ray.height + (midBlurHeight - ray.height) / 2
         );
         midGradient.addColorStop(0, 'rgba(0, 200, 255, 0.0)');
-        midGradient.addColorStop(0.3, 'rgba(0, 220, 255, 0.4)');
-        midGradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.6)');
-        midGradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.4)');
+        midGradient.addColorStop(0.3, 'rgba(0, 220, 255, 0.6)');
+        midGradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.9)');
+        midGradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.6)');
         midGradient.addColorStop(1, 'rgba(0, 200, 255, 0.0)');
         ctx.fillStyle = midGradient;
         ctx.fillRect(
@@ -944,7 +945,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         );
       }
 
-      // Núcleo central azul brillante
+      // Núcleo central azul brillante - usar 'lighter' para mantener el brillo intenso
+      ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 1.0;
       if (ray.orientation === 'vertical') {
         const coreGradient = ctx.createLinearGradient(ray.x, 0, ray.x + ray.width, 0);
@@ -2253,16 +2255,65 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         // Tamaño para Haku
         const baseSize = obj.radius * 2 * 1.2; // Un poco más grande para mejor visibilidad
         const hakuImg = megaNodeImgRef.current; // ahora apunta a haku.png
+        
+        // EFECTO DE FONDO: Añadir un círculo de fondo con gradiente para mejorar la visibilidad
+        const backgroundRadius = baseSize * 0.7; // Radio del círculo de fondo
+        const pulseIntensity = 0.3 + 0.2 * Math.sin(gameTime / 800); // Efecto pulsante
+        
+        // Capa 1: Círculo exterior con gradiente radial oscuro (contraste con fondo azul)
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        const outerGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, backgroundRadius * 1.5);
+        outerGradient.addColorStop(0, `rgba(20, 20, 40, ${0.6 + pulseIntensity * 0.2})`);
+        outerGradient.addColorStop(0.5, `rgba(30, 30, 60, ${0.4 + pulseIntensity * 0.15})`);
+        outerGradient.addColorStop(1, 'rgba(20, 20, 40, 0.0)');
+        ctx.fillStyle = outerGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, backgroundRadius * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        // Capa 2: Círculo medio con borde más definido
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        const midGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, backgroundRadius * 1.2);
+        midGradient.addColorStop(0, `rgba(40, 40, 80, ${0.5 + pulseIntensity * 0.2})`);
+        midGradient.addColorStop(0.7, `rgba(30, 30, 70, ${0.3 + pulseIntensity * 0.15})`);
+        midGradient.addColorStop(1, 'rgba(20, 20, 50, 0.0)');
+        ctx.fillStyle = midGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, backgroundRadius * 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        // Capa 3: Halo azul cian brillante alrededor del haku
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const glowGradient = ctx.createRadialGradient(0, 0, backgroundRadius * 0.3, 0, 0, backgroundRadius * 1.1);
+        glowGradient.addColorStop(0, `rgba(100, 200, 255, ${0.3 + pulseIntensity * 0.2})`);
+        glowGradient.addColorStop(0.5, `rgba(80, 180, 255, ${0.2 + pulseIntensity * 0.15})`);
+        glowGradient.addColorStop(1, 'rgba(60, 150, 255, 0.0)');
+        ctx.fillStyle = glowGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, backgroundRadius * 1.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
         if (hakuImg) {
           if ('isBlinking' in obj && obj.isBlinking) {
             const blinkCycle = Math.floor(Date.now() / 200) % 2;
             const alpha = blinkCycle === 0 ? 0.3 : 1.0;
             ctx.globalAlpha = alpha;
           }
+          
+          // Dibujar el haku con sombra azul brillante
+          ctx.save();
+          ctx.shadowColor = `rgba(80, 180, 255, ${0.6 + pulseIntensity * 0.2})`;
+          ctx.shadowBlur = 15 + 8 * Math.sin(gameTime / 1000);
           ctx.drawImage(hakuImg, -baseSize/2, -baseSize/2, baseSize, baseSize);
+          ctx.restore();
+          
           ctx.globalAlpha = 1.0;
-          ctx.shadowColor = 'rgba(80, 180, 255, 0.5)';
-          ctx.shadowBlur = 10 + 5 * Math.sin(Date.now() / 1000);
         }
          
          // Resetear sombra antes de restaurar contexto

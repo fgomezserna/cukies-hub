@@ -179,13 +179,13 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                   },
                   {
                     key: 'ukis',
-                    label: 'UKIs',
+                    label: 'Monedas',
                     count: entry.counts.ukis,
                     points: entry.points.ukis,
                   },
                   {
                     key: 'ukisX5',
-                    label: 'UKIs x5',
+                    label: 'Monedas x5',
                     count: entry.counts.ukisX5,
                     points: entry.points.ukisX5,
                   },
@@ -1855,7 +1855,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     className="game-img"
                   />
                   <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-xl" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Jugar
+                    JUGAR
                   </span>
                 </button>
                 <button 
@@ -1871,7 +1871,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     className="game-img"
                   />
                   <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-xl" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Reglas
+                    REGLAS
                   </span>
                 </button>
               </div>
@@ -1924,7 +1924,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Nivel: {gameState.level}
+                    Level: {gameState.level}
                   </span>
                 </div>
               </div>
@@ -2370,7 +2370,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Nivel: {gameState.level}
+                    Level: {gameState.level}
                   </span>
                 </div>
               </div>
