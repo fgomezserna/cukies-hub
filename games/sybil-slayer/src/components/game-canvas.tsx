@@ -1684,6 +1684,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
      
      // Dibujar energía con animación
      if ('type' in obj && obj.type === 'energy') {
+       // Asegurar renderizado suave para las gemas
+       ctx.imageSmoothingEnabled = true;
+       ctx.imageSmoothingQuality = 'high';
+       
        // Calcular el índice de frame actual para la animación
        const frameIndex = Math.floor(Date.now() / 100) % 6; // Cambio de frame cada 100ms
        
@@ -1699,6 +1703,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
      
      // Dibujar checkpoint (estático)
      if ('type' in obj && obj.type === 'checkpoint') {
+       // Asegurar renderizado suave para el checkpoint
+       ctx.imageSmoothingEnabled = true;
+       ctx.imageSmoothingQuality = 'high';
+       
        // Usar la referencia cargada para evitar parpadeo
        const checkpointImg = checkpointImgRef.current;
       if (checkpointImg) {
@@ -2598,6 +2606,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Saltar renderizado de fee aquí - se maneja arriba con sprites
            return;
          } else {
+           // Asegurar renderizado suave para collectibles (especialmente uki, checkpoint y otros)
+           if ('type' in obj && (obj.type === 'uki' || obj.type === 'heart' || obj.type === 'vaul' || obj.type === 'checkpoint' || obj.type === 'treasure' || obj.type === 'treasure2' || obj.type === 'treasure3')) {
+             ctx.imageSmoothingEnabled = true;
+             ctx.imageSmoothingQuality = 'high';
+           }
+           
            // Si es el token (no tiene 'type'), usar el factor de escala aumentado
            if (!('type' in obj)) {
              const tokenImgSize = imgSize * 1.46; // Factor de escala para token de 70x70px
@@ -2650,6 +2664,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            const blinkCycle = Math.floor(Date.now() / 200) % 2;
            const alpha = blinkCycle === 0 ? 0.3 : 1.0;
            ctx.globalAlpha = alpha;
+         }
+         
+         // Asegurar renderizado suave para collectibles en fallback también
+         if ('type' in obj && (obj.type === 'uki' || obj.type === 'heart' || obj.type === 'vaul' || obj.type === 'checkpoint' || obj.type === 'treasure' || obj.type === 'treasure2' || obj.type === 'treasure3')) {
+           ctx.imageSmoothingEnabled = true;
+           ctx.imageSmoothingQuality = 'high';
          }
          
          // Aplicar factores de escala apropiados
@@ -3505,7 +3525,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         width={width}
         height={height}
         className="block border border-border rounded-lg shadow-lg"
-        style={{ imageRendering: 'pixelated' }}
+        style={{ imageRendering: 'auto' }}
       />
   );
 };

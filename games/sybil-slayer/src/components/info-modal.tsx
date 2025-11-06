@@ -305,11 +305,13 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                             >
                               <Image
                                 src={src}
-                                alt={imageAlts[index] ?? item.name}
-                                width={64}
-                                height={64}
+                                alt={typeof imageAlts[index] === 'string' ? imageAlts[index] : item.name}
+                                width={224}
+                                height={224}
                                 quality={100}
-                                className="game-img h-full w-full object-contain"
+                                unoptimized={false}
+                                priority={false}
+                                className="info-modal-img h-full w-full object-contain"
                               />
                             </div>
                           ))}

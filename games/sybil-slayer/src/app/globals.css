@@ -161,6 +161,13 @@ body {
   -ms-interpolation-mode: nearest-neighbor; /* Para IE */
 }
 
+/* Estilos para imágenes del modal de información - renderizado nítido y suave */
+.info-modal-img {
+  image-rendering: auto !important;
+  -ms-interpolation-mode: bicubic !important;
+  /* Sobrescribe el image-rendering: pixelated de .game-img */
+}
+
 /* Efectos para imágenes de botones */
 .game-button {
   transition: transform 0.1s ease, filter 0.2s ease;
