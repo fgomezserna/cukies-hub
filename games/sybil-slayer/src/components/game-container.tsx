@@ -623,19 +623,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   ) : null;
 
   const vaultEffectBadgesElement = useMemo(() => {
-    const badges: Array<{ key: string; text: string; color: string }> = [];
+    const formatSeconds = (value: number) => `${value}s`;
+    const badges: Array<{ key: string; label: string; color: string; time?: string }> = [];
     const multiplierTime = Math.max(0, Math.ceil(gameState.multiplierTimeRemaining ?? 0));
     if (gameState.scoreMultiplier > 1 && multiplierTime > 0) {
       if (gameState.scoreMultiplier === 5) {
         badges.push({
           key: 'multiplier',
-          text: `Puntos ×5 ${multiplierTime}s`,
+          label: 'Puntos ×5',
+          time: formatSeconds(multiplierTime),
           color: '#EC4899',
         });
       } else {
         badges.push({
           key: 'multiplier',
-          text: `x${gameState.scoreMultiplier} ${multiplierTime}s`,
+          label: `x${gameState.scoreMultiplier}`,
+          time: formatSeconds(multiplierTime),
           color: '#EC4899',
         });
       }
@@ -645,7 +648,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.activeVaulEffect === 'double_collectibles' && vaulTime > 0) {
       badges.push({
         key: 'double_collectibles',
-        text: `2x Items ${vaulTime}s`,
+        label: '2x Items',
+        time: formatSeconds(vaulTime),
         color: '#EC4899',
       });
     }
@@ -653,7 +657,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.activeVaulEffect === 'energy_to_uki' && vaulTime > 0) {
       badges.push({
         key: 'energy_to_uki',
-        text: `Gemas→Monedas ${vaulTime}s`,
+        label: 'Gemas→Monedas',
+        time: formatSeconds(vaulTime),
         color: '#EC4899',
       });
     }
@@ -661,7 +666,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.eliminateEnemiesDisplay) {
       badges.push({
         key: 'eliminate_enemies',
-        text: `💥 ${gameState.eliminateEnemiesDisplay.count} Enemigos`,
+        label: `💥 ${gameState.eliminateEnemiesDisplay.count} Enemigos`,
         color: '#FF4500',
       });
     }
@@ -683,7 +688,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         }}
       >
         <div className="flex flex-wrap justify-center gap-2">
-          {badges.map(({ key, text, color }) => {
+          {badges.map(({ key, label, color, time }) => {
             const dropShadowColor = color === '#FF4500' ? 'rgba(255, 69, 0, 0.85)' : 'rgba(236, 72, 153, 0.85)';
             return (
               <div
@@ -708,7 +713,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   style={{ filter: `drop-shadow(0 0 8px ${dropShadowColor})` }}
                   priority={false}
                 />
-                <span className="whitespace-nowrap">{text}</span>
+                <span className="whitespace-nowrap">{label}</span>
+                {time && (
+                  <span
+                    className="flex items-center justify-center rounded-full border-2 px-2 font-bold text-xs uppercase tracking-wide"
+                    style={{
+                      borderColor: color,
+                      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                      minWidth: '32px',
+                      height: '32px',
+                    }}
+                  >
+                    {time}
+                  </span>
+                )}
               </div>
             );
           })}
