@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { SoundType } from '@/hooks/useAudio';
 
@@ -40,14 +40,14 @@ const infoGroups: InfoGroup[] = [
         name: 'Checkpoint',
         description:
           'Aparece cuando se está acabando el tiempo. Recógelo para sumar 30 segundos al contador y continuar tu partida.',
-        image: '/assets/collectibles/checkpointcukies.png',
+        image: '/assets/collectibles/checkpointcukies_reglas.png',
         imageAlt: 'Checkpoint brillante',
       },
       {
         name: 'Corazón',
         description:
           'Si has perdido una vida, la recuperarás al instante. Si tienes todas las vidas, obtienes puntos crecientes: +20, +40, +60 y así sucesivamente.',
-        image: '/assets/collectibles/corazoncukies.png',
+        image: '/assets/collectibles/corazoncukies_reglas.png',
         imageAlt: 'Corazón de Cukie',
       },
     ],
@@ -59,7 +59,7 @@ const infoGroups: InfoGroup[] = [
       {
         name: 'Gemas',
         description: '¡Las más codiciadas por los Cukies! Cada gema suma 1 punto a tu marcador.',
-        image: '/assets/collectibles/gemas.png',
+        image: '/assets/collectibles/gemas_reglas.png',
         imageAlt: 'Gemas resplandecientes',
       },
       {
@@ -127,11 +127,11 @@ const infoGroups: InfoGroup[] = [
         description:
           'Necesitas las 5 runas diferentes para completar el tótem mágico. Además otorgan puntos: la primera runa 5, la segunda 10, la tercera 15, y así sucesivamente.',
         image: [
-          '/assets/collectibles/runa_chef.png',
-          '/assets/collectibles/runa_engineer.png',
-          '/assets/collectibles/runa_farmer.png',
-          '/assets/collectibles/runa_gatherer.png',
-          '/assets/collectibles/runa_miner.png',
+          '/assets/collectibles/runa_chef_2.png',
+          '/assets/collectibles/runa_engineer_2.png',
+          '/assets/collectibles/runa_farmer_2.png',
+          '/assets/collectibles/runa_gatherer_2.png',
+          '/assets/collectibles/runa_miner_2.png',
         ],
         imageAlt: [
           'Runa Chef',
@@ -173,8 +173,8 @@ const infoGroups: InfoGroup[] = [
         name: 'Rayos',
         description:
           'Aparecen en bloques de 3. Observa sus avisos luminosos y ¡aléjate!. Si un rayo te alcanza perderás 1 vida.',
-        image: '/assets/effects/damagecukie.png',
-        imageAlt: 'Impacto de rayo',
+        image: '/assets/effects/rayos_reglas.png',
+        imageAlt: 'Rayos peligrosos',
       },
       {
         name: 'Zonas de Barro',
@@ -191,6 +191,8 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [treasureImageIndex, setTreasureImageIndex] = useState(0);
   const [runeImageIndex, setRuneImageIndex] = useState(0);
+  const containerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [maxContainerHeight, setMaxContainerHeight] = useState<number>(0);
 
   const treasureItem = infoGroups.flatMap(group => group.items).find(item => item.name === 'Tesoros');
   const treasureImagesLength =
@@ -252,9 +254,49 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const currentGroup = infoGroups[currentGroupIndex];
+  const arrangedItems = useMemo(() => {
+    const items = [...currentGroup.items];
+    if (items.length >= 3) {
+      let longestIndex = 0;
+      let longestLength = -Infinity;
+      items.forEach((item, index) => {
+        const detailsLength = item.details?.join(' ').length ?? 0;
+        const totalLength =
+          (item.name?.length ?? 0) +
+          (item.description?.length ?? 0) +
+          detailsLength;
+        if (totalLength > longestLength) {
+          longestLength = totalLength;
+          longestIndex = index;
+        }
+      });
+      if (longestIndex !== 2) {
+        const [longestItem] = items.splice(longestIndex, 1);
+        items.splice(2, 0, longestItem);
+      }
+    }
+    return items;
+  }, [currentGroup]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMaxContainerHeight(0);
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      const heights = containerRefs.current
+        .map(ref => ref?.getBoundingClientRect().height ?? 0)
+        .filter(height => height > 0);
+      if (heights.length > 0) {
+        const largest = Math.max(...heights);
+        setMaxContainerHeight(prev => (largest > prev ? largest : prev));
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, currentGroupIndex, arrangedItems]);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -299,19 +341,22 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
           </button>
 
           <div className="flex-1">
-            <div className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10">
+            <div
+              ref={el => {
+                containerRefs.current[currentGroupIndex] = el;
+              }}
+              className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10"
+              style={maxContainerHeight ? { minHeight: maxContainerHeight } : undefined}
+            >
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {currentGroupIndex + 1}</p>
                   <h3 className="text-2xl md:text-3xl font-pixellari text-pink-200">{currentGroup.title}</h3>
                 </div>
-                <p className="text-xs md:text-sm font-pixellari text-pink-200/70 text-left md:text-right max-w-md">
-                  {currentGroup.tagline}
-                </p>
               </div>
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentGroup.items.map(item => {
+                {arrangedItems.map((item, index) => {
                   const images = Array.isArray(item.image) ? item.image : [item.image];
                   const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
                   const isTreasureItem = item.name === 'Tesoros';
@@ -383,12 +428,19 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                     });
                   };
 
+                  const isThirdWide = arrangedItems.length >= 3 && index === 2;
+                  const cardClassName = [
+                    'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70',
+                    isThirdWide ? 'md:col-span-2 md:max-w-none' : '',
+                    !isThirdWide && isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ');
+
                   return (
                     <div
                       key={item.name}
-                      className={`group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70 ${
-                        isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : ''
-                      }`}
+                      className={cardClassName}
                     >
                       <div className="flex items-center gap-4">
                         <div className="flex flex-wrap items-center gap-2">
@@ -403,9 +455,20 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                       </p>
                       {item.details && (
                         <ul className="ml-4 list-disc space-y-1 text-xs md:text-sm text-pink-100/80 font-pixellari">
-                          {item.details.map(detail => (
-                            <li key={detail}>{detail}</li>
-                          ))}
+                    {item.name === 'Totem mágico' ? (
+                      <div className="flex flex-wrap gap-3">
+                        {item.details.map(detail => (
+                          <span
+                            key={detail}
+                            className="rounded-full border border-pink-300/60 bg-pink-300/15 px-4 py-1 font-pixellari text-sm text-pink-100 shadow-sm shadow-pink-500/20"
+                          >
+                            {detail}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      item.details.map(detail => <li key={detail}>{detail}</li>)
+                    )}
                         </ul>
                       )}
                     </div>

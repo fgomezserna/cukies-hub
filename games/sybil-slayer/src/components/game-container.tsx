@@ -623,33 +623,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   ) : null;
 
   const vaultEffectBadgesElement = useMemo(() => {
-    const formatSeconds = (value: number) => `${value}s`;
-    const badges: Array<{ key: string; label: string; color: string; time?: string }> = [];
+    const badges: Array<{ key: string; text: string; color: string }> = [];
     const multiplierTime = Math.max(0, Math.ceil(gameState.multiplierTimeRemaining ?? 0));
     if (gameState.scoreMultiplier > 1 && multiplierTime > 0) {
-      if (gameState.scoreMultiplier === 5) {
-        badges.push({
-          key: 'multiplier',
-          label: 'Puntos ×5',
-          time: formatSeconds(multiplierTime),
-          color: '#EC4899',
-        });
-      } else {
-        badges.push({
-          key: 'multiplier',
-          label: `x${gameState.scoreMultiplier}`,
-          time: formatSeconds(multiplierTime),
-          color: '#EC4899',
-        });
-      }
+      const isMaxMultiplier = gameState.scoreMultiplier === 5;
+      badges.push({
+        key: 'multiplier',
+        text: `${isMaxMultiplier ? 'Puntos x5' : `x${gameState.scoreMultiplier}`} ${multiplierTime}s`,
+        color: '#EC4899',
+      });
     }
 
     const vaulTime = Math.max(0, Math.ceil(gameState.vaulEffectTimeRemaining ?? 0));
     if (gameState.activeVaulEffect === 'double_collectibles' && vaulTime > 0) {
       badges.push({
         key: 'double_collectibles',
-        label: '2x Items',
-        time: formatSeconds(vaulTime),
+        text: `2x Items ${vaulTime}s`,
         color: '#EC4899',
       });
     }
@@ -657,8 +646,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.activeVaulEffect === 'energy_to_uki' && vaulTime > 0) {
       badges.push({
         key: 'energy_to_uki',
-        label: 'Gemas→Monedas',
-        time: formatSeconds(vaulTime),
+        text: `Gemas→Monedas ${vaulTime}s`,
         color: '#EC4899',
       });
     }
@@ -666,7 +654,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.eliminateEnemiesDisplay) {
       badges.push({
         key: 'eliminate_enemies',
-        label: `💥 ${gameState.eliminateEnemiesDisplay.count} Enemigos`,
+        text: `💥 ${gameState.eliminateEnemiesDisplay.count} Enemigos`,
         color: '#FF4500',
       });
     }
@@ -688,7 +676,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         }}
       >
         <div className="flex flex-wrap justify-center gap-2">
-          {badges.map(({ key, label, color, time }) => {
+          {badges.map(({ key, text, color }) => {
             const dropShadowColor = color === '#FF4500' ? 'rgba(255, 69, 0, 0.85)' : 'rgba(236, 72, 153, 0.85)';
             return (
               <div
@@ -702,31 +690,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   fontFamily: 'Mitr-Bold, monospace',
                   animation: 'pulse 1s infinite alternate',
                   maxWidth: '100%',
+                  filter: `drop-shadow(0 0 6px ${dropShadowColor})`,
                 }}
               >
-                <Image
-                  src="/assets/collectibles/vault.png"
-                  alt="Vault effect"
-                  width={18}
-                  height={18}
-                  className="h-[18px] w-[18px] object-contain"
-                  style={{ filter: `drop-shadow(0 0 8px ${dropShadowColor})` }}
-                  priority={false}
-                />
-                <span className="whitespace-nowrap">{label}</span>
-                {time && (
-                  <span
-                    className="flex items-center justify-center rounded-full border-2 px-2 font-bold text-xs uppercase tracking-wide"
-                    style={{
-                      borderColor: color,
-                      backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                      minWidth: '32px',
-                      height: '32px',
-                    }}
-                  >
-                    {time}
-                  </span>
-                )}
+                <span className="whitespace-nowrap">{text}</span>
               </div>
             );
           })}
