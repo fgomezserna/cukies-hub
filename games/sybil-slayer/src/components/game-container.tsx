@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { usePusherConnection } from '../hooks/usePusherConnection';
 import GameCanvas from './game-canvas';
@@ -621,6 +621,108 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       )}
     </div>
   ) : null;
+
+  const vaultEffectBadgesElement = useMemo(() => {
+    const badges: Array<{ key: string; text: string; color: string }> = [];
+    const multiplierTime = Math.max(0, Math.ceil(gameState.multiplierTimeRemaining ?? 0));
+    if (gameState.scoreMultiplier > 1 && multiplierTime > 0) {
+      if (gameState.scoreMultiplier === 5) {
+        badges.push({
+          key: 'multiplier',
+          text: `Puntos ×5 ${multiplierTime}s`,
+          color: '#EC4899',
+        });
+      } else {
+        badges.push({
+          key: 'multiplier',
+          text: `x${gameState.scoreMultiplier} ${multiplierTime}s`,
+          color: '#EC4899',
+        });
+      }
+    }
+
+    const vaulTime = Math.max(0, Math.ceil(gameState.vaulEffectTimeRemaining ?? 0));
+    if (gameState.activeVaulEffect === 'double_collectibles' && vaulTime > 0) {
+      badges.push({
+        key: 'double_collectibles',
+        text: `2x Items ${vaulTime}s`,
+        color: '#EC4899',
+      });
+    }
+
+    if (gameState.activeVaulEffect === 'energy_to_uki' && vaulTime > 0) {
+      badges.push({
+        key: 'energy_to_uki',
+        text: `Gemas→Monedas ${vaulTime}s`,
+        color: '#EC4899',
+      });
+    }
+
+    if (gameState.eliminateEnemiesDisplay) {
+      badges.push({
+        key: 'eliminate_enemies',
+        text: `💥 ${gameState.eliminateEnemiesDisplay.count} Enemigos`,
+        color: '#FF4500',
+      });
+    }
+
+    if (!badges.length) {
+      return null;
+    }
+
+    return (
+      <div
+        className="pointer-events-none absolute flex justify-center"
+        style={{
+          top: '-38px',
+          left: `calc(50% + ${canvasHorizontalOffset}px)`,
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          maxWidth: 'min(420px, 90%)',
+          padding: '0 8px',
+        }}
+      >
+        <div className="flex flex-wrap justify-center gap-2">
+          {badges.map(({ key, text, color }) => {
+            const dropShadowColor = color === '#FF4500' ? 'rgba(255, 69, 0, 0.85)' : 'rgba(236, 72, 153, 0.85)';
+            return (
+              <div
+                key={key}
+                className="flex items-center gap-2 rounded-lg border-2 px-3 py-1.5 font-bold text-sm md:text-base"
+                style={{
+                  color,
+                  borderColor: color,
+                  backgroundColor: 'rgba(0, 0, 0, 0.78)',
+                  textShadow: `0 0 10px ${color}CC, 2px 2px 4px rgba(0, 0, 0, 0.8)`,
+                  fontFamily: 'Mitr-Bold, monospace',
+                  animation: 'pulse 1s infinite alternate',
+                  maxWidth: '100%',
+                }}
+              >
+                <Image
+                  src="/assets/collectibles/vault.png"
+                  alt="Vault effect"
+                  width={18}
+                  height={18}
+                  className="h-[18px] w-[18px] object-contain"
+                  style={{ filter: `drop-shadow(0 0 8px ${dropShadowColor})` }}
+                  priority={false}
+                />
+                <span className="whitespace-nowrap">{text}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }, [
+    gameState.scoreMultiplier,
+    gameState.multiplierTimeRemaining,
+    gameState.activeVaulEffect,
+    gameState.vaulEffectTimeRemaining,
+    gameState.eliminateEnemiesDisplay,
+    canvasHorizontalOffset,
+  ]);
 
   const waitingOverlay = isMultiplayerMode && showWaitingOverlay ? (
     <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm px-6 text-center">
@@ -1885,11 +1987,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           
           {/* Sin fondos durante countdown - solo el grid del canvas será visible */}
           
-          <div 
-            ref={parentContainerRef}
-            className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2" 
-            style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
-          >
+        <div
+          ref={parentContainerRef}
+          className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2 relative" 
+          style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
+        >
+          {vaultEffectBadgesElement}
             {/* Score, Level, Hearts y Timer con cajas */}
             <div 
               className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
@@ -2187,9 +2290,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           ></div>
           
           <div
-            className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2"
+            className="flex flex-col items-center justify-center w-full max-w-[1100px] mx-auto my-2 relative"
             style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
           >
+            {vaultEffectBadgesElement}
             {/* Score, Level, Hearts y Timer con cajas */}
             <div 
               className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
@@ -2254,109 +2358,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     Score: {localScore}
                   </span>
                 </div>
-                {/* Temporizador de multiplicador - FUERA de la caja */}
-                {gameState.scoreMultiplier > 1 && (gameState.multiplierTimeRemaining ?? 0) > 0 && (
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      left: '160px', // Al lado derecho de la caja
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#EC4899', // pink-500
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
-                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '2px solid #EC4899', // pink-500
-                      whiteSpace: 'nowrap',
-                      animation: 'pulse 1s infinite alternate',
-                      zIndex: 1000
-                    }}
-                  >
-                    x{gameState.scoreMultiplier} {gameState.multiplierTimeRemaining ?? 0}s
-                  </div>
-                )}
-                
-                {/* Temporizador para efecto double_collectibles - FUERA de la caja, debajo del multiplicador */}
-                {gameState.activeVaulEffect === 'double_collectibles' && gameState.vaulEffectTimeRemaining > 0 && (
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      left: '160px',
-                      top: gameState.scoreMultiplier > 1 ? '80%' : '50%', // Debajo del multiplicador si ambos están activos
-                      transform: 'translateY(-50%)',
-                      color: '#EC4899', // pink-500
-                      fontSize: '18px',
-                      fontWeight: 'bold',
-                      fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
-                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '2px solid #EC4899', // pink-500
-                      whiteSpace: 'nowrap',
-                      animation: 'pulse 1s infinite alternate',
-                      zIndex: 1000
-                    }}
-                  >
-                    2x Items {gameState.vaulEffectTimeRemaining}s
-                  </div>
-                )}
-                
-                {/* Temporizador para efecto energy_to_uki */}
-                {gameState.activeVaulEffect === 'energy_to_uki' && gameState.vaulEffectTimeRemaining > 0 && (
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      left: '160px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#EC4899', // pink-500
-                      fontSize: '18px',
-                      fontWeight: 'bold',
-                      fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(236, 72, 153, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
-                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '2px solid #EC4899', // pink-500
-                      whiteSpace: 'nowrap',
-                      animation: 'pulse 1s infinite alternate',
-                      zIndex: 1000
-                    }}
-                  >
-                    Gemas→Monedas {gameState.vaulEffectTimeRemaining}s
-                  </div>
-                )}
-                
-                {/* Indicador de enemigos eliminados (temporal, 3 segundos) */}
-                {gameState.eliminateEnemiesDisplay && (
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      left: '160px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#FF4500',
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      fontFamily: 'Mitr-Bold, monospace',
-                      textShadow: '0 0 10px rgba(255, 69, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
-                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '2px solid #FF4500',
-                      whiteSpace: 'nowrap',
-                      animation: 'pulse 0.8s infinite alternate',
-                      zIndex: 1000
-                    }}
-                  >
-                    💥 {gameState.eliminateEnemiesDisplay.count} Enemigos
-                  </div>
-                )}
               </div>
 
               <div className="relative">

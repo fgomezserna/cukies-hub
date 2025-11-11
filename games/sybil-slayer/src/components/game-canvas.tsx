@@ -989,20 +989,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     const maxRadius = Math.max(zone.width, zone.height) * 0.7; // Radio máximo para cubrir toda la zona
     const timeFactor = timestamp * 0.003;
 
+    const referenceStartTime = zone.visualStartTime ?? zone.warningStartTime ?? timestamp;
+
     // Calcular el progreso de expansión de la mancha
     // Siempre usar warningStartTime si existe, independientemente de la fase
     // Esto asegura que la mancha siempre se expanda desde el centro hacia afuera
     let expansionProgress = 1.0; // Por defecto, completamente expandida
     
-    if (zone.warningStartTime) {
+    if (referenceStartTime) {
       // Calcular el tiempo transcurrido desde que empezó la advertencia
-      const elapsed = Math.max(0, timestamp - zone.warningStartTime);
+      const elapsed = Math.max(0, timestamp - referenceStartTime);
       const progress = Math.max(0, Math.min(1, elapsed / RED_ZONE_WARNING_DURATION_MS));
       // Usar easeOut para que empiece rápido y termine suave
       const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
       expansionProgress = easeOut(progress);
     }
-    // Si no hay warningStartTime o ya pasó el tiempo, expansionProgress es 1.0 (completamente expandida)
+    // Si no hay referencia o ya pasó el tiempo, expansionProgress es 1.0 (completamente expandida)
 
     // Calcular el radio actual basado en el progreso (desde 0 hasta maxRadius)
     const currentRadius = maxRadius * expansionProgress;

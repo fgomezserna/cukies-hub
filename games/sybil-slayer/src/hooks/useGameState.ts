@@ -665,6 +665,7 @@ const createRedZone = (
     y,
     width,
     height,
+    visualStartTime: Date.now(),
   };
 };
 
@@ -1333,11 +1334,28 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
          if (prev.status === 'playing') {
              console.log("Pausing game");
              pauseGameTime(); // Pausar el tiempo del juego
-             return { ...prev, status: 'paused' };
+            const pauseStartedAt = Date.now();
+            const pausedRedZones = prev.redZones.map(zone => ({
+              ...zone,
+              visualPauseStart: pauseStartedAt,
+            }));
+            return { ...prev, status: 'paused', redZones: pausedRedZones };
          } else if (prev.status === 'paused') {
              console.log("Resuming game");
              resumeGameTime(); // Reanudar el tiempo del juego
-             return { ...prev, status: 'playing' };
+            const resumeAt = Date.now();
+            const resumedRedZones = prev.redZones.map(zone => {
+              if (zone.visualPauseStart) {
+                const pausedDuration = resumeAt - zone.visualPauseStart;
+                return {
+                  ...zone,
+                  visualStartTime: (zone.visualStartTime ?? resumeAt) + pausedDuration,
+                  visualPauseStart: undefined,
+                };
+              }
+              return zone;
+            });
+            return { ...prev, status: 'playing', redZones: resumedRedZones };
          }
          return prev; // No change for other statuses
      });

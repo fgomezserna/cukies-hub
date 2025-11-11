@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { SoundType } from '@/hooks/useAudio';
 
@@ -26,62 +26,54 @@ interface InfoGroup {
 
 const infoGroups: InfoGroup[] = [
   {
-    title: 'Exploración Esencial',
+    title: 'Ítems Principales',
     tagline: 'Aprende lo básico para sobrevivir en el reino Cukie.',
     items: [
       {
         name: 'Cukie',
-        description: 'El héroe más dulce del reino. Mantén el ritmo para esquivar peligros y sumar puntos.',
-        details: [
-          'Usa las teclas ASDW para moverte por la pantalla.',
-          'Consigue la mayor puntuación posible antes de que se acabe el tiempo o pierdas las 3 vidas.',
-        ],
+        description:
+          '¡El héroe más dulce del reino! Usa las teclas ASDW para moverte por la pantalla de juego. Consigue la mayor puntuación posible antes de que se acabe el tiempo o pierdas las 3 vidas.',
         image: '/assets/characters/cukiesprites/south/cukie_walk_s_06.png',
         imageAlt: 'Cukie, el héroe del juego',
       },
       {
         name: 'Checkpoint',
-        description: 'Un salvavidas temporal que aparece cuando el reloj aprieta.',
-        details: ['Recógelo para sumar 30 segundos al contador y continuar tu partida.'],
+        description:
+          'Aparece cuando se está acabando el tiempo. Recógelo para sumar 30 segundos al contador y continuar tu partida.',
         image: '/assets/collectibles/checkpointcukies.png',
         imageAlt: 'Checkpoint brillante',
       },
       {
         name: 'Corazón',
-        description: 'La dulzura que recupera tu energía.',
-        details: [
-          'Si has perdido una vida, la recuperas al instante.',
-          'Si tus vidas están completas, obtienes puntos crecientes: +20, +40, +60 y así sucesivamente.',
-        ],
+        description:
+          'Si has perdido una vida, la recuperarás al instante. Si tienes todas las vidas, obtienes puntos crecientes: +20, +40, +60 y así sucesivamente.',
         image: '/assets/collectibles/corazoncukies.png',
         imageAlt: 'Corazón de Cukie',
       },
     ],
   },
   {
-    title: 'Tesoro Dulce',
+    title: 'Suma Puntos',
     tagline: 'Colecciona objetos brillantes para disparar tu marcador.',
     items: [
       {
         name: 'Gemas',
-        description: 'Las más codiciadas por los Cukies. ¡Brillan en todas partes!',
-        details: ['Cada gema otorga 1 punto inmediato.'],
+        description: '¡Las más codiciadas por los Cukies! Cada gema suma 1 punto a tu marcador.',
         image: '/assets/collectibles/gemas.png',
         imageAlt: 'Gemas resplandecientes',
       },
       {
         name: 'Monedas',
-        description: 'Escasas pero poderosas. No las dejes escapar.',
-        details: ['Cada moneda suma 5 puntos a tu marcador.'],
+        description: '¡Son muy escasas! Cada moneda suma 5 puntos a tu marcador.',
         image: '/assets/collectibles/uki.png',
         imageAlt: 'Moneda Uki',
       },
       {
         name: 'Tesoros',
-        description: 'El botín más deseado aparece en bloques de tres. ¡Sé rápido!',
+        description:
+          '¡El botín más deseado! Aparecen en bloques de 3 y tendrás que ser rápido. Si no los recoges en unos segundos, desaparecen.',
         details: [
-          'Si no los recoges en unos segundos, desaparecen.',
-          'Bonificación progresiva: 25, 50, 75 puntos y sigue aumentando por cada bloque consecutivo completado.',
+          'Bonificación progresiva por cada bloque de 3 recogido: 25, 50, 75 puntos, y así sucesivamente.',
         ],
         image: [
           '/assets/collectibles/tesoro.png',
@@ -97,50 +89,43 @@ const infoGroups: InfoGroup[] = [
     ],
   },
   {
-    title: 'Poderes y Aliados',
+    title: 'Power Ups',
     tagline: 'Activa ventajas temporales que cambian el curso de la partida.',
     items: [
       {
         name: 'Cofre',
-        description: 'Un artefacto raro que concede un poder temporal de 10-15 segundos.',
         details: [
-          'Doble cantidad de gemas y UKIs en pantalla.',
-          'Transforma las gemas en UKIs.',
-          'Multiplicador x5 en los puntos de gemas y UKIs.',
+          'Doble de gemas y monedas en pantalla.',
+          'Las gemas se convierten en monedas.',
+          'Puntos x5 en gemas y monedas.',
         ],
+        description: 'Concede un poder temporal durante 10-15 segundos:',
         image: '/assets/collectibles/vault.png',
         imageAlt: 'Cofre mágico',
       },
       {
-        name: 'Haku',
-        description: 'El espíritu amigo acelera tu recorrido.',
-        details: ['Duplica tu velocidad durante 7 segundos.'],
-        image: '/assets/collectibles/haku.png',
-        imageAlt: 'Haku espíritu amigo',
-      },
-      {
         name: 'Piel de Goat',
-        description: 'El poder del GOAT se activa cada vez que subes de nivel.',
-        details: [
-          'Durante 3 segundos eliminas a todos los duendes que toques.',
-          'Durante 3 segundos adicionales eres invulnerable a los duendes.',
-        ],
+        description:
+          'El poder del GOAT aparece cada vez que pasas de nivel. Recógelo y tendrás 3 segundos para eliminar a todos los duendes que toques, y 3 segundos más en los que los duendes no te causarán daño.',
         image: '/assets/collectibles/goatskin.png',
         imageAlt: 'Piel de Goat',
+      },
+      {
+        name: 'Haku',
+        description: 'Este espíritu amigo aumenta tu velocidad x2 durante 7 segundos.',
+        image: '/assets/collectibles/haku.png',
+        imageAlt: 'Haku espíritu amigo',
       },
     ],
   },
   {
-    title: 'Ascenso del Tótem',
+    title: 'Niveles',
     tagline: 'Completa el tótem y escala multiplicadores de puntos.',
     items: [
       {
         name: 'Runas',
-        description: 'Necesitas las 5 runas diferentes para alimentar el tótem mágico.',
-        details: [
-          'Otorgan puntos escalonados en cada nivel: +5, +10, +15, +20 y +25.',
-          'Colecciónalas todas para avanzar de nivel.',
-        ],
+        description:
+          'Necesitas las 5 runas diferentes para completar el tótem mágico. Además otorgan puntos: la primera runa 5, la segunda 10, la tercera 15, y así sucesivamente.',
         image: [
           '/assets/collectibles/runa_chef.png',
           '/assets/collectibles/runa_engineer.png',
@@ -157,48 +142,44 @@ const infoGroups: InfoGroup[] = [
         ],
       },
       {
-        name: 'Tótem mágico',
-        description: 'Cuando completas el tótem accedes a un nuevo nivel con mejores multiplicadores.',
-        details: [
-          'Nivel 2: puntos x2',
-          'Nivel 3: puntos x3',
-          'Nivel 4: puntos x4',
-          'Nivel 5: puntos x5',
-        ],
+        name: 'Totem mágico',
+        description:
+          'Cuando lo completas avanzas al siguiente nivel, con multiplicadores en los puntos al recoger gemas, monedas y runas.',
+        details: ['Nivel 2: x2', 'Nivel 3: x3', 'Nivel 4: x4', 'Nivel 5: x5'],
         image: '/assets/totem/totemlateral.png',
         imageAlt: 'Tótem mágico completo',
       },
       {
         name: 'Bonificación de nivel',
-        description: 'El tiempo restante nunca se desperdicia.',
-        details: ['Al completar un nivel, los segundos que quedan se multiplican por 5 y se suman a tu puntuación.'],
+        description:
+          'Al completar un nivel, los segundos del contador se multiplicarán x5 y se sumarán a tu puntuación.',
         image: '/assets/collectibles/watch_sand.png',
         imageAlt: 'Reloj de arena mágico',
       },
     ],
   },
   {
-    title: 'Peligros en el Camino',
+    title: 'Enemigos',
     tagline: 'Evita perder vidas manteniéndote lejos de las amenazas.',
     items: [
       {
         name: 'Duende',
-        description: 'Siempre al acecho y cada vez más numeroso.',
-        details: ['Cada golpe de un duende te hace perder 1 vida.'],
-        image: '/assets/characters/malvado3.png',
+        description:
+          'Cada golpe de un duende te hace perder 1 vida. Al principio parece sencillo, pero ten cuidado, ¡se irán multiplicando!',
+        image: '/assets/characters/malvado1.png',
         imageAlt: 'Duende enemigo',
       },
       {
         name: 'Rayos',
-        description: 'Surgen en bloques de tres. Observa sus avisos luminosos y mantente fuera de su alcance.',
-        details: ['Si un rayo te alcanza, pierdes 1 vida.'],
+        description:
+          'Aparecen en bloques de 3. Observa sus avisos luminosos y ¡aléjate!. Si un rayo te alcanza perderás 1 vida.',
         image: '/assets/effects/damagecukie.png',
         imageAlt: 'Impacto de rayo',
       },
       {
         name: 'Zonas de Barro',
-        description: 'Parecen inofensivas, pero frenan tu avance.',
-        details: ['Si las pisas te moverás más lento, lo que te deja vulnerable a otros peligros.'],
+        description:
+          'No te dañarán directamente, pero si las pisas te moverás más lento, ¡y eso puede ser muy peligroso!',
         image: '/assets/obstacles/arenasmovedizas2.png',
         imageAlt: 'Zona de barro',
       },
@@ -208,6 +189,14 @@ const infoGroups: InfoGroup[] = [
 
 const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) => {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
+  const [treasureImageIndex, setTreasureImageIndex] = useState(0);
+  const [runeImageIndex, setRuneImageIndex] = useState(0);
+
+  const treasureItem = infoGroups.flatMap(group => group.items).find(item => item.name === 'Tesoros');
+  const treasureImagesLength =
+    treasureItem && Array.isArray(treasureItem.image) ? treasureItem.image.length : 0;
+  const runeItem = infoGroups.flatMap(group => group.items).find(item => item.name === 'Runas');
+  const runeImagesLength = runeItem && Array.isArray(runeItem.image) ? runeItem.image.length : 0;
 
   const handlePrevGroup = () => {
     onPlaySound?.('button_click');
@@ -222,8 +211,46 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   const handleClose = () => {
     onPlaySound?.('button_click');
     setCurrentGroupIndex(0);
+    setTreasureImageIndex(0);
+    setRuneImageIndex(0);
     onClose();
   };
+
+  useEffect(() => {
+    if (!isOpen || treasureImagesLength === 0) {
+      return;
+    }
+
+    const durations = [2000, 2000, 5000];
+    const timeoutId = window.setTimeout(() => {
+      setTreasureImageIndex(prev => (prev + 1) % treasureImagesLength);
+    }, durations[treasureImageIndex % durations.length]);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen, treasureImagesLength, treasureImageIndex]);
+
+  useEffect(() => {
+    if (!isOpen || runeImagesLength === 0) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRuneImageIndex(prev => (prev + 1) % runeImagesLength);
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen, runeImagesLength, runeImageIndex]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setTreasureImageIndex(0);
+      setRuneImageIndex(0);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -247,10 +274,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
         </button>
 
         <div className="text-center mb-6">
-          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">Guía del Reino Cukie</h2>
-          <p className="mt-2 text-sm font-pixellari text-pink-200/80">
-            Desliza con las flechas para descubrir cada elemento del juego.
-          </p>
+          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">Reglas de Treasure Hunt</h2>
         </div>
 
         <div className="flex items-stretch gap-4">
@@ -290,47 +314,85 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                 {currentGroup.items.map(item => {
                   const images = Array.isArray(item.image) ? item.image : [item.image];
                   const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
+                  const isTreasureItem = item.name === 'Tesoros';
+                  const isRuneItem = item.name === 'Runas';
+                  const isHakuItem = item.name === 'Haku';
+                  const imagesToRender = (() => {
+                    if (isTreasureItem) {
+                      const index =
+                        treasureImagesLength > 0 ? treasureImageIndex % treasureImagesLength : 0;
+                      return [images[index]];
+                    }
+                    if (isRuneItem) {
+                      const index = runeImagesLength > 0 ? runeImageIndex % runeImagesLength : 0;
+                      return [images[index]];
+                    }
+                    return images;
+                  })();
+                  const renderIconContent = () => {
+                    if (item.name === 'Bonificación de nivel') {
+                      return (
+                        <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2">
+                          <svg
+                            className="h-full w-full text-pink-400"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M12 19V5M5 12l7-7 7 7" />
+                          </svg>
+                        </div>
+                      );
+                    }
+
+                    return imagesToRender.map((src, index) => {
+                      const originalIndex = (() => {
+                        if (isTreasureItem && treasureImagesLength) {
+                          return treasureImageIndex % treasureImagesLength;
+                        }
+                        if (isRuneItem && runeImagesLength) {
+                          return runeImageIndex % runeImagesLength;
+                        }
+                        return index;
+                      })();
+
+                      return (
+                        <div
+                          key={`${item.name}-${originalIndex}`}
+                          className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2"
+                        >
+                          <Image
+                            src={src}
+                            alt={
+                              typeof imageAlts[originalIndex] === 'string'
+                                ? imageAlts[originalIndex]
+                                : item.name
+                            }
+                            width={448}
+                            height={448}
+                            quality={100}
+                            unoptimized={false}
+                            priority={false}
+                            className="info-modal-img h-full w-full object-contain transition-opacity duration-500"
+                          />
+                        </div>
+                      );
+                    });
+                  };
 
                   return (
                     <div
                       key={item.name}
-                      className="group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70"
+                      className={`group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70 ${
+                        isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : ''
+                      }`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          {item.name === 'Bonificación de nivel' ? (
-                            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800/60 p-1">
-                              <svg
-                                className="h-full w-full text-pink-400"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M12 19V5M5 12l7-7 7 7" />
-                              </svg>
-                            </div>
-                          ) : (
-                            images.map((src, index) => (
-                              <div
-                                key={`${item.name}-${index}`}
-                                className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800/60 p-1"
-                              >
-                                <Image
-                                  src={src}
-                                  alt={typeof imageAlts[index] === 'string' ? imageAlts[index] : item.name}
-                                  width={224}
-                                  height={224}
-                                  quality={100}
-                                  unoptimized={false}
-                                  priority={false}
-                                  className="info-modal-img h-full w-full object-contain"
-                                />
-                              </div>
-                            ))
-                          )}
+                          {renderIconContent()}
                         </div>
                         <div className="flex-1">
                           <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>

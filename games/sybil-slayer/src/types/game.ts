@@ -166,6 +166,8 @@ export interface RedZone {
   y: number;
   width: number;
   height: number;
+  visualStartTime?: number;
+  visualPauseStart?: number;
 }
 
 export interface TreasureState {
