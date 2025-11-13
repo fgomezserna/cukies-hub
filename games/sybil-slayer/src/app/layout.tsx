@@ -15,10 +15,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Treasure Hunt',
   description: '¡Esquiva duendes y recolecta puntos!',
+  metadataBase: new URL('https://treasure-hunt.cukies.world'),
   openGraph: {
     title: 'Treasure Hunt',
     description: '¡Esquiva duendes y recolecta puntos!',
     type: 'website',
+    siteName: 'Treasure Hunt',
+    url: 'https://treasure-hunt.cukies.world',
   },
   twitter: {
     card: 'summary_large_image',
