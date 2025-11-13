@@ -39,7 +39,7 @@ const infoGroups: InfoGroup[] = [
       {
         name: 'Checkpoint',
         description:
-          'Aparece cuando se está acabando el tiempo. Recógelo para sumar 30 segundos al contador y continuar tu partida.',
+          'Aparece cuando se está acabando el tiempo. Recógelo para sumar 30 segundos al reloj y continuar tu partida.',
         image: '/assets/collectibles/checkpointcukies_reglas.png',
         imageAlt: 'Checkpoint brillante',
       },
@@ -152,7 +152,7 @@ const infoGroups: InfoGroup[] = [
       {
         name: 'Bonificación de nivel',
         description:
-          'Al completar un nivel, los segundos del contador se multiplicarán x5 y se sumarán a tu puntuación.',
+          'Al completar un nivel, los segundos del reloj se multiplicarán x5 y se sumarán a tu puntuación.',
         image: '/assets/collectibles/watch_sand.png',
         imageAlt: 'Reloj de arena mágico',
       },
@@ -186,6 +186,31 @@ const infoGroups: InfoGroup[] = [
     ],
   },
 ];
+
+// Función helper para organizar items de un grupo
+const arrangeGroupItems = (items: InfoGroupItem[]): InfoGroupItem[] => {
+  const arranged = [...items];
+  if (arranged.length >= 3) {
+    let longestIndex = 0;
+    let longestLength = -Infinity;
+    arranged.forEach((item, index) => {
+      const detailsLength = item.details?.join(' ').length ?? 0;
+      const totalLength =
+        (item.name?.length ?? 0) +
+        (item.description?.length ?? 0) +
+        detailsLength;
+      if (totalLength > longestLength) {
+        longestLength = totalLength;
+        longestIndex = index;
+      }
+    });
+    if (longestIndex !== 2) {
+      const [longestItem] = arranged.splice(longestIndex, 1);
+      arranged.splice(2, 0, longestItem);
+    }
+  }
+  return arranged;
+};
 
 const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) => {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
@@ -254,47 +279,31 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
     }
   }, [isOpen]);
 
-  const currentGroup = infoGroups[currentGroupIndex];
-  const arrangedItems = useMemo(() => {
-    const items = [...currentGroup.items];
-    if (items.length >= 3) {
-      let longestIndex = 0;
-      let longestLength = -Infinity;
-      items.forEach((item, index) => {
-        const detailsLength = item.details?.join(' ').length ?? 0;
-        const totalLength =
-          (item.name?.length ?? 0) +
-          (item.description?.length ?? 0) +
-          detailsLength;
-        if (totalLength > longestLength) {
-          longestLength = totalLength;
-          longestIndex = index;
-        }
-      });
-      if (longestIndex !== 2) {
-        const [longestItem] = items.splice(longestIndex, 1);
-        items.splice(2, 0, longestItem);
-      }
-    }
-    return items;
-  }, [currentGroup]);
-
   useEffect(() => {
     if (!isOpen) {
       setMaxContainerHeight(0);
       return;
     }
-    const frame = requestAnimationFrame(() => {
+    // Calcular altura máxima de todos los grupos cuando se abre el modal
+    const calculateMaxHeight = () => {
       const heights = containerRefs.current
         .map(ref => ref?.getBoundingClientRect().height ?? 0)
         .filter(height => height > 0);
       if (heights.length > 0) {
         const largest = Math.max(...heights);
-        setMaxContainerHeight(prev => (largest > prev ? largest : prev));
+        setMaxContainerHeight(largest);
       }
+    };
+    
+    // Usar múltiples frames para asegurar que todos los grupos estén renderizados y medidos
+    const frame1 = requestAnimationFrame(() => {
+      const frame2 = requestAnimationFrame(() => {
+        calculateMaxHeight();
+      });
+      return () => cancelAnimationFrame(frame2);
     });
-    return () => cancelAnimationFrame(frame);
-  }, [isOpen, currentGroupIndex, arrangedItems]);
+    return () => cancelAnimationFrame(frame1);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -340,142 +349,156 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             </div>
           </button>
 
-          <div className="flex-1">
-            <div
-              ref={el => {
-                containerRefs.current[currentGroupIndex] = el;
-              }}
-              className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10"
-              style={maxContainerHeight ? { minHeight: maxContainerHeight } : undefined}
-            >
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {currentGroupIndex + 1}</p>
-                  <h3 className="text-2xl md:text-3xl font-pixellari text-pink-200">{currentGroup.title}</h3>
-                </div>
-              </div>
+          <div className="flex-1 relative">
+            {/* Renderizar todos los grupos ocultos para medir sus alturas */}
+            {infoGroups.map((group, index) => {
+              const arrangedItemsForGroup = arrangeGroupItems(group.items);
 
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {arrangedItems.map((item, index) => {
-                  const images = Array.isArray(item.image) ? item.image : [item.image];
-                  const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
-                  const isTreasureItem = item.name === 'Tesoros';
-                  const isRuneItem = item.name === 'Runas';
-                  const isHakuItem = item.name === 'Haku';
-                  const imagesToRender = (() => {
-                    if (isTreasureItem) {
-                      const index =
-                        treasureImagesLength > 0 ? treasureImageIndex % treasureImagesLength : 0;
-                      return [images[index]];
-                    }
-                    if (isRuneItem) {
-                      const index = runeImagesLength > 0 ? runeImageIndex % runeImagesLength : 0;
-                      return [images[index]];
-                    }
-                    return images;
-                  })();
-                  const renderIconContent = () => {
-                    if (item.name === 'Bonificación de nivel') {
-                      return (
-                        <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2">
-                          <svg
-                            className="h-full w-full text-pink-400"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M12 19V5M5 12l7-7 7 7" />
-                          </svg>
-                        </div>
-                      );
-                    }
+              return (
+                <div
+                  key={`hidden-${index}`}
+                  ref={el => {
+                    containerRefs.current[index] = el;
+                  }}
+                  className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10"
+                  style={{
+                    position: index === currentGroupIndex ? 'relative' : 'absolute',
+                    visibility: index === currentGroupIndex ? 'visible' : 'hidden',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    minHeight: maxContainerHeight || undefined,
+                  }}
+                >
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {index + 1}</p>
+                      <h3 className="text-2xl md:text-3xl font-pixellari text-pink-200">{group.title}</h3>
+                    </div>
+                  </div>
 
-                    return imagesToRender.map((src, index) => {
-                      const originalIndex = (() => {
-                        if (isTreasureItem && treasureImagesLength) {
-                          return treasureImageIndex % treasureImagesLength;
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {arrangedItemsForGroup.map((item, itemIndex) => {
+                      const images = Array.isArray(item.image) ? item.image : [item.image];
+                      const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
+                      const isTreasureItem = item.name === 'Tesoros';
+                      const isRuneItem = item.name === 'Runas';
+                      const isHakuItem = item.name === 'Haku';
+                      const imagesToRender = (() => {
+                        if (isTreasureItem) {
+                          const imgIndex = treasureImagesLength > 0 ? treasureImageIndex % treasureImagesLength : 0;
+                          return [images[imgIndex]];
                         }
-                        if (isRuneItem && runeImagesLength) {
-                          return runeImageIndex % runeImagesLength;
+                        if (isRuneItem) {
+                          const imgIndex = runeImagesLength > 0 ? runeImageIndex % runeImagesLength : 0;
+                          return [images[imgIndex]];
                         }
-                        return index;
+                        return images;
                       })();
+                      const renderIconContent = () => {
+                        if (item.name === 'Bonificación de nivel') {
+                          return (
+                            <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2">
+                              <svg
+                                className="h-full w-full text-pink-400"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M12 19V5M5 12l7-7 7 7" />
+                              </svg>
+                            </div>
+                          );
+                        }
+
+                        return imagesToRender.map((src, imgIdx) => {
+                          const originalIndex = (() => {
+                            if (isTreasureItem && treasureImagesLength) {
+                              return treasureImageIndex % treasureImagesLength;
+                            }
+                            if (isRuneItem && runeImagesLength) {
+                              return runeImageIndex % runeImagesLength;
+                            }
+                            return imgIdx;
+                          })();
+
+                          return (
+                            <div
+                              key={`${item.name}-${originalIndex}`}
+                              className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2"
+                            >
+                              <Image
+                                src={src}
+                                alt={
+                                  typeof imageAlts[originalIndex] === 'string'
+                                    ? imageAlts[originalIndex]
+                                    : item.name
+                                }
+                                width={448}
+                                height={448}
+                                quality={100}
+                                unoptimized={false}
+                                priority={false}
+                                className="info-modal-img h-full w-full object-contain transition-opacity duration-500"
+                              />
+                            </div>
+                          );
+                        });
+                      };
+
+                      const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
+                      const cardClassName = [
+                        'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70',
+                        isThirdWide ? 'md:col-span-2 md:max-w-none' : '',
+                        !isThirdWide && isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
 
                       return (
                         <div
-                          key={`${item.name}-${originalIndex}`}
-                          className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2"
+                          key={item.name}
+                          className={cardClassName}
                         >
-                          <Image
-                            src={src}
-                            alt={
-                              typeof imageAlts[originalIndex] === 'string'
-                                ? imageAlts[originalIndex]
-                                : item.name
-                            }
-                            width={448}
-                            height={448}
-                            quality={100}
-                            unoptimized={false}
-                            priority={false}
-                            className="info-modal-img h-full w-full object-contain transition-opacity duration-500"
-                          />
+                          <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {renderIconContent()}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                            </div>
+                          </div>
+                          <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">
+                            {item.description}
+                          </p>
+                          {item.details && (
+                            <ul className="ml-4 list-disc space-y-1 text-xs md:text-sm text-pink-100/80 font-pixellari">
+                              {item.name === 'Totem mágico' ? (
+                                <div className="flex flex-wrap gap-3">
+                                  {item.details.map(detail => (
+                                    <span
+                                      key={detail}
+                                      className="rounded-full border border-pink-300/60 bg-pink-300/15 px-4 py-1 font-pixellari text-sm text-pink-100 shadow-sm shadow-pink-500/20"
+                                    >
+                                      {detail}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                item.details.map(detail => <li key={detail}>{detail}</li>)
+                              )}
+                            </ul>
+                          )}
                         </div>
                       );
-                    });
-                  };
-
-                  const isThirdWide = arrangedItems.length >= 3 && index === 2;
-                  const cardClassName = [
-                    'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70',
-                    isThirdWide ? 'md:col-span-2 md:max-w-none' : '',
-                    !isThirdWide && isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
-
-                  return (
-                    <div
-                      key={item.name}
-                      className={cardClassName}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {renderIconContent()}
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
-                        </div>
-                      </div>
-                      <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">
-                        {item.description}
-                      </p>
-                      {item.details && (
-                        <ul className="ml-4 list-disc space-y-1 text-xs md:text-sm text-pink-100/80 font-pixellari">
-                    {item.name === 'Totem mágico' ? (
-                      <div className="flex flex-wrap gap-3">
-                        {item.details.map(detail => (
-                          <span
-                            key={detail}
-                            className="rounded-full border border-pink-300/60 bg-pink-300/15 px-4 py-1 font-pixellari text-sm text-pink-100 shadow-sm shadow-pink-500/20"
-                          >
-                            {detail}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      item.details.map(detail => <li key={detail}>{detail}</li>)
-                    )}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <button

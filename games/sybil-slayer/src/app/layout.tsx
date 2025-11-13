@@ -13,8 +13,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Token Runner', // Updated Title
-  description: 'Esquiva fees y recolecta energía!', // Updated Description
+  title: 'Treasure Hunt',
+  description: '¡Esquiva duendes y recolecta puntos!',
+  openGraph: {
+    title: 'Treasure Hunt',
+    description: '¡Esquiva duendes y recolecta puntos!',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Treasure Hunt',
+    description: '¡Esquiva duendes y recolecta puntos!',
+  },
 };
 
 export default function RootLayout({
