@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Vector2D } from '@/types/game';
 import { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_START } from '@/lib/constants';
 
@@ -14,28 +14,54 @@ const initialInputState: InputState = {
   startToggled: false,
 };
 
-export function useGameInput(): InputState {
+export interface UseGameInputReturn extends InputState {
+  setTouchDirection: (direction: Vector2D) => void;
+  clearTouchDirection: () => void;
+}
+
+export function useGameInput(): UseGameInputReturn {
   const [inputState, setInputState] = useState<InputState>(initialInputState);
   const pressedKeys = new Set<string>();
   const startKeyPressed = { current: false }; // Flag para rastrear si Space está presionada
+  const touchDirectionRef = useRef<Vector2D>({ x: 0, y: 0 });
 
   const updateDirection = useCallback(() => {
     let dx = 0;
     let dy = 0;
+    
+    // Keyboard input
     if (pressedKeys.has(KEY_LEFT)) dx -= 1;
     if (pressedKeys.has(KEY_RIGHT)) dx += 1;
     if (pressedKeys.has(KEY_UP)) dy -= 1;
     if (pressedKeys.has(KEY_DOWN)) dy += 1;
 
-     // Normalize the direction vector if moving diagonally
-     const magnitude = Math.sqrt(dx * dx + dy * dy);
-     if (magnitude > 0) {
-       dx /= magnitude;
-       dy /= magnitude;
-     }
+    // Touch input (prioritize if active)
+    const touchDir = touchDirectionRef.current;
+    if (touchDir.x !== 0 || touchDir.y !== 0) {
+      // Touch input is active, use it instead
+      dx = touchDir.x;
+      dy = touchDir.y;
+    } else {
+      // Normalize keyboard direction vector if moving diagonally
+      const magnitude = Math.sqrt(dx * dx + dy * dy);
+      if (magnitude > 0) {
+        dx /= magnitude;
+        dy /= magnitude;
+      }
+    }
 
     setInputState(prev => ({ ...prev, direction: { x: dx, y: dy } }));
   }, []); // No dependencies needed as pressedKeys is managed internally
+
+  const setTouchDirection = useCallback((direction: Vector2D) => {
+    touchDirectionRef.current = direction;
+    updateDirection();
+  }, [updateDirection]);
+
+  const clearTouchDirection = useCallback(() => {
+    touchDirectionRef.current = { x: 0, y: 0 };
+    updateDirection();
+  }, [updateDirection]);
 
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
@@ -125,5 +151,9 @@ export function useGameInput(): InputState {
   }, [handleKeyDown, handleKeyUp, handleContextMenu, handleWindowClick, clearPressedKeys]);
 
   // Return a stable object, but its properties will update
-  return inputState;
+  return {
+    ...inputState,
+    setTouchDirection,
+    clearTouchDirection,
+  };
 }

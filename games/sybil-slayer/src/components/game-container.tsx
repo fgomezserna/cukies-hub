@@ -11,6 +11,8 @@ import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
 import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
+import { useIsMobile } from '../hooks/use-mobile';
+import TouchZones from './touch-zones';
 import { Button } from "./ui/button";
 import { Github, Play, Pause, RotateCcw } from 'lucide-react';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
@@ -555,6 +557,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [width, height, canvasSize.width, canvasSize.height]);
 
   const inputState = useGameInput();
+  const isMobile = useIsMobile();
+  
+  // Debug: Log mobile detection
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[GameContainer] isMobile:', isMobile, {
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight,
+        hasTouch: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+      });
+    }
+  }, [isMobile]);
+  
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
   const localScore = Math.floor(gameState.score);
   const opponentScore = Math.floor(multiplayer.opponent?.score ?? 0);
@@ -1013,7 +1028,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
-    const nextInputState = { ...inputState };
+    const nextInputState = {
+      direction: inputState.direction,
+      pauseToggled: inputState.pauseToggled,
+      startToggled: inputState.startToggled,
+    };
     if (
       inputState.startToggled &&
       (gameState.status === 'idle' || gameState.status === 'gameOver')
@@ -2949,6 +2968,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           stats={gameState.levelStats} 
           onClose={() => setIsLevelStatsVisible(false)}
         />
+      )}
+
+      {/* Mobile touch controls */}
+      {/* Always render in development to debug, or when isMobile is true */}
+      {(process.env.NODE_ENV === 'development' || isMobile) && (
+        <>
+          {process.env.NODE_ENV === 'development' && console.log('[GameContainer] Rendering TouchZones, isMobile:', isMobile)}
+          <TouchZones
+            onDirectionChange={inputState.setTouchDirection}
+            onDirectionClear={inputState.clearTouchDirection}
+          />
+        </>
       )}
     </div>
   );
