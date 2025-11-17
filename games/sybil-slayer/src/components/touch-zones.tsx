@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import type { Vector2D } from '@/types/game';
-import VirtualDPad from './virtual-dpad';
+import JoystickWrapper from './joystick-wrapper';
 
 interface TouchZonesProps {
   onDirectionChange: (direction: Vector2D) => void;
@@ -302,14 +302,15 @@ const TouchZones: React.FC<TouchZonesProps> = ({
   return (
     <>
 
-      {/* Virtual D-pad */}
-      <VirtualDPad
+      {/* Joystick */}
+      <JoystickWrapper
+        visible={dpadVisible}
         x={dpadPosition.x}
         y={dpadPosition.y}
         size={getDpadSize()}
+        activeTouchId={activeTouchId}
         onDirectionChange={handleDpadDirectionChange}
         onRelease={handleDpadRelease}
-        visible={dpadVisible}
       />
     </>
   );

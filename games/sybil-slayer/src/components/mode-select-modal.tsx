@@ -100,13 +100,22 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               </div>
               {/* Botón de Reglas - debajo de la imagen */}
               {onRulesClick && (
-                <button
+                <div
                   onClick={(e) => {
                     e.stopPropagation();
                     onRulesClick();
                   }}
-                  className="focus:outline-none game-button relative mt-2"
+                  className="focus:outline-none game-button relative mt-2 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
                   aria-label="Reglas"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onRulesClick();
+                    }
+                  }}
                 >
                   <Image 
                     src="/assets/ui/buttons/caja-texto2.png"
@@ -118,7 +127,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     REGLAS
                   </span>
-                </button>
+                </div>
               )}
             </div>
           </button>

@@ -569,6 +569,63 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       });
     }
   }, [isMobile]);
+
+  // Prevenir scroll vertical en móvil
+  useEffect(() => {
+    if (!isMobile) return;
+
+    // Guardar posición de scroll actual antes de aplicar position: fixed
+    let scrollY = window.scrollY;
+
+    // Prevenir scroll vertical con CSS
+    const originalHtmlOverflow = document.documentElement.style.overflowY;
+    const originalBodyOverflow = document.body.style.overflowY;
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyWidth = document.body.style.width;
+    const originalBodyHeight = document.body.style.height;
+
+    // Aplicar estilos para prevenir scroll
+    document.documentElement.style.overflowY = 'hidden';
+    document.body.style.overflowY = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+
+    // Prevenir scroll vertical con event listeners
+    const preventVerticalScroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Permitir scroll en elementos específicos que lo necesitan (modales, contenido scrolleable)
+      const isModal = target.closest('[role="dialog"], [class*="z-[60"], [class*="z-[70"]');
+      const isScrollableContent = target.closest('[class*="overflow-y-auto"], [class*="overflow-y-scroll"], [class*="max-h-\\["]');
+      
+      // Solo prevenir scroll en el body principal, no en modales o contenido scrolleable
+      if (!isModal && !isScrollableContent) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchmove', preventVerticalScroll, { passive: false });
+
+    return () => {
+      // Restaurar estilos originales y posición de scroll
+      document.documentElement.style.overflowY = originalHtmlOverflow;
+      document.body.style.overflowY = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.top = originalBodyTop;
+      document.body.style.width = originalBodyWidth;
+      document.body.style.height = originalBodyHeight;
+      
+      // Restaurar posición de scroll
+      if (originalBodyTop) {
+        window.scrollTo(0, scrollY);
+      }
+      
+      document.removeEventListener('touchmove', preventVerticalScroll);
+    };
+  }, [isMobile]);
   
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
   const localScore = Math.floor(gameState.score);
@@ -2079,8 +2136,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             
             {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-0">
-              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-0">
-                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 relative">
+              <div className="w-full flex flex-row items-center justify-center gap-0">
+                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 -mr-3 relative">
                   {/* Render canvas only when size is determined */}
                   {canvasSize.width > 0 && canvasSize.height > 0 && (
                     <div className="relative">
@@ -2145,7 +2202,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     </div>
                   )}
                 </div>
-                <div className="mt-0 lg:mt-0 lg:-ml-6">
+                <div className="mt-0 lg:mt-0 lg:-ml-6 -ml-3">
                   <RuneTotemSidebar runeState={gameState.runeState} height={canvasSize.height} />
                 </div>
               </div>
@@ -2423,8 +2480,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
             {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-0">
-              <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-0">
-                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 relative">
+              <div className="w-full flex flex-row items-center justify-center gap-0">
+                <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 -mr-3 relative">
 
               {/* Animación de jeff_goit al lado izquierdo del grid */}
               {jeffGoitAnimation && jeffGoitAnimation.active && (
@@ -2767,7 +2824,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </div>
               )}
                 </div>
-                <div className="mt-0 lg:mt-0 lg:-ml-6">
+                <div className="mt-0 lg:mt-0 lg:-ml-6 -ml-3">
                   <RuneTotemSidebar runeState={gameState.runeState} height={canvasSize.height} />
                 </div>
               </div>

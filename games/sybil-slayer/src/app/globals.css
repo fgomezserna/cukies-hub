@@ -580,13 +580,26 @@ body {
   }
 }
 
-/* Prevenir scroll y zoom accidental en móvil durante el juego */
+/* Prevenir scroll vertical en móvil */
 @media (max-width: 768px) {
-  body.game-playing {
-    touch-action: none;
-    overflow: hidden;
+  html {
+    overflow-y: hidden;
+    height: 100%;
     position: fixed;
     width: 100%;
+  }
+  
+  body {
+    overflow-y: hidden;
+    height: 100%;
+    position: fixed;
+    width: 100%;
+    touch-action: pan-x; /* Permitir scroll horizontal si es necesario, pero no vertical */
+  }
+  
+  /* Prevenir scroll en el contenedor principal */
+  #__next {
+    overflow-y: hidden;
     height: 100%;
   }
 }
