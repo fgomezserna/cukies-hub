@@ -2054,12 +2054,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
         >
           {vaultEffectBadgesElement}
-            {/* Score, Level, Hearts y Timer con cajas */}
+            {/* Score, Level, Hearts y Timer con cajas - alineados con el canvas */}
             <div 
-              className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
+              className="flex flex-wrap justify-center gap-4 mb-2 items-center" 
               style={{ 
-                width: BASE_GAME_WIDTH,
-                transform: `translateX(${canvasHorizontalOffset}px)`
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)`
               }}
             >
               <div className="relative">
@@ -2136,7 +2138,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             
             {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-0">
-              <div className="w-full flex flex-row items-center justify-center gap-0">
+              <div className="w-full flex flex-row items-center justify-center gap-0" style={{ transform: `translate(${isMobile ? 300 : 0}px, -50px)` }}>
                 <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 -mr-3 relative">
                   {/* Render canvas only when size is determined */}
                   {canvasSize.width > 0 && canvasSize.height > 0 && (
@@ -2208,10 +2210,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
             </div>
             
-            {/* Botones principales */}
+            {/* Botones principales - alineados con el canvas */}
             <div 
               className="flex space-x-8 mb-3 justify-center items-center"
-              style={{ transform: `translateX(${canvasHorizontalOffset}px)` }}
+              style={{ 
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)` 
+              }}
             >
               <button 
                 onClick={handleStartPauseClick} 
@@ -2355,12 +2362,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
           >
             {vaultEffectBadgesElement}
-            {/* Score, Level, Hearts y Timer con cajas */}
+            {/* Score, Level, Hearts y Timer con cajas - alineados con el canvas */}
             <div 
-              className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
+              className="flex flex-wrap justify-center gap-4 mb-2 items-center" 
               style={{ 
-                width: BASE_GAME_WIDTH,
-                transform: `translateX(${canvasHorizontalOffset}px)`
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)`
               }}
             >
               <div className="relative">
@@ -2480,7 +2489,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
             {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-0">
-              <div className="w-full flex flex-row items-center justify-center gap-0">
+              <div className="w-full flex flex-row items-center justify-center gap-0" style={{ transform: `translate(${isMobile ? 300 : 0}px, -50px)` }}>
                 <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 -mr-3 relative">
 
               {/* Animación de jeff_goit al lado izquierdo del grid */}
@@ -2830,10 +2839,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
             </div>
             
-            {/* Botones principales */}
+            {/* Botones principales - alineados con el canvas */}
             <div 
               className="flex space-x-8 mb-3 justify-center items-center"
-              style={{ transform: `translateX(${canvasHorizontalOffset}px)` }}
+              style={{ 
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)` 
+              }}
             >
               <button 
                 onClick={handleStartPauseClick} 

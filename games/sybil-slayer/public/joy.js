@@ -353,7 +353,7 @@ var JoyStick = (function(container, parameters, callback)
                     
                     // Salir del loop una vez que encontramos y capturamos el touch
                     break;
-                }
+            }
             }
         }
         
@@ -427,7 +427,7 @@ var JoyStick = (function(container, parameters, callback)
     }
 
     /* To simplify this code there was a new experimental feature here: https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/offsetX , but it present only in Mouse case not metod presents in Touch case :-( */
-    function onMouseMove(event)
+    function onMouseMove(event) 
     {
         if(pressed === 1)
         {
