@@ -142,27 +142,13 @@ var JoyStick = (function(container, parameters, callback)
     drawInternal();
     
     // Función para buscar y capturar cualquier touch activo después de la inicialización
-    function checkForActiveTouch() {
-        // Solo buscar si no hay un touch activo ya
-        if(pressed === 0 && touchId === null) {
-            // Buscar cualquier touch activo en el documento
-            // Nota: No podemos acceder directamente a los touches activos,
-            // pero podemos usar un pequeño truco: esperar al próximo touchmove
-            // y capturarlo inmediatamente
-            var checkTimeout = setTimeout(function() {
-                // Si después de un breve delay no hay touch activo, cancelar
-                if(pressed === 0) {
-                    // No hay touch activo, está bien
-                }
-            }, 100);
-        }
+    // Esta función se ejecutará cuando llegue el próximo evento touchmove
+    // para capturar inmediatamente cualquier touch que esté dentro del área del joystick
+    function tryCaptureActiveTouch() {
+        // Esta función será llamada desde onTouchMove cuando detecte un touch activo
+        // No podemos acceder directamente a los touches activos sin un evento,
+        // pero onTouchMove ya tiene la lógica para capturarlos
     }
-    
-    // Intentar capturar cualquier touch activo después de un breve delay
-    // Esto ayuda cuando el joystick se inicializa después de que el touch comenzó
-    setTimeout(function() {
-        checkForActiveTouch();
-    }, 10);
 
     /******************************************************
      * Private methods
@@ -228,15 +214,15 @@ var JoyStick = (function(container, parameters, callback)
         );
         
         if(distanceFromCenter <= externalRadius + 20) {
-            // El touch está dentro del área, calcular la posición relativa al centro
-            // Limitar el movimiento al círculo externo si es necesario
+            // El touch está dentro del área, usar su posición directamente para seguir el dedo
             var distance = Math.sqrt(Math.pow(touchX - centerX, 2) + Math.pow(touchY - centerY, 2));
             if(distance > maxMoveStick) {
+                // Limitar al círculo externo si está fuera
                 var angle = Math.atan2(touchY - centerY, touchX - centerX);
                 movedX = centerX + Math.cos(angle) * maxMoveStick;
                 movedY = centerY + Math.sin(angle) * maxMoveStick;
             } else {
-                // El touch está dentro del área válida, usar su posición directamente
+                // Usar la posición del touch directamente
                 movedX = touchX;
                 movedY = touchY;
             }
@@ -283,10 +269,9 @@ var JoyStick = (function(container, parameters, callback)
         
         // Si no encontramos el touch por ID, intentar capturar cualquier touch dentro del área
         // Esto permite capturar touches que comenzaron antes de que el joystick se inicializara
-        // Intentar capturar cualquier touch activo que no esté siendo rastreado
-        // También intentar si pressed es 1 pero touch es null (caso donde se activó pero no se capturó)
-        // IMPORTANTE: También buscar si touchId es null (joystick recién inicializado)
-        if(touch === null && event.targetTouches.length > 0 && (touchId === null || pressed === 0)) {
+        // IMPORTANTE: Solo buscar si realmente no hay un touch activo (touchId === null)
+        // para no interferir con el seguimiento normal del joystick
+        if(touch === null && touchId === null && event.targetTouches.length > 0) {
             // Buscar el touch que está dentro del área del joystick
             for(var i = 0; i < event.targetTouches.length; i++) {
                 var currentTouch = event.targetTouches[i];
@@ -296,17 +281,22 @@ var JoyStick = (function(container, parameters, callback)
                 var relativeX = currentTouch.clientX - rect.left;
                 var relativeY = currentTouch.clientY - rect.top;
                 
-                // Verificar si el touch está dentro del área del joystick (círculo externo)
-                // Usar un área más grande para capturar mejor los touches que comenzaron antes
+                // Verificar si el touch está dentro del área del joystick
+                // Usar un área MUY grande para capturar el touch desde donde el usuario tocó inicialmente
                 var distanceFromCenter = Math.sqrt(
                     Math.pow(relativeX - centerX, 2) + 
                     Math.pow(relativeY - centerY, 2)
                 );
                 
-                // Aumentar el área de captura para asegurar que capturemos el touch
-                var captureRadius = externalRadius + 50; // Área más grande para captura inicial
+                // Área de captura muy grande para asegurar que capturemos el touch desde cualquier posición
+                // Esto es especialmente importante cuando el joystick se inicializa después del touch
+                var captureRadius = Math.max(externalRadius + 100, canvas.width / 2); // Área muy grande
                 
-                if(distanceFromCenter <= captureRadius) {
+                // También verificar si el touch está dentro del rectángulo del canvas
+                var isInCanvasBounds = relativeX >= -50 && relativeX <= canvas.width + 50 &&
+                                       relativeY >= -50 && relativeY <= canvas.height + 50;
+                
+                if(distanceFromCenter <= captureRadius || isInCanvasBounds) {
                     // El touch está dentro del área del joystick, activarlo inmediatamente
                     pressed = 1;
                     touchId = currentTouch.identifier;
@@ -333,15 +323,16 @@ var JoyStick = (function(container, parameters, callback)
                         canvasHeight: canvas.height
                     });
                     
-                    // Calcular la posición relativa al centro del joystick
-                    // Limitar el movimiento al círculo externo
+                    // Cuando capturamos un touch que comenzó antes de la inicialización,
+                    // usar la posición actual del touch directamente para seguir el dedo inmediatamente
                     var distance = Math.sqrt(Math.pow(touchX - centerX, 2) + Math.pow(touchY - centerY, 2));
                     if(distance > maxMoveStick) {
+                        // Limitar al círculo externo si está fuera
                         var angle = Math.atan2(touchY - centerY, touchX - centerX);
                         movedX = centerX + Math.cos(angle) * maxMoveStick;
                         movedY = centerY + Math.sin(angle) * maxMoveStick;
                     } else {
-                        // El touch está dentro del área válida, usar su posición directamente
+                        // Usar la posición del touch directamente para seguir el dedo
                         movedX = touchX;
                         movedY = touchY;
                     }

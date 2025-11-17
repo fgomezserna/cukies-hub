@@ -122,9 +122,9 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
           {
             width: joystickSize,
             height: joystickSize,
-            internalFillColor: '#3B82F6', // Azul para el stick interno
+            internalFillColor: '#EC4899', // Rosa para el stick interno
             internalLineWidth: 2,
-            internalStrokeColor: '#1E40AF', // Azul oscuro para el borde
+            internalStrokeColor: '#BE185D', // Rosa oscuro para el borde
             externalLineWidth: 3,
             externalStrokeColor: 'rgba(255, 255, 255, 0.5)', // Borde externo semi-transparente
             autoReturnToCenter: true,
