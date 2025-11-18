@@ -2,28 +2,47 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Vector2D } from '@/types/game';
 import { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_START } from '@/lib/constants';
 
-interface InputState {
-  direction: Vector2D;
+type DirectionListener = (direction: Vector2D) => void;
+
+interface InputFlags {
   pauseToggled: boolean;
   startToggled: boolean;
 }
 
-const initialInputState: InputState = {
-  direction: { x: 0, y: 0 },
+const initialInputFlags: InputFlags = {
   pauseToggled: false,
   startToggled: false,
 };
 
-export interface UseGameInputReturn extends InputState {
+export interface UseGameInputReturn extends InputFlags {
   setTouchDirection: (direction: Vector2D) => void;
   clearTouchDirection: () => void;
+  subscribeToDirection: (listener: DirectionListener) => () => void;
+  getDirection: () => Vector2D;
 }
 
 export function useGameInput(): UseGameInputReturn {
-  const [inputState, setInputState] = useState<InputState>(initialInputState);
+  const [inputFlags, setInputFlags] = useState<InputFlags>(initialInputFlags);
   const pressedKeys = new Set<string>();
   const startKeyPressed = { current: false }; // Flag para rastrear si Space está presionada
   const touchDirectionRef = useRef<Vector2D>({ x: 0, y: 0 });
+  const directionRef = useRef<Vector2D>({ x: 0, y: 0 });
+  const directionListenersRef = useRef<Set<DirectionListener>>(new Set());
+
+  const notifyDirectionListeners = useCallback((direction: Vector2D) => {
+    directionListenersRef.current.forEach(listener => listener(direction));
+  }, []);
+
+  const subscribeToDirection = useCallback((listener: DirectionListener) => {
+    directionListenersRef.current.add(listener);
+    // Emitir inmediatamente la dirección actual para mantener sincronía
+    listener(directionRef.current);
+    return () => {
+      directionListenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const getDirection = useCallback(() => directionRef.current, []);
 
   const updateDirection = useCallback(() => {
     let dx = 0;
@@ -50,8 +69,17 @@ export function useGameInput(): UseGameInputReturn {
       }
     }
 
-    setInputState(prev => ({ ...prev, direction: { x: dx, y: dy } }));
-  }, []); // No dependencies needed as pressedKeys is managed internally
+    const nextDirection = { x: dx, y: dy };
+    const prevDirection = directionRef.current;
+    
+    // Evitar notificaciones innecesarias cuando la dirección no cambia
+    if (prevDirection.x === nextDirection.x && prevDirection.y === nextDirection.y) {
+      return;
+    }
+
+    directionRef.current = nextDirection;
+    notifyDirectionListeners(nextDirection);
+  }, [notifyDirectionListeners]);
 
   const setTouchDirection = useCallback((direction: Vector2D) => {
     touchDirectionRef.current = direction;
@@ -74,7 +102,7 @@ export function useGameInput(): UseGameInputReturn {
     // Solo procesar start si la tecla no ha sido presionada antes
     if (event.code === KEY_START && !startKeyPressed.current) {
         startKeyPressed.current = true;
-        setInputState(prev => ({ ...prev, startToggled: true }));
+        setInputFlags(prev => ({ ...prev, startToggled: true }));
     }
     // Prevent default browser behavior for arrow keys, space, etc.
     if ([KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_START].includes(event.code)) {
@@ -91,7 +119,7 @@ export function useGameInput(): UseGameInputReturn {
     // Reset toggle states on key up to require a fresh press
      if (event.code === KEY_START) {
         startKeyPressed.current = false;
-        setInputState(prev => ({ ...prev, startToggled: false }));
+        setInputFlags(prev => ({ ...prev, startToggled: false }));
      }
   }, [updateDirection]);
 
@@ -100,13 +128,10 @@ export function useGameInput(): UseGameInputReturn {
   const clearPressedKeys = useCallback(() => {
     pressedKeys.clear();
     startKeyPressed.current = false;
-    setInputState(prev => ({ 
-      ...prev, 
-      direction: { x: 0, y: 0 },
-      pauseToggled: false,
-      startToggled: false
-    }));
-  }, []);
+    touchDirectionRef.current = { x: 0, y: 0 };
+    updateDirection();
+    setInputFlags({ ...initialInputFlags });
+  }, [updateDirection]);
 
   // Función para prevenir menú contextual y recuperar foco
   const handleContextMenu = useCallback((event: MouseEvent) => {
@@ -152,8 +177,10 @@ export function useGameInput(): UseGameInputReturn {
 
   // Return a stable object, but its properties will update
   return {
-    ...inputState,
+    ...inputFlags,
     setTouchDirection,
     clearTouchDirection,
+    subscribeToDirection,
+    getDirection,
   };
 }

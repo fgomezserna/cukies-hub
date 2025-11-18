@@ -556,7 +556,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   }, [width, height, canvasSize.width, canvasSize.height]);
 
-  const inputState = useGameInput();
+  const {
+    pauseToggled,
+    startToggled,
+    setTouchDirection,
+    clearTouchDirection,
+    subscribeToDirection,
+  } = useGameInput();
   const isMobile = useIsMobile();
   
   // Debug: Log mobile detection
@@ -980,7 +986,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
   // useEffect(() => {
-  //   if (inputState.pauseToggled) {
+  //   if (pauseToggled) {
   //     // Ejecutar exactamente la misma lógica que el botón de pausa
   //     if (gameState.status === 'playing') {
   //       playSound('pause');
@@ -990,17 +996,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   //       togglePause();
   //     }
   //   }
-  // }, [inputState.pauseToggled, gameState.status, togglePause, playSound]);
+  // }, [pauseToggled, gameState.status, togglePause, playSound]);
 
   // Handle start game from keyboard (Space key)
   useEffect(() => {
-    if (!inputState.startToggled) return;
+    if (!startToggled) return;
     if (gameState.status !== 'idle') return;
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
     playSound('game_start');
     startGame();
-  }, [inputState.startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
+  }, [startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
   
   // Reset flags when starting a new game (moved after gameState initialization)
   useEffect(() => {
@@ -1085,20 +1091,26 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
-    const nextInputState = {
-      direction: inputState.direction,
-      pauseToggled: inputState.pauseToggled,
-      startToggled: inputState.startToggled,
-    };
-    if (
-      inputState.startToggled &&
-      (gameState.status === 'idle' || gameState.status === 'gameOver')
-    ) {
-      setModeSelectOpen(true);
-      nextInputState.startToggled = false;
-    }
-    updateInputRef(nextInputState);
-  }, [inputState, updateInputRef, gameState.status]);
+    const unsubscribe = subscribeToDirection((direction) => {
+      const nextInputState = {
+        direction,
+        pauseToggled,
+        startToggled,
+      };
+
+      if (
+        startToggled &&
+        (gameState.status === 'idle' || gameState.status === 'gameOver')
+      ) {
+        setModeSelectOpen(true);
+        nextInputState.startToggled = false;
+      }
+
+      updateInputRef(nextInputState);
+    });
+
+    return unsubscribe;
+  }, [subscribeToDirection, pauseToggled, startToggled, updateInputRef, gameState.status]);
 
   const hasStartedMultiplayerRef = useRef(false);
   useEffect(() => {
@@ -3047,8 +3059,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         <>
           {process.env.NODE_ENV === 'development' && console.log('[GameContainer] Rendering TouchZones, isMobile:', isMobile)}
           <TouchZones
-            onDirectionChange={inputState.setTouchDirection}
-            onDirectionClear={inputState.clearTouchDirection}
+            onDirectionChange={setTouchDirection}
+            onDirectionClear={clearTouchDirection}
           />
         </>
       )}
