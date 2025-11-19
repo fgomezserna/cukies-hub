@@ -2052,10 +2052,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 px-4 py-6">
             <div
               className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
-              style={{ 
-                transform: `scale(${isMobile ? scale * 1.5 : scale})`, 
-                transformOrigin: 'center' 
-              }}
+              style={{ transform: `scale(${isMobile ? scale * 1.5 : scale})`, transformOrigin: 'center' }}
             >
               <h1 className="text-4xl md:text-6xl font-pixellari text-pink-200 mb-6 text-center select-none tracking-wide">
                 TREASURE HUNT

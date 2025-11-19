@@ -309,37 +309,41 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      className={`fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm ${isMobile ? 'px-2 py-2' : 'px-4 py-6'}`}
-      onClick={handleClose}
-    >
+  // Estructura diferente para móvil: pantalla completa con elementos fijos
+  if (isMobile) {
+    return (
       <div
-        className={`relative w-full ${isMobile ? 'max-w-[95vw] max-h-[95vh]' : 'max-w-5xl'} rounded-xl border border-pink-400/60 bg-slate-900/95 ${isMobile ? 'p-4' : 'p-6 md:p-8'} shadow-2xl shadow-pink-500/20 overflow-hidden flex flex-col`}
-        onClick={event => event.stopPropagation()}
+        className="fixed inset-0 z-[80] flex flex-col bg-black/95 backdrop-blur-sm"
+        onClick={handleClose}
       >
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none"
-          aria-label="Cerrar información del juego"
-        >
-          ×
-        </button>
-
-        <div className={`text-center ${isMobile ? 'mb-4' : 'mb-6'} flex-shrink-0`}>
-          <h2 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-pixellari text-pink-200 tracking-wide`}>Reglas de Treasure Hunt</h2>
+        {/* Header fijo */}
+        <div className="relative flex-shrink-0 bg-slate-900/95 border-b border-pink-400/60 p-4">
+          <button
+            onClick={handleClose}
+            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none z-10"
+            aria-label="Cerrar información del juego"
+          >
+            ×
+          </button>
+          <div className="text-center pr-10">
+            <h2 className="text-2xl font-pixellari text-pink-200 tracking-wide">Reglas de Treasure Hunt</h2>
+          </div>
         </div>
 
-        <div className="relative flex items-stretch flex-1 min-h-0">
-          {/* Flecha izquierda - sticky */}
+        {/* Contenedor con botones fijos a los lados */}
+        <div className="flex-1 min-h-0 relative">
+          {/* Botón izquierdo - fijo, fuera del scroll */}
           <button
-            onClick={handlePrevGroup}
-            className={`sticky ${isMobile ? 'top-[calc(50%-24px)] h-12' : 'top-[calc(50%-32px)] h-16'} self-start flex-shrink-0 focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95 z-10`}
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevGroup();
+            }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
             aria-label="Grupo anterior"
           >
-            <div className={`flex ${isMobile ? 'h-12 w-12' : 'h-16 w-16'} items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50`}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
               <svg
-                className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-pink-200`}
+                className="h-6 w-6 text-pink-200"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="3"
@@ -352,8 +356,33 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             </div>
           </button>
 
-          {/* Contenido con scroll */}
-          <div className={`flex-1 relative ${isMobile ? 'mx-2' : 'mx-4'} overflow-y-auto`}>
+          {/* Botón derecho - fijo, fuera del scroll */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextGroup();
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+            aria-label="Grupo siguiente"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+              <svg
+                className="h-6 w-6 text-pink-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </button>
+
+          {/* Contenido scrolleable con padding para los botones */}
+          <div className="overflow-y-auto h-full px-16 py-4">
+            <div className="relative">
             {/* Renderizar todos los grupos ocultos para medir sus alturas */}
             {infoGroups.map((group, index) => {
               const arrangedItemsForGroup = arrangeGroupItems(group.items);
@@ -364,7 +393,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                   ref={el => {
                     containerRefs.current[index] = el;
                   }}
-                  className={`rounded-xl border border-pink-400/40 bg-slate-800/70 ${isMobile ? 'p-3' : 'p-4 md:p-6'} shadow-lg shadow-pink-500/10`}
+                  className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-3 shadow-lg shadow-pink-500/10"
                   style={{
                     position: index === currentGroupIndex ? 'relative' : 'absolute',
                     visibility: index === currentGroupIndex ? 'visible' : 'hidden',
@@ -374,14 +403,14 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                     minHeight: maxContainerHeight || undefined,
                   }}
                 >
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-2">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {index + 1}</p>
-                      <h3 className={`${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'} font-pixellari text-pink-200`}>{group.title}</h3>
+                      <p className="text-[10px] uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {index + 1}</p>
+                      <h3 className="text-xl font-pixellari text-pink-200">{group.title}</h3>
                     </div>
                   </div>
 
-                  <div className={`mt-6 grid grid-cols-1 ${isMobile ? 'gap-3' : 'md:grid-cols-2 gap-4'}`}>
+                  <div className="mt-4 grid grid-cols-1 gap-3">
                     {arrangedItemsForGroup.map((item, itemIndex) => {
                       const images = Array.isArray(item.image) ? item.image : [item.image];
                       const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
@@ -402,7 +431,222 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                       const renderIconContent = () => {
                         if (item.name === 'Bonificación de nivel') {
                           return (
-                            <div className={`flex ${isMobile ? 'h-20 w-20' : 'h-28 w-28'} items-center justify-center rounded-lg bg-slate-800/60 p-2`}>
+                            <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-800/60 p-1">
+                              <svg
+                                className="h-full w-full text-pink-400"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M12 19V5M5 12l7-7 7 7" />
+                              </svg>
+                            </div>
+                          );
+                        }
+
+                        return imagesToRender.map((src, imgIdx) => {
+                          const originalIndex = (() => {
+                            if (isTreasureItem && treasureImagesLength) {
+                              return treasureImageIndex % treasureImagesLength;
+                            }
+                            if (isRuneItem && runeImagesLength) {
+                              return runeImageIndex % runeImagesLength;
+                            }
+                            return imgIdx;
+                          })();
+
+                          return (
+                            <div
+                              key={`${item.name}-${originalIndex}`}
+                              className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-800/60 p-1"
+                            >
+                              <Image
+                                src={src}
+                                alt={
+                                  typeof imageAlts[originalIndex] === 'string'
+                                    ? imageAlts[originalIndex]
+                                    : item.name
+                                }
+                                width={448}
+                                height={448}
+                                quality={100}
+                                unoptimized={false}
+                                priority={false}
+                                className="info-modal-img h-full w-full object-contain transition-opacity duration-500"
+                              />
+                            </div>
+                          );
+                        });
+                      };
+
+                      const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
+                      const cardClassName = 'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-3 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70';
+
+                      return (
+                        <div
+                          key={item.name}
+                          className={cardClassName}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {renderIconContent()}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-base font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                            </div>
+                          </div>
+                          <p className="text-xs text-pink-100/90 leading-snug font-pixellari">
+                            {item.description}
+                          </p>
+                          {item.details && (
+                            <ul className="ml-4 list-disc space-y-1 text-[10px] text-pink-100/80 font-pixellari">
+                              {item.name === 'Totem mágico' ? (
+                                <div className="flex flex-wrap gap-3">
+                                  {item.details.map(detail => (
+                                    <span
+                                      key={detail}
+                                      className="rounded-full border border-pink-300/60 bg-pink-300/15 px-4 py-1 font-pixellari text-sm text-pink-100 shadow-sm shadow-pink-500/20"
+                                    >
+                                      {detail}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                item.details.map(detail => <li key={detail}>{detail}</li>)
+                              )}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          </div>
+        </div>
+
+        {/* Indicadores fijos */}
+        <div className="flex-shrink-0 flex items-center justify-center gap-2 py-3 bg-slate-900/50 border-t border-pink-400/30">
+          {infoGroups.map((_, index) => (
+            <button
+              key={`indicator-${index}`}
+              onClick={() => {
+                onPlaySound?.('button_click');
+                setCurrentGroupIndex(index);
+              }}
+              className="h-2.5 w-2.5 rounded-full border-2 transition-all"
+              style={{
+                borderColor: index === currentGroupIndex ? 'rgb(244, 114, 182)' : 'rgba(236, 72, 153, 0.4)',
+                backgroundColor: index === currentGroupIndex ? 'white' : 'rgba(236, 72, 153, 0.3)',
+                boxShadow: index === currentGroupIndex ? '0 0 8px rgba(236,72,153,0.6)' : 'none',
+                transform: index === currentGroupIndex ? 'scale(1.1)' : 'scale(1)',
+              }}
+              aria-label={`Ir al grupo ${index + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Estructura original para escritorio
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6 overflow-y-auto"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/95 p-6 md:p-8 shadow-2xl shadow-pink-500/20"
+        onClick={event => event.stopPropagation()}
+      >
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none"
+          aria-label="Cerrar información del juego"
+        >
+          ×
+        </button>
+
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">Reglas de Treasure Hunt</h2>
+        </div>
+
+        <div className="flex items-stretch gap-4">
+          <button
+            onClick={handlePrevGroup}
+            className="flex-shrink-0 self-center focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95"
+            aria-label="Grupo anterior"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+              <svg
+                className="h-8 w-8 text-pink-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </div>
+          </button>
+
+          <div className="flex-1 relative">
+            {/* Renderizar todos los grupos ocultos para medir sus alturas */}
+            {infoGroups.map((group, index) => {
+              const arrangedItemsForGroup = arrangeGroupItems(group.items);
+
+              return (
+                <div
+                  key={`hidden-${index}`}
+                  ref={el => {
+                    containerRefs.current[index] = el;
+                  }}
+                  className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10"
+                  style={{
+                    position: index === currentGroupIndex ? 'relative' : 'absolute',
+                    visibility: index === currentGroupIndex ? 'visible' : 'hidden',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    minHeight: maxContainerHeight || undefined,
+                  }}
+                >
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {index + 1}</p>
+                      <h3 className="text-2xl md:text-3xl font-pixellari text-pink-200">{group.title}</h3>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {arrangedItemsForGroup.map((item, itemIndex) => {
+                      const images = Array.isArray(item.image) ? item.image : [item.image];
+                      const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
+                      const isTreasureItem = item.name === 'Tesoros';
+                      const isRuneItem = item.name === 'Runas';
+                      const isHakuItem = item.name === 'Haku';
+                      const imagesToRender = (() => {
+                        if (isTreasureItem) {
+                          const imgIndex = treasureImagesLength > 0 ? treasureImageIndex % treasureImagesLength : 0;
+                          return [images[imgIndex]];
+                        }
+                        if (isRuneItem) {
+                          const imgIndex = runeImagesLength > 0 ? runeImageIndex % runeImagesLength : 0;
+                          return [images[imgIndex]];
+                        }
+                        return images;
+                      })();
+                      const renderIconContent = () => {
+                        if (item.name === 'Bonificación de nivel') {
+                          return (
+                            <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2">
                               <svg
                                 className="h-full w-full text-pink-400"
                                 fill="none"
@@ -455,9 +699,9 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
 
                       const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
                       const cardClassName = [
-                        `group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 ${isMobile ? 'p-3' : 'p-4'} shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70`,
-                        isThirdWide ? `${isMobile ? '' : 'md:col-span-2 md:max-w-none'}` : '',
-                        !isThirdWide && isHakuItem ? `${isMobile ? '' : 'md:max-w-sm md:w-full md:mx-auto'}` : '',
+                        'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70',
+                        isThirdWide ? 'md:col-span-2 md:max-w-none' : '',
+                        !isThirdWide && isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : '',
                       ]
                         .filter(Boolean)
                         .join(' ');
@@ -472,7 +716,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                               {renderIconContent()}
                             </div>
                             <div className="flex-1">
-                              <h4 className={`${isMobile ? 'text-lg' : 'text-xl'} font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]`}>{item.name}</h4>
+                              <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
                             </div>
                           </div>
                           <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">
@@ -505,15 +749,14 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             })}
           </div>
 
-          {/* Flecha derecha - sticky */}
           <button
             onClick={handleNextGroup}
-            className={`sticky ${isMobile ? 'top-[calc(50%-24px)] h-12' : 'top-[calc(50%-32px)] h-16'} self-start flex-shrink-0 focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95 z-10`}
+            className="flex-shrink-0 self-center focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95"
             aria-label="Grupo siguiente"
           >
-            <div className={`flex ${isMobile ? 'h-12 w-12' : 'h-16 w-16'} items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50`}>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
               <svg
-                className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-pink-200`}
+                className="h-8 w-8 text-pink-200"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="3"
@@ -527,7 +770,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
           </button>
         </div>
 
-        <div className={`${isMobile ? 'mt-4' : 'mt-6'} flex items-center justify-center gap-3 flex-shrink-0`}>
+        <div className="mt-6 flex items-center justify-center gap-3">
           {infoGroups.map((_, index) => (
             <button
               key={`indicator-${index}`}
