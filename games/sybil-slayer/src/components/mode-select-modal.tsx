@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useIsMobile } from '../hooks/use-mobile';
 
 type GameMode = 'single' | 'multiplayer';
 
@@ -32,6 +33,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   onRulesClick,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
+  const isMobile = useIsMobile();
 
   React.useEffect(() => {
     if (!open) {
@@ -47,7 +49,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
+        className={`relative w-full ${isMobile ? 'max-w-[95vw] max-h-[95vh] overflow-y-auto' : 'max-w-5xl'} rounded-xl border border-pink-400/60 bg-slate-900/90 ${isMobile ? 'p-4' : 'p-6'} shadow-2xl shadow-pink-500/10`}
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -57,22 +59,22 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
         >
           ×
         </button>
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">
+        <div className={`text-center ${isMobile ? 'mb-4' : 'mb-6'}`}>
+          <h2 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-pixellari text-pink-200 tracking-wide`}>
             Selecciona modo de juego
           </h2>
-          <p className="mt-2 text-sm font-pixellari text-pink-200/80">
+          <p className={`mt-2 ${isMobile ? 'text-xs' : 'text-sm'} font-pixellari text-pink-200/80`}>
             Elige cómo quieres jugar.
           </p>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-6">
+        <div className={`flex flex-wrap justify-center ${isMobile ? 'gap-4' : 'gap-6'}`}>
           {/* Single Player Mode */}
           <button
             onClick={() => onSelectMode('single')}
             onMouseEnter={() => setHoveredMode('single')}
             onMouseLeave={() => setHoveredMode(null)}
-            className="group relative flex flex-col p-6 rounded-lg border border-pink-400/40 bg-slate-800/60 shadow-lg shadow-pink-500/10 hover:border-pink-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-[280px]"
+            className={`group relative flex flex-col ${isMobile ? 'p-4' : 'p-6'} rounded-lg border border-pink-400/40 bg-slate-800/60 shadow-lg shadow-pink-500/10 hover:border-pink-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none ${isMobile ? 'w-full max-w-[280px]' : 'w-[280px]'}`}
           >
             <div className="flex flex-col gap-4 items-center">
               <div className="flex items-center justify-center gap-3 text-center">
@@ -95,7 +97,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   width={300}
                   height={300}
                   quality={100}
-                  className="object-contain w-[100px] h-[100px]"
+                  className={`object-contain ${isMobile ? 'w-[80px] h-[80px]' : 'w-[100px] h-[100px]'}`}
                 />
               </div>
               {/* Botón de Reglas - debajo de la imagen */}
@@ -122,9 +124,9 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     alt="Reglas"
                     width={120}
                     height={50}
-                    className="game-img"
+                    className={`game-img ${isMobile ? 'w-[100px] h-[42px]' : ''}`}
                   />
-                  <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                  <span className={`absolute inset-0 flex items-center justify-center text-white font-pixellari ${isMobile ? 'text-base' : 'text-lg'}`} style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
                     REGLAS
                   </span>
                 </div>
@@ -134,7 +136,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
 
           {/* Multiplayer Mode */}
           <div
-            className="group relative flex flex-col p-6 rounded-lg border border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none w-[280px]"
+            className={`group relative flex flex-col ${isMobile ? 'p-4' : 'p-6'} rounded-lg border border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none ${isMobile ? 'w-full max-w-[280px]' : 'w-[280px]'}`}
           >
             <div className="flex flex-col gap-4 items-center">
               <div className="flex items-center justify-center gap-3 text-center">

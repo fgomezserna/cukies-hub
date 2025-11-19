@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { SoundType } from '@/hooks/useAudio';
+import { useIsMobile } from '../hooks/use-mobile';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -218,6 +219,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   const [runeImageIndex, setRuneImageIndex] = useState(0);
   const containerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [maxContainerHeight, setMaxContainerHeight] = useState<number>(0);
+  const isMobile = useIsMobile();
 
   const treasureItem = infoGroups.flatMap(group => group.items).find(item => item.name === 'Tesoros');
   const treasureImagesLength =
@@ -309,11 +311,11 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6"
+      className={`fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm ${isMobile ? 'px-2 py-2' : 'px-4 py-6'}`}
       onClick={handleClose}
     >
       <div
-        className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/95 p-6 md:p-8 shadow-2xl shadow-pink-500/20"
+        className={`relative w-full ${isMobile ? 'max-w-[95vw] max-h-[95vh]' : 'max-w-5xl'} rounded-xl border border-pink-400/60 bg-slate-900/95 ${isMobile ? 'p-4' : 'p-6 md:p-8'} shadow-2xl shadow-pink-500/20 overflow-hidden flex flex-col`}
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -324,19 +326,20 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
           ×
         </button>
 
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">Reglas de Treasure Hunt</h2>
+        <div className={`text-center ${isMobile ? 'mb-4' : 'mb-6'} flex-shrink-0`}>
+          <h2 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-pixellari text-pink-200 tracking-wide`}>Reglas de Treasure Hunt</h2>
         </div>
 
-        <div className="flex items-stretch gap-4">
+        <div className="relative flex items-stretch flex-1 min-h-0">
+          {/* Flecha izquierda - sticky */}
           <button
             onClick={handlePrevGroup}
-            className="flex-shrink-0 self-center focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95"
+            className={`sticky ${isMobile ? 'top-[calc(50%-24px)] h-12' : 'top-[calc(50%-32px)] h-16'} self-start flex-shrink-0 focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95 z-10`}
             aria-label="Grupo anterior"
           >
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+            <div className={`flex ${isMobile ? 'h-12 w-12' : 'h-16 w-16'} items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50`}>
               <svg
-                className="h-8 w-8 text-pink-200"
+                className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-pink-200`}
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="3"
@@ -349,7 +352,8 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             </div>
           </button>
 
-          <div className="flex-1 relative">
+          {/* Contenido con scroll */}
+          <div className={`flex-1 relative ${isMobile ? 'mx-2' : 'mx-4'} overflow-y-auto`}>
             {/* Renderizar todos los grupos ocultos para medir sus alturas */}
             {infoGroups.map((group, index) => {
               const arrangedItemsForGroup = arrangeGroupItems(group.items);
@@ -360,7 +364,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                   ref={el => {
                     containerRefs.current[index] = el;
                   }}
-                  className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-4 md:p-6 shadow-lg shadow-pink-500/10"
+                  className={`rounded-xl border border-pink-400/40 bg-slate-800/70 ${isMobile ? 'p-3' : 'p-4 md:p-6'} shadow-lg shadow-pink-500/10`}
                   style={{
                     position: index === currentGroupIndex ? 'relative' : 'absolute',
                     visibility: index === currentGroupIndex ? 'visible' : 'hidden',
@@ -373,11 +377,11 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {index + 1}</p>
-                      <h3 className="text-2xl md:text-3xl font-pixellari text-pink-200">{group.title}</h3>
+                      <h3 className={`${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'} font-pixellari text-pink-200`}>{group.title}</h3>
                     </div>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={`mt-6 grid grid-cols-1 ${isMobile ? 'gap-3' : 'md:grid-cols-2 gap-4'}`}>
                     {arrangedItemsForGroup.map((item, itemIndex) => {
                       const images = Array.isArray(item.image) ? item.image : [item.image];
                       const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
@@ -398,7 +402,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                       const renderIconContent = () => {
                         if (item.name === 'Bonificación de nivel') {
                           return (
-                            <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-slate-800/60 p-2">
+                            <div className={`flex ${isMobile ? 'h-20 w-20' : 'h-28 w-28'} items-center justify-center rounded-lg bg-slate-800/60 p-2`}>
                               <svg
                                 className="h-full w-full text-pink-400"
                                 fill="none"
@@ -451,9 +455,9 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
 
                       const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
                       const cardClassName = [
-                        'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-4 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70',
-                        isThirdWide ? 'md:col-span-2 md:max-w-none' : '',
-                        !isThirdWide && isHakuItem ? 'md:max-w-sm md:w-full md:mx-auto' : '',
+                        `group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 ${isMobile ? 'p-3' : 'p-4'} shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70`,
+                        isThirdWide ? `${isMobile ? '' : 'md:col-span-2 md:max-w-none'}` : '',
+                        !isThirdWide && isHakuItem ? `${isMobile ? '' : 'md:max-w-sm md:w-full md:mx-auto'}` : '',
                       ]
                         .filter(Boolean)
                         .join(' ');
@@ -468,7 +472,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                               {renderIconContent()}
                             </div>
                             <div className="flex-1">
-                              <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                              <h4 className={`${isMobile ? 'text-lg' : 'text-xl'} font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]`}>{item.name}</h4>
                             </div>
                           </div>
                           <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">
@@ -501,14 +505,15 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             })}
           </div>
 
+          {/* Flecha derecha - sticky */}
           <button
             onClick={handleNextGroup}
-            className="flex-shrink-0 self-center focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95"
+            className={`sticky ${isMobile ? 'top-[calc(50%-24px)] h-12' : 'top-[calc(50%-32px)] h-16'} self-start flex-shrink-0 focus:outline-none transition-all duration-200 hover:scale-110 active:scale-95 z-10`}
             aria-label="Grupo siguiente"
           >
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+            <div className={`flex ${isMobile ? 'h-12 w-12' : 'h-16 w-16'} items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50`}>
               <svg
-                className="h-8 w-8 text-pink-200"
+                className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-pink-200`}
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="3"
@@ -522,7 +527,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
           </button>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className={`${isMobile ? 'mt-4' : 'mt-6'} flex items-center justify-center gap-3 flex-shrink-0`}>
           {infoGroups.map((_, index) => (
             <button
               key={`indicator-${index}`}
