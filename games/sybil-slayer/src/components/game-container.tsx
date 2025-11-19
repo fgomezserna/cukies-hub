@@ -1870,6 +1870,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setScale(newScale);
   }, []);
 
+  const normalizedCanvasOffset = useMemo(() => {
+    if (scale === 0) {
+      return canvasHorizontalOffset;
+    }
+    return canvasHorizontalOffset / scale;
+  }, [canvasHorizontalOffset, scale]);
+
   // Función para calcular el offset horizontal del canvas para alinear elementos
   const calculateCanvasHorizontalOffset = useCallback(() => {
     if (!containerRef.current) {
@@ -2073,7 +2080,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 width: `${canvasSize.width}px`,
                 marginLeft: 'auto',
                 marginRight: 'auto',
-                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)`
+                transform: `translate(${normalizedCanvasOffset}px, -50px)`
               }}
             >
               <div className="relative">
@@ -2229,7 +2236,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 width: `${canvasSize.width}px`,
                 marginLeft: 'auto',
                 marginRight: 'auto',
-                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)` 
+                transform: `translate(${normalizedCanvasOffset}px, -50px)` 
               }}
             >
               <button 
@@ -2381,7 +2388,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 width: `${canvasSize.width}px`,
                 marginLeft: 'auto',
                 marginRight: 'auto',
-                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)`
+                transform: `translate(${normalizedCanvasOffset}px, -50px)`
               }}
             >
               <div className="relative">
@@ -2858,7 +2865,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 width: `${canvasSize.width}px`,
                 marginLeft: 'auto',
                 marginRight: 'auto',
-                transform: isMobile ? `translate(300px, -50px)` : `translate(${canvasHorizontalOffset}px, -50px)` 
+                transform: `translate(${normalizedCanvasOffset}px, -50px)` 
               }}
             >
               <button 
