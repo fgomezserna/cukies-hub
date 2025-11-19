@@ -13,6 +13,7 @@ import { useAudio } from '../hooks/useAudio';
 import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useOrientation } from '../hooks/use-orientation';
+import { useFullscreen } from '../hooks/use-fullscreen';
 import TouchZones from './touch-zones';
 import OrientationOverlay from './orientation-overlay';
 import { Button } from "./ui/button";
@@ -567,6 +568,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   } = useGameInput();
   const isMobile = useIsMobile();
   const isPortrait = useOrientation();
+  const { elementRef: fullscreenRef, isFullscreen, toggleFullscreen } = useFullscreen<HTMLDivElement>();
   
   // Ref para rastrear si pausamos automáticamente por orientación
   const pausedByOrientationRef = useRef<boolean>(false);
@@ -2024,7 +2026,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center min-h-screen">
+    <div ref={fullscreenRef} className="relative w-full h-full flex flex-col items-center justify-center min-h-screen">
       <ModeSelectModal
         open={modeSelectOpen}
         onClose={() => setModeSelectOpen(false)}
@@ -2829,6 +2831,46 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     energyCollectedFlag={energyCollectedFlag}
                     damageFlag={damageFlag}
                   />
+                  
+                  {/* Botón de pantalla completa - solo móvil y cuando está jugando */}
+                  {isMobile && gameState.status === 'playing' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFullscreen();
+                        playSound('button_click');
+                      }}
+                      className="absolute top-4 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-pink-500/80 hover:bg-pink-500 border-2 border-pink-300/60 shadow-lg shadow-pink-500/30 backdrop-blur-sm transition-all duration-200 active:scale-95 focus:outline-none"
+                      aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                      title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                    >
+                      {isFullscreen ? (
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-6 h-6 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
                   
                   {/* Botones de game over */}
                   {gameState.status === 'gameOver' && (
