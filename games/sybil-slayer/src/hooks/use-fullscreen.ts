@@ -23,10 +23,32 @@ const isMobileDevice = () => {
 
 export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreenSupported, setIsFullscreenSupported] = useState(false);
   const elementRef = useRef<T>(null);
 
   useEffect(() => {
     const doc = document as DocumentWithFullscreen;
+    
+    // Verificar si fullscreen está soportado
+    const checkFullscreenSupport = () => {
+      const element = document.documentElement as FullscreenElement;
+      const supported = !!(
+        doc.fullscreenEnabled ||
+        (doc as any).webkitFullscreenEnabled ||
+        element.requestFullscreen ||
+        element.webkitRequestFullscreen ||
+        element.msRequestFullscreen ||
+        element.mozRequestFullScreen
+      );
+      setIsFullscreenSupported(supported);
+      console.log('[useFullscreen] Fullscreen support check:', {
+        fullscreenEnabled: doc.fullscreenEnabled,
+        webkitFullscreenEnabled: (doc as any).webkitFullscreenEnabled,
+        hasRequestFullscreen: !!element.requestFullscreen,
+        hasWebkitRequestFullscreen: !!element.webkitRequestFullscreen,
+        supported,
+      });
+    };
     
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = !!(
@@ -37,6 +59,9 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
       );
       setIsFullscreen(isCurrentlyFullscreen);
     };
+
+    // Verificar soporte inicial
+    checkFullscreenSupport();
 
     // Listen for fullscreen changes
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -60,45 +85,78 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
     const doc = document as DocumentWithFullscreen;
     const isMobile = isMobileDevice();
     
-    // En móvil, usar el documento completo directamente
+    // Siempre usar el documento completo en móvil para mejor compatibilidad
     const targetElement = isMobile 
       ? (document.documentElement as FullscreenElement)
       : (element || (document.documentElement as FullscreenElement));
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[useFullscreen] Entering fullscreen:', {
-        isMobile,
-        hasElement: !!element,
-        targetElement: targetElement.tagName,
-        hasRequestFullscreen: !!targetElement.requestFullscreen,
-        hasWebkitRequestFullscreen: !!targetElement.webkitRequestFullscreen,
-      });
+    console.log('[useFullscreen] Entering fullscreen:', {
+      isMobile,
+      hasElement: !!element,
+      targetElement: targetElement.tagName,
+      hasRequestFullscreen: !!targetElement.requestFullscreen,
+      hasWebkitRequestFullscreen: !!targetElement.webkitRequestFullscreen,
+      fullscreenEnabled: doc.fullscreenEnabled,
+      userAgent: navigator.userAgent,
+    });
+
+    // Verificar si fullscreen está habilitado
+    if (!doc.fullscreenEnabled && !(doc as any).webkitFullscreenEnabled) {
+      console.warn('[useFullscreen] Fullscreen not enabled. May need user gesture or permission.');
     }
 
     try {
+      // Intentar con el método estándar primero
       if (targetElement.requestFullscreen) {
+        console.log('[useFullscreen] Trying requestFullscreen()');
         await targetElement.requestFullscreen();
-      } else if (targetElement.webkitRequestFullscreen) {
+        return;
+      }
+      
+      // Intentar con webkit (Safari, Chrome móvil)
+      if (targetElement.webkitRequestFullscreen) {
+        console.log('[useFullscreen] Trying webkitRequestFullscreen()');
         await targetElement.webkitRequestFullscreen();
-      } else if ((targetElement as any).webkitEnterFullscreen) {
-        // iOS Safari (para video elements principalmente)
-        await (targetElement as any).webkitEnterFullscreen();
-      } else if (targetElement.msRequestFullscreen) {
+        return;
+      }
+      
+      // Intentar con ms (IE/Edge antiguo)
+      if (targetElement.msRequestFullscreen) {
+        console.log('[useFullscreen] Trying msRequestFullscreen()');
         await targetElement.msRequestFullscreen();
-      } else if (targetElement.mozRequestFullScreen) {
+        return;
+      }
+      
+      // Intentar con moz (Firefox antiguo)
+      if (targetElement.mozRequestFullScreen) {
+        console.log('[useFullscreen] Trying mozRequestFullScreen()');
         await targetElement.mozRequestFullScreen();
-      } else {
-        console.warn('[useFullscreen] Fullscreen API not supported on this browser');
-        // En móvil, intentar ocultar la barra de direcciones como alternativa
-        if (isMobile) {
-          window.scrollTo(0, 1);
-        }
+        return;
+      }
+      
+      console.warn('[useFullscreen] No fullscreen method available');
+      
+      // Fallback: intentar ocultar la barra de direcciones en móvil
+      if (isMobile) {
+        console.log('[useFullscreen] Attempting to hide address bar as fallback');
+        window.scrollTo(0, 1);
+        // También intentar hacer scroll después de un delay
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+        }, 100);
       }
     } catch (error: any) {
       console.error('[useFullscreen] Error entering fullscreen:', error);
-      // Si falla con el elemento específico en móvil, intentar con documento completo
-      if (isMobile && element && element !== document.documentElement) {
+      console.error('[useFullscreen] Error details:', {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code,
+      });
+      
+      // Si falla, intentar con documento completo como fallback
+      if (isMobile && targetElement !== document.documentElement) {
         try {
+          console.log('[useFullscreen] Trying fallback with documentElement');
           const docElement = document.documentElement as FullscreenElement;
           if (docElement.requestFullscreen) {
             await docElement.requestFullscreen();
@@ -107,10 +165,6 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
           }
         } catch (fallbackError) {
           console.error('[useFullscreen] Fallback fullscreen also failed:', fallbackError);
-          // Último recurso: intentar ocultar la barra de direcciones
-          if (isMobile) {
-            window.scrollTo(0, 1);
-          }
         }
       }
     }
@@ -128,9 +182,34 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
         await (doc as any).msExitFullscreen();
       } else if ((doc as any).mozCancelFullScreen) {
         await (doc as any).mozCancelFullScreen();
+      } else {
+        // Si no hay API disponible, salir del modo simulado
+        const element = elementRef.current;
+        if (element) {
+          element.style.position = '';
+          element.style.top = '';
+          element.style.left = '';
+          element.style.width = '';
+          element.style.height = '';
+          element.style.zIndex = '';
+          document.body.style.overflow = '';
+          setIsFullscreen(false);
+        }
       }
     } catch (error) {
       console.error('Error exiting fullscreen:', error);
+      // Si falla, intentar salir del modo simulado
+      const element = elementRef.current;
+      if (element) {
+        element.style.position = '';
+        element.style.top = '';
+        element.style.left = '';
+        element.style.width = '';
+        element.style.height = '';
+        element.style.zIndex = '';
+        document.body.style.overflow = '';
+        setIsFullscreen(false);
+      }
     }
   };
 
@@ -142,12 +221,42 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
     }
   };
 
+  // Función para modo pantalla completa simulada (para navegadores que no soportan fullscreen)
+  const toggleSimulatedFullscreen = () => {
+    const element = elementRef.current;
+    if (!element) return;
+
+    if (isFullscreen) {
+      // Salir del modo simulado
+      element.style.position = '';
+      element.style.top = '';
+      element.style.left = '';
+      element.style.width = '';
+      element.style.height = '';
+      element.style.zIndex = '';
+      document.body.style.overflow = '';
+      setIsFullscreen(false);
+    } else {
+      // Entrar en modo simulado
+      element.style.position = 'fixed';
+      element.style.top = '0';
+      element.style.left = '0';
+      element.style.width = '100vw';
+      element.style.height = '100vh';
+      element.style.zIndex = '9999';
+      document.body.style.overflow = 'hidden';
+      setIsFullscreen(true);
+    }
+  };
+
   return {
     elementRef,
     isFullscreen,
+    isFullscreenSupported,
     enterFullscreen,
     exitFullscreen,
     toggleFullscreen,
+    toggleSimulatedFullscreen,
   };
 }
 

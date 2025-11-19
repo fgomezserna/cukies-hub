@@ -568,7 +568,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   } = useGameInput();
   const isMobile = useIsMobile();
   const isPortrait = useOrientation();
-  const { elementRef: fullscreenRef, isFullscreen, toggleFullscreen } = useFullscreen<HTMLDivElement>();
+  const { elementRef: fullscreenRef, isFullscreen, isFullscreenSupported, toggleFullscreen, toggleSimulatedFullscreen } = useFullscreen<HTMLDivElement>();
   
   // Ref para rastrear si pausamos automáticamente por orientación
   const pausedByOrientationRef = useRef<boolean>(false);
@@ -2835,30 +2835,64 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   {/* Botón de pantalla completa - solo móvil y cuando está jugando */}
                   {isMobile && gameState.status === 'playing' && (
                     <button
+                      onMouseDown={async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        console.log('[Fullscreen Button] MouseDown');
+                        playSound('button_click');
+                        try {
+                          if (isFullscreenSupported) {
+                            await toggleFullscreen();
+                          } else {
+                            toggleSimulatedFullscreen();
+                          }
+                        } catch (error) {
+                          console.error('[Fullscreen Button] Error toggling fullscreen:', error);
+                          // Si falla la API, usar modo simulado
+                          toggleSimulatedFullscreen();
+                        }
+                      }}
+                      onTouchEnd={async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        console.log('[Fullscreen Button] TouchEnd');
+                        playSound('button_click');
+                        try {
+                          if (isFullscreenSupported) {
+                            await toggleFullscreen();
+                          } else {
+                            toggleSimulatedFullscreen();
+                          }
+                        } catch (error) {
+                          console.error('[Fullscreen Button] Error toggling fullscreen:', error);
+                          // Si falla la API, usar modo simulado
+                          toggleSimulatedFullscreen();
+                        }
+                      }}
                       onClick={async (e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        console.log('[Fullscreen Button] Clicked');
+                        console.log('[Fullscreen Button] Click');
+                        playSound('button_click');
                         try {
-                          await toggleFullscreen();
-                          playSound('button_click');
+                          if (isFullscreenSupported) {
+                            await toggleFullscreen();
+                          } else {
+                            toggleSimulatedFullscreen();
+                          }
                         } catch (error) {
                           console.error('[Fullscreen Button] Error toggling fullscreen:', error);
+                          // Si falla la API, usar modo simulado
+                          toggleSimulatedFullscreen();
                         }
                       }}
-                      onTouchStart={async (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        console.log('[Fullscreen Button] Touch started');
-                        try {
-                          await toggleFullscreen();
-                          playSound('button_click');
-                        } catch (error) {
-                          console.error('[Fullscreen Button] Error toggling fullscreen:', error);
-                        }
+                      className="absolute top-4 right-4 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-pink-500/90 active:bg-pink-600 border-2 border-pink-300/60 shadow-lg shadow-pink-500/30 backdrop-blur-sm transition-all duration-200 active:scale-95 focus:outline-none"
+                      style={{ 
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
                       }}
-                      className="absolute top-4 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-pink-500/80 hover:bg-pink-500 border-2 border-pink-300/60 shadow-lg shadow-pink-500/30 backdrop-blur-sm transition-all duration-200 active:scale-95 focus:outline-none touch-manipulation"
-                      style={{ touchAction: 'manipulation' }}
                       aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                       title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                     >
