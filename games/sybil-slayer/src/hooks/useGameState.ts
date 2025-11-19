@@ -1538,7 +1538,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       let newToken = { ...prev.token };
       
       // Comprobar si el token está congelado por daño reciente
-      const isFrozen = now < getAdjustedTimestamp(tokenFrozenUntilRef.current);
+      // tokenFrozenUntilRef.current está en tiempo de juego, así que comparamos directamente
+      const isFrozen = now < tokenFrozenUntilRef.current;
       
       // Solo actualizar velocidad y posición si no está congelado
       if (!isFrozen) {
