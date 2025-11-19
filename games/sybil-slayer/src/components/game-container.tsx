@@ -2835,12 +2835,30 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   {/* Botón de pantalla completa - solo móvil y cuando está jugando */}
                   {isMobile && gameState.status === 'playing' && (
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        toggleFullscreen();
-                        playSound('button_click');
+                        e.preventDefault();
+                        console.log('[Fullscreen Button] Clicked');
+                        try {
+                          await toggleFullscreen();
+                          playSound('button_click');
+                        } catch (error) {
+                          console.error('[Fullscreen Button] Error toggling fullscreen:', error);
+                        }
                       }}
-                      className="absolute top-4 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-pink-500/80 hover:bg-pink-500 border-2 border-pink-300/60 shadow-lg shadow-pink-500/30 backdrop-blur-sm transition-all duration-200 active:scale-95 focus:outline-none"
+                      onTouchStart={async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        console.log('[Fullscreen Button] Touch started');
+                        try {
+                          await toggleFullscreen();
+                          playSound('button_click');
+                        } catch (error) {
+                          console.error('[Fullscreen Button] Error toggling fullscreen:', error);
+                        }
+                      }}
+                      className="absolute top-4 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-pink-500/80 hover:bg-pink-500 border-2 border-pink-300/60 shadow-lg shadow-pink-500/30 backdrop-blur-sm transition-all duration-200 active:scale-95 focus:outline-none touch-manipulation"
+                      style={{ touchAction: 'manipulation' }}
                       aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                       title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                     >

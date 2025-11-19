@@ -16,6 +16,11 @@ interface DocumentWithFullscreen extends Document {
   mozFullScreenElement?: Element | null;
 }
 
+// Detectar si es móvil
+const isMobileDevice = () => {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
 export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const elementRef = useRef<T>(null);
@@ -52,20 +57,62 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
 
   const enterFullscreen = async () => {
     const element = elementRef.current as FullscreenElement | null;
-    if (!element) return;
+    const doc = document as DocumentWithFullscreen;
+    const isMobile = isMobileDevice();
+    
+    // En móvil, usar el documento completo directamente
+    const targetElement = isMobile 
+      ? (document.documentElement as FullscreenElement)
+      : (element || (document.documentElement as FullscreenElement));
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useFullscreen] Entering fullscreen:', {
+        isMobile,
+        hasElement: !!element,
+        targetElement: targetElement.tagName,
+        hasRequestFullscreen: !!targetElement.requestFullscreen,
+        hasWebkitRequestFullscreen: !!targetElement.webkitRequestFullscreen,
+      });
+    }
 
     try {
-      if (element.requestFullscreen) {
-        await element.requestFullscreen();
-      } else if (element.webkitRequestFullscreen) {
-        await element.webkitRequestFullscreen();
-      } else if (element.msRequestFullscreen) {
-        await element.msRequestFullscreen();
-      } else if (element.mozRequestFullScreen) {
-        await element.mozRequestFullScreen();
+      if (targetElement.requestFullscreen) {
+        await targetElement.requestFullscreen();
+      } else if (targetElement.webkitRequestFullscreen) {
+        await targetElement.webkitRequestFullscreen();
+      } else if ((targetElement as any).webkitEnterFullscreen) {
+        // iOS Safari (para video elements principalmente)
+        await (targetElement as any).webkitEnterFullscreen();
+      } else if (targetElement.msRequestFullscreen) {
+        await targetElement.msRequestFullscreen();
+      } else if (targetElement.mozRequestFullScreen) {
+        await targetElement.mozRequestFullScreen();
+      } else {
+        console.warn('[useFullscreen] Fullscreen API not supported on this browser');
+        // En móvil, intentar ocultar la barra de direcciones como alternativa
+        if (isMobile) {
+          window.scrollTo(0, 1);
+        }
       }
-    } catch (error) {
-      console.error('Error entering fullscreen:', error);
+    } catch (error: any) {
+      console.error('[useFullscreen] Error entering fullscreen:', error);
+      // Si falla con el elemento específico en móvil, intentar con documento completo
+      if (isMobile && element && element !== document.documentElement) {
+        try {
+          const docElement = document.documentElement as FullscreenElement;
+          if (docElement.requestFullscreen) {
+            await docElement.requestFullscreen();
+          } else if (docElement.webkitRequestFullscreen) {
+            await docElement.webkitRequestFullscreen();
+          }
+        } catch (fallbackError) {
+          console.error('[useFullscreen] Fallback fullscreen also failed:', fallbackError);
+          // Último recurso: intentar ocultar la barra de direcciones
+          if (isMobile) {
+            window.scrollTo(0, 1);
+          }
+        }
+      }
     }
   };
 
@@ -87,11 +134,11 @@ export function useFullscreen<T extends HTMLElement = HTMLDivElement>() {
     }
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = async () => {
     if (isFullscreen) {
-      exitFullscreen();
+      await exitFullscreen();
     } else {
-      enterFullscreen();
+      await enterFullscreen();
     }
   };
 
