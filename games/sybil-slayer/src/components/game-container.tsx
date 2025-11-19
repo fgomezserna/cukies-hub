@@ -12,7 +12,9 @@ import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
 import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
+import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
+import OrientationOverlay from './orientation-overlay';
 import { Button } from "./ui/button";
 import { Github, Play, Pause, RotateCcw } from 'lucide-react';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
@@ -564,6 +566,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     subscribeToDirection,
   } = useGameInput();
   const isMobile = useIsMobile();
+  const isPortrait = useOrientation();
+  
+  // Ref para rastrear si pausamos automáticamente por orientación
+  const pausedByOrientationRef = useRef<boolean>(false);
   
   // Debug: Log mobile detection
   useEffect(() => {
@@ -634,6 +640,35 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isMobile]);
   
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+
+  // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
+  useEffect(() => {
+    // Solo aplicar en móviles
+    if (!isMobile) return;
+
+    // Si está en portrait y el juego está jugando, pausar automáticamente
+    if (isPortrait && gameState.status === 'playing') {
+      console.log('[GameContainer] Dispositivo en vertical, pausando juego automáticamente');
+      pausedByOrientationRef.current = true;
+      togglePause();
+    }
+    
+    // Cuando vuelve a landscape, NO reanudar automáticamente
+    // El usuario debe presionar Play manualmente
+    if (!isPortrait && pausedByOrientationRef.current && gameState.status === 'paused') {
+      // Resetear el flag cuando vuelve a landscape
+      // El juego permanecerá pausado hasta que el usuario presione Play
+      pausedByOrientationRef.current = false;
+    }
+  }, [isPortrait, gameState.status, isMobile, togglePause]);
+
+  // Resetear el flag cuando el usuario presiona Play manualmente
+  useEffect(() => {
+    if (gameState.status === 'playing' && pausedByOrientationRef.current) {
+      // El usuario presionó Play, resetear el flag
+      pausedByOrientationRef.current = false;
+    }
+  }, [gameState.status]);
   const localScore = Math.floor(gameState.score);
   const opponentScore = Math.floor(multiplayer.opponent?.score ?? 0);
   const scoreDifference = isMultiplayerMode ? multiplayer.scoreDifference : 0;
@@ -1267,6 +1302,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
 
     if (gameState.status === 'paused') {
+      // No permitir reanudar si el dispositivo está en portrait
+      if (isMobile && isPortrait) {
+        console.log('[GameContainer] No se puede reanudar el juego en modo vertical');
+        return;
+      }
       playSound('resume');
       togglePause();
       return;
@@ -3071,6 +3111,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           />
         </>
       )}
+
+      {/* Orientation overlay - muestra mensaje cuando el dispositivo está en vertical */}
+      <OrientationOverlay />
     </div>
   );
 };
