@@ -1,0 +1,22 @@
+{
+  "name": "Sybil Slayer - Treasure Hunt",
+  "short_name": "Sybil Slayer",
+  "description": "¡Esquiva duendes y recolecta puntos!",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
+
