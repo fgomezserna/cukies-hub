@@ -147,8 +147,230 @@ const formatDuration = (ms?: number | null): string => {
 
 const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => void }> = ({ stats, onClose }) => {
   const sortedStats = [...stats].sort((a, b) => a.level - b.level);
-
   const hasStats = sortedStats.length > 0;
+  const isMobile = useIsMobile();
+  const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
+
+  useEffect(() => {
+    setCurrentLevelIndex(0);
+  }, [stats, isMobile]);
+
+  const buildRows = (entry: LevelStatsEntry) => [
+    {
+      key: 'gems',
+      label: 'Gemas',
+      count: entry.counts.gems,
+      points: entry.points.gems,
+    },
+    {
+      key: 'gemsX5',
+      label: 'Gemas x5',
+      count: entry.counts.gemsX5,
+      points: entry.points.gemsX5,
+    },
+    {
+      key: 'ukis',
+      label: 'Monedas',
+      count: entry.counts.ukis,
+      points: entry.points.ukis,
+    },
+    {
+      key: 'ukisX5',
+      label: 'Monedas x5',
+      count: entry.counts.ukisX5,
+      points: entry.points.ukisX5,
+    },
+    {
+      key: 'treasures',
+      label: 'Tesoros',
+      count: entry.counts.treasures,
+      points: entry.points.treasures,
+    },
+    {
+      key: 'hearts',
+      label: 'Corazones',
+      count: entry.counts.hearts,
+      points: entry.points.hearts,
+    },
+    {
+      key: 'runes',
+      label: 'Runas',
+      count: entry.counts.runes,
+      points: entry.points.runes,
+    },
+    {
+      key: 'levelCompletionBonus',
+      label: 'Bonificación nivel',
+      count: entry.counts.levelCompletionBonus,
+      points: entry.points.levelCompletionBonus,
+    },
+  ];
+
+  const handlePrevLevel = () => {
+    setCurrentLevelIndex(prev =>
+      prev === 0 ? Math.max(sortedStats.length - 1, 0) : prev - 1
+    );
+  };
+
+  const handleNextLevel = () => {
+    setCurrentLevelIndex(prev =>
+      prev === sortedStats.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  if (isMobile) {
+    if (!hasStats) {
+      return (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-4 py-6"
+          onClick={onClose}
+        >
+          <div
+            className="relative w-full max-w-md rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/15"
+            onClick={event => event.stopPropagation()}
+          >
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+            <p className="text-center font-pixellari text-pink-200">
+              No se registraron estadísticas en esta partida.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const safeIndex = Math.min(currentLevelIndex, Math.max(sortedStats.length - 1, 0));
+    const currentEntry = sortedStats[safeIndex];
+    const rows = buildRows(currentEntry);
+    const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
+    const showNavigation = sortedStats.length > 1;
+
+    return (
+      <div
+        className="fixed inset-0 z-[60] flex flex-col bg-black/90 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50 z-30"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+
+        <div
+          className="relative flex-1 w-full px-4 py-6 overflow-y-auto"
+          onClick={event => event.stopPropagation()}
+        >
+          {showNavigation && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevLevel();
+              }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+              aria-label="Nivel anterior"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+                <svg
+                  className="h-6 w-6 text-pink-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </div>
+            </button>
+          )}
+
+          {showNavigation && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextLevel();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+              aria-label="Nivel siguiente"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+                <svg
+                  className="h-6 w-6 text-pink-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </button>
+          )}
+
+          <div className="mx-auto w-full max-w-md rounded-xl border border-pink-400/60 bg-slate-900/90 p-4 shadow-2xl shadow-pink-500/15">
+            <div className="mb-3 relative flex items-center justify-between gap-3">
+              <span className="rounded-full border border-pink-300/60 bg-pink-300/15 px-3 py-1 text-[11px] tracking-[0.25em] font-pixellari text-pink-100">
+                Estadísticas
+              </span>
+              <span className="absolute left-1/2 -translate-x-1/2 text-sm font-pixellari text-pink-100 uppercase">NIVEL {currentEntry.level}</span>
+            </div>
+
+            <div className="pr-1">
+              <table className="w-full table-fixed text-sm font-pixellari text-pink-100 leading-tight">
+                <thead className="text-[11px] uppercase tracking-wide text-pink-300">
+                  <tr>
+                    <th className="w-[45%] px-1 py-1 text-left">Elemento</th>
+                    <th className="w-[25%] px-1 py-1 text-right">Recogidos</th>
+                    <th className="w-[30%] px-1 py-1 text-right">Puntos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr key={row.key} className="odd:bg-slate-900/40">
+                      <td className="px-1 py-1 pr-0">{row.label}</td>
+                      <td className="px-1 py-1 text-right">
+                        {numberFormatter.format(row.count)}
+                      </td>
+                      <td className="px-1 py-1 text-right text-amber-200">
+                        {numberFormatter.format(Math.round(row.points || 0))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-pink-400/40 text-pink-200">
+                    <td className="px-1 pt-2 text-sm font-semibold">Total</td>
+                    <td className="px-1 pt-2" />
+                    <td className="px-1 pt-2 text-right text-amber-300 font-semibold">
+                      {numberFormatter.format(totalPoints)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between text-[11px] font-pixellari text-pink-200 uppercase tracking-wide">
+              <span>Tiempo</span>
+              <span className="text-pink-100">{formatDuration(currentEntry.durationMs)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
@@ -168,56 +390,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
           <div className="max-h-[70vh] overflow-y-auto pr-1">
             <div className="grid gap-4 md:grid-cols-2">
               {sortedStats.map(entry => {
-                const rows = [
-                  {
-                    key: 'gems',
-                    label: 'Gemas',
-                    count: entry.counts.gems,
-                    points: entry.points.gems,
-                  },
-                  {
-                    key: 'gemsX5',
-                    label: 'Gemas x5',
-                    count: entry.counts.gemsX5,
-                    points: entry.points.gemsX5,
-                  },
-                  {
-                    key: 'ukis',
-                    label: 'Monedas',
-                    count: entry.counts.ukis,
-                    points: entry.points.ukis,
-                  },
-                  {
-                    key: 'ukisX5',
-                    label: 'Monedas x5',
-                    count: entry.counts.ukisX5,
-                    points: entry.points.ukisX5,
-                  },
-                  {
-                    key: 'treasures',
-                    label: 'Tesoros',
-                    count: entry.counts.treasures,
-                    points: entry.points.treasures,
-                  },
-                  {
-                    key: 'hearts',
-                    label: 'Corazones',
-                    count: entry.counts.hearts,
-                    points: entry.points.hearts,
-                  },
-                  {
-                    key: 'runes',
-                    label: 'Runas',
-                    count: entry.counts.runes,
-                    points: entry.points.runes,
-                  },
-                  {
-                    key: 'levelCompletionBonus',
-                    label: 'Bonificación nivel',
-                    count: entry.counts.levelCompletionBonus,
-                    points: entry.points.levelCompletionBonus,
-                  },
-                ];
+                const rows = buildRows(entry);
                 const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
 
                 return (
@@ -2052,7 +2225,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 px-4 py-6">
             <div
               className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
-              style={{ transform: `scale(${isMobile ? scale * 1.5 : scale})`, transformOrigin: 'center' }}
+              style={{ 
+                transform: `translate(-50%, -50%) scale(${isMobile ? scale * 1.5 : scale})`, 
+                transformOrigin: 'center',
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                maxWidth: '90vw'
+              }}
             >
               <h1 className="text-4xl md:text-6xl font-pixellari text-pink-200 mb-6 text-center select-none tracking-wide">
                 TREASURE HUNT

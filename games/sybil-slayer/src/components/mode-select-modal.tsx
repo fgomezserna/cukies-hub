@@ -51,7 +51,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
         onClick={onClose}
       >
         {/* Header fijo */}
-        <div className="relative flex-shrink-0 bg-slate-900/95 border-b border-pink-400/60 p-4">
+        <div className="relative flex-shrink-0 bg-slate-900/95 border-b border-pink-400/60 px-4 py-3">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50 focus:outline-none z-10"
@@ -60,17 +60,17 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             ×
           </button>
           <div className="text-center pr-10">
-            <h2 className="text-2xl font-pixellari text-pink-200 tracking-wide">
+            <h2 className="text-xl font-pixellari text-pink-200 tracking-wide leading-tight">
               Selecciona modo de juego
             </h2>
-            <p className="mt-2 text-xs font-pixellari text-pink-200/80">
+            <p className="mt-1 text-[11px] font-pixellari text-pink-200/80">
               Elige cómo quieres jugar.
             </p>
           </div>
         </div>
 
         {/* Contenido scrolleable */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0">
+        <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
           <div className="flex flex-wrap justify-center gap-4">
           {/* Single Player Mode */}
           <button

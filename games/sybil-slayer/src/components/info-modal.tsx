@@ -313,37 +313,37 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   if (isMobile) {
     return (
       <div
-        className="fixed inset-0 z-[80] flex flex-col bg-black/95 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] flex flex-col bg-black/95 backdrop-blur-sm relative h-screen w-screen"
         onClick={handleClose}
       >
-        {/* Header fijo */}
-        <div className="relative flex-shrink-0 bg-slate-900/95 border-b border-pink-400/60 p-4">
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none z-10"
-            aria-label="Cerrar información del juego"
-          >
-            ×
-          </button>
-          <div className="text-center pr-10">
-            <h2 className="text-2xl font-pixellari text-pink-200 tracking-wide">Reglas de Treasure Hunt</h2>
-          </div>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+          className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none z-30"
+          aria-label="Cerrar información del juego"
+        >
+          ×
+        </button>
 
         {/* Contenedor con botones fijos a los lados */}
-        <div className="flex-1 min-h-0 relative">
+        <div
+          className="flex-1 min-h-0 relative pt-4"
+          onClick={event => event.stopPropagation()}
+        >
           {/* Botón izquierdo - fijo, fuera del scroll */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               handlePrevGroup();
             }}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
             aria-label="Grupo anterior"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
               <svg
-                className="h-6 w-6 text-pink-200"
+                className="h-5 w-5 text-pink-200"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="3"
@@ -362,12 +362,12 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
               e.stopPropagation();
               handleNextGroup();
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
             aria-label="Grupo siguiente"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
               <svg
-                className="h-6 w-6 text-pink-200"
+                className="h-5 w-5 text-pink-200"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="3"
@@ -381,7 +381,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
           </button>
 
           {/* Contenido scrolleable con padding para los botones */}
-          <div className="overflow-y-auto h-full px-16 py-4">
+          <div className="overflow-y-auto h-full px-14 py-4">
             <div className="relative">
             {/* Renderizar todos los grupos ocultos para medir sus alturas */}
             {infoGroups.map((group, index) => {
@@ -410,7 +410,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3">
+                  <div className="mt-4 flex gap-2 pb-2">
                     {arrangedItemsForGroup.map((item, itemIndex) => {
                       const images = Array.isArray(item.image) ? item.image : [item.image];
                       const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
@@ -431,7 +431,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                       const renderIconContent = () => {
                         if (item.name === 'Bonificación de nivel') {
                           return (
-                            <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-800/60 p-1">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-800/60 p-1">
                               <svg
                                 className="h-full w-full text-pink-400"
                                 fill="none"
@@ -461,7 +461,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                           return (
                             <div
                               key={`${item.name}-${originalIndex}`}
-                              className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-800/60 p-1"
+                              className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-800/60 p-1"
                             >
                               <Image
                                 src={src}
@@ -483,32 +483,32 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                       };
 
                       const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
-                      const cardClassName = 'group flex h-full flex-col gap-3 rounded-lg border border-pink-400/25 bg-slate-900/80 p-3 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70';
+                      const cardClassName = 'group flex h-full flex-1 flex-col gap-2 rounded-lg border border-pink-400/25 bg-slate-900/80 p-2 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70';
 
                       return (
                         <div
                           key={item.name}
                           className={cardClassName}
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1">
                               {renderIconContent()}
                             </div>
-                            <div className="flex-1">
-                              <h4 className="text-base font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] truncate">{item.name}</h4>
                             </div>
                           </div>
-                          <p className="text-xs text-pink-100/90 leading-snug font-pixellari">
+                          <p className="text-[10px] text-pink-100/90 leading-tight font-pixellari">
                             {item.description}
                           </p>
                           {item.details && (
-                            <ul className="ml-4 list-disc space-y-1 text-[10px] text-pink-100/80 font-pixellari">
+                            <ul className="ml-3 list-disc space-y-0.5 text-[9px] text-pink-100/80 font-pixellari">
                               {item.name === 'Totem mágico' ? (
-                                <div className="flex flex-wrap gap-3">
+                                <div className="flex flex-wrap gap-2">
                                   {item.details.map(detail => (
                                     <span
                                       key={detail}
-                                      className="rounded-full border border-pink-300/60 bg-pink-300/15 px-4 py-1 font-pixellari text-sm text-pink-100 shadow-sm shadow-pink-500/20"
+                                      className="rounded-full border border-pink-300/60 bg-pink-300/15 px-2 py-0.5 font-pixellari text-[10px] text-pink-100 shadow-sm shadow-pink-500/20"
                                     >
                                       {detail}
                                     </span>
@@ -531,7 +531,10 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
         </div>
 
         {/* Indicadores fijos */}
-        <div className="flex-shrink-0 flex items-center justify-center gap-2 py-3 bg-slate-900/50 border-t border-pink-400/30">
+        <div
+          className="flex-shrink-0 flex items-center justify-center gap-2 py-3 bg-slate-900/50 border-t border-pink-400/30"
+          onClick={event => event.stopPropagation()}
+        >
           {infoGroups.map((_, index) => (
             <button
               key={`indicator-${index}`}
