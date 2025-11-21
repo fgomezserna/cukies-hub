@@ -79,7 +79,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             onMouseLeave={() => setHoveredMode(null)}
             className="group relative flex flex-col p-4 rounded-lg border border-pink-400/40 bg-slate-800/60 shadow-lg shadow-pink-500/10 hover:border-pink-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-full max-w-[280px]"
           >
-            <div className="flex flex-col gap-4 items-center">
+            <div className="flex flex-col gap-4 items-center w-full">
               <div className="flex items-center justify-center gap-3 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-400/20">
                   <span className="font-pixellari text-lg font-bold text-pink-200">1P</span>
@@ -93,7 +93,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   </p>
                 </div>
               </div>
-              <div className="flex justify-center">
+              <div className="flex justify-center w-full">
                 <Image
                   src="/assets/characters/1p.png"
                   alt="1P"
@@ -105,33 +105,35 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               </div>
               {/* Botón de Reglas - debajo de la imagen */}
               {onRulesClick && (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRulesClick();
-                  }}
-                  className="focus:outline-none game-button relative mt-2 cursor-pointer"
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Reglas"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
+                <div className="flex justify-center w-full">
+                  <div
+                    onClick={(e) => {
                       e.stopPropagation();
                       onRulesClick();
-                    }
-                  }}
-                >
-                  <Image 
-                    src="/assets/ui/buttons/caja-texto2.png"
-                    alt="Reglas"
-                    width={120}
-                    height={50}
-                    className="game-img"
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    REGLAS
-                  </span>
+                    }}
+                    className="focus:outline-none game-button relative mt-2 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Reglas"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRulesClick();
+                      }
+                    }}
+                  >
+                    <Image 
+                      src="/assets/ui/buttons/caja-texto2.png"
+                      alt="Reglas"
+                      width={120}
+                      height={50}
+                      className="game-img"
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                      REGLAS
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
