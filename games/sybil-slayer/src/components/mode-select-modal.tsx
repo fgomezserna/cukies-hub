@@ -63,9 +63,6 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             <h2 className="text-xl font-pixellari text-pink-200 tracking-wide leading-tight">
               Selecciona modo de juego
             </h2>
-            <p className="mt-1 text-[11px] font-pixellari text-pink-200/80">
-              Elige cómo quieres jugar.
-            </p>
           </div>
         </div>
 
