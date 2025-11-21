@@ -29,11 +29,13 @@ export default function InstallPrompt() {
       return;
     }
 
-    // Verificar si ya se rechazó anteriormente (localStorage)
+    // IMPORTANTE: Si la app NO está instalada, limpiar el flag de rechazo
+    // Esto permite que el prompt aparezca de nuevo si el usuario desinstaló la app
     const installPromptDismissed = localStorage.getItem('install-prompt-dismissed');
     if (installPromptDismissed) {
-      console.log('[INSTALL] Prompt ya fue rechazado anteriormente');
-      return;
+      console.log('[INSTALL] Flag de rechazo encontrado, pero app no está instalada');
+      console.log('[INSTALL] Limpiando flag para permitir mostrar prompt de nuevo');
+      localStorage.removeItem('install-prompt-dismissed');
     }
 
     // Verificar Service Worker
@@ -114,27 +116,22 @@ export default function InstallPrompt() {
       setDeferredPrompt(null);
     };
 
-    // Timeout para detectar si el evento nunca llega
+    // Timeout para detectar si el evento nunca llega (3 segundos)
     const timeoutId = setTimeout(() => {
       const stillDismissed = localStorage.getItem('install-prompt-dismissed');
       if (!deferredPrompt && isMobile && !isInstalled && !stillDismissed) {
-        console.warn('[INSTALL] ⚠️ beforeinstallprompt no recibido después de 10 segundos');
+        console.warn('[INSTALL] ⚠️ beforeinstallprompt no recibido después de 3 segundos');
         console.warn('[INSTALL] Esto puede deberse a:');
         console.warn('  - Criterios de engagement del navegador no cumplidos');
         console.warn('  - Service Worker no registrado correctamente');
         console.warn('  - Manifest con problemas');
         console.warn('  - Primera visita (el navegador requiere visitas previas)');
         
-        // Mostrar opción manual después de 15 segundos si no hay prompt
-        setTimeout(() => {
-          const stillDismissed2 = localStorage.getItem('install-prompt-dismissed');
-          if (!deferredPrompt && !isInstalled && !stillDismissed2) {
-            console.log('[INSTALL] Mostrando opción de instalación manual');
-            setShowManualInstall(true);
-          }
-        }, 5000);
+        // Mostrar opción manual inmediatamente si no hay prompt
+        console.log('[INSTALL] Mostrando opción de instalación manual');
+        setShowManualInstall(true);
       }
-    }, 10000);
+    }, 3000);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
@@ -143,7 +140,7 @@ export default function InstallPrompt() {
     console.log('[INSTALL] Inicializando install prompt:', {
       isMobile,
       isStandalone,
-      installPromptDismissed: !!installPromptDismissed,
+      installPromptDismissed: false, // Ya lo limpiamos arriba si no está instalada
       userAgent: navigator.userAgent,
     });
 
