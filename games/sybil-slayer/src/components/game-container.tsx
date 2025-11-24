@@ -491,6 +491,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Estado para controlar el modal de información
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const infoButtonClickedRef = useRef(false);
   
   // Estado para controlar el popup de estadísticas por nivel
   const [isLevelStatsVisible, setIsLevelStatsVisible] = useState(false);
@@ -1587,8 +1588,45 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
    };
 
    const handleInfoToggle = () => {
+      // Prevenir doble ejecución
+      if (infoButtonClickedRef.current) {
+        console.log('[INFO] handleInfoToggle already executing, skipping');
+        return;
+      }
+      infoButtonClickedRef.current = true;
+      
       playSound('button_click');
-      setIsInfoModalOpen(!isInfoModalOpen);
+      const currentStatus = gameState.status;
+      
+      console.log('[INFO] handleInfoToggle called, status:', currentStatus, 'modal open:', isInfoModalOpen);
+      
+      // Si el juego está en idle, hacer toggle normal
+      if (currentStatus === 'idle') {
+        setIsInfoModalOpen(!isInfoModalOpen);
+      } else {
+        // Si está en playing o paused, pausar si es necesario y abrir el modal
+        if (currentStatus === 'playing') {
+          console.log('[INFO] Pausing game before opening modal');
+          togglePause();
+        }
+        // Siempre abrir el modal cuando no está en idle
+        console.log('[INFO] Opening info modal');
+        setIsInfoModalOpen(true);
+      }
+      
+      // Resetear el flag después de un breve delay
+      setTimeout(() => {
+        infoButtonClickedRef.current = false;
+      }, 300);
+   };
+
+   const handleOpenInfo = () => {
+      playSound('button_click');
+      // Si el juego está en playing, pausar automáticamente
+      if (gameState.status === 'playing') {
+        togglePause();
+      }
+      setIsInfoModalOpen(true);
    };
 
   // Detectar cuando se recoge un checkpoint
@@ -2203,7 +2241,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         onClose={() => setModeSelectOpen(false)}
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
-        onRulesClick={() => setIsInfoModalOpen(true)}
+        onRulesClick={handleOpenInfo}
       />
       {waitingOverlay}
       {countdownOverlay}
@@ -2231,7 +2269,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 TREASURE HUNT
               </h1>
               <p className="text-base md:text-lg font-pixellari text-pink-200/80 mb-6 text-center select-none">
-                Utiliza las teclas ASDW para mover al personaje, y consigue la mayor puntuación posible.<br/>
+                {isMobile 
+                  ? "Utiliza el joystick que aparece al pulsar en pantalla para mover el personaje y consigue la mayor puntuacion posible."
+                  : "Utiliza las teclas ASDW para mover al personaje, y consigue la mayor puntuación posible."
+                }<br/>
                 <br/>
                 La partida termina cuando se acaba el tiempo o pierdes las 3 vidas.
               </p>
@@ -2253,7 +2294,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </span>
                 </button>
                 <button 
-                  onClick={() => setIsInfoModalOpen(true)} 
+                  onClick={handleOpenInfo} 
                   className="focus:outline-none game-button relative"
                   aria-label="Reglas"
                 >
@@ -3202,16 +3243,24 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       )}
 
       {/* Modal de información - Siempre disponible */}
+      {process.env.NODE_ENV === 'development' && console.log('[INFO] Rendering InfoModal, isOpen:', isInfoModalOpen)}
       <InfoModal 
         isOpen={isInfoModalOpen}
-        onClose={() => setIsInfoModalOpen(false)}
+        onClose={() => {
+          console.log('[INFO] Closing info modal');
+          setIsInfoModalOpen(false);
+        }}
         onPlaySound={playSound}
       />
 
       {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
       <div 
-        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+        className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2"
         style={{ transform: `scale(${scale})`, transformOrigin: 'bottom right' }}
+        onTouchStart={(e) => {
+          // Detener propagación para que TouchZones no capture estos botones
+          e.stopPropagation();
+        }}
       >
         {/* Botón de música */}
         <button 
@@ -3251,8 +3300,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
         {/* Botón de información */}
         <button 
-          onClick={handleInfoToggle} 
-          className="focus:outline-none game-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            // En móvil, onTouchStart ya maneja el evento, así que prevenir doble ejecución
+            if (!isMobile) {
+              handleInfoToggle();
+            }
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            // No usar preventDefault aquí porque causa error con passive listeners
+            handleInfoToggle();
+          }}
+          className="focus:outline-none game-button relative"
           aria-label="Información del juego"
         >
           <Image 

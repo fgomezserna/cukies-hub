@@ -219,6 +219,8 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   const [runeImageIndex, setRuneImageIndex] = useState(0);
   const containerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [maxContainerHeight, setMaxContainerHeight] = useState<number>(0);
+  const totemCardRef = useRef<HTMLDivElement | null>(null);
+  const [totemCardDimensions, setTotemCardDimensions] = useState<{ width: number; height: number } | null>(null);
   const isMobile = useIsMobile();
 
   const treasureItem = infoGroups.flatMap(group => group.items).find(item => item.name === 'Tesoros');
@@ -284,6 +286,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   useEffect(() => {
     if (!isOpen) {
       setMaxContainerHeight(0);
+      setTotemCardDimensions(null);
       return;
     }
     // Calcular altura máxima de todos los grupos cuando se abre el modal
@@ -297,31 +300,61 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
       }
     };
     
+    // Medir dimensiones de la card del Totem mágico en móvil
+    const measureTotemCard = () => {
+      if (isMobile && totemCardRef.current) {
+        const rect = totemCardRef.current.getBoundingClientRect();
+        setTotemCardDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    };
+    
     // Usar múltiples frames para asegurar que todos los grupos estén renderizados y medidos
     const frame1 = requestAnimationFrame(() => {
       const frame2 = requestAnimationFrame(() => {
         calculateMaxHeight();
+        measureTotemCard();
       });
       return () => cancelAnimationFrame(frame2);
     });
     return () => cancelAnimationFrame(frame1);
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   if (!isOpen) return null;
+
+  // Log para verificar que el componente se está renderizando
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[INFO-MODAL] Rendering modal, isMobile:', isMobile, 'isOpen:', isOpen);
+  }
 
   // Estructura diferente para móvil: pantalla completa con elementos fijos
   if (isMobile) {
     return (
       <div
-        className="fixed inset-0 z-[80] flex flex-col bg-black/95 backdrop-blur-sm relative h-screen w-screen"
+        className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur-sm relative h-screen w-screen"
         onClick={handleClose}
+        style={{ 
+          pointerEvents: 'auto',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 100,
+          display: 'flex',
+          visibility: 'visible',
+          opacity: 1
+        }}
       >
         <button
           onClick={(e) => {
             e.stopPropagation();
             handleClose();
           }}
-          className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none z-30"
+          className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none z-[110]"
+          style={{ zIndex: 110 }}
           aria-label="Cerrar información del juego"
         >
           ×
@@ -385,7 +418,22 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
             <div className="relative">
             {/* Renderizar todos los grupos ocultos para medir sus alturas */}
             {infoGroups.map((group, index) => {
-              const arrangedItemsForGroup = arrangeGroupItems(group.items);
+              // En móvil, para el grupo 1 (Ítems Principales), reordenar: Cukie, Corazón, Checkpoint
+              let arrangedItemsForGroup: InfoGroupItem[];
+              if (isMobile && index === 0) {
+                const cukieItem = group.items.find(item => item.name === 'Cukie');
+                const corazonItem = group.items.find(item => item.name === 'Corazón');
+                const checkpointItem = group.items.find(item => item.name === 'Checkpoint');
+                
+                if (cukieItem && corazonItem && checkpointItem) {
+                  // Orden específico para móvil: Cukie, Corazón, Checkpoint
+                  arrangedItemsForGroup = [cukieItem, corazonItem, checkpointItem];
+                } else {
+                  arrangedItemsForGroup = arrangeGroupItems(group.items);
+                }
+              } else {
+                arrangedItemsForGroup = arrangeGroupItems(group.items);
+              }
 
               return (
                 <div
@@ -483,23 +531,42 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                       };
 
                       const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
+                      const isTotemCard = item.name === 'Totem mágico';
                       const cardClassName = 'group flex h-full flex-1 flex-col gap-2 rounded-lg border border-pink-400/25 bg-slate-900/80 p-2 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70';
 
                       return (
                         <div
                           key={item.name}
+                          ref={isTotemCard ? totemCardRef : null}
                           className={cardClassName}
+                          style={isMobile && totemCardDimensions ? {
+                            width: `${totemCardDimensions.width}px`,
+                            height: `${totemCardDimensions.height}px`,
+                            minWidth: `${totemCardDimensions.width}px`,
+                            minHeight: `${totemCardDimensions.height}px`,
+                          } : undefined}
                         >
                           <div className="flex items-center gap-2">
                             <div className="flex flex-wrap items-center gap-1">
                               {renderIconContent()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="text-sm font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] truncate">{item.name}</h4>
+                              {item.name === 'Bonificación de nivel' ? (
+                                <h4 className="text-sm font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] leading-tight">
+                                  Bonificacion<br/>de nivel
+                                </h4>
+                              ) : (
+                                <h4 className="text-sm font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] truncate">{item.name}</h4>
+                              )}
                             </div>
                           </div>
                           <p className="text-[10px] text-pink-100/90 leading-tight font-pixellari">
-                            {item.description}
+                            {isMobile && item.name === 'Cukie' 
+                              ? item.description.replace(
+                                  'Usa las teclas ASDW para moverte por la pantalla de juego.',
+                                  'Usa el joystick que aparece al pulsar en pantalla para moverte.'
+                                )
+                              : item.description}
                           </p>
                           {item.details && (
                             <ul className="ml-3 list-disc space-y-0.5 text-[9px] text-pink-100/80 font-pixellari">
@@ -560,7 +627,8 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   // Estructura original para escritorio
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6 overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6 overflow-y-auto"
+      style={{ pointerEvents: 'auto' }}
       onClick={handleClose}
     >
       <div
@@ -719,7 +787,13 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                               {renderIconContent()}
                             </div>
                             <div className="flex-1">
-                              <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                              {item.name === 'Bonificación de nivel' ? (
+                                <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] leading-tight">
+                                  Bonificacion<br/>de nivel
+                                </h4>
+                              ) : (
+                                <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                              )}
                             </div>
                           </div>
                           <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">
