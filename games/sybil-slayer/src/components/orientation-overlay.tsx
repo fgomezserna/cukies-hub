@@ -40,7 +40,7 @@ export default function OrientationOverlay() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: animationStyles }} />
-      <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm px-6 text-center">
+      <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm px-6 text-center">
         <div className="flex flex-col items-center gap-6 max-w-md">
           {/* Icono de dispositivo con animación de rotación */}
           <div className="device-icon-rotate">
