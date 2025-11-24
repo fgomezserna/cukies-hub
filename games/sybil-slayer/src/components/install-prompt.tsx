@@ -9,6 +9,50 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 /**
+ * Verifica si la app está instalada usando múltiples métodos de detección
+ * @returns Promise<boolean> - true si la app está instalada
+ */
+async function checkIfAppInstalled(): Promise<boolean> {
+  // 1. Verificar display-mode (standalone, fullscreen, minimal-ui)
+  const standaloneMode = window.matchMedia('(display-mode: standalone)').matches;
+  const fullscreenMode = window.matchMedia('(display-mode: fullscreen)').matches;
+  const minimalUIMode = window.matchMedia('(display-mode: minimal-ui)').matches;
+  
+  if (standaloneMode || fullscreenMode || minimalUIMode) {
+    console.log('[INSTALL] App detectada por display-mode:', { standaloneMode, fullscreenMode, minimalUIMode });
+    return true;
+  }
+
+  // 2. Verificar window.navigator.standalone (iOS específico)
+  if ((window.navigator as any).standalone === true) {
+    console.log('[INSTALL] App detectada por navigator.standalone (iOS)');
+    return true;
+  }
+
+  // 3. Verificar flag en localStorage
+  const installedFlag = localStorage.getItem('app-installed');
+  if (installedFlag === 'true') {
+    console.log('[INSTALL] App detectada por flag en localStorage');
+    return true;
+  }
+
+  // 4. Verificar navigator.getInstalledRelatedApps() (API moderna)
+  if ('getInstalledRelatedApps' in navigator) {
+    try {
+      const apps = await (navigator as any).getInstalledRelatedApps();
+      if (apps && apps.length > 0) {
+        console.log('[INSTALL] App detectada por getInstalledRelatedApps():', apps);
+        return true;
+      }
+    } catch (error) {
+      console.warn('[INSTALL] Error al verificar getInstalledRelatedApps():', error);
+    }
+  }
+
+  return false;
+}
+
+/**
  * Componente que muestra un popup para instalar la PWA en dispositivos móviles
  * Solo aparece cuando la app es instalable y el usuario está en móvil
  */
@@ -21,22 +65,81 @@ export default function InstallPrompt() {
   const [showManualInstall, setShowManualInstall] = useState(false);
 
   useEffect(() => {
-    // Verificar si ya está instalada
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) {
-      setIsInstalled(true);
-      console.log('[INSTALL] App ya está instalada (standalone mode)');
-      return;
+    // Listener para cambios en display-mode (debe estar siempre activo)
+    const standaloneQuery = window.matchMedia('(display-mode: standalone)');
+    const fullscreenQuery = window.matchMedia('(display-mode: fullscreen)');
+    const minimalUIQuery = window.matchMedia('(display-mode: minimal-ui)');
+
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        console.log('[INSTALL] Display mode cambió a modo app, ocultando prompt');
+        setIsInstalled(true);
+        localStorage.setItem('app-installed', 'true');
+      }
+    };
+
+    // Agregar listeners (usando addEventListener si está disponible, sino addListener)
+    if (standaloneQuery.addEventListener) {
+      standaloneQuery.addEventListener('change', handleDisplayModeChange);
+      fullscreenQuery.addEventListener('change', handleDisplayModeChange);
+      minimalUIQuery.addEventListener('change', handleDisplayModeChange);
+    } else {
+      // Fallback para navegadores antiguos
+      (standaloneQuery as any).addListener(handleDisplayModeChange);
+      (fullscreenQuery as any).addListener(handleDisplayModeChange);
+      (minimalUIQuery as any).addListener(handleDisplayModeChange);
     }
 
-    // IMPORTANTE: Si la app NO está instalada, limpiar el flag de rechazo
-    // Esto permite que el prompt aparezca de nuevo si el usuario desinstaló la app
-    const installPromptDismissed = localStorage.getItem('install-prompt-dismissed');
-    if (installPromptDismissed) {
-      console.log('[INSTALL] Flag de rechazo encontrado, pero app no está instalada');
-      console.log('[INSTALL] Limpiando flag para permitir mostrar prompt de nuevo');
-      localStorage.removeItem('install-prompt-dismissed');
+    // Verificar si la app está instalada usando múltiples métodos
+    const checkInstallation = async () => {
+      const installed = await checkIfAppInstalled();
+      if (installed) {
+        setIsInstalled(true);
+        console.log('[INSTALL] App ya está instalada, no se mostrará el prompt');
+        return true;
+      }
+      return false;
+    };
+
+    // Verificar instalación de forma síncrona primero (métodos rápidos)
+    const standaloneMode = window.matchMedia('(display-mode: standalone)').matches;
+    const fullscreenMode = window.matchMedia('(display-mode: fullscreen)').matches;
+    const minimalUIMode = window.matchMedia('(display-mode: minimal-ui)').matches;
+    const iosStandalone = (window.navigator as any).standalone === true;
+    const installedFlag = localStorage.getItem('app-installed') === 'true';
+
+    if (standaloneMode || fullscreenMode || minimalUIMode || iosStandalone || installedFlag) {
+      setIsInstalled(true);
+      console.log('[INSTALL] App detectada (método rápido), no se mostrará el prompt');
+      // Retornar cleanup solo con los listeners de display-mode
+      return () => {
+        if (standaloneQuery.removeEventListener) {
+          standaloneQuery.removeEventListener('change', handleDisplayModeChange);
+          fullscreenQuery.removeEventListener('change', handleDisplayModeChange);
+          minimalUIQuery.removeEventListener('change', handleDisplayModeChange);
+        } else {
+          (standaloneQuery as any).removeListener(handleDisplayModeChange);
+          (fullscreenQuery as any).removeListener(handleDisplayModeChange);
+          (minimalUIQuery as any).removeListener(handleDisplayModeChange);
+        }
+      };
     }
+
+    // Verificar métodos asíncronos
+    checkInstallation().then((installed) => {
+      if (installed) {
+        return;
+      }
+
+      // IMPORTANTE: Si la app NO está instalada, limpiar el flag de rechazo
+      // Esto permite que el prompt aparezca de nuevo si el usuario desinstaló la app
+      const installPromptDismissed = localStorage.getItem('install-prompt-dismissed');
+      if (installPromptDismissed) {
+        console.log('[INSTALL] Flag de rechazo encontrado, pero app no está instalada');
+        console.log('[INSTALL] Limpiando flag para permitir mostrar prompt de nuevo');
+        localStorage.removeItem('install-prompt-dismissed');
+      }
+    });
 
     // Verificar Service Worker
     const checkServiceWorker = async () => {
@@ -114,6 +217,8 @@ export default function InstallPrompt() {
       setIsInstalled(true);
       setShowPrompt(false);
       setDeferredPrompt(null);
+      // Guardar flag en localStorage para detectar instalación incluso desde navegador
+      localStorage.setItem('app-installed', 'true');
     };
 
     // Timeout para detectar si el evento nunca llega (3 segundos)
@@ -139,7 +244,7 @@ export default function InstallPrompt() {
     // Log inicial
     console.log('[INSTALL] Inicializando install prompt:', {
       isMobile,
-      isStandalone,
+      isStandalone: standaloneMode,
       installPromptDismissed: false, // Ya lo limpiamos arriba si no está instalada
       userAgent: navigator.userAgent,
     });
@@ -148,6 +253,17 @@ export default function InstallPrompt() {
       clearTimeout(timeoutId);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      
+      // Limpiar listeners de display-mode
+      if (standaloneQuery.removeEventListener) {
+        standaloneQuery.removeEventListener('change', handleDisplayModeChange);
+        fullscreenQuery.removeEventListener('change', handleDisplayModeChange);
+        minimalUIQuery.removeEventListener('change', handleDisplayModeChange);
+      } else {
+        (standaloneQuery as any).removeListener(handleDisplayModeChange);
+        (fullscreenQuery as any).removeListener(handleDisplayModeChange);
+        (minimalUIQuery as any).removeListener(handleDisplayModeChange);
+      }
     };
   }, [isMobile, deferredPrompt, isInstalled]);
 
