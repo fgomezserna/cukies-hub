@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useIsMobile } from '../hooks/use-mobile';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -63,6 +63,7 @@ export default function InstallPrompt() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showManualInstall, setShowManualInstall] = useState(false);
+  const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Listener para cambios en display-mode (debe estar siempre activo)
@@ -74,7 +75,15 @@ export default function InstallPrompt() {
       if (e.matches) {
         console.log('[INSTALL] Display mode cambió a modo app, ocultando prompt');
         setIsInstalled(true);
+        setShowPrompt(false);
+        setDeferredPrompt(null);
         localStorage.setItem('app-installed', 'true');
+        
+        // Cancelar cualquier timeout pendiente
+        if (promptTimeoutRef.current) {
+          clearTimeout(promptTimeoutRef.current);
+          promptTimeoutRef.current = null;
+        }
       }
     };
 
@@ -128,6 +137,12 @@ export default function InstallPrompt() {
     // Verificar métodos asíncronos
     checkInstallation().then((installed) => {
       if (installed) {
+        // Si se detecta instalación, cancelar cualquier timeout pendiente
+        if (promptTimeoutRef.current) {
+          clearTimeout(promptTimeoutRef.current);
+          promptTimeoutRef.current = null;
+        }
+        setShowPrompt(false);
         return;
       }
 
@@ -194,20 +209,64 @@ export default function InstallPrompt() {
     checkManifest();
 
     // Escuchar el evento beforeinstallprompt
-    const handleBeforeInstallPrompt = (e: Event) => {
+    const handleBeforeInstallPrompt = async (e: Event) => {
       console.log('[INSTALL] ✅ Evento beforeinstallprompt recibido!', e);
       e.preventDefault();
+      
+      // Verificar instalación ANTES de guardar el deferredPrompt
+      const installed = await checkIfAppInstalled();
+      if (installed) {
+        console.log('[INSTALL] App ya está instalada, ignorando beforeinstallprompt');
+        setIsInstalled(true);
+        return;
+      }
+      
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
-      // Solo mostrar si es móvil
-      if (isMobile) {
-        console.log('[INSTALL] Dispositivo móvil detectado, mostrando prompt en 3 segundos');
+      // Solo mostrar si es móvil y NO está instalada
+      if (isMobile && !isInstalled) {
+        console.log('[INSTALL] Dispositivo móvil detectado, verificando instalación antes de mostrar prompt');
+        
+        // Cancelar timeout anterior si existe
+        if (promptTimeoutRef.current) {
+          clearTimeout(promptTimeoutRef.current);
+        }
+        
         // Esperar un poco antes de mostrar para no ser intrusivo
-        setTimeout(() => {
-          setShowPrompt(true);
+        promptTimeoutRef.current = setTimeout(async () => {
+          // Verificar de nuevo ANTES de mostrar (puede haber cambiado durante la espera)
+          const stillInstalled = await checkIfAppInstalled();
+          if (stillInstalled) {
+            console.log('[INSTALL] App instalada durante la espera, cancelando prompt');
+            setIsInstalled(true);
+            setShowPrompt(false);
+            setDeferredPrompt(null);
+            return;
+          }
+          
+          // Verificar el estado actual antes de mostrar
+          // Usamos una función de callback para obtener el estado más reciente
+          setShowPrompt(prevShow => {
+            // Verificar una vez más antes de mostrar
+            const currentStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                                     window.matchMedia('(display-mode: fullscreen)').matches ||
+                                     window.matchMedia('(display-mode: minimal-ui)').matches ||
+                                     (window.navigator as any).standalone === true ||
+                                     localStorage.getItem('app-installed') === 'true';
+            
+            if (currentStandalone) {
+              console.log('[INSTALL] App detectada justo antes de mostrar, cancelando');
+              setIsInstalled(true);
+              setDeferredPrompt(null);
+              return false;
+            }
+            
+            console.log('[INSTALL] Mostrando prompt de instalación');
+            return true;
+          });
         }, 3000);
       } else {
-        console.log('[INSTALL] No es dispositivo móvil, no se mostrará el prompt');
+        console.log('[INSTALL] No es dispositivo móvil o app ya instalada, no se mostrará el prompt');
       }
     };
 
@@ -217,6 +276,13 @@ export default function InstallPrompt() {
       setIsInstalled(true);
       setShowPrompt(false);
       setDeferredPrompt(null);
+      
+      // Cancelar cualquier timeout pendiente
+      if (promptTimeoutRef.current) {
+        clearTimeout(promptTimeoutRef.current);
+        promptTimeoutRef.current = null;
+      }
+      
       // Guardar flag en localStorage para detectar instalación incluso desde navegador
       localStorage.setItem('app-installed', 'true');
     };
@@ -251,6 +317,11 @@ export default function InstallPrompt() {
 
     return () => {
       clearTimeout(timeoutId);
+      // Cancelar el timeout del prompt si existe
+      if (promptTimeoutRef.current) {
+        clearTimeout(promptTimeoutRef.current);
+        promptTimeoutRef.current = null;
+      }
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       
@@ -266,6 +337,17 @@ export default function InstallPrompt() {
       }
     };
   }, [isMobile, deferredPrompt, isInstalled]);
+
+  // Efecto para cancelar el timeout si isInstalled cambia a true
+  useEffect(() => {
+    if (isInstalled && promptTimeoutRef.current) {
+      console.log('[INSTALL] App instalada detectada, cancelando timeout del prompt');
+      clearTimeout(promptTimeoutRef.current);
+      promptTimeoutRef.current = null;
+      setShowPrompt(false);
+      setDeferredPrompt(null);
+    }
+  }, [isInstalled]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
@@ -336,7 +418,7 @@ export default function InstallPrompt() {
       )}
 
       {/* Prompt automático */}
-      {isMobile && showPrompt && deferredPrompt && (
+      {isMobile && showPrompt && deferredPrompt && !isInstalled && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md w-full shadow-2xl">
             <div className="flex flex-col items-center gap-4 text-center">
