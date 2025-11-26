@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { SoundType } from '@/hooks/useAudio';
+import { useIsMobile } from '../hooks/use-mobile';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -218,6 +219,9 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   const [runeImageIndex, setRuneImageIndex] = useState(0);
   const containerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [maxContainerHeight, setMaxContainerHeight] = useState<number>(0);
+  const totemCardRef = useRef<HTMLDivElement | null>(null);
+  const [totemCardDimensions, setTotemCardDimensions] = useState<{ width: number; height: number } | null>(null);
+  const isMobile = useIsMobile();
 
   const treasureItem = infoGroups.flatMap(group => group.items).find(item => item.name === 'Tesoros');
   const treasureImagesLength =
@@ -282,6 +286,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
   useEffect(() => {
     if (!isOpen) {
       setMaxContainerHeight(0);
+      setTotemCardDimensions(null);
       return;
     }
     // Calcular altura máxima de todos los grupos cuando se abre el modal
@@ -295,21 +300,335 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
       }
     };
     
+    // Medir dimensiones de la card del Totem mágico en móvil
+    const measureTotemCard = () => {
+      if (isMobile && totemCardRef.current) {
+        const rect = totemCardRef.current.getBoundingClientRect();
+        setTotemCardDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    };
+    
     // Usar múltiples frames para asegurar que todos los grupos estén renderizados y medidos
     const frame1 = requestAnimationFrame(() => {
       const frame2 = requestAnimationFrame(() => {
         calculateMaxHeight();
+        measureTotemCard();
       });
       return () => cancelAnimationFrame(frame2);
     });
     return () => cancelAnimationFrame(frame1);
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   if (!isOpen) return null;
 
+  // Log para verificar que el componente se está renderizando
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[INFO-MODAL] Rendering modal, isMobile:', isMobile, 'isOpen:', isOpen);
+  }
+
+  // Estructura diferente para móvil: pantalla completa con elementos fijos
+  if (isMobile) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur-sm relative h-screen w-screen"
+        onClick={handleClose}
+        style={{ 
+          pointerEvents: 'auto',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 100,
+          display: 'flex',
+          visibility: 'visible',
+          opacity: 1
+        }}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+          className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-600/80 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-500 focus:outline-none z-[110]"
+          style={{ zIndex: 110 }}
+          aria-label="Cerrar información del juego"
+        >
+          ×
+        </button>
+
+        {/* Contenedor con botones fijos a los lados */}
+        <div
+          className="flex-1 min-h-0 relative pt-4"
+          onClick={event => event.stopPropagation()}
+        >
+          {/* Botón izquierdo - fijo, fuera del scroll */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevGroup();
+            }}
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+            aria-label="Grupo anterior"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+              <svg
+                className="h-5 w-5 text-pink-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </div>
+          </button>
+
+          {/* Botón derecho - fijo, fuera del scroll */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextGroup();
+            }}
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+            aria-label="Grupo siguiente"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+              <svg
+                className="h-5 w-5 text-pink-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </button>
+
+          {/* Contenido scrolleable con padding para los botones */}
+          <div className="overflow-y-auto h-full px-14 py-4">
+            <div className="relative">
+            {/* Renderizar todos los grupos ocultos para medir sus alturas */}
+            {infoGroups.map((group, index) => {
+              // En móvil, para el grupo 1 (Ítems Principales), reordenar: Cukie, Corazón, Checkpoint
+              let arrangedItemsForGroup: InfoGroupItem[];
+              if (isMobile && index === 0) {
+                const cukieItem = group.items.find(item => item.name === 'Cukie');
+                const corazonItem = group.items.find(item => item.name === 'Corazón');
+                const checkpointItem = group.items.find(item => item.name === 'Checkpoint');
+                
+                if (cukieItem && corazonItem && checkpointItem) {
+                  // Orden específico para móvil: Cukie, Corazón, Checkpoint
+                  arrangedItemsForGroup = [cukieItem, corazonItem, checkpointItem];
+                } else {
+                  arrangedItemsForGroup = arrangeGroupItems(group.items);
+                }
+              } else {
+                arrangedItemsForGroup = arrangeGroupItems(group.items);
+              }
+
+              return (
+                <div
+                  key={`hidden-${index}`}
+                  ref={el => {
+                    containerRefs.current[index] = el;
+                  }}
+                  className="rounded-xl border border-pink-400/40 bg-slate-800/70 p-3 shadow-lg shadow-pink-500/10"
+                  style={{
+                    position: index === currentGroupIndex ? 'relative' : 'absolute',
+                    visibility: index === currentGroupIndex ? 'visible' : 'hidden',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    minHeight: maxContainerHeight || undefined,
+                  }}
+                >
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.35em] font-pixellari text-pink-300/70">Grupo {index + 1}</p>
+                      <h3 className="text-xl font-pixellari text-pink-200">{group.title}</h3>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex gap-2 pb-2">
+                    {arrangedItemsForGroup.map((item, itemIndex) => {
+                      const images = Array.isArray(item.image) ? item.image : [item.image];
+                      const imageAlts = Array.isArray(item.imageAlt) ? item.imageAlt : images.map(() => item.imageAlt);
+                      const isTreasureItem = item.name === 'Tesoros';
+                      const isRuneItem = item.name === 'Runas';
+                      const isHakuItem = item.name === 'Haku';
+                      const imagesToRender = (() => {
+                        if (isTreasureItem) {
+                          const imgIndex = treasureImagesLength > 0 ? treasureImageIndex % treasureImagesLength : 0;
+                          return [images[imgIndex]];
+                        }
+                        if (isRuneItem) {
+                          const imgIndex = runeImagesLength > 0 ? runeImageIndex % runeImagesLength : 0;
+                          return [images[imgIndex]];
+                        }
+                        return images;
+                      })();
+                      const renderIconContent = () => {
+                        if (item.name === 'Bonificación de nivel') {
+                          return (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-800/60 p-1">
+                              <svg
+                                className="h-full w-full text-pink-400"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M12 19V5M5 12l7-7 7 7" />
+                              </svg>
+                            </div>
+                          );
+                        }
+
+                        return imagesToRender.map((src, imgIdx) => {
+                          const originalIndex = (() => {
+                            if (isTreasureItem && treasureImagesLength) {
+                              return treasureImageIndex % treasureImagesLength;
+                            }
+                            if (isRuneItem && runeImagesLength) {
+                              return runeImageIndex % runeImagesLength;
+                            }
+                            return imgIdx;
+                          })();
+
+                          return (
+                            <div
+                              key={`${item.name}-${originalIndex}`}
+                              className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-800/60 p-1"
+                            >
+                              <Image
+                                src={src}
+                                alt={
+                                  typeof imageAlts[originalIndex] === 'string'
+                                    ? imageAlts[originalIndex]
+                                    : item.name
+                                }
+                                width={448}
+                                height={448}
+                                quality={100}
+                                unoptimized={false}
+                                priority={false}
+                                className="info-modal-img h-full w-full object-contain transition-opacity duration-500"
+                              />
+                            </div>
+                          );
+                        });
+                      };
+
+                      const isThirdWide = arrangedItemsForGroup.length >= 3 && itemIndex === 2;
+                      const isTotemCard = item.name === 'Totem mágico';
+                      const cardClassName = 'group flex h-full flex-1 flex-col gap-2 rounded-lg border border-pink-400/25 bg-slate-900/80 p-2 shadow-md shadow-pink-500/10 transition-transform duration-200 hover:-translate-y-1 hover:border-pink-400/70';
+
+                      return (
+                        <div
+                          key={item.name}
+                          ref={isTotemCard ? totemCardRef : null}
+                          className={cardClassName}
+                          style={isMobile && totemCardDimensions ? {
+                            width: `${totemCardDimensions.width}px`,
+                            height: `${totemCardDimensions.height}px`,
+                            minWidth: `${totemCardDimensions.width}px`,
+                            minHeight: `${totemCardDimensions.height}px`,
+                          } : undefined}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {renderIconContent()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {item.name === 'Bonificación de nivel' ? (
+                                <h4 className="text-sm font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] leading-tight">
+                                  Bonificacion<br/>de nivel
+                                </h4>
+                              ) : (
+                                <h4 className="text-sm font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] truncate">{item.name}</h4>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-pink-100/90 leading-tight font-pixellari">
+                            {isMobile && item.name === 'Cukie' 
+                              ? item.description.replace(
+                                  'Usa las teclas ASDW para moverte por la pantalla de juego.',
+                                  'Usa el joystick que aparece al pulsar en pantalla para moverte.'
+                                )
+                              : item.description}
+                          </p>
+                          {item.details && (
+                            <ul className="ml-3 list-disc space-y-0.5 text-[9px] text-pink-100/80 font-pixellari">
+                              {item.name === 'Totem mágico' ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {item.details.map(detail => (
+                                    <span
+                                      key={detail}
+                                      className="rounded-full border border-pink-300/60 bg-pink-300/15 px-2 py-0.5 font-pixellari text-[10px] text-pink-100 shadow-sm shadow-pink-500/20"
+                                    >
+                                      {detail}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                item.details.map(detail => <li key={detail}>{detail}</li>)
+                              )}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          </div>
+        </div>
+
+        {/* Indicadores fijos */}
+        <div
+          className="flex-shrink-0 flex items-center justify-center gap-2 py-3 bg-slate-900/50 border-t border-pink-400/30"
+          onClick={event => event.stopPropagation()}
+        >
+          {infoGroups.map((_, index) => (
+            <button
+              key={`indicator-${index}`}
+              onClick={() => {
+                onPlaySound?.('button_click');
+                setCurrentGroupIndex(index);
+              }}
+              className="h-2.5 w-2.5 rounded-full border-2 transition-all"
+              style={{
+                borderColor: index === currentGroupIndex ? 'rgb(244, 114, 182)' : 'rgba(236, 72, 153, 0.4)',
+                backgroundColor: index === currentGroupIndex ? 'white' : 'rgba(236, 72, 153, 0.3)',
+                boxShadow: index === currentGroupIndex ? '0 0 8px rgba(236,72,153,0.6)' : 'none',
+                transform: index === currentGroupIndex ? 'scale(1.1)' : 'scale(1)',
+              }}
+              aria-label={`Ir al grupo ${index + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Estructura original para escritorio
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-6 overflow-y-auto"
+      style={{ pointerEvents: 'auto' }}
       onClick={handleClose}
     >
       <div
@@ -468,7 +787,13 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
                               {renderIconContent()}
                             </div>
                             <div className="flex-1">
-                              <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                              {item.name === 'Bonificación de nivel' ? (
+                                <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] leading-tight">
+                                  Bonificacion<br/>de nivel
+                                </h4>
+                              ) : (
+                                <h4 className="text-xl font-pixellari text-pink-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">{item.name}</h4>
+                              )}
                             </div>
                           </div>
                           <p className="text-sm md:text-base text-pink-100/90 leading-snug font-pixellari">

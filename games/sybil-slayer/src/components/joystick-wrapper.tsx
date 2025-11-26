@@ -33,6 +33,7 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
   const joystickRef = useRef<any>(null);
   const containerIdRef = useRef<string>(`joystick-${Date.now()}-${Math.random()}`);
   const wasActiveRef = useRef<boolean>(false);
+  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Convertir valores del joystick (-100 a 100) a Vector2D normalizado
   const convertJoyStickToDirection = useCallback((x: number | string, y: number | string): Vector2D => {
@@ -70,7 +71,7 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
   // Inicializar el joystick cuando el componente se monte y sea visible
   useEffect(() => {
     if (!visible || !containerRef.current) {
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         console.log('[JoystickWrapper] Skipping initialization - visible:', visible, 'containerRef:', !!containerRef.current);
       }
       return;
@@ -81,7 +82,7 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
       // Verificar que el contenedor esté en el DOM
       const containerElement = document.getElementById(containerIdRef.current);
       if (!containerElement) {
-        if (process.env.NODE_ENV === 'development') {
+        if (isDevelopment) {
           console.error('[JoystickWrapper] Container element not found in DOM:', containerIdRef.current);
         }
         return false;
@@ -89,7 +90,7 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
 
       // Verificar que la biblioteca JoyStick esté cargada
       if (typeof window === 'undefined' || !(window as any).JoyStick) {
-        if (process.env.NODE_ENV === 'development') {
+        if (isDevelopment) {
           console.error('[JoystickWrapper] JoyStick library not loaded. Make sure /joy.js is loaded.');
         }
         return false;
@@ -97,7 +98,7 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
       
       const JoyStickClass = (window as any).JoyStick;
       
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         console.log('[JoystickWrapper] Initializing joystick with container:', containerIdRef.current, 'size:', size, 'position:', { x, y });
       }
 
@@ -122,9 +123,9 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
           {
             width: joystickSize,
             height: joystickSize,
-            internalFillColor: '#3B82F6', // Azul para el stick interno
+            internalFillColor: '#EC4899', // Rosa para el stick interno
             internalLineWidth: 2,
-            internalStrokeColor: '#1E40AF', // Azul oscuro para el borde
+            internalStrokeColor: '#BE185D', // Rosa oscuro para el borde
             externalLineWidth: 3,
             externalStrokeColor: 'rgba(255, 255, 255, 0.5)', // Borde externo semi-transparente
             autoReturnToCenter: true,
@@ -132,32 +133,40 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
           (stickData: any) => {
             // Callback que se ejecuta cuando el joystick se mueve
             // stickData contiene: { x, y, xPosition, yPosition, cardinalDirection }
-            console.log('[JoystickWrapper] Callback received - Raw values:', {
-              x: stickData.x,
-              y: stickData.y,
-              xType: typeof stickData.x,
-              yType: typeof stickData.y,
-              cardinalDirection: stickData.cardinalDirection
-            });
+            if (isDevelopment) {
+              console.log('[JoystickWrapper] Callback received - Raw values:', {
+                x: stickData.x,
+                y: stickData.y,
+                xType: typeof stickData.x,
+                yType: typeof stickData.y,
+                cardinalDirection: stickData.cardinalDirection
+              });
+            }
             
             const direction = convertJoyStickToDirection(stickData.x, stickData.y);
-            console.log('[JoystickWrapper] Converted direction:', direction, {
-              magnitude: Math.sqrt(direction.x * direction.x + direction.y * direction.y),
-              angle: Math.atan2(direction.y, direction.x) * 180 / Math.PI
-            });
+            if (isDevelopment) {
+              console.log('[JoystickWrapper] Converted direction:', direction, {
+                magnitude: Math.sqrt(direction.x * direction.x + direction.y * direction.y),
+                angle: Math.atan2(direction.y, direction.x) * 180 / Math.PI
+              });
+            }
             
             const isActive = Math.abs(direction.x) > 0.01 || Math.abs(direction.y) > 0.01;
             
             // Si estaba activo y ahora está en el centro, llamar a onRelease
             if (wasActiveRef.current && !isActive) {
-              console.log('[JoystickWrapper] Joystick returned to center, calling onRelease');
+              if (isDevelopment) {
+                console.log('[JoystickWrapper] Joystick returned to center, calling onRelease');
+              }
               onRelease();
             }
             
             wasActiveRef.current = isActive;
             
             // Siempre llamar a onDirectionChange, incluso cuando está en el centro (para resetear)
-            console.log('[JoystickWrapper] Calling onDirectionChange with:', direction, 'isActive:', isActive);
+            if (isDevelopment) {
+              console.log('[JoystickWrapper] Calling onDirectionChange with:', direction, 'isActive:', isActive);
+            }
             onDirectionChange(direction);
           }
         );
@@ -173,7 +182,9 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
           setTimeout(() => {
             // Si tenemos un activeTouchId, intentar capturarlo inmediatamente
             if (activeTouchId !== null && activeTouchId !== undefined) {
-              console.log('[JoystickWrapper] Attempting to capture active touch:', activeTouchId);
+              if (isDevelopment) {
+                console.log('[JoystickWrapper] Attempting to capture active touch:', activeTouchId);
+              }
               
               // Crear un evento touchmove simulado para activar el joystick
               // Esto ayuda a capturar el touch que comenzó antes de la inicialización
@@ -188,11 +199,13 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
             canvas.style.pointerEvents = 'auto';
             containerElement.style.pointerEvents = 'auto';
             
-            console.log('[JoystickWrapper] Canvas ready, waiting for touch events');
+            if (isDevelopment) {
+              console.log('[JoystickWrapper] Canvas ready, waiting for touch events');
+            }
           }, 10);
         }
         
-        if (process.env.NODE_ENV === 'development') {
+        if (isDevelopment) {
           console.log('[JoystickWrapper] Joystick initialized successfully');
         }
         
@@ -280,6 +293,5 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
 };
 
 export default JoystickWrapper;
-
 
 

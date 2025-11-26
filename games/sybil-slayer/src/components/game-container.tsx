@@ -12,7 +12,9 @@ import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
 import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
+import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
+import OrientationOverlay from './orientation-overlay';
 import { Button } from "./ui/button";
 import { Github, Play, Pause, RotateCcw } from 'lucide-react';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
@@ -145,8 +147,230 @@ const formatDuration = (ms?: number | null): string => {
 
 const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => void }> = ({ stats, onClose }) => {
   const sortedStats = [...stats].sort((a, b) => a.level - b.level);
-
   const hasStats = sortedStats.length > 0;
+  const isMobile = useIsMobile();
+  const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
+
+  useEffect(() => {
+    setCurrentLevelIndex(0);
+  }, [stats, isMobile]);
+
+  const buildRows = (entry: LevelStatsEntry) => [
+    {
+      key: 'gems',
+      label: 'Gemas',
+      count: entry.counts.gems,
+      points: entry.points.gems,
+    },
+    {
+      key: 'gemsX5',
+      label: 'Gemas x5',
+      count: entry.counts.gemsX5,
+      points: entry.points.gemsX5,
+    },
+    {
+      key: 'ukis',
+      label: 'Monedas',
+      count: entry.counts.ukis,
+      points: entry.points.ukis,
+    },
+    {
+      key: 'ukisX5',
+      label: 'Monedas x5',
+      count: entry.counts.ukisX5,
+      points: entry.points.ukisX5,
+    },
+    {
+      key: 'treasures',
+      label: 'Tesoros',
+      count: entry.counts.treasures,
+      points: entry.points.treasures,
+    },
+    {
+      key: 'hearts',
+      label: 'Corazones',
+      count: entry.counts.hearts,
+      points: entry.points.hearts,
+    },
+    {
+      key: 'runes',
+      label: 'Runas',
+      count: entry.counts.runes,
+      points: entry.points.runes,
+    },
+    {
+      key: 'levelCompletionBonus',
+      label: 'Bonificación nivel',
+      count: entry.counts.levelCompletionBonus,
+      points: entry.points.levelCompletionBonus,
+    },
+  ];
+
+  const handlePrevLevel = () => {
+    setCurrentLevelIndex(prev =>
+      prev === 0 ? Math.max(sortedStats.length - 1, 0) : prev - 1
+    );
+  };
+
+  const handleNextLevel = () => {
+    setCurrentLevelIndex(prev =>
+      prev === sortedStats.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  if (isMobile) {
+    if (!hasStats) {
+      return (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm px-4 py-6"
+          onClick={onClose}
+        >
+          <div
+            className="relative w-full max-w-md rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/15"
+            onClick={event => event.stopPropagation()}
+          >
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+            <p className="text-center font-pixellari text-pink-200">
+              No se registraron estadísticas en esta partida.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const safeIndex = Math.min(currentLevelIndex, Math.max(sortedStats.length - 1, 0));
+    const currentEntry = sortedStats[safeIndex];
+    const rows = buildRows(currentEntry);
+    const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
+    const showNavigation = sortedStats.length > 1;
+
+    return (
+      <div
+        className="fixed inset-0 z-[60] flex flex-col bg-black/90 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50 z-30"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+
+        <div
+          className="relative flex-1 w-full px-4 py-6 overflow-y-auto"
+          onClick={event => event.stopPropagation()}
+        >
+          {showNavigation && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevLevel();
+              }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+              aria-label="Nivel anterior"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+                <svg
+                  className="h-6 w-6 text-pink-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </div>
+            </button>
+          )}
+
+          {showNavigation && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextLevel();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex-shrink-0 focus:outline-none transition-all duration-200 active:scale-95"
+              aria-label="Nivel siguiente"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-500/20 shadow-lg shadow-pink-500/30 hover:border-pink-400 hover:bg-pink-500/30 hover:shadow-pink-500/50">
+                <svg
+                  className="h-6 w-6 text-pink-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </button>
+          )}
+
+          <div className="mx-auto w-full max-w-md rounded-xl border border-pink-400/60 bg-slate-900/90 p-4 shadow-2xl shadow-pink-500/15">
+            <div className="mb-3 relative flex items-center justify-between gap-3">
+              <span className="rounded-full border border-pink-300/60 bg-pink-300/15 px-3 py-1 text-[11px] tracking-[0.25em] font-pixellari text-pink-100">
+                Estadísticas
+              </span>
+              <span className="absolute left-1/2 -translate-x-1/2 text-sm font-pixellari text-pink-100 uppercase">NIVEL {currentEntry.level}</span>
+            </div>
+
+            <div className="pr-1">
+              <table className="w-full table-fixed text-sm font-pixellari text-pink-100 leading-tight">
+                <thead className="text-[11px] uppercase tracking-wide text-pink-300">
+                  <tr>
+                    <th className="w-[45%] px-1 py-1 text-left">Elemento</th>
+                    <th className="w-[25%] px-1 py-1 text-right">Recogidos</th>
+                    <th className="w-[30%] px-1 py-1 text-right">Puntos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr key={row.key} className="odd:bg-slate-900/40">
+                      <td className="px-1 py-1 pr-0">{row.label}</td>
+                      <td className="px-1 py-1 text-right">
+                        {numberFormatter.format(row.count)}
+                      </td>
+                      <td className="px-1 py-1 text-right text-amber-200">
+                        {numberFormatter.format(Math.round(row.points || 0))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-pink-400/40 text-pink-200">
+                    <td className="px-1 pt-2 text-sm font-semibold">Total</td>
+                    <td className="px-1 pt-2" />
+                    <td className="px-1 pt-2 text-right text-amber-300 font-semibold">
+                      {numberFormatter.format(totalPoints)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between text-[11px] font-pixellari text-pink-200 uppercase tracking-wide">
+              <span>Tiempo</span>
+              <span className="text-pink-100">{formatDuration(currentEntry.durationMs)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
@@ -166,56 +390,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
           <div className="max-h-[70vh] overflow-y-auto pr-1">
             <div className="grid gap-4 md:grid-cols-2">
               {sortedStats.map(entry => {
-                const rows = [
-                  {
-                    key: 'gems',
-                    label: 'Gemas',
-                    count: entry.counts.gems,
-                    points: entry.points.gems,
-                  },
-                  {
-                    key: 'gemsX5',
-                    label: 'Gemas x5',
-                    count: entry.counts.gemsX5,
-                    points: entry.points.gemsX5,
-                  },
-                  {
-                    key: 'ukis',
-                    label: 'Monedas',
-                    count: entry.counts.ukis,
-                    points: entry.points.ukis,
-                  },
-                  {
-                    key: 'ukisX5',
-                    label: 'Monedas x5',
-                    count: entry.counts.ukisX5,
-                    points: entry.points.ukisX5,
-                  },
-                  {
-                    key: 'treasures',
-                    label: 'Tesoros',
-                    count: entry.counts.treasures,
-                    points: entry.points.treasures,
-                  },
-                  {
-                    key: 'hearts',
-                    label: 'Corazones',
-                    count: entry.counts.hearts,
-                    points: entry.points.hearts,
-                  },
-                  {
-                    key: 'runes',
-                    label: 'Runas',
-                    count: entry.counts.runes,
-                    points: entry.points.runes,
-                  },
-                  {
-                    key: 'levelCompletionBonus',
-                    label: 'Bonificación nivel',
-                    count: entry.counts.levelCompletionBonus,
-                    points: entry.points.levelCompletionBonus,
-                  },
-                ];
+                const rows = buildRows(entry);
                 const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
 
                 return (
@@ -316,6 +491,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Estado para controlar el modal de información
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const infoButtonClickedRef = useRef(false);
   
   // Estado para controlar el popup de estadísticas por nivel
   const [isLevelStatsVisible, setIsLevelStatsVisible] = useState(false);
@@ -556,8 +732,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   }, [width, height, canvasSize.width, canvasSize.height]);
 
-  const inputState = useGameInput();
+  const {
+    pauseToggled,
+    startToggled,
+    setTouchDirection,
+    clearTouchDirection,
+    subscribeToDirection,
+  } = useGameInput();
   const isMobile = useIsMobile();
+  const isPortrait = useOrientation();
+  
+  // Ref para rastrear si pausamos automáticamente por orientación
+  const pausedByOrientationRef = useRef<boolean>(false);
   
   // Debug: Log mobile detection
   useEffect(() => {
@@ -628,6 +814,35 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isMobile]);
   
   const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+
+  // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
+  useEffect(() => {
+    // Solo aplicar en móviles
+    if (!isMobile) return;
+
+    // Si está en portrait y el juego está jugando, pausar automáticamente
+    if (isPortrait && gameState.status === 'playing') {
+      console.log('[GameContainer] Dispositivo en vertical, pausando juego automáticamente');
+      pausedByOrientationRef.current = true;
+      togglePause();
+    }
+    
+    // Cuando vuelve a landscape, NO reanudar automáticamente
+    // El usuario debe presionar Play manualmente
+    if (!isPortrait && pausedByOrientationRef.current && gameState.status === 'paused') {
+      // Resetear el flag cuando vuelve a landscape
+      // El juego permanecerá pausado hasta que el usuario presione Play
+      pausedByOrientationRef.current = false;
+    }
+  }, [isPortrait, gameState.status, isMobile, togglePause]);
+
+  // Resetear el flag cuando el usuario presiona Play manualmente
+  useEffect(() => {
+    if (gameState.status === 'playing' && pausedByOrientationRef.current) {
+      // El usuario presionó Play, resetear el flag
+      pausedByOrientationRef.current = false;
+    }
+  }, [gameState.status]);
   const localScore = Math.floor(gameState.score);
   const opponentScore = Math.floor(multiplayer.opponent?.score ?? 0);
   const scoreDifference = isMultiplayerMode ? multiplayer.scoreDifference : 0;
@@ -980,7 +1195,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
   // useEffect(() => {
-  //   if (inputState.pauseToggled) {
+  //   if (pauseToggled) {
   //     // Ejecutar exactamente la misma lógica que el botón de pausa
   //     if (gameState.status === 'playing') {
   //       playSound('pause');
@@ -990,17 +1205,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   //       togglePause();
   //     }
   //   }
-  // }, [inputState.pauseToggled, gameState.status, togglePause, playSound]);
+  // }, [pauseToggled, gameState.status, togglePause, playSound]);
 
   // Handle start game from keyboard (Space key)
   useEffect(() => {
-    if (!inputState.startToggled) return;
+    if (!startToggled) return;
     if (gameState.status !== 'idle') return;
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
     playSound('game_start');
     startGame();
-  }, [inputState.startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
+  }, [startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
   
   // Reset flags when starting a new game (moved after gameState initialization)
   useEffect(() => {
@@ -1085,20 +1300,26 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
-    const nextInputState = {
-      direction: inputState.direction,
-      pauseToggled: inputState.pauseToggled,
-      startToggled: inputState.startToggled,
-    };
-    if (
-      inputState.startToggled &&
-      (gameState.status === 'idle' || gameState.status === 'gameOver')
-    ) {
-      setModeSelectOpen(true);
-      nextInputState.startToggled = false;
-    }
-    updateInputRef(nextInputState);
-  }, [inputState, updateInputRef, gameState.status]);
+    const unsubscribe = subscribeToDirection((direction) => {
+      const nextInputState = {
+        direction,
+        pauseToggled,
+        startToggled,
+      };
+
+      if (
+        startToggled &&
+        (gameState.status === 'idle' || gameState.status === 'gameOver')
+      ) {
+        setModeSelectOpen(true);
+        nextInputState.startToggled = false;
+      }
+
+      updateInputRef(nextInputState);
+    });
+
+    return unsubscribe;
+  }, [subscribeToDirection, pauseToggled, startToggled, updateInputRef, gameState.status]);
 
   const hasStartedMultiplayerRef = useRef(false);
   useEffect(() => {
@@ -1255,6 +1476,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
 
     if (gameState.status === 'paused') {
+      // No permitir reanudar si el dispositivo está en portrait
+      if (isMobile && isPortrait) {
+        console.log('[GameContainer] No se puede reanudar el juego en modo vertical');
+        return;
+      }
       playSound('resume');
       togglePause();
       return;
@@ -1362,8 +1588,45 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
    };
 
    const handleInfoToggle = () => {
+      // Prevenir doble ejecución
+      if (infoButtonClickedRef.current) {
+        console.log('[INFO] handleInfoToggle already executing, skipping');
+        return;
+      }
+      infoButtonClickedRef.current = true;
+      
       playSound('button_click');
-      setIsInfoModalOpen(!isInfoModalOpen);
+      const currentStatus = gameState.status;
+      
+      console.log('[INFO] handleInfoToggle called, status:', currentStatus, 'modal open:', isInfoModalOpen);
+      
+      // Si el juego está en idle, hacer toggle normal
+      if (currentStatus === 'idle') {
+        setIsInfoModalOpen(!isInfoModalOpen);
+      } else {
+        // Si está en playing o paused, pausar si es necesario y abrir el modal
+        if (currentStatus === 'playing') {
+          console.log('[INFO] Pausing game before opening modal');
+          togglePause();
+        }
+        // Siempre abrir el modal cuando no está en idle
+        console.log('[INFO] Opening info modal');
+        setIsInfoModalOpen(true);
+      }
+      
+      // Resetear el flag después de un breve delay
+      setTimeout(() => {
+        infoButtonClickedRef.current = false;
+      }, 300);
+   };
+
+   const handleOpenInfo = () => {
+      playSound('button_click');
+      // Si el juego está en playing, pausar automáticamente
+      if (gameState.status === 'playing') {
+        togglePause();
+      }
+      setIsInfoModalOpen(true);
    };
 
   // Detectar cuando se recoge un checkpoint
@@ -1858,6 +2121,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setScale(newScale);
   }, []);
 
+  const normalizedCanvasOffset = useMemo(() => {
+    if (scale === 0) {
+      return canvasHorizontalOffset;
+    }
+    return canvasHorizontalOffset / scale;
+  }, [canvasHorizontalOffset, scale]);
+
   // Función para calcular el offset horizontal del canvas para alinear elementos
   const calculateCanvasHorizontalOffset = useCallback(() => {
     if (!containerRef.current) {
@@ -1971,7 +2241,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         onClose={() => setModeSelectOpen(false)}
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
-        onRulesClick={() => setIsInfoModalOpen(true)}
+        onRulesClick={handleOpenInfo}
       />
       {waitingOverlay}
       {countdownOverlay}
@@ -1993,13 +2263,16 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <div className="flex flex-col items-center justify-center w-full h-full absolute inset-0 z-20 px-4 py-6">
             <div
               className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
-              style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
+              style={{ transform: `scale(${isMobile ? scale * 1.5 : scale})`, transformOrigin: 'center' }}
             >
               <h1 className="text-4xl md:text-6xl font-pixellari text-pink-200 mb-6 text-center select-none tracking-wide">
                 TREASURE HUNT
               </h1>
               <p className="text-base md:text-lg font-pixellari text-pink-200/80 mb-6 text-center select-none">
-                Utiliza las teclas ASDW para mover al personaje, y consigue la mayor puntuación posible.<br/>
+                {isMobile 
+                  ? "Utiliza el joystick que aparece al pulsar en pantalla para mover el personaje y consigue la mayor puntuacion posible."
+                  : "Utiliza las teclas ASDW para mover al personaje, y consigue la mayor puntuación posible."
+                }<br/>
                 <br/>
                 La partida termina cuando se acaba el tiempo o pierdes las 3 vidas.
               </p>
@@ -2021,7 +2294,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </span>
                 </button>
                 <button 
-                  onClick={() => setIsInfoModalOpen(true)} 
+                  onClick={handleOpenInfo} 
                   className="focus:outline-none game-button relative"
                   aria-label="Reglas"
                 >
@@ -2054,12 +2327,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
         >
           {vaultEffectBadgesElement}
-            {/* Score, Level, Hearts y Timer con cajas */}
+            {/* Score, Level, Hearts y Timer con cajas - alineados con el canvas */}
             <div 
-              className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
+              className="flex flex-wrap justify-center gap-4 mb-2 items-center" 
               style={{ 
-                width: BASE_GAME_WIDTH,
-                transform: `translateX(${canvasHorizontalOffset}px)`
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: `translate(${normalizedCanvasOffset}px, -50px)`
               }}
             >
               <div className="relative">
@@ -2136,7 +2411,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             
             {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-0">
-              <div className="w-full flex flex-row items-center justify-center gap-0">
+              <div className="w-full flex flex-row items-center justify-center gap-0" style={{ transform: `translate(${isMobile ? 300 : 0}px, -50px)` }}>
                 <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 -mr-3 relative">
                   {/* Render canvas only when size is determined */}
                   {canvasSize.width > 0 && canvasSize.height > 0 && (
@@ -2208,10 +2483,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
             </div>
             
-            {/* Botones principales */}
+            {/* Botones principales - alineados con el canvas */}
             <div 
               className="flex space-x-8 mb-3 justify-center items-center"
-              style={{ transform: `translateX(${canvasHorizontalOffset}px)` }}
+              style={{ 
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: `translate(${normalizedCanvasOffset}px, -50px)` 
+              }}
             >
               <button 
                 onClick={handleStartPauseClick} 
@@ -2355,12 +2635,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: BASE_GAME_WIDTH }}
           >
             {vaultEffectBadgesElement}
-            {/* Score, Level, Hearts y Timer con cajas */}
+            {/* Score, Level, Hearts y Timer con cajas - alineados con el canvas */}
             <div 
-              className="w-full flex flex-wrap justify-center gap-4 mb-2 items-center" 
+              className="flex flex-wrap justify-center gap-4 mb-2 items-center" 
               style={{ 
-                width: BASE_GAME_WIDTH,
-                transform: `translateX(${canvasHorizontalOffset}px)`
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: `translate(${normalizedCanvasOffset}px, -50px)`
               }}
             >
               <div className="relative">
@@ -2480,7 +2762,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
             {/* Canvas del juego con tótem lateral y panel inferior */}
             <div className="w-full flex flex-col items-center justify-center gap-0">
-              <div className="w-full flex flex-row items-center justify-center gap-0">
+              <div className="w-full flex flex-row items-center justify-center gap-0" style={{ transform: `translate(${isMobile ? 300 : 0}px, -50px)` }}>
                 <div ref={containerRef} className="w-full lg:w-auto flex justify-center items-center mb-0 lg:mb-0 lg:-mr-6 -mr-3 relative">
 
               {/* Animación de jeff_goit al lado izquierdo del grid */}
@@ -2830,10 +3112,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
             </div>
             
-            {/* Botones principales */}
+            {/* Botones principales - alineados con el canvas */}
             <div 
               className="flex space-x-8 mb-3 justify-center items-center"
-              style={{ transform: `translateX(${canvasHorizontalOffset}px)` }}
+              style={{ 
+                width: `${canvasSize.width}px`,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                transform: `translate(${normalizedCanvasOffset}px, -50px)` 
+              }}
             >
               <button 
                 onClick={handleStartPauseClick} 
@@ -2956,16 +3243,24 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       )}
 
       {/* Modal de información - Siempre disponible */}
+      {process.env.NODE_ENV === 'development' && console.log('[INFO] Rendering InfoModal, isOpen:', isInfoModalOpen)}
       <InfoModal 
         isOpen={isInfoModalOpen}
-        onClose={() => setIsInfoModalOpen(false)}
+        onClose={() => {
+          console.log('[INFO] Closing info modal');
+          setIsInfoModalOpen(false);
+        }}
         onPlaySound={playSound}
       />
 
       {/* Botones de control - Esquina inferior derecha - Siempre visibles */}
       <div 
-        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+        className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2"
         style={{ transform: `scale(${scale})`, transformOrigin: 'bottom right' }}
+        onTouchStart={(e) => {
+          // Detener propagación para que TouchZones no capture estos botones
+          e.stopPropagation();
+        }}
       >
         {/* Botón de música */}
         <button 
@@ -3005,8 +3300,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
         {/* Botón de información */}
         <button 
-          onClick={handleInfoToggle} 
-          className="focus:outline-none game-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            // En móvil, onTouchStart ya maneja el evento, así que prevenir doble ejecución
+            if (!isMobile) {
+              handleInfoToggle();
+            }
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            // No usar preventDefault aquí porque causa error con passive listeners
+            handleInfoToggle();
+          }}
+          className="focus:outline-none game-button relative"
           aria-label="Información del juego"
         >
           <Image 
@@ -3033,11 +3339,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         <>
           {process.env.NODE_ENV === 'development' && console.log('[GameContainer] Rendering TouchZones, isMobile:', isMobile)}
           <TouchZones
-            onDirectionChange={inputState.setTouchDirection}
-            onDirectionClear={inputState.clearTouchDirection}
+            onDirectionChange={setTouchDirection}
+            onDirectionClear={clearTouchDirection}
           />
         </>
       )}
+
+      {/* Orientation overlay - muestra mensaje cuando el dispositivo está en vertical */}
+      <OrientationOverlay />
     </div>
   );
 };
