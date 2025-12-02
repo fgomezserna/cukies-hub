@@ -7,8 +7,11 @@ This is a NextJS DApp for Hyppie Gaming Platform.
 Create a `.env.local` file in the root directory with the following variables:
 
 ```env
-# Database
-DATABASE_URL="mongodb://..."
+# Database - Primary database (Prisma)
+DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin"
+
+# Database - Legacy database (cukies with users and characters)
+CUKIES_DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies?authSource=admin"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
@@ -56,6 +59,15 @@ To set up Telegram verification:
 4. Add the bot to your Telegram group as an administrator
 5. Get the chat ID by sending a message to your group, then visiting: `https://api.telegram.org/bot<YourBotToken>/getUpdates`
 6. Find the chat ID in the response and save it as `TELEGRAM_CHAT_ID`
+
+## Database Configuration
+
+This project uses two MongoDB databases:
+
+1. **cukies-hub**: Primary database managed with Prisma (for new features)
+2. **cukies**: Legacy database with existing users and characters (cukies)
+
+See [docs/database-setup.md](./docs/database-setup.md) for detailed information about database structure and usage.
 
 ## Getting Started
 
