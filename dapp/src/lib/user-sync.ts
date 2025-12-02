@@ -1,5 +1,6 @@
 import { cukiesDb } from './mongodb-cukies';
 import { prisma } from './prisma';
+import { createUserDirectly } from './mongodb-hub';
 
 /**
  * Busca un usuario en la BD cukies por wallet address
@@ -114,14 +115,24 @@ export async function syncUserFromCukiesDb(
         },
       });
     } else {
-      // Crear nuevo usuario con datos sincronizados
+      // Crear nuevo usuario con datos sincronizados usando MongoDB directamente
       // Si no hay username, usar el wallet address (normalizado)
       if (!syncData.username) {
         syncData.username = normalizedAddress;
       }
 
-      return await prisma.user.create({
-        data: syncData,
+      // Create user directly in MongoDB to avoid transaction issues
+      const newUserId = await createUserDirectly({
+        walletAddress: normalizedAddress,
+        username: syncData.username,
+        email: syncData.email,
+        isUsernameSet: syncData.isUsernameSet,
+        bio: syncData.bio,
+      });
+
+      // Fetch the created user with Prisma to get the full object with relations
+      return await prisma.user.findUnique({
+        where: { id: newUserId },
         include: {
           lastCheckIn: true,
           completedQuests: {
