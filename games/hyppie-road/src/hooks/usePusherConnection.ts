@@ -566,7 +566,7 @@ function getParentOrigin(): string {
   }
   
   // Fallback to environment variable or default
-  const fallbackOrigin = process.env.NEXT_PUBLIC_PARENT_URL || 'https://hyppieliquid.com';
+  const fallbackOrigin = process.env.NEXT_PUBLIC_PARENT_URL || 'https://cukiesworld.com';
   console.log('🔧 [GAME-PUSHER] Using fallback parent origin:', fallbackOrigin);
   return fallbackOrigin;
 }

@@ -30,7 +30,7 @@ En el Dashboard de Pusher:
    http://localhost:3000
    http://localhost:9002
    http://localhost:9003
-   https://hyppieliquid.com
+   https://cukiesworld.com
    https://*.vercel.app
    ```
 

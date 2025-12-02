@@ -160,7 +160,7 @@ function ReferralsView() {
           <div className="text-center">
               <h1 className="text-3xl font-bold font-headline">Referrals</h1>
               <p className="text-muted-foreground mt-2">
-              Invite friends to HyppieLiquid and earn rewards when they play.
+              Invite friends to Cukies World and earn rewards when they play.
               </p>
           </div>
 

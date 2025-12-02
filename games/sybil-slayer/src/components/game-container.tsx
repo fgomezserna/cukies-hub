@@ -1016,7 +1016,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               // Generar URL del dapp con el juego embebido y sala específica
               const baseUrl = process.env.NODE_ENV === 'development' 
                 ? 'http://localhost:3000/games/sybil-slayer'
-                : 'https://hyppieliquid.com/games/sybil-slayer';
+                : 'https://cukiesworld.com/games/sybil-slayer';
               const invitationUrl = `${baseUrl}?room=${matchRoomId}`;
               
               // Copiar al portapapeles con fallbacks por políticas/iframes

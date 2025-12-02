@@ -9,7 +9,7 @@ export default function LandingHeader() {
         <div className="mr-4 flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Logo />
-            <span className="font-bold font-headline text-lg">HyppieLiquid</span>
+            <span className="font-bold font-headline text-lg">Cukies World</span>
           </Link>
           <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
             <Link href="/games" className="text-muted-foreground transition-colors hover:text-foreground">

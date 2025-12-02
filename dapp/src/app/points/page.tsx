@@ -688,7 +688,7 @@ function PointsView() {
                     </CardContent>
                 </Card>
                 
-                {/* HyppieLiquid Stats Card */}
+                {/* Cukies World Stats Card */}
                 <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
                     <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5 pointer-events-none" />
                     
@@ -699,7 +699,7 @@ function PointsView() {
                             </div>
                         </div>
                         <CardTitle className="text-lg font-bold text-foreground">
-                          ✨ HyppieLiquid
+                          ✨ Cukies World
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="text-center space-y-4">

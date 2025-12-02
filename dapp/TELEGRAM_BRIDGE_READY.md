@@ -49,7 +49,7 @@ curl -X POST http://localhost:3000/api/chat/sync-telegram
 4. ✅ **Debería aparecer automáticamente en el topic correspondiente de Telegram**
 
 ### Desde Telegram:
-1. Ve al grupo "HyppieLiquid ☮️"
+1. Ve al grupo "Cukies World ☮️"
 2. Envía un mensaje en el topic correspondiente:
    - Topic 1532 → Sybil Slayer / Tower Builder
    - Topic 4 → Hyppie Road

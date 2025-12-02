@@ -14,7 +14,7 @@
 
 - Primary color: Teal (#008080) for a Web3 foundation.
 - Background color: Dark gray (#253533), 20% saturation.
-- Accent color: Neon green (#44edd6) for highlights and interactive elements. Colors may be improved to match the tone of https://hyppieliquid.com/.
+- Accent color: Neon green (#44edd6) for highlights and interactive elements. Colors may be improved to match the tone of https://cukiesworld.com/.
 - Headline font: 'Space Grotesk' sans-serif for a computerized feel; body font: 'Inter' sans-serif for longer text.
 - Use clean, modern icons in neon green to complement the dark theme.
 - Sidebar should be expandable/collapsible to maximize content display. Use luck.io as main design reference.

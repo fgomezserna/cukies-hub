@@ -77,8 +77,8 @@ export default function Header() {
       {(isMobile || state === 'collapsed') && (
         <div className="flex items-center gap-2 group">
             {/* En móvil muestra icono + texto, en desktop colapsado solo texto */}
-            {isMobile && <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />}
-            <Image src={hyppieletters} alt="HyppieLiquid" height={52} />
+            {isMobile && <Image src={hyppieicon} alt="Cukies World" width={52} height={32} />}
+            <Image src={hyppieletters} alt="Cukies World" height={52} />
         </div>
       )}
 
@@ -108,7 +108,7 @@ export default function Header() {
                           <AvatarFallback className="bg-gradient-to-br from-green-400 to-emerald-500 text-white font-bold">HL</AvatarFallback>
                       </Avatar>
                       <div className="grid gap-1">
-                          <p className="text-sm font-medium text-foreground">Welcome to HyppieLiquid! 🎉</p>
+                          <p className="text-sm font-medium text-foreground">Welcome to Cukies World! 🎉</p>
                           <p className="text-sm text-muted-foreground">Complete your first quest to earn bonus points.</p>
                       </div>
                   </div>

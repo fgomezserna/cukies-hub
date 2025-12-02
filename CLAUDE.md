@@ -105,7 +105,7 @@ Uses NextAuth v5 with:
 - Primary: Teal (#008080)
 - Background: Dark gray (#253533)
 - Accent: Neon green (#44edd6)
-- Reference: https://hyppieliquid.com/
+- Reference: https://cukiesworld.com/
 
 ### Typography
 - Headlines: 'Space Grotesk' sans-serif

@@ -36,10 +36,10 @@ const SidebarLogo = () => {
   
   return (
     <div className="flex items-center gap-3 p-1">
-      <Image src={hyppieicon} alt="HyppieLiquid" width={52} height={32} />
+      <Image src={hyppieicon} alt="Cukies World" width={52} height={32} />
       <Image 
         src={hyppieletters} 
-        alt="HyppieLiquid" 
+        alt="Cukies World" 
         height={52} 
         className={`transition-opacity duration-200 ${
           state === 'collapsed' ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
@@ -172,7 +172,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center space-y-1">
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-cyan-500/10 hover:shadow-md hover:shadow-blue-500/20">
-                        <a href="https://x.com/hyppieliquid" target="_blank" rel="noopener noreferrer">
+                        <a href="https://x.com/cukiesworld" target="_blank" rel="noopener noreferrer">
                           <div className="flex items-center gap-3">
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-cyan-500/20 group-hover:from-blue-400/30 group-hover:to-cyan-500/30 transition-all">
                               <XIcon className="h-3 w-3 text-blue-400 group-hover:text-cyan-400 transition-colors" />
@@ -184,7 +184,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-indigo-500/10 hover:shadow-md hover:shadow-blue-500/20">
-                        <a href="https://t.me/HyppieLiquid" target="_blank" rel="noopener noreferrer">
+                        <a href="https://t.me/Cukies World" target="_blank" rel="noopener noreferrer">
                           <div className="flex items-center gap-3">
                             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400/20 to-indigo-500/20 group-hover:from-blue-400/30 group-hover:to-indigo-500/30 transition-all">
                               <Send className="h-3 w-3 text-blue-400 group-hover:text-indigo-400 transition-colors" />

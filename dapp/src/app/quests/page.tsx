@@ -1074,13 +1074,13 @@ function ConnectAccountTask({ text, completed, onVerify, disabled, taskType = 'a
     switch (taskType) {
       case 'twitter_follow':
         return {
-          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/intent/follow?screen_name=hyppieliquid',
+          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/intent/follow?screen_name=cukiesworld',
           text: 'Follow on X',
           description: 'Follow us on X (Twitter) first, then connect your account'
         };
       case 'twitter_like_rt':
         return {
-          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/hyppieliquid',
+          url: process.env.NEXT_PUBLIC_TWITTER_PROFILE_URL || 'https://x.com/cukiesworld',
           text: 'Go to X Profile',
           description: 'Visit our X profile to like and retweet our pinned post'
         };
