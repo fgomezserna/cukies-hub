@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { processReferralByUsername } from '@/lib/referrals';
+import { findOrSyncUserFromCukies } from '@/lib/user-sync';
 import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -30,17 +31,28 @@ export async function POST(request: Request) {
 
     if (!user) {
       try {
-        // Check for referrer username in cookies
-        const cookieStore = await cookies();
-        const referrerUsername = cookieStore.get('referrerUsername')?.value;
-        console.log('🔍 Checking for referrer cookie:', referrerUsername);
+        // Primero buscar en la BD cukies y sincronizar si existe
+        console.log('🔍 Buscando usuario en BD cukies...');
+        const syncedUser = await findOrSyncUserFromCukies(lowercasedAddress);
         
-        const newUser = await prisma.user.create({
-          data: {
-            walletAddress: lowercasedAddress,
-            username: lowercasedAddress, // Use the entire wallet address as unique username
-          },
-        });
+        if (syncedUser) {
+          console.log('✅ Usuario sincronizado desde BD cukies');
+          user = syncedUser;
+        } else {
+          // Si no existe en cukies, crear nuevo usuario
+          console.log('📝 Usuario no encontrado en BD cukies, creando nuevo...');
+          
+          // Check for referrer username in cookies
+          const cookieStore = await cookies();
+          const referrerUsername = cookieStore.get('referrerUsername')?.value;
+          console.log('🔍 Checking for referrer cookie:', referrerUsername);
+          
+          const newUser = await prisma.user.create({
+            data: {
+              walletAddress: lowercasedAddress,
+              username: lowercasedAddress, // Use the entire wallet address as unique username
+            },
+          });
 
         // Process referral if username exists
         if (referrerUsername) {

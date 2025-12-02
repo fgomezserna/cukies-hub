@@ -4,11 +4,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAccount, useDisconnect, useConnect } from 'wagmi';
 import { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useTronLink } from '@/hooks/use-tronlink';
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   isWaitingForApproval: boolean;
+  walletType: 'evm' | 'tron' | null;
   fetchUser: () => void; // Function to allow components to trigger a refetch
 };
 
@@ -18,17 +20,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const { connect, connectors } = useConnect();
+  const [walletType, setWalletType] = useState<'evm' | 'tron' | null>(null);
+  
+  // EVM wallets (MetaMask, etc.)
+  const { address: evmAddress, isConnected: isEvmConnected } = useAccount();
+  const { disconnect: disconnectEvm } = useDisconnect();
+  const { connect: connectEvm, connectors } = useConnect();
+  
+  // TronLink
+  const { address: tronAddress, isConnected: isTronConnected, connect: connectTron, disconnect: disconnectTron } = useTronLink();
+  
   const { toast } = useToast();
-  const previousAddressRef = useRef<string | undefined>(address);
+  const previousAddressRef = useRef<string | undefined>(evmAddress || tronAddress || undefined);
 
-  const fetchUser = useCallback(async () => {
-    if (!isConnected || !address) {
+  // Determine current wallet address and type
+  const currentAddress = isEvmConnected ? evmAddress : (isTronConnected ? tronAddress : null);
+  const isConnected = isEvmConnected || isTronConnected;
+
+  const fetchUser = useCallback(async (walletAddress?: string) => {
+    const addressToUse = walletAddress || currentAddress;
+    
+    if (!isConnected || !addressToUse) {
         setUser(null);
         setIsLoading(false);
         setIsWaitingForApproval(false);
+        setWalletType(null);
         return;
     }
 
@@ -38,25 +54,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address }),
+        body: JSON.stringify({ walletAddress: addressToUse }),
       });
 
       if (!response.ok) throw new Error('Login failed');
 
       const userData = await response.json();
       setUser(userData);
+      setWalletType(isEvmConnected ? 'evm' : 'tron');
       
       // Show success toast if we were waiting for approval
       if (isWaitingForApproval) {
         toast({
           title: "Wallet Connected",
-          description: `Successfully connected to ${address?.slice(0, 6)}...${address?.slice(-4)}`,
+          description: `Successfully connected to ${addressToUse?.slice(0, 6)}...${addressToUse?.slice(-4)}`,
         });
       }
     } catch (error) {
       console.error(error);
       setUser(null);
-      disconnect();
+      setWalletType(null);
+      
+      // Disconnect the appropriate wallet
+      if (isEvmConnected) disconnectEvm();
+      if (isTronConnected) disconnectTron();
       
       // Show error toast
       toast({
@@ -67,7 +88,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [address, isConnected, disconnect, toast]); // Removed isWaitingForApproval dependency
+  }, [currentAddress, isConnected, isEvmConnected, isTronConnected, disconnectEvm, disconnectTron, toast, isWaitingForApproval]);
 
   useEffect(() => {
     fetchUser();
@@ -75,25 +96,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Enhanced wallet change detection effect
   useEffect(() => {
-    console.log('useAccount hook update:', {
-      address,
+    console.log('Wallet hook update:', {
+      evmAddress,
+      tronAddress,
+      currentAddress,
       isConnected,
       previousAddress: previousAddressRef.current
     });
 
     // Skip on initial render
     if (previousAddressRef.current === undefined) {
-      previousAddressRef.current = address;
+      previousAddressRef.current = currentAddress || undefined;
       return;
     }
 
     // Detect wallet change
-    const hasWalletChanged = previousAddressRef.current !== address;
+    const hasWalletChanged = previousAddressRef.current !== currentAddress;
     
     if (hasWalletChanged) {
       console.log('🔄 Wallet change detected:', {
         previous: previousAddressRef.current,
-        current: address,
+        current: currentAddress,
         isConnected
       });
 
@@ -102,31 +125,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
 
       // Update reference for next comparison
-      previousAddressRef.current = address;
+      previousAddressRef.current = currentAddress || undefined;
 
       // If there's a new wallet connected, fetch user data (login)
-      if (isConnected && address) {
-        console.log('🔐 Logging in with new wallet:', address);
+      if (isConnected && currentAddress) {
+        console.log('🔐 Logging in with new wallet:', currentAddress);
         fetchUser();
       } else {
         // If disconnected, just finish loading
         console.log('🔓 Wallet disconnected, finishing logout');
         setIsLoading(false);
+        setWalletType(null);
       }
     }
-  }, [address, isConnected, fetchUser]);
+  }, [evmAddress, tronAddress, currentAddress, isConnected, fetchUser]);
 
-  // Direct wallet event listener as backup
+  // Direct wallet event listener as backup (EVM wallets)
   useEffect(() => {
     if (typeof window !== 'undefined' && window.ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
         console.log('🔄 Direct accountsChanged event:', accounts);
-        console.log('Current wagmi address:', address);
+        console.log('Current wagmi address:', evmAddress);
         console.log('Previous address:', previousAddressRef.current);
         
         // Force a manual check if wagmi hasn't updated yet
         const newAddress = accounts[0]?.toLowerCase();
-        if (newAddress && newAddress !== address && newAddress !== previousAddressRef.current) {
+        if (newAddress && newAddress !== evmAddress && newAddress !== previousAddressRef.current) {
           console.log('⚠️ Direct event detected change before wagmi update');
           
           // Force disconnect and reconnect to trigger authorization popup
@@ -139,13 +163,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             description: "Please approve the connection to your new wallet in the popup.",
           });
           
-          disconnect();
+          disconnectEvm();
           
           // Wait a moment for disconnect to complete, then reconnect
           setTimeout(() => {
             if (connectors.length > 0) {
               console.log('🔌 Reconnecting with first connector');
-              connect({ connector: connectors[0] });
+              connectEvm({ connector: connectors[0] });
             }
           }, 100);
         }
@@ -163,9 +187,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         window.ethereum.removeListener('chainChanged', handleChainChanged);
       };
     }
-  }, [address, disconnect, connect, connectors, toast]);
+  }, [evmAddress, disconnectEvm, connectEvm, connectors, toast]);
 
-  // Additional polling mechanism for more reliable wallet change detection
+  // Additional polling mechanism for more reliable wallet change detection (EVM only)
   useEffect(() => {
     if (typeof window !== 'undefined' && window.ethereum) {
       const pollWalletAccounts = async () => {
@@ -174,9 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const currentAccount = accounts[0]?.toLowerCase();
           
           // Only log if there's an actual change and we haven't logged it recently
-          if (currentAccount && currentAccount !== address && currentAccount !== previousAddressRef.current) {
-           
-            
+          if (currentAccount && currentAccount !== evmAddress && currentAccount !== previousAddressRef.current) {
             // This will trigger the useEffect above when wagmi updates
             // We just log here to help with debugging
           }
@@ -188,7 +210,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Poll every 5 seconds when connected (reduced frequency)
       let interval: NodeJS.Timeout;
-      if (isConnected) {
+      if (isEvmConnected) {
         interval = setInterval(pollWalletAccounts, 5000);
       }
 
@@ -198,10 +220,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       };
     }
-  }, [address, isConnected]);
+  }, [evmAddress, isEvmConnected]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isWaitingForApproval, fetchUser }}>
+    <AuthContext.Provider value={{ user, isLoading, isWaitingForApproval, walletType, fetchUser }}>
       {children}
     </AuthContext.Provider>
   );
