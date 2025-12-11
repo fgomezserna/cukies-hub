@@ -36,7 +36,7 @@ export default function GamesPage() {
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-6">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
               🎮 Game Center
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -45,10 +45,10 @@ export default function GamesPage() {
           </div>
           
           <div className="relative w-full max-w-md mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-green-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-pink-500" />
             <Input
               placeholder="🔍 Search games..."
-              className="pl-12 py-3 rounded-xl border-2 border-green-500/20 bg-card/50 backdrop-blur-sm focus:border-green-400/50 focus:ring-2 focus:ring-green-400/20 transition-all duration-300"
+              className="pl-12 py-3 rounded-xl border-2 border-pink-600/20 bg-card/50 backdrop-blur-sm focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all duration-300"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -62,7 +62,7 @@ export default function GamesPage() {
               className={cn(
                 "group relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all duration-500",
                 game.playable
-                  ? "border-green-500/20 bg-gradient-to-br from-card to-card/50 hover:border-green-400/40 hover:scale-105 hover:shadow-xl hover:shadow-green-500/20"
+                  ? "border-pink-600/20 bg-gradient-to-br from-card to-card/50 hover:border-pink-500/40 hover:scale-105 hover:shadow-xl hover:shadow-pink-600/20"
                   : "border-gray-500/20 bg-gradient-to-br from-card/50 to-card/30 cursor-not-allowed"
               )}
             >
@@ -109,7 +109,7 @@ export default function GamesPage() {
                 {game.playable ? (
                   <Button 
                     asChild 
-                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/30"
+                    className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-bold py-3 rounded-xl shadow-lg shadow-pink-600/20 transition-all duration-300 hover:shadow-xl hover:shadow-pink-600/30"
                   >
                     <Link href={game.href!}>
                       🎮 Play Now

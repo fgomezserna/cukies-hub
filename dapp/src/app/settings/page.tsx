@@ -309,14 +309,14 @@ export default function SettingsPage() {
       <AppLayout>
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent mb-4">
               ⚙️ Settings
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Manage your account and profile settings
             </p>
           </div>
-          <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+          <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
             <CardContent className="p-8 text-center">
               <div className="text-6xl mb-4">🔒</div>
               <h2 className="text-2xl font-bold font-headline mb-4">Connect Your Wallet</h2>
@@ -336,7 +336,7 @@ export default function SettingsPage() {
       <div className="max-w-4xl mx-auto flex flex-col gap-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent mb-4">
             ⚙️ Settings
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -346,17 +346,17 @@ export default function SettingsPage() {
 
         {/* Settings Tabs */}
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-2xl p-1">
+          <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-pink-600/10 to-pink-600/10 border border-pink-600/20 rounded-2xl p-1">
             <TabsTrigger 
               value="profile" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <User className="h-4 w-4 mr-2" />
               Profile
             </TabsTrigger>
             <TabsTrigger 
               value="preferences" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <SettingsIcon className="h-4 w-4 mr-2" />
               Preferences
@@ -365,10 +365,10 @@ export default function SettingsPage() {
 
           <TabsContent value="profile" className="mt-6">
             <form onSubmit={handleSubmit}>
-              <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+              <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-green-400" />
+                    <User className="h-5 w-5 text-pink-500" />
                     Public Profile
                   </CardTitle>
                   <CardDescription>
@@ -381,13 +381,13 @@ export default function SettingsPage() {
                     <div className="relative group">
                       <Avatar className="h-24 w-24 border-4 border-primary shadow-lg shadow-primary/20 transition-all duration-300 group-hover:scale-105">
                         <AvatarImage src={displayAvatar} alt={profile.username || 'User'} />
-                        <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-green-400 to-emerald-500">
+                        <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-pink-500 to-pink-600">
                           {avatarFallback}
                         </AvatarFallback>
                       </Avatar>
                       <label 
                         htmlFor="avatar-upload" 
-                        className="absolute bottom-0 right-0 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white p-2 rounded-full shadow-lg shadow-green-500/20 cursor-pointer transition-all duration-300 hover:scale-110 hover:shadow-xl"
+                        className="absolute bottom-0 right-0 bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white p-2 rounded-full shadow-lg shadow-pink-600/20 cursor-pointer transition-all duration-300 hover:scale-110 hover:shadow-xl"
                       >
                         <Camera className="h-4 w-4" />
                         <span className="sr-only">Change photo</span>
@@ -419,7 +419,7 @@ export default function SettingsPage() {
                           onChange={handleInputChange('username')}
                           placeholder="Enter your username"
                           disabled={profile.isUsernameSet}
-                          className={`border-green-500/20 focus:border-green-400 bg-card/50 backdrop-blur-sm ${
+                          className={`border-pink-600/20 focus:border-pink-500 bg-card/50 backdrop-blur-sm ${
                             profile.isUsernameSet ? 'opacity-60 cursor-not-allowed' : ''
                           }`}
                         />
@@ -432,7 +432,7 @@ export default function SettingsPage() {
                         {usernameValidation.message && (
                           <p className={`text-xs flex items-center gap-1 ${
                             usernameValidation.isValid 
-                              ? 'text-green-500' 
+                              ? 'text-pink-600' 
                               : usernameValidation.isValid === false 
                                 ? 'text-red-500' 
                                 : 'text-muted-foreground'
@@ -460,7 +460,7 @@ export default function SettingsPage() {
                           value={profile.email || ''} 
                           onChange={handleInputChange('email')}
                           placeholder="Enter your email"
-                          className="border-green-500/20 focus:border-green-400 bg-card/50 backdrop-blur-sm"
+                          className="border-pink-600/20 focus:border-pink-500 bg-card/50 backdrop-blur-sm"
                         />
                       </div>
                     </div>
@@ -477,7 +477,7 @@ export default function SettingsPage() {
                       value={profile.bio || ''}
                       onChange={handleInputChange('bio')}
                       rows={3}
-                      className="border-green-500/20 focus:border-green-400 bg-card/50 backdrop-blur-sm resize-none"
+                      className="border-pink-600/20 focus:border-pink-500 bg-card/50 backdrop-blur-sm resize-none"
                     />
                     <p className="text-xs text-muted-foreground">
                       Max 200 characters. This will be visible on your public profile.
@@ -488,7 +488,7 @@ export default function SettingsPage() {
                     <Button 
                       type="submit" 
                       disabled={saving}
-                      className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-green-500/20 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-green-500/30"
+                      className="bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-pink-600/20 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-pink-600/30"
                     >
                       {saving ? (
                         <>
@@ -509,7 +509,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="preferences" className="mt-6">
-            <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+            <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <SettingsIcon className="h-5 w-5 text-blue-400" />

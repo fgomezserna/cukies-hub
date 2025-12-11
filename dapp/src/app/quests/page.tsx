@@ -96,22 +96,22 @@ const TaskItem = ({ text, completed, onVerify, disabled, taskType = 'auto_verify
   <div className={cn(
     "flex items-center gap-4 py-4 px-5 rounded-xl transition-all duration-300 border-2",
     completed 
-      ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30" 
+      ? "bg-gradient-to-r from-pink-600/10 to-pink-600/10 border-pink-600/30" 
       : "bg-gradient-to-r from-blue-500/5 to-cyan-500/5 border-blue-500/20 hover:border-blue-400/40"
   )}>
     <div className={cn(
       "p-1 rounded-full",
-      completed ? "bg-green-500/20" : "bg-blue-500/20"
+      completed ? "bg-pink-600/20" : "bg-blue-500/20"
     )}>
       {completed ? (
-        <CheckCircle2 className="h-5 w-5 text-green-400" /> 
+        <CheckCircle2 className="h-5 w-5 text-pink-500" /> 
       ) : (
         <Circle className="h-5 w-5 text-blue-400" />
       )}
     </div>
     <span className={cn(
       "flex-1 font-medium",
-      completed ? 'text-green-400' : 'text-foreground'
+      completed ? 'text-pink-500' : 'text-foreground'
     )}>
       {text}
     </span>
@@ -121,7 +121,7 @@ const TaskItem = ({ text, completed, onVerify, disabled, taskType = 'auto_verify
       className={cn(
         "transition-all duration-300 font-semibold px-4 py-2 rounded-lg",
         completed 
-          ? "border-green-500/30 text-green-400 hover:bg-green-500/10" 
+          ? "border-pink-600/30 text-pink-500 hover:bg-pink-600/10" 
           : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
       )}
       disabled={completed || disabled || isLoading} 
@@ -176,7 +176,7 @@ function UsernameTask({ task, onVerify, disabled, isLoading = false, user }: { t
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
         <Circle className="h-5 w-5 text-muted-foreground" />
         <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
-        <span className="text-sm text-green-500">Username: {user.username}</span>
+        <span className="text-sm text-pink-600">Username: {user.username}</span>
         <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
           {isLoading ? (
             <>
@@ -412,7 +412,7 @@ function EmailTask({ task, onVerify, disabled, isLoading = false, user }: { task
       <div className="flex items-center gap-3 py-2 px-4 rounded-md bg-muted/50">
         <Circle className="h-5 w-5 text-muted-foreground" />
         <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
-        <span className="text-sm text-green-500">Email: {user.email}</span>
+        <span className="text-sm text-pink-600">Email: {user.email}</span>
         <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading || isSending}>
           {isSending ? (
             <>
@@ -553,7 +553,7 @@ function ProfilePictureTask({ task, onVerify, disabled, isLoading = false, user 
         <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
         <div className="flex items-center gap-2">
           <img src={user.profilePictureUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover" />
-          <span className="text-sm text-green-500">Picture set</span>
+          <span className="text-sm text-pink-600">Picture set</span>
         </div>
         <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
           {isLoading ? (
@@ -1021,7 +1021,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
                   className="shrink-0"
                 >
                   {codeCopied ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-pink-700" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
@@ -1431,7 +1431,7 @@ function QuestsView() {
       <div className={cn("flex flex-col gap-8", isLocked && 'blur-sm pointer-events-none')}>
         {/* Header moderno */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
             🏆 Mission Center
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -1439,7 +1439,7 @@ function QuestsView() {
           </p>
           <div className="flex justify-center items-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
-              <CheckCircle2 className="h-4 w-4 text-green-400" />
+              <CheckCircle2 className="h-4 w-4 text-pink-500" />
               {completedQuestsCount} Completed
             </span>
             <span className="flex items-center gap-1">
@@ -1523,10 +1523,10 @@ function QuestsView() {
 
         <div className="relative">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className={cn("grid w-full grid-cols-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-2xl p-1", isQuestsLocked && 'blur-sm pointer-events-none')}>
+            <TabsList className={cn("grid w-full grid-cols-3 bg-gradient-to-r from-pink-600/10 to-pink-600/10 border border-pink-600/20 rounded-2xl p-1", isQuestsLocked && 'blur-sm pointer-events-none')}>
               <TabsTrigger 
                 value="all"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
               >
                 📋 All
               </TabsTrigger>
@@ -1553,7 +1553,7 @@ function QuestsView() {
                         className={cn(
                           "border-2 rounded-2xl overflow-hidden transition-all duration-500 hover:shadow-lg",
                           quest.isCompleted 
-                            ? "border-green-500/30 bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:shadow-green-500/20" 
+                            ? "border-pink-600/30 bg-gradient-to-br from-pink-600/5 to-pink-600/5 hover:shadow-pink-600/20" 
                             : "border-blue-500/20 bg-gradient-to-br from-card to-card/50 hover:border-blue-400/40 hover:shadow-blue-500/20",
                           quest.isLocked && "border-gray-500/20 bg-gradient-to-br from-card/50 to-card/30"
                         )}
@@ -1564,7 +1564,7 @@ function QuestsView() {
                                 <div className={cn(
                                   "p-3 rounded-2xl transition-all duration-300 group-hover:scale-110",
                                   quest.isCompleted 
-                                    ? "bg-gradient-to-br from-green-400 to-emerald-500" 
+                                    ? "bg-gradient-to-br from-pink-500 to-pink-600" 
                                     : quest.isLocked 
                                       ? "bg-gradient-to-br from-gray-400 to-gray-500"
                                       : "bg-gradient-to-br from-blue-400 to-cyan-500"
@@ -1584,7 +1584,7 @@ function QuestsView() {
                               <div className="text-left flex-1">
                                   <p className={cn(
                                     "font-bold text-lg transition-colors",
-                                    quest.isCompleted ? "text-green-400" : "text-foreground group-hover:text-primary"
+                                    quest.isCompleted ? "text-pink-500" : "text-foreground group-hover:text-primary"
                                   )}>
                                     {quest.title}
                                   </p>
@@ -1597,15 +1597,15 @@ function QuestsView() {
                                     className={cn(
                                       "font-mono text-base py-1 px-3 rounded-xl font-bold",
                                       quest.isCompleted 
-                                        ? "bg-green-500/20 text-green-400 border border-green-400/30"
+                                        ? "bg-pink-600/20 text-pink-500 border border-pink-500/30"
                                         : "bg-blue-500/20 text-blue-400 border border-blue-400/30"
                                     )}
                                   >
                                       💎 {quest.xp} XP
                                   </Badge>
                                   {quest.isCompleted && (
-                                    <div className="p-2 rounded-full bg-green-500/20">
-                                      <CheckCircle2 className="h-6 w-6 text-green-400" />
+                                    <div className="p-2 rounded-full bg-pink-600/20">
+                                      <CheckCircle2 className="h-6 w-6 text-pink-500" />
                                     </div>
                                   )}
                               </div>
@@ -1658,7 +1658,7 @@ function QuestsView() {
                                 className={cn(
                                   "w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:hover:scale-100",
                                   quest.isCompleted 
-                                    ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-green-500/30 hover:shadow-green-500/40"
+                                    ? "bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white shadow-pink-600/30 hover:shadow-pink-600/40"
                                     : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-blue-500/30 hover:shadow-blue-500/40"
                                 )}
                               >

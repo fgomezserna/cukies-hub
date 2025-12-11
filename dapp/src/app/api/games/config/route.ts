@@ -16,7 +16,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
       { xp: 20000, name: 'Hyperliquid Veteran', icon: 'Medal', color: 'text-purple-400' },
       { xp: 10000, name: 'Sybil Slayer', icon: 'Trophy', color: 'text-orange-400' },
       { xp: 5000, name: 'Experimented Hyppie', icon: 'Star', color: 'text-blue-400' },
-      { xp: 2500, name: 'Explorer', icon: 'Star', color: 'text-green-400' },
+      { xp: 2500, name: 'Explorer', icon: 'Star', color: 'text-pink-500' },
     ],
     leaderboardTitle: 'Top Slayers',
     playInstructions: [
@@ -44,7 +44,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
       { xp: 20000, name: 'Highway Master', icon: 'Medal', color: 'text-purple-400' },
       { xp: 10000, name: 'Speed Demon', icon: 'Trophy', color: 'text-orange-400' },
       { xp: 5000, name: 'Experienced Driver', icon: 'Gamepad2', color: 'text-blue-400' },
-      { xp: 2500, name: 'Road Explorer', icon: 'Star', color: 'text-green-400' },
+      { xp: 2500, name: 'Road Explorer', icon: 'Star', color: 'text-pink-500' },
     ],
     leaderboardTitle: 'Top Riders',
     playInstructions: [
@@ -72,7 +72,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
       { xp: 20000, name: 'Building Expert', icon: 'Medal', color: 'text-purple-400' },
       { xp: 10000, name: 'Tower Master', icon: 'Trophy', color: 'text-orange-400' },
       { xp: 5000, name: 'Skilled Builder', icon: 'Star', color: 'text-blue-400' },
-      { xp: 2500, name: 'Construction Worker', icon: 'Star', color: 'text-green-400' },
+      { xp: 2500, name: 'Construction Worker', icon: 'Star', color: 'text-pink-500' },
     ],
     leaderboardTitle: 'Top Hyppie Builders',
     playInstructions: [

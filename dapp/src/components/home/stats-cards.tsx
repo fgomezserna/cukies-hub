@@ -55,7 +55,7 @@ export default function StatsCards() {
             title: 'My XP',
             value: loading ? '--' : (user?.xp.toLocaleString() ?? '--'),
             icon: Star,
-            gradient: 'from-emerald-400 to-green-500',
+            gradient: 'from-pink-500 to-pink-600',
             iconColor: 'text-white',
             backgroundImage: ExpImg
         },
@@ -90,7 +90,7 @@ export default function StatsCards() {
             {stats.map((stat, index) => (
                 <Card 
                     key={index} 
-                    className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40"
+                    className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40"
                 >
                     {/* Background Image with filters */}
                     <div className="absolute inset-0 z-0">

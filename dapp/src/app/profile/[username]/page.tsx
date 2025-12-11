@@ -166,7 +166,7 @@ export default function ProfilePage() {
       <div className="max-w-5xl mx-auto flex flex-col gap-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent mb-4">
             👤 Player Profile
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -175,7 +175,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Profile Header Card */}
-        <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+        <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
           <CardContent className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-primary shadow-lg shadow-primary/20">
@@ -183,7 +183,7 @@ export default function ProfilePage() {
                   src={profile.profilePictureUrl || 'https://placehold.co/150x150.png?text=' + profile.username.charAt(0)} 
                   alt={profile.username}
                 />
-                <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-green-400 to-emerald-500">
+                <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-pink-500 to-pink-600">
                   {profile.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -198,7 +198,7 @@ export default function ProfilePage() {
                     <Medal className="h-4 w-4 mr-1" />
                     {profile.tier} Tier
                   </Badge>
-                  <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">
+                  <Badge variant="secondary" className="bg-pink-600/10 text-pink-500 border-pink-600/20">
                     <Star className="h-4 w-4 mr-1" />
                     {profile.xp.toLocaleString()} XP
                   </Badge>
@@ -217,10 +217,10 @@ export default function ProfilePage() {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20">
+          <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Games Played</CardTitle>
-              <Gamepad2 className="h-4 w-4 text-green-400" />
+              <Gamepad2 className="h-4 w-4 text-pink-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{profile.stats.totalGamesPlayed}</div>
@@ -272,24 +272,24 @@ export default function ProfilePage() {
 
         {/* Detailed Stats Tabs */}
         <Tabs defaultValue="activity" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-2xl p-1">
+          <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-pink-600/10 to-pink-600/10 border border-pink-600/20 rounded-2xl p-1">
             <TabsTrigger 
               value="activity" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <Clock className="h-4 w-4 mr-2" />
               Activity
             </TabsTrigger>
             <TabsTrigger 
               value="achievements" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <Trophy className="h-4 w-4 mr-2" />
               Achievements
             </TabsTrigger>
             <TabsTrigger 
               value="stats" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <BarChart className="h-4 w-4 mr-2" />
               Stats
@@ -297,7 +297,7 @@ export default function ProfilePage() {
           </TabsList>
 
           <TabsContent value="activity" className="mt-6">
-            <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+            <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
               <CardHeader>
                 <CardTitle>Recent Game Activity</CardTitle>
                 <CardDescription>Latest games played by {profile.username}</CardDescription>
@@ -305,7 +305,7 @@ export default function ProfilePage() {
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-green-500/20">
+                    <TableRow className="border-pink-600/20">
                       <TableHead>Game</TableHead>
                       <TableHead>Score</TableHead>
                       <TableHead>Result</TableHead>
@@ -314,11 +314,11 @@ export default function ProfilePage() {
                   </TableHeader>
                   <TableBody>
                     {profile.recentActivity.length > 0 ? profile.recentActivity.map((activity, index) => (
-                      <TableRow key={index} className="border-green-500/10 hover:bg-green-500/5">
+                      <TableRow key={index} className="border-pink-600/10 hover:bg-pink-600/5">
                         <TableCell className="font-medium">{formatGameId(activity.gameId)}</TableCell>
                         <TableCell className="font-mono text-primary">{activity.score.toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge variant={activity.won ? "default" : "secondary"} className={activity.won ? "bg-green-500/20 text-green-400" : ""}>
+                          <Badge variant={activity.won ? "default" : "secondary"} className={activity.won ? "bg-pink-600/20 text-pink-500" : ""}>
                             {activity.won ? "Won" : "Lost"}
                           </Badge>
                         </TableCell>
@@ -341,7 +341,7 @@ export default function ProfilePage() {
 
           <TabsContent value="achievements" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2">
-              <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+              <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-yellow-400" />
@@ -352,9 +352,9 @@ export default function ProfilePage() {
                   {profile.achievements.questsCompleted.length > 0 ? (
                     <div className="space-y-3">
                       {profile.achievements.questsCompleted.slice(0, 5).map((quest, index) => (
-                        <div key={index} className="flex justify-between items-center p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                        <div key={index} className="flex justify-between items-center p-3 rounded-lg bg-pink-600/5 border border-pink-600/10">
                           <span className="font-medium">{quest.title}</span>
-                          <Badge variant="secondary" className="bg-green-500/20 text-green-400">
+                          <Badge variant="secondary" className="bg-pink-600/20 text-pink-500">
                             +{quest.xp} XP
                           </Badge>
                         </div>
@@ -368,7 +368,7 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+              <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-400" />
@@ -383,7 +383,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Referral Rewards</span>
-                      <span className="text-2xl font-bold text-green-400">
+                      <span className="text-2xl font-bold text-pink-500">
                         {profile.stats.referralRewards}
                       </span>
                     </div>
@@ -395,7 +395,7 @@ export default function ProfilePage() {
 
           <TabsContent value="stats" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2">
-              <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+              <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle>Game Statistics</CardTitle>
                 </CardHeader>
@@ -415,7 +415,7 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
+              <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Coins className="h-5 w-5 text-yellow-400" />
@@ -426,7 +426,7 @@ export default function ProfilePage() {
                   {profile.pointHistory.length > 0 ? (
                     <div className="space-y-2">
                       {profile.pointHistory.slice(0, 3).map((transaction) => (
-                        <div key={transaction.id} className="flex justify-between items-center p-2 rounded bg-green-500/5">
+                        <div key={transaction.id} className="flex justify-between items-center p-2 rounded bg-pink-600/5">
                           <div>
                             <div className="text-sm font-medium">{transaction.reason}</div>
                             <div className="text-xs text-muted-foreground">
@@ -434,7 +434,7 @@ export default function ProfilePage() {
                             </div>
                           </div>
                           <Badge variant={transaction.amount > 0 ? "default" : "secondary"} 
-                                 className={transaction.amount > 0 ? "bg-green-500/20 text-green-400" : ""}>
+                                 className={transaction.amount > 0 ? "bg-pink-600/20 text-pink-500" : ""}>
                             {transaction.amount > 0 ? '+' : ''}{transaction.amount}
                           </Badge>
                         </div>
@@ -453,7 +453,7 @@ export default function ProfilePage() {
 
         {/* Back Button */}
         <div className="text-center">
-          <Button asChild variant="outline" size="lg" className="border-green-500/20 hover:bg-green-500/10">
+          <Button asChild variant="outline" size="lg" className="border-pink-600/20 hover:bg-pink-600/10">
             <Link href="/leaderboard">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Leaderboard

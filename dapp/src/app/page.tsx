@@ -25,7 +25,7 @@ export default function HomePage() {
   return (
     <AppLayout>
       <div className="flex flex-col gap-8">
-        <Card className="overflow-hidden relative border-2 border-green-500/30 shadow-2xl shadow-green-500/20 rounded-3xl group">
+        <Card className="overflow-hidden relative border-2 border-pink-600/30 shadow-2xl shadow-pink-600/20 rounded-3xl group">
           {/* Background image with overlay */}
           <Image 
             src={featuredGame.imageUrl} 
@@ -38,7 +38,7 @@ export default function HomePage() {
           
           {/* Multiple overlay gradients for better effect */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-green-900/40 via-transparent to-blue-900/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-pink-900/40 via-transparent to-blue-900/40" />
           
           {/* Animated glow effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 transform translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
@@ -46,7 +46,7 @@ export default function HomePage() {
           <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12">
             {/* Game badge */}
             <div className="mb-4">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg">
                 🎮 Featured Game
               </span>
             </div>
@@ -62,7 +62,7 @@ export default function HomePage() {
               <Button 
                 asChild 
                 size="lg" 
-                className="bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-xl shadow-green-500/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/40 border-0"
+                className="bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold py-4 px-8 rounded-xl shadow-xl shadow-pink-600/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-pink-600/40 border-0"
               >
                 <Link href={featuredGame.href!}>
                   🚀 Play Now! <Gamepad2 className="ml-2 h-5 w-5" />
@@ -83,8 +83,8 @@ export default function HomePage() {
           </div>
           
           {/* Corner decoration */}
-          <div className="absolute top-4 right-4 w-16 h-16 border-t-2 border-r-2 border-green-400/50 rounded-tr-lg" />
-          <div className="absolute bottom-4 left-4 w-16 h-16 border-b-2 border-l-2 border-green-400/50 rounded-bl-lg" />
+          <div className="absolute top-4 right-4 w-16 h-16 border-t-2 border-r-2 border-pink-500/50 rounded-tr-lg" />
+          <div className="absolute bottom-4 left-4 w-16 h-16 border-b-2 border-l-2 border-pink-500/50 rounded-bl-lg" />
         </Card>
         
         <StatsCards />
@@ -106,7 +106,7 @@ export default function HomePage() {
                   className={cn(
                     "group relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all duration-500",
                     game.playable 
-                      ? "border-green-500/20 bg-gradient-to-br from-card to-card/50 hover:border-green-400/40 hover:scale-105 hover:shadow-xl hover:shadow-green-500/20" 
+                      ? "border-pink-600/20 bg-gradient-to-br from-card to-card/50 hover:border-pink-500/40 hover:scale-105 hover:shadow-xl hover:shadow-pink-600/20" 
                       : "border-gray-500/20 bg-gradient-to-br from-card/50 to-card/30 cursor-not-allowed"
                   )}
                 >
@@ -151,7 +151,7 @@ export default function HomePage() {
                   {game.playable ? (
                     <Button 
                       asChild 
-                      className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/30"
+                      className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-bold py-3 rounded-xl shadow-lg shadow-pink-600/20 transition-all duration-300 hover:shadow-xl hover:shadow-pink-600/30"
                     >
                         <Link href={game.href!}>
                           🎮 Play Now

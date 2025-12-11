@@ -416,7 +416,7 @@ function PointsView() {
       <div className={cn("flex flex-col gap-8", isLocked && 'blur-sm pointer-events-none')}>
         {/* Header moderno */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
             💰 Points Center
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -430,7 +430,7 @@ function PointsView() {
               <div className="lg:col-span-3">
                 <div className="grid gap-6 md:grid-cols-3">
                   {/* Tier Card */}
-                  <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                  <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40">
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-500 opacity-5" />
                     
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -450,7 +450,7 @@ function PointsView() {
                   </Card>
 
                   {/* Position Card */}
-                  <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                  <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40">
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-cyan-500 opacity-5" />
                     
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -467,7 +467,7 @@ function PointsView() {
                           #{userStats.stats.ranking}
                         </div>
                         <div className={cn("flex items-center text-xs px-2 py-1 rounded-full", 
-                          userStats.stats.positionChange > 0 ? 'text-green-400 bg-green-500/20' : 
+                          userStats.stats.positionChange > 0 ? 'text-pink-500 bg-pink-600/20' : 
                           userStats.stats.positionChange < 0 ? 'text-red-400 bg-red-500/20' : 'text-muted-foreground bg-gray-500/20'
                         )}>
                           {userStats.stats.positionChange > 0 && <ArrowUp className="h-3 w-3" />}
@@ -480,22 +480,22 @@ function PointsView() {
                   </Card>
 
                   {/* Total Points Card */}
-                  <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5" />
+                  <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500 to-pink-600 opacity-5" />
                     
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         💰 Total Points
                       </CardTitle>
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 bg-opacity-10">
-                        <Coins className="h-5 w-5 text-green-400" />
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-pink-600 bg-opacity-10">
+                        <Coins className="h-5 w-5 text-pink-500" />
                       </div>
                     </CardHeader>
                     <CardContent className="relative">
-                      <div className="text-3xl font-bold font-headline text-green-400">
+                      <div className="text-3xl font-bold font-headline text-pink-500">
                         {userStats.user.totalPoints.toLocaleString()}
                       </div>
-                      <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-green-400/60 to-transparent" />
+                      <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-pink-500/60 to-transparent" />
                     </CardContent>
                   </Card>
                 </div>
@@ -505,10 +505,10 @@ function PointsView() {
             {/* Main Content with Tabs - Modernizado */}
             <div className="lg:col-span-2">
                 <Tabs defaultValue="history" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-2xl p-1">
+                    <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-pink-600/10 to-pink-600/10 border border-pink-600/20 rounded-2xl p-1">
                         <TabsTrigger 
                           value="history" 
-                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
                         >
                           📊 Points History
                         </TabsTrigger>
@@ -521,8 +521,8 @@ function PointsView() {
                     </TabsList>
                     
                     <TabsContent value="history" className="mt-6">
-                        <Card className="border-2 border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-green-500/10">
-                            <CardHeader className="bg-gradient-to-r from-green-500/5 to-emerald-500/5">
+                        <Card className="border-2 border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-pink-600/10">
+                            <CardHeader className="bg-gradient-to-r from-pink-600/5 to-pink-600/5">
                                 <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
                                   📈 Points History
                                 </CardTitle>
@@ -550,7 +550,7 @@ function PointsView() {
                                                     <TableRow key={index}>
                                                         <TableCell className="font-medium">{item.reason}</TableCell>
                                                         <TableCell className="text-muted-foreground">{item.date}</TableCell>
-                                                        <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-green-500' : 'text-destructive'}`}>
+                                                        <TableCell className={`text-right font-medium ${item.points.startsWith('+') ? 'text-pink-600' : 'text-destructive'}`}>
                                                             {item.points}
                                                         </TableCell>
                                                     </TableRow>
@@ -661,7 +661,7 @@ function PointsView() {
             {/* Sidebar modernizado */}
             <div className="grid auto-rows-max items-start gap-6 lg:gap-8">
                 {/* Daily Drop Card */}
-                <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
+                <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40">
                     <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 opacity-5 pointer-events-none" />
                     
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -689,13 +689,13 @@ function PointsView() {
                 </Card>
                 
                 {/* Cukies World Stats Card */}
-                <Card className="relative overflow-hidden border border-green-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-green-400/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-500 opacity-5 pointer-events-none" />
+                <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500 to-pink-600 opacity-5 pointer-events-none" />
                     
                     <CardHeader className="text-center pb-3">
                         <div className="flex items-center justify-center mb-3">
-                            <div className="p-2 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 bg-opacity-10">
-                                <Star className="h-6 w-6 text-green-400" />
+                            <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-pink-600 bg-opacity-10">
+                                <Star className="h-6 w-6 text-pink-500" />
                             </div>
                         </div>
                         <CardTitle className="text-lg font-bold text-foreground">
@@ -704,14 +704,14 @@ function PointsView() {
                     </CardHeader>
                     <CardContent className="text-center space-y-4">
                         <div>
-                            <div className="text-3xl font-bold text-green-400 font-headline">
+                            <div className="text-3xl font-bold text-pink-500 font-headline">
                                 {userStats ? userStats.user.totalPoints.toLocaleString() : (isLoadingUserStats ? '---' : '0')}
                             </div>
                             <div className="text-sm text-muted-foreground">Total Points</div>
                         </div>
                         
                         {userStats && (
-                            <div className="space-y-2 pt-2 border-t border-green-500/20">
+                            <div className="space-y-2 pt-2 border-t border-pink-600/20">
                                 <div className="text-xs text-muted-foreground">
                                     🏆 Rank #{userStats.stats.ranking}
                                 </div>
@@ -721,14 +721,14 @@ function PointsView() {
                             </div>
                         )}
                         
-                        <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-green-400/60 to-transparent" />
+                        <div className="absolute -bottom-1 left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-pink-500/60 to-transparent" />
                     </CardContent>
                 </Card>
             </div>
         </div>
       </div>
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-start pt-24 text-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
+        <div className="absolute top-0 left-0 right-0 h-16 flex flex-col items-center justify-center text-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
             <Lock className="h-8 w-8 text-muted-foreground" />
             {isTimeLocked ? (
                 <>
