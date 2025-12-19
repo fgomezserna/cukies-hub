@@ -54,8 +54,8 @@ const questsData = [
 const gamesData = [
   {
     gameId: 'sybil-slayer',
-    name: 'Sybil Slayer',
-    description: 'Collect energy points while avoiding enemies in this intense survival game.',
+    name: 'Treasure Hunt',
+    description: "Collect as fast as you can and don't get caught!",
     emoji: '🎮',
     gameUrl: process.env.GAME_SYBILSLASH || 'http://localhost:9002/',
     port: 9002,

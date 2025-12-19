@@ -5,7 +5,7 @@ import { Web3Provider } from '@/providers/web3-provider';
 import { AuthProvider } from '@/providers/auth-provider';
 
 export const metadata: Metadata = {
-  title: 'Hyppie Games',
+  title: 'Cukies World',
   description: 'P2P betting games on Hyperliquid.',
   icons: {
     icon: '/icon.png',

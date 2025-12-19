@@ -27,13 +27,14 @@ import Header from './header';
 import DiscordIcon from '../icons/discord';
 import XIcon from '../icons/x-icon';
 import Image from 'next/image';
+import CukieLogoFirst from '@/assets/Cukie_logo_first.png';
 import { usePathname } from 'next/navigation';
 
 const SidebarLogo = () => {
   return (
     <div className="flex items-center justify-center w-full h-full px-2 py-1">
       <Image 
-        src="/Cukie_logo_white.png" 
+        src={CukieLogoFirst} 
         alt="Cukies World" 
         width={200} 
         height={48}
