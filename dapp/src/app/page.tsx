@@ -13,7 +13,7 @@ import CukiesIslandImg from "@/assets/CukiesIsland_home.jpg";
 import ComingSoonImg from "@/assets/coming-soon.png";
 
 const games = [
-  { name: "Treasure Hunt", description: "Collect as fast as you can and don't get caught!", imageUrl: THHomeImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
+  { name: "Treasure Hunt", description: "Collect as fast as you can and don't get caught!", imageUrl: "/portada_TH_Home.png", hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
   { name: "Brain Buzz", description: "The ultimate trivia challenge!", imageUrl: BrainBuzzImg, hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
   { name: "Jump n'Hop", description: "Explore enchanting realms from bustling Villages to serene Islands, mysterious Caves, and lofty Mountains.", imageUrl: JumpnHopImg, hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
   { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: CukiesIslandImg, hint: "island adventure", live: false, playable: false }
