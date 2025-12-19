@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,9 +14,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Bell, Wallet, Settings, LogOut, PanelLeft } from 'lucide-react';
+import { Bell, Wallet, Settings, LogOut, PanelLeft, Zap } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -25,6 +32,7 @@ import hyppieletters from '@/assets/hyppielettersss.png';
 import hyppieicon from '@/assets/dice.png';
 import { useAuth } from '@/providers/auth-provider';
 import { useConnect, useDisconnect } from 'wagmi';
+import { useTronLink } from '@/hooks/use-tronlink';
 
 
 
@@ -46,10 +54,28 @@ export default function Header() {
   const { user, isLoading: isAuthLoading, isWaitingForApproval } = useAuth();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const { connect: connectTron, isInstalled: isTronInstalled } = useTronLink();
+  const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   
   // This would come from user data in a real app
   const userXP = user?.xp ?? 0;
   const userRank = getRank(userXP);
+
+  const handleConnectEVM = () => {
+    setIsWalletDialogOpen(false);
+    if (connectors.length > 0) {
+      connect({ connector: connectors[0] });
+    }
+  };
+
+  const handleConnectTron = async () => {
+    setIsWalletDialogOpen(false);
+    try {
+      await connectTron();
+    } catch (error) {
+      console.error('Failed to connect TronLink:', error);
+    }
+  };
 
   if (isAuthLoading) {
     return (
@@ -176,29 +202,78 @@ export default function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button 
-            onClick={() => !isWaitingForApproval && connect({ connector: connectors[0] })} 
-            disabled={isWaitingForApproval}
-            className={`${
-              isWaitingForApproval 
-                ? "bg-gradient-to-r from-amber-500 to-orange-600 cursor-not-allowed" 
-                : "bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 hover:scale-105 hover:shadow-xl hover:shadow-pink-600/40"
-            } text-white font-bold px-6 py-2 rounded-xl shadow-lg transition-all duration-300 ${
-              isWaitingForApproval ? "shadow-amber-500/30 animate-pulse" : "shadow-pink-600/30"
-            }`}
-          >
-            {isWaitingForApproval ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent md:mr-2" />
-                <span className="hidden md:inline">Waiting for Approval...</span>
-              </>
-            ) : (
-              <>
-                <Wallet className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Connect Wallet</span>
-              </>
-            )}
-          </Button>
+          <>
+            <Button 
+              onClick={() => !isWaitingForApproval && setIsWalletDialogOpen(true)} 
+              disabled={isWaitingForApproval}
+              className={`${
+                isWaitingForApproval 
+                  ? "bg-gradient-to-r from-amber-500 to-orange-600 cursor-not-allowed" 
+                  : "bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 hover:scale-105 hover:shadow-xl hover:shadow-pink-600/40"
+              } text-white font-bold px-6 py-2 rounded-xl shadow-lg transition-all duration-300 ${
+                isWaitingForApproval ? "shadow-amber-500/30 animate-pulse" : "shadow-pink-600/30"
+              }`}
+            >
+              {isWaitingForApproval ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent md:mr-2" />
+                  <span className="hidden md:inline">Waiting for Approval...</span>
+                </>
+              ) : (
+                <>
+                  <Wallet className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Connect Wallet</span>
+                </>
+              )}
+            </Button>
+
+            <Dialog open={isWalletDialogOpen} onOpenChange={setIsWalletDialogOpen}>
+              <DialogContent className="sm:max-w-md border-2 border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-pink-600/10">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold text-foreground">
+                    Choose Wallet Type
+                  </DialogTitle>
+                  <DialogDescription className="text-muted-foreground">
+                    Select your preferred wallet to connect
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <Button
+                    onClick={handleConnectEVM}
+                    className="w-full h-auto p-6 flex flex-col items-start gap-3 bg-gradient-to-r from-blue-600/10 to-purple-600/10 hover:from-blue-600/20 hover:to-purple-600/20 border-2 border-blue-500/30 hover:border-blue-500/50 transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
+                        <Wallet className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="font-bold text-lg text-foreground">EVM Wallets</div>
+                        <div className="text-sm text-muted-foreground">MetaMask, WalletConnect, etc.</div>
+                      </div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    onClick={handleConnectTron}
+                    disabled={!isTronInstalled}
+                    className="w-full h-auto p-6 flex flex-col items-start gap-3 bg-gradient-to-r from-yellow-600/10 to-orange-600/10 hover:from-yellow-600/20 hover:to-orange-600/20 border-2 border-yellow-500/30 hover:border-yellow-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-600">
+                        <Zap className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="font-bold text-lg text-foreground">TronLink</div>
+                        <div className="text-sm text-muted-foreground">
+                          {isTronInstalled ? 'Connect your TronLink wallet' : 'Please install TronLink extension'}
+                        </div>
+                      </div>
+                    </div>
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </div>
     </header>
