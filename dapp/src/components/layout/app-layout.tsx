@@ -156,6 +156,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-pink-600/10 hover:to-pink-600/10 hover:border-pink-500/30 hover:shadow-md hover:shadow-pink-600/20"
+                >
+                  <a href="https://marketplace.cukies.world/" target="_blank" rel="noopener noreferrer">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-400/20 to-teal-500/20 group-hover:from-emerald-400/30 group-hover:to-teal-500/30 transition-all">
+                        <Coins className="h-4 w-4 text-emerald-400 group-hover:text-teal-300 transition-colors" />
+                      </div>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Marketplace</span>
+                    </div>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
             
 

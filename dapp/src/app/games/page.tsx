@@ -9,17 +9,17 @@ import { Search } from 'lucide-react';
 import Image from "next/image";
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import SybilSlayerImg from "@/assets/sybilslash.png";
-import HyppieRoadImg from "@/assets/hyppie-road.png";
+import THHomeImg from "@/assets/TH_Home.png";
+import BrainBuzzImg from "@/assets/brain_buzz_screenshot.png";
+import JumpnHopImg from "@/assets/JumpnHop_home.png";
+import CukiesIslandImg from "@/assets/CukiesIsland_home.jpg";
 import ComingSoonImg from "@/assets/coming-soon.png";
-import HyppieTowerImg from "@/assets/hyppie-tower.webp";
 
 const games = [
-  { name: "Sybil Slayer", description: "Collect as fast as you can and don't get caught!", imageUrl: SybilSlayerImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
-  { name: "Hyppie Road", description: "Navigate the crypto road, avoid traps, and multiply your rewards!", imageUrl: HyppieRoadImg, hint: "road adventure", live: false, playable: true, href: "/games/hyppie-road" },
-  { name: "Hyppie Tower", description: "Stack blocks as high as you can in this precision-based tower building game.", imageUrl: HyppieTowerImg, hint: "tower building", live: false, playable: true, href: "/games/tower-builder" },
-  { name: "Hyper Runner", description: "Run, jump, and dodge obstacles in this fast-paced endless runner.", imageUrl: ComingSoonImg, hint: "endless runner", live: false, playable: false },
-  { name: "Crypto Chess", description: "Outsmart your opponent in the classic game of strategy.", imageUrl: ComingSoonImg, hint: "chess board", live: true, playable: false }
+  { name: "Treasure Hunt", description: "Collect as fast as you can and don't get caught!", imageUrl: THHomeImg, hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
+  { name: "Brain Buzz", description: "The ultimate trivia challenge!", imageUrl: BrainBuzzImg, hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
+  { name: "Jump n'Hop", description: "Explore enchanting realms from bustling Villages to serene Islands, mysterious Caves, and lofty Mountains.", imageUrl: JumpnHopImg, hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
+  { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: CukiesIslandImg, hint: "island adventure", live: false, playable: false }
 ];
 
 export default function GamesPage() {
@@ -111,9 +111,15 @@ export default function GamesPage() {
                     asChild 
                     className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white font-bold py-3 rounded-xl shadow-lg shadow-pink-600/20 transition-all duration-300 hover:shadow-xl hover:shadow-pink-600/30"
                   >
-                    <Link href={game.href!}>
-                      🎮 Play Now
-                    </Link>
+                    {game.href?.startsWith('http://') || game.href?.startsWith('https://') ? (
+                      <a href={game.href} target="_blank" rel="noopener noreferrer">
+                        🎮 Play Now
+                      </a>
+                    ) : (
+                      <Link href={game.href!}>
+                        🎮 Play Now
+                      </Link>
+                    )}
                   </Button>
                 ) : (
                   <Button 
