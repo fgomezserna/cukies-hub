@@ -294,12 +294,24 @@ export function usePusherConnection(options?: { matchRoomId?: string | null }) {
       // Subscribe to game session channel
       const channelName = `private-game-session-${sessionData.sessionId}`;
       const gameChannel = pusherInstance.subscribe(channelName);
+      
+      // Assign channel ref immediately so it's available even if subscription is pending
+      channelRef.current = gameChannel;
+      sessionDataRef.current = sessionData;
 
       // Handle subscription events
       gameChannel.bind('pusher:subscription_succeeded', () => {
         console.log('✅ [GAME-PUSHER] Subscribed to channel:', channelName);
         isConnectingRef.current = false;
         setConnectionState('connected');
+        
+        // Ensure refs are still set (they should be, but double-check)
+        if (!channelRef.current) {
+          channelRef.current = gameChannel;
+        }
+        if (!sessionDataRef.current) {
+          sessionDataRef.current = sessionData;
+        }
         
         // Notify dapp that game is ready
         gameChannel.trigger('client-game-ready', {
@@ -353,8 +365,15 @@ export function usePusherConnection(options?: { matchRoomId?: string | null }) {
 
       gameChannel.bind('pusher:subscription_error', (error: any) => {
         console.error('❌ [GAME-PUSHER] Subscription error:', error);
+        console.error('❌ [GAME-PUSHER] Subscription error details:', {
+          error,
+          channelName,
+          hasSessionToken: !!sessionData.sessionToken,
+          pusherState: pusherInstance.connection.state
+        });
         isConnectingRef.current = false;
         setConnectionState('disconnected');
+        // Don't clear channelRef on error - keep it for retry attempts
       });
 
       // Listen for session start confirmation from dapp
@@ -368,15 +387,20 @@ export function usePusherConnection(options?: { matchRoomId?: string | null }) {
         // Dapp is ready to receive events
       });
 
-        // Update refs and state
+        // Update refs and state (channelRef already set above, but ensure everything is consistent)
         pusherRef.current = pusherInstance;
-        channelRef.current = gameChannel;
-        sessionDataRef.current = sessionData;
+        if (!channelRef.current) {
+          channelRef.current = gameChannel;
+        }
+        if (!sessionDataRef.current) {
+          sessionDataRef.current = sessionData;
+        }
         
         console.log('🔗 [GAME-PUSHER] Channel assigned to ref:', {
           hasChannel: !!channelRef.current,
           channelName: gameChannel.name,
-          sessionId: sessionData.sessionId
+          sessionId: sessionData.sessionId,
+          channelState: gameChannel.state
         });
         
         setPusher(pusherInstance);

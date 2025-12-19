@@ -9,7 +9,7 @@ import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 
 export default function SybilSlayerPage() {
   const { user, isLoading } = useAuth();
-  const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('sybil-slayer');
+  const { gameConfig, gameStats, leaderboardData, loading, error, refetch } = useGameData('sybil-slayer');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export default function SybilSlayerPage() {
     setLocalGameStats(prev => ({ ...prev, currentScore: checkpoint.score }));
   }, []);
 
-  const onSessionEnd = useCallback((result: { finalScore: number; isValid: boolean }) => {
+  const onSessionEnd = useCallback(async (result: { finalScore: number; isValid: boolean }) => {
     console.log('🏁 [DAPP-PUSHER] Game session ended:', result);
     
     // Clean up localStorage
@@ -62,9 +62,15 @@ export default function SybilSlayerPage() {
       validSessions: prev.validSessions + (result.isValid ? 1 : 0)
     }));
     
+    // Refresh game stats to get updated best score from database
+    if (result.isValid) {
+      console.log('🔄 [DAPP-PUSHER] Refreshing game stats after session end...');
+      await refetch();
+    }
+    
     // Reset session ID for new game
     setCurrentSessionId(null);
-  }, [currentSessionId]);
+  }, [currentSessionId, refetch]);
 
   const onHoneypotDetected = useCallback((event: string) => {
     console.warn('🍯 [DAPP-PUSHER] Honeypot detected:', event);
@@ -172,7 +178,17 @@ export default function SybilSlayerPage() {
   // Start game session when user is authenticated
   useEffect(() => {
     const startSession = async () => {
-      if (!authData.isAuthenticated || !user?.id || currentSessionId) return;
+      console.log('🔍 [DAPP-PUSHER] Checking session start conditions:', {
+        isAuthenticated: authData.isAuthenticated,
+        hasUserId: !!user?.id,
+        hasCurrentSessionId: !!currentSessionId,
+        userId: user?.id
+      });
+      
+      if (!authData.isAuthenticated || !user?.id || currentSessionId) {
+        console.log('⏭️ [DAPP-PUSHER] Skipping session start - conditions not met');
+        return;
+      }
 
       try {
         console.log('🚀 [DAPP-PUSHER] Starting new game session...');
@@ -191,11 +207,13 @@ export default function SybilSlayerPage() {
         
         if (data.success) {
           console.log('✅ [DAPP-PUSHER] Session created:', data);
+          console.log('✅ [DAPP-PUSHER] Setting currentSessionId to:', data.sessionId);
           setCurrentSessionId(data.sessionId);
           
           // Store session token in localStorage for Pusher auth
           localStorage.setItem(`session_token_${data.sessionId}`, data.sessionToken);
-          console.log('💾 [DAPP-PUSHER] Session token stored in localStorage');
+          console.log('💾 [DAPP-PUSHER] Session token stored in localStorage:', `session_token_${data.sessionId}`);
+          console.log('💾 [DAPP-PUSHER] Current sessionId state should now be:', data.sessionId);
           
           // Notify the session start callback
           onSessionStart({

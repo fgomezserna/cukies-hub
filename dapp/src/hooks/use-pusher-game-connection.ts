@@ -125,7 +125,13 @@ export function usePusherGameConnection(
     }
 
     const channelName = `private-game-session-${sessionId}`;
-    console.log('🔗 [PUSHER] Connecting to channel:', channelName);
+    console.log('🔗 [PUSHER] Connecting to channel:', channelName, 'for sessionId:', sessionId);
+    console.log('🔗 [PUSHER] Full connection details:', {
+      sessionId,
+      channelName,
+      userId: authData.user?.id,
+      isAuthenticated: authData.isAuthenticated
+    });
     
     isConnectingRef.current = true;
     setConnectionState('connecting');
@@ -196,13 +202,35 @@ export function usePusherGameConnection(
       );
 
       // Subscribe to private channel
+      console.log('📡 [PUSHER] Subscribing to channel:', channelName, 'for sessionId:', sessionId);
+      console.log('📡 [PUSHER] Pusher client state:', customPusherClient.connection.state);
       const newChannel = customPusherClient.subscribe(channelName);
+      console.log('📡 [PUSHER] Channel subscribe called, waiting for subscription...');
 
       // Handle subscription success
       newChannel.bind('pusher:subscription_succeeded', () => {
         console.log('✅ [PUSHER] Successfully subscribed to:', channelName);
+        console.log('✅ [PUSHER] Channel ready to receive events, sessionId:', sessionId);
+        console.log('✅ [PUSHER] Channel state:', newChannel.state);
         isConnectingRef.current = false;
         setConnectionState('connected');
+        
+        // Store channel ref for event binding
+        channelRef.current = newChannel;
+        
+        console.log('✅ [PUSHER] Channel ref stored, ready to receive events:', {
+          channelName,
+          sessionId,
+          hasChannelRef: !!channelRef.current,
+          channelState: newChannel.state
+        });
+        
+        // Verify event bindings are in place
+        console.log('✅ [PUSHER] Event listeners bound for:', {
+          hasGameEndListener: true, // We bind it below
+          hasGameReadyListener: true,
+          hasCheckpointListener: true
+        });
         
         // Notify the game that the dapp is ready
         newChannel.trigger('client-dapp-ready', {
@@ -222,8 +250,18 @@ export function usePusherGameConnection(
       // Listen for game events
       newChannel.bind('client-game-ready', (data: any) => {
         console.log('🎮 [PUSHER] Game ready signal received:', data);
+        console.log('🎮 [PUSHER] Channel is ready to receive game-end events');
         // Game is loaded and ready to receive session data
       });
+      
+      // Debug: Log all events on this channel (if bind_global is available)
+      if (typeof (newChannel as any).bind_global === 'function') {
+        (newChannel as any).bind_global((eventName: string, data: any) => {
+          if (eventName.startsWith('client-')) {
+            console.log(`📨 [PUSHER] Event received on channel ${channelName}:`, eventName, data);
+          }
+        });
+      }
 
       newChannel.bind('client-checkpoint', async (data: GameCheckpoint) => {
         console.log('📍 [PUSHER] Checkpoint received:', data);
@@ -271,8 +309,18 @@ export function usePusherGameConnection(
         }
       });
 
-      newChannel.bind('client-game-end', async (data: GameEndData) => {
+      // IMPORTANT: Bind game-end event BEFORE subscription succeeds to ensure we catch it
+      console.log('🔗 [PUSHER] Binding client-game-end event listener to channel:', channelName);
+      const gameEndHandler = async (data: GameEndData) => {
         console.log('🏁 [PUSHER] Game end received:', data);
+        console.log('🏁 [PUSHER] Game end details:', {
+          finalScore: data.finalScore,
+          gameTime: data.gameTime,
+          hasSessionToken: !!data.sessionToken,
+          sessionId: sessionId,
+          channelName: channelName,
+          channelState: newChannel.state
+        });
         
         // Process game end
         try {
@@ -280,7 +328,11 @@ export function usePusherGameConnection(
           const sessionToken = data.sessionToken || localStorage.getItem(`session_token_${sessionId}`);
           
           if (!sessionToken) {
-            console.error('❌ [PUSHER] No session token available for game end');
+            console.error('❌ [PUSHER] No session token available for game end', {
+              sessionId,
+              hasDataToken: !!data.sessionToken,
+              localStorageKeys: Object.keys(localStorage).filter(k => k.startsWith('session_token'))
+            });
             return;
           }
           
@@ -322,7 +374,11 @@ export function usePusherGameConnection(
             isValid: false
           });
         }
-      });
+      };
+      
+      // Bind the handler to the channel
+      newChannel.bind('client-game-end', gameEndHandler);
+      console.log('✅ [PUSHER] client-game-end handler bound to channel:', channelName);
 
       newChannel.bind('client-honeypot-trigger', (data: { event: string }) => {
         console.log('🍯 [PUSHER] Honeypot triggered:', data);

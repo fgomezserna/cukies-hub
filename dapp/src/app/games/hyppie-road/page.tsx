@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import { useGameData } from '@/hooks/use-game-data';
 import { useGameConnection } from '@/hooks/use-game-connection';
@@ -9,8 +9,26 @@ import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 
 export default function HyppieRoadPage() {
   const { user, isLoading } = useAuth();
-  const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('hyppie-road');
+  const { gameConfig, gameStats, leaderboardData, loading, error, refetch } = useGameData('hyppie-road');
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Game connection callbacks
+  const onSessionStart = useCallback((sessionData: { sessionToken: string; sessionId: string }) => {
+    console.log('🚀 [HYPPIE ROAD] Session started:', sessionData);
+  }, []);
+
+  const onCheckpoint = useCallback((checkpoint: any) => {
+    console.log('📍 [HYPPIE ROAD] Checkpoint received:', checkpoint);
+  }, []);
+
+  const onSessionEnd = useCallback(async (result: { finalScore: number; isValid: boolean }) => {
+    console.log('🏁 [HYPPIE ROAD] Session ended:', result);
+    // Refresh game stats to get updated best score from database
+    if (result.isValid) {
+      console.log('🔄 [HYPPIE ROAD] Refreshing game stats after session end...');
+      await refetch();
+    }
+  }, [refetch]);
 
   // Use game connection - same as other games
   const gameConnection = useGameConnection(
@@ -22,15 +40,9 @@ export default function HyppieRoadPage() {
     {
       gameId: 'hyppie-road',
       gameVersion: '1.0.0',
-      onSessionStart: (sessionData) => {
-        console.log('🚀 [HYPPIE ROAD] Session started:', sessionData);
-      },
-      onCheckpoint: (checkpoint) => {
-        console.log('📍 [HYPPIE ROAD] Checkpoint received:', checkpoint);
-      },
-      onSessionEnd: (result) => {
-        console.log('🏁 [HYPPIE ROAD] Session ended:', result);
-      }
+      onSessionStart,
+      onCheckpoint,
+      onSessionEnd
     }
   );
 

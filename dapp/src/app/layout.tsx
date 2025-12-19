@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   title: 'Cukies World',
   description: 'P2P betting games on Hyperliquid.',
   icons: {
-    icon: '/icon.png',
-    shortcut: '/icon.png',
-    apple: '/icon-512.png',
+    icon: '/Powered_up_2.png',
+    shortcut: '/Powered_up_2.png',
+    apple: '/Powered_up_2.png',
   },
 };
 

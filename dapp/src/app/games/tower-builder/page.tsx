@@ -9,7 +9,7 @@ import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 
 export default function TowerBuilderPage() {
   const { user, isLoading } = useAuth();
-  const { gameConfig, gameStats, leaderboardData, loading, error } = useGameData('tower-builder');
+  const { gameConfig, gameStats, leaderboardData, loading, error, refetch } = useGameData('tower-builder');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   // Local game state for real-time updates
@@ -31,7 +31,7 @@ export default function TowerBuilderPage() {
     setLocalGameStats(prev => ({ ...prev, currentScore: checkpoint.score }));
   }, []);
 
-  const onSessionEnd = useCallback((result: { finalScore: number; isValid: boolean }) => {
+  const onSessionEnd = useCallback(async (result: { finalScore: number; isValid: boolean }) => {
     console.log('Tower Builder session ended:', result);
     setLocalGameStats(prev => ({
       ...prev,
@@ -39,7 +39,12 @@ export default function TowerBuilderPage() {
       currentScore: 0,
       validSessions: prev.validSessions + (result.isValid ? 1 : 0)
     }));
-  }, []);
+    // Refresh game stats to get updated best score from database
+    if (result.isValid) {
+      console.log('🔄 [TOWER BUILDER] Refreshing game stats after session end...');
+      await refetch();
+    }
+  }, [refetch]);
 
   const onHoneypotDetected = useCallback((event: string) => {
     console.warn('Tower Builder honeypot detected:', event);
