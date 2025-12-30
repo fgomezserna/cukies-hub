@@ -9,9 +9,9 @@ import StatsCards from '@/components/home/stats-cards';
 
 const games = [
   { name: "Treasure Hunt", description: "Collect as fast as you can and don't get caught!", imageUrl: "/portada_TH_Home.png", hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
-  { name: "Brain Buzz", description: "The ultimate trivia challenge!", imageUrl: "/portada_brain_buzz.jpg", hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
+  { name: "Brain Buzz", description: "Engaging online trivia game designed to challenge players' knowledge across a wide range of topics.", imageUrl: "/portada_brain_buzz.jpg", hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
   { name: "Jump n'Hop", description: "Explore enchanting realms from bustling Villages to serene Islands, mysterious Caves, and lofty Mountains.", imageUrl: "/portada_jump_Hop.jpg", hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
-  { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: "/portada_cukies_island.jpg", hint: "island adventure", live: false, playable: false }
+  { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: "/portada_cukies_island.jpg", hint: "island adventure", live: false, playable: true, href: "https://cukies-island.cukies.world/" }
 ];
 const featuredGame = games[0];
 const otherGames = games.slice(1);

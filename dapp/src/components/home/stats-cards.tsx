@@ -4,10 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/providers/auth-provider";
 import { Coins, Star, Users, TrendingUp } from "lucide-react";
 import Image from "next/image";
-import ExpImg from "@/assets/exp.png";
-import RankImg from "@/assets/rank.png";
-import PlayersImg from "@/assets/players.png";
-import PointsImg from "@/assets/points.png";
 import { useEffect, useState } from "react";
 
 interface PlatformStats {
@@ -57,7 +53,7 @@ export default function StatsCards() {
             icon: Star,
             gradient: 'from-pink-500 to-pink-600',
             iconColor: 'text-white',
-            backgroundImage: ExpImg
+            backgroundImage: '/my_xp.jpg'
         },
         {
             title: 'My Rank',
@@ -65,7 +61,7 @@ export default function StatsCards() {
             icon: TrendingUp,
             gradient: 'from-blue-400 to-cyan-500',
             iconColor: 'text-white',
-            backgroundImage: RankImg
+            backgroundImage: '/my_rank.jpg'
         },
         {
             title: 'Total Players',
@@ -73,7 +69,7 @@ export default function StatsCards() {
             icon: Users,
             gradient: 'from-purple-400 to-pink-500',
             iconColor: 'text-white',
-            backgroundImage: PlayersImg
+            backgroundImage: '/total_players.jpg'
         },
         {
             title: 'Total XP',
@@ -81,7 +77,7 @@ export default function StatsCards() {
             icon: Coins,
             gradient: 'from-yellow-400 to-orange-500',
             iconColor: 'text-white',
-            backgroundImage: PointsImg
+            backgroundImage: '/total_xp.jpg'
         }
     ];
 
