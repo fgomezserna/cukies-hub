@@ -28,8 +28,6 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import Image from 'next/image';
-import hyppieletters from '@/assets/hyppielettersss.png';
-import hyppieicon from '@/assets/dice.png';
 import { useAuth } from '@/providers/auth-provider';
 import { useConnect, useDisconnect } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
@@ -101,10 +99,8 @@ export default function Header() {
       </Button>
 
       {(isMobile || state === 'collapsed') && (
-        <div className="flex items-center gap-2 group">
-            {/* En móvil muestra icono + texto, en desktop colapsado solo texto */}
-            {isMobile && <Image src={hyppieicon} alt="Cukies World" width={52} height={32} />}
-            <Image src={hyppieletters} alt="Cukies World" height={52} />
+        <div className="flex items-center gap-2 group h-full">
+            <Image src="/Cukie_logo_first.png" alt="Cukies World" width={140} height={40} className="object-contain max-h-[48px] w-auto" />
         </div>
       )}
 
