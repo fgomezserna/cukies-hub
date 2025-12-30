@@ -72,3 +72,6 @@ Después de configurar el replica set, prueba crear una sesión de juego nuevame
 - [Prisma MongoDB Transactions](https://www.prisma.io/docs/concepts/components/prisma-client/transactions)
 - [MongoDB Replica Set Setup](https://www.mongodb.com/docs/manual/replication/)
 
+
+
+

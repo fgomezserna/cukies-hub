@@ -6,17 +6,12 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import StatsCards from '@/components/home/stats-cards';
-import THHomeImg from "@/assets/TH_Home.png";
-import BrainBuzzImg from "@/assets/brain_buzz_screenshot.png";
-import JumpnHopImg from "@/assets/JumpnHop_home.png";
-import CukiesIslandImg from "@/assets/CukiesIsland_home.jpg";
-import ComingSoonImg from "@/assets/coming-soon.png";
 
 const games = [
   { name: "Treasure Hunt", description: "Collect as fast as you can and don't get caught!", imageUrl: "/portada_TH_Home.png", hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
-  { name: "Brain Buzz", description: "The ultimate trivia challenge!", imageUrl: BrainBuzzImg, hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
-  { name: "Jump n'Hop", description: "Explore enchanting realms from bustling Villages to serene Islands, mysterious Caves, and lofty Mountains.", imageUrl: JumpnHopImg, hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
-  { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: CukiesIslandImg, hint: "island adventure", live: false, playable: false }
+  { name: "Brain Buzz", description: "The ultimate trivia challenge!", imageUrl: "/portada_brain_buzz.jpg", hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
+  { name: "Jump n'Hop", description: "Explore enchanting realms from bustling Villages to serene Islands, mysterious Caves, and lofty Mountains.", imageUrl: "/portada_jump_Hop.jpg", hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
+  { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: "/portada_cukies_island.jpg", hint: "island adventure", live: false, playable: false }
 ];
 const featuredGame = games[0];
 const otherGames = games.slice(1);
