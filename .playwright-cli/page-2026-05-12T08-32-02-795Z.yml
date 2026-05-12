@@ -1,0 +1,510 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - navigation [ref=e4]:
+      - link "Cukies World home" [ref=e5] [cursor=pointer]:
+        - /url: "#presale"
+        - img "Cukies World" [ref=e6]
+      - link "Wallet" [ref=e7] [cursor=pointer]:
+        - /url: "#presale-console"
+        - img [ref=e8]
+        - generic [ref=e11]: Wallet
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Relaunch 2026
+        - heading "UKI presale opens soon" [level=1] [ref=e17]:
+          - generic [ref=e18]: UKI presale
+          - generic [ref=e19]: opens soon
+        - paragraph [ref=e20]: The token powering the next Cukies game economy on BNB Smart Chain.
+        - generic [ref=e21]:
+          - link "Join UKI presale" [ref=e22] [cursor=pointer]:
+            - /url: "#presale-console"
+            - generic [ref=e23]: Join UKI presale
+            - img [ref=e25]
+          - link "Read sale details" [ref=e27] [cursor=pointer]:
+            - /url: "#token"
+            - generic [ref=e28]: Read sale details
+            - img [ref=e30]
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - generic [ref=e37]:
+              - paragraph [ref=e38]: Audited
+              - paragraph [ref=e39]: Smart contracts
+          - generic [ref=e40]:
+            - img [ref=e41]
+            - generic [ref=e43]:
+              - paragraph [ref=e44]: Built on
+              - paragraph [ref=e45]: BNB Smart Chain
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - generic [ref=e52]:
+              - paragraph [ref=e53]: Community
+              - paragraph [ref=e54]: Since 2021
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - paragraph [ref=e58]: Buy UKI token
+          - paragraph [ref=e59]: 1 ASM = 100 UKI
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - generic [ref=e63]: A
+            - generic [ref=e64]: ASM
+          - generic [ref=e65]: "->"
+          - generic [ref=e66]:
+            - generic [ref=e67]: U
+            - generic [ref=e68]: UKI
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - generic [ref=e71]: Sale price
+            - generic [ref=e73]:
+              - text: $0.01
+              - generic [ref=e74]: Per UKI
+          - generic [ref=e75]:
+            - generic [ref=e76]: Network
+            - generic [ref=e77]:
+              - img [ref=e78]
+              - generic [ref=e80]: BNB Smart Chain
+          - generic [ref=e81]:
+            - generic [ref=e82]: Vesting
+            - generic [ref=e83]:
+              - img [ref=e84]
+              - generic [ref=e87]:
+                - text: 9 months
+                - generic [ref=e88]: Linear release
+        - generic [ref=e89]:
+          - paragraph [ref=e90]: Presale starts in
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: "06"
+              - generic [ref=e94]: Days
+            - generic [ref=e95]:
+              - generic [ref=e96]: "14"
+              - generic [ref=e97]: Hours
+            - generic [ref=e98]:
+              - generic [ref=e99]: "32"
+              - generic [ref=e100]: Minutes
+            - generic [ref=e101]:
+              - generic [ref=e102]: "45"
+              - generic [ref=e103]: Seconds
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - img [ref=e107]
+            - text: Wallet
+          - generic [ref=e110]: Not connected
+        - link "Connect wallet" [ref=e111] [cursor=pointer]:
+          - /url: "#presale"
+          - generic [ref=e112]: Connect wallet
+          - img [ref=e114]
+    - generic [ref=e117]:
+      - article [ref=e118]:
+        - img [ref=e119]
+        - generic [ref=e124]:
+          - paragraph [ref=e125]: Price
+          - paragraph [ref=e126]: $0.01
+          - paragraph [ref=e127]: Per UKI
+      - article [ref=e128]:
+        - img [ref=e129]
+        - generic [ref=e131]:
+          - paragraph [ref=e132]: Duration
+          - paragraph [ref=e133]: 1 month
+          - paragraph [ref=e134]: Presale period
+      - article [ref=e135]:
+        - img [ref=e136]
+        - generic [ref=e139]:
+          - paragraph [ref=e140]: Buy with
+          - paragraph [ref=e141]: ASM
+          - paragraph [ref=e142]: Sale currency
+      - article [ref=e143]:
+        - img [ref=e144]
+        - generic [ref=e147]:
+          - paragraph [ref=e148]: Vesting
+          - paragraph [ref=e149]: 9 months
+          - paragraph [ref=e150]: Linear release
+      - article [ref=e151]:
+        - img [ref=e152]
+        - generic [ref=e158]:
+          - paragraph [ref=e159]: Listing
+          - paragraph [ref=e160]: At least $0.012
+          - paragraph [ref=e161]: Target floor
+      - article [ref=e162]:
+        - img [ref=e163]
+        - generic [ref=e166]:
+          - paragraph [ref=e167]: Liquidity
+          - paragraph [ref=e168]: Locked / burned
+          - paragraph [ref=e169]: 9+ months
+    - generic [ref=e170]:
+      - heading "How to buy UKI" [level=2] [ref=e172]:
+        - generic [ref=e173]: How to buy UKI
+      - generic [ref=e175]:
+        - article [ref=e176]:
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]: "1"
+              - generic [ref=e181]:
+                - heading "Connect wallet" [level=3] [ref=e182]
+                - paragraph [ref=e183]: Connect your BSC wallet to get started.
+            - generic [ref=e185]:
+              - button "Connect wallet" [ref=e186] [cursor=pointer]
+              - generic [ref=e187]:
+                - generic [ref=e188]: MetaMask
+                - img [ref=e189]
+              - generic [ref=e191]:
+                - generic [ref=e192]: WalletConnect
+                - img [ref=e193]
+        - article [ref=e195]:
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - generic [ref=e199]: "2"
+              - generic [ref=e200]:
+                - heading "Approve ASM" [level=3] [ref=e201]
+                - paragraph [ref=e202]: Approve ASM as the sale currency for the presale.
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - img [ref=e206]
+                - text: Approve ASM
+              - generic [ref=e208]:
+                - paragraph [ref=e209]: Spend limit
+                - paragraph [ref=e210]: 10,000 ASM
+              - button "Approve" [ref=e211] [cursor=pointer]
+        - article [ref=e212]:
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]: "3"
+              - generic [ref=e217]:
+                - heading "Buy UKI" [level=3] [ref=e218]
+                - paragraph [ref=e219]: Exchange ASM for UKI at the fixed presale rate.
+            - generic [ref=e221]:
+              - generic [ref=e222]:
+                - paragraph [ref=e223]: You pay (ASM)
+                - generic [ref=e224]:
+                  - generic [ref=e225]: 10,000
+                  - generic [ref=e226]: ASM
+              - img [ref=e228]
+              - generic [ref=e230]:
+                - paragraph [ref=e231]: You receive (UKI)
+                - generic [ref=e232]:
+                  - generic [ref=e233]: 1,000,000
+                  - generic [ref=e234]: UKI
+        - article [ref=e235]:
+          - generic [ref=e237]:
+            - generic [ref=e238]:
+              - generic [ref=e239]: "4"
+              - generic [ref=e240]:
+                - heading "Track vesting" [level=3] [ref=e241]
+                - paragraph [ref=e242]: Your UKI unlocks linearly after launch.
+            - generic [ref=e244]:
+              - generic [ref=e245]:
+                - img [ref=e246]
+                - generic [ref=e249]:
+                  - paragraph [ref=e250]: 1,000,000 UKI
+                  - paragraph [ref=e251]: 9 months linear
+              - generic [ref=e252]:
+                - generic [ref=e253]: 0%
+                - generic [ref=e254]: 100%
+    - generic [ref=e257]:
+      - generic [ref=e258]:
+        - generic [ref=e259]:
+          - generic [ref=e260]:
+            - heading "Token trust & vesting" [level=2] [ref=e261]:
+              - generic [ref=e262]: Token trust & vesting
+            - paragraph [ref=e263]: Built for a fair launch and long-term growth.
+          - generic [ref=e265]:
+            - heading "ASM raised - UKI liquidity" [level=3] [ref=e266]
+            - generic [ref=e267]:
+              - generic [ref=e268]: ASM
+              - img [ref=e269]
+              - generic [ref=e271]: UKI
+              - img [ref=e272]
+              - generic [ref=e274]: BSC
+            - generic [ref=e275]:
+              - generic [ref=e276]: ASM raised in presale
+              - generic [ref=e277]: Converted to UKI
+              - generic [ref=e278]: Added to PancakeSwap liquidity
+            - generic [ref=e279]:
+              - generic [ref=e280]:
+                - img [ref=e281]
+                - generic [ref=e284]:
+                  - paragraph [ref=e285]: Liquidity locked / burned
+                  - paragraph [ref=e286]: For at least 9+ months
+              - generic [ref=e287]:
+                - img [ref=e288]
+                - generic [ref=e291]:
+                  - paragraph [ref=e292]: Audited & verified
+                  - paragraph [ref=e293]: Smart contracts audited. Transparent source.
+        - generic [ref=e296]:
+          - generic [ref=e297]:
+            - generic [ref=e298]:
+              - img [ref=e299]
+              - generic [ref=e302]:
+                - heading "Buyer vesting" [level=3] [ref=e303]
+                - paragraph [ref=e304]: 9 months linear
+            - generic [ref=e305]:
+              - img [ref=e309]
+              - generic [ref=e312]:
+                - generic [ref=e313]: Month 0
+                - generic [ref=e314]: Month 3
+                - generic [ref=e315]: Month 6
+                - generic [ref=e316]: Month 9
+          - generic [ref=e317]:
+            - generic [ref=e318]:
+              - img [ref=e319]
+              - generic [ref=e324]:
+                - heading "Team vesting" [level=3] [ref=e325]
+                - paragraph [ref=e326]: 9 month cliff + 24 month vesting
+            - generic [ref=e327]:
+              - img [ref=e331]
+              - generic [ref=e334]:
+                - generic [ref=e335]: "0"
+                - generic [ref=e336]: Cliff
+                - generic [ref=e337]: Month 9
+                - generic [ref=e338]: Month 21
+                - generic [ref=e339]: Month 33
+          - generic [ref=e340]:
+            - generic [ref=e341]:
+              - img [ref=e342]
+              - generic [ref=e346]:
+                - heading "Cukie Master rewards program" [level=3] [ref=e347]
+                - paragraph [ref=e348]: Released over 6 years
+            - generic [ref=e349]:
+              - img [ref=e353]
+              - generic [ref=e356]:
+                - generic [ref=e357]: Year 1
+                - generic [ref=e358]: Year 3
+                - generic [ref=e359]: Year 5
+                - generic [ref=e360]: Year 6
+      - paragraph [ref=e361]: Final allocation percentages are pending and will be confirmed before TGE.
+    - generic [ref=e362]:
+      - generic [ref=e363]:
+        - heading "Why UKI exists" [level=2] [ref=e364]:
+          - generic [ref=e365]: Why UKI exists
+        - paragraph [ref=e367]: UKI connects everything in the Cukies game economy.
+      - generic [ref=e368]:
+        - article [ref=e369]:
+          - img [ref=e370]
+          - generic [ref=e372]:
+            - heading "Games" [level=3] [ref=e373]
+            - paragraph [ref=e374]: Play, compete and earn.
+        - article [ref=e375]:
+          - img [ref=e376]
+          - generic [ref=e381]:
+            - heading "Credits" [level=3] [ref=e382]
+            - paragraph [ref=e383]: Earn, spend and upgrade.
+        - article [ref=e384]:
+          - img [ref=e385]
+          - generic [ref=e389]:
+            - heading "Pools" [level=3] [ref=e390]
+            - paragraph [ref=e391]: Powerful pools with real utility.
+        - article [ref=e392]:
+          - img [ref=e393]
+          - generic [ref=e395]:
+            - heading "Cukie Master" [level=3] [ref=e396]
+            - paragraph [ref=e397]: Boost yield and unlock perks.
+        - article [ref=e398]:
+          - img [ref=e399]
+          - generic [ref=e404]:
+            - heading "Future worlds" [level=3] [ref=e405]
+            - paragraph [ref=e406]: Expanding the Cukies universe.
+        - article [ref=e407]:
+          - img [ref=e408]
+          - generic [ref=e412]:
+            - heading "Rewards" [level=3] [ref=e413]
+            - paragraph [ref=e414]: Compete, rank, get rewarded.
+    - generic [ref=e418]:
+      - generic [ref=e419]:
+        - heading "From NFT collection to game economy" [level=2] [ref=e420]
+        - paragraph [ref=e421]: Our journey continues.
+        - link "Our history" [ref=e422] [cursor=pointer]:
+          - /url: "#utility"
+          - generic [ref=e423]: Our history
+          - img [ref=e425]
+      - generic [ref=e427]:
+        - article [ref=e428]:
+          - paragraph [ref=e429]: "2021"
+          - heading "Cukies NFTs" [level=3] [ref=e431]
+          - paragraph [ref=e432]: Collection launch and community begins.
+        - article [ref=e433]:
+          - paragraph [ref=e434]: 2022-2023
+          - heading "Ecosystem" [level=3] [ref=e436]
+          - paragraph [ref=e437]: Bridge, tools and marketplace expansion.
+        - article [ref=e438]:
+          - paragraph [ref=e439]: "2024"
+          - heading "Building" [level=3] [ref=e441]
+          - paragraph [ref=e442]: Game systems and utility access.
+        - article [ref=e443]:
+          - paragraph [ref=e444]: "2026"
+          - heading "UKI launch" [level=3] [ref=e446]
+          - paragraph [ref=e447]: Token presale and new economy.
+        - article [ref=e448]:
+          - paragraph [ref=e449]: Next
+          - heading "Game economy" [level=3] [ref=e451]
+          - paragraph [ref=e452]: Play, earn, own, together.
+    - generic [ref=e453]:
+      - generic [ref=e454]:
+        - generic [ref=e455]:
+          - 'heading "After presale: Cukie Master coming next" [level=2] [ref=e456]':
+            - generic [ref=e457]: "After presale: Cukie Master coming next"
+          - paragraph [ref=e458]: More utility. More rewards. More ways to grow.
+        - generic [ref=e459]: Phase 02
+      - generic [ref=e460]:
+        - generic [ref=e464]:
+          - generic [ref=e465]:
+            - img [ref=e467]
+            - img [ref=e470]
+          - generic [ref=e473]:
+            - heading "Stake UKI" [level=3] [ref=e474]
+            - paragraph [ref=e475]: Stake your UKI to boost power and multipliers.
+        - generic [ref=e479]:
+          - generic [ref=e480]:
+            - img [ref=e482]
+            - img [ref=e485]
+          - generic [ref=e488]:
+            - heading "Use Cukie points" [level=3] [ref=e489]
+            - paragraph [ref=e490]: Use Cukie Master points for upgrades and benefits.
+        - generic [ref=e494]:
+          - generic [ref=e495]:
+            - img [ref=e497]
+            - img [ref=e503]
+          - generic [ref=e506]:
+            - heading "Receive credits" [level=3] [ref=e507]
+            - paragraph [ref=e508]: Earn credits from activity, games and pools.
+        - generic [ref=e512]:
+          - generic [ref=e513]:
+            - img [ref=e515]
+            - img [ref=e518]
+          - generic [ref=e521]:
+            - heading "Enter pools" [level=3] [ref=e522]
+            - paragraph [ref=e523]: Join exclusive pools for greater rewards.
+      - paragraph [ref=e524]:
+        - img [ref=e525]
+        - text: Cukie Master and staking features will open after the presale and TGE.
+    - generic [ref=e530]:
+      - generic [ref=e531]:
+        - generic [ref=e532]:
+          - generic [ref=e533]:
+            - heading "Treasure Hunt the first game" [level=2] [ref=e534]:
+              - text: Treasure Hunt
+              - generic [ref=e535]: the first game
+            - paragraph [ref=e536]: Treasure Hunt is the first game connected to UKI and the Cukies game economy.
+          - link "View game trailer" [ref=e537] [cursor=pointer]:
+            - /url: /games
+            - generic [ref=e538]: View game trailer
+            - img [ref=e540]
+        - img "Treasure Hunt game scene" [ref=e543]
+        - generic [ref=e545]:
+          - heading "Game overview" [level=3] [ref=e546]
+          - list [ref=e547]:
+            - listitem [ref=e548]:
+              - img [ref=e549]
+              - text: Use credits to enter
+            - listitem [ref=e551]:
+              - img [ref=e552]
+              - text: Hunt treasures and earn rewards
+            - listitem [ref=e554]:
+              - img [ref=e555]
+              - text: Climb the weekly rankings
+          - generic [ref=e557]:
+            - generic [ref=e558]:
+              - paragraph [ref=e559]: Entry cost
+              - paragraph [ref=e560]: "10"
+              - paragraph [ref=e561]: Credits
+            - generic [ref=e562]:
+              - paragraph [ref=e563]: Rankings
+              - paragraph [ref=e564]: Weekly
+              - paragraph [ref=e565]: Resets
+            - generic [ref=e566]:
+              - paragraph [ref=e567]: Top reward
+              - paragraph [ref=e568]: UKI +
+              - paragraph [ref=e569]: Credits
+      - generic [ref=e570]:
+        - heading "More games are coming" [level=3] [ref=e571]
+        - generic [ref=e572]:
+          - article [ref=e573]:
+            - img "Cukies Rush n' Run" [ref=e575]
+            - generic [ref=e576]:
+              - heading "Cukies Rush n' Run" [level=4] [ref=e577]
+              - paragraph [ref=e578]: Action / runner
+          - article [ref=e579]:
+            - img "Cukies Board Game" [ref=e581]
+            - generic [ref=e582]:
+              - heading "Cukies Board Game" [level=4] [ref=e583]
+              - paragraph [ref=e584]: Strategy / PvP
+          - article [ref=e585]:
+            - img "Cukies Sports" [ref=e587]
+            - generic [ref=e588]:
+              - heading "Cukies Sports" [level=4] [ref=e589]
+              - paragraph [ref=e590]: Sports / arcade
+          - article [ref=e591]:
+            - img "And more..." [ref=e593]
+            - generic [ref=e594]:
+              - heading "And more..." [level=4] [ref=e595]
+              - paragraph [ref=e596]: Stay tuned
+    - generic [ref=e597]:
+      - generic [ref=e599]:
+        - heading "FAQ" [level=2] [ref=e600]
+        - generic [ref=e601]:
+          - group [ref=e602]:
+            - generic "What is UKI and what can I use it for? +" [ref=e603] [cursor=pointer]:
+              - text: What is UKI and what can I use it for?
+              - generic [ref=e604]: +
+          - group [ref=e605]:
+            - generic "Why is the presale in ASM? +" [ref=e606] [cursor=pointer]:
+              - text: Why is the presale in ASM?
+              - generic [ref=e607]: +
+          - group [ref=e608]:
+            - generic "How does vesting work? +" [ref=e609] [cursor=pointer]:
+              - text: How does vesting work?
+              - generic [ref=e610]: +
+          - group [ref=e611]:
+            - generic "When will staking be available? +" [ref=e612] [cursor=pointer]:
+              - text: When will staking be available?
+              - generic [ref=e613]: +
+          - group [ref=e614]:
+            - generic "Do Cukies NFTs provide utility? +" [ref=e615] [cursor=pointer]:
+              - text: Do Cukies NFTs provide utility?
+              - generic [ref=e616]: +
+          - group [ref=e617]:
+            - generic "How are rewards and pools structured? +" [ref=e618] [cursor=pointer]:
+              - text: How are rewards and pools structured?
+              - generic [ref=e619]: +
+      - generic [ref=e622]:
+        - generic [ref=e623]:
+          - heading "Be part of the next Cukies chapter" [level=2] [ref=e624]
+          - paragraph [ref=e625]: UKI Presale opens soon. Do not miss your chance.
+          - generic [ref=e626]:
+            - link "Join UKI presale" [ref=e627] [cursor=pointer]:
+              - /url: "#presale-console"
+              - generic [ref=e628]: Join UKI presale
+              - img [ref=e630]
+            - link "Read sale details" [ref=e632] [cursor=pointer]:
+              - /url: "#token"
+              - generic [ref=e633]: Read sale details
+              - img [ref=e635]
+        - img "Cukie character ready for the UKI launch" [ref=e638]
+    - generic [ref=e640]:
+      - img "Cukies World" [ref=e642]
+      - generic [ref=e643]:
+        - link "X" [ref=e644] [cursor=pointer]:
+          - /url: "#presale"
+          - img [ref=e645]
+        - link "Telegram" [ref=e647] [cursor=pointer]:
+          - /url: "#presale"
+          - img [ref=e648]
+        - link "YouTube" [ref=e651] [cursor=pointer]:
+          - /url: "#presale"
+          - img [ref=e652]
+        - link "Instagram" [ref=e655] [cursor=pointer]:
+          - /url: "#presale"
+          - img [ref=e656]
+      - generic [ref=e659]:
+        - link "Docs" [ref=e660] [cursor=pointer]:
+          - /url: "#token"
+        - link "Token" [ref=e661] [cursor=pointer]:
+          - /url: "#token"
+        - link "Brand kit" [ref=e662] [cursor=pointer]:
+          - /url: /brand/uki-sale-landing-reference.png
+        - generic [ref=e663]: Terms
+        - generic [ref=e664]: Privacy
+      - paragraph [ref=e665]:
+        - text: (c) 2026 Cukies World
+        - generic [ref=e666]: All rights reserved.
+  - region "Notifications (F8)":
+    - list

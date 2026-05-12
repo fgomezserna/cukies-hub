@@ -1,0 +1,166 @@
+[    1211ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[    1512ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[  245554ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[  254326ms] [LOG] [Fast Refresh] done in 8772ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[  287753ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[  288317ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[  527425ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[  527926ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[  722955ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[  723440ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 1173524ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 1177453ms] [LOG] [Fast Refresh] done in 3930ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 1181717ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 1190003ms] [LOG] [Fast Refresh] done in 8285ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 1190055ms] [LOG] [HMR] Detected local css modules. Reload all css @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/mini-css-extract-plugin/hmr/hotModuleReplacement.js:1
+[ 1219092ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 1223218ms] [LOG] [Fast Refresh] done in 4127ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 1343089ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 1343713ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 1538203ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 1538689ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 1610210ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 1610657ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 1665249ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 1665631ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 2408382ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2412926ms] [LOG] [Fast Refresh] done in 4544ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2427653ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2428876ms] [LOG] [Fast Refresh] done in 1223ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2453034ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2457357ms] [LOG] [Fast Refresh] done in 4323ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2517329ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2523586ms] [LOG] [Fast Refresh] done in 6256ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2528547ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2533575ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:144
+[ 2536760ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2540955ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 2541209ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 2547285ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-timeline-2021.svg:0
+[ 2547289ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-timeline-ecosystem.svg:0
+[ 2547290ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-timeline-building.svg:0
+[ 2547296ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-timeline-launch.svg:0
+[ 2547304ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-timeline-economy.svg:0
+[ 2573681ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2578120ms] [LOG] [Fast Refresh] done in 4438ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2608252ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2611932ms] [LOG] [Fast Refresh] done in 3679ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2677761ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2687862ms] [LOG] [Fast Refresh] done in 10100ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2688969ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2690433ms] [LOG] [Fast Refresh] done in 1463ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2691758ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-utility-map-bg.svg:0
+[ 2693266ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-utility-map-bg.svg:0
+[ 2701133ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2703879ms] [LOG] [Fast Refresh] done in 2746ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 2706878ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/brand/generated/uki-utility-map-bg.svg:0
+[ 2933331ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 2940016ms] [LOG] [Fast Refresh] done in 6685ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 3047171ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 3050529ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:144
+[ 3063230ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 3068414ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 3069093ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackErrorBoundary pathname="/" notFound={[...]} forbidden={undefined} unauthorized={undefined} ...>
+      <RedirectBoundary>
+        <RedirectErrorBoundary router={{...}}>
+          <InnerLayoutRouter url="/" tree={[...]} cacheNode={{lazyData:null, ...}} segmentPath={[...]}>
+            <HomePage>
+              <CukiesLanding>
+                <main className="uki-landin...">
+                  <div>
+                  <div>
+                  <header>
+                  <HeroSection>
+                    <section id="presale" className="uki-hero-s...">
+                      <img>
+                      <ImagePreload>
+                      <div>
+                      <div>
+                      ...
+                        <div className="uki-panel-...">
+                          <div>
+                          <div>
+                          <div>
+                          <div className="mt-2.5 rou...">
+                            <p>
+                            <PresaleCountdown>
+                              <div className="mt-2 grid ..." aria-live="polite">
+                                <div>
+                                <div>
+                                <div>
+                                <div className="uki-countd...">
+                                  <span
+                                    className="block font-headline text-xl font-black leading-none text-[var(--uki-cyan)]"
+                                  >
++                                   36
+-                                   41
+                                  ...
+                          ...
+                  ...
+            ...
+
+    at throwOnHydrationMismatch (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:13311:11)
+    at prepareToHydrateHostInstance (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:13407:21)
+    at completeWork (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:13745:15)
+    at runWithFiberInDEV (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:1511:30)
+    at completeUnitOfWork (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:15256:19)
+    at performUnitOfWork (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:15137:11)
+    at workLoopConcurrentByScheduler (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:15114:9)
+    at renderRootConcurrent (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:15089:15)
+    at performWorkOnRoot (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:14410:13)
+    at performWorkOnRootViaSchedulerTask (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:16275:7)
+    at MessagePort.performWorkUntilDeadline (webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js:45:48)
+    at span (<anonymous>)
+    at eval (webpack-internal:///(app-pages-browser)/./src/components/landing/presale-countdown.tsx:90:96)
+    at Array.map (<anonymous>)
+    at PresaleCountdown (webpack-internal:///(app-pages-browser)/./src/components/landing/presale-countdown.tsx:87:25)
+    at SaleConsole (rsc://React/Server/webpack-internal:///(rsc)/./src/components/landing/sale-console.tsx?155:142:96)
+    at HeroSection (rsc://React/Server/webpack-internal:///(rsc)/./src/components/landing/sections.tsx?9:325:96)
+    at CukiesLanding (rsc://React/Server/webpack-internal:///(rsc)/./src/components/landing/sections.tsx?2:55:88)
+    at HomePage (rsc://React/Server/webpack-internal:///(rsc)/./src/app/page.tsx?0:11:87)
+[ 3068707ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 3068716ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 3085871ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 3087026ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:144
+[ 3094852ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24914
+[ 3095308ms] [LOG] Wallet hook update: {evmAddress: undefined, tronAddress: null, currentAddress: null, isConnected: false, previousAddress: undefined} @ webpack-internal:///(app-pages-browser)/./src/providers/auth-provider.tsx:108
+[ 3805165ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 3818648ms] [LOG] [Fast Refresh] done in 13483ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 4675872ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:241
+[ 4682029ms] [LOG] [Fast Refresh] done in 6157ms @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@15.2.3_@babel+core@7.28.3_@opentelemetry+api@1.9.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:73
+[ 4688200ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/css/app/layout.css?v=1778578881120:0
+[ 4688454ms] Event
