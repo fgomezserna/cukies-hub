@@ -13,7 +13,8 @@ import {
   utilityNodes,
   vestingTracks,
 } from './data';
-import { PresaleGateAction, PresaleLockBadge } from './presale-countdown';
+import { PresaleGateAction, PresaleGateLink, PresaleLockBadge } from './presale-countdown';
+import { HeroBackgroundVideo } from './hero-background-video';
 import { LandingButton, MetricTile, Panel, ProgressTrack, SectionHeading, TokenCoin } from './primitives';
 import { SaleConsole } from './sale-console';
 import { UKI_PRESALE_START_LABEL } from './sale-config';
@@ -64,11 +65,12 @@ function LandingHeader() {
 function HeroSection() {
   return (
     <section id="presale" className="uki-hero-section">
+      <HeroBackgroundVideo />
       <Image
         src="/brand/generated/uki-hero-stage-generated.png"
         alt=""
         fill
-        className="uki-hero-bg"
+        className="uki-hero-bg uki-hero-bg-fallback"
         sizes="100vw"
         priority
       />
@@ -91,7 +93,7 @@ function HeroSection() {
           </p>
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <LandingButton href="#presale-console">Join UKI presale</LandingButton>
+            <PresaleGateLink href="#presale-console">Join UKI presale</PresaleGateLink>
             <LandingButton href="#token" variant="secondary">
               Read sale details
             </LandingButton>
@@ -313,15 +315,14 @@ function UtilityMap() {
       <SectionHeading title="Why UKI exists" subtitle="UKI connects everything in the Cukies game economy." tone="cyan" withRule />
       <div className="uki-utility-map">
         <svg className="uki-utility-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M50 52 L27 17" />
-          <path d="M50 52 L74 18" />
-          <path d="M50 52 L20 48" />
-          <path d="M50 52 L80 48" />
-          <path d="M50 52 L29 84" />
-          <path d="M50 52 L73 83" />
+          <path d="M50 53 L31 21" />
+          <path d="M50 53 L70 22" />
+          <path d="M50 53 L23 51" />
+          <path d="M50 53 L78 51" />
+          <path d="M50 53 L30 80" />
+          <path d="M50 53 L72 80" />
         </svg>
         <div className="uki-orbit" />
-        <div className="uki-central-coin">UKI</div>
         {utilityNodes.map((node) => {
           const Icon = node.icon;
           return (
@@ -342,9 +343,10 @@ function UtilityMap() {
 function Timeline() {
   return (
     <section className="uki-container pb-6">
-      <Panel innerClassName="p-5 sm:p-6">
-        <div className="grid gap-8 lg:grid-cols-[0.34fr_1fr] lg:items-center">
-          <div>
+      <Panel className="uki-timeline-panel" innerClassName="relative overflow-hidden p-5 sm:p-6">
+        <div className="uki-timeline-scene" aria-hidden="true" />
+        <div className="uki-timeline-content">
+          <div className="uki-timeline-copy">
             <h2 className="font-headline text-3xl font-black uppercase leading-tight tracking-[-0.02em] text-[var(--uki-cream)] sm:text-4xl">
               From NFT collection to game economy
             </h2>
@@ -353,13 +355,16 @@ function Timeline() {
               Our history
             </LandingButton>
           </div>
-          <div className="grid gap-4 sm:grid-cols-5">
+          <div className="uki-timeline-rail">
             {timeline.map((item) => (
-            <article key={item.year} className={`uki-timeline-card ${item.active ? 'is-active' : ''}`}>
-                <p className="font-headline text-lg font-black text-[var(--uki-cyan)]">{item.year}</p>
+              <article
+                key={item.year}
+                className={`uki-timeline-card ${item.active ? 'is-active' : ''}`}
+              >
+                <p className="font-headline text-base font-black text-[var(--uki-cyan)]">{item.year}</p>
+                <h3 className="mt-2 font-headline text-sm font-black uppercase leading-tight text-[var(--uki-cream)]">{item.title}</h3>
+                <p className="mt-1.5 text-[0.68rem] font-semibold leading-snug text-[var(--uki-muted)]">{item.text}</p>
                 <span className="uki-timeline-thumb" style={{ backgroundImage: `url(${item.image})` }} aria-hidden="true" />
-                <h3 className="mt-3 font-headline text-base font-black uppercase leading-tight text-[var(--uki-cream)]">{item.title}</h3>
-                <p className="mt-2 text-xs leading-relaxed text-[var(--uki-muted)]">{item.text}</p>
               </article>
             ))}
           </div>
@@ -372,51 +377,62 @@ function Timeline() {
 function AfterPresale() {
   return (
     <section className="uki-container pb-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SectionHeading
-          className="uki-after-heading"
-          title={
-            <>
-              After presale: <span className="text-[var(--uki-cyan)]">Cukie Master coming next</span>
-            </>
-          }
-          subtitle="More utility. More rewards. More ways to grow."
-        />
-        <span className="w-fit rounded-[4px] border border-[#ef5f8f]/55 bg-[#2a0d1a]/75 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#ff75aa]">
-          Phase 02
-        </span>
+      <div className="uki-after-scene-wrap">
+        <div className="uki-after-scene-bg" aria-hidden="true" />
+        <div className="uki-after-content">
+          <div className="uki-after-copy">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <SectionHeading
+                className="uki-after-heading"
+                title={
+                  <>
+                    After presale: <span className="text-[var(--uki-cyan)]">Cukie Master coming next</span>
+                  </>
+                }
+                subtitle="More utility. More rewards. More ways to grow."
+              />
+              <span className="w-fit rounded-[4px] border border-[#ef5f8f]/55 bg-[#2a0d1a]/75 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#ff75aa]">
+                Phase 02
+              </span>
+            </div>
+          </div>
+          <div className="uki-future-rail">
+            {futureUtility.map((item) => {
+              const Icon = item.icon;
+              return (
+                <article key={item.title} className={`uki-future-card ${item.className}`}>
+                  <Image
+                    src={item.image}
+                    alt=""
+                    fill
+                    className="uki-future-card-bg"
+                    sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                  />
+                  <span className="uki-future-image-scrim" aria-hidden="true" />
+                  <div className="uki-future-card-top">
+                    <span className="uki-future-icon">
+                      <Icon className="h-5 w-5" strokeWidth={1.8} />
+                    </span>
+                    <span className="uki-future-lock">
+                      <Lock className="h-4 w-4" strokeWidth={1.8} />
+                    </span>
+                  </div>
+                  <div className="uki-future-card-copy">
+                    <h3 className="font-headline text-lg font-black uppercase leading-none tracking-[-0.02em] text-[var(--uki-cream)]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 max-w-[15rem] text-xs font-semibold leading-snug text-[var(--uki-text)]">{item.text}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <p className="uki-after-note">
+            <Timer className="h-4 w-4 text-[var(--uki-gold)]" strokeWidth={1.8} />
+            Cukie Master and staking features will open after the {UKI_PRESALE_START_LABEL} presale and TGE.
+          </p>
+        </div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-4">
-        {futureUtility.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Panel key={item.title} className={`uki-future-card ${item.className}`} innerClassName="relative min-h-[320px] overflow-hidden p-0">
-              <div className="uki-future-card-bg" style={{ backgroundImage: `url(${item.image})` }} aria-hidden="true" />
-              <div className="uki-future-image-scrim" />
-              <div className="relative z-[1] flex min-h-[320px] flex-col justify-between p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="uki-future-icon">
-                    <Icon className="h-5 w-5" strokeWidth={1.8} />
-                  </span>
-                  <span className="uki-future-lock">
-                    <Lock className="h-4 w-4" strokeWidth={1.8} />
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-headline text-xl font-black uppercase leading-none tracking-[-0.02em] text-[var(--uki-cream)]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 max-w-[15rem] text-xs font-semibold leading-snug text-[var(--uki-text)]">{item.text}</p>
-                </div>
-              </div>
-            </Panel>
-          );
-        })}
-      </div>
-      <p className="mt-3 flex items-center justify-center gap-2 text-center text-sm font-semibold text-[var(--uki-muted)]">
-        <Timer className="h-4 w-4 text-[var(--uki-gold)]" strokeWidth={1.8} />
-        Cukie Master and staking features will open after the {UKI_PRESALE_START_LABEL} presale and TGE.
-      </p>
     </section>
   );
 }
@@ -424,11 +440,11 @@ function AfterPresale() {
 function Games() {
   return (
     <section id="games" className="uki-container pb-6">
-      <Panel innerClassName="p-4 sm:p-5">
-        <div className="grid gap-5 lg:grid-cols-[0.36fr_0.9fr_0.42fr]">
+      <Panel innerClassName="uki-games-panel p-4 sm:p-5">
+        <div className="uki-games-feature grid gap-4 lg:grid-cols-[0.44fr_minmax(0,1.12fr)_0.45fr]">
           <div className="flex flex-col justify-between">
             <div>
-              <h2 className="font-headline text-3xl font-black uppercase leading-tight tracking-[-0.02em] text-[var(--uki-cyan)] sm:text-4xl">
+              <h2 className="uki-games-title font-headline font-black uppercase leading-tight tracking-[-0.02em] text-[var(--uki-cyan)]">
                 Treasure Hunt
                 <span className="block">the first game</span>
               </h2>
@@ -441,12 +457,12 @@ function Games() {
             </LandingButton>
           </div>
 
-          <div className="uki-game-scene relative min-h-[280px] overflow-hidden rounded-[10px] border border-white/10 bg-[#02090d]">
-            <Image src="/brand/generated/uki-treasure-hunt-scene.png" alt="Treasure Hunt game scene" fill className="object-cover" sizes="(min-width: 1024px) 720px, 100vw" />
+          <div className="uki-game-scene relative overflow-hidden rounded-[10px] border border-white/10 bg-[#02090d]">
+            <Image src="/brand/generated/uki-treasure-hunt-scene-v2.png" alt="Treasure Hunt game scene" fill className="object-cover" sizes="(min-width: 1024px) 560px, 100vw" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#02090d]/55 via-transparent to-transparent" />
           </div>
 
-          <div className="rounded-[10px] border border-white/10 bg-[#02090d]/62 p-5">
+          <div className="uki-game-overview rounded-[10px] border border-white/10 bg-[#02090d]/62 p-5">
             <h3 className="font-headline text-xl font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)]">Game overview</h3>
             <ul className="mt-5 space-y-4 text-sm font-semibold text-[var(--uki-text)]">
               {['Use credits to enter', 'Hunt treasures and earn rewards', 'Climb the weekly rankings'].map((item) => (
@@ -464,11 +480,11 @@ function Games() {
           </div>
         </div>
 
-        <div className="mt-5 border-t border-white/10 pt-5">
+        <div className="uki-games-more mt-4 border-t border-white/10 pt-4">
           <h3 className="text-center font-headline text-lg font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
             More games are coming
           </h3>
-          <div className="mt-5 grid gap-4 lg:grid-cols-4">
+          <div className="mt-4 grid gap-3 lg:grid-cols-4">
             {gameCards.map((game) => (
               <article key={game.title} className="uki-game-card grid grid-cols-[82px_1fr] items-center gap-4 rounded-[9px] border border-white/10 bg-[#02090d]/60 p-3">
                 <div className="relative h-16 overflow-hidden rounded-[6px] border border-white/10 bg-[#06141a]">
@@ -489,7 +505,7 @@ function Games() {
 
 function GameMetric({ label, value, helper }: { label: string; value: string; helper: string }) {
   return (
-    <div>
+    <div className="uki-game-metric">
       <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[var(--uki-gold)]">{label}</p>
       <p className="mt-2 font-headline text-lg font-black uppercase text-[var(--uki-cream)]">{value}</p>
       <p className="text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-[var(--uki-muted)]">{helper}</p>
@@ -499,38 +515,38 @@ function GameMetric({ label, value, helper }: { label: string; value: string; he
 
 function FaqAndCta() {
   return (
-    <section id="faq" className="uki-container grid gap-6 pb-6 lg:grid-cols-[0.68fr_1fr]">
-      <Panel innerClassName="p-4 sm:p-5">
-        <h2 className="font-headline text-3xl font-black uppercase text-[var(--uki-cyan)]">FAQ</h2>
-        <div className="mt-5 divide-y divide-white/10">
+    <section id="faq" className="uki-faq-cta-row uki-container grid gap-4 pb-6 lg:grid-cols-[0.415fr_0.585fr]">
+      <Panel className="uki-faq-panel" innerClassName="p-3 sm:p-4">
+        <h2 className="font-headline text-2xl font-black uppercase text-[var(--uki-cyan)]">FAQ</h2>
+        <div className="uki-faq-list mt-3 divide-y divide-white/10">
           {faqs.map((faq) => (
-            <details key={faq.question} className="group py-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-bold text-[var(--uki-text)] transition group-open:text-[var(--uki-cyan)] hover:text-[var(--uki-cyan)]">
+            <details key={faq.question} className="group py-2">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[var(--uki-text)] transition group-open:text-[var(--uki-cyan)] hover:text-[var(--uki-cyan)]">
                 {faq.question}
-                <span className="text-xl text-[var(--uki-cyan)] transition-transform group-open:rotate-45">+</span>
+                <span className="text-lg leading-none text-[var(--uki-cyan)] transition-transform group-open:rotate-45">+</span>
               </summary>
-              <p className="pt-3 text-sm leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
+              <p className="pt-2 text-xs leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
             </details>
           ))}
         </div>
       </Panel>
 
-      <Panel className="uki-final-cta-panel" innerClassName="relative overflow-hidden p-4 sm:p-5">
-        <div className="relative z-[1] grid gap-6 lg:grid-cols-[0.9fr_0.8fr] lg:items-center">
-          <div>
-            <h2 className="font-headline text-4xl font-black uppercase leading-[0.94] tracking-[-0.025em] text-[var(--uki-cream)] sm:text-5xl">
+      <Panel className="uki-final-cta-panel" innerClassName="relative overflow-hidden p-0">
+        <div className="uki-final-cta-bg" aria-hidden="true" />
+        <div className="uki-final-cta-content">
+          <div className="uki-final-cta-copy">
+            <h2 className="font-headline text-3xl font-black uppercase leading-[0.98] text-[var(--uki-cream)] sm:text-4xl">
               Be part of the next Cukies chapter
             </h2>
-            <p className="mt-5 max-w-md text-lg leading-snug text-[var(--uki-text)]">UKI Presale opens on {UKI_PRESALE_START_LABEL}. Do not miss your chance.</p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <LandingButton href="#presale-console">Join UKI presale</LandingButton>
+            <p className="mt-3 max-w-sm text-sm font-semibold leading-snug text-[var(--uki-text)]">UKI Presale opens on {UKI_PRESALE_START_LABEL}. Do not miss your chance.</p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <PresaleGateLink href="#presale-console">Join UKI presale</PresaleGateLink>
               <LandingButton href="#token" variant="secondary">
                 Read sale details
               </LandingButton>
             </div>
           </div>
         </div>
-        <div className="uki-final-cta-bg" aria-hidden="true" />
       </Panel>
     </section>
   );
@@ -545,12 +561,15 @@ function LandingFooter() {
   ];
 
   return (
-    <footer className="border-t border-white/10 bg-[#02090d]/82">
-      <div className="uki-container flex flex-col gap-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-        <span className="relative block h-14 w-32 overflow-hidden">
-          <Image src="/Cukie_logo_first.png" alt="Cukies World" fill className="object-contain object-left" sizes="8rem" />
-        </span>
-        <div className="flex gap-2">
+    <footer className="uki-footer">
+      <div className="uki-footer-inner uki-container">
+        <div className="uki-footer-brand">
+          <span className="relative block h-11 w-[6.8rem] overflow-hidden sm:h-12 sm:w-[7.4rem]">
+            <Image src="/Cukie_logo_first.png" alt="Cukies World" fill className="object-contain object-left" sizes="7.4rem" />
+          </span>
+        </div>
+
+        <div className="uki-footer-socials">
           {socials.map((social) => {
             const Icon = social.icon;
             return (
@@ -560,14 +579,16 @@ function LandingFooter() {
             );
           })}
         </div>
-        <div className="flex flex-wrap gap-x-8 gap-y-3 text-xs font-semibold text-[var(--uki-muted)]">
+
+        <div className="uki-footer-links">
           <a href="#token" className="hover:text-[var(--uki-cyan)]">Docs</a>
           <a href="#token" className="hover:text-[var(--uki-cyan)]">Token</a>
-          <a href="/brand/uki-sale-landing-reference.png" className="hover:text-[var(--uki-cyan)]">Brand kit</a>
+          <a href="/brand/uki-sale-landing-reference.png" className="hover:text-[var(--uki-cyan)]">Brand Kit</a>
           <span className="text-white/30">Terms</span>
           <span className="text-white/30">Privacy</span>
         </div>
-        <p className="text-xs leading-relaxed text-[var(--uki-muted)]">
+
+        <p className="uki-footer-copy">
           (c) 2026 Cukies World
           <span className="block">All rights reserved.</span>
         </p>
