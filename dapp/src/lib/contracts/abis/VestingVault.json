@@ -58,6 +58,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidRecipient",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidSchedule",
     "type": "error"
   },
@@ -167,6 +172,12 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "amount",
@@ -182,8 +193,33 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "UnallocatedWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "beneficiary",
         "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
       },
       {
         "indexed": false,
@@ -200,6 +236,12 @@
       {
         "indexed": false,
         "internalType": "uint64",
+        "name": "cliff",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
         "name": "duration",
         "type": "uint64"
       }
@@ -210,6 +252,19 @@
   {
     "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PRESALE_SCHEDULE_ID",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -257,6 +312,44 @@
       }
     ],
     "name": "createVesting",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "beneficiary",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "start",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "cliff",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "duration",
+        "type": "uint64"
+      }
+    ],
+    "name": "createVestingWithCliff",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -342,12 +435,68 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "beneficiary",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "releasable",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "release",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "release",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "releaseAll",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "totalAmount",
         "type": "uint256"
       }
     ],
@@ -398,6 +547,25 @@
         "type": "address"
       }
     ],
+    "name": "scheduleIdsOf",
+    "outputs": [
+      {
+        "internalType": "bytes32[]",
+        "name": "",
+        "type": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "beneficiary",
+        "type": "address"
+      }
+    ],
     "name": "scheduleOf",
     "outputs": [
       {
@@ -415,6 +583,62 @@
           {
             "internalType": "uint64",
             "name": "start",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "cliff",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "duration",
+            "type": "uint64"
+          }
+        ],
+        "internalType": "struct VestingVault.VestingSchedule",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "beneficiary",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "scheduleOf",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint128",
+            "name": "totalAmount",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "releasedAmount",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint64",
+            "name": "start",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "cliff",
             "type": "uint64"
           },
           {
@@ -490,6 +714,48 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "unallocatedBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "beneficiary",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "scheduleId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "vestedAmount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -511,6 +777,24 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawUnallocated",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ]

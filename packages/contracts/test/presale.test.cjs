@@ -62,7 +62,9 @@ describe('Presale', function () {
     const schedule = await vault.scheduleOf(buyer.address);
     expect(schedule.totalAmount).to.equal(ukiAmount);
     expect(schedule.start).to.equal(vestingStart);
+    expect(schedule.cliff).to.equal(vestingStart);
     expect(schedule.duration).to.equal(vestingDuration);
+    expect(await vault.scheduleIdsOf(buyer.address)).to.deep.equal([await vault.PRESALE_SCHEDULE_ID()]);
   });
 
   it('allows multiple purchases in the same vesting schedule', async function () {
