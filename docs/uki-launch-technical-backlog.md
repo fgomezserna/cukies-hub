@@ -107,6 +107,7 @@ Issues hijas:
     - Informe de campos incompletos o inconsistentes.
 
 - UKI-002.3 Task - Definir adaptador `NftInventoryService`
+  - Especificacion: `docs/uki-nft-inventory-service.md`.
   - Acceptance criteria:
     - API interna propuesta con metodos:
       - `getWalletNfts(wallet)`
