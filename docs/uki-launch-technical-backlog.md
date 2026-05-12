@@ -94,6 +94,7 @@ Entender las BDs actuales de Proxmox y marketplace para no duplicar modelos ni r
 Issues hijas:
 
 - UKI-002.1 Task - Inventariar bases, colecciones y campos NFT
+  - Documento de inventario: `docs/uki-nft-data-inventory.md`.
   - Acceptance criteria:
     - Documento con colecciones relevantes por red.
     - Campos: contract/network, tokenId, owner, rarity, generation, metadata, listing status, bridge status.
