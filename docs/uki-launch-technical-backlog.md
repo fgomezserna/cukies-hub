@@ -75,6 +75,7 @@ Issues hijas:
 
 - UKI-001.3 Task - Definir politica de consistencia
   - Definir ventanas aceptables de sincronizacion para ownership NFT, staking, credits y rewards.
+  - Documento de decision: `docs/adr-uki-consistency-policy.md`.
   - Acceptance criteria:
     - Queda definido que se calcula en snapshot diario/semanal.
     - Queda definido que se comprueba en tiempo real antes de iniciar partida.
