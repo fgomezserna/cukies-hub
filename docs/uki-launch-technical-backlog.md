@@ -939,6 +939,7 @@ Separar pantallas por responsabilidad unica para evitar una dapp confusa.
 Issues hijas:
 
 - UKI-070.1 Task - Sitemap propuesto
+  - Documento de sitemap: `docs/uki-dapp-sitemap.md`.
   - Pantallas:
     - Landing/Launch
     - Preventa UKI
