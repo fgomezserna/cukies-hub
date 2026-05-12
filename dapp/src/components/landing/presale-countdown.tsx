@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Lock, Timer } from 'lucide-react';
+import { ArrowRight, Lock, Timer } from 'lucide-react';
 import { UKI_PRESALE_START_ISO, UKI_PRESALE_START_LABEL } from './sale-config';
 
 type RemainingTime = {
@@ -105,5 +105,47 @@ export function PresaleGateAction({
         openLabel ?? children
       )}
     </button>
+  );
+}
+
+export function PresaleGateLink({
+  href,
+  children,
+  className = '',
+  variant = 'primary',
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+  variant?: 'primary' | 'secondary' | 'ghost';
+}) {
+  const { isLocked } = usePresaleLock();
+  const variantClass = {
+    primary: 'uki-button-primary',
+    secondary: 'uki-button-secondary',
+    ghost: 'uki-button-ghost',
+  }[variant];
+
+  if (isLocked) {
+    return (
+      <span aria-disabled="true" className={`uki-button ${variantClass} uki-button-locked ${className}`}>
+        <span className="inline-flex items-center gap-2">
+          <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
+          Opens Jun 10
+        </span>
+        <span className="uki-button-icon" aria-hidden="true">
+          <Timer className="h-4 w-4" />
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <a href={href} className={`uki-button ${variantClass} ${className}`}>
+      <span>{children}</span>
+      <span className="uki-button-icon" aria-hidden="true">
+        <ArrowRight className="h-4 w-4" />
+      </span>
+    </a>
   );
 }
