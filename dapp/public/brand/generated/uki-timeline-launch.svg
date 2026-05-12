@@ -1,0 +1,20 @@
+<svg width="640" height="240" viewBox="0 0 640 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="door" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(346 118) rotate(90) scale(150 230)">
+      <stop stop-color="#f2c34b" stop-opacity="0.42"/>
+      <stop offset="0.48" stop-color="#22e7df" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#02090d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="240" fill="#02090d"/>
+  <rect width="640" height="240" fill="url(#door)"/>
+  <circle cx="342" cy="116" r="86" fill="#09161a" stroke="#4c3a18" stroke-width="16"/>
+  <circle cx="342" cy="116" r="58" fill="#d99a22"/>
+  <circle cx="342" cy="116" r="38" fill="#ffe58c"/>
+  <circle cx="342" cy="116" r="19" fill="#8f5b11"/>
+  <path d="M342 58V174M284 116H400M302 76L382 156M382 76L302 156" stroke="#3d2607" stroke-opacity="0.5" stroke-width="4"/>
+  <path d="M122 188C210 160 277 160 348 174C424 190 496 185 574 146" stroke="#22e7df" stroke-opacity="0.34" stroke-dasharray="9 10"/>
+  <circle cx="208" cy="168" r="13" fill="#22e7df"/>
+  <circle cx="472" cy="158" r="14" fill="#ef5f8f"/>
+  <circle cx="530" cy="122" r="10" fill="#91d867"/>
+</svg>
