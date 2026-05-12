@@ -1,0 +1,18 @@
+<svg width="640" height="240" viewBox="0 0 640 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="forge" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(338 116) rotate(90) scale(120 290)">
+      <stop stop-color="#f2c34b" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#02090d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="240" fill="#02090d"/>
+  <rect width="640" height="240" fill="url(#forge)"/>
+  <path d="M144 176L256 82L366 176H144Z" fill="#08252b" stroke="#22e7df" stroke-opacity="0.32"/>
+  <path d="M276 176L392 70L512 176H276Z" fill="#11281f" stroke="#f2c34b" stroke-opacity="0.34"/>
+  <rect x="198" y="126" width="46" height="50" fill="#031014" stroke="#22e7df" stroke-opacity="0.22"/>
+  <rect x="390" y="120" width="48" height="56" fill="#031014" stroke="#f2c34b" stroke-opacity="0.24"/>
+  <path d="M84 188H560" stroke="#22e7df" stroke-opacity="0.22"/>
+  <path d="M112 206H530" stroke="#f2c34b" stroke-opacity="0.18"/>
+  <circle cx="322" cy="128" r="32" fill="#22e7df" fill-opacity="0.14" stroke="#22e7df" stroke-opacity="0.42"/>
+  <path d="M322 84V172M278 128H366" stroke="#22e7df" stroke-opacity="0.34"/>
+</svg>

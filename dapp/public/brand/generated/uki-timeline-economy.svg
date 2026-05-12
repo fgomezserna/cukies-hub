@@ -1,0 +1,18 @@
+<svg width="640" height="240" viewBox="0 0 640 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="world" x1="0" y1="0" x2="640" y2="240">
+      <stop stop-color="#031014"/>
+      <stop offset="0.46" stop-color="#0a2e2a"/>
+      <stop offset="1" stop-color="#050b10"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="240" fill="url(#world)"/>
+  <circle cx="320" cy="124" r="58" fill="#0b2528" stroke="#22e7df" stroke-opacity="0.26"/>
+  <circle cx="320" cy="124" r="28" fill="#f2c34b"/>
+  <circle cx="182" cy="106" r="26" fill="#22e7df" fill-opacity="0.2" stroke="#22e7df" stroke-opacity="0.46"/>
+  <circle cx="470" cy="90" r="24" fill="#ef5f8f" fill-opacity="0.18" stroke="#ef5f8f" stroke-opacity="0.42"/>
+  <circle cx="464" cy="170" r="30" fill="#91d867" fill-opacity="0.18" stroke="#91d867" stroke-opacity="0.42"/>
+  <path d="M208 110C250 90 280 88 320 124C360 160 405 164 434 169" stroke="#22e7df" stroke-opacity="0.34" stroke-dasharray="7 9"/>
+  <path d="M344 116C380 92 412 84 446 90" stroke="#f2c34b" stroke-opacity="0.26" stroke-dasharray="7 9"/>
+  <path d="M0 192C92 166 184 162 304 190C430 220 524 212 640 176V240H0V192Z" fill="#02090d" fill-opacity="0.54"/>
+</svg>
