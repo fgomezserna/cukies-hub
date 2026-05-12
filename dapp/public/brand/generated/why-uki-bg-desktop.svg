@@ -1,0 +1,75 @@
+<svg width="1600" height="720" viewBox="0 0 1600 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1600" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#02080c"/>
+      <stop offset="0.36" stop-color="#082b2d"/>
+      <stop offset="0.66" stop-color="#061719"/>
+      <stop offset="1" stop-color="#010508"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(790 348) rotate(90) scale(310 560)">
+      <stop offset="0" stop-color="#22e7df" stop-opacity="0.2"/>
+      <stop offset="0.44" stop-color="#0a4a4b" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#02080c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vaultGold" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1198 250) rotate(90) scale(300 430)">
+      <stop offset="0" stop-color="#f2c34b" stop-opacity="0.24"/>
+      <stop offset="0.5" stop-color="#8d6a26" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#02080c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="leftTeal" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(224 410) rotate(90) scale(250 360)">
+      <stop offset="0" stop-color="#21e7de" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#02080c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="floor" x1="0" y1="604" x2="1600" y2="604" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#041518" stop-opacity="0"/>
+      <stop offset="0.48" stop-color="#0b3534" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#07100e" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="microGrid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" stroke="#21e7de" stroke-opacity="0.06"/>
+      <path d="M16 64V0M32 64V0M48 64V0M0 16H64M0 32H64M0 48H64" stroke="#f2c34b" stroke-opacity="0.025"/>
+    </pattern>
+    <filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="720" fill="url(#base)"/>
+  <rect width="1600" height="720" fill="url(#microGrid)" opacity="0.72"/>
+  <rect width="1600" height="720" fill="url(#coreGlow)"/>
+  <rect width="1600" height="720" fill="url(#vaultGold)"/>
+  <rect width="1600" height="720" fill="url(#leftTeal)"/>
+  <path d="M0 604C210 556 374 568 548 620C724 672 902 676 1088 618C1272 560 1432 546 1600 582V720H0V604Z" fill="url(#floor)"/>
+  <g opacity="0.36">
+    <path d="M-60 184C148 138 310 162 470 248C620 330 714 344 800 344C918 344 1022 296 1148 210C1284 116 1436 96 1660 140" stroke="#21e7de" stroke-opacity="0.18" stroke-width="2"/>
+    <path d="M-72 444C166 488 336 456 520 368C666 298 740 282 804 282C920 282 1028 344 1176 458C1308 560 1458 592 1670 548" stroke="#f2c34b" stroke-opacity="0.14" stroke-width="2"/>
+    <path d="M164 96C248 166 296 266 280 398C264 528 334 606 468 654" stroke="#21e7de" stroke-opacity="0.18" stroke-width="2"/>
+    <path d="M1412 74C1318 144 1284 240 1308 362C1336 506 1262 604 1118 650" stroke="#f2c34b" stroke-opacity="0.16" stroke-width="2"/>
+  </g>
+  <g opacity="0.38">
+    <circle cx="800" cy="344" r="274" stroke="#21e7de" stroke-opacity="0.26"/>
+    <circle cx="800" cy="344" r="218" stroke="#f2c34b" stroke-opacity="0.16"/>
+    <circle cx="800" cy="344" r="152" stroke="#21e7de" stroke-opacity="0.18"/>
+    <path d="M526 344H1074M800 70V618M606 150L994 538M996 150L604 538" stroke="#21e7de" stroke-opacity="0.12" stroke-dasharray="6 12"/>
+    <path d="M682 220C760 178 852 178 926 220M682 468C760 510 852 510 926 468" stroke="#f2c34b" stroke-opacity="0.18" stroke-dasharray="9 14"/>
+  </g>
+  <g opacity="0.42">
+    <rect x="1074" y="130" width="268" height="268" rx="134" stroke="#f2c34b" stroke-opacity="0.2" stroke-width="10"/>
+    <rect x="1128" y="184" width="160" height="160" rx="80" stroke="#21e7de" stroke-opacity="0.14" stroke-width="2"/>
+    <path d="M1208 126V402M1070 264H1346M1110 166L1306 362M1306 166L1110 362" stroke="#f2c34b" stroke-opacity="0.12" stroke-width="2"/>
+    <circle cx="1208" cy="264" r="52" stroke="#f2c34b" stroke-opacity="0.18" stroke-dasharray="8 12"/>
+  </g>
+  <g opacity="0.34">
+    <path d="M96 588H454M1160 588H1504" stroke="#21e7de" stroke-opacity="0.36"/>
+    <path d="M162 626H538M1040 626H1438" stroke="#f2c34b" stroke-opacity="0.26"/>
+    <path d="M214 664H660M910 664H1376" stroke="#21e7de" stroke-opacity="0.18"/>
+  </g>
+  <g filter="url(#softBlur)">
+    <circle cx="326" cy="158" r="30" fill="#21e7de" fill-opacity="0.34"/>
+    <circle cx="1230" cy="136" r="34" fill="#f2c34b" fill-opacity="0.42"/>
+    <circle cx="206" cy="438" r="28" fill="#86dfff" fill-opacity="0.26"/>
+    <circle cx="1366" cy="448" r="30" fill="#ef5f8f" fill-opacity="0.22"/>
+    <circle cx="444" cy="612" r="26" fill="#91d867" fill-opacity="0.22"/>
+    <circle cx="1168" cy="608" r="26" fill="#f2c34b" fill-opacity="0.28"/>
+  </g>
+  <rect width="1600" height="720" fill="#02080c" opacity="0.18"/>
+</svg>

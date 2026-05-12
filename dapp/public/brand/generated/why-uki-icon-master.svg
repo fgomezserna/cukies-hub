@@ -1,0 +1,29 @@
+<svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="masterCrown" x1="26" y1="26" x2="103" y2="103" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffc4e6"/>
+      <stop offset="0.5" stop-color="#ef5f8f"/>
+      <stop offset="1" stop-color="#a72fd6"/>
+    </linearGradient>
+    <radialGradient id="masterGem" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(64 60) rotate(90) scale(39)">
+      <stop stop-color="#fff3fa"/>
+      <stop offset="1" stop-color="#ff77bd"/>
+    </radialGradient>
+    <filter id="masterGlow" x="12" y="15" width="104" height="100" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ef5f8f" flood-opacity="0.44"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#02090d" flood-opacity="0.36"/>
+    </filter>
+  </defs>
+  <g filter="url(#masterGlow)">
+    <path d="M24 43L45 62L64 25L83 62L104 43L98 97H30L24 43Z" fill="url(#masterCrown)" stroke="#ffd8ec" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M33 80H95" stroke="#611558" stroke-opacity="0.34" stroke-width="6" stroke-linecap="round"/>
+    <path d="M39 92H89" stroke="#fff1f8" stroke-opacity="0.42" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="64" cy="57" r="13" fill="url(#masterGem)" stroke="#fff0f8" stroke-width="3"/>
+    <circle cx="45" cy="70" r="6" fill="#44edd6" stroke="#ccfff8" stroke-width="2"/>
+    <circle cx="83" cy="70" r="6" fill="#f2c34b" stroke="#fff2bd" stroke-width="2"/>
+    <path d="M55 24C58 17 70 17 73 24" stroke="#44edd6" stroke-opacity="0.75" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="25" cy="42" r="5" fill="#ffc4e6"/>
+    <circle cx="103" cy="42" r="5" fill="#ffc4e6"/>
+    <circle cx="64" cy="25" r="5.5" fill="#fff1f8"/>
+  </g>
+</svg>

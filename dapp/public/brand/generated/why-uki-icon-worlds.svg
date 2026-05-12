@@ -1,0 +1,33 @@
+<svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="worldsPlanet" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(58 54) rotate(90) scale(48)">
+      <stop stop-color="#d8ff9c"/>
+      <stop offset="0.55" stop-color="#63d66c"/>
+      <stop offset="1" stop-color="#188c65"/>
+    </radialGradient>
+    <linearGradient id="worldsRing" x1="11" y1="76" x2="117" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#44edd6"/>
+      <stop offset="0.55" stop-color="#f2c34b"/>
+      <stop offset="1" stop-color="#ef5f8f"/>
+    </linearGradient>
+    <filter id="worldsGlow" x="7" y="8" width="114" height="112" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#91d867" flood-opacity="0.38"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#02090d" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <g filter="url(#worldsGlow)">
+    <path d="M18 74C36 56 91 47 111 58C100 75 39 86 18 74Z" fill="none" stroke="url(#worldsRing)" stroke-width="7" stroke-linecap="round" stroke-opacity="0.86"/>
+    <circle cx="63" cy="65" r="42" fill="url(#worldsPlanet)" stroke="#eaffce" stroke-width="3"/>
+    <path d="M31 57C41 64 51 63 58 55C66 46 77 47 91 53" stroke="#063d37" stroke-opacity="0.36" stroke-width="7" stroke-linecap="round"/>
+    <path d="M45 91C53 82 64 82 72 91C78 98 85 98 96 93" stroke="#0e5b45" stroke-opacity="0.38" stroke-width="7" stroke-linecap="round"/>
+    <path d="M34 72C47 80 82 77 104 65" stroke="#f2c34b" stroke-opacity="0.44" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="49" cy="51" r="5" fill="#44edd6" fill-opacity="0.76"/>
+    <path d="M83 35C91 38 96 44 99 52" stroke="#ffffff" stroke-opacity="0.48" stroke-width="4" stroke-linecap="round"/>
+    <g>
+      <circle cx="91" cy="85" r="11" fill="#6b3df5" stroke="#e0d4ff" stroke-width="2.5"/>
+      <path d="M83 103C84 94 88 90 91 90C94 90 98 94 99 103" fill="#ef5f8f" stroke="#ffd4e3" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="87" cy="84" r="1.8" fill="#ffffff"/>
+      <circle cx="95" cy="84" r="1.8" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

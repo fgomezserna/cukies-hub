@@ -1,0 +1,75 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">UKI premium economy coin</title>
+  <desc id="desc">A circular golden UKI coin asset with transparent background for the Why UKI exists orbital diagram.</desc>
+  <defs>
+    <radialGradient id="coinFace" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(210 164) rotate(55) scale(346)">
+      <stop offset="0" stop-color="#FFF6B6"/>
+      <stop offset="0.18" stop-color="#FFE073"/>
+      <stop offset="0.43" stop-color="#DFA638"/>
+      <stop offset="0.68" stop-color="#9C651E"/>
+      <stop offset="0.88" stop-color="#F0C24F"/>
+      <stop offset="1" stop-color="#6F3E12"/>
+    </radialGradient>
+    <linearGradient id="rimGold" x1="132" y1="74" x2="376" y2="444" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF8C2"/>
+      <stop offset="0.22" stop-color="#EAB84F"/>
+      <stop offset="0.5" stop-color="#7B4714"/>
+      <stop offset="0.73" stop-color="#FFD86D"/>
+      <stop offset="1" stop-color="#8A5017"/>
+    </linearGradient>
+    <linearGradient id="edgeShadow" x1="111" y1="93" x2="403" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF4AE"/>
+      <stop offset="0.36" stop-color="#C88627"/>
+      <stop offset="0.69" stop-color="#5E310D"/>
+      <stop offset="1" stop-color="#E4AD3E"/>
+    </linearGradient>
+    <linearGradient id="letterGold" x1="158" y1="190" x2="354" y2="324" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFCE2"/>
+      <stop offset="0.24" stop-color="#FFE27B"/>
+      <stop offset="0.58" stop-color="#A8671C"/>
+      <stop offset="0.82" stop-color="#FFE88E"/>
+      <stop offset="1" stop-color="#7A4312"/>
+    </linearGradient>
+    <filter id="softCoinShadow" x="39" y="45" width="434" height="434" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#2A1705" flood-opacity="0.32"/>
+    </filter>
+    <filter id="engravedText" x="110" y="165" width="292" height="177" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="5" stdDeviation="2.2" flood-color="#3B1E07" flood-opacity="0.62"/>
+      <feDropShadow dx="0" dy="-2" stdDeviation="1.1" flood-color="#FFF5B8" flood-opacity="0.7"/>
+    </filter>
+    <clipPath id="coinClip">
+      <circle cx="256" cy="256" r="186"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#softCoinShadow)">
+    <circle cx="256" cy="256" r="190" fill="url(#edgeShadow)"/>
+    <circle cx="256" cy="256" r="176" fill="url(#rimGold)"/>
+    <circle cx="256" cy="256" r="153" fill="url(#coinFace)"/>
+
+    <g clip-path="url(#coinClip)" opacity="0.5">
+      <path d="M89 284C154 222 216 144 321 93" stroke="#FFF7B8" stroke-width="18" stroke-linecap="round"/>
+      <path d="M160 421C245 368 330 288 422 171" stroke="#5E320D" stroke-width="20" stroke-linecap="round" opacity="0.22"/>
+      <path d="M128 163C213 197 310 194 398 138" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" opacity="0.28"/>
+    </g>
+
+    <circle cx="256" cy="256" r="176" stroke="#FFF1A5" stroke-width="5"/>
+    <circle cx="256" cy="256" r="153" stroke="#6B3A0F" stroke-width="8" opacity="0.42"/>
+    <circle cx="256" cy="256" r="134" stroke="#FFE27B" stroke-width="3" stroke-dasharray="10 16" opacity="0.72"/>
+
+    <g opacity="0.78">
+      <path d="M256 79L266 103L292 105L272 122L278 148L256 134L234 148L240 122L220 105L246 103L256 79Z" fill="#FFF0A3"/>
+      <path d="M256 364L266 388L292 390L272 407L278 433L256 419L234 433L240 407L220 390L246 388L256 364Z" fill="#C47C22"/>
+      <path d="M79 256L103 246L105 220L122 240L148 234L134 256L148 278L122 272L105 292L103 266L79 256Z" fill="#D99B33"/>
+      <path d="M433 256L409 246L407 220L390 240L364 234L378 256L364 278L390 272L407 292L409 266L433 256Z" fill="#FFE784"/>
+    </g>
+
+    <g filter="url(#engravedText)">
+      <text x="256" y="292" text-anchor="middle" font-family="Space Grotesk, Inter, Arial, sans-serif" font-size="106" font-weight="800" letter-spacing="8" fill="#5A2F0B" opacity="0.55">UKI</text>
+      <text x="256" y="284" text-anchor="middle" font-family="Space Grotesk, Inter, Arial, sans-serif" font-size="106" font-weight="800" letter-spacing="8" fill="url(#letterGold)">UKI</text>
+    </g>
+
+    <path d="M132 174C161 119 215 89 280 91" stroke="#FFF7C2" stroke-width="10" stroke-linecap="round" opacity="0.82"/>
+    <path d="M345 392C302 421 236 427 183 400" stroke="#4A2609" stroke-width="9" stroke-linecap="round" opacity="0.26"/>
+  </g>
+</svg>

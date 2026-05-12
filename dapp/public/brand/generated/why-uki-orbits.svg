@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" fill="none" role="img" aria-hidden="true">
+  <defs>
+    <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#E9FFF9" stop-opacity="1"/>
+      <stop offset="0.28" stop-color="#44EDD6" stop-opacity="0.9"/>
+      <stop offset="0.62" stop-color="#44EDD6" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#44EDD6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pulseGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="1"/>
+      <stop offset="0.38" stop-color="#44EDD6" stop-opacity="0.86"/>
+      <stop offset="1" stop-color="#44EDD6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="connectorStroke" x1="182" y1="66" x2="818" y2="454" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#44EDD6" stop-opacity="0.08"/>
+      <stop offset="0.5" stop-color="#CFFFF6" stop-opacity="0.58"/>
+      <stop offset="1" stop-color="#44EDD6" stop-opacity="0.08"/>
+    </linearGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="thinGlow" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g opacity="0.9">
+    <ellipse cx="500" cy="260" rx="232" ry="90" stroke="#44EDD6" stroke-opacity="0.16" stroke-width="1.4"/>
+    <ellipse cx="500" cy="260" rx="306" ry="126" stroke="#44EDD6" stroke-opacity="0.12" stroke-width="1.2"/>
+    <ellipse cx="500" cy="260" rx="374" ry="170" stroke="#44EDD6" stroke-opacity="0.09" stroke-width="1"/>
+    <ellipse cx="500" cy="260" rx="198" ry="348" stroke="#44EDD6" stroke-opacity="0.1" stroke-width="1.1" transform="rotate(72 500 260)"/>
+    <ellipse cx="500" cy="260" rx="198" ry="348" stroke="#44EDD6" stroke-opacity="0.1" stroke-width="1.1" transform="rotate(108 500 260)"/>
+    <ellipse cx="500" cy="260" rx="118" ry="256" stroke="#CFFFF6" stroke-opacity="0.08" stroke-width="0.9" transform="rotate(90 500 260)"/>
+  </g>
+
+  <g stroke="url(#connectorStroke)" stroke-width="1.5" stroke-linecap="round" filter="url(#thinGlow)">
+    <line x1="500" y1="260" x2="234" y2="112"/>
+    <line x1="500" y1="260" x2="504" y2="70"/>
+    <line x1="500" y1="260" x2="768" y2="116"/>
+    <line x1="500" y1="260" x2="786" y2="400"/>
+    <line x1="500" y1="260" x2="496" y2="454"/>
+    <line x1="500" y1="260" x2="216" y2="396"/>
+  </g>
+
+  <g opacity="0.72" filter="url(#softGlow)">
+    <circle cx="366" cy="185" r="9" fill="url(#pulseGlow)"/>
+    <circle cx="502" cy="164" r="8" fill="url(#pulseGlow)"/>
+    <circle cx="635" cy="187" r="9" fill="url(#pulseGlow)"/>
+    <circle cx="644" cy="331" r="8" fill="url(#pulseGlow)"/>
+    <circle cx="498" cy="358" r="9" fill="url(#pulseGlow)"/>
+    <circle cx="357" cy="328" r="8" fill="url(#pulseGlow)"/>
+  </g>
+
+  <g filter="url(#softGlow)">
+    <circle cx="234" cy="112" r="24" fill="url(#nodeGlow)" opacity="0.8"/>
+    <circle cx="504" cy="70" r="22" fill="url(#nodeGlow)" opacity="0.78"/>
+    <circle cx="768" cy="116" r="24" fill="url(#nodeGlow)" opacity="0.8"/>
+    <circle cx="786" cy="400" r="23" fill="url(#nodeGlow)" opacity="0.78"/>
+    <circle cx="496" cy="454" r="24" fill="url(#nodeGlow)" opacity="0.8"/>
+    <circle cx="216" cy="396" r="23" fill="url(#nodeGlow)" opacity="0.78"/>
+  </g>
+
+  <g>
+    <circle cx="234" cy="112" r="5.5" fill="#E9FFF9"/>
+    <circle cx="504" cy="70" r="5" fill="#E9FFF9"/>
+    <circle cx="768" cy="116" r="5.5" fill="#E9FFF9"/>
+    <circle cx="786" cy="400" r="5" fill="#E9FFF9"/>
+    <circle cx="496" cy="454" r="5.5" fill="#E9FFF9"/>
+    <circle cx="216" cy="396" r="5" fill="#E9FFF9"/>
+  </g>
+
+  <g opacity="0.35">
+    <circle cx="500" cy="260" r="96" stroke="#44EDD6" stroke-opacity="0.16" stroke-width="1"/>
+    <circle cx="500" cy="260" r="46" stroke="#CFFFF6" stroke-opacity="0.12" stroke-width="1"/>
+    <circle cx="500" cy="260" r="3" fill="#CFFFF6" fill-opacity="0.68"/>
+  </g>
+</svg>

@@ -1228,26 +1228,33 @@ body {
 
   .uki-timeline-card {
     position: relative;
-    min-height: 7.4rem;
+    min-height: clamp(13.6rem, 17vw, 16.4rem);
     overflow: hidden;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(2, 11, 10, 0.58);
-    padding: 0.68rem;
-    backdrop-filter: blur(12px);
-    transition: transform 480ms var(--uki-ease), border-color 480ms var(--uki-ease), background-color 480ms var(--uki-ease);
+    background: rgba(2, 11, 10, 0.72);
+    padding: 0;
+    backdrop-filter: blur(10px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 18px 34px rgba(0, 0, 0, 0.28);
+    transition: transform 480ms var(--uki-ease), border-color 480ms var(--uki-ease), background-color 480ms var(--uki-ease), box-shadow 480ms var(--uki-ease);
   }
 
   .uki-timeline-card::before {
     content: "";
     position: absolute;
-    inset: 0;
-    z-index: 0;
+    left: 50%;
+    top: -0.45rem;
+    z-index: 2;
+    height: 0.9rem;
+    width: 0.9rem;
+    border-radius: 999px;
     background:
-      radial-gradient(circle at 50% 0%, rgba(34, 231, 223, 0.08), transparent 68%),
-      linear-gradient(180deg, rgba(255, 242, 220, 0.045), rgba(2, 9, 13, 0.12));
-    opacity: 1;
-    transition: transform 720ms var(--uki-ease), opacity 720ms var(--uki-ease), filter 720ms var(--uki-ease);
+      radial-gradient(circle, var(--uki-cyan) 0 32%, rgba(34, 231, 223, 0.24) 33% 64%, transparent 65%);
+    box-shadow: 0 0 18px rgba(34, 231, 223, 0.36);
+    transform: translateX(-50%);
+    transition: transform 720ms var(--uki-ease);
   }
 
   .uki-timeline-card > * {
@@ -1259,42 +1266,107 @@ body {
     border-color: rgba(34, 231, 223, 0.36);
     background: rgba(5, 24, 32, 0.76);
     transform: translateY(-4px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 24px 42px rgba(0, 0, 0, 0.34),
+      0 0 28px rgba(34, 231, 223, 0.12);
   }
 
   .uki-timeline-card:hover::before {
-    opacity: 1;
-    transform: scale(1.055);
-    filter: saturate(1.12);
+    transform: translateX(-50%) scale(1.16);
   }
 
   .uki-timeline-card.is-active {
     border-color: var(--uki-cyan);
-    background: rgba(8, 42, 50, 0.62);
+    background: rgba(8, 42, 50, 0.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 24px rgba(34, 231, 223, 0.2);
+      0 0 0 1px rgba(34, 231, 223, 0.24),
+      0 0 28px rgba(34, 231, 223, 0.26),
+      0 18px 36px rgba(0, 0, 0, 0.34);
   }
 
   .uki-timeline-thumb {
     display: block;
-    height: 2.85rem;
-    margin-top: 0.55rem;
-    overflow: hidden;
-    border-radius: 6px;
-    border: 1px solid rgba(34, 231, 223, 0.14);
-    background-position: center;
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 0;
+    height: 52%;
+    margin-top: 0;
+    border: 0;
+    border-radius: 0;
+    background-position: center bottom;
+    background-repeat: no-repeat;
     background-size: cover;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 10px 22px rgba(0, 0, 0, 0.22);
+    opacity: 0.98;
+    filter: saturate(1.22) contrast(1.1) brightness(1.16);
+    transition: transform 720ms var(--uki-ease), opacity 720ms var(--uki-ease), filter 720ms var(--uki-ease);
+  }
+
+  .uki-timeline-card:hover .uki-timeline-thumb {
+    transform: scale(1.055);
+    opacity: 1;
+    filter: saturate(1.3) contrast(1.12) brightness(1.2);
   }
 
   .uki-timeline-card.is-active .uki-timeline-thumb {
-    border-color: rgba(34, 231, 223, 0.5);
+    opacity: 0.9;
+  }
+
+  .uki-timeline-card-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      linear-gradient(180deg, rgba(2, 9, 13, 0.92) 0%, rgba(2, 9, 13, 0.74) 42%, rgba(2, 9, 13, 0.18) 66%, rgba(2, 9, 13, 0.1) 100%),
+      linear-gradient(90deg, rgba(2, 9, 13, 0.54), rgba(2, 9, 13, 0.04) 56%, rgba(2, 9, 13, 0.22));
+  }
+
+  .uki-timeline-card-copy {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    min-height: inherit;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 1rem 0.88rem 0.86rem;
+    background:
+      linear-gradient(180deg, rgba(2, 9, 13, 0.28), transparent 58%);
+  }
+
+  .uki-timeline-year {
+    width: fit-content;
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 0.34rem;
+    color: var(--uki-cyan);
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(0.95rem, 1.12vw, 1.18rem);
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 0 16px rgba(34, 231, 223, 0.24);
+  }
+
+  .uki-timeline-card h3 {
+    margin-top: 0.82rem;
+    color: var(--uki-cream);
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(0.86rem, 0.94vw, 1rem);
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .uki-timeline-card-copy > p:last-child {
+    margin-top: 0.5rem;
+    max-width: 10.5rem;
+    color: var(--uki-text);
+    font-size: clamp(0.72rem, 0.78vw, 0.8rem);
+    font-weight: 700;
+    line-height: 1.2;
   }
 
   .uki-timeline-panel .uki-panel-core {
-    min-height: clamp(15.6rem, 22vw, 18.8rem);
+    min-height: clamp(18.5rem, 25vw, 22.6rem);
     background: #02090d;
   }
 
@@ -1310,26 +1382,29 @@ body {
 
   .uki-timeline-copy {
     max-width: 18rem;
-    padding-block: 0.45rem 0.35rem;
+    padding-block: 0.45rem 0.9rem;
   }
 
   .uki-timeline-rail {
     position: relative;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.72rem;
+    gap: clamp(0.78rem, 1vw, 1rem);
     align-items: end;
   }
 
   .uki-timeline-rail::before {
     content: "";
     position: absolute;
-    left: -2.1rem;
-    right: 1.2rem;
-    top: 56%;
+    left: -3.2rem;
+    right: 1.5rem;
+    top: 46%;
     z-index: -1;
+    height: 3.6rem;
     border-top: 2px dashed rgba(255, 242, 220, 0.28);
-    transform: translateY(-50%);
+    border-radius: 999px 0 0 999px;
+    transform: translateY(-50%) rotate(-2deg);
+    filter: drop-shadow(0 0 10px rgba(34, 231, 223, 0.14));
   }
 
   .uki-timeline-scene {

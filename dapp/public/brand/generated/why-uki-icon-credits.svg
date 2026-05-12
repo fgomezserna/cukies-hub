@@ -1,0 +1,26 @@
+<svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="creditsCoin" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(53 43) rotate(63) scale(66)">
+      <stop stop-color="#fff7b5"/>
+      <stop offset="0.47" stop-color="#f2c34b"/>
+      <stop offset="1" stop-color="#c27020"/>
+    </radialGradient>
+    <linearGradient id="creditsSpark" x1="21" y1="22" x2="106" y2="105" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#44edd6"/>
+      <stop offset="1" stop-color="#ef5f8f"/>
+    </linearGradient>
+    <filter id="creditsGlow" x="13" y="13" width="102" height="102" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#f2c34b" flood-opacity="0.44"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#02090d" flood-opacity="0.36"/>
+    </filter>
+  </defs>
+  <g filter="url(#creditsGlow)">
+    <circle cx="64" cy="64" r="42" fill="url(#creditsCoin)" stroke="#fff4b6" stroke-width="3.5"/>
+    <circle cx="64" cy="64" r="31" fill="none" stroke="#8c4b16" stroke-opacity="0.26" stroke-width="5"/>
+    <path d="M64 38L72 56L91 58L76 70L81 89L64 79L47 89L52 70L37 58L56 56L64 38Z" fill="#fff4b6" stroke="#9f5a18" stroke-opacity="0.42" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M44 45C51 37 61 34 72 37" stroke="#ffffff" stroke-opacity="0.56" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="30" cy="36" r="5" fill="url(#creditsSpark)"/>
+    <circle cx="101" cy="86" r="4" fill="#44edd6" fill-opacity="0.78"/>
+    <path d="M93 26L96 34L104 37L96 40L93 48L90 40L82 37L90 34L93 26Z" fill="#ef5f8f" fill-opacity="0.86"/>
+  </g>
+</svg>

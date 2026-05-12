@@ -177,26 +177,50 @@ Use this workflow when the user asks to work from GitHub issues, continue the ro
 
 ### Backlog Triage and Priority Selection
 
-When no specific issue is provided, inspect open issues before choosing work:
+When no specific issue is provided, inspect the live GitHub roadmap before choosing work. Do not infer priority from a flat issue list alone.
 
 ```bash
 source ~/.zshrc >/dev/null 2>&1 && gh issue list --repo fgomezserna/cukies-hub --state open --limit 100 --json number,title,labels,milestone,assignees,updatedAt
 ```
 
+First read the active milestones:
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 && gh api repos/fgomezserna/cukies-hub/milestones --paginate --jq '.[] | {number,title,state,open_issues,closed_issues,due_on,updated_at,description}'
+```
+
+Then group open issues by milestone so the current phase is explicit:
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 && gh issue list --repo fgomezserna/cukies-hub --state open --limit 200 --json number,title,labels,milestone,updatedAt --jq 'group_by(.milestone.title // "Sin milestone")[] | {milestone: (.[0].milestone.title // "Sin milestone"), count: length, issues: map({number,title,labels: [.labels[].name]})}'
+```
+
 Choose work in this order:
 
 1. User-specified issue, PR, milestone or explicit instruction.
-2. Unblocked `priority:p0` issues in the earliest active milestone.
-3. For the UKI launch, prioritize `M0.5 - Comunicacion, UX y restyling` before contracts/backend because communication must start early.
-4. Leaf task issues before parent epics.
-5. Issues with clear acceptance criteria before ambiguous issues.
-6. If an issue has `blocked`, `needs-validation`, missing product decisions, missing legal approval, or an unapproved UX image gate, do not implement beyond safe discovery/spec work. Comment what is blocked and what decision is needed.
+2. The earliest active launch milestone by the current GitHub milestone order, not by stale milestone names written in old issue bodies.
+3. Unblocked `priority:p0` leaf issues inside that earliest active milestone.
+4. For the current UKI launch roadmap, `Phase 0 - Landing live, compra cerrada` is the first active phase. It includes communication, architecture of information, landing, system visual, disclaimers, data audit and public assets.
+5. Inside Phase 0, follow the live coordination issue and comments before implementation. The current correction of focus is: close branding and communication foundations before generating more screens or implementing final visual styling.
+6. For `#141 [UKI-004] Comunicacion, restyling y sistema visual de lanzamiento`, the required order is:
+   - inventory of the current website and existing visual assets,
+   - brand DNA: what stays, what is modernized and what is discarded,
+   - approved UKI launch brand direction,
+   - approved brand board,
+   - only then home, presale, dashboard and other sections.
+7. If a proposal looks like a presentation/deck instead of a navigable landing, reject that direction and return to visual system and structure.
+8. Do not treat `M0.5`, `M7` or other old milestone names inside issue bodies as authoritative when GitHub milestones have been reorganized into Phase 0-5. The current GitHub milestone assignment and recent epic comments override stale body text.
+9. Leaf task issues before parent epics.
+10. Issues with clear acceptance criteria before ambiguous issues.
+11. If an issue has `blocked`, `needs-validation`, missing product decisions, missing legal approval, or an unapproved UX image gate, do not implement beyond safe discovery/spec work. Comment what is blocked and what decision is needed.
 
-Before selecting an issue, read its parent epic, child checklist, labels, milestone and recent comments:
+Before selecting an issue, read its parent epic, child checklist, labels, milestone and recent comments. Recent comments are mandatory because roadmap changes and priority corrections are coordinated there:
 
 ```bash
 source ~/.zshrc >/dev/null 2>&1 && gh issue view <number> --repo fgomezserna/cukies-hub --comments --json number,title,body,labels,milestone,assignees,state,comments
 ```
+
+If the candidate belongs to an epic, also read the epic issue and recent comments before recommending or starting work. For UKI Phase 0, read at minimum `#141` before choosing any communication, restyling, landing, UX image or public-shell task.
 
 ### Issue Intake
 

@@ -1,0 +1,32 @@
+<svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="rewardsBox" x1="25" y1="42" x2="101" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff9fbd"/>
+      <stop offset="0.55" stop-color="#ef405f"/>
+      <stop offset="1" stop-color="#a91553"/>
+    </linearGradient>
+    <linearGradient id="rewardsRibbon" x1="41" y1="31" x2="88" y2="107" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff0a6"/>
+      <stop offset="1" stop-color="#f2c34b"/>
+    </linearGradient>
+    <filter id="rewardsGlow" x="13" y="14" width="103" height="106" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ef5f8f" flood-opacity="0.42"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#02090d" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <g filter="url(#rewardsGlow)">
+    <path d="M35 55H93V106H35V55Z" fill="url(#rewardsBox)" stroke="#ffd3df" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M28 43H100V61H28V43Z" fill="#ff749d" stroke="#ffd3df" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M58 43H70V106H58V43Z" fill="url(#rewardsRibbon)"/>
+    <path d="M28 61H100" stroke="#731334" stroke-opacity="0.34" stroke-width="4"/>
+    <path d="M52 42C39 38 35 29 41 23C52 22 60 31 64 43" fill="#ef5f8f" stroke="#ffd3df" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M76 42C89 38 93 29 87 23C76 22 68 31 64 43" fill="#ef5f8f" stroke="#ffd3df" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="48" cy="79" r="5.5" fill="#061017"/>
+    <circle cx="80" cy="79" r="5.5" fill="#061017"/>
+    <circle cx="50" cy="77" r="1.7" fill="#ffffff"/>
+    <circle cx="82" cy="77" r="1.7" fill="#ffffff"/>
+    <path d="M56 91C61 95 68 95 73 91" stroke="#fff0f7" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M96 22L99 30L107 33L99 36L96 44L93 36L85 33L93 30L96 22Z" fill="#44edd6" fill-opacity="0.82"/>
+    <circle cx="24" cy="86" r="4" fill="#f2c34b" fill-opacity="0.82"/>
+  </g>
+</svg>

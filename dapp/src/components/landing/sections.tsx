@@ -361,10 +361,13 @@ function Timeline() {
                 key={item.year}
                 className={`uki-timeline-card ${item.active ? 'is-active' : ''}`}
               >
-                <p className="font-headline text-base font-black text-[var(--uki-cyan)]">{item.year}</p>
-                <h3 className="mt-2 font-headline text-sm font-black uppercase leading-tight text-[var(--uki-cream)]">{item.title}</h3>
-                <p className="mt-1.5 text-[0.68rem] font-semibold leading-snug text-[var(--uki-muted)]">{item.text}</p>
                 <span className="uki-timeline-thumb" style={{ backgroundImage: `url(${item.image})` }} aria-hidden="true" />
+                <span className="uki-timeline-card-scrim" aria-hidden="true" />
+                <div className="uki-timeline-card-copy">
+                  <p className="uki-timeline-year">{item.year}</p>
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </div>
               </article>
             ))}
           </div>
