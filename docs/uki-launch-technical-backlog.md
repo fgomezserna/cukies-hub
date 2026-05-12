@@ -68,6 +68,7 @@ Issues hijas:
 
 - UKI-001.2 Task - Definir estados canonicos de wallet y assets
   - Estados minimos: `available`, `listed`, `bridging`, `soft_staked`, `in_pool`, `assigned_to_game`, `invalidated`, `unknown`.
+  - Documento de decision: `docs/adr-uki-canonical-asset-states.md`.
   - Acceptance criteria:
     - Un NFT no puede estar simultaneamente en marketplace, bridge, staking y pool.
     - Hay reglas de recuperacion cuando Mongo y chain/indexer discrepan.
