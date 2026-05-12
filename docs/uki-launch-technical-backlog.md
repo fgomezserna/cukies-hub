@@ -130,6 +130,7 @@ Issues hijas:
     - Lista de terminos permitidos, prohibidos y pendientes de legal.
 
 - UKI-003.2 Task - Crear disclaimers tecnicos para rewards
+  - Documento de disclaimers: `docs/uki-technical-disclaimers.md`.
   - Acceptance criteria:
     - Textos cortos para UI de rewards, staking y preventa.
     - Los textos no bloquean implementacion, pero quedan marcados como `needs-legal-validation`.
