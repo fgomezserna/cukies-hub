@@ -9,6 +9,7 @@
     "clean": "hardhat clean",
     "deploy:testnet": "hardhat run scripts/deploy-presale.cjs --network bscTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy-presale.cjs --network bsc",
+    "simulate:deploy": "hardhat run scripts/simulate-full-deploy.cjs --network hardhat",
     "export:abi": "node scripts/export-abi.cjs"
   },
   "dependencies": {

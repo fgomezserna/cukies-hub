@@ -21,6 +21,7 @@ import {
   Users,
   Coins,
   Send,
+  LockKeyhole,
 } from 'lucide-react';
 import Logo from '@/components/icons/logo';
 import Header from './header';
@@ -153,6 +154,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                         <Coins className="h-4 w-4 text-amber-400 group-hover:text-yellow-400 transition-colors" />
                       </div>
                       <span className="group-data-[collapsible=icon]:hidden font-medium">Points</span>
+                    </div>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <Link href="/vesting" passHref>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith('/vesting')}
+                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-pink-600/10 hover:to-pink-600/10 hover:border-pink-500/30 hover:shadow-md hover:shadow-pink-600/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-pink-600/20 data-[active=true]:to-pink-600/20 data-[active=true]:border-pink-500/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-500/20 group-hover:from-teal-400/30 group-hover:to-cyan-500/30 transition-all">
+                        <LockKeyhole className="h-4 w-4 text-teal-300 group-hover:text-cyan-300 transition-colors" />
+                      </div>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Vesting</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>

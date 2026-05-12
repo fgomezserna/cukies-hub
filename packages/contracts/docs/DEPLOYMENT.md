@@ -12,6 +12,7 @@
 pnpm --filter @cukies/contracts compile
 pnpm --filter @cukies/contracts test
 pnpm --filter @cukies/contracts coverage
+pnpm --filter @cukies/contracts simulate:deploy
 pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts export:abi
 ```
@@ -41,8 +42,9 @@ Optional:
 3. Deploy `Presale`.
 4. Fund `VestingVault` with the UKI amount reserved for sale.
 5. Grant `VESTING_MANAGER_ROLE` on `VestingVault` to `Presale`.
-6. Verify contracts on BscScan.
-7. Export ABIs and set dapp env addresses.
+6. Create team/advisors/ecosystem schedules with `createVestingWithCliff`.
+7. Verify contracts on BscScan.
+8. Export ABIs and set dapp env addresses.
 
 Before mainnet, complete `packages/contracts/docs/SECURITY.md`.
 

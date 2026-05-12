@@ -11,6 +11,7 @@ contract VestingVault is AccessControl {
     using SafeERC20 for IERC20;
 
     bytes32 public constant VESTING_MANAGER_ROLE = keccak256("VESTING_MANAGER_ROLE");
+    bytes32 public constant PRESALE_SCHEDULE_ID = keccak256("PRESALE");
 
     IERC20 public immutable ukiToken;
 
@@ -18,20 +19,31 @@ contract VestingVault is AccessControl {
         uint128 totalAmount;
         uint128 releasedAmount;
         uint64 start;
+        uint64 cliff;
         uint64 duration;
     }
 
-    mapping(address beneficiary => VestingSchedule) private _schedules;
+    mapping(address beneficiary => mapping(bytes32 scheduleId => VestingSchedule)) private _schedules;
+    mapping(address beneficiary => bytes32[] scheduleIds) private _scheduleIds;
     uint256 public totalAllocated;
     uint256 public totalReleased;
 
-    event VestingCreated(address indexed beneficiary, uint256 amount, uint64 start, uint64 duration);
-    event TokensReleased(address indexed beneficiary, uint256 amount);
+    event VestingCreated(
+        address indexed beneficiary,
+        bytes32 indexed scheduleId,
+        uint256 amount,
+        uint64 start,
+        uint64 cliff,
+        uint64 duration
+    );
+    event TokensReleased(address indexed beneficiary, bytes32 indexed scheduleId, uint256 amount);
+    event UnallocatedWithdrawn(address indexed to, uint256 amount);
 
     error InvalidToken();
     error InvalidBeneficiary();
     error InvalidAmount();
     error InvalidSchedule();
+    error InvalidRecipient();
     error ConflictingSchedule();
     error NothingToRelease();
     error InsufficientUnallocatedBalance();
@@ -48,50 +60,69 @@ contract VestingVault is AccessControl {
         external
         onlyRole(VESTING_MANAGER_ROLE)
     {
-        if (beneficiary == address(0)) revert InvalidBeneficiary();
-        if (amount == 0 || amount > type(uint128).max) revert InvalidAmount();
-        if (duration == 0) revert InvalidSchedule();
-        VestingSchedule storage schedule = _schedules[beneficiary];
-        if (
-            schedule.totalAmount != 0
-                && (schedule.start != start || schedule.duration != duration)
-        ) {
-            revert ConflictingSchedule();
-        }
+        _createVesting(beneficiary, PRESALE_SCHEDULE_ID, amount, start, start, duration);
+    }
 
-        uint256 available = ukiToken.balanceOf(address(this)) + totalReleased - totalAllocated;
-        if (amount > available) revert InsufficientUnallocatedBalance();
-
-        if (schedule.totalAmount == 0) {
-            schedule.start = start;
-            schedule.duration = duration;
-        }
-        schedule.totalAmount += uint128(amount);
-        totalAllocated += amount;
-
-        emit VestingCreated(beneficiary, amount, start, duration);
+    function createVestingWithCliff(
+        address beneficiary,
+        bytes32 scheduleId,
+        uint256 amount,
+        uint64 start,
+        uint64 cliff,
+        uint64 duration
+    ) external onlyRole(VESTING_MANAGER_ROLE) {
+        _createVesting(beneficiary, scheduleId, amount, start, cliff, duration);
     }
 
     function releasable(address beneficiary) public view returns (uint256) {
-        VestingSchedule memory schedule = _schedules[beneficiary];
-        return vestedAmount(beneficiary, uint64(block.timestamp)) - schedule.releasedAmount;
+        return releasable(beneficiary, PRESALE_SCHEDULE_ID);
+    }
+
+    function releasable(address beneficiary, bytes32 scheduleId) public view returns (uint256) {
+        VestingSchedule memory schedule = _schedules[beneficiary][scheduleId];
+        return vestedAmount(beneficiary, scheduleId, uint64(block.timestamp)) - schedule.releasedAmount;
     }
 
     function release() external returns (uint256 amount) {
-        amount = releasable(msg.sender);
+        return release(PRESALE_SCHEDULE_ID);
+    }
+
+    function release(bytes32 scheduleId) public returns (uint256 amount) {
+        amount = releasable(msg.sender, scheduleId);
         if (amount == 0) revert NothingToRelease();
 
-        VestingSchedule storage schedule = _schedules[msg.sender];
+        VestingSchedule storage schedule = _schedules[msg.sender][scheduleId];
         schedule.releasedAmount += uint128(amount);
         totalReleased += amount;
 
         ukiToken.safeTransfer(msg.sender, amount);
-        emit TokensReleased(msg.sender, amount);
+        emit TokensReleased(msg.sender, scheduleId, amount);
+    }
+
+    function releaseAll() external returns (uint256 totalAmount) {
+        bytes32[] memory ids = _scheduleIds[msg.sender];
+        for (uint256 index = 0; index < ids.length; index++) {
+            uint256 amount = releasable(msg.sender, ids[index]);
+            if (amount == 0) continue;
+
+            VestingSchedule storage schedule = _schedules[msg.sender][ids[index]];
+            schedule.releasedAmount += uint128(amount);
+            totalReleased += amount;
+            totalAmount += amount;
+            emit TokensReleased(msg.sender, ids[index], amount);
+        }
+
+        if (totalAmount == 0) revert NothingToRelease();
+        ukiToken.safeTransfer(msg.sender, totalAmount);
     }
 
     function vestedAmount(address beneficiary, uint64 timestamp) public view returns (uint256) {
-        VestingSchedule memory schedule = _schedules[beneficiary];
-        if (schedule.totalAmount == 0 || timestamp < schedule.start) {
+        return vestedAmount(beneficiary, PRESALE_SCHEDULE_ID, timestamp);
+    }
+
+    function vestedAmount(address beneficiary, bytes32 scheduleId, uint64 timestamp) public view returns (uint256) {
+        VestingSchedule memory schedule = _schedules[beneficiary][scheduleId];
+        if (schedule.totalAmount == 0 || timestamp < schedule.start || timestamp < schedule.cliff) {
             return 0;
         }
 
@@ -104,6 +135,61 @@ contract VestingVault is AccessControl {
     }
 
     function scheduleOf(address beneficiary) external view returns (VestingSchedule memory) {
-        return _schedules[beneficiary];
+        return _schedules[beneficiary][PRESALE_SCHEDULE_ID];
+    }
+
+    function scheduleOf(address beneficiary, bytes32 scheduleId) external view returns (VestingSchedule memory) {
+        return _schedules[beneficiary][scheduleId];
+    }
+
+    function scheduleIdsOf(address beneficiary) external view returns (bytes32[] memory) {
+        return _scheduleIds[beneficiary];
+    }
+
+    function unallocatedBalance() public view returns (uint256) {
+        return ukiToken.balanceOf(address(this)) + totalReleased - totalAllocated;
+    }
+
+    function withdrawUnallocated(address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (to == address(0)) revert InvalidRecipient();
+        if (amount == 0) revert InvalidAmount();
+        if (amount > unallocatedBalance()) revert InsufficientUnallocatedBalance();
+
+        ukiToken.safeTransfer(to, amount);
+        emit UnallocatedWithdrawn(to, amount);
+    }
+
+    function _createVesting(
+        address beneficiary,
+        bytes32 scheduleId,
+        uint256 amount,
+        uint64 start,
+        uint64 cliff,
+        uint64 duration
+    ) private {
+        if (beneficiary == address(0)) revert InvalidBeneficiary();
+        if (scheduleId == bytes32(0)) revert InvalidSchedule();
+        if (amount == 0 || amount > type(uint128).max) revert InvalidAmount();
+        if (start == 0 || cliff < start || duration == 0 || cliff > start + duration) revert InvalidSchedule();
+        VestingSchedule storage schedule = _schedules[beneficiary][scheduleId];
+        if (
+            schedule.totalAmount != 0
+                && (schedule.start != start || schedule.cliff != cliff || schedule.duration != duration)
+        ) {
+            revert ConflictingSchedule();
+        }
+
+        if (amount > unallocatedBalance()) revert InsufficientUnallocatedBalance();
+
+        if (schedule.totalAmount == 0) {
+            schedule.start = start;
+            schedule.cliff = cliff;
+            schedule.duration = duration;
+            _scheduleIds[beneficiary].push(scheduleId);
+        }
+        schedule.totalAmount += uint128(amount);
+        totalAllocated += amount;
+
+        emit VestingCreated(beneficiary, scheduleId, amount, start, cliff, duration);
     }
 }
