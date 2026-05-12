@@ -100,6 +100,8 @@ Issues hijas:
     - Campos: contract/network, tokenId, owner, rarity, generation, metadata, listing status, bridge status.
 
 - UKI-002.2 Task - Validar calidad de owner y rareza
+  - Informe/metodo: `docs/uki-nft-data-quality-report.md`.
+  - Script seguro: `dapp/scripts/audit-nft-data-quality.mjs`.
   - Acceptance criteria:
     - Muestreo de NFTs BSC y Tron contra fuente esperada.
     - Informe de campos incompletos o inconsistentes.
