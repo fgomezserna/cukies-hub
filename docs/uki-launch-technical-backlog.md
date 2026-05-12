@@ -60,6 +60,7 @@ Issues hijas:
 
 - UKI-001.1 Task - Mapear operaciones economicas
   - Definir compra, vesting, staking UKI, soft staking NFT, pool de creditos, pool de Cukies, ranking, rewards y claim.
+  - Documento de decision: `docs/adr-uki-economic-operations.md`.
   - Acceptance criteria:
     - Cada operacion tiene propietario: contrato, backend, job o UI.
     - Cada operacion indica fuente de verdad.
