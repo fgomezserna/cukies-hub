@@ -14,68 +14,68 @@ body {
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 330 81% 60%;
+    --primary: 178 79% 52%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 330 81% 60%;
+    --accent: 178 79% 52%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 330 81% 60%;
-    --chart-1: 330 81% 60%;
-    --chart-2: 340 82% 52%;
-    --chart-3: 300 65% 55%;
+    --ring: 178 79% 52%;
+    --chart-1: 178 79% 52%;
+    --chart-2: 181 100% 25%;
+    --chart-3: 176 82% 58%;
     --chart-4: 15 85% 65%;
     --chart-5: 260 70% 60%;
     --radius: 0.75rem;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 330 81% 60%;
+    --sidebar-primary: 178 79% 52%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 330 30% 95%;
-    --sidebar-accent-foreground: 330 40% 15%;
-    --sidebar-border: 330 25% 88%;
-    --sidebar-ring: 330 81% 60%;
+    --sidebar-accent: 176 30% 95%;
+    --sidebar-accent-foreground: 176 40% 15%;
+    --sidebar-border: 176 25% 88%;
+    --sidebar-ring: 178 79% 52%;
   }
   .dark {
-    --background: 330 28% 10%;
+    --background: 190 65% 4%;
     --foreground: 0 0% 98%;
-    --card: 330 30% 14%;
+    --card: 176 34% 9%;
     --card-foreground: 0 0% 98%;
-    --popover: 330 32% 12%;
+    --popover: 176 37% 8%;
     --popover-foreground: 0 0% 98%;
-    --primary: 330 81% 60%;
+    --primary: 178 79% 52%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 330 25% 20%;
+    --secondary: 176 29% 13%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 330 25% 20%;
+    --muted: 176 29% 13%;
     --muted-foreground: 0 0% 70%;
-    --accent: 330 81% 60%;
+    --accent: 178 79% 52%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 330 25% 24%;
-    --input: 330 25% 18%;
-    --ring: 330 81% 60%;
-    --chart-1: 330 81% 60%;
-    --chart-2: 340 82% 52%;
-    --chart-3: 300 65% 55%;
+    --border: 176 26% 18%;
+    --input: 176 31% 11%;
+    --ring: 178 79% 52%;
+    --chart-1: 178 79% 52%;
+    --chart-2: 181 100% 25%;
+    --chart-3: 176 82% 58%;
     --chart-4: 15 85% 65%;
     --chart-5: 260 70% 60%;
     --radius: 0.75rem;
-    --sidebar-background: 330 30% 14%;
-    --sidebar-foreground: 330 18% 80%;
-    --sidebar-primary: 330 81% 60%;
+    --sidebar-background: 176 34% 9%;
+    --sidebar-foreground: 176 18% 82%;
+    --sidebar-primary: 178 79% 52%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 330 32% 22%;
+    --sidebar-accent: 176 30% 16%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 330 28% 26%;
-    --sidebar-ring: 330 81% 60%;
+    --sidebar-border: 176 26% 20%;
+    --sidebar-ring: 178 79% 52%;
   }
 }
 
@@ -122,7 +122,7 @@ body {
 
   /* Efectos adicionales para Cukies World */
   .glow-effect {
-    box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
+    box-shadow: 0 0 20px rgba(34, 231, 223, 0.3);
   }
 
   .glass-effect {
@@ -152,7 +152,7 @@ body {
   }
 
   .animated-gradient {
-    background: linear-gradient(-45deg, #ec4899, #be185d, #f472b6, #db2777);
+    background: linear-gradient(-45deg, #22e7df, #008080, #44edd6, #008080);
     background-size: 400% 400%;
     animation: gradient-shift 15s ease infinite;
   }
@@ -199,10 +199,10 @@ body {
   /* Efecto de resplandor pulsante */
   @keyframes glow-pulse {
     0%, 100% { 
-      box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
+      box-shadow: 0 0 20px rgba(34, 231, 223, 0.3);
     }
     50% { 
-      box-shadow: 0 0 40px rgba(236, 72, 153, 0.6);
+      box-shadow: 0 0 40px rgba(34, 231, 223, 0.6);
     }
   }
 
@@ -236,8 +236,8 @@ body {
     --uki-cyan-soft: rgba(34, 231, 223, 0.11);
     --uki-cyan-border: rgba(34, 231, 223, 0.22);
     --uki-gold: #f2c34b;
-    --uki-pink: #ef5f8f;
-    --uki-pink-border: rgba(239, 95, 143, 0.28);
+    --uki-cyan-strong: #22e7df;
+    --uki-cyan-border-strong: rgba(34, 231, 223, 0.28);
     --uki-ease: cubic-bezier(0.32, 0.72, 0, 1);
     position: relative;
     font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
@@ -377,10 +377,10 @@ body {
     display: inline-flex;
     width: fit-content;
     border-radius: 5px;
-    border: 1px solid rgba(239, 95, 143, 0.72);
-    background: rgba(42, 13, 26, 0.78);
+    border: 1px solid rgba(34, 231, 223, 0.72);
+    background: rgba(2, 24, 28, 0.78);
     padding: 0.55rem 0.75rem;
-    color: #ff75aa;
+    color: #44edd6;
     font-size: 0.72rem;
     font-weight: 900;
     letter-spacing: 0.14em;
@@ -703,10 +703,10 @@ body {
     align-items: center;
     gap: 0.45rem;
     border-radius: 6px;
-    border: 1px solid rgba(239, 95, 143, 0.38);
-    background: rgba(42, 13, 26, 0.56);
+    border: 1px solid rgba(34, 231, 223, 0.38);
+    background: rgba(2, 24, 28, 0.56);
     padding: 0.45rem 0.6rem;
-    color: #ff75aa;
+    color: #44edd6;
     font-size: 0.64rem;
     font-weight: 900;
     letter-spacing: 0.1em;
@@ -725,7 +725,7 @@ body {
     gap: 0.75rem;
     min-height: 3rem;
     border-radius: 7px;
-    border: 1px solid var(--uki-pink-border);
+    border: 1px solid var(--uki-cyan-border-strong);
     background: rgba(6, 28, 25, 0.58);
     padding: 0.55rem 0.7rem;
     transition: transform 420ms var(--uki-ease), border-color 420ms var(--uki-ease), background-color 420ms var(--uki-ease);
@@ -854,7 +854,7 @@ body {
 
   .uki-metric-tile:nth-child(3n + 1) svg { color: var(--uki-cyan); }
   .uki-metric-tile:nth-child(3n + 2) svg { color: var(--uki-gold); }
-  .uki-metric-tile:nth-child(3n) svg { color: #ff75aa; }
+  .uki-metric-tile:nth-child(3n) svg { color: #44edd6; }
 
   .uki-label {
     color: var(--uki-muted);
@@ -948,7 +948,7 @@ body {
     background: radial-gradient(circle at 32% 24%, #fff0a8, #f2c34b 46%, #8b5410 100%);
   }
 
-  .uki-token-purple {
+  .uki-token-cyan {
     background: radial-gradient(circle at 32% 24%, #ffd4ff, #b668d9 46%, #5b2675 100%);
   }
 
@@ -1219,10 +1219,10 @@ body {
   .uki-node-worlds { left: 21%; bottom: 9%; }
   .uki-node-rewards { right: 21%; bottom: 9%; }
 
-  .uki-node-purple { color: #dcb8ff; background: linear-gradient(135deg, rgba(48, 21, 74, 0.72), rgba(6, 16, 22, 0.68)); }
+  .uki-node-mint { color: #8ffefa; background: linear-gradient(135deg, rgba(3, 38, 44, 0.72), rgba(6, 16, 22, 0.68)); }
   .uki-node-gold { color: #ffd97a; background: linear-gradient(135deg, rgba(58, 42, 16, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-blue { color: #99ddff; background: linear-gradient(135deg, rgba(11, 45, 61, 0.74), rgba(6, 16, 22, 0.68)); }
-  .uki-node-pink { color: #ff9fbd; background: linear-gradient(135deg, rgba(61, 19, 38, 0.76), rgba(6, 16, 22, 0.68)); }
+  .uki-node-cyan { color: #44edd6; background: linear-gradient(135deg, rgba(2, 35, 38, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-green { color: #c9f79f; background: linear-gradient(135deg, rgba(23, 50, 29, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-red { color: #ffb0bf; background: linear-gradient(135deg, rgba(59, 20, 32, 0.76), rgba(6, 16, 22, 0.68)); }
 
@@ -1442,7 +1442,7 @@ body {
     background:
       linear-gradient(180deg, rgba(2, 9, 13, 0.72) 0%, rgba(2, 9, 13, 0.5) 100%),
       radial-gradient(circle at 4% 22%, rgba(34, 231, 223, 0.13), transparent 14rem),
-      radial-gradient(circle at 96% 16%, rgba(239, 95, 143, 0.1), transparent 16rem),
+      radial-gradient(circle at 96% 16%, rgba(34, 231, 223, 0.1), transparent 16rem),
       url("/brand/generated/uki-cukie-master-scene-v2.png") left bottom / 34rem auto no-repeat;
     opacity: 0.52;
     transition: transform 900ms var(--uki-ease), filter 900ms var(--uki-ease);
@@ -1675,7 +1675,7 @@ body {
   }
 
   .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #17d8c8, transparent); }
-  .uki-future-pink .uki-panel-core::after { background: linear-gradient(0deg, #ef4f94, transparent); }
+  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #22e7df, transparent); }
   .uki-future-gold .uki-panel-core::after { background: linear-gradient(0deg, #f5c34d, transparent); }
   .uki-future-vault .uki-panel-core::after { background: linear-gradient(0deg, #ffbd4b, transparent); }
 
