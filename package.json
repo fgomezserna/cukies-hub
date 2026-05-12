@@ -14,6 +14,7 @@
     "sybil-slayer": "pnpm --filter sybil-slayer",
     "hyppie-road": "pnpm --filter hyppie-road",
     "tower-builder": "pnpm --filter tower-builder",
+    "contracts": "pnpm --filter @cukies/contracts",
     "build:dapp": "pnpm --filter dapp build",
     "build:sybil-slayer": "pnpm --filter sybil-slayer build",
     "build:hyppie-road": "pnpm --filter hyppie-road build",

@@ -1,0 +1,7 @@
+{
+  "filter_paths": "node_modules|artifacts|cache|coverage|typechain-types",
+  "solc_remaps": [
+    "@openzeppelin/=node_modules/@openzeppelin/"
+  ],
+  "exclude_dependencies": true
+}
