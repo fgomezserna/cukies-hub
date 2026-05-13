@@ -15,6 +15,7 @@ pnpm --filter @cukies/contracts coverage
 pnpm --filter @cukies/contracts simulate:deploy
 pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts export:abi
+pnpm --filter @cukies/contracts freeze:manifest
 ```
 
 ## Required environment
@@ -50,6 +51,7 @@ For non-local deploys, the deploy script fails if `SALE_OWNER_ADDRESS` is missin
 
 Before mainnet, complete `packages/contracts/docs/SECURITY.md`.
 Role ownership and emergency procedures are documented in `packages/contracts/docs/MULTISIG_RUNBOOK.md`.
+The final freeze checklist lives in `packages/contracts/docs/FREEZE_CHECKLIST.md`.
 
 ## Dapp env
 
