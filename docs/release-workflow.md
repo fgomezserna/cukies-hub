@@ -104,7 +104,12 @@ Debe tener una issue o PR de coordinacion con:
 - responsable tecnico,
 - responsable de validacion producto/ops.
 
-Formato sugerido:
+Plantilla operativa:
+
+- Markdown: `docs/release-candidate-template.md`.
+- GitHub issue form: `.github/ISSUE_TEMPLATE/release_candidate.yml`.
+
+Formato minimo:
 
 ```text
 Release candidate: UKI <fase> <fecha>
@@ -126,6 +131,16 @@ Go/no-go:
 Rollback:
 - ...
 ```
+
+Para publicar produccion, el go/no-go debe tener al menos tres responsables con decision explicita: tech lead, producto/QA y ops. Si la release toca contratos, tambien debe figurar contract owner/multisig. Si toca copy publico sensible, tambien debe figurar comms/legal.
+
+Regla de cierre:
+
+- docs internas o tooling sin deploy se pueden cerrar al merge si cumplen acceptance criteria;
+- cambios validados solo en staging se cierran tras evidencia de staging si la issue no exige produccion;
+- cambios publicos o de producto se cierran tras deploy production y smoke post-deploy;
+- issues parcialmente cubiertas permanecen abiertas con comentario del alcance pendiente;
+- cualquier no-go o blocker mantiene la issue abierta con la decision exacta requerida.
 
 ## Staging
 
