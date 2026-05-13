@@ -153,6 +153,7 @@ Gates minimos para staging:
 - BSC testnet para compras/vesting/claims on-chain.
 - Datos de prueba que no afecten usuarios reales.
 - `pnpm dapp lint`, `pnpm dapp typecheck` y tests relevantes, o fallos documentados si son preexistentes.
+- `/api/health` expone el commit/ref esperado sin secretos, cuando el endpoint este disponible.
 - Smoke test de rutas criticas.
 
 Para contratos:
@@ -182,6 +183,7 @@ El deploy de produccion debe registrar:
 
 - fecha/hora,
 - commit/tag/branch desplegado,
+- evidencia de `/api/health` si esta disponible,
 - issue/PR de release,
 - persona que ejecuta,
 - validacion post-deploy,

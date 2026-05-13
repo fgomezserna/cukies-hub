@@ -102,6 +102,7 @@ No abras una RC para una tarea docs interna que se pueda cerrar al merge sin dep
 ## Evidencias
 
 - Staging URL:
+- Health/version:
 - Deploy id / Coolify event:
 - Commit desplegado:
 - Capturas:
@@ -188,6 +189,7 @@ Issues que permanecen abiertas:
 ## Validacion post-deploy
 
 - [ ] Dominio correcto responde.
+- [ ] `/api/health` responde y expone el commit/ref esperado sin secretos.
 - [ ] Commit/ref desplegado coincide con la RC.
 - [ ] Smoke critico OK.
 - [ ] Logs sin errores nuevos relevantes.
