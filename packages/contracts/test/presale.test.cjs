@@ -125,5 +125,123 @@ describe('Presale', function () {
     await presale.connect(owner).pause();
     await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
       .to.be.revertedWithCustomError(presale, 'EnforcedPause');
+
+    await presale.connect(owner).unpause();
+    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
+      .to.emit(presale, 'Purchased');
+  });
+
+  it('allows the owner to update sale administration settings', async function () {
+    const { owner, treasury, other, buyer, presale, saleStart, saleEnd, vestingStart } = await deployPresaleFixture();
+    const nextSaleStart = saleStart + 1_000n;
+    const nextSaleEnd = saleEnd + 1_000n;
+    const nextVestingStart = vestingStart + 2_000n;
+    const nextVestingDuration = 365n * 24n * 60n * 60n;
+    const nextMin = ethers.parseEther('2');
+    const nextMax = ethers.parseEther('5000');
+    const nextCap = ethers.parseEther('15000');
+
+    await expect(presale.connect(owner).setTreasury(other.address))
+      .to.emit(presale, 'TreasuryUpdated')
+      .withArgs(treasury.address, other.address);
+    expect(await presale.treasury()).to.equal(other.address);
+
+    await expect(presale.connect(owner).setSaleWindow(nextSaleStart, nextSaleEnd))
+      .to.emit(presale, 'SaleWindowUpdated')
+      .withArgs(nextSaleStart, nextSaleEnd);
+    expect(await presale.saleStart()).to.equal(nextSaleStart);
+    expect(await presale.saleEnd()).to.equal(nextSaleEnd);
+
+    await expect(presale.connect(owner).setPurchaseLimits(nextMin, nextMax, nextCap))
+      .to.emit(presale, 'PurchaseLimitsUpdated')
+      .withArgs(nextMin, nextMax, nextCap);
+    expect(await presale.minAsmPerPurchase()).to.equal(nextMin);
+    expect(await presale.maxAsmPerPurchase()).to.equal(nextMax);
+    expect(await presale.walletAsmCap()).to.equal(nextCap);
+
+    await expect(presale.connect(owner).setVestingConfig(nextVestingStart, nextVestingDuration))
+      .to.emit(presale, 'VestingConfigUpdated')
+      .withArgs(nextVestingStart, nextVestingDuration);
+    expect(await presale.vestingStart()).to.equal(nextVestingStart);
+    expect(await presale.vestingDuration()).to.equal(nextVestingDuration);
+
+    await expect(presale.connect(buyer).setTreasury(treasury.address))
+      .to.be.revertedWithCustomError(presale, 'OwnableUnauthorizedAccount')
+      .withArgs(buyer.address);
+  });
+
+  it('rejects invalid owner sale configuration updates', async function () {
+    const { presale, saleStart, saleEnd, vestingStart } = await deployPresaleFixture();
+
+    await expect(presale.setTreasury(ethers.ZeroAddress))
+      .to.be.revertedWithCustomError(presale, 'InvalidAddress');
+    await expect(presale.setSaleWindow(0, saleEnd))
+      .to.be.revertedWithCustomError(presale, 'InvalidSaleWindow');
+    await expect(presale.setSaleWindow(saleEnd, saleStart))
+      .to.be.revertedWithCustomError(presale, 'InvalidSaleWindow');
+    await expect(presale.setPurchaseLimits(0, ethers.parseEther('10'), ethers.parseEther('10')))
+      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
+    await expect(presale.setPurchaseLimits(ethers.parseEther('20'), ethers.parseEther('10'), ethers.parseEther('30')))
+      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
+    await expect(presale.setPurchaseLimits(ethers.parseEther('1'), ethers.parseEther('20'), ethers.parseEther('10')))
+      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
+    await expect(presale.setVestingConfig(0, 1))
+      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
+    await expect(presale.setVestingConfig(vestingStart, 0))
+      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
+  });
+
+  it('rejects invalid constructor configuration', async function () {
+    const { owner, treasury, asm, vault, presale, saleStart, saleEnd, vestingStart, vestingDuration } = await deployPresaleFixture();
+    const Presale = await ethers.getContractFactory('Presale');
+    const baseConfig = {
+      owner: owner.address,
+      asmToken: await asm.getAddress(),
+      vestingVault: await vault.getAddress(),
+      treasury: treasury.address,
+      saleStart,
+      saleEnd,
+      ukiPerAsm: ethers.parseEther('100'),
+      minAsmPerPurchase: ethers.parseEther('1'),
+      maxAsmPerPurchase: ethers.parseEther('10000'),
+      walletAsmCap: ethers.parseEther('20000'),
+      totalUkiForSale: ethers.parseEther('10000000'),
+      vestingStart,
+      vestingDuration,
+    };
+
+    await expect(Presale.deploy({ ...baseConfig, owner: ethers.ZeroAddress }))
+      .to.be.revertedWithCustomError(presale, 'OwnableInvalidOwner')
+      .withArgs(ethers.ZeroAddress);
+    await expect(Presale.deploy({ ...baseConfig, asmToken: ethers.ZeroAddress }))
+      .to.be.revertedWithCustomError(presale, 'InvalidAddress');
+    await expect(Presale.deploy({ ...baseConfig, treasury: ethers.ZeroAddress }))
+      .to.be.revertedWithCustomError(presale, 'InvalidAddress');
+    await expect(Presale.deploy({ ...baseConfig, saleStart: 0 }))
+      .to.be.revertedWithCustomError(presale, 'InvalidSaleWindow');
+    await expect(Presale.deploy({ ...baseConfig, saleEnd: saleStart }))
+      .to.be.revertedWithCustomError(presale, 'InvalidSaleWindow');
+    await expect(Presale.deploy({ ...baseConfig, ukiPerAsm: 0 }))
+      .to.be.revertedWithCustomError(presale, 'InvalidRate');
+    await expect(Presale.deploy({ ...baseConfig, minAsmPerPurchase: 0 }))
+      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
+    await expect(Presale.deploy({
+      ...baseConfig,
+      minAsmPerPurchase: ethers.parseEther('2'),
+      maxAsmPerPurchase: ethers.parseEther('1'),
+    }))
+      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
+    await expect(Presale.deploy({
+      ...baseConfig,
+      maxAsmPerPurchase: ethers.parseEther('3'),
+      walletAsmCap: ethers.parseEther('2'),
+    }))
+      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
+    await expect(Presale.deploy({ ...baseConfig, totalUkiForSale: 0 }))
+      .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
+    await expect(Presale.deploy({ ...baseConfig, vestingStart: 0 }))
+      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
+    await expect(Presale.deploy({ ...baseConfig, vestingDuration: 0 }))
+      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
   });
 });

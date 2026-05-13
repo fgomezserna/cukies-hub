@@ -13,9 +13,27 @@ function optionalAddress(name) {
   return value && value !== '' ? value : null;
 }
 
+function isLocalNetwork(networkName) {
+  return networkName === 'hardhat' || networkName === 'localhost';
+}
+
+function resolveOwner(deployerAddress) {
+  const owner = optionalAddress('SALE_OWNER_ADDRESS');
+  if (owner) return owner;
+
+  if (!isLocalNetwork(hre.network.name)) {
+    throw new Error('SALE_OWNER_ADDRESS is required for non-local deploys. Use the launch multisig/admin owner.');
+  }
+
+  return deployerAddress;
+}
+
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
-  const owner = optionalAddress('SALE_OWNER_ADDRESS') || deployer.address;
+  const owner = resolveOwner(deployer?.address);
+  if (!deployer) {
+    throw new Error('DEPLOYER_PRIVATE_KEY is required for deploys.');
+  }
   const treasury = requireEnv('SALE_TREASURY_ADDRESS');
   const asmTokenAddress = requireEnv('ASM_TOKEN_ADDRESS');
   const initialSupplyReceiver = optionalAddress('UKI_INITIAL_SUPPLY_RECEIVER') || deployer.address;

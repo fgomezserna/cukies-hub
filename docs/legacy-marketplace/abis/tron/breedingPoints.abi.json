@@ -1,0 +1,622 @@
+[
+  {
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeReductionMinSkill",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_cukieId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getNumBreedsByCukie",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256[]"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "getAllBreedsOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_cukiePoints",
+        "type": "address"
+      }
+    ],
+    "name": "changePoints",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_breed",
+        "type": "uint256"
+      }
+    ],
+    "name": "recovery",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "name": "parent1",
+        "type": "uint256"
+      },
+      {
+        "name": "parent2",
+        "type": "uint256"
+      },
+      {
+        "name": "start_at",
+        "type": "uint256"
+      },
+      {
+        "name": "finish_at",
+        "type": "uint256"
+      },
+      {
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "name": "completed",
+        "type": "bool"
+      },
+      {
+        "name": "result",
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "breeds",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256[]"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "getActiveBreedsOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "reductionMaxSkill",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "costBreed",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeBaseSkill",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint8"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "cukieBreed",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_cukieToken",
+        "type": "address"
+      }
+    ],
+    "name": "changeToken",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "name": "pauseOn",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_maxBreedCukiesByUser",
+        "type": "uint8"
+      }
+    ],
+    "name": "changemaxBreedCukiesByUser",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "name": "renounceOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_maxBreedCukie",
+        "type": "uint8"
+      }
+    ],
+    "name": "changeMaxBreed",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_parent1",
+        "type": "uint256"
+      },
+      {
+        "name": "_parent2",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCostPoints",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "owner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "name": "getMaxBreedsByCukie",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "name": "isOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_parent1",
+        "type": "uint256"
+      },
+      {
+        "name": "_parent2",
+        "type": "uint256"
+      }
+    ],
+    "name": "start",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "cukiePoints",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getTypeCukie",
+    "stateMutability": "Pure",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "baseSkill",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_breed",
+        "type": "uint256"
+      }
+    ],
+    "name": "breed",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeReductionMaxSkill",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "cukieToken",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "name": "pauseOff",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_daysforfinish",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeDaysForFinish",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "probabilities",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "address"
+      },
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "userBreeds",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      },
+      {
+        "name": "_index2",
+        "type": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeProbabilities",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "address"
+      },
+      {
+        "type": "bool"
+      },
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_breed",
+        "type": "uint256"
+      }
+    ],
+    "name": "getBreed",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeCostBreed",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "reductionMinSkill",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "stateMutability": "Nonpayable",
+    "type": "Constructor"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "parent1",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "name": "parent2",
+        "type": "uint256"
+      },
+      {
+        "name": "date",
+        "type": "uint256"
+      }
+    ],
+    "name": "BreedStart",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "parent1",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "name": "parent2",
+        "type": "uint256"
+      },
+      {
+        "name": "result",
+        "type": "uint256"
+      },
+      {
+        "name": "date",
+        "type": "uint256"
+      }
+    ],
+    "name": "BreedFinish",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipRenounced",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "Event"
+  }
+]

@@ -27,14 +27,16 @@ Required for deploy:
 - `DEPLOYER_PRIVATE_KEY`
 - `ASM_TOKEN_ADDRESS`
 - `SALE_TREASURY_ADDRESS`
+- `SALE_OWNER_ADDRESS` for BSC testnet/mainnet. Use the launch multisig/admin owner.
 - `BSCSCAN_API_KEY` for verification
 
 Optional:
 
 - `UKI_TOKEN_ADDRESS` to reuse an existing UKI token.
 - `UKI_VESTING_VAULT_ADDRESS` to reuse an existing vault.
-- `SALE_OWNER_ADDRESS` to set a multisig/admin owner.
 - `SALE_START`, `SALE_END`, `VESTING_START`, `VESTING_DURATION`.
+
+For non-local deploys, the deploy script fails if `SALE_OWNER_ADDRESS` is missing. Local Hardhat flows may fall back to the deployer address.
 
 ## Deployment order
 
@@ -48,6 +50,7 @@ Optional:
 8. Export ABIs and set dapp env addresses.
 
 Before mainnet, complete `packages/contracts/docs/SECURITY.md`.
+Role ownership and emergency procedures are documented in `packages/contracts/docs/MULTISIG_RUNBOOK.md`.
 The final freeze checklist lives in `packages/contracts/docs/FREEZE_CHECKLIST.md`.
 
 ## Dapp env
