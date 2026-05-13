@@ -12,6 +12,8 @@ type WalletConnectButtonProps = {
   showCompactText?: boolean;
 };
 
+export type { WalletConnectButtonProps };
+
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
