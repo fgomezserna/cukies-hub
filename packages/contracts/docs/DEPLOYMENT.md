@@ -15,6 +15,7 @@ pnpm --filter @cukies/contracts coverage
 pnpm --filter @cukies/contracts simulate:deploy
 pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts export:abi
+pnpm --filter @cukies/contracts freeze:manifest
 ```
 
 ## Required environment
@@ -47,6 +48,7 @@ Optional:
 8. Export ABIs and set dapp env addresses.
 
 Before mainnet, complete `packages/contracts/docs/SECURITY.md`.
+The final freeze checklist lives in `packages/contracts/docs/FREEZE_CHECKLIST.md`.
 
 ## Dapp env
 
