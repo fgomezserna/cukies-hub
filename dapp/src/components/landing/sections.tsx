@@ -18,7 +18,7 @@ import { HeroBackgroundVideo } from './hero-background-video';
 import { LandingButton, MetricTile, Panel, ProgressTrack, SectionHeading, TokenCoin } from './primitives';
 import { SaleConsole } from './sale-console';
 import { UKI_PRESALE_START_LABEL } from './sale-config';
-import { WalletConnectButton } from './wallet-connect-button';
+import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 
 export function CukiesLanding() {
   return (
@@ -56,7 +56,7 @@ function LandingHeader() {
           ))}
         </div>
 
-        <WalletConnectButton />
+        <LandingWalletConnectButton />
       </nav>
     </header>
   );
@@ -167,7 +167,7 @@ function StepCard({ step }: { step: (typeof purchaseSteps)[number] }) {
       <div className="uki-step-action mt-auto rounded-[9px] border border-white/10 bg-[#02090d]/66 p-3">
         {step.number === '1' ? (
           <div className="space-y-2.5">
-            <WalletConnectButton className="h-9 w-full justify-center rounded-[5px]" showCompactText={false} />
+            <LandingWalletConnectButton className="h-9 w-full justify-center rounded-[5px]" showCompactText={false} />
             <MiniRow label="MetaMask" />
             <MiniRow label="WalletConnect" />
           </div>

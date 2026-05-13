@@ -19,8 +19,13 @@ import {
   Star,
   Users,
   Coins,
+  Dna,
+  ArrowRightLeft,
+  ChevronDown,
+  Cookie,
   Send,
   LockKeyhole,
+  Store,
 } from 'lucide-react';
 import Header from './header';
 import DiscordIcon from '../icons/discord';
@@ -45,6 +50,31 @@ const SidebarLogo = () => {
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
+  const isCukiesSection =
+    pathname.startsWith('/cukies') ||
+    pathname.startsWith('/marketplace') ||
+    pathname.startsWith('/cukiepoints') ||
+    pathname.startsWith('/users/points') ||
+    pathname.startsWith('/breeding') ||
+    pathname.startsWith('/bridge') ||
+    pathname.startsWith('/bridges');
+
+  const cukiesTools = [
+    { href: '/marketplace', label: 'Marketplace', Icon: Store, active: pathname.startsWith('/marketplace') },
+    {
+      href: '/cukiepoints',
+      label: 'CukiePoints',
+      Icon: Coins,
+      active: pathname.startsWith('/cukiepoints') || pathname.startsWith('/users/points'),
+    },
+    { href: '/breeding', label: 'Breeding', Icon: Dna, active: pathname.startsWith('/breeding') },
+    {
+      href: '/bridge',
+      label: 'Bridge',
+      Icon: ArrowRightLeft,
+      active: pathname.startsWith('/bridge') || pathname.startsWith('/bridges'),
+    },
+  ];
 
   return (
     <div className="flex h-screen w-full bg-background relative">
@@ -52,7 +82,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         <Sidebar collapsible="icon" className="border-r border-teal-400/20 bg-black/10 backdrop-blur-md shadow-xl shadow-teal-400/10" style={{
             // Override sidebar background variable for transparency
             // 25% opaque black provides dark overlay while showing content background
-            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
             "--sidebar-background": "rgb(255, 255, 255)",
             "--sidebar-border": "rgba(34, 231, 223, 0.3)"
           } as React.CSSProperties}>
@@ -158,6 +187,46 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </SidebarMenuItem>
 
               <SidebarMenuItem>
+                <details open={isCukiesSection} className="group/cukies">
+                  <summary className="list-none [&::-webkit-details-marker]:hidden">
+                    <Link href="/cukies" passHref>
+                      <SidebarMenuButton
+                        isActive={isCukiesSection}
+                        className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
+                      >
+                        <div className="flex w-full items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 group-hover:from-emerald-400/30 group-hover:to-cyan-400/30 transition-all">
+                              <Cookie className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
+                            </div>
+                            <span className="group-data-[collapsible=icon]:hidden font-medium">Cukies</span>
+                          </div>
+                          <ChevronDown className="h-3.5 w-3.5 text-cyan-200 transition group-open/cukies:rotate-180 group-data-[collapsible=icon]:hidden" />
+                        </div>
+                      </SidebarMenuButton>
+                    </Link>
+                  </summary>
+
+                  <div className="mt-1 space-y-1 pl-5 group-data-[collapsible=icon]:hidden">
+                    {cukiesTools.map(({ href, label, Icon, active }) => (
+                      <Link key={href} href={href} className="block">
+                        <div
+                          className={`flex items-center gap-2 rounded-[8px] px-3 py-2 text-sm transition ${
+                            active
+                              ? 'bg-cyan-300/15 text-cyan-100'
+                              : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          <span>{label}</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </details>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
                 <Link href="/vesting" passHref>
                   <SidebarMenuButton
                     isActive={pathname.startsWith('/vesting')}
@@ -173,21 +242,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Link>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20"
-                >
-                  <a href="https://marketplace.cukies.world/" target="_blank" rel="noopener noreferrer">
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <Coins className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Marketplace</span>
-                    </div>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
             
 
@@ -236,7 +290,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex flex-1 flex-col overflow-hidden relative z-10">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden relative z-10">
           {/* Main background with gradients and textures */}
           <div className="absolute inset-0 bg-gradient-to-br from-background via-cyan-950/20 to-cyan-950/30"></div>
           
@@ -285,7 +339,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           </div>
           
           <Header />
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative z-10">{children}</main>
+          <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
         </div>
       </SidebarProvider>
     </div>

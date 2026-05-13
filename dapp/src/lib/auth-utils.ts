@@ -1,6 +1,7 @@
 // Server-side utilities for wallet authentication
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
+import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 export async function verifyWalletAuth(walletAddress: string): Promise<any> {
   if (!walletAddress) {
@@ -8,7 +9,7 @@ export async function verifyWalletAuth(walletAddress: string): Promise<any> {
   }
 
   const user = await prisma.user.findUnique({
-    where: { walletAddress: walletAddress.toLowerCase() },
+    where: { walletAddress: normalizeWalletAddress(walletAddress) },
     select: {
       id: true,
       walletAddress: true,

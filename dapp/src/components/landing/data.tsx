@@ -27,6 +27,7 @@ export const navItems = [
   { label: 'Token', href: '#token' },
   { label: 'Utility', href: '#utility' },
   { label: 'Games', href: '#games' },
+  { label: 'Cukies', href: '/cukies' },
   { label: 'FAQ', href: '#faq' },
 ];
 

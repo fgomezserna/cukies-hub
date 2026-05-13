@@ -1,6 +1,7 @@
 import { cukiesDb } from './mongodb-cukies';
 import { prisma } from './prisma';
 import { createUserDirectly } from './mongodb-hub';
+import { normalizeWalletAddress } from './wallet-address';
 
 /**
  * Busca un usuario en la BD cukies por wallet address
@@ -9,9 +10,7 @@ import { createUserDirectly } from './mongodb-hub';
 export async function findUserInCukiesDb(walletAddress: string) {
   try {
     // Normalizar address: TRON addresses no son case-sensitive, BSC sí
-    const normalizedAddress = walletAddress.startsWith('T') 
-      ? walletAddress.toUpperCase() 
-      : walletAddress.toLowerCase();
+    const normalizedAddress = normalizeWalletAddress(walletAddress);
     
     // Primero buscar en la colección de wallets directamente
     const walletsCollection = await cukiesDb.wallets();
@@ -49,9 +48,7 @@ export async function syncUserFromCukiesDb(
 ): Promise<any> {
   try {
     // Normalizar address: TRON addresses (T...) se mantienen en mayúsculas, BSC (0x...) en minúsculas
-    const normalizedAddress = walletAddress.startsWith('T') 
-      ? walletAddress.toUpperCase() 
-      : walletAddress.toLowerCase();
+    const normalizedAddress = normalizeWalletAddress(walletAddress);
 
     // Verificar si el usuario ya existe en cukies-hub
     const existingUser = await prisma.user.findUnique({
@@ -163,4 +160,3 @@ export async function findOrSyncUserFromCukies(walletAddress: string) {
   
   return null;
 }
-
