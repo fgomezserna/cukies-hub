@@ -2,7 +2,6 @@
 
 import React, { useRef, useState, useCallback, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/providers/auth-provider';
-import AppLayout from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -101,7 +100,6 @@ export default function GameLayout({
 
   if (gameConfig.isInMaintenance) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-full">
           <Card className="max-w-md mx-auto">
             <CardContent className="p-6 text-center">
@@ -113,12 +111,10 @@ export default function GameLayout({
             </CardContent>
           </Card>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
         
         {/* Left Column: Game */}
@@ -292,6 +288,5 @@ export default function GameLayout({
           {children}
         </div>
       </div>
-    </AppLayout>
   );
 }

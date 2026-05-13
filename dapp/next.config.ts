@@ -2,6 +2,9 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -19,6 +22,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cukies.s3.eu-west-3.amazonaws.com',
         port: '',
         pathname: '/**',
       },

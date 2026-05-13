@@ -2,7 +2,7 @@ import { Lock, Wallet, Zap, type LucideIcon } from 'lucide-react';
 import { PresaleCountdown, PresaleLockBadge } from './presale-countdown';
 import { Panel, TokenCoin } from './primitives';
 import { UKI_PRESALE_START_LABEL } from './sale-config';
-import { WalletConnectButton, WalletStatusLabel } from './wallet-connect-button';
+import { LandingWalletConnectButton, LandingWalletStatusLabel } from './wallet-connect-dynamic';
 
 export function SaleConsole() {
   return (
@@ -41,12 +41,12 @@ export function SaleConsole() {
             <Wallet className="h-4 w-4" strokeWidth={1.8} />
             Wallet
           </span>
-          <WalletStatusLabel />
+          <LandingWalletStatusLabel />
         </div>
         <PresaleLockBadge className="mt-2 w-full justify-center" />
       </div>
 
-      <WalletConnectButton className="mt-2.5 w-full justify-center" showCompactText={false} />
+      <LandingWalletConnectButton className="mt-2.5 w-full justify-center" showCompactText={false} />
     </Panel>
   );
 }
