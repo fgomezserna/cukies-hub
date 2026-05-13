@@ -52,7 +52,12 @@ export default function Header() {
   const { user, isLoading: isAuthLoading, isWaitingForApproval } = useAuth();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const { connect: connectTron, isInstalled: isTronInstalled } = useTronLink();
+  const {
+    connect: connectTron,
+    error: tronError,
+    isInstalled: isTronInstalled,
+    isLoading: isTronLoading,
+  } = useTronLink();
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   
   // This would come from user data in a real app
@@ -67,9 +72,11 @@ export default function Header() {
   };
 
   const handleConnectTron = async () => {
-    setIsWalletDialogOpen(false);
     try {
-      await connectTron();
+      const address = await connectTron();
+      if (address) {
+        setIsWalletDialogOpen(false);
+      }
     } catch (error) {
       console.error('Failed to connect TronLink:', error);
     }
@@ -251,7 +258,7 @@ export default function Header() {
 
                   <Button
                     onClick={handleConnectTron}
-                    disabled={!isTronInstalled}
+                    disabled={!isTronInstalled || isTronLoading}
                     className="w-full h-auto p-6 flex flex-col items-start gap-3 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 hover:from-teal-400/20 hover:to-cyan-400/20 border-2 border-cyan-300/30 hover:border-cyan-300/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center gap-3 w-full">
@@ -261,11 +268,20 @@ export default function Header() {
                       <div className="flex-1 text-left">
                         <div className="font-bold text-lg text-foreground">TronLink</div>
                         <div className="text-sm text-muted-foreground">
-                          {isTronInstalled ? 'Connect your TronLink wallet' : 'Please install TronLink extension'}
+                          {isTronInstalled
+                            ? isTronLoading
+                              ? 'Esperando confirmacion en TronLink...'
+                              : 'Connect your TronLink wallet'
+                            : 'Please install TronLink extension'}
                         </div>
                       </div>
                     </div>
                   </Button>
+                  {tronError && (
+                    <p className="rounded-[8px] border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
+                      {tronError}
+                    </p>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>

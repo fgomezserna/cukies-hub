@@ -1,0 +1,170 @@
+[
+  {
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "removeAdmin",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address[]"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "getReferrals",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_sponsor",
+        "type": "address"
+      }
+    ],
+    "name": "setSponsor",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "addAdmin",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "name": "renounceOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "getSponsor",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "owner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "name": "isOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      },
+      {
+        "name": "_sponsor",
+        "type": "address"
+      }
+    ],
+    "name": "setSponsorOwner",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "haveSponsor",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "stateMutability": "Nonpayable",
+    "type": "Constructor"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipRenounced",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "Event"
+  }
+]

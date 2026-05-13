@@ -1,0 +1,687 @@
+[
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
+    ],
+    "name": "supportsInterface",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "constant": true,
+    "name": "name",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getApproved",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "approve",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      },
+      {
+        "type": "uint8"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getCukie",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "name": "totalSupply",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferFrom",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "uriBase",
+        "type": "string"
+      }
+    ],
+    "name": "setUriBase",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "tokenOfOwnerByIndex",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getType",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "safeTransferFrom",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "tokenByIndex",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "tokenURI",
+        "type": "string"
+      }
+    ],
+    "name": "mintWithTokenURI",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "typeId",
+        "type": "uint256"
+      },
+      {
+        "name": "generation",
+        "type": "uint256"
+      },
+      {
+        "name": "skills",
+        "type": "uint8[6]"
+      },
+      {
+        "name": "energy",
+        "type": "uint8"
+      },
+      {
+        "name": "health",
+        "type": "uint8"
+      }
+    ],
+    "name": "mintWithTokenURI",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ownerOf",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "constant": true,
+    "name": "baseURI",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "balanceOf",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "name": "renounceOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "name": "getNumTypes",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256"
+      },
+      {
+        "name": "generation",
+        "type": "uint256"
+      },
+      {
+        "name": "skills",
+        "type": "uint8[6]"
+      },
+      {
+        "name": "energy",
+        "type": "uint8"
+      },
+      {
+        "name": "health",
+        "type": "uint8"
+      }
+    ],
+    "name": "setSkills",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "owner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "name": "isOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "constant": true,
+    "name": "symbol",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "addMinter",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "name": "renounceMinter",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "approved",
+        "type": "bool"
+      }
+    ],
+    "name": "setApprovalForAll",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "isMinter",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "_data",
+        "type": "bytes"
+      }
+    ],
+    "name": "safeTransferFrom",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "tokenURI",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "name": "probability",
+        "type": "uint256"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "num",
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "types",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "probability",
+        "type": "uint256"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "addType",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "name": "operator",
+        "type": "address"
+      }
+    ],
+    "name": "isApprovedForAll",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "stateMutability": "Nonpayable",
+    "type": "Constructor"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MinterAdded",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MinterRemoved",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "Transfer",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "approved",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "Approval",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "operator",
+        "type": "address"
+      },
+      {
+        "name": "approved",
+        "type": "bool"
+      }
+    ],
+    "name": "ApprovalForAll",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipRenounced",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "Event"
+  }
+]

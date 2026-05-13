@@ -2,8 +2,6 @@ import type {Metadata} from 'next';
 import { Inter, Lilita_One, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { Web3Provider } from '@/providers/web3-provider';
-import { AuthProvider } from '@/providers/auth-provider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -50,11 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${lilita.variable} dark`} suppressHydrationWarning>
       <body className="font-body antialiased">
-        <Web3Provider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </Web3Provider>
+        {children}
         <Toaster />
       </body>
     </html>

@@ -1,0 +1,410 @@
+[
+  {
+    "inputs": [
+      {
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "changeCobrador",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      },
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getType",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_price",
+        "type": "uint256"
+      },
+      {
+        "name": "_priceIncrement",
+        "type": "uint256"
+      },
+      {
+        "name": "_priceIncrementNum",
+        "type": "uint256"
+      }
+    ],
+    "name": "changePrice",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "probability",
+        "type": "uint256"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "max",
+        "type": "uint16"
+      },
+      {
+        "name": "maxSkill",
+        "type": "uint8"
+      },
+      {
+        "name": "energy",
+        "type": "uint8"
+      },
+      {
+        "name": "health",
+        "type": "uint8"
+      }
+    ],
+    "name": "addType",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "payable": true,
+    "inputs": [
+      {
+        "name": "num",
+        "type": "uint256"
+      },
+      {
+        "name": "sponsor",
+        "type": "address"
+      }
+    ],
+    "name": "multiMint",
+    "stateMutability": "Payable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_cukieToken",
+        "type": "address"
+      }
+    ],
+    "name": "changeToken",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "name": "renounceOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "name": "getNumTypes",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "owner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "name": "isOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "name": "buyers",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "name": "togglePause",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "cukieToken",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "name": "withdrawn",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_type",
+        "type": "uint8"
+      },
+      {
+        "name": "skills",
+        "type": "uint8[6]"
+      }
+    ],
+    "name": "addSkill",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "name": "probability",
+        "type": "uint256"
+      },
+      {
+        "name": "maxSkill",
+        "type": "uint8"
+      },
+      {
+        "name": "energy",
+        "type": "uint8"
+      },
+      {
+        "name": "health",
+        "type": "uint8"
+      },
+      {
+        "name": "max",
+        "type": "uint16"
+      },
+      {
+        "name": "num",
+        "type": "uint16"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "types",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "referrals",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "address"
+      },
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "referralsBuyed",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_referrals",
+        "type": "address"
+      }
+    ],
+    "name": "changeReferrals",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "name": "num",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPrice",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "name": "getNext",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "inputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "name": "userToSponsor",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "stateMutability": "Nonpayable",
+    "type": "Constructor"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "sponsor",
+        "type": "address"
+      },
+      {
+        "name": "num",
+        "type": "uint256"
+      },
+      {
+        "name": "value",
+        "type": "uint256"
+      },
+      {
+        "name": "comission",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "name": "level",
+        "type": "uint8"
+      }
+    ],
+    "name": "MintReferral",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipRenounced",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "Event"
+  }
+]

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { processReferralByUsername } from '@/lib/referrals';
 import { findOrSyncUserFromCukies } from '@/lib/user-sync';
 import { createUserDirectly } from '@/lib/mongodb-hub';
+import { normalizeWalletAddress } from '@/lib/wallet-address';
 import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -14,11 +15,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
     }
 
-    const lowercasedAddress = walletAddress.toLowerCase();
+    const normalizedAddress = normalizeWalletAddress(walletAddress);
 
     let user = await prisma.user.findUnique({
       where: {
-        walletAddress: lowercasedAddress,
+        walletAddress: normalizedAddress,
       },
       include: {
         lastCheckIn: true,
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
       try {
         // Primero buscar en la BD cukies y sincronizar si existe
         console.log('🔍 Buscando usuario en BD cukies...');
-        const syncedUser = await findOrSyncUserFromCukies(lowercasedAddress);
+        const syncedUser = await findOrSyncUserFromCukies(normalizedAddress);
         
         if (syncedUser) {
           console.log('✅ Usuario sincronizado desde BD cukies');
@@ -50,8 +51,8 @@ export async function POST(request: Request) {
           
           // Create user directly in MongoDB to avoid transaction issues
           const newUserId = await createUserDirectly({
-            walletAddress: lowercasedAddress,
-            username: lowercasedAddress, // Use the entire wallet address as unique username
+            walletAddress: normalizedAddress,
+            username: normalizedAddress, // Use the entire wallet address as unique username
           });
 
           // Process referral if username exists
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
         if (createError instanceof Prisma.PrismaClientKnownRequestError && createError.code === 'P2002') {
           user = await prisma.user.findUnique({
             where: {
-              walletAddress: lowercasedAddress,
+              walletAddress: normalizedAddress,
             },
             include: {
               lastCheckIn: true,

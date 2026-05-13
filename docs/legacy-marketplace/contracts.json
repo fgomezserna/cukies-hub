@@ -1,0 +1,105 @@
+{
+  "source": "https://marketplace.cukies.world/",
+  "extractedAt": "2026-05-12",
+  "networks": {
+    "tron": {
+      "chain": "TRON mainnet",
+      "rpc": "https://api.trongrid.io",
+      "contracts": {
+        "MINT": "TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7",
+        "TOKEN": "TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe",
+        "REFERRALS": "TZ4QM9RF1pxfoxnPY8UGAQEEwq5SDoZXk4",
+        "POINTS": "TWwNJEySYrkNXTpDBF7WfGwkoW4YTZ4yKA",
+        "STAKING_POINTS": "TUfbQaVERA1TmT31LU3HWJS6xsW3B8VfUY",
+        "BREEDING_POINTS": "TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S",
+        "MARKETPLACE": "TWDoJEq4eVd9vUgQ6f5knjqouRBPyGDzSB",
+        "BRIDGE": "TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ"
+      }
+    },
+    "bsc": {
+      "chain": "BNB Smart Chain mainnet",
+      "chainId": 56,
+      "rpc": "https://bsc-dataseed.binance.org",
+      "contracts": {
+        "TOKEN": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+        "POINTS": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
+        "STAKING_POINTS": "0xF381bfB59A2ae9623eFBce2C83AafF60f783cc6F",
+        "BREEDING_POINTS": "0x39Be8C4FA342C5f3C10d7c16941A0946D29Ade4A",
+        "MARKETPLACE": "0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91",
+        "BRIDGE": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E"
+      }
+    }
+  },
+  "abiSources": {
+    "bsc.token": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/bsc/token.json",
+      "localPath": "docs/legacy-marketplace/abis/bsc/token.abi.json",
+      "entries": 46
+    },
+    "bsc.points": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/bsc/points.json",
+      "localPath": "docs/legacy-marketplace/abis/bsc/points.abi.json",
+      "entries": 23
+    },
+    "bsc.stakingPoints": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/bsc/stakingPoints.json",
+      "localPath": "docs/legacy-marketplace/abis/bsc/stakingPoints.abi.json",
+      "entries": 28
+    },
+    "bsc.breedingPoints": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/bsc/breedingPoints.json",
+      "localPath": "docs/legacy-marketplace/abis/bsc/breedingPoints.abi.json",
+      "entries": 41
+    },
+    "bsc.marketplace": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/bsc/marketplace.json",
+      "localPath": "docs/legacy-marketplace/abis/bsc/marketplace.abi.json",
+      "entries": 31
+    },
+    "bsc.bridge": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/bsc/bridge.json",
+      "localPath": "docs/legacy-marketplace/abis/bsc/bridge.abi.json",
+      "entries": 20
+    },
+    "tron.referrals": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/referrals.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/referrals.abi.json",
+      "entries": 14
+    },
+    "tron.mint": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/mint.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/mint.abi.json",
+      "entries": 27
+    },
+    "tron.token": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/token.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/token.abi.json",
+      "entries": 41
+    },
+    "tron.points": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/points.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/points.abi.json",
+      "entries": 23
+    },
+    "tron.stakingPoints": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/stakingPoints.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/stakingPoints.abi.json",
+      "entries": 28
+    },
+    "tron.breedingPoints": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/breedingPoints.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/breedingPoints.abi.json",
+      "entries": 41
+    },
+    "tron.marketplace": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/marketplace.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/marketplace.abi.json",
+      "entries": 31
+    },
+    "tron.bridge": {
+      "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/bridge.json",
+      "localPath": "docs/legacy-marketplace/abis/tron/bridge.abi.json",
+      "entries": 20
+    }
+  }
+}
