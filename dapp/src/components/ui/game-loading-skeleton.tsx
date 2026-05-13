@@ -3,7 +3,6 @@
 import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import AppLayout from '@/components/layout/app-layout';
 
 interface GameLoadingSkeletonProps {
   message?: string;
@@ -11,7 +10,6 @@ interface GameLoadingSkeletonProps {
 
 export default function GameLoadingSkeleton({ message = "Loading game..." }: GameLoadingSkeletonProps) {
   return (
-    <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
         
         {/* Left Column: Game Loading Area */}
@@ -134,6 +132,5 @@ export default function GameLoadingSkeleton({ message = "Loading game..." }: Gam
           <Skeleton className="h-10 w-full rounded-md" />
         </div>
       </div>
-    </AppLayout>
   );
 }

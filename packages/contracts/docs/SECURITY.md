@@ -29,6 +29,14 @@ Review role ownership and emergency procedures before each deploy candidate:
 
 - `packages/contracts/docs/MULTISIG_RUNBOOK.md`
 
+## Threat model
+
+Review the launch threat model before each deploy candidate:
+
+- `packages/contracts/docs/THREAT_MODEL.md`
+
+The current model covers `UKIToken`, `Presale` and `VestingVault`. `UKIStaking` and `RewardsDistributor` need their own threat-model update before those contracts can be considered launch-ready.
+
 ## Manual review checklist
 
 - Presale owner is a multisig or launch-controlled wallet, not a personal hot wallet.
@@ -41,6 +49,7 @@ Review role ownership and emergency procedures before each deploy candidate:
 - `saleStart`, `saleEnd`, `vestingStart` and `vestingDuration` are UTC timestamps.
 - Min, max, wallet cap and sale cap match the public sale terms.
 - `ukiPerAsm` is scaled by `1e18`.
+- ASM token address is verified for the target chain and does not have fee-on-transfer/rebase behavior unless the presale is updated to account by balance delta.
 - BscScan verification succeeds for all deployed contracts.
 - Emergency pause flow has been tested on testnet.
 - Dapp env addresses match the deployed contracts and chain id.

@@ -1,0 +1,261 @@
+[
+  {
+    "name": "unpause",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "destOwner",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "jumpOutBridge",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "constant": true,
+    "name": "bridgePrice",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "newTokenContractAddress",
+        "type": "address"
+      }
+    ],
+    "name": "changeTokenContract",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "name": "paused",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "name": "renounceOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "name": "pause",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "constant": true,
+    "name": "owner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "constant": true,
+    "name": "isOwner",
+    "stateMutability": "View",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_bridgePrice",
+        "type": "uint256"
+      }
+    ],
+    "name": "changeBridgePrice",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "payable": true,
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "destOwner",
+        "type": "address"
+      },
+      {
+        "name": "chainPrefix",
+        "type": "uint8"
+      }
+    ],
+    "name": "jumpInBridge",
+    "stateMutability": "Payable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "destOwner",
+        "type": "address"
+      },
+      {
+        "name": "typeId",
+        "type": "uint256"
+      },
+      {
+        "name": "generation",
+        "type": "uint256"
+      },
+      {
+        "name": "skills",
+        "type": "uint8[6]"
+      },
+      {
+        "name": "energy",
+        "type": "uint8"
+      },
+      {
+        "name": "health",
+        "type": "uint8"
+      }
+    ],
+    "name": "jumpOutBridge",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "stateMutability": "Nonpayable",
+    "type": "Function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "tokenAddress",
+        "type": "address"
+      },
+      {
+        "name": "_bridgePrice",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "Nonpayable",
+    "type": "Constructor"
+  },
+  {
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "originOwner",
+        "type": "address"
+      },
+      {
+        "name": "destOwner",
+        "type": "address"
+      },
+      {
+        "name": "network",
+        "type": "uint8"
+      },
+      {
+        "name": "createdAt",
+        "type": "uint256"
+      }
+    ],
+    "name": "JumpInBridge",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "createdAt",
+        "type": "uint256"
+      }
+    ],
+    "name": "JumpOutBridge",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipRenounced",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "Paused",
+    "type": "Event"
+  },
+  {
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "Unpaused",
+    "type": "Event"
+  }
+]

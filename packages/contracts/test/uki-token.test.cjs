@@ -20,6 +20,17 @@ describe('UKIToken', function () {
     expect(await uki.balanceOf(treasury.address)).to.equal(initialSupply);
   });
 
+  it('rejects invalid constructor addresses', async function () {
+    const { owner, treasury, uki, initialSupply } = await deployTokenFixture();
+    const UKIToken = await ethers.getContractFactory('UKIToken');
+
+    await expect(UKIToken.deploy(ethers.ZeroAddress, treasury.address, initialSupply))
+      .to.be.revertedWithCustomError(uki, 'OwnableInvalidOwner')
+      .withArgs(ethers.ZeroAddress);
+    await expect(UKIToken.deploy(owner.address, ethers.ZeroAddress, initialSupply))
+      .to.be.revertedWithCustomError(uki, 'InvalidSupplyReceiver');
+  });
+
   it('supports transfers, allowance and burn', async function () {
     const { treasury, user, uki } = await deployTokenFixture();
 
@@ -41,6 +52,7 @@ describe('UKIToken', function () {
     await uki.connect(owner).pause();
     await expect(uki.connect(treasury).transfer(user.address, ethers.parseEther('1')))
       .to.be.revertedWithCustomError(uki, 'EnforcedPause');
+    await expect(uki.connect(user).unpause()).to.be.revertedWithCustomError(uki, 'OwnableUnauthorizedAccount');
 
     await uki.connect(owner).unpause();
     await expect(uki.connect(treasury).transfer(user.address, ethers.parseEther('1')))
