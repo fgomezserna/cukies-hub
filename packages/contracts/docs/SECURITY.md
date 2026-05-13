@@ -23,9 +23,17 @@ slither . --config-file slither.config.json
 
 If Slither is unavailable in the local environment, record that explicitly in the PR and run it in CI or in a Python/Solc environment before mainnet.
 
+## Operational runbooks
+
+Review role ownership and emergency procedures before each deploy candidate:
+
+- `packages/contracts/docs/MULTISIG_RUNBOOK.md`
+
 ## Manual review checklist
 
 - Presale owner is a multisig or launch-controlled wallet, not a personal hot wallet.
+- `UKIToken.owner()` is the approved multisig/admin owner.
+- `VestingVault` `DEFAULT_ADMIN_ROLE` is held by the approved multisig/admin owner.
 - `VestingVault` is funded with at least `totalUkiForSale`.
 - `Presale` has `VESTING_MANAGER_ROLE` in `VestingVault`.
 - ASM token address matches the intended BSC network.
