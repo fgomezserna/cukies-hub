@@ -1,0 +1,187 @@
+name: Release candidate
+description: Agrupa issues, validacion, responsables y decision go/no-go para una release UKI.
+title: "[RC] UKI <fase> <YYYY-MM-DD>"
+labels: ["area:ops", "area:security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usa esta plantilla para congelar una release candidate antes de promover cambios entre entornos.
+        Produccion requiere aprobacion explicita de tech, producto/QA y ops.
+
+  - type: input
+    id: release_name
+    attributes:
+      label: Release candidate
+      description: Nombre corto de la RC.
+      placeholder: "UKI Phase 1 presale 2026-05-13"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_environment
+    attributes:
+      label: Entorno objetivo
+      description: Donde se quiere validar o publicar esta RC.
+      options:
+        - Staging
+        - Production
+        - Staging y despues production
+    validations:
+      required: true
+
+  - type: input
+    id: source_ref
+    attributes:
+      label: Ref origen
+      description: Rama, tag o commit que contiene los cambios.
+      placeholder: "main, release/staging-2026-05-13 o <sha>"
+    validations:
+      required: true
+
+  - type: input
+    id: target_ref
+    attributes:
+      label: Ref destino
+      description: Rama, tag o deploy target esperado.
+      placeholder: "main, production, staging-20260513.1 o prod-20260513.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: included_scope
+    attributes:
+      label: Issues incluidas
+      description: Lista cerrada de issues que entran en esta RC.
+      placeholder: |
+        - #123 Motivo
+        - #124 Motivo
+    validations:
+      required: true
+
+  - type: textarea
+    id: excluded_scope
+    attributes:
+      label: Issues excluidas o aplazadas
+      description: Trabajo cercano que queda fuera para evitar confusion de alcance.
+      placeholder: |
+        - #130 queda para la siguiente RC porque ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: prs_commits
+    attributes:
+      label: PRs, commits y tags
+      description: PRs fusionados, commits exactos y tags que forman la RC.
+      placeholder: |
+        - PR #...
+        - Commit ...
+        - Tag ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validacion requerida
+      description: Comandos, smoke tests, testnet checks, QA funcional y checks manuales.
+      placeholder: |
+        - `pnpm dapp lint`
+        - `pnpm dapp typecheck`
+        - Smoke staging: ...
+        - Contratos/testnet: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidencias
+      description: URLs de staging, capturas, tx hashes, logs, checks, deploy ids o notas de QA.
+      placeholder: |
+        - Staging URL:
+        - Deploy:
+        - Tx/BscScan:
+        - Capturas:
+    validations:
+      required: true
+
+  - type: textarea
+    id: owners
+    attributes:
+      label: Responsables
+      description: Go/no-go requiere al menos tech, producto/QA y ops.
+      value: |
+        - Tech lead:
+        - Producto/QA:
+        - Ops:
+        - Contract owner/multisig, si aplica:
+        - Comms/legal, si aplica:
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Riesgos, blockers y decisiones pendientes
+      description: Riesgos aceptados, P0 abiertos, dependencias y decisiones necesarias antes de go.
+      placeholder: |
+        - Riesgo:
+        - Mitigacion:
+        - Decision pendiente:
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback
+      description: Plan concreto de rollback para app/env/API/contratos/datos/comunicacion.
+      placeholder: |
+        - App/ref estable anterior:
+        - Env/config:
+        - Contratos:
+        - Datos:
+        - Comunicacion:
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue_closure
+    attributes:
+      label: Regla de cierre de issues
+      description: Define que issues se cierran al merge, al validar staging o solo tras produccion.
+      placeholder: |
+        - Se cierran al merge:
+        - Se cierran tras staging validado:
+        - Se cierran tras production validado:
+        - Permanecen abiertas/bloqueadas:
+    validations:
+      required: true
+
+  - type: textarea
+    id: go_no_go
+    attributes:
+      label: Decision go/no-go
+      description: Completar o actualizar antes de publicar production.
+      value: |
+        | Rol | Responsable | Decision | Fecha/hora | Nota |
+        | --- | --- | --- | --- | --- |
+        | Tech lead |  | Pending |  |  |
+        | Producto/QA |  | Pending |  |  |
+        | Ops |  | Pending |  |  |
+        | Contract owner/multisig, si aplica |  | N/A |  |  |
+        | Comms/legal, si aplica |  | N/A |  |  |
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: La RC tiene alcance cerrado y no mezcla trabajo fuera de la lista incluida.
+          required: true
+        - label: Entiendo que production no se publica sin go explicito de tech, producto/QA y ops.
+          required: true
