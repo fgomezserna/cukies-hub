@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight, Heart } from 'lucide-react';
+import { ArrowUpRight, Heart, Search, ShoppingCart, Wallet } from 'lucide-react';
 
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
 
@@ -17,9 +17,21 @@ export default function MarketplacePage() {
               Marketplace Cukies
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Explora Cukies en venta, revisa sus rasgos y entra en la ficha
-              para comprar, listar o gestionar cada NFT.
+              Usa esta pantalla como entrada de compra: filtra Cukies en venta,
+              abre una ficha y confirma precio, red y propietario antes de operar.
             </p>
+            <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
+              {[
+                [Search, 'Filtra por red, tipo o estado'],
+                [ShoppingCart, 'Abre la ficha antes de comprar'],
+                [Wallet, 'Conecta la wallet de la red correcta'],
+              ].map(([Icon, label]) => (
+                <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <Icon className="h-3.5 w-3.5 text-cyan-200" />
+                  <span>{label as string}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">

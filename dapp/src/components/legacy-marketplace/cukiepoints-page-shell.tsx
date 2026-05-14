@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight, Coins } from 'lucide-react';
+import { ArrowUpRight, Coins, Database, Network, Wallet } from 'lucide-react';
 
 import { CukiePointsClient } from '@/components/legacy-marketplace/cukiepoints-client';
 
@@ -17,9 +17,21 @@ export function CukiePointsPageShell() {
               CukiePoints
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Consulta tus puntos, revisa actividad y prepara acciones de
-              breeding desde una sola pantalla.
+              Comprueba que tus wallets tienen los puntos esperados antes y
+              despues de mint, breeding o acciones de marketplace.
             </p>
+            <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
+              {[
+                [Wallet, 'Saldo por wallet conectada'],
+                [Network, 'Lectura BSC y TRON'],
+                [Database, 'Actividad global auditable'],
+              ].map(([Icon, label]) => (
+                <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <Icon className="h-3.5 w-3.5 text-cyan-200" />
+                  <span>{label as string}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">

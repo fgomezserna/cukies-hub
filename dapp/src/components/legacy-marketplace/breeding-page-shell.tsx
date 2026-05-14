@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight, Baby } from 'lucide-react';
+import { ArrowUpRight, Baby, CheckCircle2, Coins, Dna } from 'lucide-react';
 
 import {
   BreedingClient,
@@ -24,9 +24,21 @@ export function BreedingPageShell({
               Breeding Cukies
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Selecciona dos Cukies compatibles, revisa el coste y abre nuevos
-              Cukies cuando el breeding haya terminado.
+              Flujo para crear nuevos Cukies: elige padres compatibles, valida
+              coste y revisa las crias activas o terminadas.
             </p>
+            <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
+              {[
+                [Dna, 'Selecciona dos Cukies'],
+                [Coins, 'Revisa coste y puntos'],
+                [CheckCircle2, 'Abre cuando termine'],
+              ].map(([Icon, label]) => (
+                <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <Icon className="h-3.5 w-3.5 text-emerald-200" />
+                  <span>{label as string}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">

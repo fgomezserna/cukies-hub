@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRightLeft, ArrowUpRight } from 'lucide-react';
+import { ArrowRightLeft, ArrowUpRight, CheckCircle2, Network, Wallet } from 'lucide-react';
 
 import { BridgeClient } from '@/components/legacy-marketplace/bridge-client';
 
@@ -17,9 +17,21 @@ export function BridgePageShell() {
               Cukies Bridge
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Mueve tus Cukies entre redes, revisa el coste y sigue los NFTs que
-              ya estan en proceso de bridge.
+              Prepara un movimiento entre TRON y BSC con origen, destino y coste
+              visibles antes de aprobar la operacion.
             </p>
+            <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
+              {[
+                [Network, 'Elige red origen'],
+                [Wallet, 'Confirma wallet destino'],
+                [CheckCircle2, 'Aprueba y ejecuta bridge'],
+              ].map(([Icon, label]) => (
+                <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <Icon className="h-3.5 w-3.5 text-emerald-200" />
+                  <span>{label as string}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">
