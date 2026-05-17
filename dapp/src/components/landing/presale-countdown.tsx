@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowRight, Lock, Timer } from 'lucide-react';
-import { UKI_PRESALE_START_ISO, UKI_PRESALE_START_LABEL } from './sale-config';
+import {
+  UKI_PRESALE_HAS_EXACT_START,
+  UKI_PRESALE_START_ISO,
+  UKI_PRESALE_START_LABEL,
+  UKI_PRESALE_START_SHORT_LABEL,
+} from './sale-config';
 
 type RemainingTime = {
   total: number;
@@ -14,6 +19,10 @@ type RemainingTime = {
 };
 
 function getRemainingTime(): RemainingTime {
+  if (!UKI_PRESALE_HAS_EXACT_START) {
+    return { total: Number.POSITIVE_INFINITY, days: 0, hours: 0, minutes: 0, seconds: 0 };
+  }
+
   const total = Math.max(0, new Date(UKI_PRESALE_START_ISO).getTime() - Date.now());
   const seconds = Math.floor((total / 1000) % 60);
   const minutes = Math.floor((total / (1000 * 60)) % 60);
@@ -40,6 +49,7 @@ export function usePresaleLock() {
 
   return useMemo(
     () => ({
+      hasExactStart: UKI_PRESALE_HAS_EXACT_START,
       isLocked: remaining.total > 0,
       remaining,
     }),
@@ -61,7 +71,7 @@ export function PresaleCountdown() {
       {boxes.map((box) => (
         <div key={box.label} className="uki-countdown-box">
           <span className="block font-headline text-xl font-black leading-none text-[var(--uki-cyan)]" suppressHydrationWarning>
-            {isLocked ? formatCountdownValue(box.value) : '00'}
+            {!UKI_PRESALE_HAS_EXACT_START ? '--' : isLocked ? formatCountdownValue(box.value) : '00'}
           </span>
           <span className="mt-1.5 block text-[0.55rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
             {box.label}
@@ -99,7 +109,7 @@ export function PresaleGateAction({
       {isLocked ? (
         <span className="inline-flex items-center justify-center gap-2">
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Opens Jun 10
+          Opens {UKI_PRESALE_START_SHORT_LABEL}
         </span>
       ) : (
         openLabel ?? children
@@ -131,7 +141,7 @@ export function PresaleGateLink({
       <span aria-disabled="true" className={`uki-button ${variantClass} uki-button-locked ${className}`}>
         <span className="inline-flex items-center gap-2">
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Opens Jun 10
+          Opens {UKI_PRESALE_START_SHORT_LABEL}
         </span>
         <span className="uki-button-icon" aria-hidden="true">
           <Timer className="h-4 w-4" />

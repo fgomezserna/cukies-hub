@@ -1,6 +1,6 @@
 'use client';
 
-import { Wallet } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, Wallet } from 'lucide-react';
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
@@ -110,4 +110,43 @@ export function WalletStatusLabel() {
   }
 
   return <span className="text-[var(--uki-cyan)]">{shortAddress(address)}</span>;
+}
+
+export function WalletStateCallout() {
+  const { address, chainId, isConnected } = useAccount();
+  const isWrongChain = isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
+
+  if (!isConnected || !address) {
+    return (
+      <div className="uki-state-callout uki-state-callout-warning">
+        <Wallet className="h-4 w-4" strokeWidth={1.8} />
+        <div>
+          <p>Wallet disconnected</p>
+          <span>Connect an EVM wallet to review personal sale and vesting data.</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isWrongChain) {
+    return (
+      <div className="uki-state-callout uki-state-callout-warning">
+        <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
+        <div>
+          <p>Wrong chain</p>
+          <span>Switch to {UKI_PRESALE_CHAIN_LABEL} before approve, buy or vesting actions.</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="uki-state-callout uki-state-callout-ready">
+      <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} />
+      <div>
+        <p>Wallet ready</p>
+        <span>{shortAddress(address)} is connected on {UKI_PRESALE_CHAIN_LABEL}.</span>
+      </div>
+    </div>
+  );
 }
