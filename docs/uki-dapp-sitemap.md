@@ -3,6 +3,7 @@
 Estado: propuesta inicial.
 Issue: #110 `UKI-070.1`.
 Fecha: 2026-05-12.
+Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
 ## Objetivo
 
@@ -86,11 +87,13 @@ Responsabilidad:
 Contenido minimo:
 
 - Estado de venta.
-- Precio/ratio.
+- Precio 0.01 USD, duracion prevista 1 mes y ratio ASM/UKI fijado al inicio.
+- Listing minimo previsto 0.012 USD.
 - Caps si aplican.
 - Allowance ASM.
 - Compra UKI.
 - Vesting personal.
+- Resumen de liquidez ASM -> UKI y bloqueo/quema minimo 9 meses.
 - Links a BscScan.
 
 No debe:
@@ -130,9 +133,11 @@ Contenido minimo:
 
 - Ruta UKI staking.
 - Ruta NFT points.
-- Maximo de cupos.
+- Maximo de 5 cupos por wallet.
+- Cupos iniciales: 500 por ruta UKI y 500 por ruta Cukies Originales.
 - Requisito dinamico si aplica.
 - Estado de cada cupo.
+- Aviso de 48h cuando sube requisito.
 
 No debe:
 
@@ -150,6 +155,7 @@ Contenido minimo:
 - Balance de creditos.
 - Configuracion diaria en multiplos permitidos.
 - Hora de corte.
+- Retorno minimo vigente si el calculo diario queda por debajo de 0.75 UKI por cada 10 creditos aportados.
 - Ledger de grants/spend/deposit/expire.
 - Pool availability.
 
@@ -169,6 +175,8 @@ Contenido minimo:
 - Cukies elegibles.
 - Estado canonico de cada NFT.
 - Rarity/generation.
+- Direccion actual BSC-only para nuevas posiciones, con Tron como lectura/migracion.
+- Separacion entre pool de Originales y pool de segunda generacion.
 - Locks activos.
 - Solicitud de retirada.
 - Recompensas/allocations si existen.
@@ -187,10 +195,12 @@ Responsabilidad:
 Contenido minimo:
 
 - Coste de entrada.
+- Coste exacto: 10 creditos, con 2.5 destinados al pool semanal y 7.5 en juego.
 - Credit source: propios o pool.
 - Cukie propio o asignado.
 - Session economy status.
 - Reglas de score/reward del juego.
+- Decision pendiente: seleccion manual o automatica de Cukie propio.
 
 No debe:
 
@@ -210,6 +220,8 @@ Contenido minimo:
 - Periodo semanal.
 - Partidas validas.
 - Reglas +2/-2.
+- Minimos: 20 partidas para subir, 10 para bajar.
+- Tabla de recompensa #1-#9 segun `docs/uki-current-operating-rules.md`.
 - Historial por periodo.
 
 No debe:
@@ -277,6 +289,5 @@ No debe:
 - La navegacion publica debe priorizar `/`, `/presale`, `/wallet`, `/games/treasure-hunt` y `/rewards`.
 - Pools, Cukie Master y Arena pueden aparecer bloqueados/coming next hasta que contratos/backend esten listos.
 - Cada pantalla debe consumir APIs de dominio, no leer colecciones Mongo directamente.
-- Los estados UX detallados quedan para `#111`.
-- Las imagenes o referencias visuales por pantalla quedan para `#112`.
-
+- Los estados UX detallados quedan definidos en `docs/uki-ux-state-matrix.md` para `#111`.
+- Las imagenes o referencias visuales por pantalla quedan preparadas en `docs/uki-ux-image-validation-plan.md` para `#112` y `#145`; no se generan sin aprobacion explicita.

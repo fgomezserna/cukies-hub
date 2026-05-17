@@ -4,6 +4,7 @@ Estado: borrador operativo.
 Issue: #25 `UKI-003.2`.
 Legal status: `needs-legal-validation`.
 Fecha: 2026-05-12.
+Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
 ## Objetivo
 
@@ -40,6 +41,8 @@ Todos los textos de este documento deben mostrarse o tratarse internamente como 
 | Pool de Cukies | Aportar un Cukie al pool bloquea su uso en otras acciones mientras la posicion este activa. | `needs-legal-validation` |
 | Pool de creditos | Los creditos del pool se asignan segun disponibilidad y reglas del periodo. No representan tokens ni saldo transferible. | `needs-legal-validation` |
 | Creditos diarios | Los creditos son recursos internos de juego. Pueden expirar o cambiar segun reglas operativas publicadas. | `needs-legal-validation` |
+| Migracion BSC | Las nuevas acciones de staking y pools pueden requerir BNB Smart Chain. Los activos en Tron pueden necesitar migracion antes de participar. | `needs-legal-validation` |
+| Cukie Points | Los Cukie Points son recursos internos sujetos a reglas de conversion, limites diarios y fechas de corte publicadas. | `needs-legal-validation` |
 | Rewards estimadas | Esta cifra es una estimacion calculada off-chain y puede cambiar antes del cierre del periodo. | `needs-legal-validation` |
 | Rewards pendientes | Las rewards pendientes aun no estan disponibles para claim. Deben cerrarse, validarse y publicarse en un batch. | `needs-legal-validation` |
 | Rewards claimable | Estas rewards tienen datos de claim preparados. La recepcion final depende de la transaccion y confirmacion on-chain. | `needs-legal-validation` |
@@ -120,4 +123,3 @@ Alternativas preferidas:
 - Los botones de accion on-chain deben enlazar o exponer tx hash cuando exista.
 - Las APIs deben devolver codigos de estado que permitan mostrar disclaimers correctos.
 - No mezclar creditos internos con UKI transferible.
-
