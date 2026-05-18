@@ -4,9 +4,10 @@ import { auth } from '@/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
+    const { gameId } = await params;
     const session = await auth();
     
     if (!session?.user?.id) {
@@ -14,7 +15,7 @@ export async function GET(
     }
 
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
+      where: { gameId },
       include: {
         _count: {
           select: {
@@ -38,9 +39,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
+    const { gameId } = await params;
     const session = await auth();
     
     if (!session?.user?.id) {
@@ -50,7 +52,7 @@ export async function PUT(
     const { name, description, telegramTopicId, telegramGroupId, isActive } = await request.json();
 
     const room = await prisma.chatRoom.update({
-      where: { gameId: params.gameId },
+      where: { gameId },
       data: {
         ...(name && { name }),
         ...(description !== undefined && { description }),

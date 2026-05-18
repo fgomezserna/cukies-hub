@@ -3,11 +3,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { searchParams } = new URL(request.url);
   const walletAddress = searchParams.get('walletAddress');
-  const questId = params.id;
+  const { id: questId } = await params;
 
   try {
     const quest = await prisma.quest.findUnique({

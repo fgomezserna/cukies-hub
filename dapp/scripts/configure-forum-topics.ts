@@ -75,7 +75,8 @@ async function configureForumTopics() {
             console.log(`❌ Test failed for ${mapping.gameId}: ${data.description}`);
           }
         } catch (error) {
-          console.log(`❌ Test error for ${mapping.gameId}: ${error.message}`);
+          const message = error instanceof Error ? error.message : String(error);
+          console.log(`❌ Test error for ${mapping.gameId}: ${message}`);
         }
       }
     }
@@ -94,5 +95,4 @@ async function configureForumTopics() {
 }
 
 configureForumTopics();
-
 

@@ -164,7 +164,7 @@ export default function ProfilePage() {
             👤 Player Profile
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Explore {profile.username}'s gaming stats, achievements, and activity
+            Explore {profile.username}&apos;s gaming stats, achievements, and activity
           </p>
         </div>
 

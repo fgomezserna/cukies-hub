@@ -53,7 +53,8 @@ async function testCompleteBridge() {
           console.log(`❌ Web → Telegram failed: ${data.description}`);
         }
       } catch (error) {
-        console.log(`❌ Web → Telegram error: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`❌ Web → Telegram error: ${message}`);
       }
     }
 
@@ -71,7 +72,8 @@ async function testCompleteBridge() {
             processedCount++;
             console.log(`✅ Processed message from ${update.message.from.first_name}: "${update.message.text?.slice(0, 30)}..."`);
           } catch (error) {
-            console.log(`❌ Error processing message: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            console.log(`❌ Error processing message: ${message}`);
           }
         }
       }
@@ -82,7 +84,8 @@ async function testCompleteBridge() {
         console.log('⚠️ Telegram → Web: No new messages to process');
       }
     } catch (error) {
-      console.log(`❌ Telegram → Web error: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`❌ Telegram → Web error: ${message}`);
     }
 
     // 4. Check final database state
@@ -113,5 +116,4 @@ async function testCompleteBridge() {
 }
 
 testCompleteBridge();
-
 

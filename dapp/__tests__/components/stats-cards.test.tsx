@@ -38,6 +38,14 @@ describe('components/home/StatsCards', () => {
     completedQuests: [],
   }
 
+  const mockAuthValue = (user: User | null, isLoading = false) => ({
+    user,
+    isLoading,
+    isWaitingForApproval: false,
+    walletType: null,
+    fetchUser: jest.fn(),
+  })
+
   beforeEach(() => {
     jest.clearAllMocks()
     // Mock successful API response
@@ -58,13 +66,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should render all stat cards', () => {
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(mockUser))
 
     render(<StatsCards />)
 
@@ -75,13 +77,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should display user XP when user is available', async () => {
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(mockUser))
 
     render(<StatsCards />)
 
@@ -91,13 +87,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should display placeholder when user is not available', () => {
-    mockUseAuth.mockReturnValue({
-      user: null,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(null))
 
     render(<StatsCards />)
 
@@ -105,13 +95,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should display placeholder when user is loading', () => {
-    mockUseAuth.mockReturnValue({
-      user: null,
-      isLoading: true,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(null, true))
 
     render(<StatsCards />)
 
@@ -119,13 +103,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should render correct icons', () => {
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(mockUser))
 
     render(<StatsCards />)
 
@@ -141,13 +119,7 @@ describe('components/home/StatsCards', () => {
       xp: 1234567,
     }
 
-    mockUseAuth.mockReturnValue({
-      user: userWithHighXP,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(userWithHighXP))
 
     render(<StatsCards />)
 
@@ -160,13 +132,7 @@ describe('components/home/StatsCards', () => {
       xp: 0,
     }
 
-    mockUseAuth.mockReturnValue({
-      user: userWithZeroXP,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(userWithZeroXP))
 
     render(<StatsCards />)
 
@@ -174,13 +140,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should render dynamic values for rank, total players, and total XP', async () => {
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(mockUser))
 
     render(<StatsCards />)
 
@@ -192,13 +152,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should have correct grid layout classes', () => {
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(mockUser))
 
     const { container } = render(<StatsCards />)
     const gridContainer = container.firstChild
@@ -207,13 +161,7 @@ describe('components/home/StatsCards', () => {
   })
 
   it('should render card structure correctly', async () => {
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isLoading: false,
-      isWaitingForApproval: false,
-      fetchUser: jest.fn(),
-      isWaitingForApproval: false,
-    })
+    mockUseAuth.mockReturnValue(mockAuthValue(mockUser))
 
     render(<StatsCards />)
 

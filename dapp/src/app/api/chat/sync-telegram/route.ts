@@ -55,11 +55,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Sync error:', error);
     isPolling = false;
+    const message = error instanceof Error ? error.message : String(error);
     
     return NextResponse.json({ 
       success: false,
       error: 'Sync failed',
-      details: error.message
+      details: message
     }, { status: 500 });
   }
 }
@@ -73,5 +74,4 @@ export async function GET(request: NextRequest) {
     chatId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'not configured'
   });
 }
-
 

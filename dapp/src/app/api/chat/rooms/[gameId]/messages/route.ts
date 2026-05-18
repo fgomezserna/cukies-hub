@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 
-export async function GET(request: NextRequest, context: { params: { gameId: string } }) {
-  const { params } = context;
-  const awaitedParams = await params;
+type RouteContext = { params: Promise<{ gameId: string }> };
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  const params = await context.params;
   try {
     // For GET requests, we'll check if a wallet address is provided in query params
     const { searchParams } = new URL(request.url);
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, context: { params: { gameId: str
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: awaitedParams.gameId },
+      where: { gameId: params.gameId },
     });
 
     if (!room) {
@@ -91,9 +92,8 @@ export async function GET(request: NextRequest, context: { params: { gameId: str
   }
 }
 
-export async function POST(request: NextRequest, context: { params: { gameId: string } }) {
-  const { params } = context;
-  const awaitedParams = await params;
+export async function POST(request: NextRequest, context: RouteContext) {
+  const params = await context.params;
   try {
     let requestData;
     try {
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest, context: { params: { gameId: st
 
     // Find the chat room
     const room = await prisma.chatRoom.findUnique({
-      where: { gameId: awaitedParams.gameId },
+      where: { gameId: params.gameId },
     });
 
     if (!room) {

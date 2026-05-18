@@ -64,7 +64,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   };
 
   // Fetch initial messages
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!user?.walletAddress) return;
 
     setIsLoading(true);
@@ -84,7 +84,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [gameId, user?.walletAddress]);
 
 
   // Send message
@@ -131,7 +131,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
         .then(() => fetchMessages())
         .catch(console.error);
     }
-  }, [isOpen, user?.walletAddress, gameId]);
+  }, [isOpen, user?.walletAddress, gameId, fetchMessages]);
 
   // Check for new messages without full refresh
   const checkForNewMessages = useCallback(async () => {
@@ -173,7 +173,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     } finally {
       checkingForMessages.current = false;
     }
-  }, [user?.walletAddress, gameId, messages]);
+  }, [user?.walletAddress, gameId, messages, fetchMessages]);
 
   // Poll for new messages and sync from Telegram
   useEffect(() => {
@@ -182,7 +182,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     const interval = setInterval(checkForNewMessages, 3000);
     
     return () => clearInterval(interval);
-  }, [isOpen, checkForNewMessages]);
+  }, [isOpen, user?.walletAddress, checkForNewMessages]);
 
   // Get display name for message author - memoized to avoid recreating
   const getDisplayName = useCallback((message: ChatMessage) => {

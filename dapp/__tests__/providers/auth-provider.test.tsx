@@ -19,7 +19,7 @@ const TestComponent = () => {
     <div>
       <div data-testid="loading">{isLoading ? 'loading' : 'not-loading'}</div>
       <div data-testid="user">{user ? user.username : 'no-user'}</div>
-      <button onClick={fetchUser} data-testid="fetch-user">
+      <button onClick={() => void fetchUser()} data-testid="fetch-user">
         Fetch User
       </button>
     </div>

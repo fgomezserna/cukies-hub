@@ -21,6 +21,7 @@ const initialData: LegacyMarketplaceListResponse = {
     states: [],
     networks: [],
     types: [],
+    generations: [],
   },
 };
 
@@ -30,6 +31,7 @@ export function MarketplaceClient() {
   const [network, setNetwork] = useState('all');
   const [state, setState] = useState('onSale');
   const [type, setType] = useState('all');
+  const [generation, setGeneration] = useState('all');
   const [sort, setSort] = useState('newest');
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,9 +48,10 @@ export function MarketplaceClient() {
     if (network !== 'all') params.set('network', network);
     if (state !== 'all') params.set('state', state);
     if (type !== 'all') params.set('type', type);
+    if (generation !== 'all') params.set('generation', generation);
 
     return params.toString();
-  }, [network, offset, search, sort, state, type]);
+  }, [generation, network, offset, search, sort, state, type]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -78,6 +81,7 @@ export function MarketplaceClient() {
     setNetwork('all');
     setState('onSale');
     setType('all');
+    setGeneration('all');
     setSort('newest');
     setOffset(0);
   }
@@ -88,7 +92,7 @@ export function MarketplaceClient() {
   return (
     <section className="grid gap-5">
       <div className="rounded-[8px] border border-white/10 bg-black/30 p-4 backdrop-blur">
-        <div className="grid gap-3 xl:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+        <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-[minmax(18rem,1fr)_repeat(6,minmax(9rem,auto))]">
           <div className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <Input
@@ -146,6 +150,22 @@ export function MarketplaceClient() {
             {data.facets.types.map((facet) => (
               <option key={facet.value} value={facet.value}>
                 Type {facet.value} ({facet.count})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={generation}
+            onChange={(event) => {
+              setGeneration(event.target.value);
+              setOffset(0);
+            }}
+            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+          >
+            <option value="all">All generations</option>
+            {data.facets.generations.map((facet) => (
+              <option key={facet.value} value={facet.value}>
+                Gen {facet.value} ({facet.count})
               </option>
             ))}
           </select>

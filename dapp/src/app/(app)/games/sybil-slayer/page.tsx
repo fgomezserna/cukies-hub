@@ -266,7 +266,7 @@ export default function SybilSlayerPage() {
     };
 
     startSession();
-  }, [authData.isAuthenticated, user?.id, currentSessionId, onSessionStart, roomId]);
+  }, [authData.isAuthenticated, user?.id, user?.username, user?.email, currentSessionId, onSessionStart, roomId]);
 
   // Handle game connection setup - just pass the ref
   const handleGameConnection = useCallback((iframeRef: React.RefObject<HTMLIFrameElement>) => {

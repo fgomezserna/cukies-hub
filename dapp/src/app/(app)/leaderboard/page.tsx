@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,7 +44,7 @@ function LeaderboardView() {
     }, [unlockDate]);
 
     // Fetch leaderboard data
-    const fetchLeaderboard = async () => {
+    const fetchLeaderboard = useCallback(async () => {
         try {
             setLoading(true);
             const params = new URLSearchParams({
@@ -69,13 +69,13 @@ function LeaderboardView() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedGame, selectedPeriod]);
 
     useEffect(() => {
         if (user) {
             fetchLeaderboard();
         }
-    }, [user, selectedGame, selectedPeriod]);
+    }, [user, fetchLeaderboard]);
 
     const isWalletConnected = !!user;
     const isLocked = isTimeLocked || !isWalletConnected;
@@ -93,7 +93,7 @@ function LeaderboardView() {
             <div className={cn("flex flex-col gap-6", isLocked && "blur-sm pointer-events-none")}>
                 <div>
                     <h1 className="text-3xl font-bold font-headline">Leaderboard</h1>
-                    <p className="text-muted-foreground">See who's on top of the game.</p>
+                    <p className="text-muted-foreground">See who&apos;s on top of the game.</p>
                 </div>
                 <Card>
                     <CardHeader className="flex-col items-start gap-4 border-b md:flex-row md:items-center md:justify-between">

@@ -24,6 +24,7 @@ const LEADERBOARD_LIMIT = 100;
 function PointsView() {
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading, fetchUser } = useAuth();
+  const walletAddress = user?.walletAddress;
   
   const unlockDate = useMemo(() => new Date("2025-06-31T00:00:00"), []);
   const [isTimeLocked, setIsTimeLocked] = useState(new Date() < unlockDate);
@@ -81,12 +82,12 @@ function PointsView() {
 
   // Load user stats
   useEffect(() => {
-    if (!user || isAuthLoading) return;
+    if (!walletAddress || isAuthLoading) return;
 
     const loadUserStats = async () => {
       setIsLoadingUserStats(true);
       try {
-        const response = await fetch(`/api/user/stats?walletAddress=${user.walletAddress}`);
+        const response = await fetch(`/api/user/stats?walletAddress=${walletAddress}`);
         if (!response.ok) throw new Error('Failed to fetch user stats');
         
         const data = await response.json();
@@ -104,7 +105,7 @@ function PointsView() {
     };
 
     loadUserStats();
-  }, [user?.walletAddress, isAuthLoading, toast]);
+  }, [walletAddress, isAuthLoading, toast]);
 
   // Load leaderboard
   const loadMorePlayers = useCallback(async () => {
@@ -120,7 +121,7 @@ function PointsView() {
       // Mark current user in leaderboard
       const updatedLeaderboard = data.leaderboard.map((player: LeaderboardPlayer) => ({
         ...player,
-        name: user && player.walletAddress === user.walletAddress ? 'You' : player.name,
+        name: player.walletAddress === walletAddress ? 'You' : player.name,
       }));
       
       setLeaderboard(prev => [...prev, ...updatedLeaderboard]);
@@ -136,11 +137,11 @@ function PointsView() {
     } finally {
       setIsLoadingPlayers(false);
     }
-  }, [hasMorePlayers, isLoadingPlayers, leaderboardOffset, user?.walletAddress, toast]);
+  }, [hasMorePlayers, isLoadingPlayers, leaderboardOffset, walletAddress, toast]);
 
   // Load initial leaderboard
   useEffect(() => {
-    if (!user || isAuthLoading) return;
+    if (!walletAddress || isAuthLoading) return;
     
     const loadInitialLeaderboard = async () => {
       setIsLoadingPlayers(true);
@@ -153,7 +154,7 @@ function PointsView() {
         // Mark current user in leaderboard
         const updatedLeaderboard = data.leaderboard.map((player: LeaderboardPlayer) => ({
           ...player,
-          name: player.walletAddress === user.walletAddress ? 'You' : player.name,
+          name: player.walletAddress === walletAddress ? 'You' : player.name,
         }));
         
         setLeaderboard(updatedLeaderboard);
@@ -172,14 +173,14 @@ function PointsView() {
     };
     
     loadInitialLeaderboard();
-  }, [user?.walletAddress, isAuthLoading, toast]);
+  }, [walletAddress, isAuthLoading, toast]);
 
   const loadMoreTransactions = useCallback(async () => {
-    if (!hasMorePointTransactions || isLoadingTransactions || !user) return;
+    if (!hasMorePointTransactions || isLoadingTransactions || !walletAddress) return;
     
     setIsLoadingTransactions(true);
     try {
-      const response = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=${transactionsOffset}`);
+      const response = await fetch(`/api/points?walletAddress=${walletAddress}&limit=${ITEMS_PER_PAGE}&offset=${transactionsOffset}`);
       if (!response.ok) throw new Error('Failed to fetch point transactions');
       
       const data = await response.json();
@@ -196,7 +197,7 @@ function PointsView() {
     } finally {
       setIsLoadingTransactions(false);
     }
-  }, [hasMorePointTransactions, isLoadingTransactions, transactionsOffset, user?.walletAddress, toast]);
+  }, [hasMorePointTransactions, isLoadingTransactions, transactionsOffset, walletAddress, toast]);
   
   const createObserver = (
     callback: () => void,
@@ -240,12 +241,12 @@ function PointsView() {
 
   // Load point transactions when user is available
   useEffect(() => {
-    if (!user || isAuthLoading) return;
+    if (!walletAddress || isAuthLoading) return;
     
     const loadInitialTransactions = async () => {
       setIsLoadingTransactions(true);
       try {
-        const response = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
+        const response = await fetch(`/api/points?walletAddress=${walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
         if (!response.ok) throw new Error('Failed to fetch point transactions');
         
         const data = await response.json();
@@ -265,16 +266,16 @@ function PointsView() {
     };
     
     loadInitialTransactions();
-  }, [user?.walletAddress, isAuthLoading, toast]);
+  }, [walletAddress, isAuthLoading, toast]);
   
   // Load daily status from API
   useEffect(() => {
-    if (!user || !isStarterQuestCompleted || isAuthLoading) return;
+    if (!walletAddress || !isStarterQuestCompleted || isAuthLoading) return;
 
     const loadDailyStatus = async () => {
       setIsLoadingDailyStatus(true);
       try {
-        const response = await fetch(`/api/points/daily-status?walletAddress=${user.walletAddress}`);
+        const response = await fetch(`/api/points/daily-status?walletAddress=${walletAddress}`);
         if (!response.ok) throw new Error('Failed to fetch daily status');
         
         const data = await response.json();
@@ -293,19 +294,19 @@ function PointsView() {
     };
 
     loadDailyStatus();
-  }, [user?.walletAddress, isStarterQuestCompleted, isAuthLoading, toast]);
+  }, [walletAddress, isStarterQuestCompleted, isAuthLoading, toast]);
 
   const currentReward = streakRewards[dailyStreak];
 
   const handleClaim = useCallback(async () => {
-    if (!canClaim || !isStarterQuestCompleted || !user) return;
+    if (!canClaim || !isStarterQuestCompleted || !walletAddress) return;
 
     try {
       const response = await fetch('/api/points/daily-claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress: user.walletAddress,
+          walletAddress,
           amount: currentReward,
         }),
       });
@@ -330,7 +331,7 @@ function PointsView() {
 
       // Refresh point transactions to show the new entry
       try {
-        const refreshResponse = await fetch(`/api/points?walletAddress=${user.walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
+        const refreshResponse = await fetch(`/api/points?walletAddress=${walletAddress}&limit=${ITEMS_PER_PAGE}&offset=0`);
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json();
           setPointTransactions(refreshData.transactions);
@@ -343,7 +344,7 @@ function PointsView() {
 
       // Refresh user stats
       try {
-        const statsResponse = await fetch(`/api/user/stats?walletAddress=${user.walletAddress}`);
+        const statsResponse = await fetch(`/api/user/stats?walletAddress=${walletAddress}`);
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
           setUserStats(statsData);
@@ -359,7 +360,7 @@ function PointsView() {
         variant: 'destructive',
       });
     }
-  }, [canClaim, dailyStreak, isStarterQuestCompleted, currentReward, user, toast, fetchUser]);
+  }, [canClaim, isStarterQuestCompleted, currentReward, walletAddress, toast, fetchUser]);
 
   const getButtonState = () => {
       if (!user) {
@@ -743,7 +744,7 @@ function PointsView() {
             ) : !isStarterQuestCompleted ? (
                 <>
                     <p className="mt-4 text-lg font-semibold">Complete Starter Quest First</p>
-                    <p className="mt-1 text-sm text-muted-foreground">You need to complete the "Get Started" quest to unlock the Points section.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">You need to complete the &quot;Get Started&quot; quest to unlock the Points section.</p>
                 </>
             ) : null}
         </div>

@@ -45,6 +45,14 @@ export function usePusherGameConnection(
     honeypotEvents: 0,
     sessionValid: true
   });
+  const {
+    gameId,
+    gameVersion,
+    onCheckpoint,
+    onHoneypotDetected,
+    onSessionEnd,
+    onSessionStart,
+  } = options;
 
   // Refs to prevent cleanup issues
   const channelRef = useRef<Channel | null>(null);
@@ -234,7 +242,7 @@ export function usePusherGameConnection(
         
         // Notify the game that the dapp is ready
         newChannel.trigger('client-dapp-ready', {
-          gameId: options.gameId,
+          gameId,
           userId: authData.user.id,
           timestamp: Date.now()
         });
@@ -297,10 +305,10 @@ export function usePusherGameConnection(
             }));
 
             if (result.honeypotDetected) {
-              options.onHoneypotDetected?.(data.events?.find(e => e.type === 'honeypot')?.event || 'unknown');
+              onHoneypotDetected?.(data.events?.find(e => e.type === 'honeypot')?.event || 'unknown');
             }
 
-            options.onCheckpoint?.(data);
+            onCheckpoint?.(data);
           } else {
             console.error('❌ [PUSHER] Checkpoint processing failed:', result);
           }
@@ -356,20 +364,20 @@ export function usePusherGameConnection(
               isValid: result.isValid
             });
 
-            options.onSessionEnd?.({
+            onSessionEnd?.({
               finalScore: result.finalScore,
               isValid: result.isValid
             });
           } else {
             console.error('❌ [PUSHER] Game end processing failed:', result);
-            options.onSessionEnd?.({
+            onSessionEnd?.({
               finalScore: data.finalScore,
               isValid: false
             });
           }
         } catch (error) {
           console.error('❌ [PUSHER] Error processing game end:', error);
-          options.onSessionEnd?.({
+          onSessionEnd?.({
             finalScore: data.finalScore,
             isValid: false
           });
@@ -386,7 +394,7 @@ export function usePusherGameConnection(
           ...prev,
           honeypotEvents: prev.honeypotEvents + 1
         }));
-        options.onHoneypotDetected?.(data.event);
+        onHoneypotDetected?.(data.event);
       });
 
       // Update refs and state
@@ -396,20 +404,20 @@ export function usePusherGameConnection(
       setChannel(newChannel);
 
       // NEW: Send session start via Pusher instead of postMessage
-      if (options.onSessionStart) {
+      if (onSessionStart) {
         console.log('🚀 [PUSHER] Sending session start via Pusher channel');
         
         // Trigger session start event to game
         newChannel.trigger('client-session-start', {
-          gameId: options.gameId,
+          gameId,
           sessionToken: storedSessionToken,
           sessionId: sessionId,
-          gameVersion: options.gameVersion || '1.0.0',
+          gameVersion: gameVersion || '1.0.0',
           user: authData.user
         });
         
         // Also notify the callback
-        options.onSessionStart({
+        onSessionStart({
           sessionToken: storedSessionToken,
           sessionId: sessionId
         });
@@ -447,7 +455,19 @@ export function usePusherGameConnection(
       setConnectionState('disconnected');
     };
 
-  }, [sessionId, authData.isAuthenticated, authData.user?.id, options.gameId, sessionTokenReady]);
+  }, [
+    sessionId,
+    authData.isAuthenticated,
+    authData.user,
+    authData.user?.id,
+    gameId,
+    gameVersion,
+    onCheckpoint,
+    onHoneypotDetected,
+    onSessionEnd,
+    onSessionStart,
+    sessionTokenReady,
+  ]);
 
   // Send session start notification to game
   const notifySessionStart = useCallback(async (sessionData: { sessionToken: string; sessionId: string }) => {
@@ -458,19 +478,19 @@ export function usePusherGameConnection(
 
     try {
       await channel.trigger('client-session-start', {
-        gameId: options.gameId,
+        gameId,
         sessionToken: sessionData.sessionToken,
         sessionId: sessionData.sessionId,
-        gameVersion: options.gameVersion,
+        gameVersion,
         timestamp: Date.now()
       });
       
       console.log('📤 [PUSHER] Session start notification sent');
-      options.onSessionStart?.(sessionData);
+      onSessionStart?.(sessionData);
     } catch (error) {
       console.error('❌ [PUSHER] Failed to notify session start:', error);
     }
-  }, [channel, options.gameId, options.gameVersion, options.onSessionStart]);
+  }, [channel, gameId, gameVersion, onSessionStart]);
 
   // Helper function to send commands to game via Pusher
   const sendGameCommand = useCallback((command: string, data?: any) => {
