@@ -54,7 +54,7 @@ export function MarketplaceClient() {
     const controller = new AbortController();
     setIsLoading(true);
 
-    fetch(`/api/legacy-marketplace/cukies?${queryString}`, {
+    fetch(`/api/cukies?${queryString}`, {
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -183,7 +183,7 @@ export function MarketplaceClient() {
           </h2>
           <p className="text-sm text-slate-400">
             {isLoading
-              ? 'Loading legacy inventory...'
+              ? 'Loading indexed inventory...'
               : `${data.total.toLocaleString()} results · source ${data.source}`}
           </p>
         </div>

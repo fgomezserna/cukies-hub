@@ -29,7 +29,7 @@ import {
   getLegacyBscExplorerAddressUrl,
   legacyMarketplaceContracts,
 } from '@/lib/legacy-marketplace/config';
-import { getLegacyMarketplaceCuki } from '@/lib/legacy-marketplace/data';
+import { getCuki } from '@/lib/cukies-data/data';
 import type {
   LegacyMarketplaceCukiHistoryEntry,
   LegacyMarketplaceCukiItem,
@@ -201,7 +201,7 @@ export default async function MarketplaceDetailPage({
   params,
 }: MarketplaceDetailPageProps) {
   const { tokenId } = await params;
-  const cuki = await getLegacyMarketplaceCuki(tokenId);
+  const cuki = await getCuki(tokenId);
 
   if (!cuki) {
     notFound();

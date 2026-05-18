@@ -270,7 +270,7 @@ export function BridgeClient() {
         sort: 'newest',
       });
       const response = await fetch(
-        `/api/legacy-marketplace/cukies?${query}`,
+        `/api/cukies?${query}`,
         { cache: 'no-store' },
       );
       if (!response.ok) throw new Error('No se han podido cargar Cukies.');
@@ -306,7 +306,7 @@ export function BridgeClient() {
             sort: 'newest',
           });
           const response = await fetch(
-            `/api/legacy-marketplace/cukies?${query}`,
+            `/api/cukies?${query}`,
             { cache: 'no-store' },
           );
           if (!response.ok) return [];

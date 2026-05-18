@@ -394,7 +394,7 @@ export function BreedingClient({
         limit: '60',
       });
       const response = await fetch(
-        `/api/legacy-marketplace/breeding/candidates?${query}`,
+        `/api/cukies/breeding/candidates?${query}`,
         { cache: 'no-store' },
       );
       if (!response.ok) {
@@ -428,7 +428,7 @@ export function BreedingClient({
 
     try {
       const response = await fetch(
-        `/api/legacy-marketplace/breeding/completed?${query}`,
+        `/api/cukies/breeding/completed?${query}`,
         { cache: 'no-store' },
       );
       if (!response.ok) {

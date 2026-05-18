@@ -445,6 +445,34 @@ importers:
         specifier: ^5
         version: 5.9.2
 
+  packages/chain-indexer:
+    dependencies:
+      dotenv:
+        specifier: ^16.5.0
+        version: 16.6.1
+      mongodb:
+        specifier: ^7.0.0
+        version: 7.0.0
+      tronweb:
+        specifier: ^6.1.0
+        version: 6.1.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      viem:
+        specifier: ^2.31.4
+        version: 2.36.0(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)(zod@3.25.76)
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.6
+        version: 20.19.11
+      tsx:
+        specifier: ^4.20.5
+        version: 4.20.5
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.2
+
   packages/contracts:
     dependencies:
       '@openzeppelin/contracts':
@@ -14016,6 +14044,11 @@ snapshots:
       typescript: 5.9.2
       zod: 3.25.76
 
+  abitype@1.0.9(typescript@5.9.2)(zod@3.22.4):
+    optionalDependencies:
+      typescript: 5.9.2
+      zod: 3.22.4
+
   abitype@1.0.9(typescript@5.9.2)(zod@3.25.76):
     optionalDependencies:
       typescript: 5.9.2
@@ -17884,7 +17917,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.0.8(typescript@5.9.2)(zod@3.25.76)
+      abitype: 1.0.9(typescript@5.9.2)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.2
@@ -17913,7 +17946,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.0.8(typescript@5.9.2)(zod@3.22.4)
+      abitype: 1.0.9(typescript@5.9.2)(zod@3.22.4)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.2
@@ -17928,7 +17961,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.0.8(typescript@5.9.2)(zod@3.25.76)
+      abitype: 1.0.9(typescript@5.9.2)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.2
@@ -18765,7 +18798,7 @@ snapshots:
     dependencies:
       inherits: 2.0.4
       safe-buffer: 5.2.1
-      to-buffer: 1.2.1
+      to-buffer: 1.2.2
 
   sharp@0.33.5:
     dependencies:
