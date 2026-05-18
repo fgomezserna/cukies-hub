@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     network: searchParams.get('network') ?? undefined,
     state: searchParams.get('state') ?? undefined,
     type: searchParams.get('type') ?? undefined,
+    generation: searchParams.get('generation') ?? undefined,
     owner: searchParams.get('owner') ?? undefined,
     sort: searchParams.get('sort') ?? undefined,
   });

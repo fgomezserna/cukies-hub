@@ -138,6 +138,28 @@ export function getLegacyMarketplaceNftImageUrl(tokenId: string | number) {
   return `${legacyMarketplaceEndpoints.nftImageBase}/${tokenId}.png`;
 }
 
+export function normalizeLegacyMarketplaceNftImageUrl(
+  tokenId: string | number,
+  imageUrl?: string | null,
+) {
+  const normalizedTokenId = String(tokenId).trim();
+  const value = imageUrl?.trim() || null;
+
+  if (!value) {
+    return normalizedTokenId
+      ? getLegacyMarketplaceNftImageUrl(normalizedTokenId)
+      : null;
+  }
+
+  if (value.includes('/png/tokens/v2/') || value.includes('/png/tokens/')) {
+    return normalizedTokenId
+      ? getLegacyMarketplaceNftImageUrl(normalizedTokenId)
+      : value.replace('/png/tokens/', '/png/tokens/v2/');
+  }
+
+  return value;
+}
+
 export function getLegacyBscExplorerAddressUrl(address: Address) {
   return `${legacyMarketplaceContracts.bsc.blockExplorerBaseUrl}/address/${address}`;
 }

@@ -3,7 +3,10 @@ import 'server-only';
 import type { Collection, Filter, Sort } from 'mongodb';
 
 import { getIndexerDb } from '@/lib/indexer-db/mongodb';
-import { getLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
+import {
+  getLegacyMarketplaceNftImageUrl,
+  normalizeLegacyMarketplaceNftImageUrl,
+} from '@/lib/legacy-marketplace/config';
 import {
   legacyCukiNetworks,
   legacyCukiStates,
@@ -145,13 +148,7 @@ function escapeRegex(value: string) {
 }
 
 function normalizeImageUrl(tokenId: string, imageUrl: unknown) {
-  const value = toStringOrNull(imageUrl);
-
-  if (!value) return tokenId ? getLegacyMarketplaceNftImageUrl(tokenId) : null;
-  if (value.includes('/png/tokens/v2/')) return value;
-  if (value.includes('/png/tokens/')) return value.replace('/png/tokens/', '/png/tokens/v2/');
-
-  return value;
+  return normalizeLegacyMarketplaceNftImageUrl(tokenId, toStringOrNull(imageUrl));
 }
 
 function normalizeFacet(rows: Array<{ _id: unknown; count: number }>) {
@@ -329,7 +326,7 @@ async function hydrateCukiHistory(item: LegacyMarketplaceCukiItem) {
 }
 
 async function getFacets(collection: Collection<CukiDocument>) {
-  const [states, networks, types] = await Promise.all([
+  const [states, networks, types, generations] = await Promise.all([
     collection
       .aggregate<{ _id: unknown; count: number }>([
         { $group: { _id: '$state', count: { $sum: 1 } } },
@@ -348,12 +345,19 @@ async function getFacets(collection: Collection<CukiDocument>) {
         { $sort: { _id: 1 } },
       ])
       .toArray(),
+    collection
+      .aggregate<{ _id: unknown; count: number }>([
+        { $group: { _id: '$skills.generation', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray(),
   ]);
 
   return {
     states: normalizeFacet(states),
     networks: normalizeFacet(networks),
     types: normalizeFacet(types),
+    generations: normalizeFacet(generations),
   };
 }
 
@@ -367,6 +371,13 @@ function buildCukiFilter(params: LegacyMarketplaceListParams) {
   if (params.type && params.type !== 'all') {
     const parsedType = Number(params.type);
     filter.type = Number.isFinite(parsedType) ? parsedType : params.type;
+  }
+
+  if (params.generation && params.generation !== 'all') {
+    const parsedGeneration = Number(params.generation);
+    if (Number.isFinite(parsedGeneration)) {
+      filter['skills.generation'] = parsedGeneration;
+    }
   }
 
   if (params.owner?.trim()) {
