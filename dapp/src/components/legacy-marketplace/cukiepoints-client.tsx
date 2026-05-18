@@ -225,7 +225,7 @@ export function CukiePointsClient() {
 
     try {
       const response = await fetch(
-        `/api/legacy-marketplace/points?${buildPointsQuery(0)}`,
+        `/api/cukies/points?${buildPointsQuery(0)}`,
         { cache: 'no-store' },
       );
       if (!response.ok) {
@@ -247,7 +247,7 @@ export function CukiePointsClient() {
     setIsLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/legacy-marketplace/points?${buildPointsQuery(pointsData.items.length)}`,
+        `/api/cukies/points?${buildPointsQuery(pointsData.items.length)}`,
         { cache: 'no-store' },
       );
       if (!response.ok) {
@@ -274,7 +274,14 @@ export function CukiePointsClient() {
   }, [refreshTronSnapshot]);
 
   const pointsSummary = pointsData?.summary;
-  const typeOptions = ['ALL', 'Mint', 'Breeding'];
+  const typeOptions = useMemo(() => {
+    const indexedTypes =
+      pointsSummary?.facets.types
+        .map((facet) => facet.value)
+        .filter((value) => value.length > 0) ?? [];
+
+    return ['ALL', ...Array.from(new Set(indexedTypes.length > 0 ? indexedTypes : ['Breeding', 'Unstake']))];
+  }, [pointsSummary]);
   const canLoadMore = Boolean(
     pointsData && pointsData.items.length < pointsData.total,
   );

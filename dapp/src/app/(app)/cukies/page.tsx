@@ -12,10 +12,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 
-import {
-  listLegacyCukiePoints,
-  listLegacyMarketplaceCukies,
-} from '@/lib/legacy-marketplace/data';
+import { listCukiePoints, listCukies } from '@/lib/cukies-data/data';
 
 const tools = [
   {
@@ -71,10 +68,10 @@ function formatMetric(value: number) {
 
 export default async function CukiesToolsPage() {
   const [allCukies, onSaleCukies, bridgeCukies, points] = await Promise.all([
-    listLegacyMarketplaceCukies({ limit: 1 }),
-    listLegacyMarketplaceCukies({ limit: 1, state: 'onSale' }),
-    listLegacyMarketplaceCukies({ limit: 1, state: 'inBridge' }),
-    listLegacyCukiePoints({ limit: 1 }),
+    listCukies({ limit: 1 }),
+    listCukies({ limit: 1, state: 'onSale' }),
+    listCukies({ limit: 1, state: 'inBridge' }),
+    listCukiePoints({ limit: 1 }),
   ]);
 
   const networks = allCukies.facets.networks
