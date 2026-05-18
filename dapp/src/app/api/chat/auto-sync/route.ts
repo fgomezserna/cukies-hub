@@ -41,7 +41,7 @@ async function performAutoSync() {
     return processedCount;
   } catch (error) {
     console.error('❌ Auto-sync error:', error);
-    syncStats.lastError = error.message;
+    syncStats.lastError = error instanceof Error ? error.message : String(error);
     return 0;
   }
 }
@@ -114,9 +114,10 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('❌ Auto-sync endpoint error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error.message
+      details: message
     }, { status: 500 });
   }
 }
@@ -131,5 +132,4 @@ export async function GET(request: NextRequest) {
     chatId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'not configured'
   });
 }
-
 

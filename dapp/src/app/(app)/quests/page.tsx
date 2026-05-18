@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -551,7 +552,7 @@ function ProfilePictureTask({ task, onVerify, disabled, isLoading = false, user 
         <Circle className="h-5 w-5 text-muted-foreground" />
         <span className="flex-grow text-muted-foreground">{getTaskText(task)}</span>
         <div className="flex items-center gap-2">
-          <img src={user.profilePictureUrl} alt="Profile" className="w-6 h-6 rounded-full object-cover" />
+          <Image src={user.profilePictureUrl} alt="Profile" width={24} height={24} className="w-6 h-6 rounded-full object-cover" unoptimized />
           <span className="text-sm text-pink-600">Picture set</span>
         </div>
         <Button size="sm" variant="default" onClick={handleVerifyExisting} disabled={disabled || isLoading}>
@@ -750,9 +751,9 @@ function DiscordJoinTask({ task, onVerify, disabled, isLoading = false, user }: 
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm text-muted-foreground mb-2">Steps to complete:</p>
               <ol className="text-sm space-y-1 list-decimal list-inside">
-                <li>Click "Join Discord Server" below</li>
+                <li>Click &quot;Join Discord Server&quot; below</li>
                 <li>Accept the invite and join the server</li>
-                <li>Come back and click "I've Joined" to verify</li>
+                <li>Come back and click &quot;I&apos;ve Joined&quot; to verify</li>
               </ol>
             </div>
           </div>
@@ -779,7 +780,7 @@ function DiscordJoinTask({ task, onVerify, disabled, isLoading = false, user }: 
               }}
               variant="secondary"
             >
-              I've Joined
+              I&apos;ve Joined
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1033,7 +1034,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
 
             <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
               <p className="text-xs text-amber-800 dark:text-amber-200">
-                <strong>Step 2:</strong> After sending the code, close this modal and click "Verify" to complete the task.
+                <strong>Step 2:</strong> After sending the code, close this modal and click &quot;Verify&quot; to complete the task.
               </p>
             </div>
           </div>
@@ -1269,7 +1270,7 @@ function QuestsView() {
     console.log("displayedQuests:", displayedQuests);
   }, [starterQuest, quests, displayedQuests]);
 
-  const handleVerifyTask = async (questId: string, taskId: string, payload: { type: string, value?: any }) => {
+  const handleVerifyTask = useCallback(async (questId: string, taskId: string, payload: { type: string, value?: any }) => {
     console.log(`Verifying task ${taskId} for quest ${questId} with payload`, payload);
 
     if (!user) return;
@@ -1350,7 +1351,7 @@ function QuestsView() {
         return newSet;
       });
     }
-  };
+  }, [quests, toast, user]);
   
   const handleClaimReward = async (questId: string) => {
     if (!user) return;
@@ -1410,7 +1411,7 @@ function QuestsView() {
       // Limpiar la URL
       router.replace('/quests');
     }
-  }, [searchParams, user]);
+  }, [handleVerifyTask, router, searchParams, user]);
 
   const isLoading = isAuthLoading || isLoadingQuests;
   const isWalletConnected = !!user;
@@ -1680,7 +1681,7 @@ function QuestsView() {
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
               <Lock className="h-8 w-8 text-muted-foreground" />
               <p className="mt-4 text-lg font-semibold">Additional Quests Locked</p>
-              <p className="mt-1 text-sm text-muted-foreground">Complete the "Get Started" quest above to unlock additional quests</p>
+              <p className="mt-1 text-sm text-muted-foreground">Complete the &quot;Get Started&quot; quest above to unlock additional quests</p>
             </div>
           )}
         </div>

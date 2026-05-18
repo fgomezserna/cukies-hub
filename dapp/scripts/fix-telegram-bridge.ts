@@ -63,7 +63,8 @@ async function diagnoseTelegramBridge() {
           console.log(`❌ Bot API error: ${data.description}`);
         }
       } catch (error) {
-        console.log(`❌ Bot connection failed: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`❌ Bot connection failed: ${message}`);
       }
     }
 
@@ -130,7 +131,11 @@ async function fixTelegramBridge(option: string) {
         console.log(`📤 Sending test message to room ${room.name}...`);
         
         try {
-          const payload = {
+          const payload: {
+            chat_id: string;
+            text: string;
+            message_thread_id?: string | number;
+          } = {
             chat_id: room.telegramGroupId,
             text: '🧪 Test message from Hyppie web bridge'
           };
@@ -156,7 +161,8 @@ async function fixTelegramBridge(option: string) {
             console.log(`❌ Test failed: ${data.description}`);
           }
         } catch (error) {
-          console.log(`❌ Test error: ${error.message}`);
+          const message = error instanceof Error ? error.message : String(error);
+          console.log(`❌ Test error: ${message}`);
         }
       }
     }

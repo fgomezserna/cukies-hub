@@ -67,7 +67,7 @@ export default function GameLayout({
     if (onGameConnection && iframeRef.current) {
       onGameConnection(iframeRef);
     }
-  }, [onGameConnection]);
+  }, [onGameConnection, iframeRef]);
 
   const handleFullScreen = () => {
     const element = gameContainerRef.current;

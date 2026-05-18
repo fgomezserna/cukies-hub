@@ -77,13 +77,7 @@ function ReferralsView() {
     return () => clearInterval(timer);
   }, [unlockDate]);
 
-  useEffect(() => {
-    if (user && !isTimeLocked) {
-      fetchReferralData();
-    }
-  }, [user, isTimeLocked]);
-
-  const fetchReferralData = async () => {
+  const fetchReferralData = useCallback(async () => {
     if (!user?.walletAddress) return;
     
     try {
@@ -98,7 +92,13 @@ function ReferralsView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.walletAddress]);
+
+  useEffect(() => {
+    if (user && !isTimeLocked) {
+      fetchReferralData();
+    }
+  }, [user, isTimeLocked, fetchReferralData]);
 
 
   const isStarterQuestCompleted = useMemo(() => {
@@ -260,7 +260,7 @@ function ReferralsView() {
             <CardHeader>
               <CardTitle>Your Referrals</CardTitle>
               <CardDescription>
-                You've referred {referralData?.totalReferrals || 0} friends. Keep it up!
+                You&apos;ve referred {referralData?.totalReferrals || 0} friends. Keep it up!
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -322,7 +322,7 @@ function ReferralsView() {
                 ) : !isStarterQuestCompleted ? (
                     <>
                         <p className="mt-4 text-lg font-semibold">Feature Locked</p>
-                        <p className="mt-1 text-sm text-muted-foreground">Complete the "Get Started" quest to unlock referrals.</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Complete the &quot;Get Started&quot; quest to unlock referrals.</p>
                         <Button asChild className="mt-4">
                             <Link href="/quests">Complete Quest</Link>
                         </Button>

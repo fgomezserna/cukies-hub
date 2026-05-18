@@ -59,6 +59,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     pathname.startsWith('/breeding') ||
     pathname.startsWith('/bridge') ||
     pathname.startsWith('/bridges');
+  const isMarketplaceSection = pathname.startsWith('/marketplace');
 
   const cukiesTools = [
     { href: '/marketplace', label: 'Marketplace', Icon: Store, active: pathname.startsWith('/marketplace') },
@@ -188,27 +189,30 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <details open={isCukiesSection} className="group/cukies">
-                  <summary className="list-none [&::-webkit-details-marker]:hidden">
-                    <Link href="/cukies" passHref>
-                      <SidebarMenuButton
-                        isActive={isCukiesSection}
-                        className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                      >
-                        <div className="flex w-full items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 group-hover:from-emerald-400/30 group-hover:to-cyan-400/30 transition-all">
-                              <Cookie className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                            </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium">Cukies</span>
+                <div className="group/cukies">
+                  <Link href="/cukies" passHref>
+                    <SidebarMenuButton
+                      isActive={isCukiesSection}
+                      className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
+                    >
+                      <div className="flex w-full items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 group-hover:from-emerald-400/30 group-hover:to-cyan-400/30 transition-all">
+                            <Cookie className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
                           </div>
-                          <ChevronDown className="h-3.5 w-3.5 text-cyan-200 transition group-open/cukies:rotate-180 group-data-[collapsible=icon]:hidden" />
+                          <span className="group-data-[collapsible=icon]:hidden font-medium">Cukies</span>
                         </div>
-                      </SidebarMenuButton>
-                    </Link>
-                  </summary>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-cyan-200 transition group-data-[collapsible=icon]:hidden ${
+                            isCukiesSection ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </div>
+                    </SidebarMenuButton>
+                  </Link>
 
-                  <div className="mt-1 space-y-1 pl-5 group-data-[collapsible=icon]:hidden">
+                  {isCukiesSection && (
+                    <div className="mt-1 space-y-1 pl-5 group-data-[collapsible=icon]:hidden">
                     {cukiesTools.map(({ href, label, Icon, active }) => (
                       <Link key={href} href={href} className="block">
                         <div
@@ -223,8 +227,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                         </div>
                       </Link>
                     ))}
-                  </div>
-                </details>
+                    </div>
+                  )}
+                </div>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
@@ -324,36 +329,38 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           }}></div>
           
           {/* Ambient light effects */}
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-teal-400/8 rounded-full blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
+          <div className={`absolute top-0 left-1/4 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl ${isMarketplaceSection ? '' : 'animate-pulse'}`}></div>
+          <div className={`absolute bottom-0 right-1/4 w-80 h-80 bg-teal-400/8 rounded-full blur-3xl ${isMarketplaceSection ? '' : 'animate-pulse delay-1000'}`}></div>
+          <div className={`absolute top-1/2 left-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl ${isMarketplaceSection ? '' : 'animate-pulse delay-2000'}`}></div>
           
           {/* Floating gradients */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-radial from-cyan-300/20 via-teal-400/10 to-transparent rounded-full blur-xl floating"></div>
-            <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-gradient-radial from-cyan-300/15 via-teal-400/8 to-transparent rounded-full blur-xl floating delay-3000"></div>
+            <div className={`absolute -top-40 -right-40 w-80 h-80 bg-gradient-radial from-cyan-300/20 via-teal-400/10 to-transparent rounded-full blur-xl ${isMarketplaceSection ? '' : 'floating'}`}></div>
+            <div className={`absolute -bottom-32 -left-32 w-64 h-64 bg-gradient-radial from-cyan-300/15 via-teal-400/8 to-transparent rounded-full blur-xl ${isMarketplaceSection ? '' : 'floating delay-3000'}`}></div>
           </div>
           
           {/* Animated decorative lines */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-teal-400/30 to-transparent transform -rotate-12 animate-pulse"></div>
-            <div className="absolute bottom-1/3 right-0 w-full h-px bg-gradient-to-l from-transparent via-teal-400/20 to-transparent transform rotate-12 animate-pulse delay-1500"></div>
+            <div className={`absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-teal-400/30 to-transparent transform -rotate-12 ${isMarketplaceSection ? '' : 'animate-pulse'}`}></div>
+            <div className={`absolute bottom-1/3 right-0 w-full h-px bg-gradient-to-l from-transparent via-teal-400/20 to-transparent transform rotate-12 ${isMarketplaceSection ? '' : 'animate-pulse delay-1500'}`}></div>
           </div>
           
           {/* Decorative floating particles */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-20 left-20 w-2 h-2 bg-cyan-300/60 rounded-full floating-slow"></div>
-            <div className="absolute top-40 right-32 w-1 h-1 bg-cyan-300/40 rounded-full floating-slow delay-2000"></div>
-            <div className="absolute bottom-32 left-1/3 w-3 h-3 bg-cyan-400/30 rounded-full floating-slow delay-4000"></div>
-            <div className="absolute top-1/2 right-20 w-1.5 h-1.5 bg-cyan-200/50 rounded-full floating-slow delay-6000"></div>
-            <div className="absolute bottom-20 right-1/4 w-2 h-2 bg-cyan-200/40 rounded-full floating-slow delay-8000"></div>
+            <div className={`absolute top-20 left-20 w-2 h-2 bg-cyan-300/60 rounded-full ${isMarketplaceSection ? '' : 'floating-slow'}`}></div>
+            <div className={`absolute top-40 right-32 w-1 h-1 bg-cyan-300/40 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-2000'}`}></div>
+            <div className={`absolute bottom-32 left-1/3 w-3 h-3 bg-cyan-400/30 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-4000'}`}></div>
+            <div className={`absolute top-1/2 right-20 w-1.5 h-1.5 bg-cyan-200/50 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-6000'}`}></div>
+            <div className={`absolute bottom-20 right-1/4 w-2 h-2 bg-cyan-200/40 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-8000'}`}></div>
           </div>
           
           {/* Energy waves */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400/0 via-teal-400/30 to-teal-400/0 wave-animation"></div>
-            <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-teal-400/0 via-teal-400/20 to-teal-400/0 wave-animation delay-4000"></div>
-          </div>
+          {!isMarketplaceSection && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400/0 via-teal-400/30 to-teal-400/0 wave-animation"></div>
+              <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-teal-400/0 via-teal-400/20 to-teal-400/0 wave-animation delay-4000"></div>
+            </div>
+          )}
           
           <Header />
           <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
