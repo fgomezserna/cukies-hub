@@ -40,6 +40,16 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
     ports:
       - "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.cukies-hub-gzip.compress=true
+      - traefik.http.routers.cukies-hub-dapp-websecure.entryPoints=websecure
+      - traefik.http.routers.cukies-hub-dapp-websecure.middlewares=cukies-hub-gzip
+      - traefik.http.routers.cukies-hub-dapp-websecure.rule=Host(`hub.cukies.world`) || Host(`cukieshub.eurekand.com`)
+      - traefik.http.routers.cukies-hub-dapp-websecure.service=cukies-hub-dapp-websecure
+      - traefik.http.routers.cukies-hub-dapp-websecure.tls=true
+      - traefik.http.routers.cukies-hub-dapp-websecure.tls.certresolver=letsencrypt
+      - traefik.http.services.cukies-hub-dapp-websecure.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
