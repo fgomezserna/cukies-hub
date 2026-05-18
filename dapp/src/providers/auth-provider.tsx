@@ -11,12 +11,35 @@ type AuthContextType = {
   isLoading: boolean;
   isWaitingForApproval: boolean;
   walletType: 'evm' | 'tron' | null;
-  fetchUser: () => void; // Function to allow components to trigger a refetch
+  fetchUser: (walletAddress?: string, options?: FetchUserOptions) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 type LoginWalletType = 'evm' | 'tron';
+type FetchUserOptions = {
+  promptForSignature?: boolean;
+  walletType?: LoginWalletType;
+};
+
+function isUserRejectedRequest(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const record = error as { code?: number | string; message?: string };
+  const message = record.message?.toLowerCase() || '';
+
+  return (
+    record.code === 4001 ||
+    record.code === 'ACTION_REJECTED' ||
+    message.includes('user rejected') ||
+    message.includes('user denied') ||
+    message.includes('rejected') ||
+    message.includes('cancelled') ||
+    message.includes('canceled')
+  );
+}
 
 function getBrowserTronWeb() {
   if (typeof window === 'undefined') return null;
@@ -67,11 +90,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const currentAddress = isEvmConnected ? evmAddress : (isTronConnected ? tronAddress : null);
   const isConnected = isEvmConnected || isTronConnected;
 
-  const fetchUser = useCallback(async (walletAddress?: string) => {
+  const fetchUser = useCallback(async (walletAddress?: string, options: FetchUserOptions = {}) => {
     const addressToUse = walletAddress || currentAddress;
-    const loginWalletType: LoginWalletType = isEvmConnected ? 'evm' : 'tron';
+    const loginWalletType: LoginWalletType = options.walletType || (isEvmConnected ? 'evm' : 'tron');
+    const shouldPromptForSignature = Boolean(options.promptForSignature);
+    const canUseWalletAddress = isConnected || Boolean(walletAddress && shouldPromptForSignature);
 
-    if (!isConnected || !addressToUse) {
+    if (!canUseWalletAddress || !addressToUse) {
         setUser(null);
         setIsLoading(false);
         setIsWaitingForApproval(false);
@@ -90,6 +115,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (response.status === 401) {
+        if (!shouldPromptForSignature) {
+          setUser(null);
+          setWalletType(null);
+          return;
+        }
+
         const challengeResponse = await fetch('/api/auth/challenge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -141,16 +172,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setWalletType(null);
 
-      // Disconnect the appropriate wallet
-      if (isEvmConnected) disconnectEvm();
-      if (isTronConnected) disconnectTron();
+      const wasRejected = didRequestSignature && isUserRejectedRequest(error);
+
+      if (!wasRejected) {
+        // Disconnect only on real auth/provider errors. A rejected signature should leave
+        // the wallet connected so the user can retry from the Connect Wallet button.
+        if (isEvmConnected) disconnectEvm();
+        if (isTronConnected) disconnectTron();
+      }
 
       // Show error toast
-      toast({
-        title: "Connection Failed",
-        description: "Failed to verify your wallet. Please try again.",
-        variant: "destructive",
-      });
+      if (shouldPromptForSignature) {
+        toast({
+          title: wasRejected ? "Signature Cancelled" : "Connection Failed",
+          description: wasRejected
+            ? "Click Connect Wallet when you want to try again."
+            : "Failed to verify your wallet. Please try again.",
+          variant: wasRejected ? "default" : "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
       setIsWaitingForApproval(false);
@@ -158,7 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentAddress, isConnected, isEvmConnected, isTronConnected, disconnectEvm, disconnectTron, toast]);
 
   useEffect(() => {
-    fetchUser();
+    fetchUser(undefined, { promptForSignature: false });
   }, [fetchUser]);
 
   // Enhanced wallet change detection effect
@@ -197,7 +237,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // If there's a new wallet connected, fetch user data (login)
       if (isConnected && currentAddress) {
         console.log('🔐 Logging in with new wallet:', currentAddress);
-        fetchUser();
+        fetchUser(undefined, { promptForSignature: false });
       } else {
         // If disconnected, just finish loading
         console.log('🔓 Wallet disconnected, finishing logout');

@@ -29,7 +29,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/providers/auth-provider';
-import { useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
 
 
@@ -49,12 +49,15 @@ const getRank = (xp: number): string => {
 
 export default function Header() {
   const { toggleSidebar, state, isMobile } = useSidebar();
-  const { user, isLoading: isAuthLoading, isWaitingForApproval } = useAuth();
-  const { connect, connectors } = useConnect();
+  const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
+  const { address: evmAddress, isConnected: isEvmConnected } = useAccount();
+  const { connectAsync, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const {
+    address: tronAddress,
     connect: connectTron,
     error: tronError,
+    isConnected: isTronConnected,
     isInstalled: isTronInstalled,
     isLoading: isTronLoading,
   } = useTronLink();
@@ -64,18 +67,40 @@ export default function Header() {
   const userXP = user?.xp ?? 0;
   const userRank = getRank(userXP);
 
-  const handleConnectEVM = () => {
-    setIsWalletDialogOpen(false);
-    if (connectors.length > 0) {
-      connect({ connector: connectors[0] });
+  const handleConnectEVM = async () => {
+    try {
+      setIsWalletDialogOpen(false);
+
+      if (isEvmConnected && evmAddress) {
+        await fetchUser(evmAddress, { promptForSignature: true, walletType: 'evm' });
+        return;
+      }
+
+      if (connectors.length > 0) {
+        const result = await connectAsync({ connector: connectors[0] });
+        const connectedAddress = result.accounts?.[0] || evmAddress;
+
+        if (connectedAddress) {
+          await fetchUser(connectedAddress, { promptForSignature: true, walletType: 'evm' });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to connect EVM wallet:', error);
     }
   };
 
   const handleConnectTron = async () => {
     try {
+      if (isTronConnected && tronAddress) {
+        setIsWalletDialogOpen(false);
+        await fetchUser(tronAddress, { promptForSignature: true, walletType: 'tron' });
+        return;
+      }
+
       const address = await connectTron();
       if (address) {
         setIsWalletDialogOpen(false);
+        await fetchUser(address, { promptForSignature: true, walletType: 'tron' });
       }
     } catch (error) {
       console.error('Failed to connect TronLink:', error);
