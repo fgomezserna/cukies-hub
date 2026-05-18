@@ -3,6 +3,7 @@
 Estado: aceptado para implementacion inicial.
 Issue: #16 `UKI-001.1`.
 Fecha: 2026-05-12.
+Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
 ## Contexto
 
@@ -15,6 +16,7 @@ Reglas base heredadas del backlog tecnico:
 - BSC liquida valor, compras, vesting, staking de UKI y claims finales.
 - Treasure Hunt es el primer juego, pero las reglas deben soportar multiples juegos.
 - El bridge/marketplace existente no se reimplementa dentro de este lanzamiento.
+- Direccion actual de producto: las nuevas posiciones de staking Cukie Master y pool de Cukies operan solo en BSC; Tron se mantiene para lectura, reconciliacion y migracion salvo decision posterior.
 
 ## Decision
 
@@ -31,7 +33,7 @@ Usamos BSC como fuente de verdad para valor transferible y derechos on-chain. Us
 | Staking UKI para Cukie Master | Contrato `UKIStaking` | BSC: cantidad staked, lock si aplica y timestamps | Si. Eventos `Staked`, `Unstaked`, `StakeExtended` si hay duracion. Backend/indexer deriva cupos, pero no inventa stake. |
 | Cupos por ruta UKI | Backend `CukieMasterService` | Derivado de BSC indexado: UKI staked y regla vigente de cupos | Si. Audit log off-chain con version de regla, snapshot usado y cupos calculados. No necesita evento on-chain porque es una autorizacion de producto derivada. |
 | Cupos por ruta NFT | Backend `CukieMasterService` | Mongo/marketplace normalizado por `NftInventoryService` | Si. Audit log off-chain con wallet, NFTs considerados, rareza, puntos y version de regla. Debe poder recalcularse desde snapshot. |
-| Soft staking NFT / aportar Cukie a pool | Backend `NftInventoryService` + `CukiePoolService` | Mongo: lock/position operativa sobre NFT normalizado | Si. Event log off-chain append-only para `pool_entered`, `pool_exited`, `lock_created`, `lock_released`, owner verificado y snapshot de rareza. No mueve NFT en BSC/TRON. |
+| Soft staking NFT / aportar Cukie a pool | Backend `NftInventoryService` + `CukiePoolService` | Mongo: lock/position operativa sobre NFT normalizado y elegibilidad BSC para nuevas posiciones | Si. Event log off-chain append-only para `pool_entered`, `pool_exited`, `lock_created`, `lock_released`, owner verificado y snapshot de rareza. La direccion actual no mueve NFT en partida y limita nuevas posiciones a BSC, manteniendo Tron para migracion/reconciliacion. |
 | Estado de NFT usable | Backend `NftInventoryService` | Mongo normalizado + reconciliacion con owner/bridge/listing | Si. Cambios de estado deben dejar audit log cuando afecten uso economico: `available`, `listed`, `bridging`, `soft_staked`, `in_pool`, `assigned_to_game`, `invalidated`, `unknown`. |
 | Creditos diarios de Cukie Master | Job diario + `CompetitionCreditService` | Mongo ledger append-only de creditos | Si. Ledger off-chain obligatorio con `grant`, periodo, slot/cupo origen, idempotency key y job run id. |
 | Deposito de creditos a pool | Job diario + `CompetitionCreditService` | Mongo ledger append-only | Si. Ledger con `pool_deposit`, config aplicada, hora de corte, wallet, slot y periodo. |
@@ -151,4 +153,3 @@ La UI no debe calcular saldos finales, rewards finales, ranking final, elegibili
 - #18 debe fijar ventanas de consistencia, confirmaciones BSC minimas y politicas de recuperacion.
 - #27 debe elegir framework de contratos con esta separacion como requisito.
 - #47 debe decidir si `RewardsDistributor` usa Merkle root por periodo o firmas EIP-712.
-

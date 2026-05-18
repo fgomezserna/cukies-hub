@@ -3,6 +3,7 @@
 Estado: borrador v0.1 para validacion.
 Uso: fuente de verdad para branding, design tokens, UX visual, copy base e imagenes generadas.
 Principio: los assets actuales inspiran el ADN Cukies, pero no obligan a copiar el estilo antiguo.
+Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
 ## 1. Tesis de marca
 
@@ -532,8 +533,10 @@ Campos minimos:
 - red: BNB Smart Chain,
 - activo de compra: ASM,
 - precio: $0.01,
-- duracion,
-- vesting,
+- duracion: 1 mes,
+- listing minimo: $0.012,
+- vesting comprador: 9 meses lineal sin cliff,
+- liquidez: ASM recaudado a liquidez UKI con bloqueo/quema minimo 9 meses,
 - estado wallet,
 - CTA.
 
@@ -579,7 +582,8 @@ Contenido:
 - UKI Presale.
 - BNB Smart Chain.
 - compra con ASM.
-- precio/duracion/vesting.
+- precio $0.01, duracion 1 mes y vesting 9 meses.
+- listing minimo $0.012.
 - CTA principal.
 
 Visual:
@@ -609,6 +613,7 @@ Contenido:
 - liquidity lock/burn.
 - buyer vesting.
 - team vesting.
+- ecosistema: 30M UKI liberados 40 dias tras TGE; resto con cliff/vesting.
 - rewards program.
 
 ### 4. Why UKI Exists
@@ -637,9 +642,11 @@ Objetivo: explicar utilidad futura sin distraer del CTA principal.
 Contenido:
 
 - staking UKI,
-- Cukie points,
+- Cukies Originales por puntos de rareza,
 - creditos diarios,
 - cupos,
+- maximo 5 cupos por wallet,
+- UKI con vesting cuenta para cupos,
 - fase posterior.
 
 ### 7. First Game: Treasure Hunt
@@ -776,4 +783,3 @@ Antes de implementar home:
 4. Si la preventa se comunica en ingles, español o bilingue.
 5. Si el tono visual debe inclinarse mas a comunidad NFT o mas a producto financiero/juego.
 6. Si los screenshots de producto deben ser reales desde la app o conceptuales durante prelaunch.
-

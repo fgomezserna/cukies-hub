@@ -100,28 +100,28 @@ export const vestingTracks = [
 export const utilityNodes = [
   {
     title: 'Games',
-    text: 'Play, compete and earn.',
+    text: 'Play and compete.',
     icon: Gamepad2,
     className: 'uki-node-purple',
     positionClassName: 'uki-node-games',
   },
   {
     title: 'Credits',
-    text: 'Earn, spend and upgrade.',
+    text: 'Use internal game resources.',
     icon: Coins,
     className: 'uki-node-gold',
     positionClassName: 'uki-node-credits',
   },
   {
     title: 'Pools',
-    text: 'Powerful pools with real utility.',
+    text: 'Share resources under clear rules.',
     icon: Database,
     className: 'uki-node-blue',
     positionClassName: 'uki-node-pools',
   },
   {
     title: 'Cukie Master',
-    text: 'Boost yield and unlock perks.',
+    text: 'Unlock slots and daily credit access.',
     icon: Crown,
     className: 'uki-node-pink',
     positionClassName: 'uki-node-master',
@@ -135,7 +135,7 @@ export const utilityNodes = [
   },
   {
     title: 'Rewards',
-    text: 'Compete, rank, get rewarded.',
+    text: 'Track period-based allocations.',
     icon: Gift,
     className: 'uki-node-red',
     positionClassName: 'uki-node-rewards',
@@ -171,7 +171,7 @@ export const timeline = [
   {
     year: 'Next',
     title: 'Game economy',
-    text: 'Play, earn, own, together.',
+    text: 'Play, compete and build utility.',
     image: '/brand/generated/uki-timeline-economy.svg',
   },
 ];
@@ -179,7 +179,7 @@ export const timeline = [
 export const futureUtility = [
   {
     title: 'Stake UKI',
-    text: 'Stake your UKI to boost power and multipliers.',
+    text: 'Stake UKI to unlock Cukie Master slots.',
     icon: Sparkles,
     className: 'uki-future-cyan',
     image: '/brand/generated/cukie-master-stake-landing.png',
@@ -193,14 +193,14 @@ export const futureUtility = [
   },
   {
     title: 'Receive credits',
-    text: 'Earn credits from activity, games and pools.',
+    text: 'Receive internal credits from active slots.',
     icon: Coins,
     className: 'uki-future-gold',
     image: '/brand/generated/cukie-master-credits-landing.png',
   },
   {
     title: 'Enter pools',
-    text: 'Join exclusive pools for greater rewards.',
+    text: 'Join pools when the post-presale phase opens.',
     icon: Crown,
     className: 'uki-future-vault',
     image: '/brand/generated/cukie-master-pools-landing.png',

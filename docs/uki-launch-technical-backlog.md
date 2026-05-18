@@ -4,6 +4,7 @@ Estado: borrador tecnico para convertir en GitHub Issues.
 Cadena objetivo: BNB Smart Chain.
 Fuente operativa de NFTs: Mongo Proxmox / marketplace.cukies.world.
 Regla base: Mongo opera producto y juegos; BSC liquida valor, staking de UKI, vesting y claims.
+Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
 ## Convenciones
 
@@ -42,6 +43,8 @@ Regla base: Mongo opera producto y juegos; BSC liquida valor, staking de UKI, ve
 5. Las compras, vesting, staking de UKI y claim final de UKI se resuelven on-chain en BSC.
 6. Treasure Hunt es el primer juego, pero la arquitectura debe soportar multiples juegos.
 7. Toda pantalla que tenga especificacion UX necesita imagen generada validada antes de implementacion visual final.
+8. Las reglas de preventa, Cukie Master, creditos, pools, ranking, Treasure Hunt y UKI no distribuido se toman de `docs/uki-current-operating-rules.md`.
+9. La direccion actual para staking Cukie Master y pool de Cukies es BSC-only; Tron queda como inventario/estado legacy y flujo de migracion salvo decision posterior.
 
 ## Milestone M0 - Decisiones de arquitectura y alcance
 
@@ -184,6 +187,7 @@ Issues hijas:
     - Componentes criticos identificados para reutilizacion.
 
 - UKI-004.4 Task - Validar imagenes generadas de landing, preventa y app shell
+  - Documento de preparacion: `docs/uki-ux-image-validation-plan.md`.
   - Acceptance criteria:
     - Prompt de cada pantalla validado antes de generar.
     - Imagen generada enlazada en la issue correspondiente.
@@ -283,10 +287,11 @@ Contrato para preventa UKI usando ASM como medio principal. BNB/USDT quedan como
 Issues hijas:
 
 - UKI-012.1 Task - Cerrar reglas de preventa
-  - Campos: fecha inicio, fecha fin, precio UKI, ratio ASM/UKI fijo al inicio, max/min compra, wallet caps, pausas.
+  - Campos: fecha inicio primera semana de junio 2026, duracion 1 mes, precio UKI 0.01 USD, listing minimo 0.012 USD, ratio ASM/UKI fijo al inicio, max/min compra, wallet caps, pausas.
   - Acceptance criteria:
     - Reglas versionadas.
     - Casos de borde definidos: preventa agotada, compra fuera de ventana, ASM ratio, refund si aplica.
+    - Liquidez ASM -> UKI, bloqueo/quema minimo 9 meses y vesting comprador 9 meses sin cliff documentados.
 
 - UKI-012.2 Task - Implementar contrato `Presale`
   - Acceptance criteria:
@@ -298,7 +303,7 @@ Issues hijas:
 - UKI-012.3 Task - Extension opcional BNB/USDT
   - Acceptance criteria:
     - Marcado como opcional.
-    - Si se activa, define conversion a ASM o tesoreria separada.
+    - Si se activa, define conversion automatica a ASM o tesoreria separada para convertir posteriormente a ASM.
 
 Dependencias: UKI-011.
 
@@ -316,7 +321,7 @@ Issues hijas:
 - UKI-013.1 Task - Especificar calendarios de vesting
   - Compradores: lineal 9 meses sin cliff.
   - Team/Marcel/Concilium: 9 meses cliff + 24 meses vesting.
-  - Ecosistema: reglas segun tokenomics final.
+  - Ecosistema: 3% del pool de ecosistema, 30,000,000 UKI, liberado 40 dias despues del TGE; resto con 9 meses cliff + 12 meses lineal.
   - Acceptance criteria:
     - Cada pool tiene calendario, cliff, start, end y beneficiarios.
 
@@ -348,9 +353,10 @@ Issues hijas:
   - Inicial: 20,000 UKI por cupo.
   - Maximo: 5 cupos por wallet sumando rutas.
   - Requisito dinamico si se llenan cupos.
+  - UKI comprado en preventa con vesting cuenta directamente para cupos.
   - Acceptance criteria:
     - Formula versionada.
-    - Reglas de subida de requisito y ventana 48-72h definidas.
+    - Reglas de subida de requisito y ventana 48h definidas.
 
 - UKI-014.2 Task - Implementar staking UKI
   - Acceptance criteria:
@@ -362,7 +368,7 @@ Issues hijas:
 - UKI-014.3 Task - Exponer snapshots para cupos
   - Acceptance criteria:
     - Backend puede calcular cupos por wallet desde eventos o lectura directa.
-    - Se contemplan tokens con vesting que cuentan para staking segun regla final.
+    - Incluye UKI con vesting y UKI liberado/stakeado adicional segun regla vigente.
 
 Dependencias: UKI-011, UKI-013.
 
@@ -486,7 +492,8 @@ Issues hijas:
 - UKI-022.1 Task - Calculo por ruta UKI
   - Acceptance criteria:
     - Lee staked UKI on-chain/indexado.
-    - Incluye UKI con vesting si la regla final lo confirma.
+    - Incluye automaticamente UKI comprado en preventa con vesting.
+    - Suma UKI con vesting y UKI liberado/stakeado adicional.
 
 - UKI-022.2 Task - Calculo por ruta NFT
   - Puntos: comun 1, no comun 2, raro 4, epico 7, legendario 10, goat 15.
@@ -497,8 +504,9 @@ Issues hijas:
 - UKI-022.3 Task - Motor de requisito dinamico
   - Acceptance criteria:
     - Detecta cupos llenos.
-    - Inicia ventana 48-72h.
+    - Inicia ventana 48h.
     - Calcula quien conserva/pierde cupo al cierre.
+    - Mantiene el contador aunque el numero de cupos ocupados vuelva a bajar.
 
 Dependencias: UKI-014, UKI-021.
 
@@ -519,6 +527,8 @@ Issues hijas:
     - Entrega siempre a hora fija.
     - Respeta primera entrega tras 24h.
     - No entrega dos veces por periodo.
+    - Si el usuario pierde el cupo, conserva creditos ya asignados pero deja de recibir nuevas entregas.
+    - Si vuelve a cumplir requisito, reinicia espera minima de 24h.
 
 - UKI-023.2 Task - Job de expiracion de creditos
   - Acceptance criteria:
@@ -646,6 +656,7 @@ Issues hijas:
     - Config por wallet/slot.
     - Se aplica al recibir creditos.
     - Cambios fuera de ventana aplican al dia siguiente.
+    - Recompensa del dia se mantiene para quien aporto creditos aunque pierda el cupo antes del reparto.
 
 - UKI-040.3 Task - API disponibilidad para juegos
   - Acceptance criteria:
@@ -675,7 +686,7 @@ Issues hijas:
 
 - UKI-041.1 Task - Reglas soft staking NFT
   - Acceptance criteria:
-    - Define si se permite BSC, Tron o ambos para pool.
+    - Direccion actual: nuevas posiciones de pool solo en BSC; Tron se soporta para lectura/migracion salvo decision posterior.
     - Define unstake y efecto si el Cukie esta asignado a una partida.
     - Define prioridad Originales vs 2a Generacion.
 
@@ -683,12 +694,14 @@ Issues hijas:
   - Acceptance criteria:
     - Lock atomico via `NftInventoryService`.
     - Snapshot de elegibilidad tras 24h.
-    - Recompensas ponderadas por rareza.
+    - Recompensas ponderadas por rareza segun tramos: Todos, No Comun+, Raro+, Epico+, Legendario+, Goat, 16.66% cada uno.
+    - Originales y segunda generacion se contabilizan en pools separados.
 
 - UKI-041.3 Task - Asignacion de Cukie prestado a partida
   - Acceptance criteria:
     - Primero Originales, luego 2a Generacion.
     - Si no hay disponible, asigna Seiku ficticio.
+    - El Seiku se liquida de forma similar a Cukie Comun Original.
     - Libera lock temporal al finalizar/expirar sesion.
 
 Dependencias: UKI-021, UKI-040.
@@ -791,6 +804,7 @@ Issues hijas:
     - Si no hay, asigna creditos del pool.
     - Si hay Cukie propio con partidas, usuario selecciona.
     - Si no, asigna Cukie del pool o Seiku.
+    - Decision pendiente: validar si la seleccion manual de Cukie propio se mantiene o se automatiza.
 
 - UKI-051.2 Task - Calculo de UKI generado
   - Acceptance criteria:
@@ -807,6 +821,7 @@ Issues hijas:
   - Acceptance criteria:
     - Repartos coinciden con documento de funcionamiento.
     - Ranking solo afecta cuando usa creditos prestados.
+    - Casos exactos: prestado+prestado 50% pool creditos, 25% pool Cukies, jugador segun rank sobre resto; creditos prestados+Cukie propio 50% pool creditos y jugador segun rank sobre resto; creditos propios+Cukie prestado 50% pool Cukies y 50% jugador; propios+propio 100% jugador.
 
 - UKI-051.4 Task - Integracion con juego existente
   - Acceptance criteria:
@@ -869,19 +884,21 @@ Issues hijas:
 
 - UKI-060.1 Task - Reglas de pool de creditos
   - Acceptance criteria:
-    - Define si existe retorno minimo del 20% y como se financia.
-    - Si no esta validado, queda feature flag off.
+    - Retorno minimo inicial: equivalente a convertir 20% de creditos aportados al pool.
+    - Si el calculo diario queda por debajo de 0.75 UKI por cada 10 creditos aportados, se asigna 0.75 UKI por cada 10 creditos.
+    - Importes del pool semanal se reparten la semana siguiente en 7 entregas diarias y son adicionales al minimo diario.
 
 - UKI-060.2 Task - Reglas de pool de Cukies
   - Acceptance criteria:
-    - Ponderacion por rareza.
+    - Ponderacion por rareza en seis tramos acumulativos de 16.66%.
     - Snapshot de NFTs en pool durante periodo.
     - Originales y 2a Generacion separados si aplica.
 
 - UKI-060.3 Task - Reglas de tesoreria para UKI no convertidos
   - Acceptance criteria:
-    - 85% tesoreria/reserva/liquidez/ecosistema.
-    - 5% marketing/desarrollo.
+    - 80% tesoreria/reserva/liquidez/ecosistema.
+    - 5% marketing.
+    - 5% desarrollo.
     - 10% reduccion supply.
     - Marcado como pendiente si falta decision on-chain/off-chain.
 
@@ -955,11 +972,13 @@ Issues hijas:
     - Cada pantalla tiene CTA principal y maximo dos secundarias.
 
 - UKI-070.2 Task - Matriz de estados UX
+  - Documento: `docs/uki-ux-state-matrix.md`.
   - Acceptance criteria:
     - Empty/loading/error/success para cada pantalla.
     - Chain incorrecta y wallet desconectada definidos.
 
 - UKI-070.3 Task - Validacion de imagenes por pantalla
+  - Documento de preparacion: `docs/uki-ux-image-validation-plan.md`.
   - Acceptance criteria:
     - Cada pantalla tiene prompt validado por usuario antes de generar.
     - Cada imagen generada queda linkada en el issue correspondiente.
@@ -1205,12 +1224,14 @@ Dependencias: UKI-090.
 
 ## Bloqueadores actuales
 
-1. Confirmar si soft staking de NFTs permite BSC y Tron o solo BSC para pools.
-2. Confirmar si el retorno minimo del 20% al pool de creditos se mantiene, se elimina o queda como feature flag.
-3. Confirmar si preventa acepta solo ASM o tambien BNB/USDT.
-4. Confirmar mecanismo de claim: Merkle root o firma EIP-712.
-5. Confirmar si los UKI con vesting cuentan automaticamente para staking Cukie Master.
-6. Confirmar frases permitidas a nivel legal para rewards.
+1. Confirmar fecha exacta de inicio de preventa dentro de la primera semana de junio de 2026.
+2. Confirmar si preventa acepta solo ASM o tambien BNB/USDT, y si BNB/USDT se convierten automaticamente a ASM o se custodian para conversion posterior.
+3. Confirmar mecanismo de claim: Merkle root o firma EIP-712.
+4. Confirmar frases permitidas a nivel legal para rewards.
+5. Confirmar si la seleccion de Cukie propio en Treasure Hunt sera manual o automatica.
+6. Confirmar fechas de corte para Cukie Points generados por Cukies en staking y para detener crias.
+7. Confirmar ratio/limites finales de conversion Cukie Points -> creditos.
+8. Confirmar detalle operativo de migracion Tron -> BSC y posible cobro de TRX para fees.
 
 ## Plantilla para convertir cada bloque en GitHub Issue
 
@@ -1224,13 +1245,13 @@ Dependencias: UKI-090.
 ## Dependencias
 
 ## Tareas
-- [ ] 
+- [ ]
 
 ## Criterios de aceptacion
-- [ ] 
+- [ ]
 
 ## Tests / QA
-- [ ] 
+- [ ]
 
 ## UX image gate
 Estado: no aplica | pendiente de prompt | prompt validado | imagen generada | imagen aprobada

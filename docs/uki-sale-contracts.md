@@ -3,6 +3,7 @@
 Estado: implementacion inicial.
 Issues: #27, #28, #29, #31, #32, #33, #35, #36, #68.
 Fecha: 2026-05-12.
+Fuente de producto vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
 ## Decision de framework
 
@@ -96,6 +97,24 @@ Refund:
 - No se implementa refund automatico.
 - Una compra confirmada crea vesting.
 - Cualquier politica de refund necesita decision separada y contrato adicional o funcion admin auditada.
+
+## Parametros de producto vigentes 2026-05-17
+
+Estos parametros no deben entenderse como hardcodeados si el contrato los recibe por configuracion de deploy o admin. Son la referencia de producto actual para configurar preventa, UI y runbooks:
+
+| Parametro | Valor vigente |
+| --- | --- |
+| Inicio previsto | Primera semana de junio de 2026, fecha exacta pendiente. |
+| Duracion | 1 mes. |
+| Precio preventa | 1 UKI = 0.01 USD. |
+| Listing minimo | 1 UKI >= 0.012 USD. |
+| Medio principal de compra | ASM. |
+| Ratio ASM/UKI | Fijo al inicio de preventa segun precio de ASM en ese momento. |
+| Comprador | Vesting lineal 9 meses, sin cliff. |
+| Liquidez | ASM recaudado se usa para liquidez UKI; liquidez inicial bloqueada o quemada al menos 9 meses. |
+| BNB/USDT | Extension opcional pendiente; si se acepta, debe convertirse a ASM o reservarse para conversion posterior. |
+| Incentivos Concilium/Ascensum | Se iguala cantidad vendida a esa comunidad para Marcel; 9 meses cliff + 24 meses vesting. |
+| Ecosistema | 30,000,000 UKI liberados 40 dias tras TGE; resto 9 meses cliff + 12 meses lineal. |
 
 ## BSC testnet/mainnet
 

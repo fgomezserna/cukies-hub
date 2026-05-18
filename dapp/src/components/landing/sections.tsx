@@ -17,7 +17,7 @@ import { PresaleGateAction, PresaleGateLink, PresaleLockBadge } from './presale-
 import { HeroBackgroundVideo } from './hero-background-video';
 import { LandingButton, MetricTile, Panel, ProgressTrack, SectionHeading, TokenCoin } from './primitives';
 import { SaleConsole } from './sale-console';
-import { UKI_PRESALE_START_LABEL } from './sale-config';
+import { UKI_PRESALE_START_LABEL, UKI_PRESALE_START_SHORT_LABEL } from './sale-config';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 
 export function CukiesLanding() {
@@ -85,7 +85,7 @@ function HeroSection() {
           <h1 className="uki-hero-title">
             <span className="uki-hero-title-line">UKI presale</span>
             {' '}
-            <span className="uki-hero-title-line text-[var(--uki-cyan)]">opens Jun 10</span>
+            <span className="uki-hero-title-line text-[var(--uki-cyan)]">opens {UKI_PRESALE_START_SHORT_LABEL}</span>
           </h1>
           <p className="mt-4 max-w-[28rem] text-lg leading-snug text-[var(--uki-text)] sm:text-xl">
             The token powering the next Cukies game economy on{' '}
@@ -180,7 +180,7 @@ function StepCard({ step }: { step: (typeof purchaseSteps)[number] }) {
             </div>
             <div>
               <p className="uki-label">Spend limit</p>
-              <p className="mt-1 font-headline text-lg font-black text-[var(--uki-cream)]">10,000 ASM</p>
+              <p className="mt-1 font-headline text-lg font-black text-[var(--uki-cream)]">Set amount</p>
             </div>
             <PresaleGateAction className="h-9 w-full rounded-[5px] bg-[var(--uki-cyan)] text-[0.68rem] font-black uppercase tracking-[0.1em] text-[#02090d]">
               Approve
@@ -189,11 +189,14 @@ function StepCard({ step }: { step: (typeof purchaseSteps)[number] }) {
         ) : null}
         {step.number === '3' ? (
           <div className="space-y-2">
-            <Amount label="You pay (ASM)" value="10,000" token="ASM" />
+            <Amount label="You pay" value="ASM amount" token="ASM" />
             <div className="flex justify-center">
               <ArrowRight className="h-4 w-4 rotate-90 rounded-full border border-[var(--uki-cyan-border)] p-0.5 text-[var(--uki-cyan)]" />
             </div>
-            <Amount label="You receive (UKI)" value="1,000,000" token="UKI" />
+            <Amount label="You receive" value="Quoted UKI" token="UKI" />
+            <p className="text-center text-[0.62rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+              ASM rate is fixed when presale opens
+            </p>
             <PresaleLockBadge className="mt-2 w-full justify-center" />
           </div>
         ) : null}
@@ -392,7 +395,7 @@ function AfterPresale() {
                     After presale: <span className="text-[var(--uki-cyan)]">Cukie Master coming next</span>
                   </>
                 }
-                subtitle="More utility. More rewards. More ways to grow."
+                subtitle="Slots, credits and pools open after presale."
               />
               <span className="w-fit rounded-[4px] border border-[#ef5f8f]/55 bg-[#2a0d1a]/75 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#ff75aa]">
                 Phase 02
@@ -468,7 +471,7 @@ function Games() {
           <div className="uki-game-overview rounded-[10px] border border-white/10 bg-[#02090d]/62 p-5">
             <h3 className="font-headline text-xl font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)]">Game overview</h3>
             <ul className="mt-5 space-y-4 text-sm font-semibold text-[var(--uki-text)]">
-              {['Use credits to enter', 'Hunt treasures and earn rewards', 'Climb the weekly rankings'].map((item) => (
+              {['Use credits to enter', 'Hunt treasures and submit scores', 'Climb the weekly rankings'].map((item) => (
                 <li key={item} className="flex items-center gap-3">
                   <Check className="h-4 w-4 rounded-full bg-[var(--uki-cyan)] p-0.5 text-[#02090d]" strokeWidth={2} />
                   {item}
@@ -478,7 +481,7 @@ function Games() {
             <div className="mt-8 grid grid-cols-3 gap-3 border-t border-white/10 pt-5">
               <GameMetric label="Entry cost" value="10" helper="Credits" />
               <GameMetric label="Rankings" value="Weekly" helper="Resets" />
-              <GameMetric label="Top reward" value="UKI +" helper="Credits" />
+              <GameMetric label="Settlement" value="Rules" helper="Based" />
             </div>
           </div>
         </div>
@@ -541,7 +544,9 @@ function FaqAndCta() {
             <h2 className="font-headline text-3xl font-black uppercase leading-[0.98] text-[var(--uki-cream)] sm:text-4xl">
               Be part of the next Cukies chapter
             </h2>
-            <p className="mt-3 max-w-sm text-sm font-semibold leading-snug text-[var(--uki-text)]">UKI Presale opens on {UKI_PRESALE_START_LABEL}. Do not miss your chance.</p>
+            <p className="mt-3 max-w-sm text-sm font-semibold leading-snug text-[var(--uki-text)]">
+              UKI Presale opens on {UKI_PRESALE_START_LABEL}. Review the sale details before it opens.
+            </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <PresaleGateLink href="#presale-console">Join UKI presale</PresaleGateLink>
               <LandingButton href="#token" variant="secondary">
