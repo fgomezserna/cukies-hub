@@ -2,9 +2,6 @@ import 'server-only';
 
 import { Db, MongoClient } from 'mongodb';
 
-const INDEXER_MONGO_URL = process.env.CHAIN_INDEXER_MONGO_URL ?? process.env.DATABASE_URL;
-const INDEXER_DB_NAME = process.env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new';
-
 declare global {
   // eslint-disable-next-line no-var
   var mongoIndexerClient: MongoClient | undefined;
@@ -12,39 +9,57 @@ declare global {
   var mongoIndexerDb: Db | undefined;
 }
 
+function getIndexerMongoUrl() {
+  return process.env.CHAIN_INDEXER_MONGO_URL ?? process.env.DATABASE_URL;
+}
+
 function createIndexerClient() {
-  if (!INDEXER_MONGO_URL) {
+  const mongoUrl = getIndexerMongoUrl();
+
+  if (!mongoUrl) {
     throw new Error('Falta CHAIN_INDEXER_MONGO_URL o DATABASE_URL para el viewer del indexer.');
   }
 
-  const client = new MongoClient(INDEXER_MONGO_URL);
+  const client = new MongoClient(mongoUrl);
   return {
     client,
-    db: client.db(INDEXER_DB_NAME),
+    db: client.db(getIndexerDbName()),
   };
 }
 
-let mongoIndexerClient: MongoClient;
-let mongoIndexerDb: Db;
+let mongoIndexerClient: MongoClient | undefined;
+let mongoIndexerDb: Db | undefined;
 
-if (process.env.NODE_ENV === 'production') {
-  const connection = createIndexerClient();
-  mongoIndexerClient = connection.client;
-  mongoIndexerDb = connection.db;
-} else {
+function getConnection() {
+  if (process.env.NODE_ENV === 'production') {
+    if (!mongoIndexerClient || !mongoIndexerDb) {
+      const connection = createIndexerClient();
+      mongoIndexerClient = connection.client;
+      mongoIndexerDb = connection.db;
+    }
+
+    return {
+      client: mongoIndexerClient,
+      db: mongoIndexerDb,
+    };
+  }
+
   if (!global.mongoIndexerClient || !global.mongoIndexerDb) {
     const connection = createIndexerClient();
     global.mongoIndexerClient = connection.client;
     global.mongoIndexerDb = connection.db;
   }
 
-  mongoIndexerClient = global.mongoIndexerClient;
-  mongoIndexerDb = global.mongoIndexerDb;
+  return {
+    client: global.mongoIndexerClient,
+    db: global.mongoIndexerDb,
+  };
 }
 
 async function ensureConnection() {
-  await mongoIndexerClient.connect();
-  return mongoIndexerDb;
+  const connection = getConnection();
+  await connection.client.connect();
+  return connection.db;
 }
 
 export async function getIndexerDb() {
@@ -52,5 +67,5 @@ export async function getIndexerDb() {
 }
 
 export function getIndexerDbName() {
-  return INDEXER_DB_NAME;
+  return process.env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new';
 }

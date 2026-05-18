@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { distributeReferralXp } from '@/lib/referrals';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
@@ -10,11 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Wallet address and Quest ID are required' }, { status: 400 });
     }
 
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
     const user = await prisma.user.findUnique({
-      where: { walletAddress },
+      where: { id: authenticatedUser.id },
       include: { completedQuests: true, completedTasks: true }
     });
-    
+
     if (!user) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
 
     const userCompletedTaskIds = new Set(user.completedTasks.map(t => t.taskId));
     const questTaskIds = quest.tasks.map(t => t.id);
-    
+
     const allTasksCompleted = questTaskIds.every(taskId => userCompletedTaskIds.has(taskId));
 
     if (!allTasksCompleted) {
@@ -97,4 +99,4 @@ export async function POST(request: Request) {
     console.error('Quest claim error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-} 
+}

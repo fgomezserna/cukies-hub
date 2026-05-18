@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { distributeReferralXp } from '@/lib/referrals';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 // Helper to check if two dates are on the same calendar day
 const isSameDay = (d1: Date, d2: Date) =>
@@ -20,13 +21,14 @@ export async function POST(request: Request) {
     const { walletAddress, amount } = await request.json();
 
     if (!walletAddress || !amount || typeof amount !== 'number') {
-      return NextResponse.json({ 
-        error: 'Wallet address and amount are required' 
+      return NextResponse.json({
+        error: 'Wallet address and amount are required'
       }, { status: 400 });
     }
 
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
     const user = await prisma.user.findUnique({
-      where: { walletAddress },
+      where: { id: authenticatedUser.id },
       include: {
         lastCheckIn: true,
         dailyCheckIns: {
@@ -43,13 +45,13 @@ export async function POST(request: Request) {
     const today = new Date();
 
     // Check if user has already claimed today
-    const todayCheckIn = user.dailyCheckIns.find(checkIn => 
+    const todayCheckIn = user.dailyCheckIns.find(checkIn =>
       isSameDay(new Date(checkIn.date), today)
     );
 
     if (todayCheckIn) {
-      return NextResponse.json({ 
-        error: 'Daily drop already claimed today' 
+      return NextResponse.json({
+        error: 'Daily drop already claimed today'
       }, { status: 400 });
     }
 
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     let newStreakDays = 1;
     if (user.lastCheckIn) {
       const lastCheckInDate = new Date(user.lastCheckIn.lastCheckIn);
-      
+
       if (isYesterday(lastCheckInDate)) {
         // Continue streak
         newStreakDays = user.lastCheckIn.days + 1;
@@ -98,7 +100,7 @@ export async function POST(request: Request) {
         }
       }),
       // Update or create streak record
-      user.lastCheckIn 
+      user.lastCheckIn
         ? prisma.streak.update({
             where: { userId: user.id },
             data: {
@@ -136,4 +138,4 @@ export async function POST(request: Request) {
     console.error('Daily claim error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-} 
+}

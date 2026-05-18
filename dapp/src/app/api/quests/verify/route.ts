@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
     const { walletAddress, taskId, type, value } = await request.json();
 
     if (!walletAddress || !taskId || !type) {
-      return NextResponse.json({ 
-        error: 'Wallet address, task ID, and type are required' 
+      return NextResponse.json({
+        error: 'Wallet address, task ID, and type are required'
       }, { status: 400 });
     }
 
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
+
     // Find user
     const user = await prisma.user.findUnique({
-      where: { walletAddress },
+      where: { id: authenticatedUser.id },
     });
 
     if (!user) {
@@ -41,9 +44,9 @@ export async function POST(request: Request) {
     });
 
     if (existingCompletion) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Task already completed',
-        completed: true 
+        completed: true
       }, { status: 400 });
     }
 
@@ -55,38 +58,38 @@ export async function POST(request: Request) {
       case 'username':
         // Check if user already has a custom username (not their wallet address)
         const hasCustomUsername = user.username && user.username !== user.walletAddress;
-        
+
         // If user already has a custom username and they're trying to verify it
         if (hasCustomUsername && value === user.username) {
           // Just mark the task as completed, no need to update anything
           verificationResult = true;
           break;
         }
-        
+
         // If user already has a custom username but trying to set a different one
         if (hasCustomUsername && value !== user.username) {
-          return NextResponse.json({ 
-            error: 'Username can only be set once and cannot be modified' 
+          return NextResponse.json({
+            error: 'Username can only be set once and cannot be modified'
           }, { status: 400 });
         }
 
         if (!value || typeof value !== 'string' || value.trim().length < 3) {
-          return NextResponse.json({ 
-            error: 'Username must be at least 3 characters long' 
+          return NextResponse.json({
+            error: 'Username must be at least 3 characters long'
           }, { status: 400 });
         }
-        
+
         // Check if username already exists
         const existingUser = await prisma.user.findUnique({
           where: { username: value.trim() },
         });
-        
+
         if (existingUser && existingUser.id !== user.id) {
-          return NextResponse.json({ 
-            error: 'Username already taken' 
+          return NextResponse.json({
+            error: 'Username already taken'
           }, { status: 400 });
         }
-        
+
         updateData.username = value.trim();
         // Note: isUsernameSet is inferred from username existence for compatibility
         verificationResult = true;
@@ -101,22 +104,22 @@ export async function POST(request: Request) {
         }
 
         if (!value || !isValidEmail(value)) {
-          return NextResponse.json({ 
-            error: 'Valid email is required' 
+          return NextResponse.json({
+            error: 'Valid email is required'
           }, { status: 400 });
         }
-        
+
         // Check if email already exists
         const existingEmail = await prisma.user.findFirst({
           where: { email: value },
         });
-        
+
         if (existingEmail && existingEmail.id !== user.id) {
-          return NextResponse.json({ 
-            error: 'Email already registered' 
+          return NextResponse.json({
+            error: 'Email already registered'
           }, { status: 400 });
         }
-        
+
         // For new emails, they should be verified through the email verification system
         // This path should only be reached if the email was verified through our verification flow
         // The actual email update happens in the /api/email/verify-code endpoint
@@ -133,11 +136,11 @@ export async function POST(request: Request) {
         }
 
         if (!value || typeof value !== 'string') {
-          return NextResponse.json({ 
-            error: 'Profile picture URL is required' 
+          return NextResponse.json({
+            error: 'Profile picture URL is required'
           }, { status: 400 });
         }
-        
+
         updateData.profilePictureUrl = value;
         verificationResult = true;
         break;
@@ -145,11 +148,11 @@ export async function POST(request: Request) {
       case 'discord_connect':
         // For Discord connection, we just link the user's Discord account
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
-          return NextResponse.json({ 
-            error: 'Discord username is required.' 
+          return NextResponse.json({
+            error: 'Discord username is required.'
           }, { status: 400 });
         }
-        
+
         // Store the Discord username (already verified via OAuth)
         updateData.discordUsername = value.trim();
         verificationResult = true;
@@ -165,7 +168,7 @@ export async function POST(request: Request) {
 
         if (!membershipResponse.ok) {
           const membershipData = await membershipResponse.json();
-          return NextResponse.json({ 
+          return NextResponse.json({
             error: membershipData.error,
             requiresConnection: membershipData.requiresConnection,
             requiresReconnection: membershipData.requiresReconnection,
@@ -177,13 +180,13 @@ export async function POST(request: Request) {
         break;
 
       case 'twitter_connect':
-        // For Twitter connect, we just link the user's Twitter account  
+        // For Twitter connect, we just link the user's Twitter account
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
-          return NextResponse.json({ 
-            error: 'Twitter username is required.' 
+          return NextResponse.json({
+            error: 'Twitter username is required.'
           }, { status: 400 });
         }
-        
+
         // Store the Twitter handle (already verified via OAuth)
         updateData.twitterHandle = value.trim().replace(/^@/, '');
         verificationResult = true;
@@ -192,26 +195,26 @@ export async function POST(request: Request) {
       case 'twitter_follow':
         // For Twitter follow, we verify the user is following us by checking the TwitterFollower collection
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
-          return NextResponse.json({ 
-            error: 'Twitter username is required.' 
+          return NextResponse.json({
+            error: 'Twitter username is required.'
           }, { status: 400 });
         }
-        
+
         const twitterUsername = value.trim().replace(/^@/, '').toLowerCase();
-        
+
         // Check if this user is in our followers collection
         const follower = await prisma.twitterFollower.findUnique({
           where: {
             twitterUsername: twitterUsername
           }
         });
-        
+
         if (!follower) {
-          return NextResponse.json({ 
-            error: 'You are not following us on X/Twitter. Please follow us first and try again.' 
+          return NextResponse.json({
+            error: 'You are not following us on X/Twitter. Please follow us first and try again.'
           }, { status: 403 });
         }
-        
+
         // Store the Twitter handle and mark as verified
         updateData.twitterHandle = twitterUsername;
         verificationResult = true;
@@ -232,8 +235,8 @@ export async function POST(request: Request) {
       case 'telegram_join':
         // Verify Telegram membership using verification code
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
-          return NextResponse.json({ 
-            error: 'Verification code is required' 
+          return NextResponse.json({
+            error: 'Verification code is required'
           }, { status: 400 });
         }
 
@@ -241,9 +244,9 @@ export async function POST(request: Request) {
           // Use direct verification function instead of HTTP call
           const { verifyTelegramByCode } = await import('@/lib/telegram-utils');
           const telegramResult = await verifyTelegramByCode(user.walletAddress, value.trim());
-          
+
           if (!telegramResult.success) {
-            return NextResponse.json({ 
+            return NextResponse.json({
               error: telegramResult.error || 'Failed to verify Telegram membership'
             }, { status: telegramResult.status });
           }
@@ -252,8 +255,8 @@ export async function POST(request: Request) {
           verificationResult = true;
         } catch (error) {
           console.error('Telegram verification error:', error);
-          return NextResponse.json({ 
-            error: 'Failed to verify Telegram membership. Please try again.' 
+          return NextResponse.json({
+            error: 'Failed to verify Telegram membership. Please try again.'
           }, { status: 500 });
         }
         break;
@@ -264,14 +267,14 @@ export async function POST(request: Request) {
         break;
 
       default:
-        return NextResponse.json({ 
-          error: 'Unknown verification type' 
+        return NextResponse.json({
+          error: 'Unknown verification type'
         }, { status: 400 });
     }
 
     if (!verificationResult) {
-      return NextResponse.json({ 
-        error: 'Verification failed' 
+      return NextResponse.json({
+        error: 'Verification failed'
       }, { status: 400 });
     }
 
@@ -301,8 +304,8 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Task verification error:', error);
-    return NextResponse.json({ 
-      error: 'Internal Server Error' 
+    return NextResponse.json({
+      error: 'Internal Server Error'
     }, { status: 500 });
   }
 }
@@ -310,4 +313,4 @@ export async function POST(request: Request) {
 function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
-} 
+}

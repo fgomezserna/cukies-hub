@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "tsx src/cli.ts run",
     "run": "tsx src/cli.ts run",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js run",
+    "setup:prod": "node dist/cli.js setup",
     "setup": "tsx src/cli.ts setup",
     "status": "tsx src/cli.ts status",
     "ingest:once": "tsx src/cli.ts ingest-once",

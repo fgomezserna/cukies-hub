@@ -6,29 +6,90 @@ import { findOrSyncUserFromCukies } from '@/lib/user-sync';
 import { createUserDirectly } from '@/lib/mongodb-hub';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 import { cookies } from 'next/headers';
+import {
+  clearWalletChallengeCookie,
+  readWalletChallenge,
+  readWalletSession,
+  resolveWalletType,
+  setWalletSessionCookie,
+  verifyWalletSignature,
+  walletSessionMatchesAddress,
+} from '@/lib/wallet-auth';
+import { ensureHubWalletForLogin } from '@/lib/user-wallets';
+
+const userIncludes = {
+  lastCheckIn: true,
+  completedQuests: {
+    include: {
+      quest: true,
+    },
+  },
+} as const;
 
 export async function POST(request: Request) {
   try {
-    const { walletAddress } = await request.json();
+    const { walletAddress, walletType, message, signature } = await request.json();
 
     if (!walletAddress || typeof walletAddress !== 'string') {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
     }
 
     const normalizedAddress = normalizeWalletAddress(walletAddress);
+    const resolvedWalletType = resolveWalletType(normalizedAddress, walletType);
+
+    const existingSession = await readWalletSession();
+
+    if (existingSession && walletSessionMatchesAddress(existingSession, normalizedAddress)) {
+      const sessionUser = await prisma.user.findUnique({
+        where: { id: existingSession.userId },
+        include: userIncludes,
+      });
+
+      if (sessionUser) {
+        return NextResponse.json(sessionUser);
+      }
+    }
+
+    if (typeof message !== 'string' || typeof signature !== 'string') {
+      return NextResponse.json(
+        { error: 'Wallet signature is required', requiresSignature: true },
+        { status: 401 },
+      );
+    }
+
+    const challenge = await readWalletChallenge();
+
+    if (
+      !challenge ||
+      challenge.walletAddress !== normalizedAddress ||
+      challenge.walletType !== resolvedWalletType ||
+      challenge.message !== message
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid or expired wallet challenge', requiresSignature: true },
+        { status: 401 },
+      );
+    }
+
+    const isSignatureValid = await verifyWalletSignature({
+      walletAddress: normalizedAddress,
+      walletType: resolvedWalletType,
+      message,
+      signature,
+    });
+
+    if (!isSignatureValid) {
+      return NextResponse.json(
+        { error: 'Invalid wallet signature', requiresSignature: true },
+        { status: 401 },
+      );
+    }
 
     let user = await prisma.user.findUnique({
       where: {
         walletAddress: normalizedAddress,
       },
-      include: {
-        lastCheckIn: true,
-        completedQuests: {
-          include: {
-            quest: true,
-          },
-        },
-      },
+      include: userIncludes,
     });
 
     if (!user) {
@@ -76,14 +137,7 @@ export async function POST(request: Request) {
             where: {
                 id: newUserId,
             },
-            include: {
-                lastCheckIn: true,
-                completedQuests: {
-                    include: {
-                        quest: true
-                    }
-                }
-            }
+            include: userIncludes
           });
         }
       } catch (createError) {
@@ -94,14 +148,7 @@ export async function POST(request: Request) {
             where: {
               walletAddress: normalizedAddress,
             },
-            include: {
-              lastCheckIn: true,
-              completedQuests: {
-                include: {
-                  quest: true,
-                },
-              },
-            },
+            include: userIncludes,
           });
           
           if (!user) {
@@ -113,6 +160,19 @@ export async function POST(request: Request) {
         }
       }
     }
+
+    if (!user) {
+      throw new Error('Usuario no encontrado despues de login');
+    }
+
+    await ensureHubWalletForLogin(user.id, normalizedAddress, resolvedWalletType);
+    await setWalletSessionCookie({
+      userId: user.id,
+      walletAddress: user.walletAddress,
+      signedWalletAddress: normalizedAddress,
+      walletType: resolvedWalletType,
+    });
+    await clearWalletChallengeCookie();
 
     return NextResponse.json(user);
   } catch (error) {

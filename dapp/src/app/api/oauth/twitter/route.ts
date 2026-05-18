@@ -1,48 +1,51 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
     const { code, walletAddress, codeVerifier } = await request.json();
 
     if (!code || !walletAddress || !codeVerifier) {
-      return NextResponse.json({ 
-        error: 'Code, code verifier and wallet address are required' 
+      return NextResponse.json({
+        error: 'Code, code verifier and wallet address are required'
       }, { status: 400 });
     }
 
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
+
     // Find user by wallet address
-    const user = await prisma.user.findUnique({ where: { walletAddress } });
+    const user = await prisma.user.findUnique({ where: { id: authenticatedUser.id } });
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Get the correct redirect URI (match frontend logic)
     let baseUrl = process.env.NEXTAUTH_URL;
-    
+
     if (!baseUrl && process.env.VERCEL_URL) {
       // VERCEL_URL might not include protocol, ensure it has https://
-      baseUrl = process.env.VERCEL_URL.startsWith('http') 
-        ? process.env.VERCEL_URL 
+      baseUrl = process.env.VERCEL_URL.startsWith('http')
+        ? process.env.VERCEL_URL
         : `https://${process.env.VERCEL_URL}`;
     }
-    
+
     if (!baseUrl) {
       baseUrl = 'http://localhost:3000';
     }
-    
+
     // Remove trailing slash to avoid double slashes
     baseUrl = baseUrl.replace(/\/$/, '');
-    
+
     const redirectUri = `${baseUrl}/oauth/twitter/callback.html`;
-    
+
     console.log(`[Twitter OAuth] Environment check:`, {
       NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'not set',
       VERCEL_URL: process.env.VERCEL_URL || 'not set',
       finalBaseUrl: baseUrl,
       redirectUri: redirectUri
     });
-    
+
     // Exchange code for access token (Twitter OAuth 2.0 with PKCE)
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
         code: code?.substring(0, 20) + '...',
         codeVerifier: codeVerifier?.substring(0, 20) + '...'
       });
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Failed to exchange code for token',
         details: error,
         redirectUri: redirectUri,
@@ -90,8 +93,8 @@ export async function POST(request: Request) {
     if (!userResponse.ok) {
       const error = await userResponse.text();
       console.error('Twitter user fetch failed:', error);
-      return NextResponse.json({ 
-        error: 'Failed to get user info from Twitter' 
+      return NextResponse.json({
+        error: 'Failed to get user info from Twitter'
       }, { status: 400 });
     }
 
@@ -137,7 +140,7 @@ export async function POST(request: Request) {
     // Update user's Twitter data
     await prisma.user.update({
       where: { id: user.id },
-      data: { 
+      data: {
         twitterHandle: twitterUser.username.toLowerCase(),
         twitterName: twitterUser.name,
         twitterId: twitterUser.id,
@@ -157,8 +160,8 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Twitter OAuth error:', error);
-    return NextResponse.json({ 
-      error: 'Internal Server Error' 
+    return NextResponse.json({
+      error: 'Internal Server Error'
     }, { status: 500 });
   }
-} 
+}

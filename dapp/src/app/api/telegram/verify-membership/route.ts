@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyTelegramMembership } from '@/lib/telegram-utils';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,11 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const result = await verifyTelegramMembership(telegramUsername, walletAddress);
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
+    const result = await verifyTelegramMembership(
+      telegramUsername,
+      authenticatedUser.walletAddress,
+    );
     
     if (!result.success) {
       return NextResponse.json({ 

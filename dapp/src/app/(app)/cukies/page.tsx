@@ -14,6 +14,8 @@ import {
 
 import { listCukiePoints, listCukies } from '@/lib/cukies-data/data';
 
+export const dynamic = 'force-dynamic';
+
 const tools = [
   {
     title: 'Marketplace',

@@ -136,6 +136,36 @@ Required environment variables in `dapp/.env.local`:
 - `IFTTT_WEBHOOK_SECRET` - Webhook integration
 - `GAME_SYBILSLASH` - Game URL configuration
 
+## Coolify Deployment
+
+The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through Traefik/Cloudflare.
+
+- Live integration app:
+  - Coolify resource: `game-hub`
+  - UUID: `jookw8ow8woks088s44404ok`
+  - Branch: `main`
+  - Public URL: `https://cukieshub.eurekand.com`
+- Production placeholder:
+  - Coolify resource: `game-hub-production`
+  - UUID: `u4s804o4wwcckowgk0woo4wg`
+  - Branch: `production`
+
+Use `docker-compose.coolify.yml` for the new hub deployment. It defines:
+
+- `dapp`: public Next.js app on port `3000`.
+- `chain-indexer`: internal blockchain indexer worker.
+- `cuki-card-worker`: internal NFT card renderer/uploader worker.
+
+Operational rules:
+
+- Do not commit Coolify secrets, AWS keys, Mongo URLs, OAuth secrets, RPC keys or generated `.env` files.
+- Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
+- Before saying a worker is deployed, verify the actual Coolify resource is using `docker-compose.coolify.yml`, not a single Nixpacks app.
+- Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
+- Required shared variables for Coolify include `DATABASE_URL`, `CUKIES_DATABASE_URL`, `CHAIN_INDEXER_MONGO_URL`, `CHAIN_INDEXER_DB_NAME=cukieshub-new`, `CARD_WORKER_MONGO_URL`, `CARD_WORKER_DB_NAME=cukieshub-new`, `CARD_WORKER_UPLOAD=true`, S3 bucket/region/prefix/public base URL and AWS credentials.
+- Validate post-deploy with `/api/health`, `/indexer?collection=chain_indexer_runs`, `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`.
+- Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
+
 ## Testing
 
 The main dapp has comprehensive Jest tests covering:

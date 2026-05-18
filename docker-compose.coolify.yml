@@ -1,0 +1,93 @@
+services:
+  dapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CUKIES_SERVICE: dapp
+    environment:
+      CUKIES_SERVICE: dapp
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL}
+      CUKIES_DATABASE_URL: ${CUKIES_DATABASE_URL:-}
+      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      AUTH_URL: ${AUTH_URL:-}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_INVITE_URL: ${DISCORD_INVITE_URL:-}
+      TWITTER_CLIENT_ID: ${TWITTER_CLIENT_ID:-}
+      TWITTER_CLIENT_SECRET: ${TWITTER_CLIENT_SECRET:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_GROUP_INVITE: ${TELEGRAM_GROUP_INVITE:-}
+      NEXT_PUBLIC_TWITTER_PROFILE_URL: ${NEXT_PUBLIC_TWITTER_PROFILE_URL:-}
+      NEXT_PUBLIC_DISCORD_INVITE_URL: ${NEXT_PUBLIC_DISCORD_INVITE_URL:-}
+      IFTTT_WEBHOOK_SECRET: ${IFTTT_WEBHOOK_SECRET:-}
+      GAME_SYBILSLASH: ${GAME_SYBILSLASH:-}
+      NEXT_PUBLIC_PUSHER_KEY: ${NEXT_PUBLIC_PUSHER_KEY:-}
+      NEXT_PUBLIC_PUSHER_CLUSTER: ${NEXT_PUBLIC_PUSHER_CLUSTER:-}
+      PUSHER_APP_ID: ${PUSHER_APP_ID:-}
+      PUSHER_KEY: ${PUSHER_KEY:-}
+      PUSHER_SECRET: ${PUSHER_SECRET:-}
+      PUSHER_CLUSTER: ${PUSHER_CLUSTER:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+    ports:
+      - "3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  chain-indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CUKIES_SERVICE: chain-indexer
+    environment:
+      CUKIES_SERVICE: chain-indexer
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      CUKIES_DATABASE_URL: ${CUKIES_DATABASE_URL:-}
+      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
+      CHAIN_INDEXER_CHAINS: ${CHAIN_INDEXER_CHAINS:-BSC,TRON}
+      CHAIN_INDEXER_BSC_RPC_URL: ${CHAIN_INDEXER_BSC_RPC_URL:-}
+      CHAIN_INDEXER_TRON_API_BASE_URL: ${CHAIN_INDEXER_TRON_API_BASE_URL:-https://api.trongrid.io/v1}
+      TRON_API_KEY: ${TRON_API_KEY:-}
+      TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
+      CHAIN_INDEXER_POLL_INTERVAL_MS: ${CHAIN_INDEXER_POLL_INTERVAL_MS:-60000}
+    restart: unless-stopped
+
+  cuki-card-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CUKIES_SERVICE: cuki-card-worker
+    environment:
+      CUKIES_SERVICE: cuki-card-worker
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      CARD_WORKER_MONGO_URL: ${CARD_WORKER_MONGO_URL:-${DATABASE_URL}}
+      CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new}
+      CARD_WORKER_UPLOAD: ${CARD_WORKER_UPLOAD:-true}
+      CARD_WORKER_PUBLIC_BASE_URL: ${CARD_WORKER_PUBLIC_BASE_URL}
+      CARD_WORKER_S3_BUCKET: ${CARD_WORKER_S3_BUCKET}
+      CARD_WORKER_S3_REGION: ${CARD_WORKER_S3_REGION}
+      CARD_WORKER_S3_PREFIX: ${CARD_WORKER_S3_PREFIX}
+      CARD_WORKER_S3_ACL: ${CARD_WORKER_S3_ACL:-public-read}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION:-${CARD_WORKER_S3_REGION}}
+    restart: unless-stopped

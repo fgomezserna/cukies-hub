@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 // Generate a unique 6-digit code
 function generateVerificationCode(): string {
@@ -16,9 +17,11 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
+
     // Find the user
     const user = await prisma.user.findUnique({
-      where: { walletAddress }
+      where: { id: authenticatedUser.id }
     });
 
     if (!user) {

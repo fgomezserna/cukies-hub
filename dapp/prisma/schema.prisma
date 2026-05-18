@@ -61,6 +61,35 @@ model User {
   // Chat relations
   chatMessages    ChatMessage[]
   chatRoomMembers ChatRoomMember[]
+
+  // Wallets linked to this account, including imported legacy wallets.
+  wallets UserWallet[]
+}
+
+model UserWallet {
+  id                  String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String      @db.ObjectId
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address             String
+  normalizedAddress   String      @unique
+  chain               WalletChain @default(UNKNOWN)
+  legacyWalletId      String?
+  legacyUserId        String?
+  isPrimary           Boolean     @default(false)
+  lastAuthenticatedAt DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([legacyUserId])
+}
+
+enum WalletChain {
+  BSC
+  TRON
+  SAAKURU
+  EVM
+  UNKNOWN
 }
 
 // Game Session model

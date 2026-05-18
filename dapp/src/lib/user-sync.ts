@@ -2,6 +2,14 @@ import { cukiesDb } from './mongodb-cukies';
 import { prisma } from './prisma';
 import { createUserDirectly } from './mongodb-hub';
 import { normalizeWalletAddress } from './wallet-address';
+import {
+  findHubUserIdByLegacyWallets,
+  syncHubWalletsFromLegacyUser,
+} from './user-wallets';
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
  * Busca un usuario en la BD cukies por wallet address
@@ -18,7 +26,7 @@ export async function findUserInCukiesDb(walletAddress: string) {
       $or: [
         { address: normalizedAddress },
         { address: walletAddress }, // También buscar sin normalizar
-        { address: { $regex: new RegExp(`^${walletAddress}$`, 'i') } }
+        { address: { $regex: new RegExp(`^${escapeRegex(walletAddress)}$`, 'i') } }
       ]
     });
 
@@ -29,7 +37,10 @@ export async function findUserInCukiesDb(walletAddress: string) {
     // Si encontramos el wallet, buscar el usuario que lo tiene en su array de wallets
     const usersCollection = await cukiesDb.users();
     const user = await usersCollection.findOne({
-      wallets: wallet._id.toString()
+      $or: [
+        { wallets: wallet._id },
+        { wallets: wallet._id.toString() },
+      ],
     });
 
     return user;
@@ -50,14 +61,43 @@ export async function syncUserFromCukiesDb(
     // Normalizar address: TRON addresses (T...) se mantienen en mayúsculas, BSC (0x...) en minúsculas
     const normalizedAddress = normalizeWalletAddress(walletAddress);
 
-    // Verificar si el usuario ya existe en cukies-hub
-    const existingUser = await prisma.user.findUnique({
+    const legacyUserId = cukiesUser?._id ? String(cukiesUser._id) : null;
+
+    // Verificar si el usuario ya existe en cukies-hub por la wallet actual.
+    let existingUser = await prisma.user.findUnique({
       where: { walletAddress: normalizedAddress },
     });
 
+    // Si ya se importo otra wallet del mismo usuario legacy, reutilizamos ese usuario.
+    if (!existingUser) {
+      const linkedUserId = await findHubUserIdByLegacyWallets({
+        legacyUserId,
+        walletAddresses: [normalizedAddress],
+      });
+
+      if (linkedUserId) {
+        existingUser = await prisma.user.findUnique({
+          where: { id: linkedUserId },
+        });
+      }
+    }
+
+    // Compatibilidad con usuarios sincronizados antes de crear UserWallet.
+    if (!existingUser && cukiesUser.username) {
+      existingUser = await prisma.user.findUnique({
+        where: { username: cukiesUser.username },
+      });
+    }
+
+    if (!existingUser && cukiesUser.email) {
+      existingUser = await prisma.user.findFirst({
+        where: { email: cukiesUser.email },
+      });
+    }
+
     // Preparar datos para sincronizar
     const syncData: any = {
-      walletAddress: normalizedAddress,
+      ...(existingUser ? {} : { walletAddress: normalizedAddress }),
     };
 
     // Sincronizar username si existe y no está ya establecido
@@ -67,7 +107,7 @@ export async function syncUserFromCukiesDb(
         where: { username: cukiesUser.username },
       });
 
-      if (!usernameExists) {
+      if (!usernameExists || usernameExists.id === existingUser?.id) {
         syncData.username = cukiesUser.username;
         syncData.isUsernameSet = true;
       }
@@ -79,7 +119,9 @@ export async function syncUserFromCukiesDb(
       const emailExists = await prisma.user.findFirst({
         where: {
           email: cukiesUser.email,
-          walletAddress: { not: normalizedAddress },
+          ...(existingUser
+            ? { NOT: { id: existingUser.id } }
+            : { walletAddress: { not: normalizedAddress } }),
         },
       });
 
@@ -98,19 +140,39 @@ export async function syncUserFromCukiesDb(
     }
 
     if (existingUser) {
-      // Actualizar usuario existente
-      return await prisma.user.update({
-        where: { walletAddress: normalizedAddress },
-        data: syncData,
-        include: {
-          lastCheckIn: true,
-          completedQuests: {
-            include: {
-              quest: true,
-            },
-          },
-        },
-      });
+      const updatedUser =
+        Object.keys(syncData).length > 0
+          ? await prisma.user.update({
+              where: { id: existingUser.id },
+              data: syncData,
+              include: {
+                lastCheckIn: true,
+                completedQuests: {
+                  include: {
+                    quest: true,
+                  },
+                },
+              },
+            })
+          : await prisma.user.findUnique({
+              where: { id: existingUser.id },
+              include: {
+                lastCheckIn: true,
+                completedQuests: {
+                  include: {
+                    quest: true,
+                  },
+                },
+              },
+            });
+
+      if (!updatedUser) {
+        throw new Error('Usuario legacy enlazado no encontrado en cukies-hub');
+      }
+
+      await syncHubWalletsFromLegacyUser(updatedUser.id, cukiesUser, normalizedAddress);
+
+      return updatedUser;
     } else {
       // Crear nuevo usuario con datos sincronizados usando MongoDB directamente
       // Si no hay username, usar el wallet address (normalizado)
@@ -128,7 +190,7 @@ export async function syncUserFromCukiesDb(
       });
 
       // Fetch the created user with Prisma to get the full object with relations
-      return await prisma.user.findUnique({
+      const createdUser = await prisma.user.findUnique({
         where: { id: newUserId },
         include: {
           lastCheckIn: true,
@@ -139,6 +201,12 @@ export async function syncUserFromCukiesDb(
           },
         },
       });
+
+      if (createdUser) {
+        await syncHubWalletsFromLegacyUser(createdUser.id, cukiesUser, normalizedAddress);
+      }
+
+      return createdUser;
     }
   } catch (error) {
     console.error('Error sincronizando usuario desde BD cukies:', error);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
         error: 'Telegram bot configuration missing' 
       }, { status: 500 });
     }
+
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
 
     // Check if user is member of the chat
     const membershipResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getChatMember`, {
@@ -66,9 +69,7 @@ export async function POST(request: Request) {
           { telegramUsername: telegramUsername || '' },
           // We could add telegramId field to the schema if needed
         ],
-        walletAddress: {
-          not: walletAddress
-        }
+        id: { not: authenticatedUser.id }
       }
     });
 
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
 
     // Update user's telegram info
     await prisma.user.update({
-      where: { walletAddress },
+      where: { id: authenticatedUser.id },
       data: { 
         telegramUsername: telegramUsername || `user_${telegramId}` // fallback if no username
       }

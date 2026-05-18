@@ -29,6 +29,7 @@ const preferredCollections = [
   'chain_cursors',
   'chain_indexer_runs',
   'chain_dead_letters',
+  'card_generation_jobs',
   'cukies',
   'tx_nfts',
   'point_transactions',
@@ -85,6 +86,7 @@ function buildSearchFilter(q: string) {
 function sortForCollection(collection: string): Sort {
   if (collection === 'chain_cursors') return { updatedAt: -1 };
   if (collection === 'chain_indexer_runs') return { startedAt: -1 };
+  if (collection === 'card_generation_jobs') return { createdAt: -1 };
   if (collection === 'chain_events') return { timestampMs: -1, blockNumber: -1, logIndex: -1 };
   return { updatedAt: -1, timestampMs: -1, createdAt: -1 };
 }

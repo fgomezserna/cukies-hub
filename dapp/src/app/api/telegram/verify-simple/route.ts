@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
         error: 'Telegram bot configuration missing' 
       }, { status: 500 });
     }
+
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
 
     // Get recent messages from the group to find the verification code
     const updatesResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates`);
@@ -53,9 +56,7 @@ export async function POST(request: Request) {
     const existingUser = await prisma.user.findFirst({
       where: {
         telegramUsername: telegramUser.username || `user_${telegramUser.id}`,
-        walletAddress: {
-          not: walletAddress
-        }
+        id: { not: authenticatedUser.id }
       }
     });
 
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
 
     // Update user's telegram info
     await prisma.user.update({
-      where: { walletAddress },
+      where: { id: authenticatedUser.id },
       data: { 
         telegramUsername: telegramUser.username || `user_${telegramUser.id}`
       }

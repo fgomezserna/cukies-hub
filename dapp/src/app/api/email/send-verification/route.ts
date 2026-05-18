@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { resend, EMAIL_CONFIG } from '@/lib/resend';
+import { getResendClient, EMAIL_CONFIG } from '@/lib/resend';
 import { createVerificationEmailTemplate, createVerificationEmailSubject } from '@/lib/email-templates';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -28,9 +29,11 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
+
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { walletAddress }
+      where: { id: authenticatedUser.id }
     });
 
     if (!user) {
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
     const existingUser = await prisma.user.findFirst({
       where: { 
         email: email,
-        walletAddress: { not: walletAddress }
+        id: { not: authenticatedUser.id }
       }
     });
 
@@ -86,6 +89,7 @@ export async function POST(request: Request) {
     try {
       const emailHtml = createVerificationEmailTemplate(verificationCode);
       const emailSubject = createVerificationEmailSubject();
+      const resend = getResendClient();
 
       console.log('📨 Calling resend.emails.send...');
       const result = await resend.emails.send({

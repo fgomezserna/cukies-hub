@@ -1,15 +1,16 @@
 // Server-side utilities for wallet authentication
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
-import { normalizeWalletAddress } from '@/lib/wallet-address';
+import { readWalletSession, requireWalletSession } from '@/lib/wallet-auth';
 
 export async function verifyWalletAuth(walletAddress: string): Promise<any> {
   if (!walletAddress) {
     throw new Error('Wallet address is required');
   }
 
+  const session = await requireWalletSession(walletAddress);
   const user = await prisma.user.findUnique({
-    where: { walletAddress: normalizeWalletAddress(walletAddress) },
+    where: { id: session.userId },
     select: {
       id: true,
       walletAddress: true,
@@ -25,19 +26,25 @@ export async function verifyWalletAuth(walletAddress: string): Promise<any> {
   return user;
 }
 
-export async function getUserFromRequest(request: NextRequest): Promise<any> {
-  // Try to get wallet address from various sources
-  const walletAddress = 
-    request.headers.get('x-wallet-address') || 
-    request.headers.get('wallet-address') ||
-    request.cookies.get('walletAddress')?.value;
+export async function getUserFromRequest(_request: NextRequest): Promise<any> {
+  const session = await readWalletSession();
 
-  if (!walletAddress) {
+  if (!session) {
     return null;
   }
 
   try {
-    return await verifyWalletAuth(walletAddress);
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        id: true,
+        walletAddress: true,
+        username: true,
+        profilePictureUrl: true,
+      },
+    });
+
+    return user;
   } catch {
     return null;
   }

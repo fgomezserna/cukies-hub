@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 export async function POST(request: Request) {
   try {
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
         error: 'Email, verification code, and wallet address are required' 
       }, { status: 400 });
     }
+
+    const authenticatedUser = await verifyWalletAuth(walletAddress);
 
     // Find the verification record
     const verification = await prisma.emailVerification.findFirst({
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
 
     // Find the user
     const user = await prisma.user.findUnique({
-      where: { walletAddress }
+      where: { id: authenticatedUser.id }
     });
 
     if (!user) {
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
     await prisma.$transaction([
       // Update user with verified email
       prisma.user.update({
-        where: { walletAddress },
+        where: { id: user.id },
         data: { email }
       }),
       // Mark verification as used
