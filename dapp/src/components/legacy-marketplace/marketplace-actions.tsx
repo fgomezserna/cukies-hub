@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { formatEther, isAddress, parseEther } from 'viem';
-import { useAccount, useReadContract, useSwitchChain, useWriteContract } from 'wagmi';
+import {
+  useAccount,
+  useConnect,
+  useReadContract,
+  useSwitchChain,
+  useWriteContract,
+} from 'wagmi';
 import { Check, CircleDollarSign, RotateCcw, Tag, Wallet } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -37,6 +43,7 @@ function isSameWallet(left?: string | null, right?: string | null) {
 
 export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
   const { address, chainId, isConnected } = useAccount();
+  const { connectAsync, connectors, isPending: isConnectingWallet } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, isPending: isWriting } = useWriteContract();
   const {
@@ -57,6 +64,8 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
     ? isSameWallet(address, cuki.owner)
     : isSameWallet(tronAddress, cuki.owner);
   const isBscReady = isBsc && isConnected && chainId === 56;
+  const evmConnector =
+    connectors.find((connector) => connector.id === 'injected') ?? connectors[0];
 
   const { data: isApprovedForAll } = useReadContract({
     address: bscTokenAddress,
@@ -84,13 +93,39 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
     },
   });
 
+  async function connectBscWallet() {
+    if (!evmConnector) {
+      setStatus('Instala una wallet EVM como MetaMask para operar en BSC.');
+      return false;
+    }
+
+    try {
+      setStatus('Abriendo wallet EVM...');
+      const result = await connectAsync({ connector: evmConnector });
+      const connectedChainId = result.chainId ?? chainId;
+
+      if (connectedChainId !== 56) {
+        setStatus('Cambia la wallet a BNB Smart Chain para continuar.');
+        switchChain({ chainId: 56 });
+        return false;
+      }
+
+      setStatus('Wallet EVM conectada en BSC. Ya puedes continuar.');
+      return true;
+    } catch (error) {
+      setStatus(`No se pudo conectar la wallet EVM: ${getErrorMessage(error)}`);
+      return false;
+    }
+  }
+
   function ensureBsc() {
     if (!isBsc) return false;
     if (!isConnected) {
-      setStatus('Conecta una wallet EVM desde el header.');
+      setStatus('Conecta una wallet EVM antes de continuar.');
       return false;
     }
     if (chainId !== 56) {
+      setStatus('Cambia la wallet a BNB Smart Chain para continuar.');
       switchChain({ chainId: 56 });
       return false;
     }
@@ -257,7 +292,7 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
     }, 'Cancelando venta en TRON...');
   }
 
-  const disabled = isWriting || isSwitchingChain || isTronPending;
+  const disabled = isWriting || isSwitchingChain || isTronPending || isConnectingWallet;
 
   return (
     <div className="rounded-[8px] border border-white/10 bg-[#101b19]/90 p-5 shadow-xl shadow-black/25">
@@ -286,12 +321,23 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
       <div className="mt-5 grid gap-3">
         {isBsc && !isBscReady && (
           <Button
-            onClick={ensureBsc}
+            onClick={() => {
+              if (isConnected) {
+                ensureBsc();
+                return;
+              }
+
+              void connectBscWallet();
+            }}
             disabled={disabled}
             className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
           >
             <Wallet className="mr-2 h-4 w-4" />
-            {isConnected ? 'Switch to BSC' : 'Connect EVM wallet'}
+            {isConnectingWallet
+              ? 'Connecting wallet...'
+              : isConnected
+                ? 'Switch to BSC'
+                : 'Connect EVM wallet'}
           </Button>
         )}
 
