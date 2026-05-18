@@ -80,7 +80,7 @@ function getOriginDate(cuki: LegacyMarketplaceCukiItem) {
 }
 
 function formatHistoryPrice(entry: LegacyMarketplaceCukiHistoryEntry) {
-  if (!entry.price) return '-';
+  if (entry.price === null || entry.price <= 0) return '-';
 
   if (entry.network === 'TRON' || entry.to?.toLowerCase().startsWith('t')) {
     return `${entry.price.toLocaleString('en-US')} TRX`;
@@ -95,17 +95,80 @@ function formatHistoryPrice(entry: LegacyMarketplaceCukiHistoryEntry) {
   return entry.price.toLocaleString('en-US');
 }
 
-function formatHistoryActor(
-  entry: LegacyMarketplaceCukiHistoryEntry,
-  side: 'from' | 'to',
-) {
-  const value = side === 'from' ? entry.from : entry.to;
+function getHistoryLabel(entry: LegacyMarketplaceCukiHistoryEntry) {
+  switch (entry.type.toLowerCase()) {
+    case 'putonsale':
+    case 'tokenonsale':
+      return 'Put on sale';
+    case 'cancelsale':
+    case 'markettokensalecancelled':
+      return 'Sale cancelled';
+    case 'buy':
+    case 'tokenbought':
+      return 'Bought';
+    case 'breed':
+    case 'breedfinish':
+      return 'Bred';
+    case 'mint':
+      return 'Minted';
+    case 'bridge':
+    case 'jumpoutbridge':
+      return 'Bridge';
+    default:
+      return entry.type;
+  }
+}
 
-  if (value) return shortWallet(value);
-  if (side === 'from' && entry.type.toLowerCase() === 'mint') return 'Minted';
-  if (side === 'from' && entry.type.toLowerCase() === 'breed') return 'Bred';
+function getHistoryTransactionUrl(entry: LegacyMarketplaceCukiHistoryEntry) {
+  if (!entry.transactionId) return null;
+  if (entry.network === 'BSC') return `https://bscscan.com/tx/${entry.transactionId}`;
+  if (entry.network === 'TRON') {
+    return `https://tronscan.org/#/transaction/${entry.transactionId}`;
+  }
 
-  return '-';
+  return null;
+}
+
+function shortTransaction(transactionId: string) {
+  return `${transactionId.slice(0, 8)}...${transactionId.slice(-6)}`;
+}
+
+function getHistorySummary(entry: LegacyMarketplaceCukiHistoryEntry) {
+  const type = entry.type.toLowerCase();
+  const from = entry.from ? shortWallet(entry.from) : null;
+  const to = entry.to ? shortWallet(entry.to) : null;
+  const price = formatHistoryPrice(entry);
+
+  if (type === 'putonsale' || type === 'tokenonsale') {
+    return price !== '-'
+      ? `Listed for ${price}${from ? ` by ${from}` : ''}.`
+      : `Listed on marketplace${from ? ` by ${from}` : ''}.`;
+  }
+
+  if (type === 'cancelsale' || type === 'markettokensalecancelled') {
+    return 'Removed from marketplace.';
+  }
+
+  if (type === 'buy' || type === 'tokenbought') {
+    const actor = [from ? `from ${from}` : null, to ? `to ${to}` : null]
+      .filter(Boolean)
+      .join(' ');
+    return `Bought${actor ? ` ${actor}` : ''}${price !== '-' ? ` for ${price}` : ''}.`;
+  }
+
+  if (type === 'breed' || type === 'breedfinish') {
+    return `Created by breeding${to ? ` for ${to}` : ''}.`;
+  }
+
+  if (type === 'mint') {
+    return `Minted${to ? ` to ${to}` : ''}.`;
+  }
+
+  if (type === 'bridge' || type === 'jumpoutbridge') {
+    return `Moved through bridge${to ? ` to ${to}` : ''}.`;
+  }
+
+  return 'Indexed blockchain event.';
 }
 
 function InfoRow({
@@ -414,46 +477,53 @@ export default async function MarketplaceDetailPage({
             </div>
             <div className="grid gap-3">
               {history.length > 0 ? (
-                history.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-[8px] border border-white/10 bg-white/[0.03] p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="font-semibold text-white">{item.type}</p>
-                      <div className="inline-flex items-center gap-2 text-xs text-slate-400">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {formatLegacyDate(item.date)}
+                history.map((item) => {
+                  const transactionUrl = getHistoryTransactionUrl(item);
+                  const price = formatHistoryPrice(item);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-[8px] border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="font-semibold text-white">
+                          {getHistoryLabel(item)}
+                        </p>
+                        <div className="inline-flex items-center gap-2 text-xs text-slate-400">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          {formatLegacyDate(item.date)}
+                        </div>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-300">
+                        {getHistorySummary(item)}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        {item.network && (
+                          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 font-semibold text-cyan-100">
+                            {item.network}
+                          </span>
+                        )}
+                        {price !== '-' && (
+                          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 font-semibold text-emerald-100">
+                            {price}
+                          </span>
+                        )}
+                        {transactionUrl && item.transactionId && (
+                          <a
+                            href={transactionUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-slate-300 transition hover:border-cyan-300/30 hover:text-white"
+                          >
+                            Tx {shortTransaction(item.transactionId)}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
                       </div>
                     </div>
-                    <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                      <div className="min-w-0">
-                        <p className="text-xs uppercase tracking-wide text-slate-500">
-                          From
-                        </p>
-                        <p className="mt-1 font-mono text-white">
-                          {formatHistoryActor(item, 'from')}
-                        </p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs uppercase tracking-wide text-slate-500">
-                          To
-                        </p>
-                        <p className="mt-1 font-mono text-white">
-                          {formatHistoryActor(item, 'to')}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-500">
-                          Price
-                        </p>
-                        <p className="mt-1 font-semibold text-white">
-                          {formatHistoryPrice(item)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-slate-400">
                   No history registered

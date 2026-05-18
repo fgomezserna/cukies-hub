@@ -67,6 +67,19 @@ type HistoryDocument = {
   eventName?: unknown;
   timestampMs?: unknown;
   tokenId?: unknown;
+  blockNumber?: unknown;
+  logIndex?: unknown;
+};
+
+type ChainEventDocument = {
+  _id: string;
+  chain?: unknown;
+  eventName?: unknown;
+  args?: unknown;
+  txHash?: unknown;
+  blockNumber?: unknown;
+  logIndex?: unknown;
+  timestampMs?: unknown;
 };
 
 type PointDocument = {
@@ -170,9 +183,52 @@ async function getHistoryCollection() {
   return db.collection<HistoryDocument>('tx_nfts');
 }
 
+async function getChainEventsCollection() {
+  const db = await getIndexerDb();
+  return db.collection<ChainEventDocument>('chain_events');
+}
+
 async function getPointsCollection() {
   const db = await getIndexerDb();
   return db.collection<PointDocument>('point_transactions');
+}
+
+function getRecordValue(value: unknown, key: string) {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)[key]
+    : undefined;
+}
+
+function normalizeHistoryEventType(eventName: string | null, fallback?: unknown) {
+  const type = toStringOrNull(fallback);
+  if (type) return type;
+
+  switch (eventName) {
+    case 'TokenOnSale':
+      return 'PutOnSale';
+    case 'MarketTokenSaleCancelled':
+      return 'CancelSale';
+    case 'TokenBought':
+      return 'Buy';
+    case 'BreedFinish':
+      return 'Breed';
+    default:
+      return eventName ?? 'Transaction';
+  }
+}
+
+function scaleBscWeiPrice(value: unknown) {
+  const stringValue = toStringOrNull(value);
+  if (!stringValue) return null;
+
+  try {
+    return Number(
+      (BigInt(stringValue) * BigInt(10_000)) /
+        BigInt('1000000000000000000'),
+    );
+  } catch {
+    return null;
+  }
 }
 
 function normalizeRelation(value: unknown): LegacyMarketplaceCukiReference | null {
@@ -228,16 +284,46 @@ function normalizeHistoryEntry(document: HistoryDocument): LegacyMarketplaceCuki
   const network = toStringOrNull(document.network) ?? toStringOrNull(document.chain);
   const transactionId = toStringOrNull(document.transactionId) ?? toStringOrNull(document.txHash);
   const id = toStringOrNull(document._id) ?? transactionId ?? '';
+  const eventName = toStringOrNull(document.eventName);
 
   return {
     id,
     transactionId,
-    type: toStringOrNull(document.type) ?? toStringOrNull(document.eventName) ?? 'Transaction',
+    type: normalizeHistoryEventType(eventName, document.type),
     from: toStringOrNull(document.from),
     to: toStringOrNull(document.to),
     date: normalizeTimestampMs(document.timestampMs ?? document.date),
     price: toNumberOrNull(document.price),
     network,
+    blockNumber: toNumberOrNull(document.blockNumber),
+    logIndex: toNumberOrNull(document.logIndex),
+  };
+}
+
+function normalizeChainHistoryEntry(
+  document: ChainEventDocument,
+): LegacyMarketplaceCukiHistoryEntry | null {
+  const eventName = toStringOrNull(document.eventName);
+  if (eventName !== 'TokenOnSale') return null;
+
+  const args = document.args;
+  const id = toStringOrNull(document._id);
+  const transactionId = toStringOrNull(document.txHash);
+  if (!id && !transactionId) return null;
+
+  return {
+    id: id ?? transactionId ?? '',
+    transactionId,
+    type: normalizeHistoryEventType(eventName),
+    from: toStringOrNull(getRecordValue(args, 'owner')),
+    to: null,
+    date: normalizeTimestampMs(
+      document.timestampMs ?? getRecordValue(args, 'createdAt'),
+    ),
+    price: scaleBscWeiPrice(getRecordValue(args, 'price')),
+    network: toStringOrNull(document.chain),
+    blockNumber: toNumberOrNull(document.blockNumber),
+    logIndex: toNumberOrNull(document.logIndex),
   };
 }
 
@@ -312,16 +398,36 @@ async function hydrateCukiRelations(
 }
 
 async function hydrateCukiHistory(item: LegacyMarketplaceCukiItem) {
-  const historyCollection = await getHistoryCollection();
-  const history = await historyCollection
-    .find({ tokenId: item.tokenId })
-    .sort({ timestampMs: -1, _id: -1 })
-    .limit(80)
-    .toArray();
+  const [historyCollection, chainEventsCollection] = await Promise.all([
+    getHistoryCollection(),
+    getChainEventsCollection(),
+  ]);
+  const [history, saleEvents] = await Promise.all([
+    historyCollection
+      .find({ tokenId: item.tokenId })
+      .sort({ timestampMs: -1, _id: -1 })
+      .limit(80)
+      .toArray(),
+    chainEventsCollection
+      .find({
+        eventName: 'TokenOnSale',
+        'args.tokenId': item.tokenId,
+      })
+      .sort({ timestampMs: -1, _id: -1 })
+      .limit(80)
+      .toArray(),
+  ]);
+  const entries = [
+    ...history.map(normalizeHistoryEntry),
+    ...saleEvents
+      .map((event) => normalizeChainHistoryEntry(event))
+      .filter((event): event is LegacyMarketplaceCukiHistoryEntry => event !== null),
+  ];
 
   return {
     ...item,
-    history: history.map(normalizeHistoryEntry),
+    history: Array.from(new Map(entries.map((entry) => [entry.id, entry])).values())
+      .sort((left, right) => (right.date ?? 0) - (left.date ?? 0)),
   };
 }
 

@@ -43,6 +43,8 @@ export type LegacyMarketplaceCukiHistoryEntry = {
   date: number | null;
   price: number | null;
   network: LegacyCukiNetwork | string | null;
+  blockNumber?: number | null;
+  logIndex?: number | null;
 };
 
 export type LegacyMarketplaceCukiItem = {
