@@ -83,6 +83,7 @@ export type LegacyMarketplaceListResponse = {
     states: LegacyMarketplaceFacet[];
     networks: LegacyMarketplaceFacet[];
     types: LegacyMarketplaceFacet[];
+    generations: LegacyMarketplaceFacet[];
   };
   error?: string;
 };
@@ -94,6 +95,7 @@ export type LegacyMarketplaceListParams = {
   network?: string;
   state?: string;
   type?: string;
+  generation?: string;
   owner?: string;
   sort?: string;
 };

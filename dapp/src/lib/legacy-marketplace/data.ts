@@ -8,7 +8,10 @@ import {
   fetchLegacyMarketplaceGraphQL,
   legacyMarketplaceCukiSelection,
 } from './graphql';
-import { getLegacyMarketplaceNftImageUrl } from './config';
+import {
+  getLegacyMarketplaceNftImageUrl,
+  normalizeLegacyMarketplaceNftImageUrl,
+} from './config';
 import {
   legacyCukiNetworks,
   legacyCukiStates,
@@ -131,21 +134,7 @@ function toNumberOrNull(value: unknown) {
 }
 
 function normalizeImageUrl(tokenId: string, imageUrl: unknown) {
-  const value = toStringOrNull(imageUrl);
-
-  if (!value) {
-    return tokenId ? getLegacyMarketplaceNftImageUrl(tokenId) : null;
-  }
-
-  if (value.includes('/png/tokens/v2/')) {
-    return value;
-  }
-
-  if (value.includes('/png/tokens/')) {
-    return value.replace('/png/tokens/', '/png/tokens/v2/');
-  }
-
-  return tokenId ? getLegacyMarketplaceNftImageUrl(tokenId) : value;
+  return normalizeLegacyMarketplaceNftImageUrl(tokenId, toStringOrNull(imageUrl));
 }
 
 function normalizeRelation(value: unknown): LegacyMarketplaceCukiReference | null {
@@ -551,6 +540,13 @@ function buildMongoFilter(params: LegacyMarketplaceListParams) {
     filter.type = Number.isFinite(parsedType) ? parsedType : params.type;
   }
 
+  if (params.generation && params.generation !== 'all') {
+    const parsedGeneration = Number(params.generation);
+    if (Number.isFinite(parsedGeneration)) {
+      filter['skills.generation'] = parsedGeneration;
+    }
+  }
+
   if (params.owner?.trim()) {
     filter.user = buildOwnerRegex(params.owner.trim());
   }
@@ -587,7 +583,7 @@ function buildMongoSort(sort?: string): Sort {
 
 async function getFacets() {
   const collection = await getCukiesCollection();
-  const [states, networks, types] = await Promise.all([
+  const [states, networks, types, generations] = await Promise.all([
     collection
       .aggregate<{ _id: unknown; count: number }>([
         { $group: { _id: '$state', count: { $sum: 1 } } },
@@ -606,12 +602,19 @@ async function getFacets() {
         { $sort: { _id: 1 } },
       ])
       .toArray(),
+    collection
+      .aggregate<{ _id: unknown; count: number }>([
+        { $group: { _id: '$skills.generation', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray(),
   ]);
 
   return {
     states: normalizeFacet(states),
     networks: normalizeFacet(networks),
     types: normalizeFacet(types),
+    generations: normalizeFacet(generations),
   };
 }
 
@@ -649,6 +652,7 @@ async function listFromGraphQL(
       states: [],
       networks: [],
       types: [],
+      generations: [],
     },
   };
 }
@@ -705,6 +709,7 @@ export async function listLegacyMarketplaceCukies(
           states: [],
           networks: [],
           types: [],
+          generations: [],
         },
         error:
           graphqlError instanceof Error
