@@ -328,38 +328,40 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             backgroundSize: '120px 120px'
           }}></div>
           
-          {/* Ambient light effects */}
-          <div className={`absolute top-0 left-1/4 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl ${isMarketplaceSection ? '' : 'animate-pulse'}`}></div>
-          <div className={`absolute bottom-0 right-1/4 w-80 h-80 bg-teal-400/8 rounded-full blur-3xl ${isMarketplaceSection ? '' : 'animate-pulse delay-1000'}`}></div>
-          <div className={`absolute top-1/2 left-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl ${isMarketplaceSection ? '' : 'animate-pulse delay-2000'}`}></div>
-          
-          {/* Floating gradients */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className={`absolute -top-40 -right-40 w-80 h-80 bg-gradient-radial from-cyan-300/20 via-teal-400/10 to-transparent rounded-full blur-xl ${isMarketplaceSection ? '' : 'floating'}`}></div>
-            <div className={`absolute -bottom-32 -left-32 w-64 h-64 bg-gradient-radial from-cyan-300/15 via-teal-400/8 to-transparent rounded-full blur-xl ${isMarketplaceSection ? '' : 'floating delay-3000'}`}></div>
-          </div>
-          
-          {/* Animated decorative lines */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className={`absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-teal-400/30 to-transparent transform -rotate-12 ${isMarketplaceSection ? '' : 'animate-pulse'}`}></div>
-            <div className={`absolute bottom-1/3 right-0 w-full h-px bg-gradient-to-l from-transparent via-teal-400/20 to-transparent transform rotate-12 ${isMarketplaceSection ? '' : 'animate-pulse delay-1500'}`}></div>
-          </div>
-          
-          {/* Decorative floating particles */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className={`absolute top-20 left-20 w-2 h-2 bg-cyan-300/60 rounded-full ${isMarketplaceSection ? '' : 'floating-slow'}`}></div>
-            <div className={`absolute top-40 right-32 w-1 h-1 bg-cyan-300/40 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-2000'}`}></div>
-            <div className={`absolute bottom-32 left-1/3 w-3 h-3 bg-cyan-400/30 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-4000'}`}></div>
-            <div className={`absolute top-1/2 right-20 w-1.5 h-1.5 bg-cyan-200/50 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-6000'}`}></div>
-            <div className={`absolute bottom-20 right-1/4 w-2 h-2 bg-cyan-200/40 rounded-full ${isMarketplaceSection ? '' : 'floating-slow delay-8000'}`}></div>
-          </div>
-          
-          {/* Energy waves */}
           {!isMarketplaceSection && (
-            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400/0 via-teal-400/30 to-teal-400/0 wave-animation"></div>
-              <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-teal-400/0 via-teal-400/20 to-teal-400/0 wave-animation delay-4000"></div>
-            </div>
+            <>
+              {/* Ambient light effects */}
+              <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl animate-pulse"></div>
+              <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-teal-400/8 rounded-full blur-3xl animate-pulse delay-1000"></div>
+              <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
+              
+              {/* Floating gradients */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-radial from-cyan-300/20 via-teal-400/10 to-transparent rounded-full blur-xl floating"></div>
+                <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-gradient-radial from-cyan-300/15 via-teal-400/8 to-transparent rounded-full blur-xl floating delay-3000"></div>
+              </div>
+              
+              {/* Animated decorative lines */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-teal-400/30 to-transparent transform -rotate-12 animate-pulse"></div>
+                <div className="absolute bottom-1/3 right-0 w-full h-px bg-gradient-to-l from-transparent via-teal-400/20 to-transparent transform rotate-12 animate-pulse delay-1500"></div>
+              </div>
+              
+              {/* Decorative floating particles */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-20 left-20 w-2 h-2 bg-cyan-300/60 rounded-full floating-slow"></div>
+                <div className="absolute top-40 right-32 w-1 h-1 bg-cyan-300/40 rounded-full floating-slow delay-2000"></div>
+                <div className="absolute bottom-32 left-1/3 w-3 h-3 bg-cyan-400/30 rounded-full floating-slow delay-4000"></div>
+                <div className="absolute top-1/2 right-20 w-1.5 h-1.5 bg-cyan-200/50 rounded-full floating-slow delay-6000"></div>
+                <div className="absolute bottom-20 right-1/4 w-2 h-2 bg-cyan-200/40 rounded-full floating-slow delay-8000"></div>
+              </div>
+              
+              {/* Energy waves */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400/0 via-teal-400/30 to-teal-400/0 wave-animation"></div>
+                <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-teal-400/0 via-teal-400/20 to-teal-400/0 wave-animation delay-4000"></div>
+              </div>
+            </>
           )}
           
           <Header />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Filter, RefreshCw, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ export function MarketplaceClient() {
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const requestIdRef = useRef(0);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
@@ -55,6 +56,8 @@ export function MarketplaceClient() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setIsLoading(true);
 
     fetch(`/api/cukies?${queryString}`, {
@@ -62,16 +65,22 @@ export function MarketplaceClient() {
     })
       .then(async (response) => {
         const payload = (await response.json()) as LegacyMarketplaceListResponse;
+        if (controller.signal.aborted || requestId !== requestIdRef.current) return;
         setData(payload);
       })
       .catch((error) => {
         if (error instanceof Error && error.name === 'AbortError') return;
+        if (controller.signal.aborted || requestId !== requestIdRef.current) return;
         setData({
           ...initialData,
           error: error instanceof Error ? error.message : 'Marketplace error',
         });
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted && requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      });
 
     return () => controller.abort();
   }, [queryString, reloadKey]);

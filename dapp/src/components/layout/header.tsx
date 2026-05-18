@@ -107,17 +107,6 @@ export default function Header() {
     }
   };
 
-  if (isAuthLoading) {
-    return (
-      <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6">
-        <div className="flex-1"></div>
-        <Button variant="outline" disabled>
-          <p>Loading...</p>
-        </Button>
-      </header>
-    )
-  }
-
   return (
     <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-teal-400/20 bg-black/25 backdrop-blur-md shadow-lg shadow-teal-400/10 px-4 sm:px-6">
       <Button
@@ -233,7 +222,7 @@ export default function Header() {
           <>
             <Button 
               onClick={() => !isWaitingForApproval && setIsWalletDialogOpen(true)} 
-              disabled={isWaitingForApproval}
+              disabled={isWaitingForApproval || isAuthLoading}
               className={`${
                 isWaitingForApproval 
                   ? "bg-gradient-to-r from-amber-500 to-orange-600 cursor-not-allowed" 
@@ -242,10 +231,12 @@ export default function Header() {
                 isWaitingForApproval ? "shadow-amber-500/30 animate-pulse" : "shadow-teal-400/30"
               }`}
             >
-              {isWaitingForApproval ? (
+              {isWaitingForApproval || isAuthLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent md:mr-2" />
-                  <span className="hidden md:inline">Waiting for Approval...</span>
+                  <span className="hidden md:inline">
+                    {isWaitingForApproval ? 'Waiting for Approval...' : 'Loading...'}
+                  </span>
                 </>
               ) : (
                 <>
