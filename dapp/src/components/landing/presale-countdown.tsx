@@ -20,7 +20,7 @@ type RemainingTime = {
 
 function getRemainingTime(): RemainingTime {
   if (!UKI_PRESALE_HAS_EXACT_START) {
-    return { total: Number.POSITIVE_INFINITY, days: 0, hours: 0, minutes: 0, seconds: 0 };
+    return { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
   }
 
   const total = Math.max(0, new Date(UKI_PRESALE_START_ISO).getTime() - Date.now());
@@ -71,7 +71,7 @@ export function PresaleCountdown() {
       {boxes.map((box) => (
         <div key={box.label} className="uki-countdown-box">
           <span className="block font-headline text-xl font-black leading-none text-[var(--uki-cyan)]" suppressHydrationWarning>
-            {!UKI_PRESALE_HAS_EXACT_START ? '--' : isLocked ? formatCountdownValue(box.value) : '00'}
+            {isLocked ? formatCountdownValue(box.value) : '00'}
           </span>
           <span className="mt-1.5 block text-[0.55rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
             {box.label}
@@ -80,6 +80,12 @@ export function PresaleCountdown() {
       ))}
     </div>
   );
+}
+
+export function PresaleCountdownTitle() {
+  const { isLocked } = usePresaleLock();
+
+  return <>{isLocked ? `Presale starts ${UKI_PRESALE_START_LABEL}` : 'Presale open'}</>;
 }
 
 export function PresaleLockBadge({ className = '' }: { className?: string }) {
