@@ -105,10 +105,10 @@ export default function VestingPage() {
   const vestingEnd = schedule ? schedule[2] + schedule[4] : undefined;
 
   const metrics = useMemo(() => [
-    { label: 'Purchased allocation', value: `${formatToken(totalAmount)} UKI`, icon: ShieldCheck },
-    { label: 'Claimable now', value: `${formatToken(claimableAmount)} UKI`, icon: Wallet },
+    { label: 'Total bought', value: `${formatToken(totalAmount)} UKI`, icon: ShieldCheck },
+    { label: 'Unlocked now', value: `${formatToken(claimableAmount)} UKI`, icon: Wallet },
     { label: 'Already claimed', value: `${formatToken(releasedAmount)} UKI`, icon: CheckCircle2 },
-    { label: 'Still locked', value: `${formatToken(lockedAmount)} UKI`, icon: LockKeyhole },
+    { label: 'Locked', value: `${formatToken(lockedAmount)} UKI`, icon: LockKeyhole },
   ], [claimableAmount, lockedAmount, releasedAmount, totalAmount]);
 
   function claimAll() {
@@ -162,7 +162,7 @@ export default function VestingPage() {
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-lg border border-white/10 bg-[#172522]/85 p-4 shadow-lg shadow-black/20">
+            <div key={metric.label} className={`rounded-lg border bg-[#172522]/85 p-4 shadow-lg shadow-black/20 ${metric.label === 'Total bought' ? 'border-teal-300/35' : 'border-white/10'}`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-[0.14em] text-slate-400">{metric.label}</span>
                 <metric.icon className="h-4 w-4 text-[#44edd6]" />
@@ -171,6 +171,12 @@ export default function VestingPage() {
             </div>
           ))}
         </div>
+
+        {hasPosition ? (
+          <div className="rounded-lg border border-teal-300/20 bg-teal-300/10 px-4 py-3 text-sm text-teal-50">
+            This wallet has bought <strong>{formatToken(totalAmount)} UKI</strong>. The <strong>{formatToken(claimableAmount)} UKI</strong> shown as unlocked now is only the part currently claimable from the linear vesting schedule.
+          </div>
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
           <section className="rounded-lg border border-white/10 bg-[#101b19]/90 p-5 shadow-xl shadow-black/25">
@@ -215,11 +221,11 @@ export default function VestingPage() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div>
-                    <div className="text-xs text-slate-400">Allocated</div>
+                    <div className="text-xs text-slate-400">Total bought</div>
                     <div className="mt-1 text-lg font-semibold text-white">{formatToken(totalAmount)} UKI</div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-400">Claimable</div>
+                    <div className="text-xs text-slate-400">Unlocked now</div>
                     <div className="mt-1 text-lg font-semibold text-white">{formatToken(claimableAmount)} UKI</div>
                   </div>
                   <div>

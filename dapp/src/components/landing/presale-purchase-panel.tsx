@@ -96,6 +96,28 @@ export function PresalePurchasePanel() {
   });
 
   const {
+    data: purchasedAsm,
+    refetch: refetchPurchasedAsm,
+  } = useReadContract({
+    address: presaleAddress,
+    abi: presaleAbi,
+    functionName: 'asmPurchased',
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address && presaleAddress) },
+  });
+
+  const {
+    data: purchasedUki,
+    refetch: refetchPurchasedUki,
+  } = useReadContract({
+    address: presaleAddress,
+    abi: presaleAbi,
+    functionName: 'ukiPurchased',
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address && presaleAddress) },
+  });
+
+  const {
     data: isOpen,
     refetch: refetchIsOpen,
   } = useReadContract({
@@ -128,6 +150,8 @@ export function PresalePurchasePanel() {
     void refetchAllowance();
     void refetchQuote();
     void refetchIsOpen();
+    void refetchPurchasedAsm();
+    void refetchPurchasedUki();
 
     if (lastAction === 'approve' && approvalAmount && presaleAddress) {
       toast({
@@ -151,7 +175,7 @@ export function PresalePurchasePanel() {
         description: 'Your UKI vesting schedule has been created.',
       });
     }
-  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchQuote, toast, writeContract]);
+  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, writeContract]);
 
   useEffect(() => {
     if (!error) return;
@@ -223,12 +247,12 @@ export function PresalePurchasePanel() {
     ? isConnecting
       ? 'Connecting wallet'
       : 'Connect wallet'
-    : isWrongChain
-      ? isSwitching
-        ? 'Switching network'
-        : 'Switch network'
+      : isWrongChain
+        ? isSwitching
+          ? 'Switching network'
+          : 'Switch network'
       : lastAction === 'approve' && (isPending || isConfirming)
-        ? 'Approve in wallet'
+        ? 'Confirm token access'
         : lastAction === 'buy' && (isPending || isConfirming)
           ? 'Buying UKI'
           : 'Buy UKI';
@@ -246,8 +270,13 @@ export function PresalePurchasePanel() {
         </span>
       </div>
 
-      <div className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+      <div className="mt-2 grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)] sm:grid-cols-2">
         <span>tASM balance: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
+        {isConnected ? (
+          <span className="sm:text-right">
+            Bought: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)} tASM / {formatTokenAmount(purchasedUki)} UKI</strong>
+          </span>
+        ) : null}
       </div>
 
       <label className="mt-2 block">
