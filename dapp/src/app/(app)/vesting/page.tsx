@@ -16,7 +16,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { getBscScanTxUrl, ukiSaleContracts, vestingVaultAbi } from '@/lib/contracts/uki-sale';
 
-type Schedule = readonly [bigint, bigint, bigint, bigint, bigint];
+type Schedule = {
+  readonly [index: number]: bigint | undefined;
+  readonly totalAmount?: bigint;
+  readonly releasedAmount?: bigint;
+  readonly start?: bigint;
+  readonly cliff?: bigint;
+  readonly duration?: bigint;
+};
+type ScheduleField = 'totalAmount' | 'releasedAmount' | 'start' | 'cliff' | 'duration';
 
 function formatToken(value?: bigint) {
   if (value === undefined) return '0';
@@ -48,6 +56,10 @@ function formatPercent(value: number) {
 function contractUrl(address?: string) {
   if (!address || !isAddress(address)) return undefined;
   return `${ukiSaleContracts.blockExplorerBaseUrl.replace(/\/$/, '')}/address/${address}`;
+}
+
+function scheduleField(schedule: Schedule | undefined, key: ScheduleField, index: number) {
+  return schedule?.[key] ?? schedule?.[index];
 }
 
 export default function VestingPage() {
@@ -92,17 +104,18 @@ export default function VestingPage() {
   });
 
   const schedule = userSchedule as Schedule | undefined;
-  const totalAmount = schedule?.[0] ?? BigInt(0);
-  const releasedAmount = schedule?.[1] ?? BigInt(0);
+  const totalAmount = scheduleField(schedule, 'totalAmount', 0) ?? BigInt(0);
+  const releasedAmount = scheduleField(schedule, 'releasedAmount', 1) ?? BigInt(0);
   const claimableAmount = claimable ?? BigInt(0);
   const vestedAmount = releasedAmount + claimableAmount;
   const lockedAmount = totalAmount > vestedAmount ? totalAmount - vestedAmount : BigInt(0);
   const unlockProgress = totalAmount > BigInt(0) ? Number((vestedAmount * BigInt(10000)) / totalAmount) / 100 : 0;
   const claimedProgress = totalAmount > BigInt(0) ? Number((releasedAmount * BigInt(10000)) / totalAmount) / 100 : 0;
   const hasPosition = totalAmount > BigInt(0);
-  const vestingStart = schedule?.[2];
-  const vestingCliff = schedule?.[3];
-  const vestingEnd = schedule ? schedule[2] + schedule[4] : undefined;
+  const vestingStart = scheduleField(schedule, 'start', 2);
+  const vestingCliff = scheduleField(schedule, 'cliff', 3);
+  const vestingDuration = scheduleField(schedule, 'duration', 4);
+  const vestingEnd = vestingStart !== undefined && vestingDuration !== undefined ? vestingStart + vestingDuration : undefined;
 
   const metrics = useMemo(() => [
     { label: 'Total bought', value: `${formatToken(totalAmount)} UKI`, icon: ShieldCheck },
