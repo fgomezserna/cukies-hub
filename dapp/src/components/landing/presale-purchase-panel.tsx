@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShoppingCart, WalletCards } from 'lucide-react';
+import { AlertTriangle, Loader2, ShoppingCart, WalletCards } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +52,7 @@ export function PresalePurchasePanel() {
   const { toast } = useToast();
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
+  const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
   const asmTokenAddress = ukiSaleContracts.asmTokenAddress as Address | undefined;
   const presaleAddress = ukiSaleContracts.presaleAddress as Address | undefined;
   const isReady = Boolean(isConnected && address && chainId === UKI_PRESALE_CHAIN_ID && asmTokenAddress && presaleAddress);
@@ -111,8 +112,7 @@ export function PresalePurchasePanel() {
 
   const needsApproval = Boolean(parsedAmount && allowance !== undefined && allowance < parsedAmount);
   const hasEnoughBalance = Boolean(parsedAmount && asmBalance !== undefined && asmBalance >= parsedAmount);
-  const canApprove = Boolean(isReady && parsedAmount && hasEnoughBalance && needsApproval && !isPending && !isConfirming);
-  const canBuy = Boolean(isReady && parsedAmount && hasEnoughBalance && !needsApproval && isOpen && !isPending && !isConfirming);
+  const canSubmit = Boolean(isReady && parsedAmount && hasEnoughBalance && isOpen && !isPending && !isConfirming);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
 
   useEffect(() => {
@@ -123,15 +123,34 @@ export function PresalePurchasePanel() {
     void refetchQuote();
     void refetchIsOpen();
 
-    toast({
-      title: lastAction === 'approve' ? 'Approval confirmed' : 'Purchase confirmed',
-      description: lastAction === 'approve' ? 'tASM allowance is ready for the presale.' : 'Your UKI vesting schedule has been created.',
-    });
-  }, [isSuccess, lastAction, refetchAllowance, refetchBalance, refetchIsOpen, refetchQuote, toast]);
+    if (lastAction === 'approve' && approvalAmount && presaleAddress) {
+      toast({
+        title: 'Approval confirmed',
+        description: 'Opening the purchase transaction now.',
+      });
+      setLastAction('buy');
+      setApprovalAmount(null);
+      writeContract({
+        address: presaleAddress,
+        abi: presaleAbi,
+        functionName: 'buy',
+        args: [approvalAmount],
+      });
+      return;
+    }
+
+    if (lastAction === 'buy') {
+      toast({
+        title: 'Purchase confirmed',
+        description: 'Your UKI vesting schedule has been created.',
+      });
+    }
+  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchQuote, toast, writeContract]);
 
   useEffect(() => {
     if (!error) return;
 
+    setApprovalAmount(null);
     toast({
       title: 'Transaction failed',
       description: error.message,
@@ -139,22 +158,23 @@ export function PresalePurchasePanel() {
     });
   }, [error, toast]);
 
-  function handleApprove() {
+  function handleSubmit() {
     if (!asmTokenAddress || !presaleAddress || !parsedAmount) return;
-    setLastAction('approve');
     reset();
-    writeContract({
-      address: asmTokenAddress,
-      abi: erc20Abi,
-      functionName: 'approve',
-      args: [presaleAddress, parsedAmount],
-    });
-  }
 
-  function handleBuy() {
-    if (!presaleAddress || !parsedAmount) return;
+    if (needsApproval) {
+      setLastAction('approve');
+      setApprovalAmount(parsedAmount);
+      writeContract({
+        address: asmTokenAddress,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [presaleAddress, parsedAmount],
+      });
+      return;
+    }
+
     setLastAction('buy');
-    reset();
     writeContract({
       address: presaleAddress,
       abi: presaleAbi,
@@ -175,9 +195,8 @@ export function PresalePurchasePanel() {
         </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+      <div className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
         <span>tASM balance: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
-        <span className="text-right">Allowance: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(allowance)}</strong></span>
       </div>
 
       <label className="mt-2 block">
@@ -187,7 +206,12 @@ export function PresalePurchasePanel() {
           onChange={(event) => setAmount(event.target.value.replace(',', '.'))}
           inputMode="decimal"
           placeholder="10"
-          className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#041014]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] outline-none transition focus:border-[var(--uki-cyan)]"
+          className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#041014]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-cyan)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-cyan)]"
+          style={{
+            backgroundColor: '#041014',
+            color: 'var(--uki-cream)',
+            WebkitTextFillColor: 'var(--uki-cream)',
+          }}
         />
       </label>
 
@@ -214,20 +238,14 @@ export function PresalePurchasePanel() {
         </div>
       ) : null}
 
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <button type="button" onClick={handleApprove} disabled={!canApprove} className={`uki-wallet-button justify-center ${!canApprove ? 'opacity-45' : ''}`}>
-          {isPending && lastAction === 'approve' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          Approve
-        </button>
-        <button type="button" onClick={handleBuy} disabled={!canBuy} className={`uki-wallet-button justify-center ${!canBuy ? 'opacity-45' : ''}`}>
-          {isPending && lastAction === 'buy' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
-          Buy
-        </button>
-      </div>
+      <button type="button" onClick={handleSubmit} disabled={!canSubmit} className={`uki-wallet-button mt-2 w-full justify-center ${!canSubmit ? 'opacity-45' : ''}`}>
+        {isPending || isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+        {lastAction === 'approve' && (isPending || isConfirming) ? 'Approve in wallet' : lastAction === 'buy' && (isPending || isConfirming) ? 'Buying UKI' : 'Buy UKI'}
+      </button>
 
       {isConfirming ? (
         <p className="mt-2 text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-          Confirming transaction...
+          {lastAction === 'approve' ? 'Confirming approval before purchase...' : 'Confirming purchase...'}
         </p>
       ) : null}
 
