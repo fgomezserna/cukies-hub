@@ -1,5 +1,6 @@
 import { Lock, Wallet, Zap, type LucideIcon } from 'lucide-react';
 import { PresaleCountdown, PresaleCountdownTitle, PresaleLockBadge } from './presale-countdown';
+import { PresalePurchasePanel } from './presale-purchase-panel';
 import { PresaleRateLabel, PresaleRuntimeStatus, PresaleStatusProvider } from './presale-status';
 import { Panel, TokenCoin } from './primitives';
 import { LandingWalletConnectButton, LandingWalletStateCallout, LandingWalletStatusLabel } from './wallet-connect-dynamic';
@@ -53,6 +54,8 @@ export function SaleConsole() {
           </div>
           <PresaleLockBadge className="mt-2 w-full justify-center" />
         </div>
+
+        <PresalePurchasePanel />
 
         <LandingWalletConnectButton className="mt-2.5 w-full justify-center" showCompactText={false} />
       </Panel>

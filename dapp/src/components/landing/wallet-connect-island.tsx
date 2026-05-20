@@ -1,6 +1,5 @@
 'use client';
 
-import { Web3Provider } from '@/providers/web3-provider';
 import {
   WalletConnectButton,
   WalletStateCallout,
@@ -9,25 +8,13 @@ import {
 } from './wallet-connect-button';
 
 export function LandingWalletConnectButton(props: WalletConnectButtonProps) {
-  return (
-    <Web3Provider>
-      <WalletConnectButton {...props} />
-    </Web3Provider>
-  );
+  return <WalletConnectButton {...props} />;
 }
 
 export function LandingWalletStatusLabel() {
-  return (
-    <Web3Provider>
-      <WalletStatusLabel />
-    </Web3Provider>
-  );
+  return <WalletStatusLabel />;
 }
 
 export function LandingWalletStateCallout() {
-  return (
-    <Web3Provider>
-      <WalletStateCallout />
-    </Web3Provider>
-  );
+  return <WalletStateCallout />;
 }
