@@ -60,10 +60,10 @@ export function usePresaleLock() {
 export function PresaleCountdown() {
   const { isLocked, remaining } = usePresaleLock();
   const boxes = [
-    { value: remaining.days, label: 'Days' },
-    { value: remaining.hours, label: 'Hours' },
-    { value: remaining.minutes, label: 'Minutes' },
-    { value: remaining.seconds, label: 'Seconds' },
+    { value: remaining.days, label: 'Días' },
+    { value: remaining.hours, label: 'Horas' },
+    { value: remaining.minutes, label: 'Minutos' },
+    { value: remaining.seconds, label: 'Segundos' },
   ];
 
   return (
@@ -85,7 +85,7 @@ export function PresaleCountdown() {
 export function PresaleCountdownTitle() {
   const { isLocked } = usePresaleLock();
 
-  return <>{isLocked ? `Presale starts ${UKI_PRESALE_START_LABEL}` : 'Presale open'}</>;
+  return <>{isLocked ? `La preventa empieza ${UKI_PRESALE_START_LABEL}` : 'Preventa abierta'}</>;
 }
 
 export function PresaleLockBadge({ className = '' }: { className?: string }) {
@@ -94,7 +94,7 @@ export function PresaleLockBadge({ className = '' }: { className?: string }) {
   return (
     <span className={`uki-presale-lock-badge ${className}`}>
       {isLocked ? <Lock className="h-3.5 w-3.5" strokeWidth={1.8} /> : <Timer className="h-3.5 w-3.5" strokeWidth={1.8} />}
-      {isLocked ? `Locked until ${UKI_PRESALE_START_LABEL}` : 'Presale open'}
+      {isLocked ? `Bloqueado hasta ${UKI_PRESALE_START_LABEL}` : 'Preventa abierta'}
     </span>
   );
 }
@@ -115,7 +115,7 @@ export function PresaleGateAction({
       {isLocked ? (
         <span className="inline-flex items-center justify-center gap-2">
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Opens {UKI_PRESALE_START_SHORT_LABEL}
+          Abre {UKI_PRESALE_START_SHORT_LABEL}
         </span>
       ) : (
         openLabel ?? children
@@ -147,7 +147,7 @@ export function PresaleGateLink({
       <span aria-disabled="true" className={`uki-button ${variantClass} uki-button-locked ${className}`}>
         <span className="inline-flex items-center gap-2">
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Opens {UKI_PRESALE_START_SHORT_LABEL}
+          Abre {UKI_PRESALE_START_SHORT_LABEL}
         </span>
         <span className="uki-button-icon" aria-hidden="true">
           <Timer className="h-4 w-4" />

@@ -25,13 +25,13 @@ const lilita = Lilita_One({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://cukies.world'),
-  title: 'Cukies World | UKI Presale',
+  title: 'Cukies World | Preventa UKI',
   description:
-    'UKI is the token powering the next Cukies game economy on BNB Smart Chain.',
+    'UKI es el token que conecta la nueva economía de juegos de Cukies World en BNB Smart Chain.',
   openGraph: {
-    title: 'Cukies World | UKI Presale',
+    title: 'Cukies World | Preventa UKI',
     description:
-      'Join the UKI presale and follow the next Cukies game economy on BNB Smart Chain.',
+      'Entra en la preventa UKI y sigue la nueva economía de juegos de Cukies World en BNB Smart Chain.',
     images: ['/brand/uki-sale-landing-reference.png'],
   },
   icons: {
@@ -47,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${lilita.variable} dark`} suppressHydrationWarning>
+    <html lang="es" className={`${inter.variable} ${spaceGrotesk.variable} ${lilita.variable} dark`} suppressHydrationWarning>
       <body className="font-body antialiased">
         <AppProviders>{children}</AppProviders>
         <Toaster />

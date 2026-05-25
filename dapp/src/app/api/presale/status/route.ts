@@ -31,7 +31,7 @@ export async function GET() {
       ...baseStatus,
       source: 'static',
       isConfigured: false,
-      message: 'Presale contract is not configured yet.',
+      message: 'El contrato de preventa aún no está configurado.',
     });
   }
 

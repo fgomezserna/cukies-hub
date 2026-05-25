@@ -30,7 +30,7 @@ const DynamicWalletStateCallout = dynamic(
     loading: () => (
       <div className="uki-state-callout uki-state-callout-loading">
         <div>
-          <p>Loading wallet</p>
+          <p>Cargando wallet</p>
           <span>Checking wallet state.</span>
         </div>
       </div>

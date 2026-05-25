@@ -11,7 +11,6 @@ import {
   Network,
   ShieldCheck,
   Sparkles,
-  Star,
   Timer,
   Trophy,
   Users,
@@ -23,52 +22,52 @@ import {
 export type LandingIcon = LucideIcon;
 
 export const navItems = [
-  { label: 'Presale', href: '#presale' },
-  { label: 'Token', href: '#token' },
-  { label: 'Utility', href: '#utility' },
-  { label: 'Games', href: '#games' },
+  { label: 'Preventa', href: '#presale' },
+  { label: 'Comprar', href: '#token' },
+  { label: 'Cukie Master', href: '/cukie-master' },
+  { label: 'Hodler', href: '/cukie-hodler' },
+  { label: 'Jugar', href: '/como-jugar' },
   { label: 'Cukies', href: '/cukies' },
-  { label: 'FAQ', href: '#faq' },
 ];
 
 export const trustSignals = [
-  { icon: ShieldCheck, label: 'Audited', value: 'Smart contracts' },
-  { icon: Zap, label: 'Built on', value: 'BNB Smart Chain' },
-  { icon: Users, label: 'Community', value: 'Since 2021' },
+  { icon: Zap, label: 'Red', value: 'BNB Smart Chain' },
+  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada' },
+  { icon: Users, label: 'Comunidad', value: 'Desde 2021' },
 ];
 
 export const saleFacts = [
-  { icon: Coins, label: 'Price', value: '$0.01', helper: 'Per UKI' },
-  { icon: Calendar, label: 'Duration', value: '1 month', helper: 'Presale period' },
-  { icon: CircleDollarSign, label: 'Buy with', value: 'ASM', helper: 'Sale currency' },
-  { icon: Lock, label: 'Vesting', value: '9 months', helper: 'Linear release' },
-  { icon: Trophy, label: 'Listing', value: 'At least $0.012', helper: 'Target floor' },
-  { icon: ShieldCheck, label: 'Liquidity', value: 'Locked / burned', helper: '9+ months' },
+  { icon: Coins, label: 'Precio', value: '$0.01', helper: 'Por UKI' },
+  { icon: Calendar, label: 'Duración', value: '1 mes', helper: 'Periodo de preventa' },
+  { icon: CircleDollarSign, label: 'Compra con', value: 'ASM', helper: 'Moneda principal' },
+  { icon: Lock, label: 'Vesting', value: '9 meses', helper: 'Lineal sin cliff' },
+  { icon: Trophy, label: 'Listing', value: 'Mínimo $0.012', helper: 'Objetivo inicial' },
+  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada', helper: '9+ meses' },
 ];
 
 export const purchaseSteps = [
   {
     number: '1',
-    title: 'Connect wallet',
-    text: 'Connect your BSC wallet to get started.',
+    title: 'Conecta wallet',
+    text: 'Conecta una wallet compatible con BNB Smart Chain.',
     icon: Wallet,
   },
   {
     number: '2',
-    title: 'Approve ASM',
-    text: 'Approve ASM as the sale currency for the presale.',
+    title: 'Aprueba ASM',
+    text: 'Autoriza al contrato a usar el importe de ASM elegido.',
     icon: BadgeCheck,
   },
   {
     number: '3',
-    title: 'Buy UKI',
-    text: 'Exchange ASM for UKI at the fixed presale rate.',
+    title: 'Compra UKI',
+    text: 'Compra UKI al ratio fijado al inicio de la preventa.',
     icon: Coins,
   },
   {
     number: '4',
-    title: 'Track vesting',
-    text: 'Your UKI unlocks linearly after launch.',
+    title: 'Consulta vesting',
+    text: 'Sigue la asignación de UKI creada para tu wallet.',
     icon: Timer,
   },
 ];
@@ -76,66 +75,66 @@ export const purchaseSteps = [
 export const vestingTracks = [
   {
     icon: Lock,
-    title: 'Buyer vesting',
-    subtitle: '9 months linear',
+    title: 'Vesting comprador',
+    subtitle: '9 meses lineal, sin cliff',
     color: '#2ee8d6',
-    labels: ['Month 0', 'Month 3', 'Month 6', 'Month 9'],
+    labels: ['Mes 0', 'Mes 3', 'Mes 6', 'Mes 9'],
   },
   {
     icon: Users,
-    title: 'Team vesting',
-    subtitle: '9 month cliff + 24 month vesting',
+    title: 'Vesting equipo',
+    subtitle: '9 meses cliff + 24 meses vesting',
     color: '#4d93ff',
-    labels: ['0', 'Cliff', 'Month 9', 'Month 21', 'Month 33'],
+    labels: ['0', 'Cliff', 'Mes 9', 'Mes 21', 'Mes 33'],
   },
   {
     icon: Gift,
-    title: 'Cukie Master rewards program',
-    subtitle: 'Released over 6 years',
+    title: 'Programa Cukie Master',
+    subtitle: 'Asignaciones durante 6 años',
     color: '#91d867',
-    labels: ['Year 1', 'Year 3', 'Year 5', 'Year 6'],
+    labels: ['Año 1', 'Año 3', 'Año 5', 'Año 6'],
   },
 ];
 
 export const utilityNodes = [
   {
-    title: 'Games',
-    text: 'Play and compete.',
+    title: 'Juegos',
+    text: 'Juega y compite.',
     icon: Gamepad2,
     className: 'uki-node-purple',
     positionClassName: 'uki-node-games',
   },
   {
-    title: 'Credits',
-    text: 'Use internal game resources.',
+    title: 'Créditos',
+    text: 'Usa recursos internos de juego.',
     icon: Coins,
     className: 'uki-node-gold',
     positionClassName: 'uki-node-credits',
   },
   {
     title: 'Pools',
-    text: 'Share resources under clear rules.',
+    text: 'Comparte recursos bajo reglas claras.',
     icon: Database,
     className: 'uki-node-blue',
     positionClassName: 'uki-node-pools',
   },
   {
     title: 'Cukie Master',
-    text: 'Unlock slots and daily credit access.',
+    text: 'Desbloquea cupos y créditos diarios.',
     icon: Crown,
     className: 'uki-node-pink',
     positionClassName: 'uki-node-master',
   },
   {
-    title: 'Future worlds',
-    text: 'Expanding the Cukies universe.',
+    title: 'Mundos futuros',
+    text: 'Expande el universo Cukies.',
     icon: Network,
     className: 'uki-node-green',
     positionClassName: 'uki-node-worlds',
   },
   {
     title: 'Rewards',
-    text: 'Track period-based allocations.',
+    text: 'Sigue asignaciones por periodo.',
     icon: Gift,
     className: 'uki-node-red',
     positionClassName: 'uki-node-rewards',
@@ -146,32 +145,32 @@ export const timeline = [
   {
     year: '2021',
     title: 'Cukies NFTs',
-    text: 'Collection launch and community begins.',
+    text: 'Lanzamiento de la colección y comunidad.',
     image: '/brand/generated/uki-timeline-2021.svg',
   },
   {
     year: '2022-2023',
-    title: 'Ecosystem',
-    text: 'Bridge, tools and marketplace expansion.',
+    title: 'Ecosistema',
+    text: 'Bridge, herramientas y marketplace.',
     image: '/brand/generated/uki-timeline-ecosystem.svg',
   },
   {
     year: '2024',
-    title: 'Building',
-    text: 'Game systems and utility access.',
+    title: 'Construcción',
+    text: 'Sistemas de juego y utilidad.',
     image: '/brand/generated/uki-timeline-building.svg',
   },
   {
     year: '2026',
-    title: 'UKI launch',
-    text: 'Token presale and new economy.',
+    title: 'Lanzamiento UKI',
+    text: 'Preventa y nueva economía.',
     image: '/brand/generated/uki-timeline-launch.svg',
     active: true,
   },
   {
-    year: 'Next',
-    title: 'Game economy',
-    text: 'Play, compete and build utility.',
+    year: 'Después',
+    title: 'Economía de juegos',
+    text: 'Jugar, competir y ampliar utilidad.',
     image: '/brand/generated/uki-timeline-economy.svg',
   },
 ];
@@ -179,28 +178,28 @@ export const timeline = [
 export const futureUtility = [
   {
     title: 'Stake UKI',
-    text: 'Stake UKI to unlock Cukie Master slots.',
+    text: 'Usa UKI para desbloquear cupos Cukie Master.',
     icon: Sparkles,
     className: 'uki-future-cyan',
     image: '/brand/generated/cukie-master-stake-landing.png',
   },
   {
-    title: 'Use Cukie points',
-    text: 'Use Cukie Master points for upgrades and benefits.',
-    icon: Star,
+    title: 'Créditos de competición',
+    text: 'Recibe créditos internos desde cupos activos.',
+    icon: Coins,
     className: 'uki-future-pink',
     image: '/brand/generated/cukie-master-points-landing.png',
   },
   {
-    title: 'Receive credits',
-    text: 'Receive internal credits from active slots.',
-    icon: Coins,
+    title: 'Pool de créditos',
+    text: 'Aporta créditos diarios al pool cuando se active.',
+    icon: Database,
     className: 'uki-future-gold',
     image: '/brand/generated/cukie-master-credits-landing.png',
   },
   {
-    title: 'Enter pools',
-    text: 'Join pools when the post-presale phase opens.',
+    title: 'Pool de Cukies',
+    text: 'Presta Cukies bajo reglas de disponibilidad.',
     icon: Crown,
     className: 'uki-future-vault',
     image: '/brand/generated/cukie-master-pools-landing.png',
@@ -210,55 +209,55 @@ export const futureUtility = [
 export const gameCards = [
   {
     title: "Cukies Rush n' Run",
-    text: 'Action / runner',
+    text: 'Acción / runner',
     image: '/portada_jump_Hop.jpg',
   },
   {
-    title: 'Cukies Board Game',
-    text: 'Strategy / PvP',
+    title: 'Cukies Island',
+    text: 'Aventura / mundo',
     image: '/portada_cukies_island.jpg',
   },
   {
-    title: 'Cukies Sports',
-    text: 'Sports / arcade',
+    title: 'Cukies Brain Buzz',
+    text: 'Trivia / competición',
     image: '/portada_brain_buzz.jpg',
   },
   {
-    title: 'And more...',
-    text: 'Stay tuned',
+    title: 'Más juegos',
+    text: 'En preparación',
     image: '/Powered_up_2.png',
   },
 ];
 
 export const faqs = [
   {
-    question: 'What is UKI and what can I use it for?',
+    question: '¿Qué es UKI y para qué sirve?',
     answer:
-      'UKI is the utility token planned for the Cukies game economy. It will connect games, credits, Cukie Master mechanics, rewards and future ecosystem features.',
+      'UKI es el token de utilidad previsto para la economía de juegos de Cukies World. Conecta juegos, créditos, Cukie Master, pools, rewards y futuras funciones del ecosistema.',
   },
   {
-    question: 'Why is the presale in ASM?',
+    question: '¿Por qué la preventa se compra con ASM?',
     answer:
-      'ASM is planned as the sale currency for the first UKI distribution. The final contract flow should be confirmed before the presale opens.',
+      'ASM es la moneda principal prevista para la primera distribución de UKI. El ratio ASM -> UKI se fijará al inicio de la preventa y se mantendrá durante el periodo.',
   },
   {
-    question: 'How does vesting work?',
+    question: '¿Cómo funciona el vesting?',
     answer:
-      'Presale UKI is designed to unlock linearly over 9 months. The final unlock schedule must be enforced by the vesting contract.',
+      'El UKI comprado en preventa se libera linealmente durante 9 meses, sin cliff. La asignación pendiente no está disponible hasta su desbloqueo.',
   },
   {
-    question: 'When will staking be available?',
+    question: '¿Los UKI en vesting cuentan para Cukie Master?',
     answer:
-      'Staking and Cukie Master features are planned after presale and TGE, once the token and reward infrastructure are live.',
+      'Sí. Los UKI comprados en preventa y sujetos a vesting cuentan para los cupos de Cukie Master por ruta UKI cuando la funcionalidad se active.',
   },
   {
-    question: 'Do Cukies NFTs provide utility?',
+    question: '¿Los NFTs Cukies tendrán utilidad?',
     answer:
-      'Yes. The next system should use NFT ownership and rarity data for access, points, Cukie Master mechanics and game benefits.',
+      'Sí. La utilidad depende de ownership, rareza, estado de marketplace/bridge y reglas activas de la dapp.',
   },
   {
-    question: 'How are rewards and pools structured?',
+    question: '¿Cómo se estructuran rewards y pools?',
     answer:
-      'Rewards combine game performance, credits, pools and ranking logic. Some calculations can live in the backend while token movement stays on BSC.',
+      'Las rewards combinan reglas de juego, créditos, pools y ranking por periodo. Las estimaciones no deben mostrarse como claimable hasta que exista validación y, cuando aplique, confirmación on-chain.',
   },
 ];

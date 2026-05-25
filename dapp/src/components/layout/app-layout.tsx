@@ -102,7 +102,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
                         <Home className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Home</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Inicio</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>
@@ -118,7 +118,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-300/20 to-teal-400/20 group-hover:from-cyan-300/30 group-hover:to-teal-400/30 transition-all">
                         <Gamepad2 className="h-4 w-4 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Games</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Juegos</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>
@@ -134,7 +134,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
                         <Trophy className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Leaderboard</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Ranking</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>
@@ -150,7 +150,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
                         <Star className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Quests</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Misiones</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>
@@ -166,7 +166,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
                         <Users className="h-4 w-4 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Referrals</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Referidos</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>
@@ -182,7 +182,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
                         <Coins className="h-4 w-4 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Points</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Puntos</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>

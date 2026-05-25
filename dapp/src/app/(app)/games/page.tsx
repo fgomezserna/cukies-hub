@@ -4,16 +4,16 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Gamepad2, Search } from 'lucide-react';
 import Image from "next/image";
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const games = [
-  { name: "Treasure Hunt", description: "Collect as fast as you can and don't get caught!", imageUrl: "/portada_TH_Home.png", hint: "pixel art", live: false, playable: true, href: "/games/sybil-slayer" },
-  { name: "Brain Buzz", description: "Engaging online trivia game designed to challenge players' knowledge across a wide range of topics.", imageUrl: "/portada_brain_buzz.jpg", hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
-  { name: "Jump n'Hop", description: "Explore enchanting realms from bustling Villages to serene Islands, mysterious Caves, and lofty Mountains.", imageUrl: "/portada_jump_Hop.jpg", hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
-  { name: "Cukies Island", description: "Embark on a journey in the Infinite Archipelago. Endless possibilities await!", imageUrl: "/portada_cukies_island.jpg", hint: "island adventure", live: false, playable: true, href: "https://cukies-island.cukies.world/" }
+  { name: "Treasure Hunt", description: "Primer juego conectado a UKI: usa créditos, valida score y compite por periodo.", imageUrl: "/brand/generated/uki-treasure-hunt-scene-v2.png", hint: "treasure hunt", live: false, playable: true, href: "/games/sybil-slayer" },
+  { name: "Cukies Brain Buzz", description: "Trivia competitiva para ampliar el universo de juegos Cukies.", imageUrl: "/portada_brain_buzz.jpg", hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
+  { name: "Cukies Rush n' Run", description: "Runner de acción dentro del ecosistema Cukies.", imageUrl: "/portada_jump_Hop.jpg", hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
+  { name: "Cukies Island", description: "Aventura de mundo para futuras experiencias de la economía Cukies.", imageUrl: "/portada_cukies_island.jpg", hint: "island adventure", live: false, playable: true, href: "https://cukies-island.cukies.world/" }
 ];
 
 export default function GamesPage() {
@@ -29,18 +29,18 @@ export default function GamesPage() {
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-6">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
-              🎮 Game Center
+            <h1 className="text-4xl md:text-5xl font-bold font-headline text-cyan-200">
+              Juegos / Jugar
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose your favorite game and test your luck in our gaming ecosystem
+              Treasure Hunt es el primer juego conectado a UKI. El resto de mundos se presenta como expansión futura del ecosistema.
             </p>
           </div>
           
           <div className="relative w-full max-w-md mx-auto">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-pink-500" />
             <Input
-              placeholder="🔍 Search games..."
+              placeholder="Buscar juegos..."
               className="pl-12 py-3 rounded-xl border-2 border-pink-600/20 bg-card/50 backdrop-blur-sm focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all duration-300"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -49,7 +49,7 @@ export default function GamesPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredGames.map((game, index) => (
+          {filteredGames.map((game) => (
             <Card 
               key={game.name}
               className={cn(
@@ -59,14 +59,15 @@ export default function GamesPage() {
                   : "border-gray-500/20 bg-gradient-to-br from-card/50 to-card/30 cursor-not-allowed"
               )}
             >
-              <CardHeader className="p-0 relative overflow-hidden">
+              <CardHeader className="relative aspect-[4/3] overflow-hidden p-0">
                 <Image 
                   src={game.imageUrl} 
                   alt={game.name} 
-                  width={600} 
-                  height={400} 
+                  fill
+                  sizes="(min-width: 1024px) 31vw, (min-width: 768px) 45vw, 100vw"
+                  priority
                   className={cn(
-                    "object-cover h-52 lg:h-auto lg:aspect-[4/3] transition-transform duration-500",
+                    "object-cover transition-transform duration-500",
                     game.playable ? "group-hover:scale-110" : "grayscale"
                   )} 
                   data-ai-hint={game.hint} 
@@ -74,16 +75,14 @@ export default function GamesPage() {
                 
 
                 
-                {/* Gradient overlay - only for playable games */}
                 {game.playable && (
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
                 )}
                 
-                {/* Overlay for non-playable games */}
                 {!game.playable && (
-                  <div className="absolute top-0 left-0 right-0 h-52 lg:h-full bg-black/60 flex items-center justify-center z-10 !mt-0">
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 !mt-0">
                     <span className="text-white font-bold text-lg bg-black/80 px-4 py-2 rounded-full">
-                      🚧 Coming Soon
+                      Próximamente
                     </span>
                   </div>
                 )}
@@ -106,11 +105,13 @@ export default function GamesPage() {
                   >
                     {game.href?.startsWith('http://') || game.href?.startsWith('https://') ? (
                       <a href={game.href} target="_blank" rel="noopener noreferrer">
-                        🎮 Play Now
+                        <Gamepad2 className="mr-2 h-4 w-4" />
+                        Jugar
                       </a>
                     ) : (
                       <Link href={game.href!}>
-                        🎮 Play Now
+                        <Gamepad2 className="mr-2 h-4 w-4" />
+                        Jugar
                       </Link>
                     )}
                   </Button>
@@ -119,7 +120,7 @@ export default function GamesPage() {
                     disabled 
                     className="w-full bg-gray-600 text-gray-300 cursor-not-allowed py-3 rounded-xl"
                   >
-                    ⏰ Coming Soon
+                    Próximamente
                   </Button>
                 )}
               </CardFooter>

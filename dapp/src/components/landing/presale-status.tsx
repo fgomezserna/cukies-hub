@@ -49,7 +49,7 @@ function usePresaleStatus(): PresaleStatusState {
         setState({
           status: 'error',
           data: null,
-          error: error instanceof Error ? error.message : 'Status unavailable',
+          error: error instanceof Error ? error.message : 'Estado no disponible',
         });
       }
     }
@@ -79,10 +79,10 @@ export function PresaleStatusProvider({ children }: { children: ReactNode }) {
 }
 
 function formatRate(value?: string) {
-  if (!value) return 'Fixed at launch';
+  if (!value) return 'Ratio fijado al abrir';
 
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return 'Fixed at launch';
+  if (!Number.isFinite(numeric) || numeric <= 0) return 'Ratio fijado al abrir';
 
   return `1 ASM = ${numeric.toLocaleString('en-US', { maximumFractionDigits: 4 })} UKI`;
 }
@@ -91,11 +91,11 @@ export function PresaleRateLabel() {
   const state = usePresaleStatusValue();
 
   if (state.status === 'loading') {
-    return <span className="uki-status-inline">Loading sale status</span>;
+    return <span className="uki-status-inline">Cargando estado de preventa</span>;
   }
 
   if (state.status === 'error' || !state.data.isConfigured) {
-    return <span className="uki-status-inline">ASM rate fixed at launch</span>;
+    return <span className="uki-status-inline">Ratio ASM fijado al abrir</span>;
   }
 
   return <span className="uki-status-inline">{formatRate(state.data.price?.ukiPerAsmFormatted)}</span>;
@@ -110,8 +110,8 @@ export function PresaleRuntimeStatus() {
       return {
         icon: Loader2,
         tone: 'loading',
-        title: 'Loading sale status',
-        text: 'Checking presale configuration.',
+        title: 'Cargando preventa',
+        text: 'Revisando configuración de la preventa.',
       } as const;
     }
 
@@ -119,8 +119,8 @@ export function PresaleRuntimeStatus() {
       return {
         icon: AlertTriangle,
         tone: 'warning',
-        title: 'Status unavailable',
-        text: 'The landing remains readable; buying stays locked until status is confirmed.',
+        title: 'Estado no disponible',
+        text: 'La landing sigue visible; la compra queda bloqueada hasta confirmar estado.',
       } as const;
     }
 
@@ -128,8 +128,8 @@ export function PresaleRuntimeStatus() {
       return {
         icon: RadioTower,
         tone: 'warning',
-        title: 'Contract pending',
-        text: state.data.message ?? 'Presale contract is not configured yet.',
+        title: 'Contrato pendiente',
+        text: state.data.message ?? 'El contrato de preventa aún no está configurado.',
       } as const;
     }
 
@@ -137,16 +137,16 @@ export function PresaleRuntimeStatus() {
       return {
         icon: CheckCircle2,
         tone: 'ready',
-        title: 'Presale open',
-        text: `${state.data.chainLabel} contract is active.`,
+        title: 'Preventa abierta',
+        text: `Contrato activo en ${state.data.chainLabel}.`,
       } as const;
     }
 
     return {
       icon: Lock,
       tone: isLocked ? 'locked' : 'warning',
-      title: isLocked ? `Locked until ${UKI_PRESALE_START_LABEL}` : 'Not open yet',
-      text: 'Connect wallet to review details; approve and buy stay blocked until the sale opens.',
+      title: isLocked ? `Bloqueado hasta ${UKI_PRESALE_START_LABEL}` : 'Aún no abierta',
+      text: 'Conecta wallet para revisar datos; aprobar y comprar siguen bloqueados hasta la apertura.',
     } as const;
   }, [isLocked, state]);
 

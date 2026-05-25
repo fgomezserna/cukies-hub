@@ -155,8 +155,8 @@ export function PresalePurchasePanel() {
 
     if (lastAction === 'approve' && approvalAmount && presaleAddress) {
       toast({
-        title: 'Approval confirmed',
-        description: 'Opening the purchase transaction now.',
+        title: 'Aprobación confirmada',
+        description: 'Abriendo ahora la transacción de compra.',
       });
       setLastAction('buy');
       setApprovalAmount(null);
@@ -171,8 +171,8 @@ export function PresalePurchasePanel() {
 
     if (lastAction === 'buy') {
       toast({
-        title: 'Purchase confirmed',
-        description: 'Your UKI vesting schedule has been created.',
+        title: 'Compra confirmada',
+        description: 'Se ha creado la asignación de vesting UKI para tu wallet.',
       });
     }
   }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, writeContract]);
@@ -182,7 +182,7 @@ export function PresalePurchasePanel() {
 
     setApprovalAmount(null);
     toast({
-      title: 'Transaction failed',
+      title: 'Transacción fallida',
       description: error.message,
       variant: 'destructive',
     });
@@ -192,8 +192,8 @@ export function PresalePurchasePanel() {
     if (!isConnected) {
       if (!connector) {
         toast({
-          title: 'Wallet not found',
-          description: 'Install an EVM wallet such as MetaMask to connect.',
+          title: 'Wallet no encontrada',
+          description: 'Instala una wallet EVM compatible para conectar.',
           variant: 'destructive',
         });
         return;
@@ -208,8 +208,8 @@ export function PresalePurchasePanel() {
         {
           onError: () => {
             toast({
-              title: 'Network switch failed',
-              description: `Please switch your wallet to ${UKI_PRESALE_CHAIN_LABEL}.`,
+              title: 'Cambio de red fallido',
+              description: `Cambia tu wallet a ${UKI_PRESALE_CHAIN_LABEL}.`,
               variant: 'destructive',
             });
           },
@@ -245,17 +245,17 @@ export function PresalePurchasePanel() {
   const ctaDisabled = isConnected && !canSwitch && !canSubmit;
   const ctaLabel = !isConnected
     ? isConnecting
-      ? 'Connecting wallet'
-      : 'Connect wallet'
+      ? 'Conectando wallet'
+      : 'Conectar wallet'
       : isWrongChain
         ? isSwitching
-          ? 'Switching network'
-          : 'Switch network'
+          ? 'Cambiando red'
+          : 'Cambiar red'
       : lastAction === 'approve' && (isPending || isConfirming)
-        ? 'Confirm token access'
+        ? 'Confirmando acceso'
         : lastAction === 'buy' && (isPending || isConfirming)
-          ? 'Buying UKI'
-          : 'Buy UKI';
+          ? 'Comprando UKI'
+          : 'Comprar UKI';
   const CtaIcon = !isConnected || isWrongChain ? Wallet : ShoppingCart;
 
   return (
@@ -263,24 +263,24 @@ export function PresalePurchasePanel() {
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
           <ShoppingCart className="h-4 w-4" strokeWidth={1.8} />
-          Buy UKI
+          Comprar UKI
         </span>
         <span className="text-right text-[0.62rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-          1 tASM = {formatRate(quotedUki, parsedAmount ?? undefined)} UKI
+          1 ASM = {formatRate(quotedUki, parsedAmount ?? undefined)} UKI
         </span>
       </div>
 
       <div className="mt-2 grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)] sm:grid-cols-2">
-        <span>tASM balance: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
+        <span>Balance ASM: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
         {isConnected ? (
           <span className="sm:text-right">
-            Bought: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)} tASM / {formatTokenAmount(purchasedUki)} UKI</strong>
+            Comprado: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)} ASM / {formatTokenAmount(purchasedUki)} UKI</strong>
           </span>
         ) : null}
       </div>
 
       <label className="mt-2 block">
-        <span className="sr-only">tASM amount</span>
+        <span className="sr-only">Importe ASM</span>
         <input
           value={amount}
           onChange={(event) => setAmount(event.target.value.replace(',', '.'))}
@@ -296,16 +296,16 @@ export function PresalePurchasePanel() {
       </label>
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-        <span>Cost: <strong className="text-[var(--uki-cream)]">{parsedAmount ? amount : '--'} tASM</strong></span>
-        <span className="text-right">Receives: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(quotedUki)} UKI</strong></span>
+        <span>Coste: <strong className="text-[var(--uki-cream)]">{parsedAmount ? amount : '--'} ASM</strong></span>
+        <span className="text-right">Recibes: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(quotedUki)} UKI</strong></span>
       </div>
 
       {isReady && !hasEnoughBalance && parsedAmount ? (
         <div className="uki-state-callout uki-state-callout-warning mt-2">
           <WalletCards className="h-4 w-4" strokeWidth={1.8} />
           <div>
-            <p>Insufficient tASM</p>
-            <span>Lower the amount or mint more test tASM for this wallet.</span>
+            <p>ASM insuficiente</p>
+            <span>Baja el importe o añade más ASM a esta wallet.</span>
           </div>
         </div>
       ) : null}
@@ -317,13 +317,13 @@ export function PresalePurchasePanel() {
 
       {isConfirming ? (
         <p className="mt-2 text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-          {lastAction === 'approve' ? 'Confirming approval before purchase...' : 'Confirming purchase...'}
+          {lastAction === 'approve' ? 'Confirmando aprobación antes de comprar...' : 'Confirmando compra...'}
         </p>
       ) : null}
 
       {txHash && txUrl ? (
         <a href={txUrl} target="_blank" rel="noreferrer" className="mt-2 block text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-cyan)] hover:text-[var(--uki-cream)]">
-          View tx {formatTxLabel(txHash)}
+          Ver tx {formatTxLabel(txHash)}
         </a>
       ) : null}
     </div>

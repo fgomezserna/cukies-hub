@@ -44,7 +44,7 @@ const ranks = [
 
 const getRank = (xp: number): string => {
   const userRank = ranks.find(rank => xp >= rank.xp);
-  return userRank ? userRank.name : 'No Rank';
+  return userRank ? userRank.name : 'Sin rango';
 };
 
 export default function Header() {
@@ -116,7 +116,7 @@ export default function Header() {
         className="hover:bg-teal-400/10 hover:text-cyan-300 transition-all duration-300"
       >
         <PanelLeft />
-        <span className="sr-only">Toggle Sidebar</span>
+        <span className="sr-only">Alternar barra lateral</span>
       </Button>
 
       {(isMobile || state === 'collapsed') && (
@@ -141,8 +141,8 @@ export default function Header() {
             </PopoverTrigger>
             <PopoverContent className="w-80 border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10" align="end">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-foreground">🔔 Notifications</CardTitle>
-                  <CardDescription>You have 1 unread message.</CardDescription>
+                  <CardTitle className="text-foreground">Notificaciones</CardTitle>
+                  <CardDescription>Tienes 1 mensaje sin leer.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                   <div className="flex items-start gap-4 p-3 rounded-lg bg-teal-400/5 border border-teal-400/10">
@@ -151,8 +151,8 @@ export default function Header() {
                           <AvatarFallback className="bg-gradient-to-br from-cyan-300 to-teal-400 text-white font-bold">HL</AvatarFallback>
                       </Avatar>
                       <div className="grid gap-1">
-                          <p className="text-sm font-medium text-foreground">Welcome to Cukies World! 🎉</p>
-                          <p className="text-sm text-muted-foreground">Complete your first quest to earn bonus points.</p>
+                          <p className="text-sm font-medium text-foreground">Bienvenido a Cukies World</p>
+                          <p className="text-sm text-muted-foreground">Completa tu primera misión para ganar puntos extra.</p>
                       </div>
                   </div>
                   <Button 
@@ -160,7 +160,7 @@ export default function Header() {
                     className="w-full border-teal-400/30 bg-teal-400/10 hover:bg-teal-400/20 hover:border-cyan-300/50 transition-all duration-300" 
                     asChild
                   >
-                    <Link href="/quests">✨ View All</Link>
+                    <Link href="/quests">Ver todo</Link>
                   </Button>
                 </CardContent>
             </PopoverContent>
@@ -185,11 +185,11 @@ export default function Header() {
                   ? user.username.length > 15 
                     ? `${user.username.slice(0, 15)}...` 
                     : user.username
-                  : "My Account"}
+                  : "Mi cuenta"}
               </DropdownMenuLabel>
               <div className="px-3 pt-2 pb-3 space-y-3">
                 <div className="p-3 rounded-lg bg-gradient-to-r from-teal-400/10 to-teal-400/10 border border-cyan-300/20">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Rank</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Rango</p>
                   <p className="font-bold text-cyan-300 text-sm">{userRank}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-gradient-to-r from-teal-400/10 to-cyan-400/10 border border-cyan-300/20">
@@ -200,12 +200,12 @@ export default function Header() {
               <DropdownMenuSeparator className="bg-teal-400/20" />
               <DropdownMenuItem disabled className="opacity-50">
                 <Wallet className="mr-3 h-4 w-4 text-gray-400" />
-                <span>My Wallet</span>
+                <span>Mi wallet</span>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-teal-400/10 transition-colors">
                 <Link href="/settings">
                   <Settings className="mr-3 h-4 w-4 text-cyan-300" />
-                  <span>Settings</span>
+                  <span>Ajustes</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-teal-400/20" />
@@ -214,7 +214,7 @@ export default function Header() {
                 className="hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
               >
                 <LogOut className="mr-3 h-4 w-4" />
-                <span>Disconnect</span>
+                <span>Desconectar</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -235,13 +235,13 @@ export default function Header() {
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent md:mr-2" />
                   <span className="hidden md:inline">
-                    {isWaitingForApproval ? 'Waiting for Approval...' : 'Loading...'}
+                    {isWaitingForApproval ? 'Esperando aprobación...' : 'Cargando...'}
                   </span>
                 </>
               ) : (
                 <>
                   <Wallet className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Connect Wallet</span>
+                  <span className="hidden md:inline">Conectar wallet</span>
                 </>
               )}
             </Button>
@@ -250,10 +250,10 @@ export default function Header() {
               <DialogContent className="sm:max-w-md border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold text-foreground">
-                    Choose Wallet Type
+                    Elige tipo de wallet
                   </DialogTitle>
                   <DialogDescription className="text-muted-foreground">
-                    Select your preferred wallet to connect
+                    Selecciona la wallet que quieres conectar
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -266,7 +266,7 @@ export default function Header() {
                         <Wallet className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1 text-left">
-                        <div className="font-bold text-lg text-foreground">EVM Wallets</div>
+                        <div className="font-bold text-lg text-foreground">Wallets EVM</div>
                         <div className="text-sm text-muted-foreground">MetaMask, WalletConnect, etc.</div>
                       </div>
                     </div>
@@ -287,8 +287,8 @@ export default function Header() {
                           {isTronInstalled
                             ? isTronLoading
                               ? 'Esperando confirmacion en TronLink...'
-                              : 'Connect your TronLink wallet'
-                            : 'Please install TronLink extension'}
+                              : 'Conecta tu wallet TronLink'
+                            : 'Instala la extensión TronLink'}
                         </div>
                       </div>
                     </div>

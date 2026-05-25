@@ -27,7 +27,7 @@ function isSameWalletAddress(left?: string | null, right?: string | null) {
 
 export function WalletConnectButton({
   className = '',
-  label = 'Connect wallet',
+  label = 'Conectar wallet',
   compactLabel = 'Wallet',
   showCompactText = true,
 }: WalletConnectButtonProps) {
@@ -52,8 +52,8 @@ export function WalletConnectButton({
         {
           onError: () => {
             toast({
-              title: 'Network switch failed',
-              description: `Please switch your wallet to ${UKI_PRESALE_CHAIN_LABEL}.`,
+              title: 'Cambio de red fallido',
+              description: `Cambia tu wallet a ${UKI_PRESALE_CHAIN_LABEL}.`,
               variant: 'destructive',
             });
           },
@@ -74,8 +74,8 @@ export function WalletConnectButton({
 
     if (!connector) {
       toast({
-        title: 'Wallet not found',
-        description: 'Install an EVM wallet such as MetaMask to connect.',
+        title: 'Wallet no encontrada',
+        description: 'Instala una wallet EVM compatible para conectar.',
         variant: 'destructive',
       });
       return;
@@ -90,8 +90,8 @@ export function WalletConnectButton({
       }
     } catch {
       toast({
-        title: 'Connection failed',
-        description: 'Please approve the wallet connection and try again.',
+        title: 'Conexión fallida',
+        description: 'Aprueba la conexión en tu wallet y vuelve a intentarlo.',
         variant: 'destructive',
       });
     }
@@ -99,16 +99,16 @@ export function WalletConnectButton({
 
   const text = isBusy
     ? isWaitingForApproval
-      ? 'Sign message'
-      : 'Connecting...'
+      ? 'Firmar mensaje'
+      : 'Conectando...'
     : isWrongChain
-      ? 'Switch to BSC'
+      ? 'Cambiar a BSC'
       : address
         ? isAuthenticatedWallet
           ? shortAddress(address)
-          : 'Sign in'
+          : 'Firmar'
         : label;
-  const compactText = address ? (isAuthenticatedWallet ? shortAddress(address) : 'Sign in') : compactLabel;
+  const compactText = address ? (isAuthenticatedWallet ? shortAddress(address) : 'Firmar') : compactLabel;
 
   return (
     <button type="button" onClick={handleClick} disabled={isBusy} className={`uki-wallet-button ${className}`}>
@@ -124,19 +124,19 @@ export function WalletStatusLabel() {
   const { user, isLoading } = useAuth();
 
   if (!isConnected || !address) {
-    return <span className="text-[#ff75aa]">Not connected</span>;
+    return <span className="text-[#ff75aa]">No conectada</span>;
   }
 
   if (chainId !== UKI_PRESALE_CHAIN_ID) {
-    return <span className="text-[#ffcc6d]">Wrong chain</span>;
+    return <span className="text-[#ffcc6d]">Red incorrecta</span>;
   }
 
   if (isLoading) {
-    return <span className="text-[#ffcc6d]">Checking auth</span>;
+    return <span className="text-[#ffcc6d]">Revisando auth</span>;
   }
 
   if (!isSameWalletAddress(user?.walletAddress, address)) {
-    return <span className="text-[#ffcc6d]">Signature required</span>;
+    return <span className="text-[#ffcc6d]">Firma requerida</span>;
   }
 
   return <span className="text-[var(--uki-cyan)]">{shortAddress(address)}</span>;
@@ -153,8 +153,8 @@ export function WalletStateCallout() {
       <div className="uki-state-callout uki-state-callout-warning">
         <Wallet className="h-4 w-4" strokeWidth={1.8} />
         <div>
-          <p>Wallet disconnected</p>
-          <span>Connect an EVM wallet to review personal sale and vesting data.</span>
+          <p>Wallet desconectada</p>
+          <span>Conecta una wallet EVM para revisar datos personales de preventa y vesting.</span>
         </div>
       </div>
     );
@@ -165,8 +165,8 @@ export function WalletStateCallout() {
       <div className="uki-state-callout uki-state-callout-warning">
         <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
         <div>
-          <p>Wrong chain</p>
-          <span>Switch to {UKI_PRESALE_CHAIN_LABEL} before approve, buy or vesting actions.</span>
+          <p>Red incorrecta</p>
+          <span>Cambia a {UKI_PRESALE_CHAIN_LABEL} antes de aprobar, comprar o consultar vesting.</span>
         </div>
       </div>
     );
@@ -177,8 +177,8 @@ export function WalletStateCallout() {
       <div className="uki-state-callout uki-state-callout-warning">
         <Wallet className="h-4 w-4" strokeWidth={1.8} />
         <div>
-          <p>{isWaitingForApproval ? 'Signature pending' : 'Checking wallet auth'}</p>
-          <span>{isWaitingForApproval ? 'Approve the login message in your wallet.' : 'Confirming your app session.'}</span>
+          <p>{isWaitingForApproval ? 'Firma pendiente' : 'Revisando wallet'}</p>
+          <span>{isWaitingForApproval ? 'Aprueba el mensaje de login en tu wallet.' : 'Confirmando tu sesión.'}</span>
         </div>
       </div>
     );
@@ -189,8 +189,8 @@ export function WalletStateCallout() {
       <div className="uki-state-callout uki-state-callout-warning">
         <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
         <div>
-          <p>Signature required</p>
-          <span>Sign the wallet challenge to use the same authenticated app session.</span>
+          <p>Firma requerida</p>
+          <span>Firma el challenge de wallet para usar la sesión autenticada.</span>
         </div>
       </div>
     );
@@ -200,8 +200,8 @@ export function WalletStateCallout() {
     <div className="uki-state-callout uki-state-callout-ready">
       <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} />
       <div>
-        <p>Wallet ready</p>
-        <span>{shortAddress(address)} is connected on {UKI_PRESALE_CHAIN_LABEL}.</span>
+        <p>Wallet lista</p>
+        <span>{shortAddress(address)} conectada en {UKI_PRESALE_CHAIN_LABEL}.</span>
       </div>
     </div>
   );

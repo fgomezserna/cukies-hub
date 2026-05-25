@@ -17,7 +17,7 @@ function SaleConsoleContent() {
     <Panel id="presale-console" className="uki-sale-console" innerClassName="p-3">
       <div className="text-center">
         <p className="font-headline text-xl font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">
-            UKI presale
+            Preventa UKI
         </p>
         <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[var(--uki-muted)]">
           <PresaleRateLabel />
@@ -33,9 +33,9 @@ function SaleConsoleContent() {
       </div>
 
       <div className="mt-2 grid grid-cols-3 gap-2 border-y border-white/10 py-2">
-        <ConsoleMetric label="Price" value="$0.01" helper="Per UKI" />
-        <ConsoleMetric label="Network" value="BSC" icon={Zap} />
-        <ConsoleMetric label="Vesting" value="9m" helper="Linear" icon={Lock} />
+        <ConsoleMetric label="Precio" value="$0.01" helper="Por UKI" />
+        <ConsoleMetric label="Red" value="BSC" icon={Zap} />
+        <ConsoleMetric label="Vesting" value="9m" helper="Lineal" icon={Lock} />
       </div>
 
       <PresaleCountdownGate />
