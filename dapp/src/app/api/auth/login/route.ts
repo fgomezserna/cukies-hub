@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import { processReferralByUsername } from '@/lib/referrals';
 import { findOrSyncUserFromCukies } from '@/lib/user-sync';
 import { createUserDirectly } from '@/lib/mongodb-hub';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
-import { cookies } from 'next/headers';
 import {
   clearWalletChallengeCookie,
   readWalletChallenge,
@@ -104,33 +102,12 @@ export async function POST(request: Request) {
         } else {
           // Si no existe en cukies, crear nuevo usuario
           console.log('📝 Usuario no encontrado en BD cukies, creando nuevo...');
-          
-          // Check for referrer username in cookies
-          const cookieStore = await cookies();
-          const referrerUsername = cookieStore.get('referrerUsername')?.value;
-          console.log('🔍 Checking for referrer cookie:', referrerUsername);
-          
+
           // Create user directly in MongoDB to avoid transaction issues
           const newUserId = await createUserDirectly({
             walletAddress: normalizedAddress,
             username: normalizedAddress, // Use the entire wallet address as unique username
           });
-
-          // Process referral if username exists
-          if (referrerUsername) {
-            try {
-              console.log('🎯 Processing referral for:', referrerUsername);
-              const result = await processReferralByUsername(newUserId, referrerUsername);
-              console.log('✅ Referral processed successfully:', result);
-              // Clear the referral cookie after successful processing
-              cookieStore.set('referrerUsername', '', { expires: new Date(0) });
-            } catch (referralError) {
-              console.error('❌ Error processing referral:', referralError);
-              // Continue with user creation even if referral fails
-            }
-          } else {
-            console.log('❌ No referrer username found in cookies');
-          }
           
           // Now fetch the user with the same includes as above to ensure consistent object shape
           user = await prisma.user.findUnique({
