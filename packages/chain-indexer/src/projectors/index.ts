@@ -1,3 +1,5 @@
+import { formatUnits } from 'viem';
+
 import { monitoredContractAddresses } from '../config/contracts.js';
 import type { ChainEvent, JsonValue } from '../types.js';
 import { getNumber, getString, normalizeAddress, now } from '../utils/json.js';
@@ -19,12 +21,30 @@ function numberField(event: ChainEvent, key: string) {
   return getNumber(field(event, key));
 }
 
+function bigintField(event: ChainEvent, key: string) {
+  const value = field(event, key);
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value));
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+  return null;
+}
+
 function tokenId(event: ChainEvent) {
   return stringField(event, 'tokenId');
 }
 
 function eventDate(event: ChainEvent) {
   return new Date(event.timestampMs);
+}
+
+function tokenAmount(event: ChainEvent, key: string) {
+  const raw = bigintField(event, key);
+  if (raw === null) return { raw: null, value: null };
+
+  return {
+    raw: raw.toString(),
+    value: Number(formatUnits(raw, 18)),
+  };
 }
 
 function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
@@ -564,6 +584,236 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
   return null;
 }
 
+type PresaleCampaignConfig = {
+  minimumUkiToUnlockLink: number;
+  levelOneWeight: number;
+  levelTwoWeight: number;
+  levelThreeWeight: number;
+};
+
+const defaultPresaleCampaignConfig: PresaleCampaignConfig = {
+  minimumUkiToUnlockLink: 0,
+  levelOneWeight: 1,
+  levelTwoWeight: 0.5,
+  levelThreeWeight: 0.25,
+};
+
+async function getPresaleCampaignConfig(store: IndexerStore) {
+  const config = await collection(store, 'presale_referral_campaign_config').findOne(
+    { active: true },
+    { sort: { updatedAt: -1, createdAt: -1 } },
+  );
+
+  return {
+    minimumUkiToUnlockLink:
+      getNumber(config?.minimumUkiToUnlockLink) ??
+      defaultPresaleCampaignConfig.minimumUkiToUnlockLink,
+    levelOneWeight: getNumber(config?.levelOneWeight) ?? defaultPresaleCampaignConfig.levelOneWeight,
+    levelTwoWeight: getNumber(config?.levelTwoWeight) ?? defaultPresaleCampaignConfig.levelTwoWeight,
+    levelThreeWeight:
+      getNumber(config?.levelThreeWeight) ?? defaultPresaleCampaignConfig.levelThreeWeight,
+  };
+}
+
+function levelWeight(config: PresaleCampaignConfig, level: number) {
+  if (level === 1) return config.levelOneWeight;
+  if (level === 2) return config.levelTwoWeight;
+  return config.levelThreeWeight;
+}
+
+function levelTotalField(level: number) {
+  return `referralLevel${level}UkiAmount`;
+}
+
+function levelScoreField(level: number) {
+  return `referralLevel${level}WeightedScore`;
+}
+
+function definedFields<T extends Record<string, unknown>>(value: T) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as Partial<T>;
+}
+
+async function projectPresalePurchase(store: IndexerStore, event: ChainEvent) {
+  const buyer = stringField(event, 'buyer');
+  const buyerNormalized = stringField(event, 'buyerNormalized');
+
+  if (!buyer || !buyerNormalized) return 'Purchased sin buyer';
+
+  const asmAmount = tokenAmount(event, 'asmAmountRaw');
+  const ukiAmount = tokenAmount(event, 'ukiAmountRaw');
+  const totalBuyerAsm = tokenAmount(event, 'totalBuyerAsmRaw');
+  const totalBuyerUki = tokenAmount(event, 'totalBuyerUkiRaw');
+
+  if (ukiAmount.value === null) return 'Purchased sin ukiAmount';
+
+  const config = await getPresaleCampaignConfig(store);
+  const confirmedAt = eventDate(event);
+  const current = await collection(store, 'presale_participants').findOne({
+    normalizedWalletAddress: buyerNormalized,
+  });
+  const isFirstPurchase = !current?.firstPurchaseAt;
+  const lockedSponsorWalletAddress = getString(current?.lockedSponsorWalletAddress);
+  const pendingSponsorWalletAddress = getString(current?.pendingSponsorWalletAddress);
+  const pendingSponsorWalletNormalized = getString(current?.pendingSponsorWalletNormalized);
+  const sponsorToLock = isFirstPurchase && !lockedSponsorWalletAddress
+    ? pendingSponsorWalletAddress
+    : null;
+  const sponsorToLockNormalized = isFirstPurchase && !lockedSponsorWalletAddress
+    ? pendingSponsorWalletNormalized
+    : null;
+  const effectiveSponsorWalletAddress = lockedSponsorWalletAddress ?? sponsorToLock;
+  const effectiveSponsorWalletNormalized =
+    getString(current?.lockedSponsorWalletNormalized) ?? sponsorToLockNormalized;
+
+  await collection(store, 'presale_purchases').updateOne(
+    { _id: event._id },
+    {
+      $setOnInsert: {
+        _id: event._id,
+        eventId: event._id,
+        chain: event.chain,
+        contractAddress: event.contractAddress,
+        buyerWalletAddress: buyer,
+        buyerNormalized,
+        asmAmountRaw: asmAmount.raw,
+        asmAmount: asmAmount.value,
+        ukiAmountRaw: ukiAmount.raw,
+        ukiAmount: ukiAmount.value,
+        totalBuyerAsmRaw: totalBuyerAsm.raw,
+        totalBuyerAsm: totalBuyerAsm.value,
+        totalBuyerUkiRaw: totalBuyerUki.raw,
+        totalBuyerUki: totalBuyerUki.value,
+        txHash: event.txHash,
+        logIndex: event.logIndex,
+        blockNumber: event.blockNumber,
+        blockHash: event.blockHash,
+        timestampMs: event.timestampMs,
+        confirmedAt,
+        createdAt: now(),
+      },
+    },
+    { upsert: true },
+  );
+
+  const participantSet: Record<string, unknown> = {
+    walletAddress: buyer,
+    normalizedWalletAddress: buyerNormalized,
+    totalAsmPurchased: totalBuyerAsm.value ?? 0,
+    totalAsmPurchasedRaw: totalBuyerAsm.raw,
+    totalUkiPurchased: totalBuyerUki.value ?? ukiAmount.value,
+    totalUkiPurchasedRaw: totalBuyerUki.raw ?? ukiAmount.raw,
+    referralUnlockedAt:
+      (totalBuyerUki.value ?? ukiAmount.value) >= config.minimumUkiToUnlockLink
+        ? current?.referralUnlockedAt ?? confirmedAt
+        : current?.referralUnlockedAt,
+    referralMinimumUkiSnapshot:
+      (totalBuyerUki.value ?? ukiAmount.value) >= config.minimumUkiToUnlockLink
+        ? getNumber(current?.referralMinimumUkiSnapshot) ?? config.minimumUkiToUnlockLink
+        : current?.referralMinimumUkiSnapshot,
+    updatedAt: now(),
+    lastPurchaseEventId: event._id,
+  };
+
+  if (isFirstPurchase) {
+    participantSet.firstPurchaseAt = confirmedAt;
+  }
+
+  if (sponsorToLock && sponsorToLockNormalized) {
+    participantSet.lockedSponsorWalletAddress = sponsorToLock;
+    participantSet.lockedSponsorWalletNormalized = sponsorToLockNormalized;
+    participantSet.sponsorLockedAt = confirmedAt;
+  }
+
+  await collection(store, 'presale_participants').updateOne(
+    { normalizedWalletAddress: buyerNormalized },
+    {
+      $set: definedFields(participantSet),
+      $setOnInsert: {
+        createdAt: now(),
+      },
+    },
+    { upsert: true },
+  );
+
+  let directSponsorWalletAddress = effectiveSponsorWalletAddress;
+  let sponsorWalletAddress = effectiveSponsorWalletAddress;
+  let sponsorWalletNormalized = effectiveSponsorWalletNormalized;
+
+  for (let level = 1; level <= 3; level += 1) {
+    if (!sponsorWalletAddress || !sponsorWalletNormalized) break;
+
+    if (sponsorWalletNormalized === buyerNormalized) break;
+
+    const weight = levelWeight(config, level);
+    const weightedScore = ukiAmount.value * weight;
+    const contributionId = `${event._id}:L${level}`;
+
+    const contributionResult = await collection(store, 'presale_referral_contributions').updateOne(
+      { _id: contributionId },
+      {
+        $setOnInsert: {
+          _id: contributionId,
+          eventId: event._id,
+          purchaseId: event._id,
+          buyerWalletAddress: buyer,
+          buyerWalletNormalized: buyerNormalized,
+          directSponsorWalletAddress,
+          directSponsorWalletNormalized: effectiveSponsorWalletNormalized,
+          sponsorWalletAddress,
+          sponsorWalletNormalized,
+          level,
+          levelWeightSnapshot: weight,
+          ukiAmountRaw: ukiAmount.raw,
+          ukiAmount: ukiAmount.value,
+          weightedScore,
+          asmAmountRaw: asmAmount.raw,
+          asmAmount: asmAmount.value,
+          txHash: event.txHash,
+          logIndex: event.logIndex,
+          blockNumber: event.blockNumber,
+          confirmedAt,
+          createdAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+
+    if (contributionResult.upsertedCount > 0) {
+      await collection(store, 'presale_participants').updateOne(
+        { normalizedWalletAddress: sponsorWalletNormalized },
+        {
+          $set: {
+            updatedAt: now(),
+          },
+          $inc: {
+            [levelTotalField(level)]: ukiAmount.value,
+            [levelScoreField(level)]: weightedScore,
+            referralTotalUkiAmount: ukiAmount.value,
+            referralWeightedScore: weightedScore,
+          },
+          $setOnInsert: {
+            walletAddress: sponsorWalletAddress,
+            normalizedWalletAddress: sponsorWalletNormalized,
+            createdAt: now(),
+          },
+        },
+        { upsert: true },
+      );
+    }
+
+    const sponsor = await collection(store, 'presale_participants').findOne({
+      normalizedWalletAddress: sponsorWalletNormalized,
+    });
+
+    sponsorWalletAddress = getString(sponsor?.lockedSponsorWalletAddress);
+    sponsorWalletNormalized = getString(sponsor?.lockedSponsorWalletNormalized);
+  }
+
+  return null;
+}
+
 export async function projectEvent(store: IndexerStore, event: ChainEvent) {
   if (event.eventName === 'Transfer') return projectTransfer(store, event);
 
@@ -590,6 +840,10 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'JumpInBridge' || event.eventName === 'JumpOutBridge') {
     return projectBridge(store, event);
+  }
+
+  if (event.eventName === 'Purchased') {
+    return projectPresalePurchase(store, event);
   }
 
   return `Evento sin projector: ${event.eventName}`;

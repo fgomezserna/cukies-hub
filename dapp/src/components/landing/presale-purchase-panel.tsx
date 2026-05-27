@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Loader2, ShoppingCart, Wallet, WalletCards } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Copy, Loader2, ShoppingCart, Users, Wallet, WalletCards } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import { useAccount, useConnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +10,29 @@ import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '10';
+
+type PresaleReferralStatus = {
+  totalUkiPurchased: number;
+  minimumUkiToUnlockLink: number;
+  unlockProgress: number;
+  referralUnlockedAt: string | null;
+  referralMinimumUkiSnapshot: number | null;
+  referralCode: string | null;
+  referralLink: string | null;
+  pendingSponsorCode: string | null;
+  pendingSponsorWalletAddress: string | null;
+  lockedSponsorWalletAddress: string | null;
+  sponsorLockedAt: string | null;
+  referralLevel1UkiAmount: number;
+  referralLevel2UkiAmount: number;
+  referralLevel3UkiAmount: number;
+  referralWeightedScore: number;
+  levelWeights: {
+    level1: number;
+    level2: number;
+    level3: number;
+  };
+};
 
 function formatTokenAmount(value?: bigint, maximumFractionDigits = 4) {
   if (value === undefined) return '--';
@@ -37,6 +60,17 @@ function formatTxLabel(hash?: `0x${string}`) {
   return `${hash.slice(0, 10)}...${hash.slice(-6)}`;
 }
 
+function formatNumber(value?: number | null, maximumFractionDigits = 2) {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '--';
+
+  return value.toLocaleString('en-US', { maximumFractionDigits });
+}
+
+function shortAddress(value?: string | null) {
+  if (!value) return null;
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
 function formatRate(quote?: bigint, cost?: bigint) {
   if (!quote || !cost || cost === BigInt(0)) return '100';
 
@@ -55,6 +89,8 @@ export function PresalePurchasePanel() {
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
+  const [referralStatus, setReferralStatus] = useState<PresaleReferralStatus | null>(null);
+  const [isLoadingReferralStatus, setIsLoadingReferralStatus] = useState(false);
   const asmTokenAddress = ukiSaleContracts.asmTokenAddress as Address | undefined;
   const presaleAddress = ukiSaleContracts.presaleAddress as Address | undefined;
   const isReady = Boolean(isConnected && address && chainId === UKI_PRESALE_CHAIN_ID && asmTokenAddress && presaleAddress);
@@ -143,6 +179,30 @@ export function PresalePurchasePanel() {
   const canSwitch = Boolean(isWrongChain && !isSwitching);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
 
+  const fetchReferralStatus = useCallback(async () => {
+    if (!address) {
+      setReferralStatus(null);
+      return;
+    }
+
+    setIsLoadingReferralStatus(true);
+    try {
+      const response = await fetch(`/api/presale/referral/status?walletAddress=${address}`, {
+        cache: 'no-store',
+      });
+
+      if (response.ok) {
+        setReferralStatus(await response.json());
+      }
+    } finally {
+      setIsLoadingReferralStatus(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    void fetchReferralStatus();
+  }, [fetchReferralStatus]);
+
   useEffect(() => {
     if (!isSuccess) return;
 
@@ -152,6 +212,7 @@ export function PresalePurchasePanel() {
     void refetchIsOpen();
     void refetchPurchasedAsm();
     void refetchPurchasedUki();
+    void fetchReferralStatus();
 
     if (lastAction === 'approve' && approvalAmount && presaleAddress) {
       toast({
@@ -175,7 +236,17 @@ export function PresalePurchasePanel() {
         description: 'Se ha creado la asignación de vesting UKI para tu wallet.',
       });
     }
-  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, writeContract]);
+  }, [approvalAmount, fetchReferralStatus, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, writeContract]);
+
+  async function copyReferralLink() {
+    if (!referralStatus?.referralLink) return;
+
+    await navigator.clipboard.writeText(referralStatus.referralLink);
+    toast({
+      title: 'Link copiado',
+      description: 'Ya puedes compartir tu enlace de preventa.',
+    });
+  }
 
   useEffect(() => {
     if (!error) return;
@@ -257,6 +328,13 @@ export function PresalePurchasePanel() {
           ? 'Comprando UKI'
           : 'Comprar UKI';
   const CtaIcon = !isConnected || isWrongChain ? Wallet : ShoppingCart;
+  const referralMinimum = referralStatus?.minimumUkiToUnlockLink ?? 0;
+  const referralProgress = referralStatus?.unlockProgress ?? 0;
+  const referralProgressPercent = Math.round(referralProgress * 100);
+  const remainingUkiToUnlock = Math.max(
+    referralMinimum - (referralStatus?.totalUkiPurchased ?? 0),
+    0,
+  );
 
   return (
     <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#02090d]/72 p-2.5">
@@ -325,6 +403,87 @@ export function PresalePurchasePanel() {
         <a href={txUrl} target="_blank" rel="noreferrer" className="mt-2 block text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-cyan)] hover:text-[var(--uki-cream)]">
           Ver tx {formatTxLabel(txHash)}
         </a>
+      ) : null}
+
+      {isConnected ? (
+        <div className="mt-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#041014]/70 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.1em] text-[var(--uki-cyan)]">
+              <Users className="h-3.5 w-3.5" />
+              Referidos preventa
+            </span>
+            <span className="inline-flex items-center gap-1 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+              {isLoadingReferralStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Score {formatNumber(referralStatus?.referralWeightedScore)}
+            </span>
+          </div>
+
+          {referralStatus?.referralLink ? (
+            <>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  value={referralStatus.referralLink}
+                  readOnly
+                  className="h-9 min-w-0 flex-1 rounded-[7px] border border-[var(--uki-cyan-border)] bg-[#02090d] px-2 text-xs font-bold text-[var(--uki-cream)] outline-none"
+                />
+                <button type="button" onClick={copyReferralLink} className="uki-wallet-button h-9 px-3">
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+                Link activo. El volumen de tus referidos se contabiliza al cierre para premios Cukies.
+              </p>
+            </>
+          ) : (
+            <div className="mt-2">
+              <div className="flex items-end justify-between gap-2 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+                <span>Desbloqueo</span>
+                <span>
+                  {formatNumber(referralStatus?.totalUkiPurchased)} / {formatNumber(referralMinimum)} UKI
+                </span>
+              </div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-black/35">
+                <div
+                  className="h-full rounded-full bg-[var(--uki-cyan)] transition-all"
+                  style={{ width: `${referralProgressPercent}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+                {remainingUkiToUnlock > 0
+                  ? `Compra ${formatNumber(remainingUkiToUnlock)} UKI más para desbloquear tu link.`
+                  : 'Tu link se activará cuando el indexer confirme la compra.'}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-2 grid gap-1 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+            {referralStatus?.lockedSponsorWalletAddress ? (
+              <span>Sponsor fijado: <strong className="text-[var(--uki-cream)]">{shortAddress(referralStatus.lockedSponsorWalletAddress)}</strong></span>
+            ) : referralStatus?.pendingSponsorCode ? (
+              <span>Sponsor provisional: <strong className="text-[var(--uki-cream)]">{referralStatus.pendingSponsorCode}</strong></span>
+            ) : (
+              <span>Sin sponsor provisional</span>
+            )}
+          </div>
+
+          <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+            <span>
+              N1
+              <strong className="block text-[var(--uki-cream)]">{formatNumber(referralStatus?.referralLevel1UkiAmount)}</strong>
+              <em className="not-italic text-[var(--uki-muted)]">x{formatNumber(referralStatus?.levelWeights.level1, 2)}</em>
+            </span>
+            <span>
+              N2
+              <strong className="block text-[var(--uki-cream)]">{formatNumber(referralStatus?.referralLevel2UkiAmount)}</strong>
+              <em className="not-italic text-[var(--uki-muted)]">x{formatNumber(referralStatus?.levelWeights.level2, 2)}</em>
+            </span>
+            <span>
+              N3
+              <strong className="block text-[var(--uki-cream)]">{formatNumber(referralStatus?.referralLevel3UkiAmount)}</strong>
+              <em className="not-italic text-[var(--uki-muted)]">x{formatNumber(referralStatus?.levelWeights.level3, 2)}</em>
+            </span>
+          </div>
+        </div>
       ) : null}
     </div>
   );

@@ -26,6 +26,8 @@ export const eventSignatures: Record<EventName, string> = {
     'event JumpInBridge(uint256 tokenId, address originOwner, address destOwner, uint8 network, uint256 createdAt)',
   JumpOutBridge:
     'event JumpOutBridge(uint256 tokenId, address destOwner, uint256 createdAt)',
+  Purchased:
+    'event Purchased(address indexed buyer, uint256 asmAmount, uint256 ukiAmount, uint256 totalBuyerAsm, uint256 totalBuyerUki)',
 };
 
 export const bscEventAbis = Object.fromEntries(

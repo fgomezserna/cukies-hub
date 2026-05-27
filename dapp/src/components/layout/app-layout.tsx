@@ -17,7 +17,6 @@ import {
   Gamepad2,
   Trophy,
   Star,
-  Users,
   Coins,
   Dna,
   ArrowRightLeft,
@@ -155,23 +154,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <Link href="/referrals" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/referrals')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <Users className="h-4 w-4 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Referidos</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-              
+
               <SidebarMenuItem>
                 <Link href="/points" passHref>
                   <SidebarMenuButton

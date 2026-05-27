@@ -45,6 +45,8 @@ const envSchema = z.object({
   CHAIN_INDEXER_CHAINS: z.string().default('BSC,TRON'),
   CHAIN_INDEXER_BSC_RPC_URL: z.string().optional(),
   BSC_RPC_URL: z.string().optional(),
+  CHAIN_INDEXER_PRESALE_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_TRON_API_BASE_URL: z.string().default('https://api.trongrid.io/v1'),
   CUKIES_DATABASE_URL: z.string().optional(),
   TRON_API_KEY: z.string().optional(),
@@ -100,6 +102,7 @@ export function getIndexerConfig(): IndexerConfig {
     tronRequestDelayMs: env.CHAIN_INDEXER_TRON_REQUEST_DELAY_MS,
     pollIntervalMs: env.CHAIN_INDEXER_POLL_INTERVAL_MS,
     projectBatchSize: env.CHAIN_INDEXER_PROJECT_BATCH_SIZE,
+    presaleAddress: env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS,
   };
 }
 

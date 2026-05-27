@@ -6,7 +6,8 @@ export type ContractAlias =
   | 'STAKING_POINTS'
   | 'BREEDING_POINTS'
   | 'MARKETPLACE'
-  | 'BRIDGE';
+  | 'BRIDGE'
+  | 'PRESALE';
 
 export type EventName =
   | 'Transfer'
@@ -21,7 +22,8 @@ export type EventName =
   | 'MarketTokenSaleCancelled'
   | 'MarketTokenPriceChanged'
   | 'JumpInBridge'
-  | 'JumpOutBridge';
+  | 'JumpOutBridge'
+  | 'Purchased';
 
 export type ChainEventStatus =
   | 'ingested'
@@ -93,6 +95,7 @@ export type IndexerConfig = {
   tronRequestDelayMs: number;
   pollIntervalMs: number;
   projectBatchSize: number;
+  presaleAddress?: string;
 };
 
 export type LegacyImportConfig = {

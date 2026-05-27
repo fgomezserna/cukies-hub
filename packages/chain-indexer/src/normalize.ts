@@ -174,6 +174,21 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (eventName === 'Purchased') {
+    const buyer = getString(args.buyer);
+
+    return toJsonRecord({
+      ...base,
+      buyer,
+      buyerNormalized: normalizeAddress(chain, buyer),
+      asmAmountRaw: getString(args.asmAmount),
+      ukiAmountRaw: getString(args.ukiAmount),
+      totalBuyerAsmRaw: getString(args.totalBuyerAsm),
+      totalBuyerUkiRaw: getString(args.totalBuyerUki),
+      txType: 'PresalePurchase',
+    });
+  }
+
   return toJsonRecord({
     ...base,
     contractAlias,
