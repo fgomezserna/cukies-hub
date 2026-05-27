@@ -50,8 +50,39 @@ Indexer:
 
 ```bash
 CHAIN_INDEXER_BSC_RPC_URL=...
-CHAIN_INDEXER_TRON_RPC_URL=...
+CHAIN_INDEXER_TRON_API_BASE_URL=https://api.trongrid.io/v1
+CHAIN_INDEXER_PRESALE_ADDRESS=...
+CHAIN_INDEXER_START_BSC_BLOCK=...
+CHAIN_INDEXER_BSC_CONFIRMATIONS=12
 ```
+
+`CHAIN_INDEXER_PRESALE_ADDRESS` debe ser el contrato `Presale` real del entorno. Si no se define, el worker seguira indexando Cukies legacy, marketplace y bridge, pero no leera compras de preventa ni generara `presale_purchases`, `presale_participants` o `presale_referral_contributions`.
+
+`CHAIN_INDEXER_START_BSC_BLOCK` debe apuntar al bloque de despliegue del contrato de preventa o a un bloque anterior cercano. Para backfill historico amplio, usar un RPC que soporte rangos de logs suficientemente antiguos.
+
+Config inicial en Mongo para referidos de preventa:
+
+```js
+db.presale_referral_campaign_config.updateOne(
+  { active: true },
+  {
+    $set: {
+      active: true,
+      minimumUkiToUnlockLink: 0,
+      levelOneWeight: 1,
+      levelTwoWeight: 0.5,
+      levelThreeWeight: 0.25,
+      updatedAt: new Date()
+    },
+    $setOnInsert: {
+      createdAt: new Date()
+    }
+  },
+  { upsert: true }
+)
+```
+
+Cambiar `minimumUkiToUnlockLink` y pesos por los valores finales antes de abrir la campana.
 
 Card worker:
 
@@ -73,6 +104,9 @@ No activar `CARD_WORKER_UPLOAD=true` sin bucket, region, credenciales y base pub
 
 - Abrir la web publica y revisar `/api/health`.
 - Abrir `/indexer?collection=chain_indexer_runs`.
+- Abrir `/indexer?collection=presale_purchases` tras una compra de prueba confirmada.
+- Abrir `/indexer?collection=presale_participants` y comprobar `totalUkiPurchased`, `referralUnlockedAt`, sponsor provisional/bloqueado y acumulados N1/N2/N3.
+- Abrir `/indexer?collection=presale_referral_contributions` y verificar que una compra atribuida crea hasta tres filas, una por nivel.
 - Abrir `/indexer?collection=card_generation_jobs`.
 - Revisar logs de `chain-indexer` y confirmar que ejecuta `setup` y luego `run`.
 - Revisar logs de `cuki-card-worker` y confirmar que ejecuta `setup` y luego `run`.

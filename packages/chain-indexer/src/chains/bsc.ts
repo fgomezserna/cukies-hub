@@ -52,7 +52,9 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
 
   const latestBlock = Number(await client.getBlockNumber());
   const safeBlock = Math.max(0, latestBlock - config.bscConfirmations);
-  const contractEvents = getContractEventConfigs(['BSC']);
+  const contractEvents = getContractEventConfigs(['BSC'], {
+    presaleAddress: config.presaleAddress,
+  });
   const timestampCache = new Map<number, number>();
   let inserted = 0;
   let ranges = 0;

@@ -7,7 +7,7 @@ const bscContracts = {
   BREEDING_POINTS: '0x39Be8C4FA342C5f3C10d7c16941A0946D29Ade4A',
   MARKETPLACE: '0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91',
   BRIDGE: '0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E',
-} as const satisfies Record<ContractAlias, string>;
+} as const satisfies Record<Exclude<ContractAlias, 'PRESALE'>, string>;
 
 const tronContracts = {
   TOKEN: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
@@ -16,7 +16,7 @@ const tronContracts = {
   BREEDING_POINTS: 'TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S',
   MARKETPLACE: 'TWDoJEq4eVd9vUgQ6f5knjqouRBPyGDzSB',
   BRIDGE: 'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ',
-} as const satisfies Record<ContractAlias, string>;
+} as const satisfies Record<Exclude<ContractAlias, 'PRESALE'>, string>;
 
 const eventsByContract = {
   TOKEN: ['Transfer'],
@@ -30,12 +30,20 @@ const eventsByContract = {
     'MarketTokenPriceChanged',
   ],
   BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
+  PRESALE: ['Purchased'],
 } as const;
 
-export const monitoredContractAddresses = {
-  BSC: bscContracts,
-  TRON: tronContracts,
-} as const;
+export function getMonitoredContractAddresses(presaleAddress?: string) {
+  return {
+    BSC: {
+      ...bscContracts,
+      ...(presaleAddress ? { PRESALE: presaleAddress } : {}),
+    },
+    TRON: tronContracts,
+  } as const;
+}
+
+export const monitoredContractAddresses = getMonitoredContractAddresses();
 
 export function getContractAliasByAddress(chain: ChainName, address: string) {
   const addresses = monitoredContractAddresses[chain];
@@ -50,18 +58,25 @@ export function getContractAliasByAddress(chain: ChainName, address: string) {
   return null;
 }
 
-export function getContractEventConfigs(chains: ChainName[]) {
+export function getContractEventConfigs(chains: ChainName[], options: { presaleAddress?: string } = {}) {
   const configs: ContractEventConfig[] = [];
 
   for (const chain of chains) {
-    const addresses = chain === 'BSC' ? bscContracts : tronContracts;
+    const addresses: Partial<Record<ContractAlias, string>> = chain === 'BSC'
+      ? {
+          ...bscContracts,
+          ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
+        }
+      : tronContracts;
 
     for (const [contractAlias, eventNames] of Object.entries(eventsByContract)) {
+      if (!(contractAlias in addresses)) continue;
+
       for (const eventName of eventNames) {
         configs.push({
           chain,
           contractAlias: contractAlias as ContractAlias,
-          contractAddress: addresses[contractAlias as ContractAlias],
+          contractAddress: addresses[contractAlias as ContractAlias]!,
           eventName,
         });
       }
