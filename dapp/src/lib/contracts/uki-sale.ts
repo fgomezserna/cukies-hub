@@ -280,27 +280,13 @@ const env = envSchema.parse({
   NEXT_PUBLIC_BSCSCAN_BASE_URL: process.env.NEXT_PUBLIC_BSCSCAN_BASE_URL,
 });
 
-const NON_PRODUCTION_EXPLORER_RE = /test\s*net/i;
-
-function productionChainId(chainId: number) {
-  if (chainId !== 56) return 56;
-
-  return chainId;
-}
-
-function productionExplorerBaseUrl(url: string) {
-  return NON_PRODUCTION_EXPLORER_RE.test(url) ? 'https://bscscan.com' : url;
-}
-
-const hasProductionContracts = env.NEXT_PUBLIC_UKI_CHAIN_ID === 56;
-
 export const ukiSaleContracts = {
-  chainId: productionChainId(env.NEXT_PUBLIC_UKI_CHAIN_ID),
-  asmTokenAddress: hasProductionContracts ? env.NEXT_PUBLIC_ASM_TOKEN_ADDRESS : undefined,
-  ukiTokenAddress: hasProductionContracts ? env.NEXT_PUBLIC_UKI_TOKEN_ADDRESS : undefined,
-  vestingVaultAddress: hasProductionContracts ? env.NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS : undefined,
-  presaleAddress: hasProductionContracts ? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS : undefined,
-  blockExplorerBaseUrl: productionExplorerBaseUrl(env.NEXT_PUBLIC_BSCSCAN_BASE_URL),
+  chainId: env.NEXT_PUBLIC_UKI_CHAIN_ID,
+  asmTokenAddress: env.NEXT_PUBLIC_ASM_TOKEN_ADDRESS,
+  ukiTokenAddress: env.NEXT_PUBLIC_UKI_TOKEN_ADDRESS,
+  vestingVaultAddress: env.NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS,
+  presaleAddress: env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS,
+  blockExplorerBaseUrl: env.NEXT_PUBLIC_BSCSCAN_BASE_URL,
 } as const;
 
 export function getBscScanTxUrl(txHash: string) {
