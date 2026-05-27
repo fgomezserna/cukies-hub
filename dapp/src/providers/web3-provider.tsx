@@ -1,7 +1,7 @@
 'use client';
 
 import { WagmiProvider, createConfig, http } from 'wagmi';
-import { mainnet, sepolia } from 'wagmi/chains';
+import { mainnet } from 'wagmi/chains';
 import { defineChain } from 'viem';
 import { injected } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -27,35 +27,14 @@ const bsc = defineChain({
   },
 });
 
-// Binance Smart Chain Testnet
-const bscTestnet = defineChain({
-  id: 97,
-  name: 'BNB Smart Chain Testnet',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'BNB',
-    symbol: 'BNB',
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://data-seed-prebsc-1-s1.binance.org:8545'],
-    },
-  },
-  blockExplorers: {
-    default: { name: 'BscScan', url: 'https://testnet.bscscan.com' },
-  },
-});
-
 export const config = createConfig({
-  chains: [bsc, bscTestnet, mainnet, sepolia],
+  chains: [bsc, mainnet],
   connectors: [
     injected(),
   ],
   transports: {
     [bsc.id]: http(),
-    [bscTestnet.id]: http(),
     [mainnet.id]: http(),
-    [sepolia.id]: http(),
   },
 });
 
@@ -67,4 +46,4 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       </QueryClientProvider>
     </WagmiProvider>
   );
-} 
+}

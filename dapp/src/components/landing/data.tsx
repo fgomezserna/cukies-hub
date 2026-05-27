@@ -104,9 +104,9 @@ export const utilityNodes = [
     positionClassName: 'uki-node-games',
   },
   {
-    title: 'Créditos',
-    text: 'Créditos de competición.',
-    icon: Coins,
+    title: 'Skills y cría',
+    text: 'Crea nuevos Cukies y mejora sus habilidades.',
+    icon: Sparkles,
     className: 'uki-node-gold',
     positionClassName: 'uki-node-credits',
   },
@@ -144,12 +144,12 @@ export const communityRewards = [
   {
     icon: Users,
     title: '60%+ para la comunidad',
-    text: 'Mas del 60% del supply total de UKI se entregara como recompensas durante 6 anos.',
+    text: 'Más del 60% del supply total de UKI se entregará como recompensas durante 6 años.',
   },
   {
     icon: Crown,
-    title: 'Multiples formas de participar',
-    text: 'Stakea UKI, stakea o presta Cukies, presta creditos de competicion, juega o combina varias rutas.',
+    title: 'Múltiples formas de participar',
+    text: 'Stakea UKI, stakea o presta Cukies, presta créditos de competición, juega o combina varias rutas.',
   },
   {
     icon: Trophy,
@@ -224,7 +224,7 @@ export const futureUtility = [
 ];
 
 export const presalePrizeTiers = [
-  { amount: '10,000 UKI', prize: 'Sorteo 10 Cukies 2a Generacion', helper: 'Rarezas variadas' },
+  { amount: '10,000 UKI', prize: 'Sorteo 10 Cukies 2ª Generación', helper: 'Rarezas variadas' },
   { amount: '30,000 UKI', prize: 'Sorteo 5 Cukies Common' },
   { amount: '50,000 UKI', prize: 'Sorteo 2 Cukies Rare + 3 Uncommon' },
   { amount: '80,000 UKI', prize: 'Sorteo 1 Cukie Epic + 2 Rare + 2 Uncommon' },
@@ -236,22 +236,22 @@ export const gameCards = [
   {
     title: "Cukies Rush n' Run",
     text: 'Acción / runner',
-    image: '/portada_jump_Hop.jpg',
+    image: '/brand/generated/uki-timeline-economy.svg',
   },
   {
     title: 'Cukies Island',
     text: 'Aventura / mundo',
-    image: '/portada_cukies_island.jpg',
+    image: '/brand/generated/uki-final-cta-scene-v2.png',
   },
   {
     title: 'Cukies Brain Buzz',
     text: 'Trivia / competición',
-    image: '/portada_brain_buzz.jpg',
+    image: '/brand/generated/uki-utility-map-scene-v2.png',
   },
   {
     title: 'Más juegos',
     text: 'En preparación',
-    image: '/Powered_up_2.png',
+    image: '/brand/generated/uki-cukie-master-scene-v2.png',
   },
 ];
 
@@ -259,7 +259,7 @@ export const faqs = [
   {
     question: '¿Qué es UKI y para qué sirve?',
     answer:
-      'UKI es el token de utilidad previsto para la economía de juegos de Cukies World. Conecta juegos, créditos, Cukie Master, pools, rewards y futuras funciones del ecosistema.',
+      'UKI es el token de utilidad de la economía de juegos de Cukies World. Conecta juegos, créditos de competición, Cukie Master, pools, rankings, Cukies y recompensas.',
   },
   {
     question: '¿Por qué la preventa se compra con ASM?',

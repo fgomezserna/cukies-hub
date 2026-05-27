@@ -72,11 +72,11 @@ function shortAddress(value?: string | null) {
 }
 
 function formatRate(quote?: bigint, cost?: bigint) {
-  if (!quote || !cost || cost === BigInt(0)) return '100';
+  if (!quote || !cost || cost === BigInt(0)) return null;
 
   const quoteNumber = Number(formatUnits(quote, TOKEN_DECIMALS));
   const costNumber = Number(formatUnits(cost, TOKEN_DECIMALS));
-  if (!Number.isFinite(quoteNumber) || !Number.isFinite(costNumber) || costNumber <= 0) return '100';
+  if (!Number.isFinite(quoteNumber) || !Number.isFinite(costNumber) || costNumber <= 0) return null;
 
   return (quoteNumber / costNumber).toLocaleString('en-US', { maximumFractionDigits: 4 });
 }
@@ -331,6 +331,7 @@ export function PresalePurchasePanel() {
   const referralMinimum = referralStatus?.minimumUkiToUnlockLink ?? 0;
   const referralProgress = referralStatus?.unlockProgress ?? 0;
   const referralProgressPercent = Math.round(referralProgress * 100);
+  const quoteRate = isOpen ? formatRate(quotedUki, parsedAmount ?? undefined) : null;
   const remainingUkiToUnlock = Math.max(
     referralMinimum - (referralStatus?.totalUkiPurchased ?? 0),
     0,
@@ -344,7 +345,7 @@ export function PresalePurchasePanel() {
           Comprar UKI
         </span>
         <span className="text-right text-[0.62rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-          1 ASM = {formatRate(quotedUki, parsedAmount ?? undefined)} UKI
+          {quoteRate ? `1 ASM = ${quoteRate} UKI` : 'Ratio ASM fijado al abrir'}
         </span>
       </div>
 

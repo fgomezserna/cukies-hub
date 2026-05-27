@@ -89,12 +89,13 @@ function formatRate(value?: string) {
 
 export function PresaleRateLabel() {
   const state = usePresaleStatusValue();
+  const { isLocked } = usePresaleLock();
 
   if (state.status === 'loading') {
     return <span className="uki-status-inline">Cargando estado de preventa</span>;
   }
 
-  if (state.status === 'error' || !state.data.isConfigured) {
+  if (isLocked || state.status === 'error' || !state.data.isConfigured) {
     return <span className="uki-status-inline">Ratio ASM fijado al abrir</span>;
   }
 

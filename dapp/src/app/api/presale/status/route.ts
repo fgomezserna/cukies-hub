@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createPublicClient, formatUnits, http, isAddress } from 'viem';
-import { bsc, bscTestnet } from 'viem/chains';
+import { bsc } from 'viem/chains';
 
 import { presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
 import {
@@ -11,10 +11,6 @@ import {
 } from '@/components/landing/sale-config';
 
 export const dynamic = 'force-dynamic';
-
-function getChain(chainId: number) {
-  return chainId === bscTestnet.id ? bscTestnet : bsc;
-}
 
 export async function GET() {
   const configuredPresale = ukiSaleContracts.presaleAddress;
@@ -35,9 +31,8 @@ export async function GET() {
     });
   }
 
-  const chain = getChain(ukiSaleContracts.chainId);
   const client = createPublicClient({
-    chain,
+    chain: bsc,
     transport: http(),
   });
 

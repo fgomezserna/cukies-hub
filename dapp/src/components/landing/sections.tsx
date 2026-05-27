@@ -250,12 +250,12 @@ function Amount({ label, value, token }: { label: string; value: string; token: 
 function CommunityOwnership() {
   return (
     <section className="uki-container pb-10">
-      <SectionHeading title="Cukies World es de su gente" subtitle="Mas del 60% del supply total de UKI se entregara como recompensas a quienes participan en el ecosistema durante 6 anos." tone="cyan" withRule />
+      <SectionHeading title="Cukies World es de su gente" subtitle="Más del 60% del supply total de UKI se entregará como recompensas a quienes participan en el ecosistema durante 6 años." tone="cyan" withRule />
       <div className="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Panel innerClassName="flex h-full flex-col justify-center p-6">
           <p className="font-headline text-7xl font-black leading-none text-[var(--uki-cyan)] sm:text-8xl">60%+</p>
           <p className="mt-4 max-w-xl text-lg font-semibold leading-snug text-[var(--uki-text)]">
-            Una parte mayoritaria de UKI esta reservada para jugadores, holders, Cukie Masters, prestadores de recursos y miembros activos de Cukies World.
+            Una parte mayoritaria de UKI está reservada para jugadores, holders, Cukie Masters, prestadores de recursos y miembros activos de Cukies World.
           </p>
         </Panel>
         <div className="grid gap-3">
@@ -282,7 +282,7 @@ function CommunityOwnership() {
 function UtilityMap() {
   return (
     <section id="utility" className="uki-container relative pb-9">
-      <SectionHeading title="Por qué existe UKI" subtitle="UKI lo conecta todo: juegos, creditos de competicion, Cukies, pools, rankings y recompensas." tone="cyan" withRule />
+      <SectionHeading title="Por qué existe UKI" subtitle="UKI lo conecta todo: juegos, créditos de competición, Cukies, pools, rankings y recompensas." tone="cyan" withRule />
       <div className="uki-utility-map">
         <svg className="uki-utility-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           <path d="M50 53 L31 21" />
@@ -325,7 +325,7 @@ function AfterPresale() {
                     Después de la preventa: <span className="text-[var(--uki-cyan)]">Cukie Master</span>
                   </>
                 }
-                subtitle="La llave principal al ecosistema para ganar recompensas cada dia de forma activa o pasiva."
+                subtitle="La llave principal al ecosistema para ganar recompensas cada día de forma activa o pasiva."
               />
             </div>
           </div>
@@ -362,11 +362,11 @@ function AfterPresale() {
           </div>
           <p className="uki-after-note">
             <Timer className="h-4 w-4 text-[var(--uki-gold)]" strokeWidth={1.8} />
-            500 cupos iniciales. Requisito: stakear 20,000 UKI o mas por cupo, maximo 5 cupos por wallet. Los UKI comprados durante la preventa califican aunque tengan vesting.
+            500 cupos iniciales. Requisito: stakear 20,000 UKI o más por cupo, máximo 5 cupos por wallet. Los UKI comprados durante la preventa califican aunque tengan vesting.
           </p>
           <p className="uki-after-note">
             <Gift className="h-4 w-4 text-[var(--uki-gold)]" strokeWidth={1.8} />
-            Cada cupo recibe 100 creditos de competicion diarios. Puedes jugarlos para convertirlos a UKI o aportarlos a un pool para compartir ganancias.
+            Cada cupo recibe 100 créditos de competición diarios. Puedes jugarlos para convertirlos a UKI o aportarlos a un pool para compartir ganancias.
           </p>
         </div>
       </div>
@@ -399,7 +399,7 @@ function Games() {
           <div className="uki-game-overview rounded-[10px] border border-white/10 bg-[#02090d]/62 p-5">
             <h3 className="font-headline text-xl font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)]">Resumen de juego</h3>
             <ul className="mt-5 space-y-4 text-sm font-semibold text-[var(--uki-text)]">
-              {['Partidas rapidas de unos 5 minutos', 'Coste por partida: 10 creditos', 'Cada partida rankea en el torneo semanal'].map((item) => (
+              {['Partidas rápidas de unos 5 minutos', 'Coste por partida: 10 créditos', 'Cada partida rankea en el torneo semanal'].map((item) => (
                 <li key={item} className="flex items-center gap-3">
                   <Check className="h-4 w-4 rounded-full bg-[var(--uki-cyan)] p-0.5 text-[#02090d]" strokeWidth={2} />
                   {item}
@@ -407,7 +407,7 @@ function Games() {
               ))}
             </ul>
             <div className="mt-8 grid grid-cols-3 gap-3 border-t border-white/10 pt-5">
-              <GameMetric label="Entrada" value="10" helper="Creditos" />
+              <GameMetric label="Entrada" value="10" helper="Créditos" />
               <GameMetric label="Ranking" value="Semanal" helper="Periodo" />
               <GameMetric label="Premio" value="7.5" helper="UKI max." />
             </div>
@@ -456,7 +456,7 @@ function PrizesPreview() {
         <Panel innerClassName="flex h-full flex-col justify-between p-5">
           <div>
             <Trophy className="h-10 w-10 text-[var(--uki-gold)]" strokeWidth={1.8} />
-            <h3 className="mt-4 font-headline text-2xl font-black uppercase text-[var(--uki-cyan)]">Competicion de referidos</h3>
+            <h3 className="mt-4 font-headline text-2xl font-black uppercase text-[var(--uki-cyan)]">Competición de referidos</h3>
             <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
               Los 5 mejores sponsors reciben un Cukie garantizado y el resto participa en sorteos por UKI recomendado.
             </p>

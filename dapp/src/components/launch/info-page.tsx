@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { LandingButton, Panel } from '@/components/landing/primitives';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
@@ -32,6 +33,7 @@ type InfoPageProps = {
   sections: InfoSection[];
   primaryCta: { label: string; href: string };
   secondaryCta?: { label: string; href: string };
+  afterSections?: ReactNode;
   note?: string;
 };
 
@@ -55,6 +57,7 @@ export function LaunchInfoPage({
   sections,
   primaryCta,
   secondaryCta,
+  afterSections,
   note,
 }: InfoPageProps) {
   return (
@@ -117,7 +120,6 @@ export function LaunchInfoPage({
       <section className="uki-container relative z-[2] grid gap-4 pb-10 lg:grid-cols-2">
         {sections.map((section) => (
           <Panel key={section.title} innerClassName="h-full p-5 sm:p-6">
-            <span id={section.title === 'Consigue tu link de invitacion' ? 'invitacion' : undefined} className="block scroll-mt-28" />
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" strokeWidth={1.8} />
               <div>
@@ -141,6 +143,8 @@ export function LaunchInfoPage({
           </Panel>
         ))}
       </section>
+
+      {afterSections}
 
       {note ? (
         <section className="uki-container relative z-[2] pb-14">
