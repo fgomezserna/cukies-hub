@@ -37,6 +37,7 @@ type InfoPageProps = {
 
 const publicNav = [
   { label: 'Inicio', href: '/' },
+  { label: 'Premios', href: '/premios' },
   { label: 'Cukie Master', href: '/cukie-master' },
   { label: 'Hodler', href: '/cukie-hodler' },
   { label: 'Cómo jugar', href: '/como-jugar' },
@@ -116,6 +117,7 @@ export function LaunchInfoPage({
       <section className="uki-container relative z-[2] grid gap-4 pb-10 lg:grid-cols-2">
         {sections.map((section) => (
           <Panel key={section.title} innerClassName="h-full p-5 sm:p-6">
+            <span id={section.title === 'Consigue tu link de invitacion' ? 'invitacion' : undefined} className="block scroll-mt-28" />
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" strokeWidth={1.8} />
               <div>

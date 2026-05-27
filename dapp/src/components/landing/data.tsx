@@ -9,7 +9,6 @@ import {
   Gift,
   Lock,
   Network,
-  ShieldCheck,
   Sparkles,
   Timer,
   Trophy,
@@ -24,15 +23,15 @@ export type LandingIcon = LucideIcon;
 export const navItems = [
   { label: 'Preventa', href: '#presale' },
   { label: 'Comprar', href: '#token' },
+  { label: 'Premios', href: '/premios' },
   { label: 'Cukie Master', href: '/cukie-master' },
   { label: 'Hodler', href: '/cukie-hodler' },
   { label: 'Jugar', href: '/como-jugar' },
-  { label: 'Cukies', href: '/cukies' },
 ];
 
 export const trustSignals = [
   { icon: Zap, label: 'Red', value: 'BNB Smart Chain' },
-  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada' },
+  { icon: Timer, label: 'Inicio', value: '15 junio' },
   { icon: Users, label: 'Comunidad', value: 'Desde 2021' },
 ];
 
@@ -42,7 +41,7 @@ export const saleFacts = [
   { icon: CircleDollarSign, label: 'Compra con', value: 'ASM', helper: 'Moneda principal' },
   { icon: Lock, label: 'Vesting', value: '9 meses', helper: 'Lineal sin cliff' },
   { icon: Trophy, label: 'Listing', value: 'Mínimo $0.012', helper: 'Objetivo inicial' },
-  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada', helper: '9+ meses' },
+  { icon: Gift, label: 'Premios', value: 'Cukies', helper: 'Sorteos y sponsors' },
 ];
 
 export const purchaseSteps = [
@@ -106,38 +105,56 @@ export const utilityNodes = [
   },
   {
     title: 'Créditos',
-    text: 'Usa recursos internos de juego.',
+    text: 'Créditos de competición.',
     icon: Coins,
     className: 'uki-node-gold',
     positionClassName: 'uki-node-credits',
   },
   {
-    title: 'Pools',
-    text: 'Comparte recursos bajo reglas claras.',
-    icon: Database,
+    title: 'Recompensas',
+    text: 'Participa y gana UKI cada día.',
+    icon: Gift,
     className: 'uki-node-blue',
     positionClassName: 'uki-node-pools',
   },
   {
     title: 'Cukie Master',
-    text: 'Desbloquea cupos y créditos diarios.',
+    text: 'Stakea tus UKI para recibir créditos diarios.',
     icon: Crown,
     className: 'uki-node-pink',
     positionClassName: 'uki-node-master',
   },
   {
-    title: 'Mundos futuros',
-    text: 'Expande el universo Cukies.',
+    title: 'Gobernanza',
+    text: 'Forma parte de las decisiones.',
     icon: Network,
     className: 'uki-node-green',
     positionClassName: 'uki-node-worlds',
   },
   {
-    title: 'Rewards',
-    text: 'Sigue asignaciones por periodo.',
-    icon: Gift,
+    title: 'Marketplace',
+    text: 'Compra y vende Cukies y recursos para los juegos.',
+    icon: Database,
     className: 'uki-node-red',
     positionClassName: 'uki-node-rewards',
+  },
+];
+
+export const communityRewards = [
+  {
+    icon: Users,
+    title: '60%+ para la comunidad',
+    text: 'Mas del 60% del supply total de UKI se entregara como recompensas durante 6 anos.',
+  },
+  {
+    icon: Crown,
+    title: 'Multiples formas de participar',
+    text: 'Stakea UKI, stakea o presta Cukies, presta creditos de competicion, juega o combina varias rutas.',
+  },
+  {
+    icon: Trophy,
+    title: 'Actividad recompensada',
+    text: 'El sistema premia a quienes forman parte del ecosistema, no solo a quienes compran el token.',
   },
 ];
 
@@ -204,6 +221,15 @@ export const futureUtility = [
     className: 'uki-future-vault',
     image: '/brand/generated/cukie-master-pools-landing.png',
   },
+];
+
+export const presalePrizeTiers = [
+  { amount: '10,000 UKI', prize: 'Sorteo 10 Cukies 2a Generacion', helper: 'Rarezas variadas' },
+  { amount: '30,000 UKI', prize: 'Sorteo 5 Cukies Common' },
+  { amount: '50,000 UKI', prize: 'Sorteo 2 Cukies Rare + 3 Uncommon' },
+  { amount: '80,000 UKI', prize: 'Sorteo 1 Cukie Epic + 2 Rare + 2 Uncommon' },
+  { amount: '125,000 UKI', prize: 'Sorteo 1 Cukie Legendary + 3 Epic' },
+  { amount: '150,000 UKI', prize: 'Sorteo 1 Cukie Goat + 3 Legendary', helper: '+1 ticket adicional en cada sorteo desde este tramo' },
 ];
 
 export const gameCards = [
