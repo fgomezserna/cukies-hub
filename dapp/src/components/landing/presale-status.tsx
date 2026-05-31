@@ -79,10 +79,10 @@ export function PresaleStatusProvider({ children }: { children: ReactNode }) {
 }
 
 function formatRate(value?: string) {
-  if (!value) return 'Ratio fijado al abrir';
+  if (!value) return 'RATIO ASM - UKI SE FIJARÁ AL INICIO';
 
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return 'Ratio fijado al abrir';
+  if (!Number.isFinite(numeric) || numeric <= 0) return 'RATIO ASM - UKI SE FIJARÁ AL INICIO';
 
   return `1 ASM = ${numeric.toLocaleString('en-US', { maximumFractionDigits: 4 })} UKI`;
 }
@@ -95,8 +95,8 @@ export function PresaleRateLabel() {
     return <span className="uki-status-inline">Cargando estado de preventa</span>;
   }
 
-  if (isLocked || state.status === 'error' || !state.data.isConfigured) {
-    return <span className="uki-status-inline">Ratio ASM fijado al abrir</span>;
+  if (isLocked || state.status === 'error' || !state.data.isConfigured || !state.data.isOpen) {
+    return <span className="uki-status-inline">RATIO ASM - UKI SE FIJARÁ AL INICIO</span>;
   }
 
   return <span className="uki-status-inline">{formatRate(state.data.price?.ukiPerAsmFormatted)}</span>;

@@ -70,38 +70,47 @@ export default function VestingPage() {
   const contractAddress = isConfigured ? vaultAddress as `0x${string}` : undefined;
   const accountAddress = address as `0x${string}` | undefined;
 
-  const { data: totalAllocated } = useReadContract({
+  const { data: totalAllocated, isError: isTotalAllocatedError } = useReadContract({
+    chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'totalAllocated',
     query: { enabled: isConfigured },
   });
-  const { data: totalReleased } = useReadContract({
+  const { data: totalReleased, isError: isTotalReleasedError } = useReadContract({
+    chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'totalReleased',
     query: { enabled: isConfigured },
   });
-  const { data: unallocated } = useReadContract({
+  const { data: unallocated, isError: isUnallocatedError } = useReadContract({
+    chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'unallocatedBalance',
     query: { enabled: isConfigured },
   });
-  const { data: userSchedule } = useReadContract({
+  const { data: userSchedule, isError: isScheduleError } = useReadContract({
+    chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'scheduleOf',
     args: accountAddress ? [accountAddress] : undefined,
     query: { enabled: isConfigured && Boolean(accountAddress) },
   });
-  const { data: claimable } = useReadContract({
+  const { data: claimable, isError: isClaimableError } = useReadContract({
+    chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'releasable',
     args: accountAddress ? [accountAddress] : undefined,
     query: { enabled: isConfigured && Boolean(accountAddress) },
   });
+
+  const hasGlobalReadError = isTotalAllocatedError || isTotalReleasedError || isUnallocatedError;
+  const hasWalletReadError = Boolean(isConnected && (isScheduleError || isClaimableError));
+  const hasVestingReadError = isConfigured && (hasGlobalReadError || hasWalletReadError);
 
   const schedule = userSchedule as Schedule | undefined;
   const totalAmount = scheduleField(schedule, 'totalAmount', 0) ?? BigInt(0);
@@ -127,6 +136,7 @@ export default function VestingPage() {
   function claimAll() {
     if (!contractAddress) return;
     writeContract({
+      chainId: ukiSaleContracts.chainId,
       address: contractAddress,
       abi: vestingVaultAbi,
       functionName: 'releaseAll',
@@ -167,6 +177,20 @@ export default function VestingPage() {
                 <p className="font-semibold text-amber-50">Vesting contract is not configured.</p>
                 <p className="mt-1 text-amber-100/80">
                   Add `NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS` and the matching presale contract addresses before testing the post-purchase flow.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {hasVestingReadError ? (
+          <section className="rounded-lg border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold text-red-50">Vesting data is not available right now.</p>
+                <p className="mt-1 text-red-100/80">
+                  The contract read failed on chain {ukiSaleContracts.chainId}. Check the RPC, contract address and selected network before treating the values below as final.
                 </p>
               </div>
             </div>
@@ -253,7 +277,7 @@ export default function VestingPage() {
               </div>
             </div>
 
-            {isConnected && !hasPosition ? (
+            {isConfigured && isConnected && !hasPosition && !hasWalletReadError ? (
               <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
                 No presale vesting schedule was found for this wallet. After a successful purchase, this area should show the UKI allocation created by the presale contract.
               </div>

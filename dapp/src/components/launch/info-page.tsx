@@ -40,11 +40,6 @@ type InfoPageProps = {
 const publicNav = [
   { label: 'Inicio', href: '/' },
   { label: 'Premios', href: '/premios' },
-  { label: 'Cukie Master', href: '/cukie-master' },
-  { label: 'Hodler', href: '/cukie-hodler' },
-  { label: 'Cómo jugar', href: '/como-jugar' },
-  { label: 'Wallet', href: '/wallet' },
-  { label: 'Juegos', href: '/games' },
 ];
 
 export function LaunchInfoPage({

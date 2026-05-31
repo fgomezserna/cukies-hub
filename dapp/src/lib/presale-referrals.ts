@@ -48,6 +48,18 @@ function referralCodeForWallet(normalizedWalletAddress: string) {
   return `uki-${hash.slice(0, 10)}`;
 }
 
+type ReferralLevelCounts = {
+  level1: number;
+  level2: number;
+  level3: number;
+};
+
+const emptyReferralLevelCounts: ReferralLevelCounts = {
+  level1: 0,
+  level2: 0,
+  level3: 0,
+};
+
 async function getCampaignConfig(db: Db) {
   const config = await db.collection('presale_referral_campaign_config').findOne(
     { active: true },
@@ -62,13 +74,52 @@ async function getCampaignConfig(db: Db) {
   };
 }
 
+async function getReferralLevelCounts(db: Db, sponsorWalletNormalized?: string | null) {
+  if (!sponsorWalletNormalized) return emptyReferralLevelCounts;
+
+  const rows = await db.collection('presale_referral_contributions').aggregate<{
+    _id: number;
+    referralCount: number;
+  }>([
+    {
+      $match: {
+        sponsorWalletNormalized,
+        level: { $in: [1, 2, 3] },
+      },
+    },
+    {
+      $group: {
+        _id: '$level',
+        uniqueBuyers: { $addToSet: '$buyerWalletNormalized' },
+      },
+    },
+    {
+      $project: {
+        referralCount: { $size: '$uniqueBuyers' },
+      },
+    },
+  ]).toArray();
+
+  return rows.reduce<ReferralLevelCounts>((counts, row) => {
+    if (row._id === 1) counts.level1 = row.referralCount;
+    if (row._id === 2) counts.level2 = row.referralCount;
+    if (row._id === 3) counts.level3 = row.referralCount;
+    return counts;
+  }, { ...emptyReferralLevelCounts });
+}
+
 function publicParticipant(
   participant: Record<string, any>,
   campaignConfig: Awaited<ReturnType<typeof getCampaignConfig>>,
+  referralLevelCounts: ReferralLevelCounts,
   origin?: string | null,
 ) {
   const isUnlocked = Boolean(participant.referralUnlockedAt);
-  const referralCode = String(participant.referralCode);
+  const normalizedWalletAddress = String(participant.normalizedWalletAddress);
+  const referralCode =
+    typeof participant.referralCode === 'string' && participant.referralCode.trim()
+      ? participant.referralCode
+      : referralCodeForWallet(normalizedWalletAddress);
   const totalUkiPurchased = Number(participant.totalUkiPurchased ?? 0);
   const minimumUkiToUnlockLink = campaignConfig.minimumUkiToUnlockLink;
   const unlockProgress = minimumUkiToUnlockLink > 0
@@ -79,7 +130,7 @@ function publicParticipant(
 
   return {
     walletAddress: participant.walletAddress,
-    normalizedWalletAddress: participant.normalizedWalletAddress,
+    normalizedWalletAddress,
     totalUkiPurchased,
     minimumUkiToUnlockLink,
     unlockProgress,
@@ -94,6 +145,9 @@ function publicParticipant(
     referralLevel1UkiAmount: participant.referralLevel1UkiAmount ?? 0,
     referralLevel2UkiAmount: participant.referralLevel2UkiAmount ?? 0,
     referralLevel3UkiAmount: participant.referralLevel3UkiAmount ?? 0,
+    referralLevel1Count: referralLevelCounts.level1,
+    referralLevel2Count: referralLevelCounts.level2,
+    referralLevel3Count: referralLevelCounts.level3,
     referralWeightedScore: participant.referralWeightedScore ?? 0,
     levelWeights: {
       level1: campaignConfig.levelOneWeight,
@@ -131,6 +185,23 @@ export async function getOrCreatePresaleParticipant(walletAddress: string) {
     { upsert: true },
   );
 
+  await db.collection('presale_participants').updateOne(
+    {
+      normalizedWalletAddress,
+      $or: [
+        { referralCode: { $exists: false } },
+        { referralCode: null },
+        { referralCode: '' },
+      ],
+    },
+    {
+      $set: {
+        referralCode,
+        updatedAt: now,
+      },
+    },
+  );
+
   return db.collection('presale_participants').findOne({ normalizedWalletAddress });
 }
 
@@ -139,8 +210,12 @@ export async function getPresaleReferralStatus(walletAddress: string, origin?: s
   const participant = await getOrCreatePresaleParticipant(walletAddress);
   if (!participant) throw new Error('No se pudo cargar participante de preventa.');
   const campaignConfig = await getCampaignConfig(db);
+  const referralLevelCounts = await getReferralLevelCounts(
+    db,
+    participant.normalizedWalletAddress,
+  );
 
-  return publicParticipant(participant, campaignConfig, origin);
+  return publicParticipant(participant, campaignConfig, referralLevelCounts, origin);
 }
 
 export async function applyPresaleReferralCode(walletAddress: string, referralCode: string) {

@@ -1,5 +1,4 @@
-import { Lock, Zap, type LucideIcon } from 'lucide-react';
-import { PresaleCountdownGate } from './presale-countdown-gate';
+import { Zap, type LucideIcon } from 'lucide-react';
 import { PresalePurchasePanel } from './presale-purchase-panel';
 import { PresaleRateLabel, PresaleStatusProvider } from './presale-status';
 import { Panel, TokenCoin } from './primitives';
@@ -25,6 +24,9 @@ function SaleConsoleContent() {
       </div>
 
       <div className="mt-2.5 rounded-[10px] border border-[var(--uki-pink-border)] bg-[#02090d]/74 p-2.5">
+        <p className="mb-2 text-center font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cream)]">
+          1 ASM = ¿? UKI
+        </p>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <TokenBox label="ASM" tone="purple" />
           <span className="font-headline text-2xl font-black text-[var(--uki-cyan)]">-&gt;</span>
@@ -35,10 +37,8 @@ function SaleConsoleContent() {
       <div className="mt-2 grid grid-cols-3 gap-2 border-y border-white/10 py-2">
         <ConsoleMetric label="Precio" value="$0.01" helper="Por UKI" />
         <ConsoleMetric label="Red" value="BSC" icon={Zap} />
-        <ConsoleMetric label="Vesting" value="9m" helper="Lineal" icon={Lock} />
+        <ConsoleMetric label="Listing" value="$0.012" helper="Por UKI" />
       </div>
-
-      <PresaleCountdownGate />
 
       <PresalePurchasePanel />
     </Panel>

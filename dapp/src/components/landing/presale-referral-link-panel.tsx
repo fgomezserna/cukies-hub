@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Copy, Loader2, ShieldAlert, Users, Wallet } from 'lucide-react';
+import { Copy, Loader2, ShieldAlert, Ticket, Trophy, Users, Wallet } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
@@ -14,6 +14,17 @@ type PresaleReferralStatus = {
   unlockProgress: number;
   referralLink: string | null;
   referralWeightedScore: number;
+  referralLevel1UkiAmount: number;
+  referralLevel2UkiAmount: number;
+  referralLevel3UkiAmount: number;
+  referralLevel1Count: number;
+  referralLevel2Count: number;
+  referralLevel3Count: number;
+  levelWeights: {
+    level1: number;
+    level2: number;
+    level3: number;
+  };
 };
 
 function formatNumber(value?: number | null, maximumFractionDigits = 2) {
@@ -27,6 +38,7 @@ export function PresaleReferralLinkPanel() {
   const { toast } = useToast();
   const [status, setStatus] = useState<PresaleReferralStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const isWrongChain = isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
 
   const fetchStatus = useCallback(async () => {
@@ -36,6 +48,7 @@ export function PresaleReferralLinkPanel() {
     }
 
     setIsLoading(true);
+    setStatusError(null);
     try {
       const response = await fetch(`/api/presale/referral/status?walletAddress=${address}`, {
         cache: 'no-store',
@@ -43,7 +56,13 @@ export function PresaleReferralLinkPanel() {
 
       if (response.ok) {
         setStatus(await response.json());
+      } else {
+        setStatus(null);
+        setStatusError('No se pudo cargar tu progreso de referidos.');
       }
+    } catch {
+      setStatus(null);
+      setStatusError('No se pudo cargar tu progreso de referidos.');
     } finally {
       setIsLoading(false);
     }
@@ -66,15 +85,44 @@ export function PresaleReferralLinkPanel() {
   const referralMinimum = status?.minimumUkiToUnlockLink ?? 0;
   const referralProgressPercent = Math.round((status?.unlockProgress ?? 0) * 100);
   const remainingUkiToUnlock = Math.max(referralMinimum - (status?.totalUkiPurchased ?? 0), 0);
+  const hasPurchasedUki = (status?.totalUkiPurchased ?? 0) > 0;
+  const referralLevels = [
+    {
+      level: 'Nivel 1',
+      includes: 'Invitados directos',
+      referrals: status?.referralLevel1Count ?? 0,
+      purchased: status?.referralLevel1UkiAmount ?? 0,
+      weight: status?.levelWeights?.level1 ?? 1,
+      color: 'text-[#7dd3fc]',
+    },
+    {
+      level: 'Nivel 2',
+      includes: 'Invitados de tus invitados',
+      referrals: status?.referralLevel2Count ?? 0,
+      purchased: status?.referralLevel2UkiAmount ?? 0,
+      weight: status?.levelWeights?.level2 ?? 0.5,
+      color: 'text-[#e45cff]',
+    },
+    {
+      level: 'Nivel 3',
+      includes: 'Tercer nivel de tu red',
+      referrals: status?.referralLevel3Count ?? 0,
+      purchased: status?.referralLevel3UkiAmount ?? 0,
+      weight: status?.levelWeights?.level3 ?? 0.25,
+      color: 'text-[#91e96f]',
+    },
+  ];
 
   if (!isConnected || !address) {
     return (
-      <div className="rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#071923]/82 p-5">
-        <div className="uki-state-callout uki-state-callout-warning">
-          <Wallet className="h-4 w-4" strokeWidth={1.8} />
+      <div className="rounded-[10px] border border-[#e45cff]/36 bg-[#070817]/86 p-5">
+        <div className="flex gap-3 rounded-[9px] border border-[#f2c34b]/35 bg-[#2b1d08]/48 p-4">
+          <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-gold)]" strokeWidth={1.8} />
           <div>
-            <p>Conecta tu wallet</p>
-            <span>Conecta una wallet EVM para comprobar si ya puedes acceder a tu link de invitación.</span>
+            <p className="font-headline text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cream)]">Conecta tu wallet</p>
+            <span className="mt-1 block text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Conecta una wallet EVM para ver tu progreso y comprobar si ya puedes acceder a tu link de invitación.
+            </span>
           </div>
         </div>
         <LandingWalletConnectButton className="mt-4 w-full justify-center" showCompactText={false} />
@@ -84,12 +132,14 @@ export function PresaleReferralLinkPanel() {
 
   if (isWrongChain) {
     return (
-      <div className="rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#071923]/82 p-5">
-        <div className="uki-state-callout uki-state-callout-warning">
-          <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
+      <div className="rounded-[10px] border border-[#e45cff]/36 bg-[#070817]/86 p-5">
+        <div className="flex gap-3 rounded-[9px] border border-[#f2c34b]/35 bg-[#2b1d08]/48 p-4">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-gold)]" strokeWidth={1.8} />
           <div>
-            <p>Red incorrecta</p>
-            <span>Cambia a {UKI_PRESALE_CHAIN_LABEL} para revisar tu compra y tu link.</span>
+            <p className="font-headline text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cream)]">Red incorrecta</p>
+            <span className="mt-1 block text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Cambia a {UKI_PRESALE_CHAIN_LABEL} para revisar tu compra y tu link.
+            </span>
           </div>
         </div>
         <LandingWalletConnectButton className="mt-4 w-full justify-center" showCompactText={false} />
@@ -98,11 +148,11 @@ export function PresaleReferralLinkPanel() {
   }
 
   return (
-    <div className="rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#071923]/82 p-5">
+    <div className="rounded-[10px] border border-[#e45cff]/36 bg-[#070817]/86 p-5">
       <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
+        <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[#f19bff]">
           <Users className="h-4 w-4" strokeWidth={1.8} />
-          Link de invitación
+          Tu enlace de invitación
         </span>
         <span className="inline-flex items-center gap-1 text-[0.68rem] font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
           {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -116,32 +166,64 @@ export function PresaleReferralLinkPanel() {
             <input
               value={status.referralLink}
               readOnly
-              className="h-11 min-w-0 flex-1 rounded-[7px] border border-[var(--uki-cyan-border)] bg-[#02090d] px-3 text-sm font-bold text-[var(--uki-cream)] outline-none"
+              aria-label="Enlace de invitación de preventa"
+              className="h-11 min-w-0 flex-1 rounded-[7px] border border-[#e45cff]/36 bg-[#02030a] px-3 text-sm font-bold text-[var(--uki-cream)] outline-none"
             />
-            <button type="button" onClick={copyReferralLink} className="uki-wallet-button h-11 px-4" aria-label="Copiar link de invitación">
+            <button
+              type="button"
+              onClick={copyReferralLink}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[7px] border border-[#e45cff]/60 bg-[#7c3cff] px-4 font-headline text-xs font-black uppercase tracking-[0.08em] text-white shadow-[0_0_18px_rgba(228,92,255,0.28)] transition hover:bg-[#8f4fff]"
+              aria-label="Copiar link de invitación"
+            >
               <Copy className="h-4 w-4" strokeWidth={1.8} />
+              <span className="hidden sm:inline">Copiar enlace</span>
             </button>
           </div>
           <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
             Link activo. El volumen comprado desde tus invitaciones cuenta para la competición de sponsors.
           </p>
         </>
+      ) : statusError ? (
+        <div className="mt-4 flex gap-3 rounded-[9px] border border-[#f2c34b]/35 bg-[#2b1d08]/48 p-4">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-gold)]" strokeWidth={1.8} />
+          <div>
+            <p className="font-headline text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cream)]">Progreso no disponible</p>
+            <span className="mt-1 block text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              {statusError}
+            </span>
+          </div>
+        </div>
+      ) : !status ? (
+        <div className="mt-4 flex gap-3 rounded-[9px] border border-[#e45cff]/30 bg-[#09091a]/70 p-4">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#f19bff]" strokeWidth={1.8} />
+          <div>
+            <p className="font-headline text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cream)]">Cargando progreso</p>
+            <span className="mt-1 block text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Estamos revisando tus compras y tu enlace de invitación.
+            </span>
+          </div>
+        </div>
       ) : (
         <>
           <div className="mt-4">
             <div className="flex items-end justify-between gap-2 text-[0.68rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-              <span>Compra mínima</span>
+              <span>Desbloqueo de link</span>
               <span>
                 {formatNumber(status?.totalUkiPurchased)} / {formatNumber(referralMinimum)} UKI
               </span>
             </div>
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-black/35">
-              <div className="h-full rounded-full bg-[var(--uki-cyan)] transition-all" style={{ width: `${referralProgressPercent}%` }} />
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#e45cff] to-[#f2c34b] transition-all"
+                style={{ width: `${referralProgressPercent}%` }}
+              />
             </div>
           </div>
           <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
             {remainingUkiToUnlock > 0
-              ? `Necesitas comprar ${formatNumber(remainingUkiToUnlock)} UKI más con esta wallet para acceder a tu link.`
+              ? hasPurchasedUki
+                ? `Necesitas comprar ${formatNumber(remainingUkiToUnlock)} UKI más con esta wallet para acceder a tu link.`
+                : 'Aún no has hecho ninguna compra con esta wallet. Compra UKI para desbloquear tu enlace de invitación.'
               : 'Tu link aparecerá cuando el indexer confirme la compra mínima.'}
           </p>
           <Link href="/#presale-console" className="uki-button uki-button-secondary mt-4 w-full justify-center">
@@ -149,6 +231,62 @@ export function PresaleReferralLinkPanel() {
           </Link>
         </>
       )}
+
+      {status ? (
+        <>
+          <div className="mt-5 overflow-x-auto rounded-[10px] border border-white/10">
+            <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
+              <thead className="bg-white/[0.06] text-[var(--uki-muted)]">
+                <tr>
+                  <th className="px-4 py-3 font-headline text-[0.65rem] font-black uppercase tracking-[0.12em]">Nivel</th>
+                  <th className="px-4 py-3 font-headline text-[0.65rem] font-black uppercase tracking-[0.12em]">Qué incluye</th>
+                  <th className="px-4 py-3 font-headline text-[0.65rem] font-black uppercase tracking-[0.12em]">Referidos</th>
+                  <th className="px-4 py-3 font-headline text-[0.65rem] font-black uppercase tracking-[0.12em]">Comprado por invitados</th>
+                  <th className="px-4 py-3 text-right font-headline text-[0.65rem] font-black uppercase tracking-[0.12em]">
+                    Cuenta para competición
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10 text-[var(--uki-text)]">
+                {referralLevels.map((level) => (
+                  <tr key={level.level}>
+                    <td className={`px-4 py-3 font-headline text-base font-black uppercase ${level.color}`}>{level.level}</td>
+                    <td className="px-4 py-3 font-semibold">{level.includes}</td>
+                    <td className="px-4 py-3 font-headline text-lg font-black text-[var(--uki-cream)]">
+                      {formatNumber(level.referrals, 0)}
+                    </td>
+                    <td className="px-4 py-3 font-semibold">
+                      <span className="inline-flex items-center gap-2">
+                        <Ticket className="h-4 w-4 text-[var(--uki-gold)]" strokeWidth={1.8} />
+                        {formatNumber(level.purchased)} UKI
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-headline text-lg font-black text-[var(--uki-cream)]">
+                      {formatNumber(level.purchased * level.weight)} UKI
+                      <span className="ml-2 text-xs text-[var(--uki-muted)]">({Math.round(level.weight * 100)}%)</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-3 rounded-[10px] border border-[#f2c34b]/30 bg-[#2b1d08]/40 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="inline-flex items-center gap-2 text-[0.72rem] font-black uppercase tracking-[0.12em] text-[#7dd3fc]">
+                <Trophy className="h-4 w-4" strokeWidth={1.8} />
+                Total de UKI recomendados que cuentan para la competición
+              </div>
+              <strong className="font-headline text-3xl font-black uppercase leading-none text-[var(--uki-gold)]">
+                {formatNumber(status.referralWeightedScore)} UKI
+              </strong>
+            </div>
+            <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Cálculo aplicado: Nivel 1 cuenta al 100%, Nivel 2 al 50% y Nivel 3 al 25%.
+            </p>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   Gift,
   Lock,
   Network,
+  ShieldCheck,
   Sparkles,
   Timer,
   Trophy,
@@ -21,12 +22,8 @@ import {
 export type LandingIcon = LucideIcon;
 
 export const navItems = [
-  { label: 'Preventa', href: '#presale' },
-  { label: 'Comprar', href: '#token' },
+  { label: 'Inicio', href: '#presale' },
   { label: 'Premios', href: '/premios' },
-  { label: 'Cukie Master', href: '/cukie-master' },
-  { label: 'Hodler', href: '/cukie-hodler' },
-  { label: 'Jugar', href: '/como-jugar' },
 ];
 
 export const trustSignals = [
@@ -41,7 +38,7 @@ export const saleFacts = [
   { icon: CircleDollarSign, label: 'Compra con', value: 'ASM', helper: 'Moneda principal' },
   { icon: Lock, label: 'Vesting', value: '9 meses', helper: 'Lineal sin cliff' },
   { icon: Trophy, label: 'Listing', value: 'Mínimo $0.012', helper: 'Objetivo inicial' },
-  { icon: Gift, label: 'Premios', value: 'Cukies', helper: 'Sorteos y sponsors' },
+  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada', helper: '9+ meses' },
 ];
 
 export const purchaseSteps = [
@@ -75,9 +72,9 @@ export const vestingTracks = [
   {
     icon: Lock,
     title: 'Vesting comprador',
-    subtitle: '9 meses lineal, sin cliff',
+    subtitle: 'Consulta disponible para wallets con compra',
     color: '#2ee8d6',
-    labels: ['Mes 0', 'Mes 3', 'Mes 6', 'Mes 9'],
+    labels: ['Asignación', 'Contrato', 'Desbloqueos', 'Claim'],
   },
   {
     icon: Users,
@@ -234,24 +231,19 @@ export const presalePrizeTiers = [
 
 export const gameCards = [
   {
-    title: "Cukies Rush n' Run",
-    text: 'Acción / runner',
+    title: "Jump n' Hop",
+    text: 'Acción / Plataformas',
     image: '/brand/generated/uki-timeline-economy.svg',
   },
   {
     title: 'Cukies Island',
-    text: 'Aventura / mundo',
+    text: 'Estrategia / Simulación',
     image: '/brand/generated/uki-final-cta-scene-v2.png',
   },
   {
-    title: 'Cukies Brain Buzz',
-    text: 'Trivia / competición',
+    title: 'Brain Buzz',
+    text: 'Trivia / Conocimiento',
     image: '/brand/generated/uki-utility-map-scene-v2.png',
-  },
-  {
-    title: 'Más juegos',
-    text: 'En preparación',
-    image: '/brand/generated/uki-cukie-master-scene-v2.png',
   },
 ];
 

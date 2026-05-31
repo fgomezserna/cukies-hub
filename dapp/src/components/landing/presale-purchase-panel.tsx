@@ -1,38 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Loader2, ShoppingCart, Users, Wallet, WalletCards } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, ShoppingCart, Wallet, WalletCards } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import { useAccount, useConnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { erc20Abi, getBscScanTxUrl, presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
+import { usePresaleLock } from './presale-countdown';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '10';
-
-type PresaleReferralStatus = {
-  totalUkiPurchased: number;
-  minimumUkiToUnlockLink: number;
-  unlockProgress: number;
-  referralUnlockedAt: string | null;
-  referralMinimumUkiSnapshot: number | null;
-  referralCode: string | null;
-  referralLink: string | null;
-  pendingSponsorCode: string | null;
-  pendingSponsorWalletAddress: string | null;
-  lockedSponsorWalletAddress: string | null;
-  sponsorLockedAt: string | null;
-  referralLevel1UkiAmount: number;
-  referralLevel2UkiAmount: number;
-  referralLevel3UkiAmount: number;
-  referralWeightedScore: number;
-  levelWeights: {
-    level1: number;
-    level2: number;
-    level3: number;
-  };
-};
 
 function formatTokenAmount(value?: bigint, maximumFractionDigits = 4) {
   if (value === undefined) return '--';
@@ -60,17 +38,6 @@ function formatTxLabel(hash?: `0x${string}`) {
   return `${hash.slice(0, 10)}...${hash.slice(-6)}`;
 }
 
-function formatNumber(value?: number | null, maximumFractionDigits = 2) {
-  if (value === undefined || value === null || !Number.isFinite(value)) return '--';
-
-  return value.toLocaleString('en-US', { maximumFractionDigits });
-}
-
-function shortAddress(value?: string | null) {
-  if (!value) return null;
-  return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
 function formatRate(quote?: bigint, cost?: bigint) {
   if (!quote || !cost || cost === BigInt(0)) return null;
 
@@ -86,81 +53,89 @@ export function PresalePurchasePanel() {
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { toast } = useToast();
+  const { isLocked: isPublicPresaleLocked } = usePresaleLock();
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
-  const [referralStatus, setReferralStatus] = useState<PresaleReferralStatus | null>(null);
-  const [isLoadingReferralStatus, setIsLoadingReferralStatus] = useState(false);
+  const handledReceiptHashRef = useRef<string | null>(null);
   const asmTokenAddress = ukiSaleContracts.asmTokenAddress as Address | undefined;
   const presaleAddress = ukiSaleContracts.presaleAddress as Address | undefined;
   const isReady = Boolean(isConnected && address && chainId === UKI_PRESALE_CHAIN_ID && asmTokenAddress && presaleAddress);
   const isWrongChain = isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
   const parsedAmount = useMemo(() => parseTokenAmount(amount), [amount]);
   const connector = connectors.find((item) => item.id === 'injected') ?? connectors[0];
+  const readsEnabled = Boolean((!isConnected || !isWrongChain) && asmTokenAddress && presaleAddress);
+  const isPublicPresaleOpen = !isPublicPresaleLocked;
 
   const {
     data: asmBalance,
     refetch: refetchBalance,
   } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
     address: asmTokenAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && asmTokenAddress) },
+    query: { enabled: Boolean(address && readsEnabled) },
   });
 
   const {
     data: allowance,
     refetch: refetchAllowance,
   } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
     address: asmTokenAddress,
     abi: erc20Abi,
     functionName: 'allowance',
     args: address && presaleAddress ? [address, presaleAddress] : undefined,
-    query: { enabled: Boolean(address && asmTokenAddress && presaleAddress) },
+    query: { enabled: Boolean(address && readsEnabled) },
   });
 
   const {
     data: quotedUki,
     refetch: refetchQuote,
   } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
     address: presaleAddress,
     abi: presaleAbi,
     functionName: 'quoteUki',
     args: parsedAmount ? [parsedAmount] : undefined,
-    query: { enabled: Boolean(presaleAddress && parsedAmount) },
+    query: { enabled: Boolean(readsEnabled && parsedAmount && isPublicPresaleOpen) },
   });
 
   const {
     data: purchasedAsm,
     refetch: refetchPurchasedAsm,
   } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
     address: presaleAddress,
     abi: presaleAbi,
     functionName: 'asmPurchased',
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && presaleAddress) },
+    query: { enabled: Boolean(address && readsEnabled) },
   });
 
   const {
     data: purchasedUki,
     refetch: refetchPurchasedUki,
   } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
     address: presaleAddress,
     abi: presaleAbi,
     functionName: 'ukiPurchased',
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && presaleAddress) },
+    query: { enabled: Boolean(address && readsEnabled) },
   });
 
   const {
     data: isOpen,
     refetch: refetchIsOpen,
   } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
     address: presaleAddress,
     abi: presaleAbi,
     functionName: 'isOpen',
-    query: { enabled: Boolean(presaleAddress) },
+    query: { enabled: Boolean(readsEnabled && isPublicPresaleOpen) },
   });
 
   const { writeContract, data: txHash, error, isPending, reset } = useWriteContract();
@@ -174,37 +149,26 @@ export function PresalePurchasePanel() {
 
   const needsApproval = Boolean(parsedAmount && allowance !== undefined && allowance < parsedAmount);
   const hasEnoughBalance = Boolean(parsedAmount && asmBalance !== undefined && asmBalance >= parsedAmount);
-  const canSubmit = Boolean(isReady && parsedAmount && hasEnoughBalance && isOpen && !isPending && !isConfirming);
+  const hasAllowanceData = !isReady || allowance !== undefined;
+  const canSubmit = Boolean(
+    isReady &&
+    parsedAmount &&
+    hasEnoughBalance &&
+    hasAllowanceData &&
+    isPublicPresaleOpen &&
+    isOpen &&
+    !isPending &&
+    !isConfirming,
+  );
   const canConnect = Boolean(!isConnected && connector && !isConnecting);
   const canSwitch = Boolean(isWrongChain && !isSwitching);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
 
-  const fetchReferralStatus = useCallback(async () => {
-    if (!address) {
-      setReferralStatus(null);
-      return;
-    }
-
-    setIsLoadingReferralStatus(true);
-    try {
-      const response = await fetch(`/api/presale/referral/status?walletAddress=${address}`, {
-        cache: 'no-store',
-      });
-
-      if (response.ok) {
-        setReferralStatus(await response.json());
-      }
-    } finally {
-      setIsLoadingReferralStatus(false);
-    }
-  }, [address]);
-
   useEffect(() => {
-    void fetchReferralStatus();
-  }, [fetchReferralStatus]);
+    if (!isSuccess || !txHash) return;
+    if (handledReceiptHashRef.current === txHash) return;
 
-  useEffect(() => {
-    if (!isSuccess) return;
+    handledReceiptHashRef.current = txHash;
 
     void refetchBalance();
     void refetchAllowance();
@@ -212,7 +176,6 @@ export function PresalePurchasePanel() {
     void refetchIsOpen();
     void refetchPurchasedAsm();
     void refetchPurchasedUki();
-    void fetchReferralStatus();
 
     if (lastAction === 'approve' && approvalAmount && presaleAddress) {
       toast({
@@ -236,17 +199,7 @@ export function PresalePurchasePanel() {
         description: 'Se ha creado la asignación de vesting UKI para tu wallet.',
       });
     }
-  }, [approvalAmount, fetchReferralStatus, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, writeContract]);
-
-  async function copyReferralLink() {
-    if (!referralStatus?.referralLink) return;
-
-    await navigator.clipboard.writeText(referralStatus.referralLink);
-    toast({
-      title: 'Link copiado',
-      description: 'Ya puedes compartir tu enlace de preventa.',
-    });
-  }
+  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash, writeContract]);
 
   useEffect(() => {
     if (!error) return;
@@ -259,7 +212,17 @@ export function PresalePurchasePanel() {
     });
   }, [error, toast]);
 
-  function handleSubmit() {
+  async function ensureReferralAttribution() {
+    if (!address) return true;
+
+    const response = await fetch(`/api/presale/referral/status?walletAddress=${address}`, {
+      cache: 'no-store',
+    });
+
+    return response.ok;
+  }
+
+  async function handleSubmit() {
     if (!isConnected) {
       if (!connector) {
         toast({
@@ -289,7 +252,52 @@ export function PresalePurchasePanel() {
       return;
     }
 
+    if (!isPublicPresaleOpen) {
+      toast({
+        title: 'Preventa aún no abierta',
+        description: 'La compra se activará cuando llegue la fecha de inicio.',
+      });
+      return;
+    }
+
     if (!asmTokenAddress || !presaleAddress || !parsedAmount) return;
+
+    if (!isOpen) {
+      toast({
+        title: 'Compra no disponible',
+        description: 'El contrato de preventa todavía no está abierto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (allowance === undefined) {
+      toast({
+        title: 'Revisando permisos',
+        description: 'Espera a que cargue la aprobación de ASM antes de comprar.',
+      });
+      return;
+    }
+
+    if (!hasEnoughBalance) {
+      toast({
+        title: 'ASM insuficiente',
+        description: 'Baja el importe o añade más ASM a esta wallet.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const referralReady = await ensureReferralAttribution();
+    if (!referralReady) {
+      toast({
+        title: 'No se pudo preparar la compra',
+        description: 'No hemos podido validar el estado de referidos de esta wallet. Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     reset();
 
     if (needsApproval) {
@@ -322,20 +330,16 @@ export function PresalePurchasePanel() {
         ? isSwitching
           ? 'Cambiando red'
           : 'Cambiar red'
+      : isPublicPresaleLocked
+        ? 'Abre 15 de junio'
       : lastAction === 'approve' && (isPending || isConfirming)
         ? 'Confirmando acceso'
         : lastAction === 'buy' && (isPending || isConfirming)
           ? 'Comprando UKI'
           : 'Comprar UKI';
   const CtaIcon = !isConnected || isWrongChain ? Wallet : ShoppingCart;
-  const referralMinimum = referralStatus?.minimumUkiToUnlockLink ?? 0;
-  const referralProgress = referralStatus?.unlockProgress ?? 0;
-  const referralProgressPercent = Math.round(referralProgress * 100);
-  const quoteRate = isOpen ? formatRate(quotedUki, parsedAmount ?? undefined) : null;
-  const remainingUkiToUnlock = Math.max(
-    referralMinimum - (referralStatus?.totalUkiPurchased ?? 0),
-    0,
-  );
+  const quoteRate = isPublicPresaleOpen && isOpen ? formatRate(quotedUki, parsedAmount ?? undefined) : null;
+  const visibleQuotedUki = isPublicPresaleOpen && isOpen ? quotedUki : undefined;
 
   return (
     <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#02090d]/72 p-2.5">
@@ -345,7 +349,7 @@ export function PresalePurchasePanel() {
           Comprar UKI
         </span>
         <span className="text-right text-[0.62rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-          {quoteRate ? `1 ASM = ${quoteRate} UKI` : 'Ratio ASM fijado al abrir'}
+          {quoteRate ? `1 ASM = ${quoteRate} UKI` : 'RATIO ASM - UKI SE FIJARÁ AL INICIO'}
         </span>
       </div>
 
@@ -376,7 +380,7 @@ export function PresalePurchasePanel() {
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
         <span>Coste: <strong className="text-[var(--uki-cream)]">{parsedAmount ? amount : '--'} ASM</strong></span>
-        <span className="text-right">Recibes: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(quotedUki)} UKI</strong></span>
+        <span className="text-right">Recibes: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(visibleQuotedUki)} UKI</strong></span>
       </div>
 
       {isReady && !hasEnoughBalance && parsedAmount ? (
@@ -406,86 +410,6 @@ export function PresalePurchasePanel() {
         </a>
       ) : null}
 
-      {isConnected ? (
-        <div className="mt-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#041014]/70 p-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.1em] text-[var(--uki-cyan)]">
-              <Users className="h-3.5 w-3.5" />
-              Referidos preventa
-            </span>
-            <span className="inline-flex items-center gap-1 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-              {isLoadingReferralStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Score {formatNumber(referralStatus?.referralWeightedScore)}
-            </span>
-          </div>
-
-          {referralStatus?.referralLink ? (
-            <>
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  value={referralStatus.referralLink}
-                  readOnly
-                  className="h-9 min-w-0 flex-1 rounded-[7px] border border-[var(--uki-cyan-border)] bg-[#02090d] px-2 text-xs font-bold text-[var(--uki-cream)] outline-none"
-                />
-                <button type="button" onClick={copyReferralLink} className="uki-wallet-button h-9 px-3">
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-                Link activo. El volumen de tus referidos se contabiliza al cierre para premios Cukies.
-              </p>
-            </>
-          ) : (
-            <div className="mt-2">
-              <div className="flex items-end justify-between gap-2 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-                <span>Desbloqueo</span>
-                <span>
-                  {formatNumber(referralStatus?.totalUkiPurchased)} / {formatNumber(referralMinimum)} UKI
-                </span>
-              </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-black/35">
-                <div
-                  className="h-full rounded-full bg-[var(--uki-cyan)] transition-all"
-                  style={{ width: `${referralProgressPercent}%` }}
-                />
-              </div>
-              <p className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-                {remainingUkiToUnlock > 0
-                  ? `Compra ${formatNumber(remainingUkiToUnlock)} UKI más para desbloquear tu link.`
-                  : 'Tu link se activará cuando el indexer confirme la compra.'}
-              </p>
-            </div>
-          )}
-
-          <div className="mt-2 grid gap-1 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-            {referralStatus?.lockedSponsorWalletAddress ? (
-              <span>Sponsor fijado: <strong className="text-[var(--uki-cream)]">{shortAddress(referralStatus.lockedSponsorWalletAddress)}</strong></span>
-            ) : referralStatus?.pendingSponsorCode ? (
-              <span>Sponsor provisional: <strong className="text-[var(--uki-cream)]">{referralStatus.pendingSponsorCode}</strong></span>
-            ) : (
-              <span>Sin sponsor provisional</span>
-            )}
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-            <span>
-              N1
-              <strong className="block text-[var(--uki-cream)]">{formatNumber(referralStatus?.referralLevel1UkiAmount)}</strong>
-              <em className="not-italic text-[var(--uki-muted)]">x{formatNumber(referralStatus?.levelWeights.level1, 2)}</em>
-            </span>
-            <span>
-              N2
-              <strong className="block text-[var(--uki-cream)]">{formatNumber(referralStatus?.referralLevel2UkiAmount)}</strong>
-              <em className="not-italic text-[var(--uki-muted)]">x{formatNumber(referralStatus?.levelWeights.level2, 2)}</em>
-            </span>
-            <span>
-              N3
-              <strong className="block text-[var(--uki-cream)]">{formatNumber(referralStatus?.referralLevel3UkiAmount)}</strong>
-              <em className="not-italic text-[var(--uki-muted)]">x{formatNumber(referralStatus?.levelWeights.level3, 2)}</em>
-            </span>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

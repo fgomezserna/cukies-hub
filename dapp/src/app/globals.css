@@ -810,6 +810,15 @@ body {
     margin-top: -2.4rem;
   }
 
+  .uki-hero-countdown {
+    border-radius: 10px;
+    border: 1px solid rgba(242, 195, 75, 0.24);
+    background: rgba(2, 9, 13, 0.56);
+    padding: 0.85rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(12px);
+  }
+
   .uki-vault-room {
     position: absolute;
     left: 10%;
@@ -1293,6 +1302,123 @@ body {
   .uki-node-green { color: #c9f79f; background: linear-gradient(135deg, rgba(23, 50, 29, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-red { color: #ffb0bf; background: linear-gradient(135deg, rgba(59, 20, 32, 0.76), rgba(6, 16, 22, 0.68)); }
 
+  .uki-community-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(174, 106, 255, 0.34);
+    background:
+      radial-gradient(circle at 18% 62%, rgba(174, 106, 255, 0.32), transparent 19rem),
+      radial-gradient(circle at 86% 40%, rgba(242, 195, 75, 0.2), transparent 16rem),
+      linear-gradient(135deg, rgba(13, 9, 42, 0.96), rgba(5, 13, 30, 0.94));
+    padding: clamp(1.2rem, 3vw, 2.4rem);
+    isolation: isolate;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+  }
+
+  .uki-community-panel::before {
+    content: "";
+    position: absolute;
+    inset: auto -5rem -8rem auto;
+    z-index: -1;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 44% 34%, rgba(255, 229, 143, 0.3), transparent 18%),
+      url("/brand/generated/uki-cukie-master-scene-v2.png") center / cover no-repeat;
+    opacity: 0.34;
+    filter: saturate(1.12);
+  }
+
+  .uki-community-copy {
+    position: relative;
+    z-index: 1;
+    max-width: 64rem;
+  }
+
+  .uki-community-visual {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.55fr);
+    gap: 1rem;
+    align-items: center;
+    margin-top: 2rem;
+  }
+
+  .uki-community-ring {
+    display: grid;
+    min-height: 17rem;
+    place-items: center;
+    border-radius: 999px;
+    border: 1.15rem solid rgba(174, 106, 255, 0.82);
+    background: radial-gradient(circle, rgba(10, 8, 28, 0.92), rgba(10, 8, 28, 0.55));
+    box-shadow:
+      inset 0 0 44px rgba(174, 106, 255, 0.18),
+      0 0 46px rgba(174, 106, 255, 0.24);
+    text-align: center;
+  }
+
+  .uki-community-ring span {
+    display: block;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(4rem, 8vw, 7rem);
+    font-weight: 900;
+    line-height: 0.85;
+    color: var(--uki-cream);
+  }
+
+  .uki-community-ring small,
+  .uki-community-years small {
+    display: block;
+    margin-top: 0.55rem;
+    max-width: 15rem;
+    color: #c8a4ff;
+    font-size: 0.78rem;
+    font-weight: 900;
+    line-height: 1.18;
+    text-transform: uppercase;
+  }
+
+  .uki-community-years {
+    display: grid;
+    justify-items: center;
+    border-radius: 12px;
+    border: 1px solid rgba(174, 106, 255, 0.32);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1.25rem;
+    text-align: center;
+    color: #b576ff;
+  }
+
+  .uki-community-years span {
+    margin-top: 0.8rem;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    font-weight: 900;
+    line-height: 0.9;
+    color: #b576ff;
+  }
+
+  .uki-community-footer {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 1.35rem auto 0;
+    max-width: 44rem;
+    border-radius: 999px;
+    border: 1px solid rgba(174, 106, 255, 0.5);
+    background: rgba(76, 28, 128, 0.62);
+    padding: 0.85rem 1rem;
+    color: #e4d5ff;
+    font-weight: 900;
+    text-align: center;
+  }
+
   .uki-timeline-card {
     position: relative;
     min-height: clamp(13.6rem, 17vw, 16.4rem);
@@ -1594,6 +1720,227 @@ body {
     font-weight: 600;
   }
 
+  .uki-master-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(174, 106, 255, 0.32);
+    background:
+      radial-gradient(circle at 78% 12%, rgba(174, 106, 255, 0.3), transparent 18rem),
+      radial-gradient(circle at 10% 100%, rgba(242, 195, 75, 0.18), transparent 18rem),
+      linear-gradient(180deg, rgba(11, 8, 39, 0.96), rgba(4, 8, 26, 0.98));
+    padding: clamp(1rem, 2.6vw, 2rem);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+  }
+
+  .uki-master-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(8, 7, 28, 0.92), rgba(8, 7, 28, 0.55) 44%, rgba(8, 7, 28, 0.82)),
+      url("/brand/generated/uki-cukie-master-scene-v2.png") right top / auto 34rem no-repeat;
+    opacity: 0.42;
+    pointer-events: none;
+  }
+
+  .uki-master-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .uki-master-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.38fr);
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .uki-master-badge {
+    display: grid;
+    min-height: 16rem;
+    place-items: center;
+    border-radius: 14px;
+    border: 1px solid rgba(242, 195, 75, 0.36);
+    background:
+      radial-gradient(circle at 50% 0%, rgba(242, 195, 75, 0.28), transparent 45%),
+      rgba(28, 13, 57, 0.72);
+    padding: 1rem;
+    text-align: center;
+    box-shadow: inset 0 0 36px rgba(174, 106, 255, 0.16);
+  }
+
+  .uki-master-badge span {
+    display: block;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(2rem, 3vw, 3rem);
+    font-weight: 900;
+    color: var(--uki-cream);
+  }
+
+  .uki-master-badge small {
+    max-width: 12rem;
+    color: var(--uki-gold);
+    font-size: 0.76rem;
+    font-weight: 900;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .uki-master-requirements,
+  .uki-master-flow,
+  .uki-master-uses .grid {
+    margin-top: 1rem;
+  }
+
+  .uki-master-requirements {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+  }
+
+  .uki-master-requirement,
+  .uki-master-flow-step,
+  .uki-master-use-card {
+    border-radius: 12px;
+    border: 1px solid rgba(174, 106, 255, 0.28);
+    background: rgba(20, 13, 55, 0.72);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .uki-master-requirement {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1rem;
+    align-items: center;
+    min-height: 9rem;
+    padding: 1rem;
+  }
+
+  .uki-master-presale {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(242, 195, 75, 0.46);
+    background: rgba(58, 33, 18, 0.58);
+    padding: 1rem;
+  }
+
+  .uki-master-presale h3,
+  .uki-master-benefits h3,
+  .uki-master-uses h3,
+  .uki-master-use-card h4 {
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--uki-cream);
+  }
+
+  .uki-master-presale h3 {
+    color: var(--uki-gold);
+    font-size: 1.25rem;
+    text-transform: uppercase;
+  }
+
+  .uki-master-presale p,
+  .uki-master-benefits p,
+  .uki-master-use-card p {
+    margin-top: 0.35rem;
+    color: var(--uki-text);
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .uki-master-benefits,
+  .uki-master-uses {
+    margin-top: 1.2rem;
+  }
+
+  .uki-master-benefits h3,
+  .uki-master-uses h3 {
+    font-size: clamp(1.35rem, 2vw, 2rem);
+    text-align: center;
+  }
+
+  .uki-master-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: center;
+  }
+
+  .uki-master-flow-step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    min-height: 6.4rem;
+    padding: 0.9rem;
+    text-align: left;
+  }
+
+  .uki-master-flow-step p {
+    margin: 0;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: 1.35rem;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--uki-cream);
+  }
+
+  .uki-master-flow-step span {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--uki-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+
+  .uki-master-flow-arrow {
+    color: #b576ff;
+  }
+
+  .uki-master-use-card {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: center;
+    min-height: 8rem;
+    padding: 1rem;
+  }
+
+  .uki-master-use-card > span {
+    display: grid;
+    height: 2rem;
+    width: 2rem;
+    place-items: center;
+    border-radius: 999px;
+    background: #b576ff;
+    color: white;
+    font-weight: 900;
+  }
+
+  .uki-master-final {
+    margin-top: 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(242, 195, 75, 0.36);
+    background: rgba(26, 16, 45, 0.84);
+    padding: 1rem 1.2rem;
+    color: var(--uki-cream);
+    font-size: clamp(1.05rem, 1.7vw, 1.45rem);
+    font-weight: 800;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .uki-master-final strong {
+    color: var(--uki-gold);
+  }
+
   .uki-game-scene img,
   .uki-game-card img {
     transition: transform 720ms var(--uki-ease), filter 720ms var(--uki-ease);
@@ -1603,6 +1950,150 @@ body {
     background:
       radial-gradient(circle at 44% 18%, rgba(34, 231, 223, 0.12), transparent 34%),
       linear-gradient(180deg, rgba(3, 20, 25, 0.92), rgba(2, 11, 13, 0.96));
+  }
+
+  .uki-treasure-hero {
+    position: relative;
+    min-height: clamp(29rem, 48vw, 42rem);
+    overflow: hidden;
+    border-radius: 10px;
+    background: #070719;
+    isolation: isolate;
+  }
+
+  .uki-treasure-hero > img {
+    z-index: 0;
+    object-position: 68% center;
+    filter: saturate(1.14) contrast(1.04);
+  }
+
+  .uki-treasure-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      linear-gradient(90deg, rgba(5, 5, 22, 0.98) 0%, rgba(5, 5, 22, 0.82) 31%, rgba(5, 5, 22, 0.18) 61%, rgba(5, 5, 22, 0.42) 100%),
+      linear-gradient(0deg, rgba(5, 5, 22, 0.88), transparent 28%, rgba(5, 5, 22, 0.15));
+  }
+
+  .uki-treasure-top,
+  .uki-treasure-copy,
+  .uki-treasure-metrics {
+    position: relative;
+    z-index: 2;
+  }
+
+  .uki-treasure-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: clamp(1rem, 2.4vw, 1.7rem);
+  }
+
+  .uki-treasure-top > span,
+  .uki-treasure-hud span {
+    border-radius: 999px;
+    border: 1px solid rgba(174, 106, 255, 0.5);
+    background: rgba(20, 13, 55, 0.75);
+    padding: 0.6rem 1rem;
+    color: #d9c1ff;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .uki-treasure-hud {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  .uki-treasure-hud span:first-child {
+    color: var(--uki-cream);
+  }
+
+  .uki-treasure-hud span:last-child {
+    color: #ff6363;
+  }
+
+  .uki-treasure-copy {
+    max-width: 41rem;
+    padding: clamp(1rem, 2.4vw, 1.8rem);
+    padding-top: clamp(1rem, 5vw, 3.4rem);
+  }
+
+  .uki-treasure-copy h2 {
+    max-width: 38rem;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(2.6rem, 6vw, 5.5rem);
+    font-weight: 900;
+    line-height: 0.93;
+    text-transform: uppercase;
+    color: var(--uki-cream);
+    text-wrap: balance;
+  }
+
+  .uki-treasure-copy h2::first-line {
+    color: var(--uki-cream);
+  }
+
+  .uki-treasure-copy p {
+    margin-top: 1.25rem;
+    max-width: 32rem;
+    color: var(--uki-text);
+    font-size: clamp(1rem, 1.4vw, 1.2rem);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .uki-treasure-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-top: 1.35rem;
+    border-radius: 10px;
+    border: 1px solid rgba(174, 106, 255, 0.4);
+    background: rgba(39, 19, 75, 0.72);
+    padding: 0.85rem 1rem;
+    color: #f0e8ff;
+    font-weight: 800;
+  }
+
+  .uki-treasure-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-top: clamp(1rem, 3vw, 2rem);
+    padding: clamp(1rem, 2.4vw, 1.8rem);
+  }
+
+  .uki-treasure-metric {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 7.2rem;
+    border-radius: 12px;
+    border: 1px solid rgba(174, 106, 255, 0.42);
+    background: rgba(14, 10, 49, 0.82);
+    padding: 1rem;
+  }
+
+  .uki-treasure-metric p {
+    margin: 0;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    color: var(--uki-cream);
+    font-size: clamp(1.55rem, 2.5vw, 2.55rem);
+    font-weight: 900;
+    line-height: 0.95;
+  }
+
+  .uki-treasure-metric span {
+    display: block;
+    margin-top: 0.35rem;
+    color: #c8a4ff;
+    font-weight: 900;
   }
 
   .uki-games-feature {
@@ -1636,7 +2127,9 @@ body {
   }
 
   .uki-games-more {
-    margin-inline: -0.15rem;
+    margin-inline: 0;
+    padding-inline: 1rem;
+    padding-bottom: 1rem;
   }
 
   .uki-game-scene:hover img {
@@ -1659,7 +2152,130 @@ body {
     filter: saturate(1.12);
   }
 
+  .uki-game-card-face {
+    position: absolute;
+    right: 0.35rem;
+    bottom: 0.35rem;
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 242, 220, 0.3);
+    background:
+      radial-gradient(circle at 45% 38%, #fff 0 7%, transparent 8%),
+      radial-gradient(circle at 66% 38%, #fff 0 7%, transparent 8%),
+      radial-gradient(circle at 54% 64%, rgba(2, 9, 13, 0.72) 0 10%, transparent 11%),
+      radial-gradient(circle at 50% 50%, var(--uki-cyan), #7f55ff 72%);
+    box-shadow: 0 0 16px rgba(174, 106, 255, 0.35);
+  }
+
+  .uki-prizes-hero {
+    position: relative;
+    display: grid;
+    min-height: clamp(28rem, 43vw, 39rem);
+    grid-template-columns: minmax(0, 0.78fr) minmax(18rem, 0.42fr);
+    align-items: end;
+    gap: 1rem;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(174, 106, 255, 0.34);
+    background: #080719;
+    padding: clamp(1.2rem, 3vw, 2.2rem);
+    isolation: isolate;
+  }
+
+  .uki-prizes-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(90deg, rgba(7, 7, 23, 0.98) 0%, rgba(7, 7, 23, 0.8) 35%, rgba(7, 7, 23, 0.15) 68%, rgba(7, 7, 23, 0.36)),
+      linear-gradient(0deg, rgba(7, 7, 23, 0.88), transparent 42%, rgba(7, 7, 23, 0.2)),
+      url("/brand/generated/uki-final-cta-scene-v2.png") right center / cover no-repeat;
+    filter: saturate(1.18) contrast(1.05);
+  }
+
+  .uki-prizes-copy {
+    max-width: 42rem;
+  }
+
+  .uki-prizes-copy h2 {
+    margin-top: 1.2rem;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(3rem, 6.6vw, 6.8rem);
+    font-weight: 900;
+    line-height: 0.9;
+    text-transform: uppercase;
+    color: var(--uki-cream);
+    text-wrap: balance;
+  }
+
+  .uki-prizes-copy h2::first-line {
+    color: var(--uki-cream);
+  }
+
+  .uki-prizes-copy p {
+    margin-top: 1.2rem;
+    max-width: 31rem;
+    color: var(--uki-text);
+    font-size: clamp(1rem, 1.5vw, 1.25rem);
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .uki-prizes-side-card {
+    justify-self: end;
+    max-width: 24rem;
+    border-radius: 14px;
+    border: 1px solid rgba(242, 195, 75, 0.48);
+    background: rgba(25, 14, 49, 0.78);
+    padding: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .uki-prizes-side-card h3 {
+    margin-top: 0.75rem;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    color: var(--uki-cream);
+    font-size: 1.65rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .uki-prizes-side-card h3::first-line {
+    color: var(--uki-gold);
+  }
+
+  .uki-prizes-side-card p {
+    margin-top: 0.65rem;
+    color: var(--uki-text);
+    font-weight: 700;
+  }
+
   @media (max-width: 1023px) {
+    .uki-community-visual,
+    .uki-master-hero,
+    .uki-master-requirements,
+    .uki-master-flow,
+    .uki-prizes-hero,
+    .uki-treasure-metrics {
+      grid-template-columns: 1fr;
+    }
+
+    .uki-master-flow-arrow {
+      justify-self: center;
+      transform: rotate(90deg);
+    }
+
+    .uki-prizes-side-card {
+      justify-self: stretch;
+      max-width: none;
+    }
+
+    .uki-treasure-top {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
     .uki-game-scene {
       min-height: auto;
     }
@@ -2008,6 +2624,34 @@ body {
       width: auto;
       max-width: 100%;
       transform: none;
+    }
+
+    .uki-community-panel,
+    .uki-master-panel,
+    .uki-prizes-hero {
+      padding: 1rem;
+    }
+
+    .uki-community-ring {
+      min-height: 14rem;
+      border-width: 0.8rem;
+    }
+
+    .uki-treasure-copy h2,
+    .uki-prizes-copy h2 {
+      font-size: clamp(2.2rem, 12vw, 3.4rem);
+    }
+
+    .uki-treasure-hud {
+      flex-wrap: wrap;
+    }
+
+    .uki-master-requirement,
+    .uki-master-use-card,
+    .uki-treasure-metric {
+      grid-template-columns: 1fr;
+      text-align: center;
+      justify-items: center;
     }
 
     .uki-timeline-content {
