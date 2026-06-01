@@ -234,7 +234,8 @@ export function PresaleReferralLinkPanel() {
 
       {status ? (
         <>
-          <div className="mt-5 overflow-x-auto rounded-[10px] border border-white/10">
+          {/* Vista desktop en formato tabla */}
+          <div className="mt-5 hidden overflow-x-auto rounded-[10px] border border-white/10 md:block">
             <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
               <thead className="bg-white/[0.06] text-[var(--uki-muted)]">
                 <tr>
@@ -269,6 +270,38 @@ export function PresaleReferralLinkPanel() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Vista móvil en formato tarjetas */}
+          <div className="mt-5 space-y-4 md:hidden">
+            {referralLevels.map((level) => (
+              <article key={level.level} className="rounded-[10px] border border-white/10 bg-white/[0.02] p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className={`font-headline text-sm font-black uppercase ${level.color}`}>{level.level}</span>
+                  <span className="text-xs font-semibold text-[var(--uki-muted)]">{level.includes}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-[var(--uki-muted)] font-black uppercase tracking-[0.08em]">Referidos</p>
+                    <p className="font-headline text-base font-black text-[var(--uki-cream)] mt-1">{formatNumber(level.referrals, 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[var(--uki-muted)] font-black uppercase tracking-[0.08em]">Comprado</p>
+                    <p className="font-semibold mt-1 flex items-center gap-1.5 text-xs text-[var(--uki-cream)]">
+                      <Ticket className="h-3.5 w-3.5 text-[var(--uki-gold)]" strokeWidth={1.8} />
+                      {formatNumber(level.purchased)} UKI
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-white/[0.04] rounded-[6px] p-2 flex items-center justify-between">
+                  <span className="text-[0.62rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">Puntos competición</span>
+                  <strong className="font-headline text-sm font-black text-[var(--uki-gold)]">
+                    {formatNumber(level.purchased * level.weight)} UKI
+                    <span className="ml-1 text-[0.62rem] text-[var(--uki-muted)] font-normal">({Math.round(level.weight * 100)}%)</span>
+                  </strong>
+                </div>
+              </article>
+            ))}
           </div>
 
           <div className="mt-3 rounded-[10px] border border-[#f2c34b]/30 bg-[#2b1d08]/40 p-4">

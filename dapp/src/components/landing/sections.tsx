@@ -34,6 +34,9 @@ import { SaleConsole } from './sale-console';
 import { UKI_PRESALE_START_LABEL } from './sale-config';
 import { VestingAccessButton } from './vesting-access-button';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
+import { LandingHeader } from './header';
+import { LandingFooter } from './footer';
+
 
 export function CukiesLanding() {
   return (
@@ -52,28 +55,6 @@ export function CukiesLanding() {
       <FaqAndCta />
       <LandingFooter />
     </main>
-  );
-}
-
-function LandingHeader() {
-  return (
-    <header className="uki-landing-header">
-      <nav className="uki-container flex h-[5.7rem] items-center justify-between">
-        <a href="#presale" className="uki-header-logo relative block h-[5.1rem] w-48 overflow-hidden" aria-label="Inicio Cukies World">
-          <Image src="/Cukie_logo_first.png" alt="Cukies World" fill className="object-contain object-left" sizes="11rem" priority />
-        </a>
-
-        <div className="hidden items-center gap-6 lg:flex">
-          {navItems.map((item, index) => (
-            <a key={item.href} href={item.href} className={`uki-nav-link ${index === 0 ? 'is-active' : ''}`}>
-              {item.label}
-            </a>
-          ))}
-        </div>
-
-        <LandingWalletConnectButton />
-      </nav>
-    </header>
   );
 }
 
@@ -509,9 +490,13 @@ function FaqAndCta() {
             <details key={faq.question} className="group py-2">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[var(--uki-text)] transition group-open:text-[var(--uki-cyan)] hover:text-[var(--uki-cyan)]">
                 {faq.question}
-                <span className="text-lg leading-none text-[var(--uki-cyan)] transition-transform group-open:rotate-45">+</span>
+                <span className="text-lg leading-none text-[var(--uki-cyan)] transition-transform duration-300 group-open:rotate-45">+</span>
               </summary>
-              <p className="pt-2 text-xs leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
+              <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-in-out group-open:grid-rows-[1fr]">
+                <div className="overflow-hidden">
+                  <p className="pt-2 text-xs leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
+                </div>
+              </div>
             </details>
           ))}
         </div>
@@ -528,9 +513,9 @@ function FaqAndCta() {
               La preventa UKI abre en {UKI_PRESALE_START_LABEL}. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <PresaleGateLink href="#presale-console">Comprar UKI</PresaleGateLink>
+              <PresaleGateLink href="#presale-console">Participa ahora</PresaleGateLink>
               <LandingButton href="#token" variant="secondary">
-                Ver detalles
+                Lee las condiciones
               </LandingButton>
             </div>
           </div>
@@ -540,41 +525,3 @@ function FaqAndCta() {
   );
 }
 
-function LandingFooter() {
-  const socials = [
-    { label: 'X', icon: MessageCircle, href: 'https://x.com/cukiesworld' },
-  ];
-
-  return (
-    <footer className="uki-footer">
-      <div className="uki-footer-inner uki-container">
-        <div className="uki-footer-brand">
-          <span className="relative block h-11 w-[6.8rem] overflow-hidden sm:h-12 sm:w-[7.4rem]">
-            <Image src="/Cukie_logo_first.png" alt="Cukies World" fill className="object-contain object-left" sizes="7.4rem" />
-          </span>
-        </div>
-
-        <div className="uki-footer-socials">
-          {socials.map((social) => {
-            const Icon = social.icon;
-            return (
-              <a key={social.label} href={social.href} target="_blank" rel="noreferrer" aria-label={social.label} className="uki-social-link">
-                <Icon className="h-4 w-4" strokeWidth={1.8} />
-              </a>
-            );
-          })}
-        </div>
-
-        <div className="uki-footer-links">
-          <a href="#presale" className="hover:text-[var(--uki-cyan)]">Inicio</a>
-          <a href="/premios" className="hover:text-[var(--uki-cyan)]">Premios</a>
-        </div>
-
-        <p className="uki-footer-copy">
-          © 2026 Cukies World
-          <span className="block">Todos los derechos reservados.</span>
-        </p>
-      </div>
-    </footer>
-  );
-}

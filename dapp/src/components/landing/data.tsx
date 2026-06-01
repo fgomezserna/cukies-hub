@@ -233,17 +233,17 @@ export const gameCards = [
   {
     title: "Jump n' Hop",
     text: 'Acción / Plataformas',
-    image: '/brand/generated/uki-timeline-economy.svg',
+    image: '/portada_jump_Hop.jpg',
   },
   {
     title: 'Cukies Island',
     text: 'Estrategia / Simulación',
-    image: '/brand/generated/uki-final-cta-scene-v2.png',
+    image: '/portada_cukies_island.jpg',
   },
   {
     title: 'Brain Buzz',
     text: 'Trivia / Conocimiento',
-    image: '/brand/generated/uki-utility-map-scene-v2.png',
+    image: '/portada_brain_buzz.jpg',
   },
 ];
 

@@ -1024,7 +1024,7 @@ body {
     background: radial-gradient(circle at 32% 24%, #fff0a8, #f2c34b 46%, #8b5410 100%);
   }
 
-  .uki-token-cyan {
+  .uki-token-purple {
     background: radial-gradient(circle at 32% 24%, #ffd4ff, #b668d9 46%, #5b2675 100%);
   }
 
@@ -1206,13 +1206,20 @@ body {
     filter: drop-shadow(0 0 12px rgba(34, 231, 223, 0.2));
   }
 
+  @keyframes uki-line-flow {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+
   .uki-utility-lines path {
     fill: none;
     stroke: rgba(34, 231, 223, 0.42);
-    stroke-dasharray: 2 5;
+    stroke-dasharray: 3 6;
     stroke-linecap: round;
     stroke-width: 0.18;
     vector-effect: non-scaling-stroke;
+    animation: uki-line-flow 1.8s linear infinite;
   }
 
   .uki-orbit {
@@ -2145,6 +2152,25 @@ body {
     border-color: rgba(34, 231, 223, 0.35);
     background: rgba(5, 20, 26, 0.84);
     transform: translateY(-3px);
+    cursor: pointer;
+  }
+
+  /* Clase general para hover-card en premios/landing */
+  .uki-hover-card {
+    cursor: pointer;
+    transition: transform 0.3s var(--uki-ease), box-shadow 0.3s var(--uki-ease), border-color 0.3s var(--uki-ease);
+  }
+  .uki-hover-card:hover {
+    transform: translateY(-4px) scale(1.025);
+    box-shadow: 0 12px 32px rgba(46, 232, 214, 0.15);
+  }
+
+  /* Soporte para animaciones del FAQ */
+  .grid-rows-0fr {
+    grid-template-rows: 0fr;
+  }
+  .group[open] .group-open\:grid-rows-1fr {
+    grid-template-rows: 1fr;
   }
 
   .uki-game-card:hover img {
