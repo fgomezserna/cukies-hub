@@ -73,14 +73,17 @@ function HeroSection() {
       <div className="uki-hero-vignette" />
       <div className="uki-container uki-hero-layout">
         <div className="uki-hero-content">
-          <p className="uki-launch-badge">Preventa UKI</p>
+          <p className="uki-launch-badge">Lanzamiento 2026</p>
           <h1 className="uki-hero-title">
             <span className="uki-hero-title-line">Preventa UKI</span>
           </h1>
           <div className="uki-hero-countdown mt-5 max-w-[30rem]">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">Inicio 15 de Junio</p>
-              <p className="uki-label">Cuenta atrás</p>
+              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">Inicio 15 de junio 17:00</p>
+              <div className="uki-token-pair" aria-label="Compra con ASM y recibe UKI">
+                <span className="uki-token-logo uki-token-logo-asm">ASM</span>
+                <span className="uki-token-logo uki-token-logo-uki">UKI</span>
+              </div>
             </div>
             <PresaleCountdown />
           </div>
@@ -524,4 +527,3 @@ function FaqAndCta() {
     </section>
   );
 }
-

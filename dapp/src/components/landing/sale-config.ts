@@ -1,6 +1,6 @@
-const DEFAULT_PRESALE_START_ISO = '2026-06-15T00:00:00+02:00';
-const DEFAULT_PRESALE_START_LABEL = '15 de junio de 2026';
-const DEFAULT_PRESALE_START_SHORT_LABEL = '15 de junio';
+const DEFAULT_PRESALE_START_ISO = '2026-06-15T17:00:00+02:00';
+const DEFAULT_PRESALE_START_LABEL = '15 de junio de 2026 a las 17:00';
+const DEFAULT_PRESALE_START_SHORT_LABEL = '15 de junio 17:00';
 const NON_PRODUCTION_LABEL_RE = /test\s*net/i;
 
 function publicLabel(value: string | undefined, fallback: string) {

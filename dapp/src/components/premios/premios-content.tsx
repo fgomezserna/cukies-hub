@@ -94,7 +94,6 @@ const rarityRewards = [
     glow: 'shadow-[0_0_22px_rgba(242,195,75,0.2)]',
     text: 'text-[#ffe08a]',
     icon: Crown,
-    perk: 'Máxima prioridad y multiplicador x5 de XP en ecosistema.',
   },
   {
     name: 'Legendario',
@@ -103,7 +102,6 @@ const rarityRewards = [
     glow: 'shadow-[0_0_18px_rgba(215,166,62,0.16)]',
     text: 'text-[#f2c34b]',
     icon: Trophy,
-    perk: 'Acceso garantizado a betas y multiplicador x3 de XP.',
   },
   {
     name: 'Épico',
@@ -112,7 +110,6 @@ const rarityRewards = [
     glow: 'shadow-[0_0_18px_rgba(217,83,255,0.15)]',
     text: 'text-[#f19bff]',
     icon: Sparkles,
-    perk: 'Multiplicador x2 de XP y cosméticos de juego exclusivos.',
   },
   {
     name: 'Raro',
@@ -121,7 +118,6 @@ const rarityRewards = [
     glow: 'shadow-[0_0_14px_rgba(56,189,248,0.12)]',
     text: 'text-[#7dd3fc]',
     icon: Star,
-    perk: 'Multiplicador x1.5 de XP y rol premium en Discord.',
   },
   {
     name: 'No Común',
@@ -130,7 +126,6 @@ const rarityRewards = [
     glow: 'shadow-[0_0_14px_rgba(145,233,111,0.12)]',
     text: 'text-[#b8f486]',
     icon: Gift,
-    perk: 'Acceso prioritario a preventas de ítems y cosméticos.',
   },
   {
     name: 'Común',
@@ -139,7 +134,6 @@ const rarityRewards = [
     glow: '',
     text: 'text-[var(--uki-cream)]',
     icon: Users,
-    perk: 'Participación en sorteos recurrentes comunitarios.',
   },
 ];
 
@@ -422,9 +416,6 @@ export function PremiosContent() {
                       <Icon className={`h-8 w-8 ${rarity.text}`} strokeWidth={1.8} />
                     </div>
 
-                    <p className="mt-4 text-xs font-semibold text-[var(--uki-text)] leading-relaxed">
-                      {rarity.perk}
-                    </p>
                   </article>
                 );
               })}

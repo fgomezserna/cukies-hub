@@ -819,6 +819,38 @@ body {
     backdrop-filter: blur(12px);
   }
 
+  .uki-token-pair {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .uki-token-logo {
+    display: inline-grid;
+    height: 2.15rem;
+    min-width: 2.15rem;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 242, 220, 0.18);
+    padding-inline: 0.48rem;
+    font-family: var(--font-space-grotesk), sans-serif;
+    font-size: 0.66rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 10px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .uki-token-logo-asm {
+    background: linear-gradient(145deg, #6f4cf4, #24104f);
+    color: #ffffff;
+  }
+
+  .uki-token-logo-uki {
+    background: linear-gradient(145deg, #f2c34b, #7a3b08);
+    color: #120807;
+  }
+
   .uki-vault-room {
     position: absolute;
     left: 10%;

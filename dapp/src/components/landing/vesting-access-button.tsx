@@ -6,6 +6,7 @@ import { formatUnits, type Address } from 'viem';
 import { useAccount, useReadContract } from 'wagmi';
 import { presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
+import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 
 function hasPurchased(value?: bigint) {
   if (!value || value <= BigInt(0)) return false;
@@ -30,9 +31,12 @@ export function VestingAccessButton() {
 
   if (!isConnected || !address) {
     return (
-      <button type="button" disabled className="uki-wallet-button mt-5 w-full justify-center opacity-60">
-        Conecta wallet para consultar
-      </button>
+      <LandingWalletConnectButton
+        className="mt-5 w-full justify-center"
+        label="Conecta wallet para consultar"
+        compactLabel="Consultar"
+        showCompactText={false}
+      />
     );
   }
 
