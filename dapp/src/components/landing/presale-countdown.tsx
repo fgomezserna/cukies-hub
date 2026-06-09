@@ -1,60 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowRight, Lock, Timer } from 'lucide-react';
-import {
-  UKI_PRESALE_HAS_EXACT_START,
-  UKI_PRESALE_START_ISO,
-  UKI_PRESALE_START_LABEL,
-  UKI_PRESALE_START_SHORT_LABEL,
-} from './sale-config';
-
-type RemainingTime = {
-  total: number;
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-};
-
-function getRemainingTime(): RemainingTime {
-  if (!UKI_PRESALE_HAS_EXACT_START) {
-    return { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
-  }
-
-  const total = Math.max(0, new Date(UKI_PRESALE_START_ISO).getTime() - Date.now());
-  const seconds = Math.floor((total / 1000) % 60);
-  const minutes = Math.floor((total / (1000 * 60)) % 60);
-  const hours = Math.floor((total / (1000 * 60 * 60)) % 24);
-  const days = Math.floor(total / (1000 * 60 * 60 * 24));
-
-  return { total, days, hours, minutes, seconds };
-}
+import { usePresaleTiming } from './presale-status';
 
 function formatCountdownValue(value: number) {
   return value.toString().padStart(2, '0');
 }
 
 export function usePresaleLock() {
-  const [remaining, setRemaining] = useState<RemainingTime>(() => getRemainingTime());
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setRemaining(getRemainingTime());
-    }, 1000);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  return useMemo(
-    () => ({
-      hasExactStart: UKI_PRESALE_HAS_EXACT_START,
-      isLocked: remaining.total > 0,
-      remaining,
-    }),
-    [remaining],
-  );
+  return usePresaleTiming();
 }
 
 export function PresaleCountdown() {
@@ -83,18 +38,18 @@ export function PresaleCountdown() {
 }
 
 export function PresaleCountdownTitle() {
-  const { isLocked } = usePresaleLock();
+  const { isLocked, startLabel } = usePresaleLock();
 
-  return <>{isLocked ? `La preventa empieza ${UKI_PRESALE_START_LABEL}` : 'Preventa abierta'}</>;
+  return <>{isLocked ? `La preventa empieza ${startLabel}` : 'Preventa abierta'}</>;
 }
 
 export function PresaleLockBadge({ className = '' }: { className?: string }) {
-  const { isLocked } = usePresaleLock();
+  const { isLocked, startLabel } = usePresaleLock();
 
   return (
     <span className={`uki-presale-lock-badge ${className}`}>
       {isLocked ? <Lock className="h-3.5 w-3.5" strokeWidth={1.8} /> : <Timer className="h-3.5 w-3.5" strokeWidth={1.8} />}
-      {isLocked ? `Bloqueado hasta ${UKI_PRESALE_START_LABEL}` : 'Preventa abierta'}
+      {isLocked ? `Bloqueado hasta ${startLabel}` : 'Preventa abierta'}
     </span>
   );
 }
@@ -108,14 +63,14 @@ export function PresaleGateAction({
   className?: string;
   openLabel?: ReactNode;
 }) {
-  const { isLocked } = usePresaleLock();
+  const { isLocked, startShortLabel } = usePresaleLock();
 
   return (
     <button type="button" disabled={isLocked} className={`${className} ${isLocked ? 'uki-action-locked' : ''}`}>
       {isLocked ? (
         <span className="inline-flex items-center justify-center gap-2">
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Abre {UKI_PRESALE_START_SHORT_LABEL}
+          Abre {startShortLabel}
         </span>
       ) : (
         openLabel ?? children
@@ -135,7 +90,7 @@ export function PresaleGateLink({
   className?: string;
   variant?: 'primary' | 'secondary' | 'ghost';
 }) {
-  const { isLocked } = usePresaleLock();
+  const { isLocked, startShortLabel } = usePresaleLock();
   const variantClass = {
     primary: 'uki-button-primary',
     secondary: 'uki-button-secondary',
@@ -147,7 +102,7 @@ export function PresaleGateLink({
       <span aria-disabled="true" className={`uki-button ${variantClass} uki-button-locked ${className}`}>
         <span className="inline-flex items-center gap-2">
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Abre {UKI_PRESALE_START_SHORT_LABEL}
+          Abre {startShortLabel}
         </span>
         <span className="uki-button-icon" aria-hidden="true">
           <Timer className="h-4 w-4" />

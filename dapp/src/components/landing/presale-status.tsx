@@ -3,18 +3,27 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, Lock, RadioTower } from 'lucide-react';
-import { UKI_PRESALE_START_LABEL } from './sale-config';
-import { usePresaleLock } from './presale-countdown';
+import {
+  UKI_PRESALE_START_ISO,
+  UKI_PRESALE_START_LABEL,
+  UKI_PRESALE_START_SHORT_LABEL,
+} from './sale-config';
+import { formatPresaleRateLabel, remainingTimeUntil } from '@/lib/presale-display';
 
 type PresaleStatusResponse = {
   source: 'static' | 'contract';
   isConfigured: boolean;
   isOpen?: boolean;
+  saleEnabled?: boolean | null;
   message?: string;
+  startsAt: string;
   startsAtLabel: string;
+  startsAtShortLabel?: string;
+  endsAt?: string | null;
+  endsAtLabel?: string | null;
   chainLabel: string;
   price?: {
-    ukiPerAsmFormatted: string;
+    ukiPerAsmFormatted: string | null;
   };
 };
 
@@ -62,7 +71,7 @@ function usePresaleStatus(): PresaleStatusState {
   return state;
 }
 
-function usePresaleStatusValue() {
+export function usePresaleStatusValue() {
   const state = useContext(PresaleStatusContext);
 
   if (!state) {
@@ -78,33 +87,83 @@ export function PresaleStatusProvider({ children }: { children: ReactNode }) {
   return <PresaleStatusContext.Provider value={state}>{children}</PresaleStatusContext.Provider>;
 }
 
-function formatRate(value?: string) {
-  if (!value) return 'RATIO ASM - UKI SE FIJARÁ AL INICIO';
+export function usePresaleTiming() {
+  const state = usePresaleStatusValue();
+  const [, setTick] = useState(0);
 
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return 'RATIO ASM - UKI SE FIJARÁ AL INICIO';
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setTick((value) => value + 1);
+    }, 1000);
 
-  return `1 ASM = ${numeric.toLocaleString('en-US', { maximumFractionDigits: 4 })} UKI`;
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const data = state.status === 'ready' ? state.data : null;
+  const startsAt = data?.startsAt ?? UKI_PRESALE_START_ISO;
+  const remaining = remainingTimeUntil(startsAt);
+  const isContractConfigured = Boolean(data?.isConfigured);
+  const isContractOpen = Boolean(data?.isOpen && data.saleEnabled !== false);
+  const isLocked = state.status !== 'ready' || !isContractConfigured || !isContractOpen;
+
+  return {
+    hasExactStart: Boolean(startsAt),
+    isLocked,
+    isContractConfigured,
+    isContractOpen,
+    remaining,
+    startsAt,
+    startLabel: data?.startsAtLabel ?? UKI_PRESALE_START_LABEL,
+    startShortLabel: data?.startsAtShortLabel ?? UKI_PRESALE_START_SHORT_LABEL,
+    endsAt: data?.endsAt ?? null,
+    endLabel: data?.endsAtLabel ?? null,
+  };
 }
 
 export function PresaleRateLabel() {
   const state = usePresaleStatusValue();
-  const { isLocked } = usePresaleLock();
 
   if (state.status === 'loading') {
     return <span className="uki-status-inline">Cargando estado de preventa</span>;
   }
 
-  if (isLocked || state.status === 'error' || !state.data.isConfigured || !state.data.isOpen) {
-    return <span className="uki-status-inline">RATIO ASM - UKI SE FIJARÁ AL INICIO</span>;
+  if (state.status === 'error' || !state.data.isConfigured) {
+    return <span className="uki-status-inline">Ratio ASM - UKI pendiente</span>;
   }
 
-  return <span className="uki-status-inline">{formatRate(state.data.price?.ukiPerAsmFormatted)}</span>;
+  return <span className="uki-status-inline">{formatPresaleRateLabel(state.data.price?.ukiPerAsmFormatted)}</span>;
+}
+
+export function PresaleStartLabel({ prefix = '' }: { prefix?: string }) {
+  const { startLabel } = usePresaleTiming();
+
+  return (
+    <span suppressHydrationWarning>
+      {prefix}
+      {prefix ? ' ' : ''}
+      {startLabel}
+    </span>
+  );
+}
+
+export function PresaleQuoteAmount({ asmAmount }: { asmAmount: number }) {
+  const state = usePresaleStatusValue();
+  const rate = state.status === 'ready' ? Number(state.data.price?.ukiPerAsmFormatted) : null;
+
+  if (!rate || !Number.isFinite(rate) || rate <= 0) {
+    return <span>pendiente</span>;
+  }
+
+  return (
+    <span>
+      {(asmAmount * rate).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+    </span>
+  );
 }
 
 export function PresaleRuntimeStatus() {
   const state = usePresaleStatusValue();
-  const { isLocked } = usePresaleLock();
+  const timing = usePresaleTiming();
 
   const runtime = useMemo(() => {
     if (state.status === 'loading') {
@@ -134,7 +193,7 @@ export function PresaleRuntimeStatus() {
       } as const;
     }
 
-    if (state.data.isOpen) {
+    if (timing.isContractOpen) {
       return {
         icon: CheckCircle2,
         tone: 'ready',
@@ -145,11 +204,11 @@ export function PresaleRuntimeStatus() {
 
     return {
       icon: Lock,
-      tone: isLocked ? 'locked' : 'warning',
-      title: isLocked ? `Bloqueado hasta ${UKI_PRESALE_START_LABEL}` : 'Aún no abierta',
+      tone: timing.isLocked ? 'locked' : 'warning',
+      title: timing.isLocked ? `Bloqueado hasta ${timing.startLabel}` : 'Aún no abierta',
       text: 'Conecta wallet para revisar datos; aprobar y comprar siguen bloqueados hasta la apertura.',
     } as const;
-  }, [isLocked, state]);
+  }, [state, timing.isContractOpen, timing.isLocked, timing.startLabel]);
 
   const Icon = runtime.icon;
 

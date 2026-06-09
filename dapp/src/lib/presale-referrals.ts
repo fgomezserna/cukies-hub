@@ -108,7 +108,7 @@ async function getReferralLevelCounts(db: Db, sponsorWalletNormalized?: string |
   }, { ...emptyReferralLevelCounts });
 }
 
-function publicParticipant(
+export function toPublicPresaleParticipantStatus(
   participant: Record<string, any>,
   campaignConfig: Awaited<ReturnType<typeof getCampaignConfig>>,
   referralLevelCounts: ReferralLevelCounts,
@@ -215,7 +215,7 @@ export async function getPresaleReferralStatus(walletAddress: string, origin?: s
     participant.normalizedWalletAddress,
   );
 
-  return publicParticipant(participant, campaignConfig, referralLevelCounts, origin);
+  return toPublicPresaleParticipantStatus(participant, campaignConfig, referralLevelCounts, origin);
 }
 
 export async function applyPresaleReferralCode(walletAddress: string, referralCode: string) {

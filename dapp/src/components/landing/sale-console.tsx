@@ -1,17 +1,10 @@
-import { Zap, type LucideIcon } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, Zap, type LucideIcon } from 'lucide-react';
 import { PresalePurchasePanel } from './presale-purchase-panel';
-import { PresaleRateLabel, PresaleStatusProvider } from './presale-status';
-import { Panel, TokenCoin } from './primitives';
+import { PresaleRateLabel } from './presale-status';
+import { Panel } from './primitives';
 
 export function SaleConsole() {
-  return (
-    <PresaleStatusProvider>
-      <SaleConsoleContent />
-    </PresaleStatusProvider>
-  );
-}
-
-function SaleConsoleContent() {
   return (
     <Panel id="presale-console" className="uki-sale-console" innerClassName="p-3">
       <div className="text-center">
@@ -25,12 +18,14 @@ function SaleConsoleContent() {
 
       <div className="mt-2.5 rounded-[10px] border border-[var(--uki-pink-border)] bg-[#02090d]/74 p-2.5">
         <p className="mb-2 text-center font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cream)]">
-          1 ASM = ¿? UKI
+          <PresaleRateLabel />
         </p>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <TokenBox label="ASM" tone="purple" />
-          <span className="font-headline text-2xl font-black text-[var(--uki-cyan)]">-&gt;</span>
-          <TokenBox label="UKI" tone="gold" />
+          <TokenBox label="ASM" tone="asm" image="/brand/official/asm-token-coingecko.png" />
+          <span className="uki-conversion-arrow" aria-hidden="true">
+            <ArrowRight className="h-5 w-5" strokeWidth={2.4} />
+          </span>
+          <TokenBox label="UKI" tone="uki" image="/brand/official/uki-token-cukies-world.png" />
         </div>
       </div>
 
@@ -68,10 +63,12 @@ function ConsoleMetric({
   );
 }
 
-function TokenBox({ label, tone }: { label: string; tone: 'purple' | 'gold' }) {
+function TokenBox({ label, image, tone }: { label: string; image: string; tone: 'asm' | 'uki' }) {
   return (
     <div className="flex items-center gap-2.5 rounded-[8px] bg-white/[0.045] px-2.5 py-2.5">
-      <TokenCoin label={label.slice(0, 1)} tone={tone} size="sm" />
+      <span className={`uki-token-official uki-token-official-${tone}`}>
+        <Image src={image} alt={`${label} oficial`} fill sizes="40px" className="object-contain" />
+      </span>
       <span className="font-headline text-xl font-black uppercase tracking-[0.04em] text-[var(--uki-cream)]">{label}</span>
     </div>
   );

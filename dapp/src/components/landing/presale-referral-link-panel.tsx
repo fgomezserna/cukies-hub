@@ -12,6 +12,7 @@ type PresaleReferralStatus = {
   totalUkiPurchased: number;
   minimumUkiToUnlockLink: number;
   unlockProgress: number;
+  referralUnlockedAt: string | null;
   referralLink: string | null;
   referralWeightedScore: number;
   referralLevel1UkiAmount: number;
@@ -83,7 +84,12 @@ export function PresaleReferralLinkPanel() {
   }
 
   const referralMinimum = status?.minimumUkiToUnlockLink ?? 0;
-  const referralProgressPercent = Math.round((status?.unlockProgress ?? 0) * 100);
+  const hasConfiguredMinimum = referralMinimum > 0;
+  const referralProgressPercent = hasConfiguredMinimum
+    ? Math.round((status?.unlockProgress ?? 0) * 100)
+    : status?.referralLink
+      ? 100
+      : 0;
   const remainingUkiToUnlock = Math.max(referralMinimum - (status?.totalUkiPurchased ?? 0), 0);
   const hasPurchasedUki = (status?.totalUkiPurchased ?? 0) > 0;
   const referralLevels = [
@@ -209,7 +215,9 @@ export function PresaleReferralLinkPanel() {
             <div className="flex items-end justify-between gap-2 text-[0.68rem] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
               <span>Desbloqueo de link</span>
               <span>
-                {formatNumber(status?.totalUkiPurchased)} / {formatNumber(referralMinimum)} UKI
+                {hasConfiguredMinimum
+                  ? `${formatNumber(status?.totalUkiPurchased)} / ${formatNumber(referralMinimum)} UKI`
+                  : `${formatNumber(status?.totalUkiPurchased)} UKI indexados`}
               </span>
             </div>
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-black/35">
@@ -220,7 +228,11 @@ export function PresaleReferralLinkPanel() {
             </div>
           </div>
           <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-            {remainingUkiToUnlock > 0
+            {!hasConfiguredMinimum
+              ? hasPurchasedUki
+                ? 'Compra detectada, pero el indexer todavía no ha marcado el desbloqueo del link. Refresca después de proyectar eventos de preventa.'
+                : 'Tu link aparecerá cuando el indexer proyecte tu primera compra de UKI.'
+              : remainingUkiToUnlock > 0
               ? hasPurchasedUki
                 ? `Necesitas comprar ${formatNumber(remainingUkiToUnlock)} UKI más con esta wallet para acceder a tu link.`
                 : 'Aún no has hecho ninguna compra con esta wallet. Compra UKI para desbloquear tu enlace de invitación.'

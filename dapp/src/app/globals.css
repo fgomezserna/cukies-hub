@@ -827,6 +827,7 @@ body {
 
   .uki-token-logo {
     display: inline-grid;
+    position: relative;
     height: 2.15rem;
     min-width: 2.15rem;
     place-items: center;
@@ -849,6 +850,57 @@ body {
   .uki-token-logo-uki {
     background: linear-gradient(145deg, #f2c34b, #7a3b08);
     color: #120807;
+  }
+
+  .uki-token-logo-official {
+    overflow: hidden;
+    width: 2.4rem;
+    min-width: 2.4rem;
+    height: 2.4rem;
+    border-color: rgba(255, 242, 220, 0.34);
+    background:
+      radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.2), transparent 38%),
+      rgba(2, 9, 13, 0.76);
+    padding: 0.18rem;
+  }
+
+  .uki-token-official {
+    position: relative;
+    display: inline-grid;
+    height: 2.45rem;
+    width: 2.45rem;
+    flex: 0 0 auto;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 242, 220, 0.26);
+    background: rgba(2, 9, 13, 0.74);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 0 18px rgba(0, 0, 0, 0.24);
+  }
+
+  .uki-token-official-asm {
+    background: radial-gradient(circle at 50% 28%, rgba(255, 224, 128, 0.2), rgba(34, 23, 3, 0.86));
+  }
+
+  .uki-token-official-uki {
+    padding: 0.16rem;
+    background: radial-gradient(circle at 50% 28%, rgba(68, 237, 214, 0.24), rgba(10, 32, 32, 0.88));
+  }
+
+  .uki-conversion-arrow {
+    display: grid;
+    height: 2.5rem;
+    width: 2.5rem;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 231, 223, 0.42);
+    background: rgba(34, 231, 223, 0.08);
+    color: var(--uki-cyan);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 18px rgba(34, 231, 223, 0.16);
   }
 
   .uki-vault-room {
@@ -1334,6 +1386,8 @@ body {
   .uki-node-worlds { left: 21%; bottom: 9%; }
   .uki-node-rewards { right: 21%; bottom: 9%; }
 
+  .uki-node-purple { color: #c7a6ff; background: linear-gradient(135deg, rgba(46, 24, 75, 0.78), rgba(6, 16, 22, 0.68)); }
+  .uki-node-pink { color: #ff9fe8; background: linear-gradient(135deg, rgba(62, 22, 56, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-mint { color: #8ffefa; background: linear-gradient(135deg, rgba(3, 38, 44, 0.72), rgba(6, 16, 22, 0.68)); }
   .uki-node-gold { color: #ffd97a; background: linear-gradient(135deg, rgba(58, 42, 16, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-blue { color: #99ddff; background: linear-gradient(135deg, rgba(11, 45, 61, 0.74), rgba(6, 16, 22, 0.68)); }
@@ -1351,6 +1405,7 @@ body {
       radial-gradient(circle at 86% 40%, rgba(242, 195, 75, 0.2), transparent 16rem),
       linear-gradient(135deg, rgba(13, 9, 42, 0.96), rgba(5, 13, 30, 0.94));
     padding: clamp(1.2rem, 3vw, 2.4rem);
+    min-height: clamp(34rem, 42vw, 41.5rem);
     isolation: isolate;
     box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
   }
@@ -1358,38 +1413,92 @@ body {
   .uki-community-panel::before {
     content: "";
     position: absolute;
-    inset: auto -5rem -8rem auto;
-    z-index: -1;
-    width: 28rem;
-    height: 28rem;
-    border-radius: 999px;
+    inset: 0;
+    z-index: 0;
     background:
-      radial-gradient(circle at 44% 34%, rgba(255, 229, 143, 0.3), transparent 18%),
-      url("/brand/generated/uki-cukie-master-scene-v2.png") center / cover no-repeat;
-    opacity: 0.34;
-    filter: saturate(1.12);
+      linear-gradient(180deg, rgba(7, 5, 29, 0.98) 0%, rgba(7, 5, 29, 0.82) 28%, rgba(7, 5, 29, 0.24) 58%, rgba(7, 5, 29, 0.86) 100%),
+      linear-gradient(90deg, rgba(7, 5, 29, 0.96) 0%, rgba(7, 5, 29, 0.76) 34%, rgba(7, 5, 29, 0.16) 66%, rgba(7, 5, 29, 0.38) 100%),
+      url("/brand/generated/uki-community-cukie-scene-v1.png") right bottom / auto clamp(28rem, 38vw, 38rem) no-repeat;
+    opacity: 0.96;
+    filter: saturate(1.08) contrast(1.04);
+    pointer-events: none;
   }
 
   .uki-community-copy {
     position: relative;
     z-index: 1;
-    max-width: 64rem;
+    max-width: 76rem;
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .uki-community-copy .uki-launch-badge {
+    margin-inline: auto;
+  }
+
+  .uki-community-title {
+    margin: 1.35rem auto 0;
+    max-width: 76rem;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(2.9rem, 3.9vw, 4.6rem);
+    font-weight: 900;
+    line-height: 0.92;
+    text-transform: uppercase;
+    text-wrap: balance;
+    color: var(--uki-cream);
+  }
+
+  .uki-community-title span {
+    display: block;
+  }
+
+  .uki-community-title span:last-child {
+    color: var(--uki-gold);
+  }
+
+  .uki-community-lead {
+    margin: 1rem auto 0;
+    max-width: 47rem;
+    color: var(--uki-text);
+    font-size: clamp(1rem, 1.25vw, 1.18rem);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .uki-community-lead strong {
+    color: var(--uki-gold);
+    font-weight: 900;
+  }
+
+  .uki-community-principle {
+    margin: 0.7rem auto 0;
+    max-width: 42rem;
+    color: #d6c8e8;
+    font-size: clamp(0.92rem, 1.04vw, 1.04rem);
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1.55;
   }
 
   .uki-community-visual {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.55fr);
-    gap: 1rem;
-    align-items: center;
-    margin-top: 2rem;
+    grid-template-columns: minmax(18rem, 22rem) minmax(15rem, 19rem) minmax(18rem, 1fr);
+    gap: clamp(1rem, 3vw, 2rem);
+    align-items: end;
+    min-height: clamp(15rem, 19vw, 18.5rem);
+    margin-top: clamp(0.8rem, 1.55vw, 1.35rem);
   }
 
   .uki-community-ring {
-    display: grid;
-    min-height: 17rem;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 22rem);
+    aspect-ratio: 1;
+    justify-self: start;
     border-radius: 999px;
     border: 1.15rem solid rgba(174, 106, 255, 0.82);
     background: radial-gradient(circle, rgba(10, 8, 28, 0.92), rgba(10, 8, 28, 0.55));
@@ -1402,7 +1511,7 @@ body {
   .uki-community-ring span {
     display: block;
     font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
-    font-size: clamp(4rem, 8vw, 7rem);
+    font-size: clamp(3.8rem, 6.8vw, 6rem);
     font-weight: 900;
     line-height: 0.85;
     color: var(--uki-cream);
@@ -1420,9 +1529,14 @@ body {
     text-transform: uppercase;
   }
 
+  .uki-community-ring small {
+    margin-top: 1.1rem;
+  }
+
   .uki-community-years {
     display: grid;
     justify-items: center;
+    align-self: center;
     border-radius: 12px;
     border: 1px solid rgba(174, 106, 255, 0.32);
     background: rgba(255, 255, 255, 0.04);
@@ -1447,7 +1561,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    margin: 1.35rem auto 0;
+    margin: clamp(0.75rem, 1vw, 1rem) auto 0;
     max-width: 44rem;
     border-radius: 999px;
     border: 1px solid rgba(174, 106, 255, 0.5);
@@ -1456,6 +1570,71 @@ body {
     color: #e4d5ff;
     font-weight: 900;
     text-align: center;
+  }
+
+  .uki-premios-page-hero {
+    position: relative;
+    display: flex;
+    min-height: clamp(34rem, 48vw, 43rem);
+    align-items: center;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(124, 60, 255, 0.42);
+    background: #050712;
+    padding: clamp(1.25rem, 4vw, 3rem);
+    box-shadow: 0 0 54px rgba(124, 60, 255, 0.22);
+    isolation: isolate;
+  }
+
+  .uki-premios-page-hero-image {
+    z-index: 0;
+    object-fit: cover;
+    object-position: center;
+    filter: saturate(1.12) contrast(1.05);
+  }
+
+  .uki-premios-page-hero-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      linear-gradient(90deg, rgba(5, 7, 18, 0.98) 0%, rgba(5, 7, 18, 0.86) 34%, rgba(5, 7, 18, 0.28) 62%, rgba(5, 7, 18, 0.22) 100%),
+      linear-gradient(0deg, rgba(5, 7, 18, 0.82), rgba(5, 7, 18, 0.08) 48%, rgba(5, 7, 18, 0.18));
+  }
+
+  .uki-premios-page-hero-copy {
+    position: relative;
+    z-index: 2;
+    max-width: 47rem;
+  }
+
+  .uki-premios-page-hero-copy h1 {
+    margin-top: 1.25rem;
+    font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
+    font-size: clamp(3.2rem, 6.4vw, 6.9rem);
+    font-weight: 900;
+    line-height: 0.9;
+    text-transform: uppercase;
+    text-wrap: balance;
+    color: var(--uki-cream);
+  }
+
+  .uki-premios-page-hero-copy h1 span {
+    color: var(--uki-gold);
+  }
+
+  .uki-premios-page-hero-copy h1 strong {
+    color: #e45cff;
+    font-weight: inherit;
+  }
+
+  .uki-premios-page-hero-copy > p:not(.uki-launch-badge) {
+    margin-top: 1.15rem;
+    max-width: 35rem;
+    color: var(--uki-text);
+    font-size: clamp(1rem, 1.45vw, 1.25rem);
+    font-weight: 700;
+    line-height: 1.45;
   }
 
   .uki-timeline-card {
@@ -1777,9 +1956,9 @@ body {
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(8, 7, 28, 0.92), rgba(8, 7, 28, 0.55) 44%, rgba(8, 7, 28, 0.82)),
-      url("/brand/generated/uki-cukie-master-scene-v2.png") right top / auto 34rem no-repeat;
-    opacity: 0.42;
+      linear-gradient(90deg, rgba(8, 7, 28, 0.96), rgba(8, 7, 28, 0.62) 41%, rgba(8, 7, 28, 0.36) 68%, rgba(8, 7, 28, 0.78)),
+      url("/brand/generated/uki-cukie-master-scene-v3.png") right 17rem top / auto 34rem no-repeat;
+    opacity: 0.72;
     pointer-events: none;
   }
 
@@ -2248,7 +2427,7 @@ body {
     background:
       linear-gradient(90deg, rgba(7, 7, 23, 0.98) 0%, rgba(7, 7, 23, 0.8) 35%, rgba(7, 7, 23, 0.15) 68%, rgba(7, 7, 23, 0.36)),
       linear-gradient(0deg, rgba(7, 7, 23, 0.88), transparent 42%, rgba(7, 7, 23, 0.2)),
-      url("/brand/generated/uki-final-cta-scene-v2.png") right center / cover no-repeat;
+      url("/brand/generated/uki-prizes-cukie-scene-v1.png") right center / cover no-repeat;
     filter: saturate(1.18) contrast(1.05);
   }
 
@@ -2332,6 +2511,42 @@ body {
     .uki-treasure-top {
       align-items: flex-start;
       flex-direction: column;
+    }
+
+    .uki-community-panel {
+      min-height: auto;
+    }
+
+    .uki-community-panel::before {
+      background:
+        linear-gradient(180deg, rgba(7, 5, 29, 0.98) 0%, rgba(7, 5, 29, 0.8) 38%, rgba(7, 5, 29, 0.32) 66%, rgba(7, 5, 29, 0.9) 100%),
+        linear-gradient(90deg, rgba(7, 5, 29, 0.94), rgba(7, 5, 29, 0.4) 76%, rgba(7, 5, 29, 0.16)),
+        url("/brand/generated/uki-community-cukie-scene-v1.png") right bottom / auto 30rem no-repeat;
+    }
+
+    .uki-community-visual {
+      max-width: 25rem;
+      margin-inline: auto;
+      min-height: auto;
+    }
+
+    .uki-community-ring {
+      justify-self: center;
+    }
+
+    .uki-premios-page-hero {
+      align-items: flex-start;
+      min-height: 40rem;
+    }
+
+    .uki-premios-page-hero-image {
+      object-position: 62% center;
+    }
+
+    .uki-premios-page-hero-scrim {
+      background:
+        linear-gradient(180deg, rgba(5, 7, 18, 0.98) 0%, rgba(5, 7, 18, 0.76) 44%, rgba(5, 7, 18, 0.2) 100%),
+        linear-gradient(90deg, rgba(5, 7, 18, 0.98), rgba(5, 7, 18, 0.36) 78%, rgba(5, 7, 18, 0.08));
     }
 
     .uki-game-scene {
@@ -2686,13 +2901,69 @@ body {
 
     .uki-community-panel,
     .uki-master-panel,
-    .uki-prizes-hero {
+    .uki-prizes-hero,
+    .uki-premios-page-hero {
       padding: 1rem;
+    }
+
+    .uki-community-copy {
+      text-align: left;
+    }
+
+    .uki-community-copy .uki-launch-badge {
+      margin-inline: 0;
+    }
+
+    .uki-community-title {
+      font-size: clamp(2rem, 9.3vw, 3rem);
+      line-height: 0.98;
+      text-align: left;
+    }
+
+    .uki-community-lead,
+    .uki-community-principle {
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    .uki-community-panel::before {
+      background:
+        linear-gradient(180deg, rgba(7, 5, 29, 0.98) 0%, rgba(7, 5, 29, 0.88) 42%, rgba(7, 5, 29, 0.5) 70%, rgba(7, 5, 29, 0.92) 100%),
+        url("/brand/generated/uki-community-cukie-scene-v1.png") center bottom / auto 22rem no-repeat;
+      opacity: 0.78;
     }
 
     .uki-community-ring {
       min-height: 14rem;
       border-width: 0.8rem;
+    }
+
+    .uki-community-years {
+      padding: 1rem;
+    }
+
+    .uki-community-footer {
+      align-items: flex-start;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.25;
+    }
+
+    .uki-premios-page-hero {
+      min-height: 42rem;
+    }
+
+    .uki-premios-page-hero-image {
+      object-position: 64% bottom;
+    }
+
+    .uki-premios-page-hero-copy h1 {
+      font-size: clamp(2.7rem, 12vw, 4rem);
+      line-height: 0.92;
+    }
+
+    .uki-premios-page-hero-copy > p:not(.uki-launch-badge) {
+      max-width: 20rem;
     }
 
     .uki-treasure-copy h2,

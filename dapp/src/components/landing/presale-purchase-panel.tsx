@@ -53,7 +53,7 @@ export function PresalePurchasePanel() {
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { toast } = useToast();
-  const { isLocked: isPublicPresaleLocked } = usePresaleLock();
+  const { isLocked: isPublicPresaleLocked, startShortLabel } = usePresaleLock();
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
@@ -100,7 +100,7 @@ export function PresalePurchasePanel() {
     abi: presaleAbi,
     functionName: 'quoteUki',
     args: parsedAmount ? [parsedAmount] : undefined,
-    query: { enabled: Boolean(readsEnabled && parsedAmount && isPublicPresaleOpen) },
+    query: { enabled: Boolean(readsEnabled && parsedAmount) },
   });
 
   const {
@@ -331,15 +331,15 @@ export function PresalePurchasePanel() {
           ? 'Cambiando red'
           : 'Cambiar red'
       : isPublicPresaleLocked
-        ? 'Abre 15 de junio'
+        ? `Abre ${startShortLabel}`
       : lastAction === 'approve' && (isPending || isConfirming)
         ? 'Confirmando acceso'
         : lastAction === 'buy' && (isPending || isConfirming)
           ? 'Comprando UKI'
           : 'Comprar UKI';
   const CtaIcon = !isConnected || isWrongChain ? Wallet : ShoppingCart;
-  const quoteRate = isPublicPresaleOpen && isOpen ? formatRate(quotedUki, parsedAmount ?? undefined) : null;
-  const visibleQuotedUki = isPublicPresaleOpen && isOpen ? quotedUki : undefined;
+  const quoteRate = formatRate(quotedUki, parsedAmount ?? undefined);
+  const visibleQuotedUki = quotedUki;
 
   return (
     <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#02090d]/72 p-2.5">

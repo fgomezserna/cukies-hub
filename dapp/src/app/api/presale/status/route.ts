@@ -1,19 +1,35 @@
 import { NextResponse } from 'next/server';
-import { createPublicClient, formatUnits, http, isAddress } from 'viem';
+import { createPublicClient, formatUnits, http, isAddress, type Address } from 'viem';
 import { bsc, bscTestnet } from 'viem/chains';
 
-import { presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
+import { presaleAbi, ukiSaleContracts, vestingVaultAbi } from '@/lib/contracts/uki-sale';
 import {
   UKI_PRESALE_START_ISO,
   UKI_PRESALE_START_LABEL,
   UKI_PRESALE_CHAIN_ID,
   UKI_PRESALE_CHAIN_LABEL,
 } from '@/components/landing/sale-config';
+import { formatPresaleDateLabel, isoFromUnixSeconds } from '@/lib/presale-display';
 
 export const dynamic = 'force-dynamic';
 
 function getChain(chainId: number) {
   return chainId === bscTestnet.id ? bscTestnet : bsc;
+}
+
+function asBigInt(value: unknown) {
+  return typeof value === 'bigint' ? value : null;
+}
+
+function asBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function secondsFrom(value: unknown) {
+  const parsed = asBigInt(value);
+  if (parsed === null) return null;
+
+  return Number(parsed);
 }
 
 export async function GET() {
@@ -36,61 +52,130 @@ export async function GET() {
   }
 
   const chain = getChain(ukiSaleContracts.chainId);
+  const presaleAddress = configuredPresale as Address;
   const client = createPublicClient({
     chain,
     transport: http(),
   });
 
+  type PresaleReadFunctionName =
+    | 'isOpen'
+    | 'saleStart'
+    | 'saleEnd'
+    | 'ukiPerAsm'
+    | 'minAsmPerPurchase'
+    | 'totalUkiForSale'
+    | 'totalAsmRaised'
+    | 'totalUkiSold'
+    | 'saleEnabled'
+    | 'vestingVault';
+
+  async function readPresale(functionName: PresaleReadFunctionName) {
+    try {
+      return await client.readContract({ address: presaleAddress, abi: presaleAbi, functionName });
+    } catch {
+      return null;
+    }
+  }
+
   const [
-    isOpen,
-    saleStart,
-    saleEnd,
-    ukiPerAsm,
-    minAsmPerPurchase,
-    maxAsmPerPurchase,
-    walletAsmCap,
-    totalUkiForSale,
-    totalAsmRaised,
-    totalUkiSold,
-    vestingStart,
-    vestingDuration,
+    isOpenValue,
+    saleStartValue,
+    saleEndValue,
+    ukiPerAsmValue,
+    minAsmPerPurchaseValue,
+    totalUkiForSaleValue,
+    totalAsmRaisedValue,
+    totalUkiSoldValue,
+    saleEnabledValue,
+    vestingVaultAddress,
   ] = await Promise.all([
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'isOpen' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'saleStart' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'saleEnd' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'ukiPerAsm' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'minAsmPerPurchase' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'maxAsmPerPurchase' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'walletAsmCap' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'totalUkiForSale' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'totalAsmRaised' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'totalUkiSold' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'vestingStart' }),
-    client.readContract({ address: configuredPresale, abi: presaleAbi, functionName: 'vestingDuration' }),
+    readPresale('isOpen'),
+    readPresale('saleStart'),
+    readPresale('saleEnd'),
+    readPresale('ukiPerAsm'),
+    readPresale('minAsmPerPurchase'),
+    readPresale('totalUkiForSale'),
+    readPresale('totalAsmRaised'),
+    readPresale('totalUkiSold'),
+    readPresale('saleEnabled'),
+    readPresale('vestingVault'),
   ]);
+
+  const saleStart = secondsFrom(saleStartValue);
+  const saleEnd = secondsFrom(saleEndValue);
+  const startsAt = isoFromUnixSeconds(saleStart) ?? UKI_PRESALE_START_ISO;
+  const startsAtLabel = formatPresaleDateLabel(startsAt) ?? UKI_PRESALE_START_LABEL;
+  const startsAtShortLabel = formatPresaleDateLabel(startsAt, { short: true }) ?? startsAtLabel;
+  const endsAt = isoFromUnixSeconds(saleEnd);
+  const computedIsOpen =
+    saleStart !== null && saleEnd !== null && Date.now() >= saleStart * 1000 && Date.now() <= saleEnd * 1000;
+
+  let vestingStart: unknown = null;
+  let vestingDuration: unknown = null;
+  let vestingConfigFrozen: unknown = null;
+  const vestingVaultAddressString = typeof vestingVaultAddress === 'string' ? vestingVaultAddress : null;
+
+  if (vestingVaultAddressString && isAddress(vestingVaultAddressString)) {
+    const vestingAddress = vestingVaultAddressString as Address;
+    type VestingReadFunctionName =
+      | 'presaleVestingStart'
+      | 'presaleVestingDuration'
+      | 'presaleVestingConfigFrozen';
+
+    async function readVesting(functionName: VestingReadFunctionName) {
+      try {
+        return await client.readContract({ address: vestingAddress, abi: vestingVaultAbi, functionName });
+      } catch {
+        return null;
+      }
+    }
+
+    [vestingStart, vestingDuration, vestingConfigFrozen] = await Promise.all([
+      readVesting('presaleVestingStart'),
+      readVesting('presaleVestingDuration'),
+      readVesting('presaleVestingConfigFrozen'),
+    ]);
+  }
+
+  const ukiPerAsm = asBigInt(ukiPerAsmValue);
+  const minAsmPerPurchase = asBigInt(minAsmPerPurchaseValue);
+  const totalUkiForSale = asBigInt(totalUkiForSaleValue);
+  const totalAsmRaised = asBigInt(totalAsmRaisedValue);
+  const totalUkiSold = asBigInt(totalUkiSoldValue);
 
   return NextResponse.json({
     ...baseStatus,
+    startsAt,
+    startsAtLabel,
+    startsAtShortLabel,
+    endsAt,
+    endsAtLabel: formatPresaleDateLabel(endsAt),
     source: 'contract',
     isConfigured: true,
-    isOpen,
-    saleStart: Number(saleStart),
-    saleEnd: Number(saleEnd),
-    vestingStart: Number(vestingStart),
-    vestingDuration: Number(vestingDuration),
+    isOpen: asBoolean(isOpenValue) ?? computedIsOpen,
+    saleEnabled: asBoolean(saleEnabledValue),
+    saleStart,
+    saleEnd,
+    vestingVaultAddress: vestingVaultAddressString,
+    vesting: {
+      start: secondsFrom(vestingStart),
+      duration: secondsFrom(vestingDuration),
+      configFrozen: asBoolean(vestingConfigFrozen),
+    },
     price: {
-      ukiPerAsm: ukiPerAsm.toString(),
-      ukiPerAsmFormatted: formatUnits(ukiPerAsm, 18),
+      ukiPerAsm: ukiPerAsm?.toString() ?? null,
+      ukiPerAsmFormatted: ukiPerAsm ? formatUnits(ukiPerAsm, 18) : null,
     },
     limits: {
-      minAsmPerPurchase: minAsmPerPurchase.toString(),
-      maxAsmPerPurchase: maxAsmPerPurchase.toString(),
-      walletAsmCap: walletAsmCap.toString(),
+      minAsmPerPurchase: minAsmPerPurchase?.toString() ?? null,
+      hasPerPurchaseMaximum: false,
+      hasWalletCap: false,
     },
     totals: {
-      totalUkiForSale: totalUkiForSale.toString(),
-      totalAsmRaised: totalAsmRaised.toString(),
-      totalUkiSold: totalUkiSold.toString(),
+      totalUkiForSale: totalUkiForSale?.toString() ?? null,
+      totalAsmRaised: totalAsmRaised?.toString() ?? null,
+      totalUkiSold: totalUkiSold?.toString() ?? null,
     },
   });
 }

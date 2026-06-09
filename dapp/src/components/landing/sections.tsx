@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import {
   ArrowRight,
   CalendarDays,
@@ -21,8 +21,6 @@ import {
 } from 'lucide-react';
 import {
   faqs,
-  gameCards,
-  navItems,
   purchaseSteps,
   saleFacts,
   utilityNodes,
@@ -31,7 +29,7 @@ import { PresaleCountdown, PresaleGateLink } from './presale-countdown';
 import { HeroBackgroundVideo } from './hero-background-video';
 import { LandingButton, MetricTile, Panel, SectionHeading } from './primitives';
 import { SaleConsole } from './sale-console';
-import { UKI_PRESALE_START_LABEL } from './sale-config';
+import { PresaleQuoteAmount, PresaleStartLabel, PresaleStatusProvider } from './presale-status';
 import { VestingAccessButton } from './vesting-access-button';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 import { LandingHeader } from './header';
@@ -40,21 +38,23 @@ import { LandingFooter } from './footer';
 
 export function CukiesLanding() {
   return (
-    <main className="uki-landing min-h-screen overflow-hidden bg-[var(--uki-bg)] text-[var(--uki-cream)]">
-      <div className="uki-noise" />
-      <div className="uki-grid-bg" />
-      <LandingHeader />
-      <HeroSection />
-      <SaleFacts />
-      <HowToBuy />
-      <CommunityOwnership />
-      <UtilityMap />
-      <AfterPresale />
-      <Games />
-      <PrizesPreview />
-      <FaqAndCta />
-      <LandingFooter />
-    </main>
+    <PresaleStatusProvider>
+      <main className="uki-landing min-h-screen overflow-hidden bg-[var(--uki-bg)] text-[var(--uki-cream)]">
+        <div className="uki-noise" />
+        <div className="uki-grid-bg" />
+        <LandingHeader />
+        <HeroSection />
+        <SaleFacts />
+        <HowToBuy />
+        <CommunityOwnership />
+        <UtilityMap />
+        <AfterPresale />
+        <Games />
+        <PrizesPreview />
+        <FaqAndCta />
+        <LandingFooter />
+      </main>
+    </PresaleStatusProvider>
   );
 }
 
@@ -79,10 +79,14 @@ function HeroSection() {
           </h1>
           <div className="uki-hero-countdown mt-5 max-w-[30rem]">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">Inicio 15 de junio 17:00</p>
+              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">Inicio de preventa</p>
               <div className="uki-token-pair" aria-label="Compra con ASM y recibe UKI">
-                <span className="uki-token-logo uki-token-logo-asm">ASM</span>
-                <span className="uki-token-logo uki-token-logo-uki">UKI</span>
+                <span className="uki-token-logo uki-token-logo-official" title="ASM">
+                  <Image src="/brand/official/asm-token-coingecko.png" alt="ASM oficial" fill sizes="42px" className="object-contain" />
+                </span>
+                <span className="uki-token-logo uki-token-logo-official" title="UKI">
+                  <Image src="/brand/official/uki-token-cukies-world.png" alt="UKI oficial" fill sizes="42px" className="object-contain" />
+                </span>
               </div>
             </div>
             <PresaleCountdown />
@@ -175,9 +179,9 @@ function StepCard({ step }: { step: (typeof purchaseSteps)[number] }) {
             <div className="flex justify-center">
               <ArrowRight className="h-4 w-4 rotate-90 rounded-full border border-[var(--uki-cyan-border)] p-0.5 text-[var(--uki-cyan)]" />
             </div>
-            <Amount label="Recibes" value="*****" token="UKI" />
+            <Amount label="Recibes" value={<PresaleQuoteAmount asmAmount={100} />} token="UKI" />
             <p className="text-center text-[0.62rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-              El ratio ASM se fija al abrir preventa
+              El ratio se lee del contrato de preventa
             </p>
           </div>
         ) : null}
@@ -206,7 +210,7 @@ function MiniRow({ label }: { label: string }) {
   );
 }
 
-function Amount({ label, value, token }: { label: string; value: string; token: string }) {
+function Amount({ label, value, token }: { label: string; value: ReactNode; token: string }) {
   return (
     <div className="uki-amount-card rounded-[7px] border border-white/10 bg-[#04141a] p-2.5">
       <p className="text-[0.66rem] font-semibold text-[var(--uki-muted)]">{label}</p>
@@ -227,11 +231,15 @@ function CommunityOwnership() {
             <Users className="h-4 w-4" strokeWidth={1.8} />
             Economía centrada en la comunidad
           </p>
-          <h2 className="mt-5 max-w-5xl font-headline text-4xl font-black uppercase leading-tight text-[var(--uki-cream)] sm:text-5xl lg:text-6xl">
-            Más del 60% de UKI <span className="text-[var(--uki-gold)]">está destinado a la comunidad</span>
+          <h2 className="uki-community-title">
+            <span>Más del 60% de UKI</span>
+            <span>está destinado a la comunidad</span>
           </h2>
-          <p className="mt-5 max-w-3xl text-base font-semibold leading-relaxed text-[var(--uki-text)] sm:text-lg">
-            En Cukies World, más del 60% del supply total de UKI está destinado a recompensar a las personas que participan en el ecosistema durante un periodo de <strong className="text-[var(--uki-gold)]">6 años</strong>. Porque creemos que una economía sostenible debe beneficiar a quienes juegan, aportan y forman parte de su crecimiento.
+          <p className="uki-community-lead">
+            En Cukies World, más del 60% del supply total de UKI se entregará como recompensas a las personas que participan en el ecosistema durante un periodo de <strong>6 años.</strong>
+          </p>
+          <p className="uki-community-principle">
+            Porque creemos que una economía sostenible debe beneficiar a quienes juegan, aportan y forman parte de su crecimiento.
           </p>
         </div>
         <div className="uki-community-visual" aria-hidden="true">
@@ -396,7 +404,7 @@ function Games() {
     <section id="games" className="uki-container pb-6">
       <Panel innerClassName="uki-games-panel p-0">
         <div className="uki-treasure-hero">
-          <Image src="/brand/generated/uki-treasure-hunt-scene-v2.png" alt="Treasure Hunt" fill className="object-cover" sizes="100vw" />
+          <Image src="/brand/generated/uki-treasure-hunt-cukie-scene-v1.png" alt="Treasure Hunt" fill className="object-cover" sizes="100vw" />
           <div className="uki-treasure-scrim" />
           <div className="uki-treasure-top">
             <span>Treasure Hunt · Primer juego</span>
@@ -419,26 +427,6 @@ function Games() {
             <TreasureMetric icon={Coins} value="Hasta 7.5 UKI" label="premio inmediato" />
           </div>
         </div>
-
-        <div className="uki-games-more mt-4 border-t border-white/10 pt-4">
-          <h3 className="text-center font-headline text-lg font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
-            Otros juegos del ecosistema
-          </h3>
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            {gameCards.map((game) => (
-              <article key={game.title} className="uki-game-card grid grid-cols-[82px_1fr] items-center gap-4 rounded-[9px] border border-white/10 bg-[#02090d]/60 p-3">
-                <div className="relative h-16 overflow-hidden rounded-[6px] border border-white/10 bg-[#06141a]">
-                  <Image src={game.image} alt={game.title} fill className="object-cover" sizes="82px" />
-                  <span className="uki-game-card-face" aria-hidden="true" />
-                </div>
-                <div>
-                  <h4 className="font-headline text-base font-black text-[var(--uki-cream)]">{game.title}</h4>
-                  <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{game.text}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
       </Panel>
     </section>
   );
@@ -446,7 +434,7 @@ function Games() {
 
 function PrizesPreview() {
   return (
-    <section className="uki-container pb-6">
+    <section id="premios" className="uki-container pb-6">
       <div className="uki-prizes-hero">
         <div className="uki-prizes-bg" aria-hidden="true" />
         <div className="uki-prizes-copy">
@@ -513,7 +501,7 @@ function FaqAndCta() {
               Entra en la nueva etapa de Cukies
             </h2>
             <p className="mt-3 max-w-sm text-sm font-semibold leading-snug text-[var(--uki-text)]">
-              La preventa UKI abre en {UKI_PRESALE_START_LABEL}. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
+              La preventa UKI abre en <PresaleStartLabel />. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <PresaleGateLink href="#presale-console">Participa ahora</PresaleGateLink>

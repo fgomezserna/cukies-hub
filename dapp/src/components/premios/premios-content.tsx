@@ -199,37 +199,35 @@ export function PremiosContent() {
     <>
       <LandingHeader />
 
-      <section className="uki-container relative z-[2] grid min-h-[35rem] gap-8 pb-12 pt-36 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
-        <div>
-          <p className="uki-launch-badge">PREMIOS</p>
-          <h1 className="mt-5 max-w-4xl font-headline text-5xl font-black uppercase leading-[0.94] text-[var(--uki-cream)] sm:text-6xl lg:text-7xl">
-            Consigue Cukies por comprar <span className="text-[var(--uki-gold)]">UKI</span> y por{' '}
-            <span className="text-[#e45cff]">invitar</span>
-          </h1>
-          <p className="mt-5 max-w-2xl text-lg font-semibold leading-relaxed text-[var(--uki-text)]">
-            Participa en la preventa y suma oportunidades de conseguir Cukies. Cuanto más compras o más recomiendas,
-            mejores premios desbloqueas.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/#presale-console" className="uki-button uki-button-primary justify-center">
-              Ir a la preventa
-            </Link>
-            <Link href="#progreso-referidos" className="uki-button uki-button-secondary justify-center">
-              Mi progreso de referidos
-            </Link>
-          </div>
-        </div>
-
-        <div className="relative min-h-[22rem] overflow-hidden rounded-[14px] border border-[#7c3cff]/45 bg-[#050712] shadow-[0_0_54px_rgba(124,60,255,0.22)] lg:min-h-[31rem]">
+      <section className="uki-container relative z-[2] pb-12 pt-32">
+        <div className="uki-premios-page-hero">
           <Image
-            src="/brand/generated/uki-premios-hero-generated.png"
+            src="/brand/generated/uki-premios-cukies-rewards-hero-v2.png"
             alt="Cukies con tesoro y premios UKI"
             fill
-            className="object-cover"
-            sizes="(min-width: 1024px) 54vw, 100vw"
+            className="uki-premios-page-hero-image"
+            sizes="100vw"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#050712]/82 via-[#050712]/12 to-transparent" />
+          <div className="uki-premios-page-hero-scrim" />
+          <div className="uki-premios-page-hero-copy">
+            <p className="uki-launch-badge">PREMIOS</p>
+            <h1>
+              Consigue Cukies por comprar <span>UKI</span> y por <strong>invitar</strong>
+            </h1>
+            <p>
+              Participa en la preventa y suma oportunidades de conseguir Cukies. Cuanto más compras o más recomiendas,
+              mejores premios desbloqueas.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link href="/#presale-console" className="uki-button uki-button-primary justify-center">
+                Ir a la preventa
+              </Link>
+              <Link href="#progreso-referidos" className="uki-button uki-button-secondary justify-center">
+                Mi progreso de referidos
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 

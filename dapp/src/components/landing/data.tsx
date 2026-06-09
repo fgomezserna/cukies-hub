@@ -95,22 +95,22 @@ export const vestingTracks = [
 export const utilityNodes = [
   {
     title: 'Juegos',
-    text: 'Juega y compite.',
+    text: 'Juega, compite y gana.',
     icon: Gamepad2,
     className: 'uki-node-purple',
     positionClassName: 'uki-node-games',
   },
   {
-    title: 'Skills y cría',
-    text: 'Crea nuevos Cukies y mejora sus habilidades.',
-    icon: Sparkles,
+    title: 'Créditos',
+    text: 'Gana, gasta y mejora.',
+    icon: Coins,
     className: 'uki-node-gold',
     positionClassName: 'uki-node-credits',
   },
   {
-    title: 'Recompensas',
-    text: 'Participa y gana UKI cada día.',
-    icon: Gift,
+    title: 'Pools',
+    text: 'Pools con utilidad real.',
+    icon: Database,
     className: 'uki-node-blue',
     positionClassName: 'uki-node-pools',
   },
@@ -122,16 +122,16 @@ export const utilityNodes = [
     positionClassName: 'uki-node-master',
   },
   {
-    title: 'Gobernanza',
-    text: 'Forma parte de las decisiones.',
+    title: 'Future Worlds',
+    text: 'Expande el universo Cukies.',
     icon: Network,
     className: 'uki-node-green',
     positionClassName: 'uki-node-worlds',
   },
   {
-    title: 'Marketplace',
-    text: 'Compra y vende Cukies y recursos para los juegos.',
-    icon: Database,
+    title: 'Rewards',
+    text: 'Compite, rankea y recibe premios.',
+    icon: Gift,
     className: 'uki-node-red',
     positionClassName: 'uki-node-rewards',
   },
@@ -256,7 +256,7 @@ export const faqs = [
   {
     question: '¿Por qué la preventa se compra con ASM?',
     answer:
-      'ASM es la moneda principal prevista para la primera distribución de UKI. El ratio ASM -> UKI se fijará al inicio de la preventa y se mantendrá durante el periodo.',
+      'ASM es la moneda principal prevista para la primera distribución de UKI. El ratio ASM a UKI se leerá desde el contrato y se mantendrá durante el periodo.',
   },
   {
     question: '¿Cómo funciona el vesting?',
