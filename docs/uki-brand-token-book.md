@@ -613,7 +613,7 @@ Contenido:
 - liquidity lock/burn.
 - buyer vesting.
 - team vesting.
-- ecosistema: 30M UKI liberados 40 dias tras TGE; resto con cliff/vesting.
+- ecosistema: 30M UKI, equivalente al 3% del suministro total, liberados 40 dias tras TGE; resto con cliff/vesting.
 - rewards program.
 
 ### 4. Why UKI Exists

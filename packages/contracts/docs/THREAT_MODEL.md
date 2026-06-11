@@ -44,22 +44,26 @@ The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an i
 
 | ID | Threat | Impact | Current controls | Required before mainnet |
 | --- | --- | --- | --- | --- |
-| T01 | Admin key compromise | Owner can pause token/presale, update sale window/limits/treasury, and manage vault roles. | `Ownable`/`AccessControl` restrict privileged calls. Emergency pause exists. | Transfer owner/admin roles to multisig, document signers/threshold, rehearse pause and role revocation on testnet. |
-| T02 | Presale price error | Buyers receive too much/too little UKI for ASM. | `ukiPerAsm` is constructor-only and scaled by `1e18`; tests cover quote and sale cap behavior. | Pre-deploy config review with human-readable ratio, dry-run deploy, BscScan verification, dapp/API cross-check against on-chain value. |
-| T03 | Wrong ASM token or fee-on-transfer sale token | Treasury may receive less/different token than expected while vesting uses nominal `asmAmount`. | `ASM_TOKEN_ADDRESS` is configured at deploy; `SafeERC20` handles standard ERC-20 failures. | Verify ASM address per chain; confirm token has no fee-on-transfer/rebase behavior or change presale to account by treasury balance delta before accepting funds. |
+| T01 | Admin key compromise | Owner can pause token/presale, enable/disable sale, update sale parameters, manage vault roles and control TGE vesting freeze. | `Ownable`/`AccessControl` restrict privileged calls. Emergency pause exists. | Transfer owner/admin roles to multisig, document signers/threshold, rehearse sale enable/disable, parameter update, vesting freeze and role revocation on testnet. |
+| T02 | Presale price error | Buyers receive too much/too little UKI for ASM. | `ukiPerAsm` is scaled by `1e18`, owner-updatable and tests cover quote, mutable price and sale cap behavior. | Human-readable ratio review before every price update, Safe calldata review, BscScan verification, dapp/API cross-check against on-chain value. |
+| T03 | Wrong sale token configured | Treasury may receive a token different from the approved ASM asset while vesting uses nominal `asmAmount`. | `ASM_TOKEN_ADDRESS` is configured at deploy; the approved ASM token is confirmed as standard ERC-20 with no fee-on-transfer/rebase behavior; `SafeERC20` handles standard ERC-20 failures. | Verify ASM address per chain; if the sale token address ever changes from approved ASM, review transfer behavior again or change presale to account by balance delta before accepting funds. |
 | T04 | Wrong treasury | ASM proceeds go to an unintended address. | Constructor requires non-zero treasury; owner can update treasury. Event emitted on update. | Use multisig-controlled treasury, preflight address checksum, testnet transfer check, issue/PR record for final address. |
-| T05 | Sale window manipulation | Presale could open/close at wrong time. | Owner-only `setSaleWindow`; invalid zero/end-before-start rejected; events emitted. | Freeze final timestamps before launch; publish UTC timestamps; monitor events; restrict owner to multisig. |
-| T06 | Purchase limit misconfiguration | Wallet cap, min/max or total sale cap can block users or oversell sale allocation. | Min/max/wallet cap guards; total UKI sale cap enforced; tests cover boundaries. | Final parameter sheet, dry-run purchase matrix, dapp/API consistency check. |
+| T05 | Sale window manipulation | Presale could open/close at wrong time or be adjusted during the sale. | Owner-only `setSaleWindow`; invalid zero/end-before-start rejected; events emitted; `saleEnabled` gates purchases. | Publish UTC timestamps; monitor events; restrict owner to multisig; record every live adjustment with reason and tx hash. |
+| T06 | Sale cap or minimum misconfiguration | Wrong minimum blocks small buyers, or wrong total cap oversells the ecosystem allocation. | Minimum ASM guard and total UKI sale cap enforced; no max per purchase or per wallet is approved. Tests cover boundaries. | Final parameter sheet, dry-run purchase matrix, dapp/API consistency check. |
 | T07 | Vault underfunding | Purchases revert or allocations cannot be created. | `VestingVault.createVesting` checks unallocated balance, reverting full purchase if insufficient. | Fund vault with at least `totalUkiForSale`; verify role grant and vault balance before opening sale. |
-| T08 | Unauthorized vesting creation | Attacker or wrong operator creates schedules. | `VESTING_MANAGER_ROLE` required; invalid schedules rejected. | Only presale and approved multisig/operator have manager role; record role grants/revokes; test role matrix on testnet. |
-| T09 | Vesting bypass or early release | Beneficiary receives UKI before allowed vesting time. | Linear vesting uses `start`, `cliff`, `duration`, `releasedAmount`; release only transfers releasable amount. | Test final schedules with exact timestamps; review cliff/duration config; keep admin tools separate from user claim UI. |
+| T08 | Unauthorized vesting creation | Attacker or wrong operator creates schedules. | Buyer schedules require `PRESALE_VESTING_ROLE`; internal schedules require `ALLOCATION_MANAGER_ROLE`; allocation calls cannot use `PRESALE_SCHEDULE_ID`. | Grant `PRESALE_VESTING_ROLE` only to `Presale`; grant allocation role only to approved multisig/operator; record role grants/revokes; test role matrix on testnet. |
+| T09 | Vesting bypass or early release | Beneficiary receives UKI before allowed vesting time. | Internal schedules use `start`, `cliff`, `duration`, `releasedAmount`; presale schedules use global vault TGE config and release zero until `freezePresaleVestingConfig()`. | Test final schedules with exact timestamps; review TGE start/duration config; keep admin tools separate from user claim UI. |
 | T10 | Double release from vesting | Beneficiary claims same vested amount twice. | `releasedAmount` is incremented before transfer and deducted from future `releasable`. | Keep coverage for `release`, `release(bytes32)`, `releaseAll`; run testnet repeated claim attempts. |
 | T11 | Pause misuse | Token or presale pause can disrupt users. | Pause is owner-only and emits standard pause state through OpenZeppelin. | Multisig procedure, public incident template, test pause/unpause runbook. |
 | T12 | Timestamp edge manipulation | Miner/validator timestamp variance can slightly affect open/close and vesting. | Sale and vesting use timestamp comparisons; no per-block randomness. | Avoid second-level launch assumptions; use buffered operational windows. |
-| T13 | Malicious rewards root | Future distributor could publish a root that overpays or excludes users. | Not implemented. | Block launch of rewards until root publication requires multisig, batch hash, input hash, period id, immutable root history and reproducible generation script. |
-| T14 | Double claim of rewards | Future distributor users claim same batch twice. | Not implemented. | `claimed[batchId][account]` or equivalent, domain-separated leaf, tests for repeated claim, wrong proof, wrong batch and amount tampering. |
-| T15 | Staking unlock bypass | Future staking users withdraw earlier than rules allow or snapshot sees wrong stake. | Not implemented. | Define stake lock model, emergency behavior, snapshot semantics and backend reconciliation before Cukie Master launch. |
-| T16 | Backend overrides on-chain truth | UI/support marks purchase, vesting or claim state incorrectly. | ADR assigns BSC as source of truth for transferable value. | Indexer must treat Mongo as cache; support actions need tx hash/event evidence. |
+| T13 | Ownership renounced while paused | If `UKIToken` or `Presale` is paused and ownership is renounced, there may be no account able to unpause. | Current contracts inherit OpenZeppelin `renounceOwnership()`. | Disable `renounceOwnership()` or use an approved governance pattern that preserves pause recovery. |
+| T14 | Sale opens before approved launch | Purchases can begin before the team has explicitly enabled the sale. | `buy()` requires `saleEnabled`; owner can disable the sale without changing timestamps. | Attach final preflight/deploy evidence that `saleEnabled()` matches the intended launch state. |
+| T15 | Role-holder invisibility | Required role holders can be checked, but extra role holders cannot be enumerated on-chain with the current vault. | `AccessControl` role checks and event logs exist. | Use enumerable/singleton roles or produce an auditable role-holder proof before launch. |
+| T16 | Legacy owner compromise | Legacy contracts may remain controlled by a risky EOA and create launch or brand risk if still in scope. | Ownership inventory documents known legacy owners. | Rotate to Safe or formally exclude legacy contracts from launch scope. |
+| T17 | Malicious rewards root | Future distributor could publish a root that overpays or excludes users. | Not implemented. | Block launch of rewards until root publication requires multisig, batch hash, input hash, period id, immutable root history and reproducible generation script. |
+| T18 | Double claim of rewards | Future distributor users claim same batch twice. | Not implemented. | `claimed[batchId][account]` or equivalent, domain-separated leaf, tests for repeated claim, wrong proof, wrong batch and amount tampering. |
+| T19 | Staking unlock bypass | Future staking users withdraw earlier than rules allow or snapshot sees wrong stake. | Not implemented. | Define stake lock model, emergency behavior, snapshot semantics and backend reconciliation before Cukie Master launch. |
+| T20 | Backend overrides on-chain truth | UI/support marks purchase, vesting or claim state incorrectly. | ADR assigns BSC as source of truth for transferable value. | Indexer must treat Mongo as cache; support actions need tx hash/event evidence. |
 
 ## Acceptance-criteria threats
 
@@ -90,7 +94,10 @@ The current contracts rely on privileged owner/admin roles. Mainnet launch must 
 
 - owner of `UKIToken` and `Presale` controlled by multisig,
 - default admin of `VestingVault` controlled by multisig,
-- `VESTING_MANAGER_ROLE` granted only to `Presale` and any approved allocation operator,
+- `renounceOwnership()` cannot strand paused contracts,
+- `PRESALE_VESTING_ROLE` granted only to `Presale`,
+- `ALLOCATION_MANAGER_ROLE` granted only to the approved multisig/operator for internal allocations,
+- exact privileged role holders are provable, not inferred,
 - deployer stripped of privileged roles after setup when possible,
 - emergency pause/unpause and role-revoke runbook tested on BSC testnet.
 
@@ -100,18 +107,31 @@ The vault prevents early release through `start`, `cliff`, `duration` and `relea
 
 - final schedule table reviewed before deploy,
 - final schedule ids documented,
+- `duration` is treated as the vesting period after `cliff`; full vesting occurs at `cliff + duration`,
 - no public/admin UI route exposed to non-admin users for `createVestingWithCliff`,
+- `presaleVestingStart >= saleEnd` enforced in deploy/preflight for buyer schedules,
+- `freezePresaleVestingConfig()` executed before claims at TGE,
 - testnet release attempts before cliff, during vesting, after full vesting and after already released.
 
 ### Presale price error
 
-The presale price is constructor-only via `ukiPerAsm` and uses `RATE_SCALE = 1e18`. A wrong value requires redeploy, not a setter correction. Mainnet readiness requires:
+The presale price is controlled by `ukiPerAsm` and uses `RATE_SCALE = 1e18`. The Launch Safe may update it during presale if ASM price moves sharply. Updates affect only future purchases. Mainnet readiness requires:
 
 - parameter sheet with human units and wei units,
 - independent check that `1 ASM = expected UKI`,
 - dry-run purchase in Hardhat and BSC testnet,
+- Safe calldata review before every `setUkiPerAsm()` update,
 - `/api/presale/status` cross-check against on-chain `ukiPerAsm`,
 - dapp copy must match on-chain ratio.
+
+### Sale enable gate
+
+The sale must be explicitly enabled before public purchases, without freezing parameters. Mainnet readiness requires:
+
+- `setSaleEnabled(true)` executed only after launch approval,
+- `buy()` guarded so purchases cannot execute while `saleEnabled` is false,
+- preflight records whether `saleEnabled()` is the expected value for the current phase,
+- every live parameter update records reason, calldata and tx hash.
 
 ## Mainnet blockers
 
@@ -122,7 +142,8 @@ The sale contracts must not accept mainnet funds until all of these are complete
 - Slither/static analysis has run and findings are triaged.
 - BSC testnet deploy is verified on explorer.
 - Multisig ownership and role plan is executed on testnet.
-- Vault is funded and `Presale` has `VESTING_MANAGER_ROLE`.
+- Audit findings A02-A08 in `packages/contracts/docs/SECURITY.md` are fixed or explicitly accepted; A01 requires final evidence.
+- Vault is funded, `Presale` has `PRESALE_VESTING_ROLE`, and sale config is frozen.
 - Final sale token, treasury, timestamps, caps and ratio are reviewed.
 - External audit or equivalent independent review is complete.
 

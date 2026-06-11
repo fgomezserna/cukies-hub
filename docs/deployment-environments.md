@@ -182,12 +182,12 @@ Reglas operativas:
 | `SALE_START` | Timestamp testnet | Timestamp mainnet | UTC. |
 | `SALE_END` | Timestamp testnet | Timestamp mainnet | UTC. |
 | `UKI_PER_ASM` | Ratio testnet | Ratio mainnet | Raw `1e18` scale. |
-| `MIN_ASM_PER_PURCHASE` | Limite testnet | Limite mainnet | Raw units. |
-| `MAX_ASM_PER_PURCHASE` | Limite testnet | Limite mainnet | Raw units. |
-| `WALLET_ASM_CAP` | Cap testnet | Cap mainnet | Raw units. |
-| `TOTAL_UKI_FOR_SALE` | Cap testnet | Cap mainnet | Raw units. |
-| `VESTING_START` | Timestamp testnet | Timestamp mainnet | UTC. |
+| `MIN_ASM_PER_PURCHASE` | 5 ASM testnet | 5 ASM mainnet | Raw units. |
+| `TOTAL_UKI_FOR_SALE` | Cap testnet | 250M UKI mainnet | Raw units. |
+| `SALE_ENABLED` | Estado testnet | Estado mainnet | `false` antes de abrir compras; `true` durante preventa abierta. |
+| `VESTING_START` | TGE testnet | TGE mainnet | UTC; final value lives in `VestingVault`. |
 | `VESTING_DURATION` | Duracion testnet | Duracion mainnet | Segundos. |
+| `VESTING_CONFIG_FROZEN` | Estado testnet | Estado mainnet | `false` antes de TGE; `true` antes de claims. |
 
 ## Gates para staging
 

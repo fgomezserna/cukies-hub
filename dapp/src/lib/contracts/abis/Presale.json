@@ -45,28 +45,8 @@
           },
           {
             "internalType": "uint256",
-            "name": "maxAsmPerPurchase",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "walletAsmCap",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
             "name": "totalUkiForSale",
             "type": "uint256"
-          },
-          {
-            "internalType": "uint64",
-            "name": "vestingStart",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint64",
-            "name": "vestingDuration",
-            "type": "uint64"
           }
         ],
         "internalType": "struct Presale.PresaleConfig",
@@ -108,11 +88,6 @@
     "type": "error"
   },
   {
-    "inputs": [],
-    "name": "InvalidVesting",
-    "type": "error"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -136,7 +111,7 @@
   },
   {
     "inputs": [],
-    "name": "PurchaseTooLarge",
+    "name": "OwnershipRenounceDisabled",
     "type": "error"
   },
   {
@@ -167,13 +142,26 @@
   },
   {
     "inputs": [],
-    "name": "SaleNotOpen",
+    "name": "SaleNotEnabled",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "WalletCapExceeded",
+    "name": "SaleNotOpen",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "minAsmPerPurchase",
+        "type": "uint256"
+      }
+    ],
+    "name": "MinPurchaseUpdated",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -205,31 +193,6 @@
       }
     ],
     "name": "Paused",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "minAsmPerPurchase",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "maxAsmPerPurchase",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "walletAsmCap",
-        "type": "uint256"
-      }
-    ],
-    "name": "PurchaseLimitsUpdated",
     "type": "event"
   },
   {
@@ -274,6 +237,19 @@
     "inputs": [
       {
         "indexed": false,
+        "internalType": "bool",
+        "name": "enabled",
+        "type": "bool"
+      }
+    ],
+    "name": "SaleEnabledUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
         "internalType": "uint64",
         "name": "saleStart",
         "type": "uint64"
@@ -286,6 +262,19 @@
       }
     ],
     "name": "SaleWindowUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalUkiForSale",
+        "type": "uint256"
+      }
+    ],
+    "name": "TotalUkiForSaleUpdated",
     "type": "event"
   },
   {
@@ -312,12 +301,18 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "previousUkiPerAsm",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "nextUkiPerAsm",
+        "type": "uint256"
       }
     ],
-    "name": "Unpaused",
+    "name": "UkiPerAsmUpdated",
     "type": "event"
   },
   {
@@ -325,18 +320,12 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint64",
-        "name": "vestingStart",
-        "type": "uint64"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "vestingDuration",
-        "type": "uint64"
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
       }
     ],
-    "name": "VestingConfigUpdated",
+    "name": "Unpaused",
     "type": "event"
   },
   {
@@ -418,19 +407,6 @@
   },
   {
     "inputs": [],
-    "name": "maxAsmPerPurchase",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "minAsmPerPurchase",
     "outputs": [
       {
@@ -498,7 +474,20 @@
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "saleEnabled",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -533,19 +522,22 @@
         "internalType": "uint256",
         "name": "nextMinAsmPerPurchase",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "nextMaxAsmPerPurchase",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "nextWalletAsmCap",
-        "type": "uint256"
       }
     ],
-    "name": "setPurchaseLimits",
+    "name": "setMinAsmPerPurchase",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "enabled",
+        "type": "bool"
+      }
+    ],
+    "name": "setSaleEnabled",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -571,6 +563,19 @@
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "nextTotalUkiForSale",
+        "type": "uint256"
+      }
+    ],
+    "name": "setTotalUkiForSale",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "nextTreasury",
         "type": "address"
@@ -584,17 +589,12 @@
   {
     "inputs": [
       {
-        "internalType": "uint64",
-        "name": "nextVestingStart",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint64",
-        "name": "nextVestingDuration",
-        "type": "uint64"
+        "internalType": "uint256",
+        "name": "nextUkiPerAsm",
+        "type": "uint256"
       }
     ],
-    "name": "setVestingConfig",
+    "name": "setUkiPerAsm",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -705,51 +705,12 @@
   },
   {
     "inputs": [],
-    "name": "vestingDuration",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "vestingStart",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "vestingVault",
     "outputs": [
       {
         "internalType": "contract VestingVault",
         "name": "",
         "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "walletAsmCap",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",

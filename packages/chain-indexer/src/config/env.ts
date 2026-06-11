@@ -4,7 +4,7 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-import type { ChainName, IndexerConfig, LegacyImportConfig } from '../types.js';
+import type { ChainName, ContractAlias, IndexerConfig, LegacyImportConfig } from '../types.js';
 
 function findWorkspaceRoot(startDir: string) {
   let current = startDir;
@@ -43,6 +43,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   CHAIN_INDEXER_DB_NAME: z.string().default('cukieshub-new'),
   CHAIN_INDEXER_CHAINS: z.string().default('BSC,TRON'),
+  CHAIN_INDEXER_CONTRACT_ALIASES: z.string().optional(),
   CHAIN_INDEXER_BSC_RPC_URL: z.string().optional(),
   BSC_RPC_URL: z.string().optional(),
   CHAIN_INDEXER_PRESALE_ADDRESS: z.string().optional(),
@@ -73,6 +74,27 @@ function parseChains(value: string): ChainName[] {
   return valid.length > 0 ? valid : ['BSC', 'TRON'];
 }
 
+function parseContractAliases(value?: string): ContractAlias[] | undefined {
+  if (!value) return undefined;
+
+  const aliases = value
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+  const valid = aliases.filter(
+    (item): item is ContractAlias =>
+      item === 'TOKEN' ||
+      item === 'POINTS' ||
+      item === 'STAKING_POINTS' ||
+      item === 'BREEDING_POINTS' ||
+      item === 'MARKETPLACE' ||
+      item === 'BRIDGE' ||
+      item === 'PRESALE',
+  );
+
+  return valid.length > 0 ? valid : undefined;
+}
+
 export function getIndexerConfig(): IndexerConfig {
   loadIndexerEnvFiles();
   const env = envSchema.parse(process.env);
@@ -88,6 +110,7 @@ export function getIndexerConfig(): IndexerConfig {
     mongoUrl,
     dbName: env.CHAIN_INDEXER_DB_NAME,
     chains: parseChains(env.CHAIN_INDEXER_CHAINS),
+    contractAliases: parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES),
     bscRpcUrl:
       env.CHAIN_INDEXER_BSC_RPC_URL ??
       env.BSC_RPC_URL ??

@@ -10,6 +10,21 @@
         "internalType": "address",
         "name": "admin",
         "type": "address"
+      },
+      {
+        "internalType": "uint64",
+        "name": "presaleVestingStart_",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "presaleVestingDuration_",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "unallocatedWithdrawalUnlockTime_",
+        "type": "uint64"
       }
     ],
     "stateMutability": "nonpayable",
@@ -73,7 +88,17 @@
   },
   {
     "inputs": [],
+    "name": "InvalidWithdrawalUnlockTime",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NothingToRelease",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PresaleVestingConfigLocked",
     "type": "error"
   },
   {
@@ -86,6 +111,49 @@
     ],
     "name": "SafeERC20FailedOperation",
     "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnallocatedWithdrawalLocked",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "start",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "duration",
+        "type": "uint64"
+      }
+    ],
+    "name": "PresaleVestingConfigFrozen",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "start",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "duration",
+        "type": "uint64"
+      }
+    ],
+    "name": "PresaleVestingConfigUpdated",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -251,6 +319,19 @@
   },
   {
     "inputs": [],
+    "name": "ALLOCATION_MANAGER_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
     "outputs": [
       {
@@ -277,7 +358,7 @@
   },
   {
     "inputs": [],
-    "name": "VESTING_MANAGER_ROLE",
+    "name": "PRESALE_VESTING_ROLE",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -299,16 +380,6 @@
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint64",
-        "name": "start",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint64",
-        "name": "duration",
-        "type": "uint64"
       }
     ],
     "name": "createVesting",
@@ -355,6 +426,13 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "freezePresaleVestingConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -368,6 +446,49 @@
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRoleMember",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRoleMemberCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -410,6 +531,45 @@
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "presaleVestingConfigFrozen",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "presaleVestingDuration",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "presaleVestingStart",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",
@@ -658,6 +818,24 @@
   {
     "inputs": [
       {
+        "internalType": "uint64",
+        "name": "nextStart",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "nextDuration",
+        "type": "uint64"
+      }
+    ],
+    "name": "setPresaleVestingConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes4",
         "name": "interfaceId",
         "type": "bytes4"
@@ -721,6 +899,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "unallocatedWithdrawalUnlockTime",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",

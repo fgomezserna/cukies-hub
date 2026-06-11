@@ -20,6 +20,13 @@
       "chain": "BNB Smart Chain mainnet",
       "chainId": 56,
       "rpc": "https://bsc-dataseed.binance.org",
+      "ownership": {
+        "checkedAt": "2026-06-04",
+        "method": "owner() via public BSC mainnet RPC",
+        "criticalOwnerRotationRequired": true,
+        "criticalOwner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "reason": "EOA owner with public activity consistent with compromise risk; rotate all legacy BSC contract ownership to an approved secure wallet or multisig."
+      },
       "contracts": {
         "TOKEN": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
         "POINTS": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
@@ -27,6 +34,14 @@
         "BREEDING_POINTS": "0x39Be8C4FA342C5f3C10d7c16941A0946D29Ade4A",
         "MARKETPLACE": "0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91",
         "BRIDGE": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E"
+      },
+      "owners": {
+        "TOKEN": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "POINTS": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "STAKING_POINTS": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "BREEDING_POINTS": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "MARKETPLACE": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "BRIDGE": "0x7894df8379c2e156f0e4d9df0829127d605bd52b"
       }
     }
   },

@@ -96,6 +96,7 @@ export type IndexerConfig = {
   pollIntervalMs: number;
   projectBatchSize: number;
   presaleAddress?: string;
+  contractAliases?: ContractAlias[];
 };
 
 export type LegacyImportConfig = {

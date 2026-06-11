@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 
@@ -13,13 +14,32 @@ const navItems = [
 
 export function LandingHeader() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial state
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
 
   return (
     <>
-      <header className="uki-landing-header">
+      <header className={`uki-landing-header ${isScrolled ? 'is-scrolled' : ''}`}>
         <nav className="uki-container flex h-[5.7rem] items-center justify-between">
           <Link href="/" className="uki-header-logo relative block h-[5.1rem] w-48 overflow-hidden" aria-label="Inicio Cukies World" onClick={closeMenu}>
             <Image src="/Cukie_logo_first.png" alt="Cukies World" fill className="object-contain object-left" sizes="11rem" priority />
@@ -27,11 +47,18 @@ export function LandingHeader() {
 
           {/* Menú de Desktop */}
           <div className="hidden items-center gap-6 lg:flex">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className="uki-nav-link">
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`uki-nav-link ${isActive ? 'is-active' : ''}`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="hidden items-center lg:block">
@@ -68,16 +95,21 @@ export function LandingHeader() {
               </button>
             </div>
             <nav className="flex flex-col gap-4">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={closeMenu}
-                  className="font-headline text-xl font-black uppercase tracking-[0.04em] text-[var(--uki-cream)] hover:text-[var(--uki-cyan)] transition"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={closeMenu}
+                    className={`font-headline text-xl font-black uppercase tracking-[0.04em] transition ${
+                      isActive ? 'text-[var(--uki-cyan)]' : 'text-[var(--uki-cream)] hover:text-[var(--uki-cyan)]'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
           </div>
           <div className="pt-6 border-t border-white/10" onClick={closeMenu}>

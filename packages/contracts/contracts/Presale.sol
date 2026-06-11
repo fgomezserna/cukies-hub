@@ -22,16 +22,13 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
 
     uint64 public saleStart;
     uint64 public saleEnd;
-    uint64 public vestingStart;
-    uint64 public vestingDuration;
 
     uint256 public ukiPerAsm;
     uint256 public minAsmPerPurchase;
-    uint256 public maxAsmPerPurchase;
-    uint256 public walletAsmCap;
     uint256 public totalUkiForSale;
     uint256 public totalAsmRaised;
     uint256 public totalUkiSold;
+    bool public saleEnabled;
 
     mapping(address buyer => uint256) public asmPurchased;
     mapping(address buyer => uint256) public ukiPurchased;
@@ -45,17 +42,18 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
     );
     event TreasuryUpdated(address indexed previousTreasury, address indexed nextTreasury);
     event SaleWindowUpdated(uint64 saleStart, uint64 saleEnd);
-    event PurchaseLimitsUpdated(uint256 minAsmPerPurchase, uint256 maxAsmPerPurchase, uint256 walletAsmCap);
-    event VestingConfigUpdated(uint64 vestingStart, uint64 vestingDuration);
+    event MinPurchaseUpdated(uint256 minAsmPerPurchase);
+    event TotalUkiForSaleUpdated(uint256 totalUkiForSale);
+    event UkiPerAsmUpdated(uint256 previousUkiPerAsm, uint256 nextUkiPerAsm);
+    event SaleEnabledUpdated(bool enabled);
     error InvalidAddress();
     error InvalidSaleWindow();
     error InvalidRate();
     error InvalidLimits();
-    error InvalidVesting();
+    error SaleNotEnabled();
     error SaleNotOpen();
     error PurchaseTooSmall();
-    error PurchaseTooLarge();
-    error WalletCapExceeded();
+    error OwnershipRenounceDisabled();
     error SaleCapExceeded();
 
     struct PresaleConfig {
@@ -67,11 +65,7 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
         uint64 saleEnd;
         uint256 ukiPerAsm;
         uint256 minAsmPerPurchase;
-        uint256 maxAsmPerPurchase;
-        uint256 walletAsmCap;
         uint256 totalUkiForSale;
-        uint64 vestingStart;
-        uint64 vestingDuration;
     }
 
     constructor(PresaleConfig memory config) Ownable(config.owner) {
@@ -87,23 +81,22 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
         treasury = config.treasury;
 
         _setSaleWindow(config.saleStart, config.saleEnd);
-        _setPurchaseConfig(
-            config.ukiPerAsm,
-            config.minAsmPerPurchase,
-            config.maxAsmPerPurchase,
-            config.walletAsmCap,
-            config.totalUkiForSale
-        );
-        _setVestingConfig(config.vestingStart, config.vestingDuration);
+        _setUkiPerAsm(config.ukiPerAsm);
+        _setMinAsmPerPurchase(config.minAsmPerPurchase);
+        _setTotalUkiForSale(config.totalUkiForSale);
+    }
+
+    function renounceOwnership() public view override onlyOwner {
+        revert OwnershipRenounceDisabled();
     }
 
     function buy(uint256 asmAmount) external nonReentrant whenNotPaused returns (uint256 ukiAmount) {
+        if (!saleEnabled) revert SaleNotEnabled();
         if (!isOpen()) revert SaleNotOpen();
         if (asmAmount < minAsmPerPurchase) revert PurchaseTooSmall();
-        if (asmAmount > maxAsmPerPurchase) revert PurchaseTooLarge();
-        if (asmPurchased[msg.sender] + asmAmount > walletAsmCap) revert WalletCapExceeded();
 
         ukiAmount = quoteUki(asmAmount);
+        if (ukiAmount == 0) revert InvalidRate();
         if (totalUkiSold + ukiAmount > totalUkiForSale) revert SaleCapExceeded();
 
         totalAsmRaised += asmAmount;
@@ -112,7 +105,7 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
         ukiPurchased[msg.sender] += ukiAmount;
 
         asmToken.safeTransferFrom(msg.sender, treasury, asmAmount);
-        vestingVault.createVesting(msg.sender, ukiAmount, vestingStart, vestingDuration);
+        vestingVault.createVesting(msg.sender, ukiAmount);
 
         emit Purchased(msg.sender, asmAmount, ukiAmount, asmPurchased[msg.sender], ukiPurchased[msg.sender]);
     }
@@ -137,26 +130,25 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
         emit SaleWindowUpdated(nextSaleStart, nextSaleEnd);
     }
 
-    function setPurchaseLimits(uint256 nextMinAsmPerPurchase, uint256 nextMaxAsmPerPurchase, uint256 nextWalletAsmCap)
-        external
-        onlyOwner
-    {
-        if (
-            nextMinAsmPerPurchase == 0 || nextMinAsmPerPurchase > nextMaxAsmPerPurchase
-                || nextMaxAsmPerPurchase > nextWalletAsmCap
-        ) {
-            revert InvalidLimits();
-        }
-
-        minAsmPerPurchase = nextMinAsmPerPurchase;
-        maxAsmPerPurchase = nextMaxAsmPerPurchase;
-        walletAsmCap = nextWalletAsmCap;
-        emit PurchaseLimitsUpdated(nextMinAsmPerPurchase, nextMaxAsmPerPurchase, nextWalletAsmCap);
+    function setMinAsmPerPurchase(uint256 nextMinAsmPerPurchase) external onlyOwner {
+        _setMinAsmPerPurchase(nextMinAsmPerPurchase);
+        emit MinPurchaseUpdated(nextMinAsmPerPurchase);
     }
 
-    function setVestingConfig(uint64 nextVestingStart, uint64 nextVestingDuration) external onlyOwner {
-        _setVestingConfig(nextVestingStart, nextVestingDuration);
-        emit VestingConfigUpdated(nextVestingStart, nextVestingDuration);
+    function setTotalUkiForSale(uint256 nextTotalUkiForSale) external onlyOwner {
+        _setTotalUkiForSale(nextTotalUkiForSale);
+        emit TotalUkiForSaleUpdated(nextTotalUkiForSale);
+    }
+
+    function setUkiPerAsm(uint256 nextUkiPerAsm) external onlyOwner {
+        uint256 previousUkiPerAsm = ukiPerAsm;
+        _setUkiPerAsm(nextUkiPerAsm);
+        emit UkiPerAsmUpdated(previousUkiPerAsm, nextUkiPerAsm);
+    }
+
+    function setSaleEnabled(bool enabled) external onlyOwner {
+        saleEnabled = enabled;
+        emit SaleEnabledUpdated(enabled);
     }
 
     function pause() external onlyOwner {
@@ -173,32 +165,19 @@ contract Presale is Ownable, Pausable, ReentrancyGuard {
         saleEnd = nextSaleEnd;
     }
 
-    function _setPurchaseConfig(
-        uint256 nextUkiPerAsm,
-        uint256 nextMinAsmPerPurchase,
-        uint256 nextMaxAsmPerPurchase,
-        uint256 nextWalletAsmCap,
-        uint256 nextTotalUkiForSale
-    ) private {
+    function _setUkiPerAsm(uint256 nextUkiPerAsm) private {
         if (nextUkiPerAsm == 0) revert InvalidRate();
-        if (
-            nextMinAsmPerPurchase == 0 || nextMinAsmPerPurchase > nextMaxAsmPerPurchase
-                || nextMaxAsmPerPurchase > nextWalletAsmCap
-        ) {
-            revert InvalidLimits();
-        }
-        if (nextTotalUkiForSale == 0) revert SaleCapExceeded();
-
         ukiPerAsm = nextUkiPerAsm;
-        minAsmPerPurchase = nextMinAsmPerPurchase;
-        maxAsmPerPurchase = nextMaxAsmPerPurchase;
-        walletAsmCap = nextWalletAsmCap;
-        totalUkiForSale = nextTotalUkiForSale;
     }
 
-    function _setVestingConfig(uint64 nextVestingStart, uint64 nextVestingDuration) private {
-        if (nextVestingStart == 0 || nextVestingDuration == 0) revert InvalidVesting();
-        vestingStart = nextVestingStart;
-        vestingDuration = nextVestingDuration;
+    function _setMinAsmPerPurchase(uint256 nextMinAsmPerPurchase) private {
+        if (nextMinAsmPerPurchase == 0) revert InvalidLimits();
+        minAsmPerPurchase = nextMinAsmPerPurchase;
+    }
+
+    function _setTotalUkiForSale(uint256 nextTotalUkiForSale) private {
+        if (nextTotalUkiForSale == 0 || nextTotalUkiForSale > type(uint128).max) revert SaleCapExceeded();
+        if (nextTotalUkiForSale < totalUkiSold) revert SaleCapExceeded();
+        totalUkiForSale = nextTotalUkiForSale;
     }
 }

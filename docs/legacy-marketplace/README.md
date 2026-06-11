@@ -45,6 +45,10 @@ El manifiesto machine-readable esta en `contracts.json`.
 
 ### BSC
 
+Owner actual comprobado on-chain el 2026-06-04: `0x7894df8379c2e156f0e4d9df0829127d605bd52b`.
+
+Critico: esta wallet debe rotarse a una wallet segura o multisig aprobada. Ver inventario y evidencia en `docs/contract-ownership-inventory.md`.
+
 | Alias | Address |
 | --- | --- |
 | `TOKEN` | `0x0dbDeBCC62f11005BF434ABFad74564E896aC861` |

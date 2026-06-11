@@ -48,6 +48,29 @@ const addresses = {
   presale: optionalEnv('NEXT_PUBLIC_UKI_PRESALE_ADDRESS', 'UKI_PRESALE_ADDRESS'),
   owner: optionalEnv('SALE_OWNER_ADDRESS'),
   treasury: optionalEnv('SALE_TREASURY_ADDRESS'),
+  deployer: optionalEnv('DEPLOYER_ADDRESS'),
+  allocationManager: optionalEnv('ALLOCATION_MANAGER_ADDRESS'),
+};
+const saleParameters = {
+  saleStart: optionalEnv('SALE_START'),
+  saleEnd: optionalEnv('SALE_END'),
+  unallocatedWithdrawalUnlockTime: optionalEnv('UNALLOCATED_WITHDRAWAL_UNLOCK_TIME', 'SALE_END'),
+  vestingStart: optionalEnv('VESTING_START'),
+  vestingDuration: optionalEnv('VESTING_DURATION'),
+  ukiPerAsm: optionalEnv('UKI_PER_ASM'),
+  minAsmPerPurchase: optionalEnv('MIN_ASM_PER_PURCHASE'),
+  totalUkiForSale: optionalEnv('TOTAL_UKI_FOR_SALE'),
+  saleEnabled: optionalEnv('SALE_ENABLED'),
+  vestingConfigFrozen: optionalEnv('VESTING_CONFIG_FROZEN'),
+};
+const tokenParameters = {
+  initialSupply: optionalEnv('UKI_INITIAL_SUPPLY'),
+  initialSupplyReceiver: optionalEnv('UKI_INITIAL_SUPPLY_RECEIVER'),
+};
+const expectedRoles = {
+  presaleVestingRoleHolder: addresses.presale,
+  allocationManagerRoleHolder: addresses.allocationManager,
+  defaultAdminRoleHolder: addresses.owner,
 };
 
 const manifest = {
@@ -59,12 +82,28 @@ const manifest = {
     explorerBaseUrl,
   },
   addresses,
+  saleParameters,
+  tokenParameters,
+  expectedRoles,
   artifacts: Object.fromEntries(contracts.map((contractName) => [contractName, artifactSummary(contractName)])),
   readiness: {
     hasContractAddresses: Boolean(addresses.ukiToken && addresses.vestingVault && addresses.presale),
     hasSaleAddresses: Boolean(addresses.asmToken && addresses.treasury),
     hasOwner: Boolean(addresses.owner),
     hasChain: Boolean(chainId),
+    hasTokenParameters: Boolean(tokenParameters.initialSupply),
+    hasSaleParameters: Boolean(
+      saleParameters.saleStart
+        && saleParameters.saleEnd
+        && saleParameters.unallocatedWithdrawalUnlockTime
+        && saleParameters.vestingStart
+        && saleParameters.vestingDuration
+        && saleParameters.ukiPerAsm
+        && saleParameters.minAsmPerPurchase
+        && saleParameters.totalUkiForSale
+    ),
+    saleEnabled: saleParameters.saleEnabled === 'true',
+    vestingConfigFrozen: saleParameters.vestingConfigFrozen === 'true',
   },
 };
 

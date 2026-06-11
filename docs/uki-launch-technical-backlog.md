@@ -287,7 +287,7 @@ Contrato para preventa UKI usando ASM como medio principal. BNB/USDT quedan como
 Issues hijas:
 
 - UKI-012.1 Task - Cerrar reglas de preventa
-  - Campos: fecha inicio primera semana de junio 2026, duracion 1 mes, precio UKI 0.01 USD, listing minimo 0.012 USD, ratio ASM/UKI fijo al inicio, max/min compra, wallet caps, pausas.
+  - Campos: fecha inicio primera semana de junio 2026, duracion 1 mes, precio UKI 0.01 USD, listing minimo 0.012 USD, ratio ASM/UKI editable por Safe ante volatilidad brusca, minimo 5 ASM, sin maximo por compra/wallet, cap global 250M UKI y pausas.
   - Acceptance criteria:
     - Reglas versionadas.
     - Casos de borde definidos: preventa agotada, compra fuera de ventana, ASM ratio, refund si aplica.
@@ -321,7 +321,7 @@ Issues hijas:
 - UKI-013.1 Task - Especificar calendarios de vesting
   - Compradores: lineal 9 meses sin cliff.
   - Team/Marcel/Concilium: 9 meses cliff + 24 meses vesting.
-  - Ecosistema: 3% del pool de ecosistema, 30,000,000 UKI, liberado 40 dias despues del TGE; resto con 9 meses cliff + 12 meses lineal.
+  - Ecosistema: 3% del suministro total, 30,000,000 UKI, liberado 40 dias despues del TGE como subasignacion de ecosistema; resto con 9 meses cliff + 12 meses lineal.
   - Acceptance criteria:
     - Cada pool tiene calendario, cliff, start, end y beneficiarios.
 

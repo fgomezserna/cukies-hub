@@ -58,8 +58,12 @@ export function getContractAliasByAddress(chain: ChainName, address: string) {
   return null;
 }
 
-export function getContractEventConfigs(chains: ChainName[], options: { presaleAddress?: string } = {}) {
+export function getContractEventConfigs(
+  chains: ChainName[],
+  options: { presaleAddress?: string; contractAliases?: ContractAlias[] } = {},
+) {
   const configs: ContractEventConfig[] = [];
+  const allowedAliases = options.contractAliases ? new Set(options.contractAliases) : null;
 
   for (const chain of chains) {
     const addresses: Partial<Record<ContractAlias, string>> = chain === 'BSC'
@@ -70,6 +74,7 @@ export function getContractEventConfigs(chains: ChainName[], options: { presaleA
       : tronContracts;
 
     for (const [contractAlias, eventNames] of Object.entries(eventsByContract)) {
+      if (allowedAliases && !allowedAliases.has(contractAlias as ContractAlias)) continue;
       if (!(contractAlias in addresses)) continue;
 
       for (const eventName of eventNames) {

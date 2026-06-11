@@ -149,6 +149,11 @@
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "OwnershipRenounceDisabled",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -404,7 +409,7 @@
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {

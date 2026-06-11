@@ -38,20 +38,6 @@ export const presaleAbi = [
   },
   {
     type: 'function',
-    name: 'vestingStart',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint64' }],
-  },
-  {
-    type: 'function',
-    name: 'vestingDuration',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint64' }],
-  },
-  {
-    type: 'function',
     name: 'ukiPerAsm',
     stateMutability: 'view',
     inputs: [],
@@ -60,20 +46,6 @@ export const presaleAbi = [
   {
     type: 'function',
     name: 'minAsmPerPurchase',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'maxAsmPerPurchase',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'walletAsmCap',
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
@@ -123,6 +95,13 @@ export const presaleAbi = [
   {
     type: 'function',
     name: 'isOpen',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    type: 'function',
+    name: 'saleEnabled',
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'bool' }],
@@ -205,6 +184,27 @@ export const vestingVaultAbi = [
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'presaleVestingStart',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint64' }],
+  },
+  {
+    type: 'function',
+    name: 'presaleVestingDuration',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint64' }],
+  },
+  {
+    type: 'function',
+    name: 'presaleVestingConfigFrozen',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
   },
   {
     type: 'function',

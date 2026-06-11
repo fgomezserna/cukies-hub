@@ -94,6 +94,58 @@ body {
 }
 
 @layer utilities {
+  /* Scroll reveal animations */
+  .uki-reveal {
+    opacity: 0;
+    transition-property: opacity, transform;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .uki-reveal-fade {
+    transform: none;
+  }
+
+  .uki-reveal-up {
+    transform: translateY(32px);
+  }
+
+  .uki-reveal-down {
+    transform: translateY(-32px);
+  }
+
+  .uki-reveal-left {
+    transform: translateX(32px);
+  }
+
+  .uki-reveal-right {
+    transform: translateX(-32px);
+  }
+
+  .uki-reveal-scale {
+    transform: scale(0.92);
+  }
+
+  .uki-reveal.uki-in-view {
+    opacity: 1;
+    transform: none;
+  }
+
+  .uki-section-divider {
+    height: 1px;
+    width: min(100% - 5rem, 1440px);
+    margin-inline: auto;
+    background: linear-gradient(90deg, transparent, rgba(34, 231, 223, 0.12) 20%, rgba(242, 195, 75, 0.12) 80%, transparent);
+    margin-block: 2.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .uki-section-divider {
+      width: min(100% - 2rem, 1500px);
+      margin-block: 1.5rem;
+    }
+  }
+
   /* For Webkit-based browsers (Chrome, Safari, Edge) */
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
@@ -278,14 +330,23 @@ body {
   }
 
   .uki-landing-header {
-    position: absolute;
+    position: fixed;
     inset-inline: 0;
     top: 0;
-    z-index: 30;
+    z-index: 50;
     border-bottom: 1px solid rgba(34, 231, 223, 0.08);
     background:
       linear-gradient(180deg, rgba(2, 9, 13, 0.46), rgba(2, 9, 13, 0.1) 72%, transparent),
       linear-gradient(90deg, rgba(34, 231, 223, 0.055), transparent 34%, rgba(242, 195, 75, 0.045));
+    transition: background 320ms var(--uki-ease), backdrop-filter 320ms var(--uki-ease), border-color 320ms var(--uki-ease), box-shadow 320ms var(--uki-ease);
+  }
+
+  .uki-landing-header.is-scrolled {
+    background: rgba(2, 9, 13, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: rgba(34, 231, 223, 0.16);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
   }
 
   .uki-header-logo img {
@@ -2488,7 +2549,7 @@ body {
     font-weight: 700;
   }
 
-  @media (max-width: 1023px) {
+  @media (max-width: 1140px) {
     .uki-community-visual,
     .uki-master-hero,
     .uki-master-requirements,
@@ -2749,17 +2810,23 @@ body {
     }
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 1141px) {
     .uki-step-arrow {
       display: block;
     }
   }
 
-  @media (max-width: 1023px) {
+  @media (max-width: 1140px) {
     .uki-landing-header {
       background:
         linear-gradient(180deg, rgba(2, 9, 13, 0.66), rgba(2, 9, 13, 0.18) 76%, transparent),
         linear-gradient(90deg, rgba(34, 231, 223, 0.05), transparent 38%, rgba(242, 195, 75, 0.04));
+    }
+
+    .uki-landing-header.is-scrolled {
+      background: rgba(2, 9, 13, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
 
     .uki-hero-section {

@@ -20,6 +20,11 @@ contract UKIToken is ERC20, ERC20Burnable, Ownable, Pausable {
 
     error InvalidOwner();
     error InvalidSupplyReceiver();
+    error OwnershipRenounceDisabled();
+
+    function renounceOwnership() public view override onlyOwner {
+        revert OwnershipRenounceDisabled();
+    }
 
     function pause() external onlyOwner {
         _pause();

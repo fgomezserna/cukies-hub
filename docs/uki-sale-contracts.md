@@ -48,9 +48,10 @@ Politica mint/burn:
 ### `VestingVault`
 
 - Custodia UKI reservado para vesting.
-- `VESTING_MANAGER_ROLE` crea schedules.
+- `PRESALE_VESTING_ROLE` crea schedules de compradores de preventa.
+- `ALLOCATION_MANAGER_ROLE` crea schedules internos de team, ecosistema, advisors o recompensas aprobadas.
 - Release lineal por beneficiario.
-- Permite acumular compras multiples si comparten `start` y `duration`.
+- Permite acumular compras multiples de preventa bajo la configuracion global de TGE del vault.
 - No permite schedules conflictivos para el mismo beneficiario.
 
 ### `Presale`
@@ -61,9 +62,11 @@ Politica mint/burn:
 - Crea vesting para el comprador en `VestingVault`.
 - Emite `Purchased`.
 - Tiene ventana `saleStart/saleEnd`.
-- Tiene min/max por compra.
-- Tiene cap por wallet en ASM.
+- Tiene minimo de compra.
+- No tiene maximo por compra ni cap por wallet aprobados.
 - Tiene cap global en UKI vendido.
+- Requiere `saleEnabled == true` para aceptar compras.
+- Permite editar parametros por Launch Safe durante la venta.
 - Pausable por owner.
 
 ## Reglas de preventa implementadas
@@ -72,21 +75,19 @@ Politica mint/burn:
 | --- | --- |
 | Fecha inicio | `saleStart` |
 | Fecha fin | `saleEnd` |
-| Ratio ASM/UKI | `ukiPerAsm`, escalado a `1e18` |
+| Ratio ASM/UKI | `ukiPerAsm`, escalado a `1e18`, editable por Launch Safe |
 | Min compra | `minAsmPerPurchase` |
-| Max compra | `maxAsmPerPurchase` |
-| Wallet cap | `walletAsmCap` |
 | Cap venta | `totalUkiForSale` |
+| Apertura operativa | `saleEnabled` con `setSaleEnabled(true/false)` |
 | Pausas | `pause()` / `unpause()` |
-| Vesting comprador | `VestingVault.createVesting` |
+| Vesting comprador | `VestingVault.createVesting`; TGE/vesting global en `VestingVault` |
 | Eventos | `Purchased`, config update events, OZ pause events |
 
 Casos de borde:
 
 - Compra antes/despues de ventana: revert `SaleNotOpen`.
+- Compra antes de habilitar venta: revert `SaleNotEnabled`.
 - Compra por debajo de minimo: revert `PurchaseTooSmall`.
-- Compra por encima de maximo: revert `PurchaseTooLarge`.
-- Wallet supera cap: revert `WalletCapExceeded`.
 - Cap global agotado: revert `SaleCapExceeded`.
 - Contrato pausado: revert `EnforcedPause`.
 - Vault sin UKI suficiente: revert `InsufficientUnallocatedBalance`.
@@ -109,12 +110,15 @@ Estos parametros no deben entenderse como hardcodeados si el contrato los recibe
 | Precio preventa | 1 UKI = 0.01 USD. |
 | Listing minimo | 1 UKI >= 0.012 USD. |
 | Medio principal de compra | ASM. |
-| Ratio ASM/UKI | Fijo al inicio de preventa segun precio de ASM en ese momento. |
+| Ratio ASM/UKI | Configurado al inicio y editable por Launch Safe durante preventa si ASM tiene una variacion brusca; aplica solo a compras futuras. |
 | Comprador | Vesting lineal 9 meses, sin cliff. |
+| Compra minima | 5 ASM. |
+| Maximo por compra/wallet | No hay limite aprobado. |
+| Maximo total vendible | 250,000,000 UKI del pool de ecosistema. |
 | Liquidez | ASM recaudado se usa para liquidez UKI; liquidez inicial bloqueada o quemada al menos 9 meses. |
 | BNB/USDT | Extension opcional pendiente; si se acepta, debe convertirse a ASM o reservarse para conversion posterior. |
 | Incentivos Concilium/Ascensum | Se iguala cantidad vendida a esa comunidad para Marcel; 9 meses cliff + 24 meses vesting. |
-| Ecosistema | 30,000,000 UKI liberados 40 dias tras TGE; resto 9 meses cliff + 12 meses lineal. |
+| Ecosistema | 30,000,000 UKI, equivalente al 3% del suministro total, liberados 40 dias tras TGE; resto 9 meses cliff + 12 meses lineal. |
 
 ## BSC testnet/mainnet
 

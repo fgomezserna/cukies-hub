@@ -58,4 +58,12 @@ describe('UKIToken', function () {
     await expect(uki.connect(treasury).transfer(user.address, ethers.parseEther('1')))
       .to.changeTokenBalances(uki, [treasury, user], [-ethers.parseEther('1'), ethers.parseEther('1')]);
   });
+
+  it('does not allow ownership renounce to strand pause recovery', async function () {
+    const { owner, uki } = await deployTokenFixture();
+
+    await expect(uki.connect(owner).renounceOwnership())
+      .to.be.revertedWithCustomError(uki, 'OwnershipRenounceDisabled');
+    expect(await uki.owner()).to.equal(owner.address);
+  });
 });

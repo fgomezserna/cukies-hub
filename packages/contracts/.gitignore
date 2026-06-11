@@ -5,3 +5,4 @@ coverage.json
 coverage.json
 typechain-types/
 node_modules/
+.venv-slither/

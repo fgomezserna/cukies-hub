@@ -13,12 +13,15 @@ Este documento sustituye como referencia de producto a los documentos antiguos d
 - Precio preventa: 1 UKI = 0.01 USD.
 - Precio de listing: al menos 0.012 USD. Si ASM sube durante la preventa, se puede anunciar un listing mayor para incentivar compra.
 - Compra principal: ASM.
-- Ratio ASM -> UKI: se fija al inicio de la preventa con el valor de ASM en ese momento y permanece constante durante toda la preventa.
+- Ratio ASM -> UKI: se configura al inicio de la preventa con el valor de ASM en ese momento. La Launch Safe puede actualizarlo durante la preventa si ASM sufre una variacion brusca; el cambio aplica solo a compras futuras.
 - Ejemplo de ratio: si ASM vale 6 USD al inicio, 1 ASM = 600 UKI.
+- Compra minima on-chain: 5 ASM.
+- Maximo por compra o por wallet: no hay limite especifico aprobado.
+- Maximo total vendible: 250,000,000 UKI, correspondiente al pool de ecosistema asignado como techo de venta.
 - BNB/USDT: opcion pendiente. Si se permite, debe convertirse automaticamente a ASM o guardarse para conversion posterior a ASM.
 - ASM recaudado: debe usarse para aportar liquidez contra UKI.
 - Liquidez inicial: se quema o se bloquea durante al menos 9 meses.
-- Compradores de preventa: vesting lineal de 9 meses, sin cliff.
+- Compradores de preventa: vesting lineal de 9 meses, sin cliff. El inicio del vesting se fija en TGE, cuando se aporte liquidez en Pancake, y debe congelarse antes de permitir claims.
 - Incentivos Concilium/Ascensum: la cantidad vendida en preventa a esa comunidad se iguala con UKI para Marcel, destinada a incentivos de Concilium/Ascensum.
 - Vesting de incentivos Concilium/Ascensum: mismas condiciones que team, 9 meses de cliff y 24 meses de vesting.
 - Incentivo por compra y referral: pendiente de definir, posiblemente sorteo o regalo de Cukies.
@@ -34,11 +37,33 @@ Suministro total: 1,000,000,000 UKI.
 | Liquidez | 18% | Listing en Pancake, market making, liquidez posterior o exchange centralizado. |
 | Equipo | 12% | Team y asignaciones de incentivos Concilium/Ascensum. |
 
+## Matriz de pools y vesting UKI
+
+Esta matriz es la referencia para configurar `VestingVault` y cualquier contrato futuro de rewards. Si producto cambia una fecha o beneficiario, debe actualizarse aqui antes del deploy.
+
+| Pool | % supply | UKI | Regla actual | Representacion tecnica |
+| --- | ---: | ---: | --- | --- |
+| Compradores preventa | Sale desde ecosistema | Hasta 250,000,000 | 9 meses lineal, sin cliff, inicio en TGE/Pancake liquidity. | `PRESALE_SCHEDULE_ID`; `presaleVestingStart = TGE`, `presaleVestingDuration = 9 meses`, congelar con `freezePresaleVestingConfig()` antes de claims. |
+| Ecosistema - desbloqueo 40 dias | 3% supply total | 30,000,000 | Cliff de 40 dias desde TGE y desbloqueo inmediato, sin vesting lineal. | Schedule dedicada tipo `ECOSYSTEM_40D` con `duration = 0`, que desbloquea el 100% en el cliff. |
+| Ecosistema - resto | Resto del 25% no vendido ni asignado al desbloqueo 40d | TBD segun venta real | 9 meses cliff + 12 meses vesting lineal. | Schedule dedicada tipo `ECOSYSTEM_REMAINDER`; amount final depende de UKI vendido en preventa y subasignaciones aprobadas. |
+| Equipo | 12% | 120,000,000 | 9 meses cliff + 24 meses vesting. | Schedules por beneficiario o grupo; ids versionados tipo `TEAM_*`. |
+| Incentivos Concilium/Ascensum para Marcel | Variable dentro de equipo | Igual a cantidad vendida a esa comunidad | Mismas condiciones que team: 9 meses cliff + 24 meses vesting. | Schedule separada tipo `CONCILIUM_INCENTIVES`; amount final depende de ventas atribuidas. |
+| Programa de recompensas Cukie Masters | 45% | 450,000,000 | Entrega durante 6 anos segun programa de recompensas. La documentacion actual no concreta cliff/start/duration unico. | No congelar como schedule unica hasta definir calendario; probablemente requiere `RewardsDistributor` por periodos o vesting por tramos. |
+| Liquidez | 18% | 180,000,000 | Liquidez inicial en Pancake; ASM recaudado se usa para liquidez UKI. Bloqueo o quema LP minimo 9 meses. | No es vesting de usuario; registrar tx de liquidez y bloqueo/quema LP. |
+
+Puntos pendientes antes de mainnet:
+
+- Definir si el programa de recompensas del 45% usa contrato de rewards por periodos, varios vestings por tramo o una combinacion.
+- Definir beneficiario exacto y operational owner de `ECOSYSTEM_40D`.
+- Calcular `ECOSYSTEM_REMAINDER` despues de cerrar la preventa: `250M - UKI vendido - 30M - otras subasignaciones aprobadas`.
+- Confirmar si la preventa realmente puede usar todo el pool de ecosistema como cap o si producto aprueba una subasignacion menor antes del deploy.
+
 Reglas de ecosistema:
 
 - Los tokens vendidos durante preventa salen del pool de ecosistema.
-- 3% del pool de ecosistema, 30,000,000 UKI, se libera 40 dias despues del TGE.
-- Ese 3% solo se usa si aparece una oportunidad concreta: partner, marketing, evento u otra accion aprobada.
+- El pool de ecosistema completo es 250,000,000 UKI. Ese es el maximo absoluto que la preventa puede vender si no se aprueba una subasignacion menor antes del deploy.
+- 3% del suministro total, 30,000,000 UKI, se libera 40 dias despues del TGE como subasignacion de ecosistema.
+- Ese 3% del suministro total solo se usa si aparece una oportunidad concreta: partner, marketing, evento u otra accion aprobada.
 - El resto del ecosistema tiene 9 meses de cliff y 12 meses de vesting lineal.
 
 ## Cukie Master

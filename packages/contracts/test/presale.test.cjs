@@ -8,18 +8,20 @@ describe('Presale', function () {
     const MockERC20 = await ethers.getContractFactory('MockERC20');
     const asm = await MockERC20.deploy('ApeSwap', 'ASM');
 
-    const UKIToken = await ethers.getContractFactory('UKIToken');
-    const uki = await UKIToken.deploy(owner.address, owner.address, ethers.parseEther('100000000'));
-
-    const VestingVault = await ethers.getContractFactory('VestingVault');
-    const vault = await VestingVault.deploy(await uki.getAddress(), owner.address);
-    await uki.transfer(await vault.getAddress(), ethers.parseEther('10000000'));
-
     const now = await time.latest();
     const saleStart = BigInt(now + 100);
     const saleEnd = saleStart + 30n * 24n * 60n * 60n;
-    const vestingStart = saleStart + 60n * 60n;
+    const vestingStart = saleEnd;
     const vestingDuration = 9n * 30n * 24n * 60n * 60n;
+    const minAsmPerPurchase = ethers.parseEther('5');
+    const totalUkiForSale = ethers.parseEther('250000000');
+
+    const UKIToken = await ethers.getContractFactory('UKIToken');
+    const uki = await UKIToken.deploy(owner.address, owner.address, ethers.parseEther('1000000000'));
+
+    const VestingVault = await ethers.getContractFactory('VestingVault');
+    const vault = await VestingVault.deploy(await uki.getAddress(), owner.address, vestingStart, vestingDuration, saleEnd);
+    await uki.transfer(await vault.getAddress(), totalUkiForSale);
 
     const Presale = await ethers.getContractFactory('Presale');
     const presale = await Presale.deploy({
@@ -30,24 +32,42 @@ describe('Presale', function () {
       saleStart,
       saleEnd,
       ukiPerAsm: ethers.parseEther('100'),
-      minAsmPerPurchase: ethers.parseEther('1'),
-      maxAsmPerPurchase: ethers.parseEther('10000'),
-      walletAsmCap: ethers.parseEther('20000'),
-      totalUkiForSale: ethers.parseEther('10000000'),
-      vestingStart,
-      vestingDuration,
+      minAsmPerPurchase,
+      totalUkiForSale,
     });
 
-    await vault.grantRole(await vault.VESTING_MANAGER_ROLE(), await presale.getAddress());
-    await asm.mint(buyer.address, ethers.parseEther('50000'));
+    await vault.grantRole(await vault.PRESALE_VESTING_ROLE(), await presale.getAddress());
+    await asm.mint(buyer.address, ethers.parseEther('3000000'));
     await asm.connect(buyer).approve(await presale.getAddress(), ethers.MaxUint256);
 
-    return { owner, treasury, buyer, other, asm, uki, vault, presale, saleStart, saleEnd, vestingStart, vestingDuration };
+    return {
+      owner,
+      treasury,
+      buyer,
+      other,
+      asm,
+      uki,
+      vault,
+      presale,
+      saleStart,
+      saleEnd,
+      vestingStart,
+      vestingDuration,
+      minAsmPerPurchase,
+      totalUkiForSale,
+    };
   }
 
-  it('sells UKI with ASM and creates buyer vesting', async function () {
-    const { treasury, buyer, asm, vault, presale, saleStart, vestingStart, vestingDuration } = await deployPresaleFixture();
+  async function openSale(presale, saleStart) {
+    await presale.setSaleEnabled(true);
     await time.setNextBlockTimestamp(saleStart);
+  }
+
+  it('sells UKI with ASM and creates buyer vesting from the vault pool', async function () {
+    const { treasury, buyer, asm, vault, presale, saleStart, vestingStart, vestingDuration } =
+      await deployPresaleFixture();
+    await vault.freezePresaleVestingConfig();
+    await openSale(presale, saleStart);
 
     const asmAmount = ethers.parseEther('100');
     const ukiAmount = ethers.parseEther('10000');
@@ -67,79 +87,80 @@ describe('Presale', function () {
     expect(await vault.scheduleIdsOf(buyer.address)).to.deep.equal([await vault.PRESALE_SCHEDULE_ID()]);
   });
 
-  it('allows multiple purchases in the same vesting schedule', async function () {
-    const { buyer, vault, presale, saleStart } = await deployPresaleFixture();
+  it('requires the sale to be explicitly enabled before buys', async function () {
+    const { buyer, presale, saleStart } = await deployPresaleFixture();
     await time.setNextBlockTimestamp(saleStart);
 
-    await presale.connect(buyer).buy(ethers.parseEther('10'));
-    await presale.connect(buyer).buy(ethers.parseEther('15'));
-
-    expect(await presale.asmPurchased(buyer.address)).to.equal(ethers.parseEther('25'));
-    const schedule = await vault.scheduleOf(buyer.address);
-    expect(schedule.totalAmount).to.equal(ethers.parseEther('2500'));
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
+      .to.be.revertedWithCustomError(presale, 'SaleNotEnabled');
   });
 
-  it('reverts outside window, below min, above max and over wallet cap', async function () {
-    const { buyer, presale, saleStart, saleEnd } = await deployPresaleFixture();
+  it('allows multiple purchases by the same wallet without per-wallet caps', async function () {
+    const { buyer, vault, presale, saleStart } = await deployPresaleFixture();
+    await openSale(presale, saleStart);
 
-    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
+    await presale.connect(buyer).buy(ethers.parseEther('1000000'));
+    await presale.connect(buyer).buy(ethers.parseEther('1000000'));
+
+    expect(await presale.asmPurchased(buyer.address)).to.equal(ethers.parseEther('2000000'));
+    expect(await presale.ukiPurchased(buyer.address)).to.equal(ethers.parseEther('200000000'));
+    const schedule = await vault.scheduleOf(buyer.address);
+    expect(schedule.totalAmount).to.equal(ethers.parseEther('200000000'));
+  });
+
+  it('reverts outside the sale window and below the 5 ASM minimum', async function () {
+    const { buyer, presale, saleStart, saleEnd } = await deployPresaleFixture();
+    await presale.setSaleEnabled(true);
+
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
       .to.be.revertedWithCustomError(presale, 'SaleNotOpen');
 
     await time.setNextBlockTimestamp(saleStart);
-    await expect(presale.connect(buyer).buy(ethers.parseEther('0.5')))
+    await expect(presale.connect(buyer).buy(ethers.parseEther('4.999999999999999999')))
       .to.be.revertedWithCustomError(presale, 'PurchaseTooSmall');
 
-    await expect(presale.connect(buyer).buy(ethers.parseEther('10001')))
-      .to.be.revertedWithCustomError(presale, 'PurchaseTooLarge');
-
-    await presale.connect(buyer).buy(ethers.parseEther('10000'));
-    await presale.connect(buyer).buy(ethers.parseEther('10000'));
-    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
-      .to.be.revertedWithCustomError(presale, 'WalletCapExceeded');
-
     await time.setNextBlockTimestamp(saleEnd + 1n);
-    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
       .to.be.revertedWithCustomError(presale, 'SaleNotOpen');
   });
 
-  it('reverts when the global UKI sale cap is exceeded', async function () {
-    const { buyer, asm, presale, saleStart } = await deployPresaleFixture();
-    await time.setNextBlockTimestamp(saleStart);
+  it('reverts when the 250M UKI ecosystem sale cap is exceeded', async function () {
+    const { buyer, presale, saleStart } = await deployPresaleFixture();
+    await openSale(presale, saleStart);
 
-    await presale.setPurchaseLimits(
-      ethers.parseEther('1'),
-      ethers.parseEther('1000000'),
-      ethers.parseEther('1000000')
-    );
-
-    await asm.mint(buyer.address, ethers.parseEther('100000'));
-    await presale.connect(buyer).buy(ethers.parseEther('100000'));
-    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
+    await presale.connect(buyer).buy(ethers.parseEther('2500000'));
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
       .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
   });
 
   it('blocks buys while paused', async function () {
     const { owner, buyer, presale, saleStart } = await deployPresaleFixture();
-    await time.setNextBlockTimestamp(saleStart);
+    await openSale(presale, saleStart);
 
     await presale.connect(owner).pause();
-    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
       .to.be.revertedWithCustomError(presale, 'EnforcedPause');
 
     await presale.connect(owner).unpause();
-    await expect(presale.connect(buyer).buy(ethers.parseEther('1')))
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
       .to.emit(presale, 'Purchased');
   });
 
-  it('allows the owner to update sale administration settings', async function () {
-    const { owner, treasury, other, buyer, presale, saleStart, saleEnd, vestingStart } = await deployPresaleFixture();
+  it('does not allow ownership renounce to strand pause recovery', async function () {
+    const { owner, presale } = await deployPresaleFixture();
+
+    await expect(presale.connect(owner).renounceOwnership())
+      .to.be.revertedWithCustomError(presale, 'OwnershipRenounceDisabled');
+    expect(await presale.owner()).to.equal(owner.address);
+  });
+
+  it('allows the owner to update mutable administration settings before enabling', async function () {
+    const { owner, treasury, other, buyer, presale, saleStart, saleEnd } = await deployPresaleFixture();
     const nextSaleStart = saleStart + 1_000n;
     const nextSaleEnd = saleEnd + 1_000n;
-    const nextVestingStart = vestingStart + 2_000n;
-    const nextVestingDuration = 365n * 24n * 60n * 60n;
-    const nextMin = ethers.parseEther('2');
-    const nextMax = ethers.parseEther('5000');
-    const nextCap = ethers.parseEther('15000');
+    const nextMin = ethers.parseEther('10');
+    const nextTotalUkiForSale = ethers.parseEther('200000000');
+    const nextUkiPerAsm = ethers.parseEther('80');
 
     await expect(presale.connect(owner).setTreasury(other.address))
       .to.emit(presale, 'TreasuryUpdated')
@@ -152,26 +173,86 @@ describe('Presale', function () {
     expect(await presale.saleStart()).to.equal(nextSaleStart);
     expect(await presale.saleEnd()).to.equal(nextSaleEnd);
 
-    await expect(presale.connect(owner).setPurchaseLimits(nextMin, nextMax, nextCap))
-      .to.emit(presale, 'PurchaseLimitsUpdated')
-      .withArgs(nextMin, nextMax, nextCap);
+    await expect(presale.connect(owner).setMinAsmPerPurchase(nextMin))
+      .to.emit(presale, 'MinPurchaseUpdated')
+      .withArgs(nextMin);
     expect(await presale.minAsmPerPurchase()).to.equal(nextMin);
-    expect(await presale.maxAsmPerPurchase()).to.equal(nextMax);
-    expect(await presale.walletAsmCap()).to.equal(nextCap);
 
-    await expect(presale.connect(owner).setVestingConfig(nextVestingStart, nextVestingDuration))
-      .to.emit(presale, 'VestingConfigUpdated')
-      .withArgs(nextVestingStart, nextVestingDuration);
-    expect(await presale.vestingStart()).to.equal(nextVestingStart);
-    expect(await presale.vestingDuration()).to.equal(nextVestingDuration);
+    await expect(presale.connect(owner).setTotalUkiForSale(nextTotalUkiForSale))
+      .to.emit(presale, 'TotalUkiForSaleUpdated')
+      .withArgs(nextTotalUkiForSale);
+    expect(await presale.totalUkiForSale()).to.equal(nextTotalUkiForSale);
+
+    await expect(presale.connect(owner).setUkiPerAsm(nextUkiPerAsm))
+      .to.emit(presale, 'UkiPerAsmUpdated')
+      .withArgs(ethers.parseEther('100'), nextUkiPerAsm);
+    expect(await presale.ukiPerAsm()).to.equal(nextUkiPerAsm);
 
     await expect(presale.connect(buyer).setTreasury(treasury.address))
       .to.be.revertedWithCustomError(presale, 'OwnableUnauthorizedAccount')
       .withArgs(buyer.address);
   });
 
+  it('keeps sale settings editable after enabling and after purchases', async function () {
+    const { owner, treasury, other, buyer, presale, saleStart, saleEnd } = await deployPresaleFixture();
+
+    await expect(presale.connect(owner).setSaleEnabled(true))
+      .to.emit(presale, 'SaleEnabledUpdated')
+      .withArgs(true);
+    expect(await presale.saleEnabled()).to.equal(true);
+
+    await expect(presale.connect(owner).setUkiPerAsm(ethers.parseEther('120')))
+      .to.emit(presale, 'UkiPerAsmUpdated')
+      .withArgs(ethers.parseEther('100'), ethers.parseEther('120'));
+
+    await time.setNextBlockTimestamp(saleStart);
+    await expect(presale.connect(buyer).buy(ethers.parseEther('5')))
+      .to.emit(presale, 'Purchased')
+      .withArgs(
+        buyer.address,
+        ethers.parseEther('5'),
+        ethers.parseEther('600'),
+        ethers.parseEther('5'),
+        ethers.parseEther('600')
+      );
+
+    await expect(presale.connect(owner).setTreasury(other.address))
+      .to.emit(presale, 'TreasuryUpdated')
+      .withArgs(treasury.address, other.address);
+    await expect(presale.connect(owner).setSaleWindow(saleStart + 1n, saleEnd + 1n))
+      .to.emit(presale, 'SaleWindowUpdated')
+      .withArgs(saleStart + 1n, saleEnd + 1n);
+    await expect(presale.connect(owner).setMinAsmPerPurchase(ethers.parseEther('10')))
+      .to.emit(presale, 'MinPurchaseUpdated')
+      .withArgs(ethers.parseEther('10'));
+    await expect(presale.connect(owner).setTotalUkiForSale(ethers.parseEther('200000000')))
+      .to.emit(presale, 'TotalUkiForSaleUpdated')
+      .withArgs(ethers.parseEther('200000000'));
+    await expect(presale.connect(owner).setTotalUkiForSale(ethers.parseEther('599')))
+      .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
+    await expect(presale.connect(owner).setSaleEnabled(false))
+      .to.emit(presale, 'SaleEnabledUpdated')
+      .withArgs(false);
+    await expect(presale.connect(buyer).buy(ethers.parseEther('10')))
+      .to.be.revertedWithCustomError(presale, 'SaleNotEnabled');
+  });
+
+  it('applies ukiPerAsm changes only to later purchases', async function () {
+    const { owner, buyer, presale, saleStart } = await deployPresaleFixture();
+    await openSale(presale, saleStart);
+
+    await presale.connect(buyer).buy(ethers.parseEther('10'));
+    await expect(presale.connect(owner).setUkiPerAsm(ethers.parseEther('80')))
+      .to.emit(presale, 'UkiPerAsmUpdated')
+      .withArgs(ethers.parseEther('100'), ethers.parseEther('80'));
+    await presale.connect(buyer).buy(ethers.parseEther('10'));
+
+    expect(await presale.asmPurchased(buyer.address)).to.equal(ethers.parseEther('20'));
+    expect(await presale.ukiPurchased(buyer.address)).to.equal(ethers.parseEther('1800'));
+  });
+
   it('rejects invalid owner sale configuration updates', async function () {
-    const { presale, saleStart, saleEnd, vestingStart } = await deployPresaleFixture();
+    const { presale, saleStart, saleEnd } = await deployPresaleFixture();
 
     await expect(presale.setTreasury(ethers.ZeroAddress))
       .to.be.revertedWithCustomError(presale, 'InvalidAddress');
@@ -179,20 +260,18 @@ describe('Presale', function () {
       .to.be.revertedWithCustomError(presale, 'InvalidSaleWindow');
     await expect(presale.setSaleWindow(saleEnd, saleStart))
       .to.be.revertedWithCustomError(presale, 'InvalidSaleWindow');
-    await expect(presale.setPurchaseLimits(0, ethers.parseEther('10'), ethers.parseEther('10')))
+    await expect(presale.setMinAsmPerPurchase(0))
       .to.be.revertedWithCustomError(presale, 'InvalidLimits');
-    await expect(presale.setPurchaseLimits(ethers.parseEther('20'), ethers.parseEther('10'), ethers.parseEther('30')))
-      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
-    await expect(presale.setPurchaseLimits(ethers.parseEther('1'), ethers.parseEther('20'), ethers.parseEther('10')))
-      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
-    await expect(presale.setVestingConfig(0, 1))
-      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
-    await expect(presale.setVestingConfig(vestingStart, 0))
-      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
+    await expect(presale.setUkiPerAsm(0))
+      .to.be.revertedWithCustomError(presale, 'InvalidRate');
+    await expect(presale.setTotalUkiForSale(0))
+      .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
+    await expect(presale.setTotalUkiForSale(1n << 128n))
+      .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
   });
 
   it('rejects invalid constructor configuration', async function () {
-    const { owner, treasury, asm, vault, presale, saleStart, saleEnd, vestingStart, vestingDuration } = await deployPresaleFixture();
+    const { owner, treasury, asm, vault, presale, saleStart, saleEnd } = await deployPresaleFixture();
     const Presale = await ethers.getContractFactory('Presale');
     const baseConfig = {
       owner: owner.address,
@@ -202,18 +281,16 @@ describe('Presale', function () {
       saleStart,
       saleEnd,
       ukiPerAsm: ethers.parseEther('100'),
-      minAsmPerPurchase: ethers.parseEther('1'),
-      maxAsmPerPurchase: ethers.parseEther('10000'),
-      walletAsmCap: ethers.parseEther('20000'),
-      totalUkiForSale: ethers.parseEther('10000000'),
-      vestingStart,
-      vestingDuration,
+      minAsmPerPurchase: ethers.parseEther('5'),
+      totalUkiForSale: ethers.parseEther('250000000'),
     };
 
     await expect(Presale.deploy({ ...baseConfig, owner: ethers.ZeroAddress }))
       .to.be.revertedWithCustomError(presale, 'OwnableInvalidOwner')
       .withArgs(ethers.ZeroAddress);
     await expect(Presale.deploy({ ...baseConfig, asmToken: ethers.ZeroAddress }))
+      .to.be.revertedWithCustomError(presale, 'InvalidAddress');
+    await expect(Presale.deploy({ ...baseConfig, vestingVault: ethers.ZeroAddress }))
       .to.be.revertedWithCustomError(presale, 'InvalidAddress');
     await expect(Presale.deploy({ ...baseConfig, treasury: ethers.ZeroAddress }))
       .to.be.revertedWithCustomError(presale, 'InvalidAddress');
@@ -225,23 +302,9 @@ describe('Presale', function () {
       .to.be.revertedWithCustomError(presale, 'InvalidRate');
     await expect(Presale.deploy({ ...baseConfig, minAsmPerPurchase: 0 }))
       .to.be.revertedWithCustomError(presale, 'InvalidLimits');
-    await expect(Presale.deploy({
-      ...baseConfig,
-      minAsmPerPurchase: ethers.parseEther('2'),
-      maxAsmPerPurchase: ethers.parseEther('1'),
-    }))
-      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
-    await expect(Presale.deploy({
-      ...baseConfig,
-      maxAsmPerPurchase: ethers.parseEther('3'),
-      walletAsmCap: ethers.parseEther('2'),
-    }))
-      .to.be.revertedWithCustomError(presale, 'InvalidLimits');
     await expect(Presale.deploy({ ...baseConfig, totalUkiForSale: 0 }))
       .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
-    await expect(Presale.deploy({ ...baseConfig, vestingStart: 0 }))
-      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
-    await expect(Presale.deploy({ ...baseConfig, vestingDuration: 0 }))
-      .to.be.revertedWithCustomError(presale, 'InvalidVesting');
+    await expect(Presale.deploy({ ...baseConfig, totalUkiForSale: (1n << 128n) }))
+      .to.be.revertedWithCustomError(presale, 'SaleCapExceeded');
   });
 });

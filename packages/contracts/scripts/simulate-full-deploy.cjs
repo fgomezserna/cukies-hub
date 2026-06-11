@@ -23,7 +23,7 @@ async function main() {
     deployer.address,
     hre.ethers.parseEther('1000000000'),
   ]);
-  const vault = await deploy('VestingVault', [await uki.getAddress(), deployer.address]);
+  const vault = await deploy('VestingVault', [await uki.getAddress(), deployer.address, presaleVestingStart, nineMonths, saleEnd]);
   const presale = await deploy('Presale', [{
     owner: deployer.address,
     asmToken: await asm.getAddress(),
@@ -32,17 +32,13 @@ async function main() {
     saleStart,
     saleEnd,
     ukiPerAsm: hre.ethers.parseEther('100'),
-    minAsmPerPurchase: hre.ethers.parseEther('1'),
-    maxAsmPerPurchase: hre.ethers.parseEther('10000'),
-    walletAsmCap: hre.ethers.parseEther('25000'),
-    totalUkiForSale: hre.ethers.parseEther('10000000'),
-    vestingStart: presaleVestingStart,
-    vestingDuration: nineMonths,
+    minAsmPerPurchase: hre.ethers.parseEther('5'),
+    totalUkiForSale: hre.ethers.parseEther('250000000'),
   }]);
 
-  await uki.transfer(await vault.getAddress(), hre.ethers.parseEther('150000000'));
-  await vault.grantRole(await vault.VESTING_MANAGER_ROLE(), await presale.getAddress());
-  await vault.grantRole(await vault.VESTING_MANAGER_ROLE(), deployer.address);
+  await uki.transfer(await vault.getAddress(), hre.ethers.parseEther('400000000'));
+  await vault.grantRole(await vault.PRESALE_VESTING_ROLE(), await presale.getAddress());
+  await vault.grantRole(await vault.ALLOCATION_MANAGER_ROLE(), deployer.address);
 
   await vault.createVestingWithCliff(
     team.address,
@@ -68,6 +64,9 @@ async function main() {
     BigInt(now) + 30n * 24n * 60n * 60n,
     twoYears
   );
+
+  await presale.setSaleEnabled(true);
+  await vault.freezePresaleVestingConfig();
 
   await asm.mint(buyer.address, hre.ethers.parseEther('5000'));
   await asm.connect(buyer).approve(await presale.getAddress(), hre.ethers.MaxUint256);
