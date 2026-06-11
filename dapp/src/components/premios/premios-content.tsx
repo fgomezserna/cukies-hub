@@ -161,7 +161,11 @@ export function PremiosContent() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/presale/referral/status?walletAddress=${address}`);
+      const params = new URLSearchParams({
+        walletAddress: address,
+        origin: window.location.origin,
+      });
+      const response = await fetch(`/api/presale/referral/status?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         setTotalPurchased(data.totalUkiPurchased ?? 0);
