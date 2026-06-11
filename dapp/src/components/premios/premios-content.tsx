@@ -290,7 +290,7 @@ export function PremiosContent() {
                 <div className="mt-4">
                   <div className="h-3 overflow-hidden rounded-full bg-black/45 border border-white/5">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#2ee8d6] to-[#7c3cff] transition-all duration-700 ease-out"
+                      className="h-full rounded-full bg-gradient-to-r from-[#2ee8d6] to-[#f2c34b] transition-all duration-700 ease-out"
                       style={{ width: `${animatedProgress}%` }}
                     />
                   </div>
@@ -307,7 +307,7 @@ export function PremiosContent() {
       )}
 
       <section className="uki-container relative z-[2] pb-12">
-        <div className="rounded-[14px] border border-[#7c3cff]/42 bg-[#070817]/86 p-4 shadow-[0_0_44px_rgba(124,60,255,0.16)] sm:p-6">
+        <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-4 shadow-[0_0_44px_rgba(34,231,223,0.06)] sm:p-6">
           <div className="grid gap-8 lg:grid-cols-[0.34fr_0.66fr]">
             <ScrollReveal animation="left" duration={800} className="flex flex-col justify-between gap-6">
               <div>
@@ -320,11 +320,11 @@ export function PremiosContent() {
                 </p>
               </div>
 
-              <div className="rounded-[10px] border border-[#7c3cff]/36 bg-[#0d0b24]/78 p-4">
-                <p className="text-sm font-black uppercase tracking-[0.12em] text-[#f19bff]">Notas importantes</p>
+              <div className="rounded-[10px] border border-[var(--uki-cyan)]/20 bg-[#06141a]/60 p-4">
+                <p className="text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">Notas importantes</p>
                 <ul className="mt-4 space-y-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                   <li className="flex gap-3">
-                    <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-[#e45cff]" strokeWidth={1.8} />
+                    <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" strokeWidth={1.8} />
                     <span>Desde 150.000 UKI, recibes 1 ticket extra por cada 10.000 UKI comprados.</span>
                   </li>
                   <li className="flex gap-3">
@@ -353,7 +353,7 @@ export function PremiosContent() {
                       } bg-gradient-to-r p-4 sm:p-5 relative overflow-hidden transition-all duration-300 ${
                         totalPurchased !== null && !isUnlocked && !isNext ? 'opacity-52 filter saturate-50' : ''
                       } ${isUnlocked ? 'border-[#2ee8d6]/50 bg-[#051a1a]/40 shadow-[0_0_20px_rgba(46,232,214,0.08)]' : ''} ${
-                        isNext ? 'border-dashed border-[#7c3cff]/70 shadow-[0_0_20px_rgba(124,60,255,0.12)]' : ''
+                        isNext ? 'border-dashed border-[var(--uki-cyan)]/60 shadow-[0_0_20px_rgba(34,231,223,0.1)]' : ''
                       }`}
                     >
                       {/* Fila 1: Monto, Tier badge y Estado */}
@@ -397,7 +397,7 @@ export function PremiosContent() {
 
                       {/* Fila 2: Premio y descripción */}
                       <div className="flex items-start gap-3">
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#7c3cff]/10 text-[#e45cff] border border-[#7c3cff]/20">
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)] border border-[var(--uki-cyan)]/20">
                           <Gift className="h-4 w-4" />
                         </div>
                         <div>
@@ -504,7 +504,7 @@ export function PremiosContent() {
 
       <section id="progreso-referidos" className="uki-container relative z-[2] scroll-mt-28 pb-14">
         <ScrollReveal animation="scale" className="w-full">
-          <div className="rounded-[14px] border border-[#e45cff]/44 bg-[#080719]/90 p-4 shadow-[0_0_48px_rgba(228,92,255,0.18)] sm:p-6">
+          <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-4 shadow-[0_0_48px_rgba(34,232,214,0.08)] sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[0.36fr_0.64fr]">
               <div>
                 <p className="uki-launch-badge">TU PROGRESO EN LA COMPETICIÓN DE REFERIDOS</p>
@@ -563,7 +563,7 @@ function RulePanel({
   return (
     <article className="rounded-[10px] border border-white/10 bg-[#09091a]/82 p-4">
       <div className="flex items-center gap-3">
-        <Icon className="h-6 w-6 text-[#e45cff]" strokeWidth={1.8} />
+        <Icon className="h-6 w-6 text-[var(--uki-cyan)]" strokeWidth={1.8} />
         <h3 className="font-headline text-base font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">{title}</h3>
       </div>
       <div className="mt-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">{children}</div>
