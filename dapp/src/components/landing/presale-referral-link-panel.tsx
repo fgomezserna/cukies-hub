@@ -34,6 +34,17 @@ function formatNumber(value?: number | null, maximumFractionDigits = 2) {
   return value.toLocaleString('en-US', { maximumFractionDigits });
 }
 
+function withCurrentBrowserOrigin(referralLink: string | null) {
+  if (!referralLink || typeof window === 'undefined') return referralLink;
+
+  try {
+    const link = new URL(referralLink);
+    return `${window.location.origin}${link.pathname}${link.search}${link.hash}`;
+  } catch {
+    return referralLink;
+  }
+}
+
 export function PresaleReferralLinkPanel() {
   const { address, chainId, isConnected } = useAccount();
   const { toast } = useToast();
@@ -60,7 +71,11 @@ export function PresaleReferralLinkPanel() {
       });
 
       if (response.ok) {
-        setStatus(await response.json());
+        const data = await response.json();
+        setStatus({
+          ...data,
+          referralLink: withCurrentBrowserOrigin(data.referralLink),
+        });
       } else {
         setStatus(null);
         setStatusError('No se pudo cargar tu progreso de referidos.');

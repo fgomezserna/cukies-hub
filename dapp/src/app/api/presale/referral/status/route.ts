@@ -9,7 +9,7 @@ function validBrowserOrigin(value: string | null) {
   try {
     const url = new URL(value);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    if (url.hostname === '0.0.0.0') return null;
+    if (url.hostname === '0.0.0.0' || url.hostname === '[::]' || url.hostname === '') return null;
 
     return url.origin;
   } catch {
@@ -21,18 +21,18 @@ function getPublicOrigin(request: NextRequest, browserOrigin: string | null) {
   const explicitBrowserOrigin = validBrowserOrigin(browserOrigin);
   if (explicitBrowserOrigin) return explicitBrowserOrigin;
 
+  const headerBrowserOrigin = validBrowserOrigin(request.headers.get('origin'));
+  if (headerBrowserOrigin) return headerBrowserOrigin;
+
+  const refererOrigin = validBrowserOrigin(request.headers.get('referer'));
+  if (refererOrigin) return refererOrigin;
+
   const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
   const host = forwardedHost || request.headers.get('host')?.split(',')[0]?.trim();
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
   const proto = forwardedProto || (host?.startsWith('localhost') ? 'http' : 'https');
 
   if (host && !host.startsWith('0.0.0.0')) return `${proto}://${host}`;
-
-  const headerBrowserOrigin = validBrowserOrigin(request.headers.get('origin'));
-  if (headerBrowserOrigin) return headerBrowserOrigin;
-
-  const referer = request.headers.get('referer');
-  if (referer) return new URL(referer).origin;
 
   return new URL(request.url).origin;
 }
