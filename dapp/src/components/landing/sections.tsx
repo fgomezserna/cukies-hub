@@ -130,7 +130,7 @@ function SaleFacts() {
   return (
     <section className="uki-container uki-facts-section">
       <ScrollReveal animation="fade" duration={700}>
-        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#071923]/82 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#0d0b24]/82 sm:grid-cols-2 lg:grid-cols-6">
           {saleFacts.map((fact) => (
             <MetricTile key={fact.label} {...fact} />
           ))}
@@ -175,7 +175,7 @@ function StepCard({ step }: { step: (typeof purchaseSteps)[number] }) {
           <p className="mt-1.5 text-xs font-semibold leading-snug text-[var(--uki-text)]">{step.text}</p>
         </div>
       </div>
-      <div className="uki-step-action mt-auto rounded-[9px] border border-white/10 bg-[#02090d]/66 p-3">
+      <div className="uki-step-action mt-auto rounded-[9px] border border-white/10 bg-[#04030a]/66 p-3">
         {step.number === '1' ? (
           <div className="space-y-2.5">
             <LandingWalletConnectButton className="h-9 w-full justify-center rounded-[5px]" showCompactText={false} />
@@ -186,14 +186,14 @@ function StepCard({ step }: { step: (typeof purchaseSteps)[number] }) {
         {step.number === '2' ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3 text-xs font-semibold text-[var(--uki-text)]">
-              <Check className="h-4 w-4 rounded-full bg-[#91d867] p-0.5 text-[#02090d]" strokeWidth={2} />
+              <Check className="h-4 w-4 rounded-full bg-[#91d867] p-0.5 text-[#04030a]" strokeWidth={2} />
               Aprobar ASM
             </div>
             <div>
               <p className="uki-label">Límite de gasto</p>
               <p className="mt-1 font-headline text-lg font-black text-[var(--uki-cream)]">5,000 ASM</p>
             </div>
-            <button type="button" className="h-9 w-full rounded-[5px] bg-[var(--uki-cyan)] text-[0.68rem] font-black uppercase tracking-[0.1em] text-[#02090d]">
+            <button type="button" className="h-9 w-full rounded-[5px] bg-[var(--uki-cyan)] text-[0.68rem] font-black uppercase tracking-[0.1em] text-[#04030a]">
               Aprobar
             </button>
           </div>
@@ -486,8 +486,8 @@ const carouselSlides = [
     icon: Star,
     title: 'Sorteo de Tiers',
     desc: 'Cukies de 2ª generación y rarezas variadas desde 10.000 UKI',
-    color: 'text-[#7dd3fc]',
-    bg: 'from-[#008080]/20 to-[#09091a]/90 border-[#2ee8d6]/30',
+    color: 'text-[#f19bff]',
+    bg: 'from-[#7c3cff]/20 to-[#09091a]/90 border-[#e45cff]/30',
   },
 ];
 
@@ -569,7 +569,7 @@ function FaqAndCta() {
             <h2 className="font-headline text-2xl font-black uppercase text-[var(--uki-cyan)]">FAQ</h2>
             <div className="uki-faq-list mt-3 divide-y divide-white/10">
               {faqs.map((faq) => (
-                <details key={faq.question} className="group py-2.5 border-l-2 border-transparent open:border-[var(--uki-cyan)] open:bg-[#2ee8d6]/[0.02] pl-3.5 transition-all duration-300 rounded-r-[6px]">
+                <details key={faq.question} className="group py-2.5 border-l-2 border-transparent open:border-[var(--uki-cyan)] open:bg-[#e45cff]/[0.02] pl-3.5 transition-all duration-300 rounded-r-[6px]">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[var(--uki-text)] transition group-open:text-[var(--uki-cyan)] hover:text-[var(--uki-cyan)]">
                     {faq.question}
                     <ChevronDown className="h-4 w-4 text-[var(--uki-cyan)] transition-transform duration-300 group-open:rotate-180" />

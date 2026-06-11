@@ -118,7 +118,7 @@ export function PresaleReferralLinkPanel() {
       referrals: status?.referralLevel1Count ?? 0,
       purchased: status?.referralLevel1UkiAmount ?? 0,
       weight: status?.levelWeights?.level1 ?? 1,
-      color: 'text-[#7dd3fc]',
+      color: 'text-[#f19bff]',
     },
     {
       level: 'Nivel 2',
@@ -134,13 +134,13 @@ export function PresaleReferralLinkPanel() {
       referrals: status?.referralLevel3Count ?? 0,
       purchased: status?.referralLevel3UkiAmount ?? 0,
       weight: status?.levelWeights?.level3 ?? 0.25,
-      color: 'text-[#91e96f]',
+      color: 'text-[#c7a6ff]',
     },
   ];
 
   if (!isConnected || !address) {
     return (
-      <div className="rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-5 shadow-[0_0_40px_rgba(34,231,223,0.06)]">
+      <div className="rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-5 shadow-[0_0_40px_rgba(228,92,255,0.06)]">
         <div className="flex gap-3 rounded-[9px] border border-[#f2c34b]/35 bg-[#2b1d08]/48 p-4">
           <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-gold)]" strokeWidth={1.8} />
           <div>
@@ -157,7 +157,7 @@ export function PresaleReferralLinkPanel() {
 
   if (isWrongChain) {
     return (
-      <div className="rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-5 shadow-[0_0_40px_rgba(34,231,223,0.06)]">
+      <div className="rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-5 shadow-[0_0_40px_rgba(228,92,255,0.06)]">
         <div className="flex gap-3 rounded-[9px] border border-[#f2c34b]/35 bg-[#2b1d08]/48 p-4">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-gold)]" strokeWidth={1.8} />
           <div>
@@ -173,7 +173,7 @@ export function PresaleReferralLinkPanel() {
   }
 
   return (
-    <div className="rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-5 shadow-[0_0_40px_rgba(34,231,223,0.06)]">
+    <div className="rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-5 shadow-[0_0_40px_rgba(228,92,255,0.06)]">
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
           <Users className="h-4 w-4" strokeWidth={1.8} />
@@ -192,12 +192,12 @@ export function PresaleReferralLinkPanel() {
               value={status.referralLink}
               readOnly
               aria-label="Enlace de invitación de preventa"
-              className="h-11 min-w-0 flex-1 rounded-[7px] border border-[var(--uki-cyan)]/20 bg-[#02030a] px-3 text-sm font-bold text-[var(--uki-cream)] outline-none"
+              className="h-11 min-w-0 flex-1 rounded-[7px] border border-[var(--uki-cyan)]/20 bg-[#04030a] px-3 text-sm font-bold text-[var(--uki-cream)] outline-none"
             />
             <button
               type="button"
               onClick={copyReferralLink}
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-cyan)]/60 bg-[var(--uki-cyan)] px-4 font-headline text-xs font-black uppercase tracking-[0.08em] text-[#040d12] shadow-[0_0_18px_rgba(34,231,223,0.22)] transition hover:bg-[#2ef1eb]"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-cyan)]/60 bg-[var(--uki-cyan)] px-4 font-headline text-xs font-black uppercase tracking-[0.08em] text-white shadow-[0_0_18px_rgba(228,92,255,0.22)] transition hover:bg-[#f19bff]"
               aria-label="Copiar link de invitación"
             >
               <Copy className="h-4 w-4" strokeWidth={1.8} />
@@ -219,7 +219,7 @@ export function PresaleReferralLinkPanel() {
           </div>
         </div>
       ) : !status ? (
-        <div className="mt-4 flex gap-3 rounded-[9px] border border-[var(--uki-cyan)]/20 bg-[#05131a]/70 p-4">
+        <div className="mt-4 flex gap-3 rounded-[9px] border border-[var(--uki-cyan)]/20 bg-[#070817]/70 p-4">
           <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-cyan)]" strokeWidth={1.8} />
           <div>
             <p className="font-headline text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cream)]">Cargando progreso</p>
@@ -337,7 +337,7 @@ export function PresaleReferralLinkPanel() {
 
           <div className="mt-3 rounded-[10px] border border-[#f2c34b]/30 bg-[#2b1d08]/40 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="inline-flex items-center gap-2 text-[0.72rem] font-black uppercase tracking-[0.12em] text-[#7dd3fc]">
+              <div className="inline-flex items-center gap-2 text-[0.72rem] font-black uppercase tracking-[0.12em] text-[#f19bff]">
                 <Trophy className="h-4 w-4" strokeWidth={1.8} />
                 Total de UKI recomendados que cuentan para la competición
               </div>

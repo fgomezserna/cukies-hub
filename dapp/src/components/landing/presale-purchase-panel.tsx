@@ -346,7 +346,7 @@ export function PresalePurchasePanel() {
   const visibleQuotedUki = quotedUki;
 
   return (
-    <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#02090d]/72 p-2.5">
+    <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#04030a]/72 p-2.5">
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
           <ShoppingCart className="h-4 w-4" strokeWidth={1.8} />
@@ -373,9 +373,9 @@ export function PresalePurchasePanel() {
           onChange={(event) => setAmount(event.target.value.replace(',', '.'))}
           inputMode="decimal"
           placeholder="10"
-          className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#041014]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-cyan)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-cyan)]"
+          className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#0b0719]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-cyan)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-cyan)]"
           style={{
-            backgroundColor: '#041014',
+            backgroundColor: '#0b0719',
             color: 'var(--uki-cream)',
             WebkitTextFillColor: 'var(--uki-cream)',
           }}

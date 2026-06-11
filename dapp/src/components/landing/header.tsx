@@ -78,7 +78,7 @@ export function LandingHeader() {
 
       {/* Drawer del Menú Móvil */}
       <div
-        className={`fixed inset-y-0 right-0 z-50 w-64 transform border-l border-white/10 bg-[#060a12]/95 p-6 shadow-[0_0_40px_rgba(46,232,214,0.15)] backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed inset-y-0 right-0 z-50 w-64 transform border-l border-white/10 bg-[#060a12]/95 p-6 shadow-[0_0_40px_rgba(228,92,255,0.15)] backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

@@ -16,7 +16,7 @@ export function SaleConsole() {
         </p>
       </div>
 
-      <div className="mt-2.5 rounded-[10px] border border-[var(--uki-pink-border)] bg-[#02090d]/74 p-2.5">
+      <div className="mt-2.5 rounded-[10px] border border-[var(--uki-pink-border)] bg-[#04030a]/74 p-2.5">
         <p className="mb-2 text-center font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cream)]">
           <PresaleRateLabel />
         </p>

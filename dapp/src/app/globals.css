@@ -135,7 +135,7 @@ body {
     height: 1px;
     width: min(100% - 5rem, 1440px);
     margin-inline: auto;
-    background: linear-gradient(90deg, transparent, rgba(34, 231, 223, 0.12) 20%, rgba(242, 195, 75, 0.12) 80%, transparent);
+    background: linear-gradient(90deg, transparent, rgba(228, 92, 255, 0.12) 20%, rgba(242, 195, 75, 0.12) 80%, transparent);
     margin-block: 2.5rem;
   }
 
@@ -174,7 +174,7 @@ body {
 
   /* Efectos adicionales para Cukies World */
   .glow-effect {
-    box-shadow: 0 0 20px rgba(34, 231, 223, 0.3);
+    box-shadow: 0 0 20px rgba(228, 92, 255, 0.3);
   }
 
   .glass-effect {
@@ -204,7 +204,7 @@ body {
   }
 
   .animated-gradient {
-    background: linear-gradient(-45deg, #22e7df, #008080, #44edd6, #008080);
+    background: linear-gradient(-45deg, #e45cff, #7c3cff, #f19bff, #7c3cff);
     background-size: 400% 400%;
     animation: gradient-shift 15s ease infinite;
   }
@@ -251,10 +251,10 @@ body {
   /* Efecto de resplandor pulsante */
   @keyframes glow-pulse {
     0%, 100% { 
-      box-shadow: 0 0 20px rgba(34, 231, 223, 0.3);
+      box-shadow: 0 0 20px rgba(228, 92, 255, 0.3);
     }
     50% { 
-      box-shadow: 0 0 40px rgba(34, 231, 223, 0.6);
+      box-shadow: 0 0 40px rgba(228, 92, 255, 0.6);
     }
   }
 
@@ -279,25 +279,25 @@ body {
 
 @layer components {
   .uki-landing {
-    --uki-bg: #02090d;
-    --uki-bg-2: #06141a;
+    --uki-bg: #04030a;
+    --uki-bg-2: #0d0b24;
     --uki-cream: #fff2dc;
     --uki-text: rgba(255, 242, 220, 0.78);
     --uki-muted: rgba(255, 242, 220, 0.52);
-    --uki-cyan: #22e7df;
-    --uki-cyan-soft: rgba(34, 231, 223, 0.11);
-    --uki-cyan-border: rgba(34, 231, 223, 0.22);
+    --uki-cyan: #e45cff;
+    --uki-cyan-soft: rgba(228, 92, 255, 0.11);
+    --uki-cyan-border: rgba(228, 92, 255, 0.22);
     --uki-gold: #f2c34b;
-    --uki-cyan-strong: #22e7df;
-    --uki-cyan-border-strong: rgba(34, 231, 223, 0.28);
+    --uki-cyan-strong: #e45cff;
+    --uki-cyan-border-strong: rgba(228, 92, 255, 0.28);
     --uki-ease: cubic-bezier(0.32, 0.72, 0, 1);
     position: relative;
     font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
     font-variant-numeric: tabular-nums;
     background:
-      radial-gradient(circle at 20% 6%, rgba(34, 178, 210, 0.08), transparent 25rem),
+      radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), transparent 25rem),
       radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), transparent 22rem),
-      linear-gradient(180deg, #04111a 0%, #02090d 48%, #010608 100%);
+      linear-gradient(180deg, #04111a 0%, #04030a 48%, #010608 100%);
   }
 
   .uki-container {
@@ -324,8 +324,8 @@ body {
     inset: 0;
     opacity: 0.045;
     background-image:
-      linear-gradient(rgba(34, 210, 232, 0.28) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(34, 210, 232, 0.28) 1px, transparent 1px);
+      linear-gradient(rgba(228, 92, 255, 0.28) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(228, 92, 255, 0.28) 1px, transparent 1px);
     background-size: 64px 64px;
   }
 
@@ -334,10 +334,10 @@ body {
     inset-inline: 0;
     top: 0;
     z-index: 50;
-    border-bottom: 1px solid rgba(34, 231, 223, 0.08);
+    border-bottom: 1px solid rgba(228, 92, 255, 0.08);
     background:
       linear-gradient(180deg, rgba(2, 9, 13, 0.46), rgba(2, 9, 13, 0.1) 72%, transparent),
-      linear-gradient(90deg, rgba(34, 231, 223, 0.055), transparent 34%, rgba(242, 195, 75, 0.045));
+      linear-gradient(90deg, rgba(228, 92, 255, 0.055), transparent 34%, rgba(242, 195, 75, 0.045));
     transition: background 320ms var(--uki-ease), backdrop-filter 320ms var(--uki-ease), border-color 320ms var(--uki-ease), box-shadow 320ms var(--uki-ease);
   }
 
@@ -345,7 +345,7 @@ body {
     background: rgba(2, 9, 13, 0.82);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-color: rgba(34, 231, 223, 0.16);
+    border-color: rgba(228, 92, 255, 0.16);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
   }
 
@@ -368,14 +368,14 @@ body {
   .uki-nav-link:hover {
     border-color: var(--uki-cyan);
     color: var(--uki-cyan);
-    text-shadow: 0 0 14px rgba(34, 231, 223, 0.32);
+    text-shadow: 0 0 14px rgba(228, 92, 255, 0.32);
     transform: translateY(-1px);
   }
 
   .uki-nav-link.is-active {
     border-color: var(--uki-cyan);
     color: var(--uki-cyan);
-    text-shadow: 0 0 14px rgba(34, 231, 223, 0.32);
+    text-shadow: 0 0 14px rgba(228, 92, 255, 0.32);
   }
 
   .uki-wallet-button,
@@ -393,14 +393,14 @@ body {
 
   .uki-wallet-button {
     height: 2.75rem;
-    border: 1px solid rgba(34, 231, 223, 0.78);
+    border: 1px solid rgba(228, 92, 255, 0.78);
     background: rgba(2, 16, 21, 0.34);
     padding-inline: 1rem;
     color: var(--uki-cyan);
     cursor: pointer;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 0 1px rgba(34, 231, 223, 0.04),
+      0 0 0 1px rgba(228, 92, 255, 0.04),
       0 12px 32px rgba(0, 0, 0, 0.18);
   }
 
@@ -438,10 +438,10 @@ body {
     display: inline-flex;
     width: fit-content;
     border-radius: 5px;
-    border: 1px solid rgba(34, 231, 223, 0.72);
-    background: rgba(2, 24, 28, 0.78);
+    border: 1px solid rgba(228, 92, 255, 0.72);
+    background: rgba(38, 14, 54, 0.78);
     padding: 0.55rem 0.75rem;
-    color: #44edd6;
+    color: #f19bff;
     font-size: 0.72rem;
     font-weight: 900;
     letter-spacing: 0.14em;
@@ -472,7 +472,7 @@ body {
     letter-spacing: 0;
     text-shadow:
       0 2px 0 rgba(0, 0, 0, 0.48),
-      0 0 18px rgba(34, 231, 223, 0.24);
+      0 0 18px rgba(228, 92, 255, 0.24);
   }
 
   .uki-heading-rule {
@@ -513,7 +513,7 @@ body {
     text-shadow:
       0 3px 0 rgba(0, 0, 0, 0.58),
       0 8px 18px rgba(0, 0, 0, 0.5),
-      0 0 22px rgba(34, 231, 223, 0.32);
+      0 0 22px rgba(228, 92, 255, 0.32);
   }
 
   .uki-hero-section {
@@ -536,7 +536,7 @@ body {
   .uki-hero-section::before {
     top: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(34, 231, 223, 0.28), transparent);
+    background: linear-gradient(90deg, transparent, rgba(228, 92, 255, 0.28), transparent);
   }
 
   .uki-hero-section::after {
@@ -592,10 +592,10 @@ body {
     min-width: 10.4rem;
     transform: rotate(-2deg);
     border-radius: 9px;
-    border: 1px solid rgba(34, 231, 223, 0.58);
+    border: 1px solid rgba(228, 92, 255, 0.58);
     background:
-      linear-gradient(180deg, rgba(9, 86, 92, 0.94), rgba(5, 34, 43, 0.96)),
-      rgba(5, 34, 43, 0.96);
+      linear-gradient(180deg, rgba(72, 24, 104, 0.94), rgba(28, 12, 42, 0.96)),
+      rgba(28, 12, 42, 0.96);
     padding: 0.72rem 1.1rem 0.86rem;
     color: var(--uki-cyan);
     font-family: var(--font-display), var(--font-space-grotesk), sans-serif;
@@ -607,7 +607,7 @@ body {
     box-shadow:
       0 18px 42px rgba(0, 0, 0, 0.42),
       inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 0 30px rgba(34, 231, 223, 0.18);
+      0 0 30px rgba(228, 92, 255, 0.18);
   }
 
   .uki-hero-sale-sign span {
@@ -657,7 +657,7 @@ body {
 
   .uki-button-primary {
     background: var(--uki-cyan);
-    color: #02090d;
+    color: #04030a;
   }
 
   .uki-button-secondary {
@@ -667,8 +667,8 @@ body {
   }
 
   .uki-button-ghost {
-    border: 1px solid rgba(34, 231, 223, 0.42);
-    background: rgba(34, 231, 223, 0.08);
+    border: 1px solid rgba(228, 92, 255, 0.42);
+    background: rgba(228, 92, 255, 0.08);
     color: var(--uki-cyan);
   }
 
@@ -693,7 +693,7 @@ body {
 
   .uki-panel-shell {
     border-radius: 13px;
-    border: 1px solid rgba(34, 231, 223, 0.16);
+    border: 1px solid rgba(228, 92, 255, 0.16);
     background: rgba(255, 242, 220, 0.035);
     padding: 1px;
     transition: transform 520ms var(--uki-ease), border-color 520ms var(--uki-ease), background-color 520ms var(--uki-ease);
@@ -704,21 +704,21 @@ body {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.055);
     background:
-      radial-gradient(circle at 50% 0%, rgba(34, 231, 223, 0.07), transparent 38%),
-      rgba(5, 20, 26, 0.82);
+      radial-gradient(circle at 50% 0%, rgba(228, 92, 255, 0.07), transparent 38%),
+      rgba(19, 10, 31, 0.82);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .uki-panel-shell:hover {
-    border-color: rgba(34, 231, 223, 0.32);
-    background: rgba(34, 231, 223, 0.055);
+    border-color: rgba(228, 92, 255, 0.32);
+    background: rgba(228, 92, 255, 0.055);
     transform: translateY(-3px);
   }
 
   .uki-sale-console {
     position: relative;
     z-index: 3;
-    border-color: rgba(34, 231, 223, 0.58);
+    border-color: rgba(228, 92, 255, 0.58);
     justify-self: end;
     width: 100%;
     margin-top: clamp(0rem, 0.75vw, 0.55rem);
@@ -727,8 +727,8 @@ body {
 
   .uki-sale-console .uki-panel-core {
     background:
-      radial-gradient(circle at 50% 0%, rgba(34, 231, 223, 0.1), transparent 38%),
-      rgba(5, 20, 26, 0.94);
+      radial-gradient(circle at 50% 0%, rgba(228, 92, 255, 0.1), transparent 38%),
+      rgba(19, 10, 31, 0.94);
     position: relative;
     overflow: hidden;
   }
@@ -739,7 +739,7 @@ body {
     inset: -35% -80%;
     pointer-events: none;
     opacity: 0.28;
-    background: linear-gradient(90deg, transparent 35%, rgba(34, 231, 223, 0.18), transparent 65%);
+    background: linear-gradient(90deg, transparent 35%, rgba(228, 92, 255, 0.18), transparent 65%);
     transform: translateX(-40%) rotate(8deg);
     animation: uki-console-sheen 5.4s ease-in-out infinite;
   }
@@ -752,7 +752,7 @@ body {
     border-radius: 8px;
     border: 1px solid var(--uki-cyan-border);
     background:
-      radial-gradient(circle at 50% 0%, rgba(34, 231, 223, 0.08), transparent 66%),
+      radial-gradient(circle at 50% 0%, rgba(228, 92, 255, 0.08), transparent 66%),
       #071b22;
     padding: 0.5rem;
     text-align: center;
@@ -764,10 +764,10 @@ body {
     align-items: center;
     gap: 0.45rem;
     border-radius: 6px;
-    border: 1px solid rgba(34, 231, 223, 0.38);
-    background: rgba(2, 24, 28, 0.56);
+    border: 1px solid rgba(228, 92, 255, 0.38);
+    background: rgba(38, 14, 54, 0.56);
     padding: 0.45rem 0.6rem;
-    color: #44edd6;
+    color: #f19bff;
     font-size: 0.64rem;
     font-weight: 900;
     letter-spacing: 0.1em;
@@ -823,8 +823,8 @@ body {
   }
 
   .uki-state-callout-locked {
-    border-color: rgba(34, 231, 223, 0.25);
-    background: rgba(2, 24, 28, 0.56);
+    border-color: rgba(228, 92, 255, 0.25);
+    background: rgba(38, 14, 54, 0.56);
   }
 
   .uki-state-callout-warning {
@@ -833,8 +833,8 @@ body {
   }
 
   .uki-state-callout-ready {
-    border-color: rgba(34, 231, 223, 0.34);
-    background: rgba(34, 231, 223, 0.08);
+    border-color: rgba(228, 92, 255, 0.34);
+    background: rgba(228, 92, 255, 0.08);
   }
 
   .uki-state-callout-loading svg,
@@ -860,7 +860,7 @@ body {
   }
 
   .uki-trust-signal:hover {
-    border-color: rgba(34, 231, 223, 0.45);
+    border-color: rgba(228, 92, 255, 0.45);
     background: rgba(7, 31, 40, 0.78);
     transform: translateY(-2px);
   }
@@ -956,12 +956,12 @@ body {
     width: 2.5rem;
     place-items: center;
     border-radius: 999px;
-    border: 1px solid rgba(34, 231, 223, 0.42);
-    background: rgba(34, 231, 223, 0.08);
+    border: 1px solid rgba(228, 92, 255, 0.42);
+    background: rgba(228, 92, 255, 0.08);
     color: var(--uki-cyan);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 18px rgba(34, 231, 223, 0.16);
+      0 0 18px rgba(228, 92, 255, 0.16);
   }
 
   .uki-vault-room {
@@ -971,9 +971,9 @@ body {
     height: 31rem;
     width: 27rem;
     border-radius: 28px;
-    border: 1px solid rgba(34, 231, 223, 0.14);
+    border: 1px solid rgba(228, 92, 255, 0.14);
     background:
-      linear-gradient(90deg, transparent 0 49%, rgba(34, 231, 223, 0.09) 50%, transparent 51%),
+      linear-gradient(90deg, transparent 0 49%, rgba(228, 92, 255, 0.09) 50%, transparent 51%),
       radial-gradient(circle at 55% 55%, rgba(242, 195, 75, 0.08), transparent 38%),
       rgba(5, 24, 22, 0.72);
   }
@@ -997,7 +997,7 @@ body {
     content: "";
     position: absolute;
     border-radius: 999px;
-    border: 1px solid rgba(34, 231, 223, 0.18);
+    border: 1px solid rgba(228, 92, 255, 0.18);
   }
 
   .uki-vault-door::before {
@@ -1015,7 +1015,7 @@ body {
     top: 3.5rem;
     display: grid;
     border-radius: 7px;
-    border: 1px solid rgba(34, 231, 223, 0.42);
+    border: 1px solid rgba(228, 92, 255, 0.42);
     background: #071f28;
     padding: 1rem 1.5rem;
     text-align: center;
@@ -1069,13 +1069,13 @@ body {
   }
 
   .uki-metric-tile:hover {
-    background: rgba(34, 231, 223, 0.035);
+    background: rgba(228, 92, 255, 0.035);
     transform: translateY(-2px);
   }
 
   .uki-metric-tile:nth-child(3n + 1) svg { color: var(--uki-cyan); }
   .uki-metric-tile:nth-child(3n + 2) svg { color: var(--uki-gold); }
-  .uki-metric-tile:nth-child(3n) svg { color: #44edd6; }
+  .uki-metric-tile:nth-child(3n) svg { color: #f19bff; }
 
   .uki-label {
     color: var(--uki-muted);
@@ -1100,8 +1100,8 @@ body {
 
   .uki-step-card .uki-panel-core {
     background:
-      radial-gradient(circle at 16% 0%, rgba(34, 231, 223, 0.08), transparent 34%),
-      rgba(5, 20, 26, 0.76);
+      radial-gradient(circle at 16% 0%, rgba(228, 92, 255, 0.08), transparent 34%),
+      rgba(19, 10, 31, 0.76);
   }
 
   .uki-buy-steps > article {
@@ -1161,7 +1161,7 @@ body {
   }
 
   .uki-token-cyan {
-    background: radial-gradient(circle at 32% 26%, #b9fff6, #2ee8d6 46%, #08736d 100%);
+    background: radial-gradient(circle at 32% 26%, #b9fff6, #e45cff 46%, #3d1460 100%);
   }
 
   .uki-token-gold,
@@ -1276,7 +1276,7 @@ body {
     height: 1rem;
     overflow: hidden;
     border-radius: 999px;
-    background: #02090d;
+    background: #04030a;
   }
 
   .uki-progress-fill {
@@ -1309,7 +1309,7 @@ body {
     margin-top: 0.25rem;
     overflow: hidden;
     border-radius: 12px;
-    border: 1px solid rgba(34, 231, 223, 0.12);
+    border: 1px solid rgba(228, 92, 255, 0.12);
     background:
       radial-gradient(circle at 50% 54%, rgba(242, 195, 75, 0.2), transparent 14rem),
       linear-gradient(180deg, rgba(1, 12, 15, 0.18), rgba(1, 12, 15, 0.72));
@@ -1335,8 +1335,8 @@ body {
     z-index: -1;
     background:
       radial-gradient(circle at 50% 54%, rgba(242, 195, 75, 0.26), transparent 12rem),
-      radial-gradient(circle at 43% 36%, rgba(34, 231, 223, 0.11), transparent 14rem),
-      radial-gradient(circle at 77% 22%, rgba(34, 231, 223, 0.08), transparent 16rem),
+      radial-gradient(circle at 43% 36%, rgba(228, 92, 255, 0.11), transparent 14rem),
+      radial-gradient(circle at 77% 22%, rgba(228, 92, 255, 0.08), transparent 16rem),
       linear-gradient(90deg, rgba(2, 9, 13, 0.72), transparent 21%, transparent 78%, rgba(2, 9, 13, 0.68)),
       linear-gradient(180deg, rgba(255, 242, 220, 0.055), transparent 24%, rgba(2, 9, 13, 0.3));
   }
@@ -1348,7 +1348,7 @@ body {
     width: calc(100% - 17rem);
     height: calc(100% - 4.1rem);
     overflow: visible;
-    filter: drop-shadow(0 0 12px rgba(34, 231, 223, 0.2));
+    filter: drop-shadow(0 0 12px rgba(228, 92, 255, 0.2));
   }
 
   @keyframes uki-line-flow {
@@ -1359,7 +1359,7 @@ body {
 
   .uki-utility-lines path {
     fill: none;
-    stroke: rgba(34, 231, 223, 0.42);
+    stroke: rgba(228, 92, 255, 0.42);
     stroke-dasharray: 3 6;
     stroke-linecap: round;
     stroke-width: 0.18;
@@ -1376,9 +1376,9 @@ body {
     width: clamp(14rem, 23vw, 21rem);
     transform: translate(-50%, -50%);
     border-radius: 999px;
-    border: 1px solid rgba(34, 231, 223, 0.2);
+    border: 1px solid rgba(228, 92, 255, 0.2);
     box-shadow:
-      0 0 52px rgba(34, 231, 223, 0.09),
+      0 0 52px rgba(228, 92, 255, 0.09),
       inset 0 0 38px rgba(242, 195, 75, 0.05);
     opacity: 0.86;
   }
@@ -1394,7 +1394,7 @@ body {
 
   .uki-orbit::after {
     inset: 5.15rem;
-    border-color: rgba(34, 231, 223, 0.22);
+    border-color: rgba(228, 92, 255, 0.22);
   }
 
   .uki-utility-node {
@@ -1449,11 +1449,11 @@ body {
 
   .uki-node-purple { color: #c7a6ff; background: linear-gradient(135deg, rgba(46, 24, 75, 0.78), rgba(6, 16, 22, 0.68)); }
   .uki-node-pink { color: #ff9fe8; background: linear-gradient(135deg, rgba(62, 22, 56, 0.76), rgba(6, 16, 22, 0.68)); }
-  .uki-node-mint { color: #8ffefa; background: linear-gradient(135deg, rgba(3, 38, 44, 0.72), rgba(6, 16, 22, 0.68)); }
+  .uki-node-mint { color: #f19bff; background: linear-gradient(135deg, rgba(72, 24, 104, 0.72), rgba(22, 12, 38, 0.68)); }
   .uki-node-gold { color: #ffd97a; background: linear-gradient(135deg, rgba(58, 42, 16, 0.76), rgba(6, 16, 22, 0.68)); }
-  .uki-node-blue { color: #99ddff; background: linear-gradient(135deg, rgba(11, 45, 61, 0.74), rgba(6, 16, 22, 0.68)); }
-  .uki-node-cyan { color: #44edd6; background: linear-gradient(135deg, rgba(2, 35, 38, 0.76), rgba(6, 16, 22, 0.68)); }
-  .uki-node-green { color: #c9f79f; background: linear-gradient(135deg, rgba(23, 50, 29, 0.76), rgba(6, 16, 22, 0.68)); }
+  .uki-node-lavender { color: #dfc6ff; background: linear-gradient(135deg, rgba(60, 30, 96, 0.74), rgba(22, 12, 38, 0.68)); }
+  .uki-node-cyan { color: #f19bff; background: linear-gradient(135deg, rgba(72, 24, 104, 0.76), rgba(6, 16, 22, 0.68)); }
+  .uki-node-violet { color: #c7a6ff; background: linear-gradient(135deg, rgba(46, 24, 75, 0.76), rgba(22, 12, 38, 0.68)); }
   .uki-node-red { color: #ffb0bf; background: linear-gradient(135deg, rgba(59, 20, 32, 0.76), rgba(6, 16, 22, 0.68)); }
 
   .uki-community-panel {
@@ -1723,8 +1723,8 @@ body {
     width: 0.9rem;
     border-radius: 999px;
     background:
-      radial-gradient(circle, var(--uki-cyan) 0 32%, rgba(34, 231, 223, 0.24) 33% 64%, transparent 65%);
-    box-shadow: 0 0 18px rgba(34, 231, 223, 0.36);
+      radial-gradient(circle, var(--uki-cyan) 0 32%, rgba(228, 92, 255, 0.24) 33% 64%, transparent 65%);
+    box-shadow: 0 0 18px rgba(228, 92, 255, 0.36);
     transform: translateX(-50%);
     transition: transform 720ms var(--uki-ease);
   }
@@ -1735,13 +1735,13 @@ body {
   }
 
   .uki-timeline-card:hover {
-    border-color: rgba(34, 231, 223, 0.36);
+    border-color: rgba(228, 92, 255, 0.36);
     background: rgba(5, 24, 32, 0.76);
     transform: translateY(-4px);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.1),
       0 24px 42px rgba(0, 0, 0, 0.34),
-      0 0 28px rgba(34, 231, 223, 0.12);
+      0 0 28px rgba(228, 92, 255, 0.12);
   }
 
   .uki-timeline-card:hover::before {
@@ -1753,8 +1753,8 @@ body {
     background: rgba(8, 42, 50, 0.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 0 1px rgba(34, 231, 223, 0.24),
-      0 0 28px rgba(34, 231, 223, 0.26),
+      0 0 0 1px rgba(228, 92, 255, 0.24),
+      0 0 28px rgba(228, 92, 255, 0.26),
       0 18px 36px rgba(0, 0, 0, 0.34);
   }
 
@@ -1815,7 +1815,7 @@ body {
     font-size: clamp(0.95rem, 1.12vw, 1.18rem);
     font-weight: 900;
     line-height: 1;
-    text-shadow: 0 0 16px rgba(34, 231, 223, 0.24);
+    text-shadow: 0 0 16px rgba(228, 92, 255, 0.24);
   }
 
   .uki-timeline-card h3 {
@@ -1839,7 +1839,7 @@ body {
 
   .uki-timeline-panel .uki-panel-core {
     min-height: clamp(18.5rem, 25vw, 22.6rem);
-    background: #02090d;
+    background: #04030a;
   }
 
   .uki-timeline-content {
@@ -1876,7 +1876,7 @@ body {
     border-top: 2px dashed rgba(255, 242, 220, 0.28);
     border-radius: 999px 0 0 999px;
     transform: translateY(-50%) rotate(-2deg);
-    filter: drop-shadow(0 0 10px rgba(34, 231, 223, 0.14));
+    filter: drop-shadow(0 0 10px rgba(228, 92, 255, 0.14));
   }
 
   .uki-timeline-scene {
@@ -1900,7 +1900,7 @@ body {
     position: relative;
     overflow: hidden;
     border-radius: 12px;
-    border: 1px solid rgba(34, 231, 223, 0.14);
+    border: 1px solid rgba(228, 92, 255, 0.14);
     padding: 1rem;
     isolation: isolate;
     min-height: auto;
@@ -1913,8 +1913,8 @@ body {
     z-index: -1;
     background:
       linear-gradient(180deg, rgba(2, 9, 13, 0.72) 0%, rgba(2, 9, 13, 0.5) 100%),
-      radial-gradient(circle at 4% 22%, rgba(34, 231, 223, 0.13), transparent 14rem),
-      radial-gradient(circle at 96% 16%, rgba(34, 231, 223, 0.1), transparent 16rem),
+      radial-gradient(circle at 4% 22%, rgba(228, 92, 255, 0.13), transparent 14rem),
+      radial-gradient(circle at 96% 16%, rgba(228, 92, 255, 0.1), transparent 16rem),
       url("/brand/generated/uki-cukie-master-scene-v2.png") left bottom / 34rem auto no-repeat;
     opacity: 0.52;
     transition: transform 900ms var(--uki-ease), filter 900ms var(--uki-ease);
@@ -1958,7 +1958,7 @@ body {
     z-index: 0;
     background:
       linear-gradient(180deg, rgba(255, 242, 220, 0.055), transparent 22%, rgba(2, 9, 13, 0.18)),
-      radial-gradient(circle at 50% 4%, rgba(34, 231, 223, 0.08), transparent 62%);
+      radial-gradient(circle at 50% 4%, rgba(228, 92, 255, 0.08), transparent 62%);
   }
 
   .uki-future-card > * {
@@ -1968,7 +1968,7 @@ body {
 
   .uki-future-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(34, 231, 223, 0.34);
+    border-color: rgba(228, 92, 255, 0.34);
     background: rgba(5, 24, 32, 0.62);
   }
 
@@ -2227,7 +2227,7 @@ body {
 
   .uki-games-panel {
     background:
-      radial-gradient(circle at 44% 18%, rgba(34, 231, 223, 0.12), transparent 34%),
+      radial-gradient(circle at 44% 18%, rgba(228, 92, 255, 0.12), transparent 34%),
       linear-gradient(180deg, rgba(3, 20, 25, 0.92), rgba(2, 11, 13, 0.96));
   }
 
@@ -2386,14 +2386,14 @@ body {
   .uki-game-scene {
     aspect-ratio: 347 / 181;
     min-height: 100%;
-    box-shadow: inset 0 0 0 1px rgba(34, 231, 223, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(228, 92, 255, 0.08);
   }
 
   .uki-game-overview {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    box-shadow: inset 0 0 0 1px rgba(34, 231, 223, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(228, 92, 255, 0.06);
   }
 
   .uki-game-metric {
@@ -2421,8 +2421,8 @@ body {
   }
 
   .uki-game-card:hover {
-    border-color: rgba(34, 231, 223, 0.35);
-    background: rgba(5, 20, 26, 0.84);
+    border-color: rgba(228, 92, 255, 0.35);
+    background: rgba(19, 10, 31, 0.84);
     transform: translateY(-3px);
     cursor: pointer;
   }
@@ -2434,7 +2434,7 @@ body {
   }
   .uki-hover-card:hover {
     transform: translateY(-4px) scale(1.025);
-    box-shadow: 0 12px 32px rgba(46, 232, 214, 0.15);
+    box-shadow: 0 12px 32px rgba(228, 92, 255, 0.15);
   }
 
   /* Soporte para animaciones del FAQ */
@@ -2691,8 +2691,8 @@ body {
     z-index: 0;
   }
 
-  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #17d8c8, transparent); }
-  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #22e7df, transparent); }
+  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #d953ff, transparent); }
+  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #e45cff, transparent); }
   .uki-future-gold .uki-panel-core::after { background: linear-gradient(0deg, #f5c34d, transparent); }
   .uki-future-vault .uki-panel-core::after { background: linear-gradient(0deg, #ffbd4b, transparent); }
 
@@ -2703,8 +2703,8 @@ body {
   .uki-faq-panel .uki-panel-core {
     min-height: 13.35rem;
     background:
-      linear-gradient(180deg, rgba(5, 20, 26, 0.84), rgba(2, 9, 13, 0.72)),
-      rgba(5, 20, 26, 0.78);
+      linear-gradient(180deg, rgba(19, 10, 31, 0.84), rgba(2, 9, 13, 0.72)),
+      rgba(19, 10, 31, 0.78);
   }
 
   .uki-faq-list details:first-child {
@@ -2738,7 +2738,7 @@ body {
     inset: 0;
     z-index: 0;
     background:
-      linear-gradient(90deg, rgba(5, 20, 26, 0.99) 0%, rgba(5, 20, 26, 0.94) 34%, rgba(5, 20, 26, 0.42) 57%, rgba(5, 20, 26, 0.04) 100%),
+      linear-gradient(90deg, rgba(19, 10, 31, 0.99) 0%, rgba(19, 10, 31, 0.94) 34%, rgba(19, 10, 31, 0.42) 57%, rgba(19, 10, 31, 0.04) 100%),
       linear-gradient(0deg, rgba(2, 9, 13, 0.5), rgba(2, 9, 13, 0.03) 58%, rgba(2, 9, 13, 0.34)),
       radial-gradient(circle at 72% 52%, rgba(242, 195, 75, 0.2), transparent 20rem),
       url("/brand/generated/uki-final-cta-scene-v2.png") 72% center / cover no-repeat;
@@ -2820,7 +2820,7 @@ body {
     .uki-landing-header {
       background:
         linear-gradient(180deg, rgba(2, 9, 13, 0.66), rgba(2, 9, 13, 0.18) 76%, transparent),
-        linear-gradient(90deg, rgba(34, 231, 223, 0.05), transparent 38%, rgba(242, 195, 75, 0.04));
+        linear-gradient(90deg, rgba(228, 92, 255, 0.05), transparent 38%, rgba(242, 195, 75, 0.04));
     }
 
     .uki-landing-header.is-scrolled {
@@ -2930,7 +2930,7 @@ body {
 
     .uki-final-cta-bg {
       background:
-        linear-gradient(90deg, rgba(5, 20, 26, 0.99) 0%, rgba(5, 20, 26, 0.9) 48%, rgba(5, 20, 26, 0.2) 100%),
+        linear-gradient(90deg, rgba(19, 10, 31, 0.99) 0%, rgba(19, 10, 31, 0.9) 48%, rgba(19, 10, 31, 0.2) 100%),
         linear-gradient(0deg, rgba(2, 9, 13, 0.66), rgba(2, 9, 13, 0.12) 56%, rgba(2, 9, 13, 0.44)),
         radial-gradient(circle at 78% 52%, rgba(242, 195, 75, 0.18), transparent 16rem),
         url("/brand/generated/uki-final-cta-scene-v2.png") 72% center / cover no-repeat;
@@ -3101,8 +3101,8 @@ body {
 
     .uki-final-cta-bg {
       background:
-        linear-gradient(180deg, rgba(5, 20, 26, 0.98) 0%, rgba(5, 20, 26, 0.78) 46%, rgba(5, 20, 26, 0.08) 100%),
-        linear-gradient(90deg, rgba(5, 20, 26, 0.98), rgba(5, 20, 26, 0.42) 76%, rgba(5, 20, 26, 0.06)),
+        linear-gradient(180deg, rgba(19, 10, 31, 0.98) 0%, rgba(19, 10, 31, 0.78) 46%, rgba(19, 10, 31, 0.08) 100%),
+        linear-gradient(90deg, rgba(19, 10, 31, 0.98), rgba(19, 10, 31, 0.42) 76%, rgba(19, 10, 31, 0.06)),
         radial-gradient(circle at 70% 68%, rgba(242, 195, 75, 0.2), transparent 13rem),
         url("/brand/generated/uki-final-cta-scene-v2.png") 70% bottom / auto 82% no-repeat,
         #05141a;

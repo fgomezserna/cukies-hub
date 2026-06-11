@@ -73,21 +73,21 @@ export const vestingTracks = [
     icon: Lock,
     title: 'Vesting comprador',
     subtitle: 'Consulta disponible para wallets con compra',
-    color: '#2ee8d6',
+    color: '#e45cff',
     labels: ['Asignación', 'Contrato', 'Desbloqueos', 'Claim'],
   },
   {
     icon: Users,
     title: 'Vesting equipo',
     subtitle: '9 meses cliff + 24 meses vesting',
-    color: '#4d93ff',
+    color: '#b67cff',
     labels: ['0', 'Cliff', 'Mes 9', 'Mes 21', 'Mes 33'],
   },
   {
     icon: Gift,
     title: 'Programa Cukie Master',
     subtitle: 'Asignaciones durante 6 años',
-    color: '#91d867',
+    color: '#f19bff',
     labels: ['Año 1', 'Año 3', 'Año 5', 'Año 6'],
   },
 ];
@@ -111,7 +111,7 @@ export const utilityNodes = [
     title: 'Pools',
     text: 'Pools con utilidad real.',
     icon: Database,
-    className: 'uki-node-blue',
+    className: 'uki-node-lavender',
     positionClassName: 'uki-node-pools',
   },
   {
@@ -125,7 +125,7 @@ export const utilityNodes = [
     title: 'Future Worlds',
     text: 'Expande el universo Cukies.',
     icon: Network,
-    className: 'uki-node-green',
+    className: 'uki-node-violet',
     positionClassName: 'uki-node-worlds',
   },
   {

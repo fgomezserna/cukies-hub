@@ -70,9 +70,9 @@ const purchaseRewards = [
     prize: 'Sorteo de 1 Cukie Legendario + 3 Cukies Épicos',
     helper: 'Tramo alto de lanzamiento',
     tier: 'Platino',
-    badgeColor: 'bg-[#008080]/30 text-[#44edd6] border-[#008080]/60',
-    tone: 'from-[#008080]/20 to-[#09091a]/86 shadow-[0_0_24px_rgba(0,128,128,0.15)]',
-    border: 'border-[#008080]/45',
+    badgeColor: 'bg-[#7c3cff]/30 text-[#f19bff] border-[#7c3cff]/60',
+    tone: 'from-[#7c3cff]/20 to-[#09091a]/86 shadow-[0_0_24px_rgba(124,60,255,0.15)]',
+    border: 'border-[#7c3cff]/45',
   },
   {
     amount: 150000,
@@ -118,18 +118,18 @@ const rarityRewards = [
   {
     name: 'Raro',
     threshold: '500.000 UKI',
-    border: 'border-[#38bdf8]/65 hover:border-[#38bdf8]',
+    border: 'border-[#d953ff]/65 hover:border-[#d953ff]',
     glow: 'shadow-[0_0_14px_rgba(56,189,248,0.12)]',
-    text: 'text-[#7dd3fc]',
+    text: 'text-[#f19bff]',
     icon: Star,
     stars: 2,
   },
   {
     name: 'No Común',
     threshold: '250.000 UKI',
-    border: 'border-[#91e96f]/65 hover:border-[#91e96f]',
+    border: 'border-[#c7a6ff]/65 hover:border-[#c7a6ff]',
     glow: 'shadow-[0_0_14px_rgba(145,233,111,0.12)]',
-    text: 'text-[#b8f486]',
+    text: 'text-[#dfc6ff]',
     icon: Gift,
     stars: 1,
   },
@@ -261,7 +261,7 @@ export function PremiosContent() {
       {isConnected && totalPurchased !== null && (
         <section className="uki-container relative z-[2] pb-6">
           <ScrollReveal animation="up" duration={700} className="w-full">
-            <div className="rounded-[14px] border border-[#2ee8d6]/30 bg-[#05131a]/82 p-5 shadow-[0_0_32px_rgba(46,232,214,0.08)]">
+            <div className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 p-5 shadow-[0_0_32px_rgba(228,92,255,0.08)]">
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">Progreso de preventa de tu Wallet</p>
@@ -290,7 +290,7 @@ export function PremiosContent() {
                 <div className="mt-4">
                   <div className="h-3 overflow-hidden rounded-full bg-black/45 border border-white/5">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#2ee8d6] to-[#f2c34b] transition-all duration-700 ease-out"
+                      className="h-full rounded-full bg-gradient-to-r from-[#e45cff] to-[#f2c34b] transition-all duration-700 ease-out"
                       style={{ width: `${animatedProgress}%` }}
                     />
                   </div>
@@ -307,7 +307,7 @@ export function PremiosContent() {
       )}
 
       <section className="uki-container relative z-[2] pb-12">
-        <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-4 shadow-[0_0_44px_rgba(34,231,223,0.06)] sm:p-6">
+        <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-4 shadow-[0_0_44px_rgba(228,92,255,0.06)] sm:p-6">
           <div className="grid gap-8 lg:grid-cols-[0.34fr_0.66fr]">
             <ScrollReveal animation="left" duration={800} className="flex flex-col justify-between gap-6">
               <div>
@@ -320,7 +320,7 @@ export function PremiosContent() {
                 </p>
               </div>
 
-              <div className="rounded-[10px] border border-[var(--uki-cyan)]/20 bg-[#06141a]/60 p-4">
+              <div className="rounded-[10px] border border-[var(--uki-cyan)]/20 bg-[#0d0b24]/60 p-4">
                 <p className="text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">Notas importantes</p>
                 <ul className="mt-4 space-y-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                   <li className="flex gap-3">
@@ -352,8 +352,8 @@ export function PremiosContent() {
                         reward.tone
                       } bg-gradient-to-r p-4 sm:p-5 relative overflow-hidden transition-all duration-300 ${
                         totalPurchased !== null && !isUnlocked && !isNext ? 'opacity-52 filter saturate-50' : ''
-                      } ${isUnlocked ? 'border-[#2ee8d6]/50 bg-[#051a1a]/40 shadow-[0_0_20px_rgba(46,232,214,0.08)]' : ''} ${
-                        isNext ? 'border-dashed border-[var(--uki-cyan)]/60 shadow-[0_0_20px_rgba(34,231,223,0.1)]' : ''
+                      } ${isUnlocked ? 'border-[#e45cff]/50 bg-[#051a1a]/40 shadow-[0_0_20px_rgba(228,92,255,0.08)]' : ''} ${
+                        isNext ? 'border-dashed border-[var(--uki-cyan)]/60 shadow-[0_0_20px_rgba(228,92,255,0.1)]' : ''
                       }`}
                     >
                       {/* Fila 1: Monto, Tier badge y Estado */}
@@ -376,7 +376,7 @@ export function PremiosContent() {
                         {totalPurchased !== null && (
                           <div className="shrink-0 mt-1 sm:mt-0">
                             {isUnlocked ? (
-                              <span className="inline-flex items-center gap-1.5 text-[0.68rem] text-[var(--uki-cyan)] font-bold bg-[#2ee8d6]/10 border border-[#2ee8d6]/30 px-2.5 py-1 rounded-[6px]">
+                              <span className="inline-flex items-center gap-1.5 text-[0.68rem] text-[var(--uki-cyan)] font-bold bg-[#e45cff]/10 border border-[#e45cff]/30 px-2.5 py-1 rounded-[6px]">
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                 Conseguido
                               </span>
@@ -419,7 +419,7 @@ export function PremiosContent() {
 
       <section className="uki-container relative z-[2] pb-12">
         <ScrollReveal animation="fade" className="w-full">
-          <div className="rounded-[14px] border border-[#38bdf8]/32 bg-[#06101d]/88 p-4 sm:p-6">
+          <div className="rounded-[14px] border border-[#d953ff]/32 bg-[#06101d]/88 p-4 sm:p-6">
             <div className="grid gap-6">
               <div>
                 <p className="uki-launch-badge">COMPETICIÓN DE REFERIDOS</p>
@@ -504,7 +504,7 @@ export function PremiosContent() {
 
       <section id="progreso-referidos" className="uki-container relative z-[2] scroll-mt-28 pb-14">
         <ScrollReveal animation="scale" className="w-full">
-          <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#05131a]/82 p-4 shadow-[0_0_48px_rgba(34,232,214,0.08)] sm:p-6">
+          <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-4 shadow-[0_0_48px_rgba(228,92,255,0.08)] sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[0.36fr_0.64fr]">
               <div>
                 <p className="uki-launch-badge">TU PROGRESO EN LA COMPETICIÓN DE REFERIDOS</p>
@@ -524,7 +524,7 @@ export function PremiosContent() {
       {/* CTA Final */}
       <section className="uki-container pb-14 relative z-[2]">
         <ScrollReveal animation="scale" className="w-full">
-          <div className="rounded-[14px] border border-[#2ee8d6]/30 bg-[#05131a]/82 overflow-hidden relative min-h-[16rem] flex flex-col justify-center p-6 sm:p-8 shadow-[0_0_48px_rgba(46,232,214,0.1)]">
+          <div className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 overflow-hidden relative min-h-[16rem] flex flex-col justify-center p-6 sm:p-8 shadow-[0_0_48px_rgba(228,92,255,0.1)]">
             <div className="absolute inset-0 bg-cover bg-center opacity-15" style={{ backgroundImage: 'url("/brand/generated/uki-final-cta-scene-v2.png")' }} />
             <div className="relative z-10 max-w-lg">
               <h2 className="font-headline text-3xl font-black uppercase leading-[1.05] text-[var(--uki-cream)] sm:text-4xl">
