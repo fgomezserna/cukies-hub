@@ -122,6 +122,10 @@ Estos parametros no deben entenderse como hardcodeados si el contrato los recibe
 
 ## BSC testnet/mainnet
 
+Runbook operativo para mainnet:
+
+- `docs/uki-mainnet-contract-deployment.md`
+
 Configuracion en `packages/contracts/hardhat.config.cjs`:
 
 - `bscTestnet`, chain id `97`.

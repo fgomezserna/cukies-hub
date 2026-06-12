@@ -193,6 +193,10 @@ El deploy de produccion debe registrar:
 
 Contratos tienen un carril separado.
 
+Runbook operativo de despliegue mainnet UKI:
+
+- `docs/uki-mainnet-contract-deployment.md`
+
 | Evento | Significa | No significa |
 | --- | --- | --- |
 | PR de contrato mergeado | Codigo disponible. | Deploy aprobado. |
