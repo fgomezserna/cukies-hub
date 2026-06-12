@@ -14,6 +14,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { erc20Abi, getBscScanTxUrl, presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
+import { isBelowContractMinimumPurchase } from '@/lib/presale-purchase-validation';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
 import { usePresaleLock } from './presale-countdown';
 
@@ -148,6 +149,17 @@ export function PresalePurchasePanel() {
   });
 
   const {
+    data: minAsmPerPurchase,
+    refetch: refetchMinAsmPerPurchase,
+  } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
+    address: presaleAddress,
+    abi: presaleAbi,
+    functionName: 'minAsmPerPurchase',
+    query: { enabled: readsEnabled },
+  });
+
+  const {
     data: purchasedAsm,
     refetch: refetchPurchasedAsm,
   } = useReadContract({
@@ -194,11 +206,15 @@ export function PresalePurchasePanel() {
   const needsApproval = Boolean(parsedAmount && allowance !== undefined && allowance < parsedAmount);
   const hasEnoughBalance = Boolean(parsedAmount && asmBalance !== undefined && asmBalance >= parsedAmount);
   const hasAllowanceData = !isReady || allowance !== undefined;
+  const hasMinPurchaseData = !isReady || minAsmPerPurchase !== undefined;
+  const isBelowMinPurchase = isBelowContractMinimumPurchase(parsedAmount, minAsmPerPurchase);
   const canSubmit = Boolean(
     isReady &&
     parsedAmount &&
     hasEnoughBalance &&
     hasAllowanceData &&
+    hasMinPurchaseData &&
+    !isBelowMinPurchase &&
     isPublicPresaleOpen &&
     isOpen &&
     !isPending &&
@@ -252,6 +268,7 @@ export function PresalePurchasePanel() {
     void refetchBalance();
     void refetchAllowance();
     void refetchQuote();
+    void refetchMinAsmPerPurchase();
     void refetchIsOpen();
     void refetchPurchasedAsm();
     void refetchPurchasedUki();
@@ -278,7 +295,7 @@ export function PresalePurchasePanel() {
         description: 'Se ha creado la asignación de vesting UKI para tu wallet.',
       });
     }
-  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash, writeContract]);
+  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchMinAsmPerPurchase, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash, writeContract]);
 
   useEffect(() => {
     if (!error) return;
@@ -362,6 +379,23 @@ export function PresalePurchasePanel() {
       return;
     }
 
+    if (minAsmPerPurchase === undefined) {
+      toast({
+        title: 'Revisando compra mínima',
+        description: 'Espera a que cargue el mínimo de ASM desde el contrato.',
+      });
+      return;
+    }
+
+    if (isBelowMinPurchase) {
+      toast({
+        title: 'Importe inferior al mínimo',
+        description: `El contrato exige una compra mínima de ${formatTokenAmount(minAsmPerPurchase)} ASM.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!hasEnoughBalance) {
       toast({
         title: 'ASM insuficiente',
@@ -423,6 +457,9 @@ export function PresalePurchasePanel() {
   const CtaIcon = !isConnected || isWrongChain ? Wallet : ShoppingCart;
   const quoteRate = formatRate(quotedUki, parsedAmount ?? undefined);
   const visibleQuotedUki = quotedUki;
+  const minPurchaseLabel = minAsmPerPurchase !== undefined && minAsmPerPurchase > BigInt(0)
+    ? formatTokenAmount(minAsmPerPurchase)
+    : null;
 
   return (
     <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#04030a]/72 p-2.5">
@@ -452,7 +489,7 @@ export function PresalePurchasePanel() {
               <SheetHeader>
                 <SheetTitle className="font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">Compras de UKI</SheetTitle>
                 <SheetDescription className="font-semibold text-[var(--uki-muted)]">
-                  Historial indexado de compras realizadas con esta cartera. Los enlaces abren el explorer configurado para la red activa.
+                  Historial de compras registradas con esta cartera. Los enlaces abren el explorer configurado para la red activa.
                 </SheetDescription>
               </SheetHeader>
 
@@ -481,7 +518,7 @@ export function PresalePurchasePanel() {
                   </div>
                 ) : purchaseHistory.length === 0 ? (
                   <div className="rounded-[10px] border border-white/10 bg-white/[0.03] p-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                    Todavía no hay compras indexadas para esta cartera. Si acabas de comprar, puede tardar unos minutos en aparecer.
+                    Todavía no hay compras registradas para esta cartera. Si acabas de comprar, puede tardar unos minutos en aparecer.
                   </div>
                 ) : (
                   purchaseHistory.map((purchase) => (
@@ -540,6 +577,22 @@ export function PresalePurchasePanel() {
         <span>Coste: <strong className="text-[var(--uki-cream)]">{parsedAmount ? amount : '--'} ASM</strong></span>
         <span className="text-right">Recibes: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(visibleQuotedUki)} UKI</strong></span>
       </div>
+
+      {minPurchaseLabel ? (
+        <p className={`mt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] ${isBelowMinPurchase ? 'text-[#ffe2a0]' : 'text-[var(--uki-muted)]'}`}>
+          Compra mínima: <strong className="text-[var(--uki-cream)]">{minPurchaseLabel} ASM</strong>
+        </p>
+      ) : null}
+
+      {isBelowMinPurchase && minPurchaseLabel ? (
+        <div className="uki-state-callout uki-state-callout-warning mt-2">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>Importe inferior al mínimo</p>
+            <span>El contrato exige al menos {minPurchaseLabel} ASM por compra.</span>
+          </div>
+        </div>
+      ) : null}
 
       {isReady && !hasEnoughBalance && parsedAmount ? (
         <div className="uki-state-callout uki-state-callout-warning mt-2">

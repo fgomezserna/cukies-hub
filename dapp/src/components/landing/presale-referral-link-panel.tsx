@@ -236,7 +236,7 @@ export function PresaleReferralLinkPanel() {
               <span>
                 {hasConfiguredMinimum
                   ? `${formatNumber(status?.totalUkiPurchased)} / ${formatNumber(referralMinimum)} UKI`
-                  : `${formatNumber(status?.totalUkiPurchased)} UKI indexados`}
+                  : `${formatNumber(status?.totalUkiPurchased)} UKI comprados`}
               </span>
             </div>
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-black/35">
@@ -249,13 +249,13 @@ export function PresaleReferralLinkPanel() {
           <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
             {!hasConfiguredMinimum
               ? hasPurchasedUki
-                ? 'Compra detectada, pero el indexer todavía no ha marcado el desbloqueo del link. Refresca después de proyectar eventos de preventa.'
-                : 'Tu link aparecerá cuando el indexer proyecte tu primera compra de UKI.'
+                ? 'Compra detectada. Tu enlace de invitación estará disponible en unos minutos.'
+                : 'Tu enlace de invitación aparecerá después de tu primera compra de UKI.'
               : remainingUkiToUnlock > 0
               ? hasPurchasedUki
                 ? `Necesitas comprar ${formatNumber(remainingUkiToUnlock)} UKI más con esta wallet para acceder a tu link.`
                 : 'Aún no has hecho ninguna compra con esta wallet. Compra UKI para desbloquear tu enlace de invitación.'
-              : 'Tu link aparecerá cuando el indexer confirme la compra mínima.'}
+              : 'Compra mínima alcanzada. Tu enlace de invitación estará disponible en unos minutos.'}
           </p>
           <Link href="/#presale-console" className="uki-button uki-button-secondary mt-4 w-full justify-center">
             Comprar UKI
