@@ -1,16 +1,38 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, ShoppingCart, Wallet, WalletCards } from 'lucide-react';
+import { ExternalLink, Loader2, ShoppingCart, Wallet, WalletCards } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import { useAccount, useConnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { erc20Abi, getBscScanTxUrl, presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
 import { usePresaleLock } from './presale-countdown';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '10';
+
+type PurchaseHistoryItem = {
+  eventId: string;
+  chain?: string;
+  asmAmount: number;
+  ukiAmount: number;
+  totalBuyerAsm: number;
+  totalBuyerUki: number;
+  txHash?: string;
+  txUrl?: string | null;
+  blockNumber?: number | null;
+  confirmedAt?: string | null;
+  timestampMs?: number | null;
+};
 
 function formatTokenAmount(value?: bigint, maximumFractionDigits = 4) {
   if (value === undefined) return '--';
@@ -38,6 +60,24 @@ function formatTxLabel(hash?: `0x${string}`) {
   return `${hash.slice(0, 10)}...${hash.slice(-6)}`;
 }
 
+function formatNumber(value?: number | null, maximumFractionDigits = 2) {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '--';
+  return value.toLocaleString('en-US', { maximumFractionDigits });
+}
+
+function formatPurchaseDate(purchase: PurchaseHistoryItem) {
+  const timestamp = purchase.confirmedAt ?? (purchase.timestampMs ? new Date(purchase.timestampMs).toISOString() : null);
+  if (!timestamp) return 'Fecha pendiente';
+
+  return new Date(timestamp).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function formatRate(quote?: bigint, cost?: bigint) {
   if (!quote || !cost || cost === BigInt(0)) return null;
 
@@ -57,6 +97,10 @@ export function PresalePurchasePanel() {
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const handledReceiptHashRef = useRef<string | null>(null);
   const asmTokenAddress = ukiSaleContracts.asmTokenAddress as Address | undefined;
   const presaleAddress = ukiSaleContracts.presaleAddress as Address | undefined;
@@ -163,6 +207,41 @@ export function PresalePurchasePanel() {
   const canConnect = Boolean(!isConnected && connector && !isConnecting);
   const canSwitch = Boolean(isWrongChain && !isSwitching);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
+
+  useEffect(() => {
+    if (!isHistoryOpen || !address) return;
+
+    let isCancelled = false;
+    const params = new URLSearchParams({
+      walletAddress: address,
+      limit: '50',
+    });
+
+    setIsHistoryLoading(true);
+    setHistoryError(null);
+
+    fetch(`/api/presale/purchases?${params.toString()}`, { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('No se pudo cargar el historial de compras.');
+        return response.json();
+      })
+      .then((data) => {
+        if (isCancelled) return;
+        setPurchaseHistory(Array.isArray(data.purchases) ? data.purchases : []);
+      })
+      .catch((fetchError) => {
+        if (isCancelled) return;
+        setPurchaseHistory([]);
+        setHistoryError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el historial de compras.');
+      })
+      .finally(() => {
+        if (!isCancelled) setIsHistoryLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [address, isHistoryOpen]);
 
   useEffect(() => {
     if (!isSuccess || !txHash) return;
@@ -360,9 +439,84 @@ export function PresalePurchasePanel() {
       <div className="mt-2 grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)] sm:grid-cols-2">
         <span>Balance ASM: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
         {isConnected ? (
-          <span className="sm:text-right">
-            Comprado: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)} ASM / {formatTokenAmount(purchasedUki)} UKI</strong>
-          </span>
+          <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                className="text-left underline-offset-4 transition hover:text-[var(--uki-cyan)] hover:underline sm:text-right"
+              >
+                Comprado: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)} ASM / {formatTokenAmount(purchasedUki)} UKI</strong>
+              </button>
+            </SheetTrigger>
+            <SheetContent className="w-full border-[var(--uki-cyan)]/25 bg-[#070817] text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.16)] sm:max-w-xl">
+              <SheetHeader>
+                <SheetTitle className="font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">Compras de UKI</SheetTitle>
+                <SheetDescription className="font-semibold text-[var(--uki-muted)]">
+                  Historial indexado de compras realizadas con esta cartera. Los enlaces abren el explorer configurado para la red activa.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-6 rounded-[10px] border border-[var(--uki-cyan)]/20 bg-[#0d0b24]/70 p-4">
+                <div className="grid grid-cols-2 gap-3 text-[0.68rem] font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+                  <div>
+                    <span>Total ASM</span>
+                    <p className="mt-1 font-headline text-lg text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)}</p>
+                  </div>
+                  <div className="text-right">
+                    <span>Total UKI</span>
+                    <p className="mt-1 font-headline text-lg text-[var(--uki-cream)]">{formatTokenAmount(purchasedUki)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {isHistoryLoading ? (
+                  <div className="flex items-center gap-3 rounded-[10px] border border-white/10 bg-white/[0.03] p-4 text-sm font-semibold text-[var(--uki-text)]">
+                    <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" />
+                    Cargando compras...
+                  </div>
+                ) : historyError ? (
+                  <div className="rounded-[10px] border border-[#f2c34b]/30 bg-[#2b1d08]/42 p-4 text-sm font-semibold text-[#ffe2a0]">
+                    {historyError}
+                  </div>
+                ) : purchaseHistory.length === 0 ? (
+                  <div className="rounded-[10px] border border-white/10 bg-white/[0.03] p-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                    Todavía no hay compras indexadas para esta cartera. Si acabas de comprar, puede tardar unos minutos en aparecer.
+                  </div>
+                ) : (
+                  purchaseHistory.map((purchase) => (
+                    <article key={purchase.eventId} className="rounded-[10px] border border-white/10 bg-white/[0.035] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-headline text-base font-black uppercase text-[var(--uki-cream)]">
+                            {formatNumber(purchase.ukiAmount)} UKI
+                          </p>
+                          <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+                            {formatNumber(purchase.asmAmount)} ASM · {formatPurchaseDate(purchase)}
+                          </p>
+                        </div>
+                        {purchase.txUrl ? (
+                          <a
+                            href={purchase.txUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-[var(--uki-cyan)]/30 bg-[var(--uki-cyan)]/10 px-2.5 py-1.5 text-[0.66rem] font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)] transition hover:bg-[var(--uki-cyan)]/15"
+                          >
+                            Ver tx
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 rounded-[8px] bg-black/20 p-3 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+                        <span>Acumulado ASM <strong className="block text-[var(--uki-cream)]">{formatNumber(purchase.totalBuyerAsm)}</strong></span>
+                        <span className="text-right">Acumulado UKI <strong className="block text-[var(--uki-cream)]">{formatNumber(purchase.totalBuyerUki)}</strong></span>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         ) : null}
       </div>
 

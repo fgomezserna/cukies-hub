@@ -260,6 +260,47 @@ export async function applyPresaleReferralCode(walletAddress: string, referralCo
   };
 }
 
+export async function listPresalePurchasesForWallet(walletAddress: string, limit = 25) {
+  const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const db = await getPresaleDb();
+
+  const rows = await db
+    .collection('presale_purchases')
+    .find({ buyerNormalized: normalizedWalletAddress })
+    .sort({ confirmedAt: -1, timestampMs: -1, blockNumber: -1, logIndex: -1 })
+    .limit(safeLimit)
+    .project({
+      _id: 0,
+      eventId: 1,
+      chain: 1,
+      buyerWalletAddress: 1,
+      asmAmount: 1,
+      ukiAmount: 1,
+      totalBuyerAsm: 1,
+      totalBuyerUki: 1,
+      txHash: 1,
+      blockNumber: 1,
+      confirmedAt: 1,
+      timestampMs: 1,
+    })
+    .toArray();
+
+  return rows.map((row) => ({
+    eventId: row.eventId,
+    chain: row.chain,
+    buyerWalletAddress: row.buyerWalletAddress,
+    asmAmount: Number(row.asmAmount ?? 0),
+    ukiAmount: Number(row.ukiAmount ?? 0),
+    totalBuyerAsm: Number(row.totalBuyerAsm ?? 0),
+    totalBuyerUki: Number(row.totalBuyerUki ?? 0),
+    txHash: row.txHash,
+    blockNumber: row.blockNumber ?? null,
+    confirmedAt: row.confirmedAt ?? null,
+    timestampMs: row.timestampMs ?? null,
+  }));
+}
+
 export async function listPresaleReferralRanking(limit = 100) {
   const db = await getPresaleDb();
   const safeLimit = Math.min(Math.max(limit, 1), 500);

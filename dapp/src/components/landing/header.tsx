@@ -10,6 +10,7 @@ import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 const navItems = [
   { label: 'Inicio', href: '/' },
   { label: 'Premios', href: '/premios' },
+  { label: 'Vesting', href: '/vesting' },
 ];
 
 export function LandingHeader() {
