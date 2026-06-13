@@ -13,7 +13,8 @@ export function usePresaleLock() {
 }
 
 export function PresaleCountdown() {
-  const { isLocked, remaining } = usePresaleLock();
+  const { isLocked, isContractOpen, endsAt, remaining } = usePresaleLock();
+  const shouldShowCountdown = isLocked || Boolean(isContractOpen && endsAt);
   const boxes = [
     { value: remaining.days, label: 'Días' },
     { value: remaining.hours, label: 'Horas' },
@@ -26,7 +27,7 @@ export function PresaleCountdown() {
       {boxes.map((box) => (
         <div key={box.label} className="uki-countdown-box">
           <span className="block font-headline text-xl font-black leading-none text-[var(--uki-cyan)]" suppressHydrationWarning>
-            {isLocked ? formatCountdownValue(box.value) : '00'}
+            {shouldShowCountdown ? formatCountdownValue(box.value) : '00'}
           </span>
           <span className="mt-1.5 block text-[0.55rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
             {box.label}
@@ -35,6 +36,15 @@ export function PresaleCountdown() {
       ))}
     </div>
   );
+}
+
+export function PresaleCountdownHeading() {
+  const { isLocked, isContractOpen, endsAt } = usePresaleLock();
+
+  if (isLocked) return <>Inicio de preventa</>;
+  if (isContractOpen && endsAt) return <>Fin de preventa</>;
+
+  return <>Preventa abierta</>;
 }
 
 export function PresaleCountdownTitle() {

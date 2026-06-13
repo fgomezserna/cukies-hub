@@ -100,10 +100,19 @@ export function usePresaleTiming() {
   }, []);
 
   const data = state.status === 'ready' ? state.data : null;
-  const startsAt = data?.startsAt ?? UKI_PRESALE_START_ISO;
-  const remaining = remainingTimeUntil(startsAt);
+  const contractStartsAt = data?.startsAt ?? '';
+  const contractRemaining = remainingTimeUntil(contractStartsAt);
   const isContractConfigured = Boolean(data?.isConfigured);
   const isContractOpen = Boolean(data?.isOpen && data.saleEnabled !== false);
+  const shouldUsePublicStart =
+    state.status !== 'ready' ||
+    !data?.isConfigured ||
+    data.saleEnabled === false ||
+    (!data.isOpen && contractStartsAt && contractRemaining.total <= 0);
+  const startsAt = shouldUsePublicStart ? UKI_PRESALE_START_ISO : contractStartsAt;
+  const endsAt = data?.endsAt ?? null;
+  const countdownTarget = isContractOpen && endsAt ? endsAt : startsAt;
+  const remaining = remainingTimeUntil(countdownTarget);
   const isLocked = state.status !== 'ready' || !isContractConfigured || !isContractOpen;
 
   return {
@@ -113,9 +122,9 @@ export function usePresaleTiming() {
     isContractOpen,
     remaining,
     startsAt,
-    startLabel: data?.startsAtLabel ?? UKI_PRESALE_START_LABEL,
-    startShortLabel: data?.startsAtShortLabel ?? UKI_PRESALE_START_SHORT_LABEL,
-    endsAt: data?.endsAt ?? null,
+    startLabel: shouldUsePublicStart ? UKI_PRESALE_START_LABEL : data?.startsAtLabel ?? UKI_PRESALE_START_LABEL,
+    startShortLabel: shouldUsePublicStart ? UKI_PRESALE_START_SHORT_LABEL : data?.startsAtShortLabel ?? UKI_PRESALE_START_SHORT_LABEL,
+    endsAt,
     endLabel: data?.endsAtLabel ?? null,
   };
 }
@@ -143,6 +152,25 @@ export function PresaleStartLabel({ prefix = '' }: { prefix?: string }) {
       {prefix ? ' ' : ''}
       {startLabel}
     </span>
+  );
+}
+
+export function PresaleFinalCtaText() {
+  const { isContractOpen, endLabel, startLabel } = usePresaleTiming();
+
+  if (isContractOpen) {
+    return (
+      <>
+        La preventa UKI ya está abierta. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
+        {endLabel ? <> La preventa termina {endLabel}.</> : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      La preventa UKI abre el {startLabel}. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
+    </>
   );
 }
 

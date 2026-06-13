@@ -3,6 +3,7 @@ import { ArrowRight, Zap, type LucideIcon } from 'lucide-react';
 import { PresalePurchasePanel } from './presale-purchase-panel';
 import { PresaleRateLabel } from './presale-status';
 import { Panel } from './primitives';
+import { UKI_TOKEN_ICON_SRC } from './sale-config';
 
 export function SaleConsole() {
   return (
@@ -25,7 +26,7 @@ export function SaleConsole() {
           <span className="uki-conversion-arrow" aria-hidden="true">
             <ArrowRight className="h-5 w-5" strokeWidth={2.4} />
           </span>
-          <TokenBox label="UKI" tone="uki" image="/brand/official/uki-token-cukies-world.png" />
+          <TokenBox label="UKI" tone="uki" image={UKI_TOKEN_ICON_SRC} />
         </div>
       </div>
 

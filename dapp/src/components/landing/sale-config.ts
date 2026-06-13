@@ -1,6 +1,7 @@
-const DEFAULT_PRESALE_START_ISO = '';
+const DEFAULT_PRESALE_START_ISO = '2026-06-15T00:00:00+02:00';
 const DEFAULT_PRESALE_START_LABEL = '15 de junio de 2026';
 const DEFAULT_PRESALE_START_SHORT_LABEL = '15 de junio';
+export const UKI_TOKEN_ICON_SRC = '/brand/official/uki-token-cukies-world-coin.png';
 const NON_PRODUCTION_LABEL_RE = /test\s*net/i;
 
 function publicLabel(value: string | undefined, fallback: string) {

@@ -31,11 +31,12 @@ import {
   saleFacts,
   utilityNodes,
 } from './data';
-import { PresaleCountdown, PresaleGateLink } from './presale-countdown';
+import { PresaleCountdown, PresaleCountdownHeading, PresaleGateLink } from './presale-countdown';
 import { HeroBackgroundVideo } from './hero-background-video';
 import { LandingButton, MetricTile, Panel, SectionHeading } from './primitives';
 import { SaleConsole } from './sale-console';
-import { PresaleQuoteAmount, PresaleStartLabel, PresaleStatusProvider } from './presale-status';
+import { PresaleFinalCtaText, PresaleQuoteAmount, PresaleStatusProvider } from './presale-status';
+import { UKI_TOKEN_ICON_SRC } from './sale-config';
 import { VestingAccessButton } from './vesting-access-button';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 import { LandingHeader } from './header';
@@ -93,13 +94,15 @@ function HeroSection() {
           </h1>
           <div className="uki-hero-countdown mt-5 max-w-[30rem]">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">Inicio de preventa</p>
+              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">
+                <PresaleCountdownHeading />
+              </p>
               <div className="uki-token-pair" aria-label="Compra con ASM y recibe UKI">
                 <span className="uki-token-logo uki-token-logo-official" title="ASM">
                   <Image src="/brand/official/asm-token-coingecko.png" alt="ASM oficial" fill sizes="42px" className="object-contain" />
                 </span>
                 <span className="uki-token-logo uki-token-logo-official" title="UKI">
-                  <Image src="/brand/official/uki-token-cukies-world.png" alt="UKI oficial" fill sizes="42px" className="object-contain" />
+                  <Image src={UKI_TOKEN_ICON_SRC} alt="UKI oficial" fill sizes="42px" className="object-contain" />
                 </span>
               </div>
             </div>
@@ -459,6 +462,7 @@ function Games() {
               <TreasureMetric icon={Timer} value="5 min" label="partidas rápidas" />
               <TreasureMetric icon={Star} value="10 créditos" label="coste por partida" />
               <TreasureMetric icon={Coins} value="Hasta 7.5 UKI" label="premio inmediato" />
+              <TreasureMetric icon={Trophy} value="Torneo Semanal" label="grandes premios en UKI" />
             </div>
           </div>
         </Panel>
@@ -595,7 +599,7 @@ function FaqAndCta() {
                 Entra en la nueva etapa de Cukies
               </h2>
               <p className="mt-3 max-w-sm text-sm font-semibold leading-snug text-[var(--uki-text)]">
-                La preventa UKI abre en <PresaleStartLabel />. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
+                <PresaleFinalCtaText />
               </p>
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <PresaleGateLink href="#presale-console">Participa ahora</PresaleGateLink>
