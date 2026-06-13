@@ -227,7 +227,7 @@ export function PremiosContent() {
         <ScrollReveal animation="fade" duration={900} className="w-full">
           <div className="uki-premios-page-hero">
             <Image
-              src="/brand/generated/uki-premios-cukies-rewards-hero-v2.png"
+              src="/brand/generated/uki-premios-cukies-rewards-hero-v5.png"
               alt="Cukies con tesoro y premios UKI"
               fill
               className="uki-premios-page-hero-image"

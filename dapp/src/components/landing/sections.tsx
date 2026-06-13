@@ -580,7 +580,7 @@ function FaqAndCta() {
                   </summary>
                   <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-in-out group-open:grid-rows-[1fr]">
                     <div className="overflow-hidden">
-                      <p className="pt-3 pb-1 px-1 text-xs leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
+                      <p className="whitespace-pre-line pt-3 pb-1 px-1 text-xs leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
                     </div>
                   </div>
                 </details>

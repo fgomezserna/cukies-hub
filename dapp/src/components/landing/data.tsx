@@ -254,28 +254,24 @@ export const faqs = [
       'UKI es el token de utilidad de la economía de juegos de Cukies World. Conecta juegos, créditos de competición, Cukie Master, pools, rankings, Cukies y recompensas.',
   },
   {
-    question: '¿Por qué la preventa se compra con ASM?',
+    question: '¿Qué token se usa en la preventa de UKI?',
     answer:
-      'ASM es la moneda principal prevista para la primera distribución de UKI. El ratio ASM a UKI se leerá desde el contrato y se mantendrá durante el periodo.',
+      'ASM es la moneda principal prevista para la preventa de UKI. El ratio ASM a UKI se mantendrá durante la duración de la preventa.',
   },
   {
-    question: '¿Cómo funciona el vesting?',
+    question: '¿Los UKI en vesting cuentan para ser Cukie Master?',
     answer:
-      'El UKI comprado en preventa se libera linealmente durante 9 meses, sin cliff. La asignación pendiente no está disponible hasta su desbloqueo.',
+      'Sí. Los UKI comprados en preventa y sujetos a vesting cuentan de forma automática para obtener hasta 5 cupos de Cukie Master por wallet (1 cupo por cada 20,000 UKI comprados).',
   },
   {
-    question: '¿Los UKI en vesting cuentan para Cukie Master?',
+    question: '¿Los Cukies tendrán utilidad?',
     answer:
-      'Sí. Los UKI comprados en preventa y sujetos a vesting cuentan para los cupos de Cukie Master por ruta UKI cuando la funcionalidad se active.',
+      'Sí. Al inicio los Cukies se usarán para jugar a Treasure Hunt y obtener recompensas, y también se podrán prestar para ganar de forma pasiva. A medida que el ecosistema se desarrolle irán teniendo mayor utilidad.',
   },
   {
-    question: '¿Los NFTs Cukies tendrán utilidad?',
-    answer:
-      'Sí. La utilidad depende de ownership, rareza, estado de marketplace/bridge y reglas activas de la dapp.',
-  },
-  {
-    question: '¿Cómo se estructuran rewards y pools?',
-    answer:
-      'Las rewards combinan reglas de juego, créditos, pools y ranking por periodo. Las estimaciones no deben mostrarse como claimable hasta que exista validación y, cuando aplique, confirmación on-chain.',
+    question: '¿Cómo puedo ganar en Cukies World?',
+    answer: `Hay varios caminos para ganar recompensas. De forma activa, puedes jugar cada día y ganar UKI en cada partida y además participar en el torneo semanal para ganar mayores recompensas.
+
+De forma pasiva, puedes stakear tus tokens UKI para ser Cukie Master y ceder los créditos de competición que recibirás a otros jugadores, y compartir los UKI que ellos generen. También puedes prestar tus Cukies para ganar más.`,
   },
 ];
