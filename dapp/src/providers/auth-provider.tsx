@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useAccount, useDisconnect, useConnect } from 'wagmi';
+import { useAccount, useDisconnect, useSignMessage, type Connector } from 'wagmi';
 import { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useTronLink } from '@/hooks/use-tronlink';
@@ -20,6 +20,7 @@ type LoginWalletType = 'evm' | 'tron';
 type FetchUserOptions = {
   promptForSignature?: boolean;
   walletType?: LoginWalletType;
+  evmConnector?: Connector;
 };
 
 function isUserRejectedRequest(error: unknown) {
@@ -46,19 +47,6 @@ function getBrowserTronWeb() {
   return window.tronWeb ?? window.tronLink?.tronWeb ?? window.tron?.tronWeb ?? null;
 }
 
-async function signEvmLoginMessage(message: string, walletAddress: string) {
-  const ethereum = (window as any).ethereum;
-
-  if (!ethereum?.request) {
-    throw new Error('No EVM wallet provider is available');
-  }
-
-  return ethereum.request({
-    method: 'personal_sign',
-    params: [message, walletAddress],
-  }) as Promise<string>;
-}
-
 async function signTronLoginMessage(message: string) {
   const tronWeb = getBrowserTronWeb();
 
@@ -76,9 +64,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [walletType, setWalletType] = useState<'evm' | 'tron' | null>(null);
 
   // EVM wallets (MetaMask, etc.)
-  const { address: evmAddress, isConnected: isEvmConnected } = useAccount();
+  const { address: evmAddress, connector: activeEvmConnector, isConnected: isEvmConnected } = useAccount();
   const { disconnect: disconnectEvm } = useDisconnect();
-  const { connect: connectEvm, connectors } = useConnect();
+  const { signMessageAsync } = useSignMessage();
 
   // TronLink
   const { address: tronAddress, isConnected: isTronConnected, connect: connectTron, disconnect: disconnectTron } = useTronLink();
@@ -139,7 +127,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         didRequestSignature = true;
         const signature =
           loginWalletType === 'evm'
-            ? await signEvmLoginMessage(challenge.message, addressToUse)
+            ? await signMessageAsync({
+                account: addressToUse as `0x${string}`,
+                connector: options.evmConnector ?? activeEvmConnector,
+                message: challenge.message,
+              })
             : await signTronLoginMessage(challenge.message);
 
         response = await fetch('/api/auth/login', {
@@ -195,7 +187,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(false);
       setIsWaitingForApproval(false);
     }
-  }, [currentAddress, isConnected, isEvmConnected, isTronConnected, disconnectEvm, disconnectTron, toast]);
+  }, [activeEvmConnector, currentAddress, isConnected, isEvmConnected, isTronConnected, disconnectEvm, disconnectTron, signMessageAsync, toast]);
 
   useEffect(() => {
     fetchUser(undefined, { promptForSignature: false });
@@ -260,25 +252,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (newAddress && newAddress !== evmAddress && newAddress !== previousAddressRef.current) {
           console.log('⚠️ Direct event detected change before wagmi update');
 
-          // Force disconnect and reconnect to trigger authorization popup
-          console.log('🔌 Forcing disconnect and reconnect to trigger popup');
+          // Wagmi will settle the connection state; this fallback only clears stale auth.
           setIsWaitingForApproval(true);
 
-          // Show toast notification
           toast({
             title: "Wallet Change Detected",
-            description: "Please approve the connection to your new wallet in the popup.",
+            description: "Please confirm the new wallet before continuing.",
           });
 
-          disconnectEvm();
-
-          // Wait a moment for disconnect to complete, then reconnect
-          setTimeout(() => {
-            if (connectors.length > 0) {
-              console.log('🔌 Reconnecting with first connector');
-              connectEvm({ connector: connectors[0] });
-            }
-          }, 100);
+          setUser(null);
+          setWalletType(null);
+          setIsLoading(false);
+          setIsWaitingForApproval(false);
         }
       };
 
@@ -294,7 +279,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         window.ethereum.removeListener('chainChanged', handleChainChanged);
       };
     }
-  }, [evmAddress, disconnectEvm, connectEvm, connectors, toast]);
+  }, [evmAddress, toast]);
 
   // Additional polling mechanism for more reliable wallet change detection (EVM only)
   useEffect(() => {

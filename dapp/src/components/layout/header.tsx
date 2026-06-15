@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,14 +23,16 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Bell, Wallet, Settings, LogOut, PanelLeft, Zap } from 'lucide-react';
+import { Bell, Wallet, Settings, LogOut, PanelLeft } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/providers/auth-provider';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useHasMounted } from '@/hooks/use-has-mounted';
+import { useAccount, useConnect, useDisconnect, type Connector } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { getConnectorDescription, getConnectorDisplayName, getConnectorLogoSrc, getVisibleWalletConnectors } from '@/lib/wallet-connectors';
 
 
 
@@ -47,6 +49,38 @@ const getRank = (xp: number): string => {
   return userRank ? userRank.name : 'Sin rango';
 };
 
+function HeaderWalletLogo({ connector }: { connector: Connector }) {
+  const logoSrc = getConnectorLogoSrc(connector);
+
+  if (logoSrc) {
+    return (
+      <Image
+        src={logoSrc}
+        alt={`${getConnectorDisplayName(connector)} logo`}
+        width={24}
+        height={24}
+        unoptimized
+        className="h-6 w-6 object-contain"
+      />
+    );
+  }
+
+  return <Wallet className="h-6 w-6 text-white" />;
+}
+
+function HeaderTronLinkLogo() {
+  return (
+    <Image
+      src="/brand/wallets/tronlink.png"
+      alt="TronLink logo"
+      width={24}
+      height={24}
+      unoptimized
+      className="h-6 w-6 object-contain"
+    />
+  );
+}
+
 export default function Header() {
   const { toggleSidebar, state, isMobile } = useSidebar();
   const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
@@ -62,12 +96,17 @@ export default function Header() {
     isLoading: isTronLoading,
   } = useTronLink();
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
+  const hasMounted = useHasMounted();
+  const evmConnectors = useMemo(
+    () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
+    [connectors, hasMounted],
+  );
   
   // This would come from user data in a real app
   const userXP = user?.xp ?? 0;
   const userRank = getRank(userXP);
 
-  const handleConnectEVM = async () => {
+  const handleConnectEVM = async (connector: Connector) => {
     try {
       setIsWalletDialogOpen(false);
 
@@ -76,13 +115,11 @@ export default function Header() {
         return;
       }
 
-      if (connectors.length > 0) {
-        const result = await connectAsync({ connector: connectors[0] });
-        const connectedAddress = result.accounts?.[0] || evmAddress;
+      const result = await connectAsync({ connector });
+      const connectedAddress = result.accounts?.[0] || evmAddress;
 
-        if (connectedAddress) {
-          await fetchUser(connectedAddress, { promptForSignature: true, walletType: 'evm' });
-        }
+      if (connectedAddress) {
+        await fetchUser(connectedAddress, { evmConnector: connector, promptForSignature: true, walletType: 'evm' });
       }
     } catch (error) {
       console.error('Failed to connect EVM wallet:', error);
@@ -257,20 +294,29 @@ export default function Header() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <Button
-                    onClick={handleConnectEVM}
-                    className="w-full h-auto p-6 flex flex-col items-start gap-3 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 hover:from-teal-400/20 hover:to-cyan-400/20 border-2 border-cyan-300/30 hover:border-cyan-300/50 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-400">
-                        <Wallet className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <div className="font-bold text-lg text-foreground">Wallets EVM</div>
-                        <div className="text-sm text-muted-foreground">MetaMask, WalletConnect, etc.</div>
-                      </div>
+                  {evmConnectors.length > 0 ? (
+                    evmConnectors.map((connector) => (
+                      <Button
+                        key={connector.id}
+                        onClick={() => void handleConnectEVM(connector)}
+                        className="w-full h-auto p-5 flex flex-col items-start gap-3 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 hover:from-teal-400/20 hover:to-cyan-400/20 border-2 border-cyan-300/30 hover:border-cyan-300/50 transition-all duration-300"
+                      >
+                        <div className="flex items-center gap-3 w-full">
+                          <div className="grid h-10 w-10 place-items-center rounded-lg border border-cyan-300/20 bg-white">
+                            <HeaderWalletLogo connector={connector} />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="font-bold text-lg text-foreground">{getConnectorDisplayName(connector)}</div>
+                            <div className="text-sm text-muted-foreground">{getConnectorDescription(connector)}</div>
+                          </div>
+                        </div>
+                      </Button>
+                    ))
+                  ) : (
+                    <div className="rounded-[8px] border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
+                      Instala una wallet EVM o configura WalletConnect para conectar.
                     </div>
-                  </Button>
+                  )}
 
                   <Button
                     onClick={handleConnectTron}
@@ -278,8 +324,8 @@ export default function Header() {
                     className="w-full h-auto p-6 flex flex-col items-start gap-3 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 hover:from-teal-400/20 hover:to-cyan-400/20 border-2 border-cyan-300/30 hover:border-cyan-300/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center gap-3 w-full">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-400">
-                        <Zap className="h-6 w-6 text-white" />
+                      <div className="grid h-10 w-10 place-items-center rounded-lg border border-cyan-300/20 bg-white">
+                        <HeaderTronLinkLogo />
                       </div>
                       <div className="flex-1 text-left">
                         <div className="font-bold text-lg text-foreground">TronLink</div>
