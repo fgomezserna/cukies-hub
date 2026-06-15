@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Wallet } from 'lucide-react';
+import { Loader2, LogOut, ShieldAlert, Wallet } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import type { Connector } from 'wagmi';
@@ -25,11 +25,20 @@ type TronLinkNativeOption = {
   onSelect: () => Promise<void> | void;
 };
 
+type WalletDialogAction = {
+  description: string;
+  isLoading?: boolean;
+  label: string;
+  onSelect: () => Promise<void> | void;
+};
+
 type WalletConnectorDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connectors: readonly Connector[];
   onSelectConnector: (connector: Connector) => Promise<void> | void;
+  currentWalletAction?: WalletDialogAction;
+  disconnectAction?: WalletDialogAction;
   isConnecting?: boolean;
   title?: string;
   description?: string;
@@ -72,13 +81,30 @@ export function WalletConnectorDialog({
   onOpenChange,
   connectors,
   onSelectConnector,
+  currentWalletAction,
+  disconnectAction,
   isConnecting = false,
   title = 'Conectar wallet',
   description = 'Elige como quieres conectar tu wallet.',
   tronLinkNative,
 }: WalletConnectorDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const isBusy = isConnecting || Boolean(selectedId) || Boolean(tronLinkNative?.isLoading);
+  const isBusy = isConnecting ||
+    Boolean(selectedId) ||
+    Boolean(currentWalletAction?.isLoading) ||
+    Boolean(disconnectAction?.isLoading) ||
+    Boolean(tronLinkNative?.isLoading);
+
+  async function handleDialogAction(action: WalletDialogAction, selectedActionId: string) {
+    if (isBusy) return;
+    setSelectedId(selectedActionId);
+
+    try {
+      await action.onSelect();
+    } finally {
+      setSelectedId(null);
+    }
+  }
 
   async function handleSelectConnector(connector: Connector) {
     if (isBusy) return;
@@ -115,6 +141,54 @@ export function WalletConnectorDialog({
         </DialogHeader>
 
         <div className="grid gap-2">
+          {currentWalletAction ? (
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleDialogAction(currentWalletAction, 'current-wallet-action')}
+              className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-[var(--uki-cyan)]/35 bg-[var(--uki-cyan)]/10 px-3 py-2 text-left transition hover:border-[var(--uki-cyan)]/55 hover:bg-[var(--uki-cyan)]/15 disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-cyan)]/30 bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]">
+                <ShieldAlert className="h-5 w-5" strokeWidth={1.8} />
+              </span>
+              <span>
+                <span className="block text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">
+                  {currentWalletAction.label}
+                </span>
+                <span className="mt-0.5 block text-xs font-semibold leading-snug text-[var(--uki-muted)]">
+                  {currentWalletAction.description}
+                </span>
+              </span>
+              {selectedId === 'current-wallet-action' || currentWalletAction.isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" />
+              ) : null}
+            </button>
+          ) : null}
+
+          {disconnectAction ? (
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleDialogAction(disconnectAction, 'disconnect-wallet-action')}
+              className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-[#ff75aa]/30 bg-[#40101f]/28 px-3 py-2 text-left transition hover:border-[#ff75aa]/50 hover:bg-[#40101f]/42 disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[#ff75aa]/30 bg-[#ff75aa]/10 text-[#ffd0df]">
+                <LogOut className="h-5 w-5" strokeWidth={1.8} />
+              </span>
+              <span>
+                <span className="block text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">
+                  {disconnectAction.label}
+                </span>
+                <span className="mt-0.5 block text-xs font-semibold leading-snug text-[#ffd0df]">
+                  {disconnectAction.description}
+                </span>
+              </span>
+              {selectedId === 'disconnect-wallet-action' || disconnectAction.isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-[#ffd0df]" />
+              ) : null}
+            </button>
+          ) : null}
+
           {connectors.map((connector) => {
             const isSelected = selectedId === connector.id;
 
