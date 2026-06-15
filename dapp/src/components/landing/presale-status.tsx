@@ -154,19 +154,11 @@ export function PresaleStartLabel({ prefix = '' }: { prefix?: string }) {
 }
 
 export function PresaleFinalCtaText() {
-  const { isContractOpen, startLabel } = usePresaleTiming();
-
-  if (isContractOpen) {
-    return (
-      <>
-        La preventa UKI ya está abierta desde el {startLabel}. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
-      </>
-    );
-  }
+  const { startLabel } = usePresaleTiming();
 
   return (
     <>
-      La preventa UKI abre el {startLabel}. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
+      La preventa de UKI comienza el {startLabel}. Revisa todos los detalles antes de comprar.
     </>
   );
 }
