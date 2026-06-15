@@ -64,8 +64,40 @@ export function WalletConnectButton({
   const isAuthenticatedWallet = isSameWalletAddress(user?.walletAddress, activeAddress);
   const isBusy = hasMounted && (isPending || isSwitching || isAuthLoading || isWaitingForApproval || isTronLoading);
 
+  const handleSwitchToPresaleChain = () => {
+    switchChain(
+      { chainId: UKI_PRESALE_CHAIN_ID },
+      {
+        onError: () => {
+          toast({
+            title: 'Cambio de red fallido',
+            description: `Desconecta esta wallet o cambia manualmente a ${UKI_PRESALE_CHAIN_LABEL}.`,
+            variant: 'destructive',
+          });
+        },
+      },
+    );
+  };
+
+  const handleDisconnectActiveWallet = () => {
+    if (activeWalletType === 'evm') {
+      disconnect();
+    } else if (activeWalletType === 'tron') {
+      disconnectTron();
+    }
+
+    toast({
+      title: 'Wallet desconectada',
+      description: 'Elige otra wallet para continuar.',
+    });
+  };
+
   const handleConnectEvm = async (connector: Connector) => {
     try {
+      if (isConnected) {
+        disconnect();
+      }
+
       const result = await connectAsync({ connector, chainId: UKI_PRESALE_CHAIN_ID });
       const connectedAddress = result.accounts?.[0] ?? address;
 
@@ -115,24 +147,13 @@ export function WalletConnectButton({
     if (isBusy) return;
 
     if (isWrongChain) {
-      switchChain(
-        { chainId: UKI_PRESALE_CHAIN_ID },
-        {
-          onError: () => {
-            toast({
-              title: 'Cambio de red fallido',
-              description: `Cambia tu wallet a ${UKI_PRESALE_CHAIN_LABEL}.`,
-              variant: 'destructive',
-            });
-          },
-        },
-      );
+      setIsConnectorDialogOpen(true);
       return;
     }
 
     if (activeWalletType && activeAddress) {
       if (!isAuthenticatedWallet) {
-        await fetchUser(activeAddress, { promptForSignature: true, walletType: activeWalletType });
+        setIsConnectorDialogOpen(true);
         return;
       }
 
@@ -182,6 +203,32 @@ export function WalletConnectButton({
         onOpenChange={setIsConnectorDialogOpen}
         connectors={evmConnectors}
         onSelectConnector={handleConnectEvm}
+        currentWalletAction={
+          isWrongChain
+            ? {
+                description: `Intenta mover la wallet actual a ${UKI_PRESALE_CHAIN_LABEL}.`,
+                isLoading: isSwitching,
+                label: 'Cambiar a BSC',
+                onSelect: handleSwitchToPresaleChain,
+              }
+            : activeWalletType && activeAddress && !isAuthenticatedWallet
+              ? {
+                  description: `Firma el login con ${shortAddress(activeAddress)}.`,
+                  isLoading: isWaitingForApproval || isAuthLoading,
+                  label: 'Firmar wallet actual',
+                  onSelect: () => fetchUser(activeAddress, { promptForSignature: true, walletType: activeWalletType }),
+                }
+              : undefined
+        }
+        disconnectAction={
+          activeWalletType && activeAddress
+            ? {
+                description: `${shortAddress(activeAddress)} no se usara para esta sesion.`,
+                label: 'Desconectar wallet actual',
+                onSelect: handleDisconnectActiveWallet,
+              }
+            : undefined
+        }
         isConnecting={isPending}
         description="Elige una wallet EVM para BSC o conecta TronLink en modo TRON."
         tronLinkNative={{

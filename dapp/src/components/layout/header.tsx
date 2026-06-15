@@ -90,6 +90,7 @@ export default function Header() {
   const {
     address: tronAddress,
     connect: connectTron,
+    disconnect: disconnectTron,
     error: tronError,
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
@@ -110,9 +111,12 @@ export default function Header() {
     try {
       setIsWalletDialogOpen(false);
 
-      if (isEvmConnected && evmAddress) {
-        await fetchUser(evmAddress, { promptForSignature: true, walletType: 'evm' });
-        return;
+      if (isEvmConnected) {
+        disconnect();
+      }
+
+      if (isTronConnected) {
+        disconnectTron();
       }
 
       const result = await connectAsync({ connector });
@@ -128,6 +132,10 @@ export default function Header() {
 
   const handleConnectTron = async () => {
     try {
+      if (isEvmConnected) {
+        disconnect();
+      }
+
       if (isTronConnected && tronAddress) {
         setIsWalletDialogOpen(false);
         await fetchUser(tronAddress, { promptForSignature: true, walletType: 'tron' });
