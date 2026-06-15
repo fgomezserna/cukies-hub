@@ -12,7 +12,7 @@ export default function WalletInfoPage() {
       eyebrow="Panel"
       title="Wallet UKI"
       subtitle="La vista de wallet resume estado de compra, vesting, NFTs, créditos, cupos, pools y alertas sin sustituir las pantallas especializadas."
-      heroImage="/brand/generated/uki-utility-map-scene-v2.png"
+      heroImage="/brand/generated/uki-utility-map-scene-v3.png"
       heroAlt="Mapa de utilidad UKI con token y bóveda"
       primaryCta={{ label: 'Conectar wallet', href: '/#presale-console' }}
       secondaryCta={{ label: 'Ver Cukie Master', href: '/cukie-master' }}

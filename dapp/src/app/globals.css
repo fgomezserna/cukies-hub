@@ -1327,7 +1327,7 @@ body {
     background:
       linear-gradient(90deg, rgba(2, 9, 13, 0.88), rgba(2, 9, 13, 0.04) 31%, rgba(2, 9, 13, 0.02) 64%, rgba(2, 9, 13, 0.84)),
       linear-gradient(180deg, rgba(2, 9, 13, 0.04), rgba(2, 9, 13, 0.14) 50%, rgba(2, 9, 13, 0.52)),
-      url("/brand/generated/uki-utility-map-scene-v2.png") 50% 46% / cover no-repeat;
+      url("/brand/generated/uki-utility-map-scene-v3.png") 50% 46% / cover no-repeat;
     opacity: 1;
   }
 
@@ -2883,7 +2883,7 @@ body {
       background:
         linear-gradient(180deg, rgba(2, 9, 13, 0.02), rgba(2, 9, 13, 0.28) 42%, rgba(2, 9, 13, 0.9) 72%),
         linear-gradient(90deg, rgba(2, 9, 13, 0.62), rgba(2, 9, 13, 0.08), rgba(2, 9, 13, 0.62)),
-        url("/brand/generated/uki-utility-map-scene-v2.png") 50% 0% / auto 52% no-repeat;
+        url("/brand/generated/uki-utility-map-scene-v3.png") 50% 0% / auto 52% no-repeat;
     }
 
     .uki-orbit,
