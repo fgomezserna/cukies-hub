@@ -41,6 +41,9 @@ export const saleFacts = [
   { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada', helper: '9+ meses' },
 ];
 
+export const pancakeSwapAsmUrl =
+  'https://pancakeswap.finance/swap?chain=bsc&outputCurrency=0x707F0f4a39a4a26239F7D00463B15AB5656861f9';
+
 export const purchaseSteps = [
   {
     number: '1',

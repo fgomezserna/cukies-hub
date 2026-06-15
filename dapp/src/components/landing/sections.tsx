@@ -10,6 +10,7 @@ import {
   Coins,
   Crown,
   Database,
+  ExternalLink,
   Gamepad2,
   Gem,
   Gift,
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react';
 import {
   faqs,
+  pancakeSwapAsmUrl,
   purchaseSteps,
   saleFacts,
   utilityNodes,
@@ -148,6 +150,30 @@ function HowToBuy() {
     <section id="token" className="uki-container pb-9 pt-12">
       <ScrollReveal animation="fade">
         <SectionHeading title="Cómo comprar UKI" tone="cyan" withRule />
+      </ScrollReveal>
+      <ScrollReveal animation="up" delay={80}>
+        <Panel className="uki-buy-asm-card mt-5" innerClassName="grid gap-4 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:p-5">
+          <span className="uki-step-number uki-step-number-featured">0</span>
+          <div>
+            <h3 className="font-headline text-lg font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">
+              Compra ASM antes de la preventa
+            </h3>
+            <p className="mt-1.5 max-w-3xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Necesitas ASM en BNB Smart Chain para participar. Compra o cambia ASM en PancakeSwap y vuelve aquí para aprobarlo y comprar UKI.
+            </p>
+          </div>
+          <a
+            href={pancakeSwapAsmUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="uki-button uki-button-primary justify-center"
+          >
+            <span>Comprar ASM</span>
+            <span className="uki-button-icon" aria-hidden="true">
+              <ExternalLink className="h-4 w-4" />
+            </span>
+          </a>
+        </Panel>
       </ScrollReveal>
       <div className="uki-buy-steps mt-5 grid gap-4 lg:grid-cols-4">
         {purchaseSteps.map((step, index) => (
