@@ -17,7 +17,7 @@ services:
     environment:
       CUKIES_SERVICE: dapp
       NODE_ENV: production
-      APP_ENV: ${APP_ENV:-production}
+      APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
       PORT: 3000
       HOSTNAME: 0.0.0.0
       DATABASE_URL: ${DATABASE_URL}
@@ -59,15 +59,8 @@ services:
       NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL: ${NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL:-abierta}
     ports:
       - "3000"
-    labels:
-      - traefik.enable=true
-      - traefik.http.middlewares.cukies-hub-main-gzip.compress=true
-      - traefik.http.routers.cukies-hub-main-dapp-websecure.entryPoints=websecure
-      - traefik.http.routers.cukies-hub-main-dapp-websecure.middlewares=cukies-hub-main-gzip
-      - traefik.http.routers.cukies-hub-main-dapp-websecure.rule=Host(`cukies.world`) || Host(`www.cukies.world`)
-      - traefik.http.routers.cukies-hub-main-dapp-websecure.service=cukies-hub-main-dapp-websecure
-      - traefik.http.routers.cukies-hub-main-dapp-websecure.tls=true
-      - traefik.http.services.cukies-hub-main-dapp-websecure.loadbalancer.server.port=3000
+    label_file:
+      - ${CUKIES_DAPP_TRAEFIK_LABEL_FILE:?Set CUKIES_DAPP_TRAEFIK_LABEL_FILE in Coolify environment variables}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
