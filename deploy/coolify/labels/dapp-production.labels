@@ -1,0 +1,8 @@
+traefik.enable=true
+traefik.http.middlewares.cukies-hub-main-gzip.compress=true
+traefik.http.routers.cukies-hub-main-dapp-websecure.entryPoints=websecure
+traefik.http.routers.cukies-hub-main-dapp-websecure.middlewares=cukies-hub-main-gzip
+traefik.http.routers.cukies-hub-main-dapp-websecure.rule=Host(`cukies.world`) || Host(`www.cukies.world`)
+traefik.http.routers.cukies-hub-main-dapp-websecure.service=cukies-hub-main-dapp-websecure
+traefik.http.routers.cukies-hub-main-dapp-websecure.tls=true
+traefik.http.services.cukies-hub-main-dapp-websecure.loadbalancer.server.port=3000
