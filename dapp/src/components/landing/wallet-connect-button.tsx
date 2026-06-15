@@ -1,10 +1,15 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { CheckCircle2, ShieldAlert, Wallet } from 'lucide-react';
-import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useSwitchChain, type Connector } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
+import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useAuth } from '@/providers/auth-provider';
+import { useTronLink } from '@/hooks/use-tronlink';
+import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
+import { WalletConnectorDialog } from './wallet-connector-dialog';
 
 type WalletConnectButtonProps = {
   className?: string;
@@ -36,14 +41,77 @@ export function WalletConnectButton({
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
+  const {
+    address: tronAddress,
+    connect: connectTron,
+    disconnect: disconnectTron,
+    error: tronError,
+    isConnected: isTronConnected,
+    isInstalled: isTronInstalled,
+    isLoading: isTronLoading,
+  } = useTronLink();
   const { toast } = useToast();
+  const [isConnectorDialogOpen, setIsConnectorDialogOpen] = useState(false);
+  const hasMounted = useHasMounted();
 
-  const connector = connectors.find((item) => item.id === 'injected') ?? connectors[0];
-  const isWrongChain = isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
-  const isAuthenticatedWallet = isSameWalletAddress(user?.walletAddress, address);
-  const isBusy = isPending || isSwitching || isAuthLoading || isWaitingForApproval;
+  const evmConnectors = useMemo(
+    () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
+    [connectors, hasMounted],
+  );
+  const activeAddress = hasMounted && isConnected ? address : hasMounted && isTronConnected ? tronAddress : null;
+  const activeWalletType = hasMounted && isConnected ? 'evm' : hasMounted && isTronConnected ? 'tron' : null;
+  const isWrongChain = hasMounted && isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
+  const isAuthenticatedWallet = isSameWalletAddress(user?.walletAddress, activeAddress);
+  const isBusy = hasMounted && (isPending || isSwitching || isAuthLoading || isWaitingForApproval || isTronLoading);
+
+  const handleConnectEvm = async (connector: Connector) => {
+    try {
+      const result = await connectAsync({ connector, chainId: UKI_PRESALE_CHAIN_ID });
+      const connectedAddress = result.accounts?.[0] ?? address;
+
+      if (connectedAddress) {
+        setIsConnectorDialogOpen(false);
+        await fetchUser(connectedAddress, {
+          evmConnector: connector,
+          promptForSignature: true,
+          walletType: 'evm',
+        });
+      }
+    } catch {
+      toast({
+        title: 'Conexión fallida',
+        description: 'Aprueba la conexión en tu wallet y vuelve a intentarlo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleConnectTron = async () => {
+    try {
+      const connectedAddress = isTronConnected && tronAddress ? tronAddress : await connectTron();
+
+      if (connectedAddress) {
+        setIsConnectorDialogOpen(false);
+        await fetchUser(connectedAddress, { promptForSignature: true, walletType: 'tron' });
+        return;
+      }
+
+      toast({
+        title: 'TronLink no conectado',
+        description: tronError || 'Activa TronLink y aprueba la conexión.',
+        variant: 'destructive',
+      });
+    } catch {
+      toast({
+        title: 'Conexión fallida',
+        description: 'Aprueba la conexión en TronLink y vuelve a intentarlo.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleClick = async () => {
+    if (!hasMounted) return;
     if (isBusy) return;
 
     if (isWrongChain) {
@@ -62,17 +130,21 @@ export function WalletConnectButton({
       return;
     }
 
-    if (isConnected && address) {
+    if (activeWalletType && activeAddress) {
       if (!isAuthenticatedWallet) {
-        await fetchUser(address, { promptForSignature: true, walletType: 'evm' });
+        await fetchUser(activeAddress, { promptForSignature: true, walletType: activeWalletType });
         return;
       }
 
-      disconnect();
+      if (activeWalletType === 'evm') {
+        disconnect();
+      } else {
+        disconnectTron();
+      }
       return;
     }
 
-    if (!connector) {
+    if (evmConnectors.length === 0 && !isTronInstalled) {
       toast({
         title: 'Wallet no encontrada',
         description: 'Instala una wallet EVM compatible para conectar.',
@@ -81,20 +153,7 @@ export function WalletConnectButton({
       return;
     }
 
-    try {
-      const result = await connectAsync({ connector });
-      const connectedAddress = result.accounts?.[0] ?? address;
-
-      if (connectedAddress) {
-        await fetchUser(connectedAddress, { promptForSignature: true, walletType: 'evm' });
-      }
-    } catch {
-      toast({
-        title: 'Conexión fallida',
-        description: 'Aprueba la conexión en tu wallet y vuelve a intentarlo.',
-        variant: 'destructive',
-      });
-    }
+    setIsConnectorDialogOpen(true);
   };
 
   const text = isBusy
@@ -103,27 +162,57 @@ export function WalletConnectButton({
       : 'Conectando...'
     : isWrongChain
       ? 'Cambiar a BSC'
-      : address
+      : activeAddress
         ? isAuthenticatedWallet
-          ? shortAddress(address)
+          ? shortAddress(activeAddress)
           : 'Firmar'
         : label;
-  const compactText = address ? (isAuthenticatedWallet ? shortAddress(address) : 'Firmar') : compactLabel;
+  const compactText = activeAddress ? (isAuthenticatedWallet ? shortAddress(activeAddress) : 'Firmar') : compactLabel;
 
   return (
-    <button type="button" onClick={handleClick} disabled={isBusy} className={`uki-wallet-button ${className}`}>
-      <Wallet className="h-4 w-4" strokeWidth={1.8} />
-      <span className={showCompactText ? 'hidden sm:inline' : ''}>{text}</span>
-      {showCompactText ? <span className="sm:hidden">{compactText}</span> : null}
-    </button>
+    <>
+      <button type="button" onClick={handleClick} disabled={isBusy} className={`uki-wallet-button ${className}`}>
+        <Wallet className="h-4 w-4" strokeWidth={1.8} />
+        <span className={showCompactText ? 'hidden sm:inline' : ''}>{text}</span>
+        {showCompactText ? <span className="sm:hidden">{compactText}</span> : null}
+      </button>
+
+      <WalletConnectorDialog
+        open={isConnectorDialogOpen}
+        onOpenChange={setIsConnectorDialogOpen}
+        connectors={evmConnectors}
+        onSelectConnector={handleConnectEvm}
+        isConnecting={isPending}
+        description="Elige una wallet EVM para BSC o conecta TronLink en modo TRON."
+        tronLinkNative={{
+          error: tronError,
+          isInstalled: isTronInstalled,
+          isLoading: isTronLoading,
+          onSelect: handleConnectTron,
+        }}
+      />
+    </>
   );
 }
 
 export function WalletStatusLabel() {
   const { address, chainId, isConnected } = useAccount();
+  const { address: tronAddress, isConnected: isTronConnected } = useTronLink();
   const { user, isLoading } = useAuth();
 
-  if (!isConnected || !address) {
+  if (!isConnected && (!isTronConnected || !tronAddress)) {
+    return <span className="text-[#ff75aa]">No conectada</span>;
+  }
+
+  if (!isConnected && isTronConnected && tronAddress) {
+    return isSameWalletAddress(user?.walletAddress, tronAddress) ? (
+      <span className="text-[var(--uki-cyan)]">{shortAddress(tronAddress)}</span>
+    ) : (
+      <span className="text-[#ffcc6d]">Firma requerida</span>
+    );
+  }
+
+  if (!address) {
     return <span className="text-[#ff75aa]">No conectada</span>;
   }
 
@@ -144,17 +233,31 @@ export function WalletStatusLabel() {
 
 export function WalletStateCallout() {
   const { address, chainId, isConnected } = useAccount();
+  const { address: tronAddress, isConnected: isTronConnected } = useTronLink();
   const { user, isLoading, isWaitingForApproval } = useAuth();
   const isWrongChain = isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
-  const isAuthenticatedWallet = isSameWalletAddress(user?.walletAddress, address);
+  const activeAddress = isConnected ? address : isTronConnected ? tronAddress : null;
+  const isAuthenticatedWallet = isSameWalletAddress(user?.walletAddress, activeAddress);
 
-  if (!isConnected || !address) {
+  if (!isConnected && (!isTronConnected || !tronAddress)) {
     return (
       <div className="uki-state-callout uki-state-callout-warning">
         <Wallet className="h-4 w-4" strokeWidth={1.8} />
         <div>
           <p>Wallet desconectada</p>
           <span>Conecta una wallet EVM para revisar datos personales de preventa y vesting.</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected && isTronConnected && tronAddress) {
+    return (
+      <div className="uki-state-callout uki-state-callout-warning">
+        <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
+        <div>
+          <p>TronLink en TRON</p>
+          <span>Para comprar o consultar vesting en BSC, conecta TronLink en modo EVM o una wallet EVM.</span>
         </div>
       </div>
     );
@@ -201,7 +304,7 @@ export function WalletStateCallout() {
       <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} />
       <div>
         <p>Wallet lista</p>
-        <span>{shortAddress(address)} conectada en {UKI_PRESALE_CHAIN_LABEL}.</span>
+        <span>{address ? shortAddress(address) : '--'} conectada en {UKI_PRESALE_CHAIN_LABEL}.</span>
       </div>
     </div>
   );

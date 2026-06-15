@@ -13,7 +13,9 @@ import { Check, CircleDollarSign, RotateCcw, Tag, Wallet } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { getPreferredWalletConnector } from '@/lib/wallet-connectors';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import {
@@ -55,6 +57,7 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
   const [sellPrice, setSellPrice] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [isTronPending, setIsTronPending] = useState(false);
+  const hasMounted = useHasMounted();
 
   const tokenId = useMemo(() => BigInt(cuki.tokenId), [cuki.tokenId]);
   const isBsc = cuki.network === 'BSC';
@@ -64,8 +67,10 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
     ? isSameWallet(address, cuki.owner)
     : isSameWallet(tronAddress, cuki.owner);
   const isBscReady = isBsc && isConnected && chainId === 56;
-  const evmConnector =
-    connectors.find((connector) => connector.id === 'injected') ?? connectors[0];
+  const evmConnector = useMemo(
+    () => (hasMounted ? getPreferredWalletConnector(connectors) : undefined),
+    [connectors, hasMounted],
+  );
 
   const { data: isApprovedForAll } = useReadContract({
     address: bscTokenAddress,
