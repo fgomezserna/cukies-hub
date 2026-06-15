@@ -111,8 +111,7 @@ export function usePresaleTiming() {
     (!data.isOpen && contractStartsAt && contractRemaining.total <= 0);
   const startsAt = shouldUsePublicStart ? UKI_PRESALE_START_ISO : contractStartsAt;
   const endsAt = data?.endsAt ?? null;
-  const countdownTarget = isContractOpen && endsAt ? endsAt : startsAt;
-  const remaining = remainingTimeUntil(countdownTarget);
+  const remaining = remainingTimeUntil(startsAt);
   const isLocked = state.status !== 'ready' || !isContractConfigured || !isContractOpen;
 
   return {
@@ -125,7 +124,6 @@ export function usePresaleTiming() {
     startLabel: shouldUsePublicStart ? UKI_PRESALE_START_LABEL : data?.startsAtLabel ?? UKI_PRESALE_START_LABEL,
     startShortLabel: shouldUsePublicStart ? UKI_PRESALE_START_SHORT_LABEL : data?.startsAtShortLabel ?? UKI_PRESALE_START_SHORT_LABEL,
     endsAt,
-    endLabel: data?.endsAtLabel ?? null,
   };
 }
 
@@ -156,13 +154,12 @@ export function PresaleStartLabel({ prefix = '' }: { prefix?: string }) {
 }
 
 export function PresaleFinalCtaText() {
-  const { isContractOpen, endLabel, startLabel } = usePresaleTiming();
+  const { isContractOpen, startLabel } = usePresaleTiming();
 
   if (isContractOpen) {
     return (
       <>
-        La preventa UKI ya está abierta. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
-        {endLabel ? <> La preventa termina {endLabel}.</> : null}
+        La preventa UKI ya está abierta desde el {startLabel}. Revisa precio, premios, Cukie Master y condiciones antes de comprar.
       </>
     );
   }
