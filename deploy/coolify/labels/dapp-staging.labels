@@ -1,0 +1,8 @@
+traefik.enable=true
+traefik.http.middlewares.cukies-hub-staging-gzip.compress=true
+traefik.http.routers.cukies-hub-staging-dapp-websecure.entryPoints=websecure
+traefik.http.routers.cukies-hub-staging-dapp-websecure.middlewares=cukies-hub-staging-gzip
+traefik.http.routers.cukies-hub-staging-dapp-websecure.rule=Host(`cukies-hub.eurekand.com`) || Host(`cukieshub.eurekand.com`)
+traefik.http.routers.cukies-hub-staging-dapp-websecure.service=cukies-hub-staging-dapp-websecure
+traefik.http.routers.cukies-hub-staging-dapp-websecure.tls=true
+traefik.http.services.cukies-hub-staging-dapp-websecure.loadbalancer.server.port=3000
