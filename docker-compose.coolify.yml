@@ -17,6 +17,7 @@ services:
     environment:
       CUKIES_SERVICE: dapp
       NODE_ENV: production
+      APP_ENV: ${APP_ENV:-production}
       PORT: 3000
       HOSTNAME: 0.0.0.0
       DATABASE_URL: ${DATABASE_URL}
@@ -60,14 +61,13 @@ services:
       - "3000"
     labels:
       - traefik.enable=true
-      - traefik.http.middlewares.cukies-hub-gzip.compress=true
-      - traefik.http.routers.cukies-hub-dapp-websecure.entryPoints=websecure
-      - traefik.http.routers.cukies-hub-dapp-websecure.middlewares=cukies-hub-gzip
-      - traefik.http.routers.cukies-hub-dapp-websecure.rule=Host(`hub.cukies.world`) || Host(`cukieshub.eurekand.com`)
-      - traefik.http.routers.cukies-hub-dapp-websecure.service=cukies-hub-dapp-websecure
-      - traefik.http.routers.cukies-hub-dapp-websecure.tls=true
-      - traefik.http.routers.cukies-hub-dapp-websecure.tls.certresolver=letsencrypt
-      - traefik.http.services.cukies-hub-dapp-websecure.loadbalancer.server.port=3000
+      - traefik.http.middlewares.${TRAEFIK_MIDDLEWARE_NAME:-cukies-hub-main-gzip}.compress=true
+      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-main-dapp-websecure}.entryPoints=websecure
+      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-main-dapp-websecure}.middlewares=${TRAEFIK_MIDDLEWARE_NAME:-cukies-hub-main-gzip}
+      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-main-dapp-websecure}.rule=${TRAEFIK_HOST_RULE:-Host(`cukies.world`) || Host(`www.cukies.world`)}
+      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-main-dapp-websecure}.service=${TRAEFIK_SERVICE_NAME:-cukies-hub-main-dapp-websecure}
+      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-main-dapp-websecure}.tls=true
+      - traefik.http.services.${TRAEFIK_SERVICE_NAME:-cukies-hub-main-dapp-websecure}.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -75,6 +75,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - coolify
 
   chain-indexer:
     build:
@@ -123,3 +125,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION:-${CARD_WORKER_S3_REGION}}
     restart: unless-stopped
+
+networks:
+  coolify:
+    external: true
