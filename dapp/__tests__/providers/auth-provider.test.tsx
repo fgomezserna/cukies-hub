@@ -1,12 +1,14 @@
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { AuthProvider, useAuth } from '@/providers/auth-provider'
-import { useAccount, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useSignMessage } from 'wagmi'
 
 // Mock wagmi hooks
 jest.mock('wagmi')
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
+const mockUseConnect = useConnect as jest.MockedFunction<typeof useConnect>
 const mockUseDisconnect = useDisconnect as jest.MockedFunction<typeof useDisconnect>
+const mockUseSignMessage = useSignMessage as jest.MockedFunction<typeof useSignMessage>
 
 // Mock fetch
 const mockFetch = global.fetch as jest.MockedFunction<typeof global.fetch>
@@ -51,6 +53,15 @@ describe('providers/AuthProvider', () => {
     jest.clearAllMocks()
     mockUseDisconnect.mockReturnValue({
       disconnect: mockDisconnect,
+    } as any)
+    mockUseConnect.mockReturnValue({
+      connect: jest.fn(),
+      connectAsync: jest.fn(),
+      connectors: [],
+    } as any)
+    mockUseSignMessage.mockReturnValue({
+      signMessage: jest.fn(),
+      signMessageAsync: jest.fn().mockResolvedValue('0xsigned-login-message'),
     } as any)
 
     // Mock successful fetch response

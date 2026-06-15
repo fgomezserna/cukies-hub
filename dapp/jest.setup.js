@@ -1,5 +1,29 @@
 import '@testing-library/jest-dom'
 
+const { TextDecoder, TextEncoder } = require('node:util')
+
+if (!global.TextEncoder) {
+  global.TextEncoder = TextEncoder
+}
+
+if (!global.TextDecoder) {
+  global.TextDecoder = TextDecoder
+}
+
+const { Request, Response, Headers } = require('undici')
+
+if (!global.Request) {
+  global.Request = Request
+}
+
+if (!global.Response) {
+  global.Response = Response
+}
+
+if (!global.Headers) {
+  global.Headers = Headers
+}
+
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -33,7 +57,12 @@ jest.mock('wagmi', () => ({
   })),
   useConnect: jest.fn(() => ({
     connect: jest.fn(),
+    connectAsync: jest.fn(),
     connectors: [],
+  })),
+  useSignMessage: jest.fn(() => ({
+    signMessage: jest.fn(),
+    signMessageAsync: jest.fn(),
   })),
 }))
 
@@ -41,8 +70,9 @@ jest.mock('wagmi', () => ({
 jest.mock('next/image', () => ({
   __esModule: true,
   default: (props) => {
+    const { fill, priority, quality, placeholder, blurDataURL, loader, unoptimized, ...imgProps } = props
     // eslint-disable-next-line jsx-a11y/alt-text
-    return <img {...props} />
+    return <img {...imgProps} />
   },
 }))
 
