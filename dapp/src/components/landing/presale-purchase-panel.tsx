@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Loader2, ShoppingCart, Wallet, WalletCards } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
-import { useAccount, useConnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract, type Connector } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract, type Connector } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import {
@@ -95,6 +95,7 @@ function formatRate(quote?: bigint, cost?: bigint) {
 export function PresalePurchasePanel() {
   const { address, chainId, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
+  const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { toast } = useToast();
   const { isLocked: isPublicPresaleLocked, startShortLabel } = usePresaleLock();
@@ -332,6 +333,10 @@ export function PresalePurchasePanel() {
 
   async function connectEvmForPurchase(connector: Connector) {
     try {
+      if (isConnected) {
+        disconnect();
+      }
+
       await connectAsync({ connector, chainId: UKI_PRESALE_CHAIN_ID });
       setIsConnectorDialogOpen(false);
       toast({
@@ -345,6 +350,29 @@ export function PresalePurchasePanel() {
         variant: 'destructive',
       });
     }
+  }
+
+  function switchToPresaleChain() {
+    switchChain(
+      { chainId: UKI_PRESALE_CHAIN_ID },
+      {
+        onError: () => {
+          toast({
+            title: 'Cambio de red fallido',
+            description: `Desconecta esta wallet o cambia manualmente a ${UKI_PRESALE_CHAIN_LABEL}.`,
+            variant: 'destructive',
+          });
+        },
+      },
+    );
+  }
+
+  function disconnectCurrentWallet() {
+    disconnect();
+    toast({
+      title: 'Wallet desconectada',
+      description: 'Elige otra wallet para comprar UKI.',
+    });
   }
 
   async function handleSubmit() {
@@ -370,18 +398,7 @@ export function PresalePurchasePanel() {
     }
 
     if (isWrongChain) {
-      switchChain(
-        { chainId: UKI_PRESALE_CHAIN_ID },
-        {
-          onError: () => {
-            toast({
-              title: 'Cambio de red fallido',
-              description: `Cambia tu wallet a ${UKI_PRESALE_CHAIN_LABEL}.`,
-              variant: 'destructive',
-            });
-          },
-        },
-      );
+      setIsConnectorDialogOpen(true);
       return;
     }
 
@@ -647,6 +664,25 @@ export function PresalePurchasePanel() {
         onOpenChange={setIsConnectorDialogOpen}
         connectors={evmConnectors}
         onSelectConnector={connectEvmForPurchase}
+        currentWalletAction={
+          isWrongChain
+            ? {
+                description: `Intenta mover la wallet actual a ${UKI_PRESALE_CHAIN_LABEL}.`,
+                isLoading: isSwitching,
+                label: 'Cambiar a BSC',
+                onSelect: switchToPresaleChain,
+              }
+            : undefined
+        }
+        disconnectAction={
+          isConnected && address
+            ? {
+                description: `${formatTxLabel(address as `0x${string}`) ?? address} no se usara para esta compra.`,
+                label: 'Desconectar wallet actual',
+                onSelect: disconnectCurrentWallet,
+              }
+            : undefined
+        }
         isConnecting={isConnecting}
         title="Conectar para comprar"
         description={`Elige una wallet EVM compatible con ${UKI_PRESALE_CHAIN_LABEL}.`}

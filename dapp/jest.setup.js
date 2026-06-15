@@ -60,6 +60,10 @@ jest.mock('wagmi', () => ({
     connectAsync: jest.fn(),
     connectors: [],
   })),
+  useSwitchChain: jest.fn(() => ({
+    switchChain: jest.fn(),
+    isPending: false,
+  })),
   useSignMessage: jest.fn(() => ({
     signMessage: jest.fn(),
     signMessageAsync: jest.fn(),
