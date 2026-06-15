@@ -8,9 +8,12 @@ type ConnectorLike = Pick<Connector, 'icon' | 'id' | 'name' | 'type' | 'rdns'>;
 type BrowserWindowWithTronLink = {
   ethereum?: EIP1193Provider & {
     providers?: EIP1193Provider[];
+    isPhantom?: boolean;
     isTronLink?: boolean;
     isTronlink?: boolean;
+    rdns?: string;
   };
+  phantom?: { ethereum?: EIP1193Provider };
   tron?: { ethereum?: EIP1193Provider };
   tronLink?: { ethereum?: EIP1193Provider; provider?: EIP1193Provider };
 };
@@ -37,6 +40,11 @@ export function isWalletConnectConnector(connector: ConnectorLike) {
 export function isCoinbaseWalletConnector(connector: ConnectorLike) {
   const text = `${connector.id} ${connector.name} ${connector.type} ${normalizeConnectorText(connector.rdns)}`;
   return text.toLowerCase().includes('coinbase');
+}
+
+export function isPhantomConnector(connector: ConnectorLike) {
+  const text = `${connector.id} ${connector.name} ${connector.type} ${normalizeConnectorText(connector.rdns)}`;
+  return text.toLowerCase().includes('phantom');
 }
 
 export function isMetaMaskConnector(connector: ConnectorLike) {
@@ -79,7 +87,18 @@ export function hasTronLinkEvmProvider(windowObject?: unknown) {
   return Boolean(findTronLinkEvmProvider(windowObject));
 }
 
+function isPhantomProvider(provider?: EIP1193Provider | null) {
+  const candidate = provider as (EIP1193Provider & { isPhantom?: boolean; rdns?: string }) | undefined;
+  return Boolean(candidate?.isPhantom || candidate?.rdns?.toLowerCase().includes('phantom'));
+}
+
+function isDefaultInjectedPhantomProvider(windowObject?: unknown) {
+  const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  return isPhantomProvider(browserWindow?.ethereum);
+}
+
 export function getConnectorDisplayName(connector: ConnectorLike) {
+  if (isPhantomConnector(connector)) return 'Phantom';
   if (isMetaMaskConnector(connector)) return 'MetaMask';
   if (isTronLinkEvmConnector(connector)) return 'TronLink EVM';
   if (isWalletConnectConnector(connector)) return 'WalletConnect';
@@ -90,6 +109,10 @@ export function getConnectorDisplayName(connector: ConnectorLike) {
 }
 
 export function getConnectorDescription(connector: ConnectorLike) {
+  if (isPhantomConnector(connector)) {
+    return 'No disponible para la preventa en BNB Smart Chain.';
+  }
+
   if (isMetaMaskConnector(connector)) {
     return 'Extension, navegador movil o deep link oficial.';
   }
@@ -124,11 +147,15 @@ export function getConnectorLogoSrc(connector: ConnectorLike) {
 }
 
 function getConnectorPriority(connector: ConnectorLike) {
+  if (isPhantomConnector(connector)) return Number.POSITIVE_INFINITY;
+  if (connector.id === TRONLINK_EVM_CONNECTOR_ID) return CONNECTOR_ORDER.indexOf(TRONLINK_EVM_CONNECTOR_ID);
+  if (connector.id === 'metaMask') return CONNECTOR_ORDER.indexOf('metaMask');
+
   const exactIndex = CONNECTOR_ORDER.indexOf(connector.id);
   if (exactIndex >= 0) return exactIndex;
 
-  if (isMetaMaskConnector(connector)) return CONNECTOR_ORDER.indexOf('metaMask');
-  if (isTronLinkEvmConnector(connector)) return CONNECTOR_ORDER.indexOf(TRONLINK_EVM_CONNECTOR_ID);
+  if (isMetaMaskConnector(connector)) return CONNECTOR_ORDER.indexOf('metaMask') + 0.1;
+  if (isTronLinkEvmConnector(connector)) return CONNECTOR_ORDER.indexOf(TRONLINK_EVM_CONNECTOR_ID) + 0.1;
   if (isWalletConnectConnector(connector)) return CONNECTOR_ORDER.indexOf('walletConnect');
   if (isCoinbaseWalletConnector(connector)) return CONNECTOR_ORDER.indexOf('coinbaseWalletSDK');
 
@@ -151,20 +178,48 @@ export function getSortedWalletConnectors<TConnector extends ConnectorLike>(conn
   });
 }
 
+function getConnectorFamilyKey(connector: ConnectorLike) {
+  if (isPhantomConnector(connector)) return 'phantom';
+  if (isMetaMaskConnector(connector)) return 'metamask';
+  if (isTronLinkEvmConnector(connector)) return 'tronlink-evm';
+  if (isWalletConnectConnector(connector)) return 'walletconnect';
+  if (isCoinbaseWalletConnector(connector)) return 'coinbase';
+  if (connector.id === 'injected' && connector.name === 'Injected') return 'browser-injected';
+
+  return connector.id;
+}
+
 export function getVisibleWalletConnectors<TConnector extends ConnectorLike>(
   connectors: readonly TConnector[],
   windowObject?: unknown,
 ) {
   const browserWindow = windowObject ?? (typeof window === 'undefined' ? undefined : window);
   const hasDedicatedTronLinkProvider = hasTronLinkEvmProvider(browserWindow);
+  const defaultInjectedProviderIsPhantom = isDefaultInjectedPhantomProvider(browserWindow);
+  const visibleConnectors: TConnector[] = [];
+  const seenFamilies = new Set<string>();
 
-  return getSortedWalletConnectors(connectors).filter((connector) => {
-    if (connector.id === TRONLINK_EVM_CONNECTOR_ID) {
-      return hasDedicatedTronLinkProvider;
+  for (const connector of getSortedWalletConnectors(connectors)) {
+    if (isPhantomConnector(connector)) {
+      continue;
     }
 
-    return true;
-  });
+    if (connector.id === TRONLINK_EVM_CONNECTOR_ID) {
+      if (!hasDedicatedTronLinkProvider) continue;
+    }
+
+    if (connector.id === 'injected' && connector.name === 'Injected' && defaultInjectedProviderIsPhantom) {
+      continue;
+    }
+
+    const familyKey = getConnectorFamilyKey(connector);
+    if (seenFamilies.has(familyKey)) continue;
+
+    seenFamilies.add(familyKey);
+    visibleConnectors.push(connector);
+  }
+
+  return visibleConnectors;
 }
 
 export function getPreferredWalletConnector<TConnector extends ConnectorLike>(connectors: readonly TConnector[]) {
