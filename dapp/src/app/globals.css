@@ -1107,6 +1107,19 @@ body {
       rgba(19, 10, 31, 0.76);
   }
 
+  .uki-buy-asm-card .uki-panel-core {
+    background:
+      radial-gradient(circle at 8% 0%, rgba(68, 237, 214, 0.18), transparent 34%),
+      linear-gradient(135deg, rgba(19, 10, 31, 0.92), rgba(8, 35, 34, 0.84));
+  }
+
+  .uki-step-number-featured {
+    height: 2.6rem;
+    width: 2.6rem;
+    background: rgba(68, 237, 214, 0.1);
+    box-shadow: 0 0 22px rgba(68, 237, 214, 0.22);
+  }
+
   .uki-buy-steps > article {
     animation: uki-rise-in 720ms var(--uki-ease) both;
     animation-delay: calc(var(--uki-stagger, 0) * 80ms);
