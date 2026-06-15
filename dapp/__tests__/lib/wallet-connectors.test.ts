@@ -5,7 +5,9 @@ import {
   getConnectorLogoSrc,
   getPreferredWalletConnector,
   getSortedWalletConnectors,
+  getVisibleWalletConnectors,
   isCoinbaseWalletConnector,
+  isPhantomConnector,
   isTronLinkEvmConnector,
   isWalletConnectConnector,
 } from '@/lib/wallet-connectors';
@@ -60,10 +62,12 @@ describe('lib/wallet-connectors', () => {
     const walletConnect = connector({ id: 'custom', name: 'WalletConnect', type: 'walletConnect' });
     const coinbase = connector({ id: 'customCoinbase', name: 'CB Wallet', rdns: 'com.coinbase.wallet' });
     const tronLink = connector({ id: 'customTron', name: 'TRONLINK', rdns: 'io.tronlink' });
+    const phantom = connector({ id: 'app.phantom', name: 'Phantom', rdns: 'app.phantom' });
 
     expect(isWalletConnectConnector(walletConnect)).toBe(true);
     expect(isCoinbaseWalletConnector(coinbase)).toBe(true);
     expect(isTronLinkEvmConnector(tronLink)).toBe(true);
+    expect(isPhantomConnector(phantom)).toBe(true);
   });
 
   it('normalizes labels and descriptions for user-facing wallet options', () => {
@@ -94,5 +98,31 @@ describe('lib/wallet-connectors', () => {
 
     expect(getConnectorLogoSrc(embeddedMetaMask)).toBe('/brand/wallets/metamask.svg');
     expect(getConnectorLogoSrc(unknownWallet)).toBe('data:image/png;base64,valid');
+  });
+
+  it('filters Phantom and hides the generic browser wallet when Phantom owns the default provider', () => {
+    const browserWallet = connector({ id: 'injected', name: 'Injected', type: 'injected' });
+    const phantom = connector({ id: 'app.phantom', name: 'Phantom', rdns: 'app.phantom' });
+    const coinbase = connector({ id: 'coinbaseWalletSDK', name: 'Coinbase Wallet', type: 'coinbaseWallet' });
+
+    const visible = getVisibleWalletConnectors([browserWallet, phantom, coinbase], {
+      ethereum: { isPhantom: true },
+    });
+
+    expect(visible.map((item) => item.id)).toEqual(['coinbaseWalletSDK']);
+  });
+
+  it('deduplicates TronLink EVM connectors while keeping the native TRON option separate in the UI layer', () => {
+    const browserWallet = connector({ id: 'injected', name: 'Injected', type: 'injected' });
+    const dedicatedTronLink = connector({ id: TRONLINK_EVM_CONNECTOR_ID, name: 'TronLink EVM', type: 'injected' });
+    const mipdTronLink = connector({ id: 'io.tronlink', name: 'TronLink', rdns: 'io.tronlink' });
+
+    const visible = getVisibleWalletConnectors([mipdTronLink, browserWallet, dedicatedTronLink], {
+      ethereum: {
+        providers: [{ rdns: 'io.tronlink' }],
+      },
+    });
+
+    expect(visible.map((item) => item.id)).toEqual([TRONLINK_EVM_CONNECTOR_ID, 'injected']);
   });
 });
