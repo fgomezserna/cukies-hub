@@ -61,13 +61,13 @@ services:
       - "3000"
     labels:
       - traefik.enable=true
-      - traefik.http.middlewares.${TRAEFIK_MIDDLEWARE_NAME:-cukies-hub-staging-gzip}.compress=true
-      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-staging-dapp-websecure}.entryPoints=websecure
-      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-staging-dapp-websecure}.middlewares=${TRAEFIK_MIDDLEWARE_NAME:-cukies-hub-staging-gzip}
-      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-staging-dapp-websecure}.rule=${TRAEFIK_HOST_RULE:-Host(`cukies-hub.eurekand.com`) || Host(`cukieshub.eurekand.com`)}
-      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-staging-dapp-websecure}.service=${TRAEFIK_SERVICE_NAME:-cukies-hub-staging-dapp-websecure}
-      - traefik.http.routers.${TRAEFIK_ROUTER_NAME:-cukies-hub-staging-dapp-websecure}.tls=true
-      - traefik.http.services.${TRAEFIK_SERVICE_NAME:-cukies-hub-staging-dapp-websecure}.loadbalancer.server.port=3000
+      - traefik.http.middlewares.cukies-hub-staging-gzip.compress=true
+      - traefik.http.routers.cukies-hub-staging-dapp-websecure.entryPoints=websecure
+      - traefik.http.routers.cukies-hub-staging-dapp-websecure.middlewares=cukies-hub-staging-gzip
+      - traefik.http.routers.cukies-hub-staging-dapp-websecure.rule=Host(`cukies-hub.eurekand.com`) || Host(`cukieshub.eurekand.com`)
+      - traefik.http.routers.cukies-hub-staging-dapp-websecure.service=cukies-hub-staging-dapp-websecure
+      - traefik.http.routers.cukies-hub-staging-dapp-websecure.tls=true
+      - traefik.http.services.cukies-hub-staging-dapp-websecure.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
