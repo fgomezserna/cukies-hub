@@ -1,4 +1,5 @@
-const PRESALE_DISPLAY_TIME_ZONE = 'Europe/Madrid';
+const PRESALE_DISPLAY_TIME_ZONE = 'UTC';
+const PRESALE_DISPLAY_TIME_ZONE_LABEL = 'UTC';
 
 export function isoFromUnixSeconds(seconds?: number | null) {
   if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return null;
@@ -35,7 +36,7 @@ export function formatPresaleDateLabel(
     timeZone: PRESALE_DISPLAY_TIME_ZONE,
   }).format(date);
 
-  return `${dateLabel} a las ${timeLabel}`;
+  return `${dateLabel} a las ${timeLabel} ${PRESALE_DISPLAY_TIME_ZONE_LABEL}`;
 }
 
 export function formatPresaleRateLabel(value?: string | number | null) {
