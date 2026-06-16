@@ -8,7 +8,7 @@ import {
   UKI_PRESALE_START_LABEL,
   UKI_PRESALE_START_SHORT_LABEL,
 } from './sale-config';
-import { formatPresaleRateLabel, remainingTimeUntil } from '@/lib/presale-display';
+import { formatPresaleDateLabel, formatPresaleRateLabel, remainingTimeUntil } from '@/lib/presale-display';
 
 type PresaleStatusResponse = {
   source: 'static' | 'contract';
@@ -110,6 +110,9 @@ export function usePresaleTiming() {
     data.saleEnabled === false ||
     (!data.isOpen && contractStartsAt && contractRemaining.total <= 0);
   const startsAt = shouldUsePublicStart ? UKI_PRESALE_START_ISO : contractStartsAt;
+  const publicStartLabel = formatPresaleDateLabel(UKI_PRESALE_START_ISO) ?? UKI_PRESALE_START_LABEL;
+  const publicStartShortLabel =
+    formatPresaleDateLabel(UKI_PRESALE_START_ISO, { short: true }) ?? UKI_PRESALE_START_SHORT_LABEL;
   const endsAt = data?.endsAt ?? null;
   const remaining = remainingTimeUntil(startsAt);
   const isLocked = state.status !== 'ready' || !isContractConfigured || !isContractOpen;
@@ -121,8 +124,8 @@ export function usePresaleTiming() {
     isContractOpen,
     remaining,
     startsAt,
-    startLabel: shouldUsePublicStart ? UKI_PRESALE_START_LABEL : data?.startsAtLabel ?? UKI_PRESALE_START_LABEL,
-    startShortLabel: shouldUsePublicStart ? UKI_PRESALE_START_SHORT_LABEL : data?.startsAtShortLabel ?? UKI_PRESALE_START_SHORT_LABEL,
+    startLabel: shouldUsePublicStart ? publicStartLabel : data?.startsAtLabel ?? publicStartLabel,
+    startShortLabel: shouldUsePublicStart ? publicStartShortLabel : data?.startsAtShortLabel ?? publicStartShortLabel,
     endsAt,
   };
 }
