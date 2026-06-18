@@ -101,8 +101,9 @@ export function PresalePurchasePanel() {
   const { isLocked: isPublicPresaleLocked, startShortLabel } = usePresaleLock();
   const hasMounted = useHasMounted();
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
-  const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
+  const [lastAction, setLastAction] = useState<'approve' | 'approved' | 'buy' | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
+  const [locallyApprovedAmount, setLocallyApprovedAmount] = useState<bigint | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -217,9 +218,12 @@ export function PresalePurchasePanel() {
     query: { enabled: Boolean(txHash) },
   });
 
-  const needsApproval = Boolean(parsedAmount && allowance !== undefined && allowance < parsedAmount);
+  const effectiveAllowance = locallyApprovedAmount && (!allowance || locallyApprovedAmount > allowance)
+    ? locallyApprovedAmount
+    : allowance;
+  const needsApproval = Boolean(parsedAmount && effectiveAllowance !== undefined && effectiveAllowance < parsedAmount);
   const hasEnoughBalance = Boolean(parsedAmount && asmBalance !== undefined && asmBalance >= parsedAmount);
-  const hasAllowanceData = !isReady || allowance !== undefined;
+  const hasAllowanceData = !isReady || effectiveAllowance !== undefined;
   const hasMinPurchaseData = !isReady || minAsmPerPurchase !== undefined;
   const hasBalanceData = !isReady || asmBalance !== undefined;
   const asmBalanceLabel = isAsmBalanceError
@@ -244,6 +248,13 @@ export function PresalePurchasePanel() {
   const canConnect = Boolean(hasMounted && !isConnected && evmConnectors.length > 0 && !isConnecting);
   const canSwitch = Boolean(isWrongChain && !isSwitching);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
+
+  useEffect(() => {
+    setLastAction(null);
+    setApprovalAmount(null);
+    setLocallyApprovedAmount(null);
+    handledReceiptHashRef.current = null;
+  }, [address, asmTokenAddress, presaleAddress]);
 
   useEffect(() => {
     if (!isHistoryOpen || !address) return;
@@ -294,33 +305,32 @@ export function PresalePurchasePanel() {
     void refetchPurchasedAsm();
     void refetchPurchasedUki();
 
-    if (lastAction === 'approve' && approvalAmount && presaleAddress) {
-      toast({
-        title: 'Aprobación confirmada',
-        description: 'Abriendo ahora la transacción de compra.',
-      });
-      setLastAction('buy');
+    if (lastAction === 'approve' && approvalAmount) {
+      setLocallyApprovedAmount(approvalAmount);
+      setLastAction('approved');
       setApprovalAmount(null);
-      writeContract({
-        address: presaleAddress,
-        abi: presaleAbi,
-        functionName: 'buy',
-        args: [approvalAmount],
+      toast({
+        title: 'ASM aprobado',
+        description: 'Permiso confirmado. Pulsa Comprar UKI para abrir la compra final.',
       });
       return;
     }
 
     if (lastAction === 'buy') {
+      setLastAction(null);
+      setApprovalAmount(null);
+      setLocallyApprovedAmount(null);
       toast({
         title: 'Compra confirmada',
         description: 'Se ha creado la asignación de vesting UKI para tu wallet.',
       });
     }
-  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchMinAsmPerPurchase, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash, writeContract]);
+  }, [approvalAmount, isSuccess, lastAction, refetchAllowance, refetchBalance, refetchIsOpen, refetchMinAsmPerPurchase, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash]);
 
   useEffect(() => {
     if (!error) return;
 
+    setLastAction(null);
     setApprovalAmount(null);
     toast({
       title: 'Transacción fallida',
@@ -433,7 +443,7 @@ export function PresalePurchasePanel() {
       return;
     }
 
-    if (allowance === undefined) {
+    if (effectiveAllowance === undefined) {
       toast({
         title: 'Revisando permisos',
         description: 'Espera a que cargue la aprobación de ASM antes de comprar.',
@@ -491,6 +501,10 @@ export function PresalePurchasePanel() {
       return;
     }
 
+    toast({
+      title: 'Confirma la compra',
+      description: 'Revisa y firma la compra final en tu wallet.',
+    });
     setLastAction('buy');
     writeContract({
       address: presaleAddress,
@@ -686,6 +700,16 @@ export function PresalePurchasePanel() {
         </div>
       ) : null}
 
+      {lastAction === 'approved' && !isPending && !isConfirming ? (
+        <div className="uki-state-callout mt-2 border-[var(--uki-cyan)]/35 bg-[var(--uki-cyan)]/10">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>ASM aprobado</p>
+            <span>Permiso confirmado. Pulsa Comprar UKI para firmar la compra final.</span>
+          </div>
+        </div>
+      ) : null}
+
       <button type="button" onClick={handleSubmit} disabled={ctaDisabled || (!canConnect && !isConnected && !isConnecting)} className={`uki-wallet-button mt-2 w-full justify-center ${ctaDisabled ? 'opacity-45' : ''}`}>
         {isPending || isConfirming || isConnecting || isSwitching ? <Loader2 className="h-4 w-4 animate-spin" /> : <CtaIcon className="h-4 w-4" />}
         {ctaLabel}
@@ -722,7 +746,9 @@ export function PresalePurchasePanel() {
 
       {isConfirming ? (
         <p className="mt-2 text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-          {lastAction === 'approve' ? 'Confirmando aprobación antes de comprar...' : 'Confirmando compra...'}
+          {lastAction === 'approve'
+            ? 'Confirmando permiso ASM. Luego pulsa Comprar UKI para la compra final.'
+            : 'Confirmando compra UKI. Espera la confirmación on-chain.'}
         </p>
       ) : null}
 
