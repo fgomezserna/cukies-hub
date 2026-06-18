@@ -22,7 +22,7 @@ import { usePresaleLock } from './presale-countdown';
 import { WalletConnectorDialog } from './wallet-connector-dialog';
 
 const TOKEN_DECIMALS = 18;
-const DEFAULT_AMOUNT = '10';
+const DEFAULT_AMOUNT = '1';
 
 type PurchaseHistoryItem = {
   eventId: string;
@@ -123,6 +123,8 @@ export function PresalePurchasePanel() {
 
   const {
     data: asmBalance,
+    isError: isAsmBalanceError,
+    isLoading: isAsmBalanceLoading,
     refetch: refetchBalance,
   } = useReadContract({
     chainId: UKI_PRESALE_CHAIN_ID,
@@ -130,7 +132,10 @@ export function PresalePurchasePanel() {
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && readsEnabled) },
+    query: {
+      enabled: Boolean(address && readsEnabled),
+      staleTime: 0,
+    },
   });
 
   const {
@@ -216,11 +221,18 @@ export function PresalePurchasePanel() {
   const hasEnoughBalance = Boolean(parsedAmount && asmBalance !== undefined && asmBalance >= parsedAmount);
   const hasAllowanceData = !isReady || allowance !== undefined;
   const hasMinPurchaseData = !isReady || minAsmPerPurchase !== undefined;
+  const hasBalanceData = !isReady || asmBalance !== undefined;
+  const asmBalanceLabel = isAsmBalanceError
+    ? 'Error de lectura'
+    : isAsmBalanceLoading && asmBalance === undefined
+      ? 'Cargando...'
+      : formatTokenAmount(asmBalance);
   const isBelowMinPurchase = isBelowContractMinimumPurchase(parsedAmount, minAsmPerPurchase);
   const canSubmit = Boolean(
     isReady &&
     parsedAmount &&
     hasEnoughBalance &&
+    hasBalanceData &&
     hasAllowanceData &&
     hasMinPurchaseData &&
     !isBelowMinPurchase &&
@@ -524,7 +536,7 @@ export function PresalePurchasePanel() {
       </div>
 
       <div className="mt-2 grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)] sm:grid-cols-2">
-        <span>Balance ASM: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
+        <span>Balance ASM: <strong className="text-[var(--uki-cream)]">{asmBalanceLabel}</strong></span>
         {isConnected ? (
           <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
             <SheetTrigger asChild>
@@ -613,7 +625,7 @@ export function PresalePurchasePanel() {
           value={amount}
           onChange={(event) => setAmount(event.target.value.replace(',', '.'))}
           inputMode="decimal"
-          placeholder="10"
+          placeholder="1"
           className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#0b0719]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-cyan)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-cyan)]"
           style={{
             backgroundColor: '#0b0719',
@@ -644,7 +656,27 @@ export function PresalePurchasePanel() {
         </div>
       ) : null}
 
-      {isReady && !hasEnoughBalance && parsedAmount ? (
+      {isReady && !hasBalanceData && parsedAmount ? (
+        <div className="uki-state-callout uki-state-callout-warning mt-2">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>Balance ASM pendiente</p>
+            <span>Espera a que la dapp lea el saldo de ASM en BNB Smart Chain.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {isReady && isAsmBalanceError ? (
+        <div className="uki-state-callout uki-state-callout-warning mt-2">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>No se pudo leer ASM</p>
+            <span>Revisa la conexión RPC de BNB Smart Chain o vuelve a conectar la wallet.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {isReady && hasBalanceData && !hasEnoughBalance && parsedAmount ? (
         <div className="uki-state-callout uki-state-callout-warning mt-2">
           <WalletCards className="h-4 w-4" strokeWidth={1.8} />
           <div>

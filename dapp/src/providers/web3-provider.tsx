@@ -8,6 +8,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { findTronLinkEvmProvider, TRONLINK_EVM_CONNECTOR_ID } from '@/lib/wallet-connectors';
 
 const queryClient = new QueryClient();
+const BSC_RPC_URL = 'https://bsc-dataseed1.binance.org';
+const BSC_TESTNET_RPC_URL = 'https://data-seed-prebsc-1-s1.binance.org:8545';
 
 // Binance Smart Chain Mainnet
 const bsc = defineChain({
@@ -20,7 +22,7 @@ const bsc = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://bsc-dataseed1.binance.org'],
+      http: [BSC_RPC_URL],
     },
   },
   blockExplorers: {
@@ -38,7 +40,7 @@ const bscTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://data-seed-prebsc-1-s1.binance.org:8545'],
+      http: [BSC_TESTNET_RPC_URL],
     },
   },
   blockExplorers: {
@@ -93,8 +95,8 @@ export const config = createConfig({
   connectors,
   ssr: true,
   transports: {
-    [bsc.id]: http(),
-    [bscTestnet.id]: http(),
+    [bsc.id]: http(BSC_RPC_URL),
+    [bscTestnet.id]: http(BSC_TESTNET_RPC_URL),
     [mainnet.id]: http(),
     [sepolia.id]: http(),
   },
