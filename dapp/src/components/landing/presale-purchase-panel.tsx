@@ -345,12 +345,25 @@ export function PresalePurchasePanel() {
     const params = new URLSearchParams({
       walletAddress: address,
       origin: window.location.origin,
+      applyReferral: '1',
     });
     const response = await fetch(`/api/presale/referral/status?${params.toString()}`, {
       cache: 'no-store',
     });
 
-    return response.ok;
+    if (!response.ok) return false;
+
+    const data = await response.json().catch(() => null) as {
+      referralAttribution?: {
+        applied: boolean;
+        reason?: 'invalid_or_locked_code' | 'self_referral' | 'sponsor_already_locked';
+      } | null;
+    } | null;
+    const attribution = data?.referralAttribution;
+
+    if (!attribution || attribution.applied) return true;
+
+    return attribution.reason === 'self_referral' || attribution.reason === 'sponsor_already_locked';
   }
 
   async function connectEvmForPurchase(connector: Connector) {
