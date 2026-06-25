@@ -144,7 +144,7 @@ export const rarityRewards = [
   {
     name: 'Común',
     nameEn: 'Common',
-    threshold: '>150.000 UKI',
+    threshold: '<150.000 UKI',
     border: 'border-white/20 hover:border-white/40',
     glow: '',
     text: 'text-[var(--uki-cream)]',

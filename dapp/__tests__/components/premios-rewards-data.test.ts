@@ -34,7 +34,7 @@ describe('premios rewards data', () => {
       'Épico:500.000 UKI',
       'Raro:300.000 UKI',
       'No Común:150.000 UKI',
-      'Común:>150.000 UKI',
+      'Común:<150.000 UKI',
     ]);
   });
 
@@ -47,6 +47,10 @@ describe('premios rewards data', () => {
     expect(rarityRewardDisplay(rarityRewards[1], 'en')).toEqual({
       name: 'Legendary',
       threshold: '1,000,000 UKI',
+    });
+    expect(rarityRewardDisplay(rarityRewards[5], 'en')).toEqual({
+      name: 'Common',
+      threshold: '<150,000 UKI',
     });
   });
 });
