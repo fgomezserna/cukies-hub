@@ -6,9 +6,10 @@ type ButtonProps = {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'ghost';
   className?: string;
+  external?: boolean;
 };
 
-export function LandingButton({ href, children, variant = 'primary', className = '' }: ButtonProps) {
+export function LandingButton({ href, children, variant = 'primary', className = '', external = false }: ButtonProps) {
   const variantClass = {
     primary: 'uki-button-primary',
     secondary: 'uki-button-secondary',
@@ -16,7 +17,12 @@ export function LandingButton({ href, children, variant = 'primary', className =
   }[variant];
 
   return (
-    <a href={href} className={`uki-button ${variantClass} ${className}`}>
+    <a
+      href={href}
+      className={`uki-button ${variantClass} ${className}`}
+      target={external ? '_blank' : undefined}
+      rel={external ? 'noreferrer' : undefined}
+    >
       <span>{children}</span>
       <span className="uki-button-icon" aria-hidden="true">
         <ArrowRight className="h-4 w-4" />

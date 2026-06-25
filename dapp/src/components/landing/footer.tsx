@@ -1,7 +1,26 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePublicLocale } from '@/providers/public-locale-provider';
+
+const footerCopy = {
+  es: {
+    home: 'Inicio',
+    rewards: 'Premios',
+    rights: 'Todos los derechos reservados.',
+  },
+  en: {
+    home: 'Home',
+    rewards: 'Rewards',
+    rights: 'All rights reserved.',
+  },
+} as const;
 
 export function LandingFooter() {
+  const { locale } = usePublicLocale();
+  const copy = footerCopy[locale];
+
   return (
     <footer className="uki-footer">
       <div className="uki-footer-inner uki-container">
@@ -54,13 +73,13 @@ export function LandingFooter() {
         </div>
 
         <div className="uki-footer-links">
-          <Link href="/" className="hover:text-[var(--uki-cyan)]">Inicio</Link>
-          <Link href="/premios" className="hover:text-[var(--uki-cyan)]">Premios</Link>
+          <Link href="/" className="hover:text-[var(--uki-cyan)]">{copy.home}</Link>
+          <Link href="/premios" className="hover:text-[var(--uki-cyan)]">{copy.rewards}</Link>
         </div>
 
         <p className="uki-footer-copy">
           © 2026 Cukies World
-          <span className="block">Todos los derechos reservados.</span>
+          <span className="block">{copy.rights}</span>
         </p>
       </div>
     </footer>
