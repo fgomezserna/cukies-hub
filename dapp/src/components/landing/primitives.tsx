@@ -81,7 +81,7 @@ export function MetricTile({
   icon: LucideIcon;
   label: string;
   value: string;
-  helper: string;
+  helper?: string;
 }) {
   return (
     <article className="uki-metric-tile">
@@ -89,7 +89,7 @@ export function MetricTile({
       <div>
         <p className="uki-label">{label}</p>
         <p className="mt-1 font-headline text-lg font-black uppercase leading-tight text-[var(--uki-cream)]">{value}</p>
-        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{helper}</p>
+        {helper ? <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{helper}</p> : null}
       </div>
     </article>
   );

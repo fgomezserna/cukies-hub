@@ -38,7 +38,7 @@ export const saleFacts = [
   { icon: CircleDollarSign, label: 'Compra con', value: 'ASM', helper: 'Moneda principal' },
   { icon: Lock, label: 'Vesting', value: '9 meses', helper: 'Lineal sin cliff' },
   { icon: Trophy, label: 'Listing', value: 'Mínimo $0.012', helper: 'Objetivo inicial' },
-  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada', helper: '9+ meses' },
+  { icon: ShieldCheck, label: 'Liquidez', value: 'Bloqueada', helper: '' },
 ];
 
 export const pancakeSwapAsmUrl =

@@ -106,15 +106,23 @@ export function getIndexerConfig(): IndexerConfig {
     );
   }
 
+  const chains = parseChains(env.CHAIN_INDEXER_CHAINS);
+  const contractAliases = parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES);
+  const presaleAddress = env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS;
+
+  if (contractAliases?.includes('PRESALE') && !presaleAddress) {
+    throw new Error('Falta CHAIN_INDEXER_PRESALE_ADDRESS o NEXT_PUBLIC_UKI_PRESALE_ADDRESS para indexar la preventa.');
+  }
+
   return {
     mongoUrl,
     dbName: env.CHAIN_INDEXER_DB_NAME,
-    chains: parseChains(env.CHAIN_INDEXER_CHAINS),
-    contractAliases: parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES),
+    chains,
+    contractAliases,
     bscRpcUrl:
       env.CHAIN_INDEXER_BSC_RPC_URL ??
       env.BSC_RPC_URL ??
-      'https://bsc-rpc.publicnode.com',
+      'https://bsc.rpc.blxrbdn.com',
     tronApiBaseUrl: env.CHAIN_INDEXER_TRON_API_BASE_URL.replace(/\/$/, ''),
     tronApiKey: env.TRON_API_KEY ?? env.TRONGRID_API_KEY,
     bscStartBlock: env.CHAIN_INDEXER_START_BSC_BLOCK,
@@ -125,7 +133,7 @@ export function getIndexerConfig(): IndexerConfig {
     tronRequestDelayMs: env.CHAIN_INDEXER_TRON_REQUEST_DELAY_MS,
     pollIntervalMs: env.CHAIN_INDEXER_POLL_INTERVAL_MS,
     projectBatchSize: env.CHAIN_INDEXER_PROJECT_BATCH_SIZE,
-    presaleAddress: env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS,
+    presaleAddress,
   };
 }
 
