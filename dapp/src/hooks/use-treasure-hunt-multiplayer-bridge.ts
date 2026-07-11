@@ -244,12 +244,11 @@ export function createTreasureHuntMultiplayerBridge(
   const abortControllers = new Set<AbortController>();
   const inFlightRequestIds = new Set<string>();
   const pendingJoinOperations = new Set<Promise<void>>();
-  const observedIframe = options.iframeRef.current;
-  const parentMarkedNavigationEpoch = observedIframe
-    ? readParentIframeNavigationEpoch(observedIframe)
-    : 0;
-  let hasObservedIframeLoad = parentMarkedNavigationEpoch > 0;
-  let iframeNavigationEpoch = parentMarkedNavigationEpoch;
+  let observedIframe: HTMLIFrameElement | null = null;
+  let observedIframeLoadListener: (() => void) | null = null;
+  let hasObservedIframeNode = false;
+  let hasObservedIframeLoad = false;
+  let iframeNavigationEpoch = 0;
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
   let knownMatchStatus: string | null = null;
@@ -261,14 +260,50 @@ export function createTreasureHuntMultiplayerBridge(
   let generation = 0;
   let disposed = false;
 
-  const handleIframeLoad = () => {
-    if (!hasObservedIframeLoad) {
-      hasObservedIframeLoad = true;
-      return;
+  const detachObservedIframe = () => {
+    if (observedIframe && observedIframeLoadListener) {
+      observedIframe.removeEventListener('load', observedIframeLoadListener);
     }
-    iframeNavigationEpoch += 1;
+    observedIframeLoadListener = null;
   };
-  observedIframe?.addEventListener('load', handleIframeLoad);
+
+  const syncObservedIframe = () => {
+    const nextIframe = options.iframeRef.current;
+    if (nextIframe === observedIframe) return;
+
+    detachObservedIframe();
+    const parentMarkedNavigationEpoch = nextIframe
+      ? readParentIframeNavigationEpoch(nextIframe)
+      : 0;
+    if (hasObservedIframeNode) {
+      iframeNavigationEpoch = Math.max(
+        iframeNavigationEpoch + 1,
+        parentMarkedNavigationEpoch,
+      );
+    } else if (nextIframe) {
+      hasObservedIframeNode = true;
+      iframeNavigationEpoch = Math.max(
+        iframeNavigationEpoch,
+        parentMarkedNavigationEpoch,
+      );
+    }
+
+    observedIframe = nextIframe;
+    hasObservedIframeLoad = parentMarkedNavigationEpoch > 0;
+    if (!nextIframe) return;
+
+    const attachedIframe = nextIframe;
+    observedIframeLoadListener = () => {
+      if (observedIframe !== attachedIframe) return;
+      if (!hasObservedIframeLoad) {
+        hasObservedIframeLoad = true;
+        return;
+      }
+      iframeNavigationEpoch += 1;
+    };
+    attachedIframe.addEventListener('load', observedIframeLoadListener);
+  };
+  syncObservedIframe();
 
   const updateKnownMatchState = (match: unknown) => {
     if (!isRecord(match) || typeof match.status !== 'string') return;
@@ -305,12 +340,15 @@ export function createTreasureHuntMultiplayerBridge(
 
   const rejectStaleIframeAuthority = async (
     request: MultiplayerRequest,
+    requestIframe: HTMLIFrameElement,
     requestNavigationEpoch: number,
     signal: AbortSignal,
   ) => {
+    syncObservedIframe();
     const hasJoinedIframeAuthority =
       knownIframeClientInstanceId !== null && knownIframeNavigationEpoch !== null;
     const isStaleIframe = hasJoinedIframeAuthority && (
+      requestIframe !== observedIframe ||
       request.clientInstanceId !== knownIframeClientInstanceId ||
       requestNavigationEpoch !== knownIframeNavigationEpoch ||
       iframeNavigationEpoch !== requestNavigationEpoch
@@ -320,6 +358,7 @@ export function createTreasureHuntMultiplayerBridge(
     if (knownMatchId && knownMatchReloadSensitive) {
       const forfeitedMatch = await forfeitCanonicalMatch(knownMatchId, signal);
       updateKnownMatchState(forfeitedMatch);
+      syncObservedIframe();
     }
     throw new BridgeError(
       'STALE_IFRAME',
@@ -328,7 +367,9 @@ export function createTreasureHuntMultiplayerBridge(
   };
 
   const handleMessage = (event: MessageEvent) => {
-    const frameWindow = options.iframeRef.current?.contentWindow;
+    syncObservedIframe();
+    const requestIframe = observedIframe;
+    const frameWindow = requestIframe?.contentWindow;
     if (!frameWindow || event.source !== frameWindow || event.origin !== targetOrigin) {
       return;
     }
@@ -433,6 +474,7 @@ export function createTreasureHuntMultiplayerBridge(
           // authority depend on an in-memory promise that a lost network response could
           // leave pending forever. The server-side CAS resolves the remaining race.
           await waitForPendingJoins(joinBarrier, abortController.signal);
+          syncObservedIframe();
           if (
             disposed ||
             abortController.signal.aborted ||
@@ -477,6 +519,13 @@ export function createTreasureHuntMultiplayerBridge(
               abortController.signal,
             );
             updateKnownMatchState(forfeitedMatch);
+            syncObservedIframe();
+            if (requestIframe !== observedIframe) {
+              throw new BridgeError(
+                'STALE_IFRAME',
+                'Iframe navigation changed; join the multiplayer match again',
+              );
+            }
             if (
               disposed ||
               abortController.signal.aborted ||
@@ -497,6 +546,7 @@ export function createTreasureHuntMultiplayerBridge(
             signal: abortController.signal,
           });
           data = await readApiResponse(response);
+          syncObservedIframe();
           if (
             disposed ||
             abortController.signal.aborted ||
@@ -534,6 +584,7 @@ export function createTreasureHuntMultiplayerBridge(
               data.match.matchId,
               abortController.signal,
             );
+            syncObservedIframe();
             if (
               disposed ||
               abortController.signal.aborted ||
@@ -543,6 +594,12 @@ export function createTreasureHuntMultiplayerBridge(
             }
             updateKnownMatchState(forfeitedMatch);
             data = { ...data, match: forfeitedMatch };
+          }
+          if (requestIframe !== observedIframe) {
+            throw new BridgeError(
+              'STALE_IFRAME',
+              'Iframe navigation changed; join the multiplayer match again',
+            );
           }
           knownIframeClientInstanceId = request.clientInstanceId;
           knownIframeNavigationEpoch = iframeNavigationEpoch;
@@ -570,6 +627,7 @@ export function createTreasureHuntMultiplayerBridge(
           if (requiresJoinedIframeAuthority(request.command)) {
             await rejectStaleIframeAuthority(
               request,
+              requestIframe,
               requestNavigationEpoch,
               abortController.signal,
             );
@@ -617,12 +675,14 @@ export function createTreasureHuntMultiplayerBridge(
           if (requiresJoinedIframeAuthority(request.command)) {
             await rejectStaleIframeAuthority(
               request,
+              requestIframe,
               requestNavigationEpoch,
               abortController.signal,
             );
           }
         }
 
+        syncObservedIframe();
         if (
           disposed ||
           abortController.signal.aborted ||
@@ -652,6 +712,7 @@ export function createTreasureHuntMultiplayerBridge(
           }
         }
       } catch (error) {
+        syncObservedIframe();
         if (
           !disposed &&
           requestGeneration === generation &&
@@ -688,7 +749,7 @@ export function createTreasureHuntMultiplayerBridge(
     disposed = true;
     generation += 1;
     windowObject.removeEventListener('message', handleMessage);
-    observedIframe?.removeEventListener('load', handleIframeLoad);
+    detachObservedIframe();
     for (const controller of abortControllers) {
       controller.abort();
     }

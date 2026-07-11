@@ -51,35 +51,56 @@ function requestMessage(
 
 function createHarness(
   fetchImpl = jest.fn(),
-  { initialMarkedLoads = 0 }: { initialMarkedLoads?: number } = {},
+  {
+    initialMarkedLoads = 0,
+    startWithNullIframe = false,
+  }: {
+    initialMarkedLoads?: number;
+    startWithNullIframe?: boolean;
+  } = {},
 ) {
   const releaseOrder: string[] = [];
-  const postMessage = jest.fn((_message: unknown, _origin: string) => {
-    releaseOrder.push('response');
-  });
-  const contentWindow = { postMessage } as unknown as Window;
-  const iframeEvents = new EventTarget();
-  const addIframeEventListener = jest.fn(
-    (type: string, listener: EventListenerOrEventListenerObject) => {
-      iframeEvents.addEventListener(type, listener);
-    },
-  );
-  const removeIframeEventListener = jest.fn(
-    (type: string, listener: EventListenerOrEventListenerObject) => {
-      iframeEvents.removeEventListener(type, listener);
-    },
-  );
-  const iframeElement = {
-    contentWindow,
-    addEventListener: addIframeEventListener,
-    removeEventListener: removeIframeEventListener,
-  } as unknown as HTMLIFrameElement;
+  const createIframeNode = (markedLoads = 0) => {
+    const postMessage = jest.fn((_message: unknown, _origin: string) => {
+      releaseOrder.push('response');
+    });
+    const contentWindow = { postMessage } as unknown as Window;
+    const iframeEvents = new EventTarget();
+    const addIframeEventListener = jest.fn(
+      (type: string, listener: EventListenerOrEventListenerObject) => {
+        iframeEvents.addEventListener(type, listener);
+      },
+    );
+    const removeIframeEventListener = jest.fn(
+      (type: string, listener: EventListenerOrEventListenerObject) => {
+        iframeEvents.removeEventListener(type, listener);
+      },
+    );
+    const iframeElement = {
+      contentWindow,
+      addEventListener: addIframeEventListener,
+      removeEventListener: removeIframeEventListener,
+    } as unknown as HTMLIFrameElement;
+    for (let load = 0; load < markedLoads; load += 1) {
+      markParentIframeNavigation(iframeElement);
+    }
+    return {
+      addIframeEventListener,
+      contentWindow,
+      dispatchIframeLoad: () => {
+        const dispatched = iframeEvents.dispatchEvent(new Event('load'));
+        markParentIframeNavigation(iframeElement);
+        return dispatched;
+      },
+      iframeElement,
+      postMessage,
+      removeIframeEventListener,
+    };
+  };
+  const initialIframe = createIframeNode(initialMarkedLoads);
   const iframeRef = {
-    current: iframeElement,
-  } as React.RefObject<HTMLIFrameElement>;
-  for (let load = 0; load < initialMarkedLoads; load += 1) {
-    markParentIframeNavigation(iframeElement);
-  }
+    current: startWithNullIframe ? null : initialIframe.iframeElement,
+  } as { current: HTMLIFrameElement | null };
   const onRoomJoined = jest.fn();
   const onSessionReleased = jest.fn(() => releaseOrder.push('callback'));
   const cleanup = createTreasureHuntMultiplayerBridge({
@@ -94,16 +115,21 @@ function createHarness(
   });
   return {
     cleanup,
-    addIframeEventListener,
-    contentWindow,
-    dispatchIframeLoad: () => {
-      const dispatched = iframeEvents.dispatchEvent(new Event('load'));
-      markParentIframeNavigation(iframeElement);
-      return dispatched;
+    addIframeEventListener: initialIframe.addIframeEventListener,
+    attachInitialIframe: () => {
+      iframeRef.current = initialIframe.iframeElement;
     },
-    iframeElement,
-    postMessage,
-    removeIframeEventListener,
+    contentWindow: initialIframe.contentWindow,
+    dispatchIframeLoad: initialIframe.dispatchIframeLoad,
+    iframeElement: initialIframe.iframeElement,
+    iframeRef,
+    postMessage: initialIframe.postMessage,
+    removeIframeEventListener: initialIframe.removeIframeEventListener,
+    replaceIframe: ({ markedLoads = 0 }: { markedLoads?: number } = {}) => {
+      const replacement = createIframeNode(markedLoads);
+      iframeRef.current = replacement.iframeElement;
+      return replacement;
+    },
     fetchImpl,
     onRoomJoined,
     onSessionReleased,
@@ -180,6 +206,117 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
 
     expect(removeIframeEventListener).toHaveBeenCalledTimes(1);
     expect(removeIframeEventListener).toHaveBeenCalledWith('load', loadListener);
+  });
+
+  it('attaches when a null iframe first appears and does not flag its first JOIN', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(apiResponse({
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+    }));
+    const {
+      addIframeEventListener,
+      attachInitialIframe,
+      cleanup,
+      contentWindow,
+      postMessage,
+    } = createHarness(fetchImpl, { startWithNullIframe: true });
+
+    expect(addIframeEventListener).not.toHaveBeenCalled();
+    attachInitialIframe();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'first-join-after-appearance',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+
+    expect(addIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'first-join-after-appearance',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'running' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('forfeits a same-UUID reload after a preloaded iframe appears from null', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      attachInitialIframe,
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl, {
+      initialMarkedLoads: 1,
+      startWithNullIframe: true,
+    });
+
+    attachInitialIframe();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-after-null',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-after-null-reload',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+      '/api/games/treasure-hunt/multiplayer/matches',
+    ]);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'join-after-null-reload',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
   });
 
   it('treats the first load as the baseline for the first JOIN', async () => {
@@ -358,6 +495,227 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     expect(postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         requestId: 'join-after-observed-reload',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('reattaches to a replacement node and treats its same-UUID JOIN as reload', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      addIframeEventListener,
+      cleanup,
+      contentWindow,
+      postMessage,
+      removeIframeEventListener,
+      replaceIframe,
+    } = createHarness(fetchImpl, { initialMarkedLoads: 1 });
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-node-a',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    const nodeAListener = addIframeEventListener.mock.calls[0][1];
+    const nodeB = replaceIframe({ markedLoads: 1 });
+
+    requestMessage(
+      nodeB.contentWindow,
+      GAME_ORIGIN,
+      'join-node-b',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(nodeB.postMessage).toHaveBeenCalledTimes(1));
+
+    expect(removeIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(removeIframeEventListener).toHaveBeenCalledWith('load', nodeAListener);
+    expect(nodeB.addIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+      '/api/games/treasure-hunt/multiplayer/matches',
+    ]);
+    expect(nodeB.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'join-node-b',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+
+    const nodeBListener = nodeB.addIframeEventListener.mock.calls[0][1];
+    cleanup();
+    expect(nodeB.removeIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(nodeB.removeIframeEventListener).toHaveBeenCalledWith('load', nodeBListener);
+  });
+
+  it('forfeits and rejects a match operation from a replacement iframe node', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      postMessage,
+      replaceIframe,
+    } = createHarness(fetchImpl, { initialMarkedLoads: 1 });
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-before-node-swap',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    const nodeB = replaceIframe({ markedLoads: 1 });
+    requestMessage(
+      nodeB.contentWindow,
+      GAME_ORIGIN,
+      'heartbeat-node-b',
+      'heartbeat',
+      {},
+      'same-child',
+    );
+    await waitFor(() => expect(nodeB.postMessage).toHaveBeenCalledTimes(1));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toEqual({
+      action: 'forfeit',
+      gameSessionId: 'parent-game-session',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
+    });
+    expect(nodeB.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'heartbeat-node-b',
+        success: false,
+        error: expect.objectContaining({ code: 'STALE_IFRAME' }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('detects a node replacement during JOIN await and never binds the new node implicitly', async () => {
+    const delayedJoin = deferred<Response>();
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'waiting' },
+      }))
+      .mockImplementationOnce(() => delayedJoin.promise)
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      postMessage,
+      removeIframeEventListener,
+      replaceIframe,
+    } = createHarness(fetchImpl, { initialMarkedLoads: 1 });
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-before-await-swap',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-during-node-swap',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    const nodeB = replaceIframe({ markedLoads: 1 });
+    delayedJoin.resolve(apiResponse({
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+    }));
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3));
+
+    expect(removeIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(nodeB.addIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    expect(nodeB.postMessage).not.toHaveBeenCalled();
+    expect(JSON.parse(fetchImpl.mock.calls[2][1]?.body as string)).toEqual({
+      action: 'forfeit',
+      gameSessionId: 'parent-game-session',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
+    });
+
+    requestMessage(
+      nodeB.contentWindow,
+      GAME_ORIGIN,
+      'join-node-b-after-await',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(nodeB.postMessage).toHaveBeenCalledTimes(1));
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(nodeB.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'join-node-b-after-await',
         success: true,
         data: expect.objectContaining({
           match: expect.objectContaining({ status: 'finished' }),
