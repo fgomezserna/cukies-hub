@@ -71,6 +71,7 @@ export function createWaitingMatch(input: NewMatchInput): Match {
     startAt: null,
     resumeAt: null,
     pausedFromStatus: null,
+    pendingElimination: null,
     suddenDeath: null,
     result: null,
     createdAt: input.now,

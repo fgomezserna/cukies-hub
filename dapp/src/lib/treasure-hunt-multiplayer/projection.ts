@@ -11,10 +11,10 @@ export function projectPublicMatch(match: Match): PublicMatch {
     revision: match.revision,
     status: match.status,
     config: {
+      ...match.rules,
       seed: match.seed,
       startAt: match.startAt,
       resumeAt: match.resumeAt,
-      winDelta: match.rules.winDelta,
     },
     players: match.players.map((player) => ({
       playerId: player.playerId,

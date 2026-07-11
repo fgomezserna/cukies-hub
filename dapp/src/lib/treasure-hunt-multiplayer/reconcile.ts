@@ -39,6 +39,7 @@ function finishMatch(
     },
     resumeAt: null,
     pausedFromStatus: null,
+    pendingElimination: null,
     updatedAt: now,
   };
 }
@@ -81,15 +82,22 @@ function evaluateVictory(match: Match, now: number): Match {
       return match;
     }
 
-    if (isDead(chaser)) {
-      return finishMatch(match, now, 'sudden_death', match.suddenDeath.leaderPlayerId);
-    }
-
     if (chaser.snapshot.score > match.suddenDeath.targetScore) {
       return finishMatch(match, now, 'sudden_death', chaser.playerId);
     }
 
+    if (isDead(chaser)) {
+      return finishMatch(match, now, 'sudden_death', match.suddenDeath.leaderPlayerId);
+    }
+
     return match;
+  }
+
+  const firstDead = isDead(first);
+  const secondDead = isDead(second);
+
+  if (firstDead && secondDead) {
+    return winnerByScore(match, now, 'elimination');
   }
 
   const scoreDifference = first.snapshot.score - second.snapshot.score;
@@ -102,30 +110,44 @@ function evaluateVictory(match: Match, now: number): Match {
     );
   }
 
-  const firstDead = isDead(first);
-  const secondDead = isDead(second);
-
-  if (firstDead && secondDead) {
-    return winnerByScore(match, now, 'elimination');
-  }
-
   if (!firstDead && !secondDead) {
-    return match;
+    return match.pendingElimination
+      ? { ...match, pendingElimination: null, updatedAt: now }
+      : match;
   }
 
   const deadPlayer = firstDead ? first : second;
   const livingPlayer = firstDead ? second : first;
-  if (deadPlayer.snapshot.score <= livingPlayer.snapshot.score) {
+  const pending = match.pendingElimination;
+  if (!pending || pending.playerId !== deadPlayer.playerId) {
+    return {
+      ...match,
+      pendingElimination: {
+        playerId: deadPlayer.playerId,
+        scoreAtDeath: deadPlayer.snapshot.score,
+        detectedAt: now,
+        resolveAt: now + match.rules.eliminationResolutionDelayMs,
+      },
+      updatedAt: now,
+    };
+  }
+
+  if (now < pending.resolveAt) {
+    return match;
+  }
+
+  if (pending.scoreAtDeath <= livingPlayer.snapshot.score) {
     return finishMatch(match, now, 'elimination', livingPlayer.playerId);
   }
 
   return {
     ...match,
     status: 'sudden_death',
+    pendingElimination: null,
     suddenDeath: {
       leaderPlayerId: deadPlayer.playerId,
       chasingPlayerId: livingPlayer.playerId,
-      targetScore: deadPlayer.snapshot.score,
+      targetScore: pending.scoreAtDeath,
     },
     updatedAt: now,
   };
@@ -183,7 +205,21 @@ function resolveExpiredBudgets(match: Match, now: number): Match {
     return match;
   }
 
+  if (expired.length === match.players.length) {
+    const withForfeits: Match = {
+      ...match,
+      players: match.players.map((player) => ({ ...player, presence: 'forfeited' as const })),
+      updatedAt: now,
+    };
+    return finishMatch(withForfeits, now, 'abandoned', null);
+  }
+
   const expiredIds = new Set(expired.map((player) => player.playerId));
+  const winner = match.players.find((player) => !expiredIds.has(player.playerId));
+  if (!winner || winner.presence !== 'online') {
+    return match;
+  }
+
   const withForfeits: Match = {
     ...match,
     players: match.players.map((player) =>
@@ -191,12 +227,6 @@ function resolveExpiredBudgets(match: Match, now: number): Match {
     ),
     updatedAt: now,
   };
-
-  if (expired.length === match.players.length) {
-    return finishMatch(withForfeits, now, 'abandoned', null);
-  }
-
-  const winner = withForfeits.players.find((player) => !expiredIds.has(player.playerId));
   return finishMatch(withForfeits, now, 'forfeit', winner?.playerId ?? null);
 }
 
@@ -285,7 +315,11 @@ export function reconnectMatchPlayer(match: Match, playerId: string, now: number
 
   let found = false;
   const players = match.players.map((player) => {
-    if (player.playerId !== playerId || player.presence === 'forfeited') {
+    if (
+      player.playerId !== playerId ||
+      player.presence === 'forfeited' ||
+      player.reconnectBudgetRemainingMs === 0
+    ) {
       return player;
     }
 

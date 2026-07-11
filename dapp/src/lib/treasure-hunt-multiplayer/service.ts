@@ -7,6 +7,7 @@ import {
   MatchRevisionConflictError,
   MultiplayerDomainError,
   invalidInput,
+  invalidSnapshot,
 } from './errors';
 import { createMatchPlayer, createWaitingMatch } from './match';
 import { projectPublicMatch } from './projection';
@@ -262,6 +263,18 @@ export class TreasureHuntMultiplayerService {
       }
       if (isTerminalMatch(next)) {
         throw new MultiplayerDomainError('MATCH_TERMINAL', `Match ${matchId} is terminal`, 409);
+      }
+      if (next.status !== 'running' && next.status !== 'sudden_death') {
+        throw invalidSnapshot(`snapshots are not accepted while match status is ${next.status}`);
+      }
+      if (next.pendingElimination?.playerId === player.playerId) {
+        throw invalidSnapshot('the first eliminated player snapshot is frozen');
+      }
+      if (
+        next.status === 'sudden_death' &&
+        next.suddenDeath?.leaderPlayerId === player.playerId
+      ) {
+        throw invalidSnapshot('the sudden-death leader snapshot is frozen');
       }
 
       next = reconnectMatchPlayer(next, player.playerId, now);

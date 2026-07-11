@@ -1,11 +1,14 @@
 import type { MatchRules } from './types';
 
+export const ABSOLUTE_MAX_HEARTS = 10;
+
 export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
   winDelta: 500,
   initialCountdownMs: 3_000,
   offlineThresholdMs: 3_000,
   reconnectBudgetMs: 15_000,
   reconnectCountdownMs: 3_000,
+  eliminationResolutionDelayMs: 250,
   initialHearts: 3,
   maxHearts: 10,
   maxHeartsDelta: 1,
@@ -21,6 +24,7 @@ const POSITIVE_RULES: readonly (keyof MatchRules)[] = [
   'offlineThresholdMs',
   'reconnectBudgetMs',
   'reconnectCountdownMs',
+  'eliminationResolutionDelayMs',
   'maxHearts',
   'maxHeartsDelta',
   'maxScore',
@@ -44,6 +48,10 @@ export function createMatchRules(overrides: Partial<MatchRules> = {}): MatchRule
 
   if (rules.initialHearts > rules.maxHearts) {
     throw new TypeError('initialHearts cannot exceed maxHearts');
+  }
+
+  if (rules.maxHearts > ABSOLUTE_MAX_HEARTS) {
+    throw new TypeError(`maxHearts cannot exceed ${ABSOLUTE_MAX_HEARTS}`);
   }
 
   return Object.freeze(rules);

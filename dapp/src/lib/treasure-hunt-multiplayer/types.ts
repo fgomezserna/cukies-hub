@@ -44,6 +44,7 @@ export interface MatchRules {
   readonly offlineThresholdMs: number;
   readonly reconnectBudgetMs: number;
   readonly reconnectCountdownMs: number;
+  readonly eliminationResolutionDelayMs: number;
   readonly initialHearts: number;
   readonly maxHearts: number;
   readonly maxHeartsDelta: number;
@@ -74,6 +75,13 @@ export interface SuddenDeathState {
   readonly targetScore: number;
 }
 
+export interface PendingElimination {
+  readonly playerId: string;
+  readonly scoreAtDeath: number;
+  readonly detectedAt: number;
+  readonly resolveAt: number;
+}
+
 export type PausableMatchStatus = 'countdown' | 'running' | 'sudden_death';
 
 export interface Match {
@@ -91,6 +99,7 @@ export interface Match {
   readonly startAt: number | null;
   readonly resumeAt: number | null;
   readonly pausedFromStatus: PausableMatchStatus | null;
+  readonly pendingElimination: PendingElimination | null;
   readonly suddenDeath: SuddenDeathState | null;
   readonly result: MatchResult | null;
   readonly createdAt: number;
@@ -122,11 +131,10 @@ export interface PublicMatch {
   readonly rulesVersion: string;
   readonly revision: number;
   readonly status: MatchStatus;
-  readonly config: {
+  readonly config: MatchRules & {
     readonly seed: string | null;
     readonly startAt: number | null;
     readonly resumeAt: number | null;
-    readonly winDelta: number;
   };
   readonly players: readonly PublicMatchPlayer[];
   readonly suddenDeath: SuddenDeathState | null;

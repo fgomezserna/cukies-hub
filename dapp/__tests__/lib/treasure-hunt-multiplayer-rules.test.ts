@@ -11,7 +11,7 @@ import {
 const seedFactory = () => 'stable-seed';
 
 function createRunningMatch(ruleOverrides: Partial<MatchRules> = {}): Match {
-  const rules = createMatchRules(ruleOverrides);
+  const rules = createMatchRules({ offlineThresholdMs: 1_000_000, ...ruleOverrides });
   const waiting = createWaitingMatch({
     matchId: 'match-1',
     roomCode: 'ROOM',
@@ -65,8 +65,13 @@ function withPlayerState(
   };
 }
 
-function evaluate(match: Match, now = 100) {
+function evaluate(match: Match, now = 10_000) {
   return reconcileMatch(match, { now, createSeed: seedFactory });
+}
+
+function resolveFirstElimination(match: Match, now = 10_000) {
+  const pending = evaluate(match, now);
+  return evaluate(pending, now + match.rules.eliminationResolutionDelayMs);
 }
 
 describe('Treasure Hunt multiplayer reconciliation rules', () => {
@@ -127,7 +132,11 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
     match = withPlayerState(match, 'player-a', 300, 0);
     match = withPlayerState(match, 'player-b', 300, 2);
 
-    expect(evaluate(match).result).toMatchObject({
+    const pending = evaluate(match);
+    expect(pending.pendingElimination).toMatchObject({ playerId: 'player-a' });
+    expect(evaluate(pending, 10_249).result).toBeNull();
+
+    expect(evaluate(pending, 10_250).result).toMatchObject({
       winnerPlayerId: 'player-b',
       reason: 'elimination',
     });
@@ -138,7 +147,7 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
     match = withPlayerState(match, 'player-a', 600, 0);
     match = withPlayerState(match, 'player-b', 500, 2);
 
-    const suddenDeath = evaluate(match);
+    const suddenDeath = resolveFirstElimination(match);
     expect(suddenDeath.status).toBe('sudden_death');
     expect(suddenDeath.suddenDeath).toEqual({
       leaderPlayerId: 'player-a',
@@ -146,11 +155,11 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
       targetScore: 600,
     });
 
-    const tied = evaluate(withPlayerState(suddenDeath, 'player-b', 600, 2), 200);
+    const tied = evaluate(withPlayerState(suddenDeath, 'player-b', 600, 2), 10_300);
     expect(tied.status).toBe('sudden_death');
     expect(tied.result).toBeNull();
 
-    const exceeded = evaluate(withPlayerState(tied, 'player-b', 601, 2), 300);
+    const exceeded = evaluate(withPlayerState(tied, 'player-b', 601, 2), 10_400);
     expect(exceeded.result).toMatchObject({
       winnerPlayerId: 'player-b',
       reason: 'sudden_death',
@@ -161,12 +170,29 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
     let match = createRunningMatch();
     match = withPlayerState(match, 'player-a', 450, 0);
     match = withPlayerState(match, 'player-b', 300, 2);
-    const suddenDeath = evaluate(match);
+    const suddenDeath = resolveFirstElimination(match);
 
-    const chaserDead = evaluate(withPlayerState(suddenDeath, 'player-b', 400, 0), 200);
+    const chaserDead = evaluate(withPlayerState(suddenDeath, 'player-b', 400, 0), 10_300);
 
     expect(chaserDead.result).toMatchObject({
       winnerPlayerId: 'player-a',
+      reason: 'sudden_death',
+    });
+  });
+
+  it('awards a sudden-death chaser that exceeds the target in its final death snapshot', () => {
+    let match = createRunningMatch();
+    match = withPlayerState(match, 'player-a', 600, 0);
+    match = withPlayerState(match, 'player-b', 500, 2);
+    const suddenDeath = resolveFirstElimination(match);
+
+    const finalSnapshot = evaluate(
+      withPlayerState(suddenDeath, 'player-b', 601, 0),
+      10_300,
+    );
+
+    expect(finalSnapshot.result).toMatchObject({
+      winnerPlayerId: 'player-b',
       reason: 'sudden_death',
     });
   });
@@ -176,10 +202,12 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
       initialCountdownMs: 10,
       offlineThresholdMs: 100,
       reconnectBudgetMs: 500,
+      eliminationResolutionDelayMs: 10,
     });
     match = withPlayerState(match, 'player-a', 450, 0);
     match = withPlayerState(match, 'player-b', 300, 2);
-    const suddenDeath = evaluate(match, 20);
+    const pending = evaluate(match, 20);
+    const suddenDeath = evaluate(pending, 30);
     const leaderAliveOnWire = reconnectMatchPlayer(suddenDeath, 'player-a', 600);
 
     const chaserForfeit = evaluate(leaderAliveOnWire, 600);
