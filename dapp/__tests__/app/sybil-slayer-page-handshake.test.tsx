@@ -119,9 +119,14 @@ describe('SybilSlayerPage game-session handshake', () => {
       '/api/games/start-session',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ gameId: 'sybil-slayer', gameVersion: '1.0.0' }),
+        body: expect.any(String),
       }),
     );
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toMatchObject({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      idempotencyKey: expect.stringMatching(/^[A-Za-z0-9_-]{16,128}$/),
+    });
 
     view.rerender(
       <StrictMode>

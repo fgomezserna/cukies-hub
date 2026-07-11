@@ -498,6 +498,7 @@ describe('game session single-flight starter', () => {
       fetchImpl: fetchImpl as typeof fetch,
       gameId: 'sybil-slayer',
       gameVersion: '1.0.0',
+      idempotencyKeyFactory: () => 'test-idempotency-key-0001',
     });
 
     const first = starter.start('wallet-user');
@@ -506,6 +507,7 @@ describe('game session single-flight starter', () => {
     expect(JSON.parse(fetchImpl.mock.calls[0][1]?.body as string)).toEqual({
       gameId: 'sybil-slayer',
       gameVersion: '1.0.0',
+      idempotencyKey: 'test-idempotency-key-0001',
     });
 
     resolveRequest?.(
@@ -541,6 +543,7 @@ describe('game session single-flight starter', () => {
       fetchImpl: fetchImpl as typeof fetch,
       gameId: 'sybil-slayer',
       gameVersion: '1.0.0',
+      idempotencyKeyFactory: () => 'retry-idempotency-key-0001',
       maxAttempts: 2,
       retryDelayMs: 0,
     });
@@ -549,6 +552,10 @@ describe('game session single-flight starter', () => {
       sessionId: 'session-after-retry',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl.mock.calls[0][1]?.body).toBe(fetchImpl.mock.calls[1][1]?.body);
+    expect(JSON.parse(fetchImpl.mock.calls[0][1]?.body as string)).toMatchObject({
+      idempotencyKey: 'retry-idempotency-key-0001',
+    });
     await starter.start('wallet-user');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
@@ -559,6 +566,7 @@ describe('game session single-flight starter', () => {
       fetchImpl: fetchImpl as typeof fetch,
       gameId: 'sybil-slayer',
       gameVersion: '1.0.0',
+      idempotencyKeyFactory: () => 'cancel-idempotency-key-0001',
       maxAttempts: 2,
       retryDelayMs: 10_000,
     });

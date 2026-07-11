@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -11,10 +11,61 @@ const SUPPORTED_GAME_IDS: ReadonlySet<string> = new Set([
   'tower-builder',
 ]);
 const DEFAULT_GAME_VERSION = '1.0.0';
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const GAME_SESSION_SELECT = {
+  sessionId: true,
+  sessionToken: true,
+  userId: true,
+  gameId: true,
+  gameVersion: true,
+} as const;
+
+interface ExistingGameSession {
+  readonly sessionId: string;
+  readonly sessionToken: string;
+  readonly userId: string;
+  readonly gameId: string;
+  readonly gameVersion: string | null;
+}
 
 function json(payload: unknown, status = 200) {
   return NextResponse.json(payload, { status, headers: NO_STORE_HEADERS });
+}
+
+function createSessionId(userId: string, gameId: string, idempotencyKey: string) {
+  const digest = createHash('sha256')
+    .update(JSON.stringify(['cukies-game-session-v1', userId, gameId, idempotencyKey]))
+    .digest('hex');
+  return `game_${digest}`;
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
+}
+
+function isCompatibleSession(
+  session: ExistingGameSession,
+  identity: { readonly userId: string; readonly gameId: string },
+) {
+  return session.userId === identity.userId && session.gameId === identity.gameId;
+}
+
+function successResponse(session: ExistingGameSession) {
+  return json({
+    success: true,
+    sessionToken: session.sessionToken,
+    sessionId: session.sessionId,
+    gameId: session.gameId,
+    gameVersion: session.gameVersion ?? DEFAULT_GAME_VERSION,
+  });
+}
+
+async function findGameSession(sessionId: string): Promise<ExistingGameSession | null> {
+  return prisma.gameSession.findUnique({
+    where: { sessionId },
+    select: GAME_SESSION_SELECT,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -56,6 +107,20 @@ export async function POST(request: NextRequest) {
     ) {
       return json({ success: false, error: 'Invalid game version' }, 400);
     }
+    const normalizedGameVersion = gameVersion.trim();
+
+    let idempotencyKey: string;
+    if (input.idempotencyKey === undefined) {
+      // Legacy callers remain compatible, but only callers that reuse a key get replay safety.
+      idempotencyKey = randomUUID();
+    } else if (
+      typeof input.idempotencyKey === 'string' &&
+      IDEMPOTENCY_KEY_PATTERN.test(input.idempotencyKey)
+    ) {
+      idempotencyKey = input.idempotencyKey;
+    } else {
+      return json({ success: false, error: 'Invalid idempotency key' }, 400);
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: walletSession.userId },
@@ -65,27 +130,46 @@ export async function POST(request: NextRequest) {
       return json({ success: false, error: 'User not found' }, 404);
     }
 
-    const sessionToken = `session_${randomBytes(32).toString('base64url')}`;
-    const sessionId = `game_${gameId}_${randomUUID()}`;
+    const identity = { userId: walletSession.userId, gameId };
+    const sessionId = createSessionId(identity.userId, identity.gameId, idempotencyKey);
+    const existing = await findGameSession(sessionId);
+    if (existing) {
+      if (!isCompatibleSession(existing, identity)) {
+        return json({ success: false, error: 'Game session conflict' }, 409);
+      }
+      return successResponse(existing);
+    }
 
-    await prisma.gameSession.create({
-      data: {
-        sessionToken,
-        sessionId,
-        userId: walletSession.userId,
-        gameId,
-        gameVersion: gameVersion.trim(),
-        isActive: true,
-      },
-    });
-
-    return json({
-      success: true,
-      sessionToken,
+    const candidate: ExistingGameSession = {
+      sessionToken: `session_${randomBytes(32).toString('base64url')}`,
       sessionId,
-      gameId,
-      gameVersion: gameVersion.trim(),
-    });
+      userId: identity.userId,
+      gameId: identity.gameId,
+      gameVersion: normalizedGameVersion,
+    };
+
+    try {
+      await prisma.gameSession.create({
+        data: {
+          ...candidate,
+          isActive: true,
+        },
+      });
+      return successResponse(candidate);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const winner = await findGameSession(sessionId);
+      if (!winner) {
+        throw error;
+      }
+      if (!isCompatibleSession(winner, identity)) {
+        return json({ success: false, error: 'Game session conflict' }, 409);
+      }
+      return successResponse(winner);
+    }
   } catch {
     console.error('Unexpected error while starting game session');
     return json({ success: false, error: 'Internal server error' }, 500);

@@ -364,8 +364,22 @@ export interface SingleFlightGameSessionStarterOptions {
   readonly gameId: string;
   readonly gameVersion: string;
   readonly fetchImpl?: typeof fetch;
+  readonly idempotencyKeyFactory?: () => string;
   readonly maxAttempts?: number;
   readonly retryDelayMs?: number;
+}
+
+function createGameSessionIdempotencyKey() {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi) {
+    throw new Error('Web Crypto is required to start a game session');
+  }
+  if (typeof cryptoApi.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function gameSessionAbortError() {
@@ -397,6 +411,8 @@ export function createSingleFlightGameSessionStarter(
   options: SingleFlightGameSessionStarterOptions,
 ) {
   const fetchImpl = options.fetchImpl ?? fetch;
+  const idempotencyKeyFactory =
+    options.idempotencyKeyFactory ?? createGameSessionIdempotencyKey;
   const maxAttempts = options.maxAttempts ?? 2;
   const retryDelayMs = options.retryDelayMs ?? 100;
   if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5) {
@@ -449,6 +465,24 @@ export function createSingleFlightGameSessionStarter(
 
       const runGeneration = ++generation;
       const controller = new AbortController();
+      let idempotencyKey: string;
+      try {
+        idempotencyKey = idempotencyKeyFactory();
+      } catch {
+        return Promise.reject(
+          new BridgeError('IDEMPOTENCY_UNAVAILABLE', 'Game session request key is unavailable'),
+        );
+      }
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(idempotencyKey)) {
+        return Promise.reject(
+          new BridgeError('INVALID_IDEMPOTENCY_KEY', 'Game session request key is invalid'),
+        );
+      }
+      const requestBody = JSON.stringify({
+        gameId: options.gameId,
+        gameVersion: options.gameVersion,
+        idempotencyKey,
+      });
       const request = (async () => {
         // Deferring one microtask lets React StrictMode cancel its probe mount before any POST.
         await Promise.resolve();
@@ -462,10 +496,7 @@ export function createSingleFlightGameSessionStarter(
               method: 'POST',
               credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                gameId: options.gameId,
-                gameVersion: options.gameVersion,
-              }),
+              body: requestBody,
               signal: controller.signal,
             });
             receivedResponse = true;
