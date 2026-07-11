@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 const REQUEST_TYPE = 'TH_MULTIPLAYER_REQUEST';
 const RESPONSE_TYPE = 'TH_MULTIPLAYER_RESPONSE';
@@ -40,10 +40,16 @@ export interface TreasureHuntMultiplayerBridgeOptions {
   readonly iframeRef: RefObject<HTMLIFrameElement>;
   readonly gameUrl: string;
   readonly currentSessionId: string;
+  readonly authorityClientInstanceId?: string;
   readonly fetchImpl?: typeof fetch;
   readonly windowObject?: Window;
   readonly onRoomJoined?: (roomCode: string) => void;
   readonly onSessionReleased?: (sessionId: string) => void;
+}
+
+export interface TreasureHuntMultiplayerAuthorityLease {
+  readonly sessionId: string;
+  readonly clientInstanceId: string;
 }
 
 export interface UseTreasureHuntMultiplayerBridgeOptions {
@@ -56,6 +62,23 @@ export interface UseTreasureHuntMultiplayerBridgeOptions {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function createAuthorityClientInstanceId(cryptoApi: Crypto): string {
+  if (typeof cryptoApi.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function resolveTreasureHuntMultiplayerAuthorityLease(
+  current: TreasureHuntMultiplayerAuthorityLease | null,
+  sessionId: string,
+  cryptoApi: Crypto,
+): TreasureHuntMultiplayerAuthorityLease {
+  if (current?.sessionId === sessionId) return current;
+  return { sessionId, clientInstanceId: createAuthorityClientInstanceId(cryptoApi) };
 }
 
 function parseRequest(value: unknown): MultiplayerRequest | null {
@@ -187,6 +210,11 @@ export function createTreasureHuntMultiplayerBridge(
   const windowObject = options.windowObject ?? window;
   const fetchImpl = options.fetchImpl ?? fetch;
   const targetOrigin = new URL(options.gameUrl, windowObject.location.href).origin;
+  const authorityClientInstanceId =
+    options.authorityClientInstanceId ?? createAuthorityClientInstanceId(windowObject.crypto);
+  if (authorityClientInstanceId.length === 0 || authorityClientInstanceId.length > 128) {
+    throw new BridgeError('INVALID_CLIENT_ID', 'Multiplayer authority client is invalid');
+  }
   const abortControllers = new Set<AbortController>();
   const inFlightRequestIds = new Set<string>();
   const pendingJoinOperations = new Set<Promise<void>>();
@@ -332,7 +360,7 @@ export function createTreasureHuntMultiplayerBridge(
             body: JSON.stringify({
               roomCode,
               gameSessionId: options.currentSessionId,
-              clientInstanceId: request.clientInstanceId,
+              clientInstanceId: authorityClientInstanceId,
             }),
             signal: abortController.signal,
           });
@@ -376,7 +404,7 @@ export function createTreasureHuntMultiplayerBridge(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               gameSessionId: options.currentSessionId,
-              clientInstanceId: request.clientInstanceId,
+              clientInstanceId: authorityClientInstanceId,
             }),
             signal: abortController.signal,
           });
@@ -391,7 +419,7 @@ export function createTreasureHuntMultiplayerBridge(
           if (request.command === 'get') {
             const query = new URLSearchParams({
               gameSessionId: options.currentSessionId,
-              clientInstanceId: request.clientInstanceId,
+              clientInstanceId: authorityClientInstanceId,
             });
             const response = await fetchImpl(`${matchPath}?${query.toString()}`, {
               method: 'GET',
@@ -403,7 +431,7 @@ export function createTreasureHuntMultiplayerBridge(
             const body: Record<string, unknown> = {
               action: request.command,
               gameSessionId: options.currentSessionId,
-              clientInstanceId: request.clientInstanceId,
+              clientInstanceId: authorityClientInstanceId,
             };
             if (request.command === 'snapshot') {
               body.snapshot = request.payload.snapshot;
@@ -499,16 +527,23 @@ export function createTreasureHuntMultiplayerBridge(
 export function useTreasureHuntMultiplayerBridge(
   options: UseTreasureHuntMultiplayerBridgeOptions,
 ) {
+  const authorityLeaseRef = useRef<TreasureHuntMultiplayerAuthorityLease | null>(null);
   useEffect(() => {
     if (!options.gameUrl || !options.currentSessionId) {
       return undefined;
     }
 
     try {
+      authorityLeaseRef.current = resolveTreasureHuntMultiplayerAuthorityLease(
+        authorityLeaseRef.current,
+        options.currentSessionId,
+        window.crypto,
+      );
       return createTreasureHuntMultiplayerBridge({
         iframeRef: options.iframeRef,
         gameUrl: options.gameUrl,
         currentSessionId: options.currentSessionId,
+        authorityClientInstanceId: authorityLeaseRef.current.clientInstanceId,
         onRoomJoined: options.onRoomJoined,
         onSessionReleased: options.onSessionReleased,
       });

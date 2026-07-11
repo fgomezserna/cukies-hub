@@ -3,10 +3,12 @@ import { waitFor } from '@testing-library/react';
 import {
   createSingleFlightGameSessionStarter,
   createTreasureHuntMultiplayerBridge,
+  resolveTreasureHuntMultiplayerAuthorityLease,
 } from '@/hooks/use-treasure-hunt-multiplayer-bridge';
 
 const GAME_ORIGIN = 'https://game.example';
 const GAME_URL = `${GAME_ORIGIN}/treasure-hunt`;
+const AUTHORITY_CLIENT_ID = 'parent-authority-client';
 
 function apiResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -61,6 +63,7 @@ function createHarness(fetchImpl = jest.fn()) {
     iframeRef,
     gameUrl: GAME_URL,
     currentSessionId: 'parent-game-session',
+    authorityClientInstanceId: AUTHORITY_CLIENT_ID,
     fetchImpl: fetchImpl as typeof fetch,
     windowObject: window,
     onRoomJoined,
@@ -89,6 +92,30 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it('keeps one cryptographic authority lease across iframe reloads and rotates by session', () => {
+    const randomUUID = jest
+      .fn()
+      .mockReturnValueOnce('11111111-1111-4111-8111-111111111111')
+      .mockReturnValueOnce('22222222-2222-4222-8222-222222222222');
+    const cryptoApi = { randomUUID } as unknown as Crypto;
+
+    const first = resolveTreasureHuntMultiplayerAuthorityLease(null, 'session-1', cryptoApi);
+    const iframeReload = resolveTreasureHuntMultiplayerAuthorityLease(
+      first,
+      'session-1',
+      cryptoApi,
+    );
+    const rotatedSession = resolveTreasureHuntMultiplayerAuthorityLease(
+      iframeReload,
+      'session-2',
+      cryptoApi,
+    );
+
+    expect(iframeReload).toBe(first);
+    expect(rotatedSession.clientInstanceId).not.toBe(first.clientInstanceId);
+    expect(randomUUID).toHaveBeenCalledTimes(2);
   });
 
   it('ignores messages from a different iframe source or origin', async () => {
@@ -133,7 +160,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
         body: JSON.stringify({
           roomCode: 'ROOM 42',
           gameSessionId: 'parent-game-session',
-          clientInstanceId: 'client-1',
+          clientInstanceId: AUTHORITY_CLIENT_ID,
         }),
       }),
     );
@@ -180,7 +207,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     requestMessage(contentWindow, GAME_ORIGIN, 'get', 'get', { matchId: 'attacker-match' });
     await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
     expect(fetchImpl.mock.calls[1][0]).toBe(
-      '/api/games/treasure-hunt/multiplayer/matches/trusted-match?gameSessionId=parent-game-session&clientInstanceId=client-1',
+      `/api/games/treasure-hunt/multiplayer/matches/trusted-match?gameSessionId=parent-game-session&clientInstanceId=${AUTHORITY_CLIENT_ID}`,
     );
 
     requestMessage(contentWindow, GAME_ORIGIN, 'heartbeat', 'heartbeat', {
@@ -194,7 +221,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     expect(JSON.parse(fetchImpl.mock.calls[2][1]?.body as string)).toEqual({
       action: 'heartbeat',
       gameSessionId: 'parent-game-session',
-      clientInstanceId: 'client-1',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
     });
 
     const snapshot = { seq: 1, score: 10, hearts: 3, elapsedMs: 100, lifecycle: 'playing' };
@@ -206,7 +233,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     expect(JSON.parse(fetchImpl.mock.calls[3][1]?.body as string)).toEqual({
       action: 'snapshot',
       gameSessionId: 'parent-game-session',
-      clientInstanceId: 'client-1',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
       snapshot,
     });
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('attacker-match');
@@ -219,12 +246,12 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     expect(JSON.parse(fetchImpl.mock.calls[4][1]?.body as string)).toEqual({
       action: 'forfeit',
       gameSessionId: 'parent-game-session',
-      clientInstanceId: 'client-1',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
     });
     cleanup();
   });
 
-  it('delegates reload authority to the server with the new iframe client instance', async () => {
+  it('keeps the parent authority across an active iframe reload', async () => {
     const fetchImpl = jest
       .fn()
       .mockResolvedValueOnce(apiResponse({
@@ -240,8 +267,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
         match: {
           matchId: 'match-1',
           roomCode: 'ROOM42',
-          status: 'finished',
-          result: { winnerPlayerId: 'player-2', reason: 'forfeit' },
+          status: 'running',
         },
       }));
     const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
@@ -255,7 +281,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toEqual({
       roomCode: 'ROOM42',
       gameSessionId: 'parent-game-session',
-      clientInstanceId: 'client-new',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
     });
     expect(postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -264,7 +290,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
         data: expect.objectContaining({
           playerId: 'player-1',
           slot: 0,
-          match: expect.objectContaining({ status: 'finished' }),
+          match: expect.objectContaining({ status: 'running' }),
         }),
       }),
       GAME_ORIGIN,
@@ -272,7 +298,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     cleanup();
   });
 
-  it('allows a new iframe client to reconnect before a waiting match starts', async () => {
+  it('keeps the parent authority across a waiting iframe reload', async () => {
     const waitingJoin = {
       success: true,
       playerId: 'player-1',
@@ -292,7 +318,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toEqual({
       roomCode: 'ROOM42',
       gameSessionId: 'parent-game-session',
-      clientInstanceId: 'client-new',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
     });
     cleanup();
   });
@@ -318,7 +344,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
         method: 'POST',
         body: JSON.stringify({
           gameSessionId: 'parent-game-session',
-          clientInstanceId: 'client-1',
+          clientInstanceId: AUTHORITY_CLIENT_ID,
         }),
       }),
     );
@@ -337,6 +363,50 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
     expect(onSessionReleased).toHaveBeenCalledTimes(1);
     cleanup();
+  });
+
+  it('replays a lost release with the same parent lease after the iframe UUID changes', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockRejectedValueOnce(new TypeError('lost release response'))
+      .mockResolvedValueOnce(apiResponse({ success: true, released: true, match: null }));
+    const firstBridge = createHarness(fetchImpl);
+    requestMessage(
+      firstBridge.contentWindow,
+      GAME_ORIGIN,
+      'release-before-reload',
+      'release',
+      {},
+      'ephemeral-child-old',
+    );
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(firstBridge.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'release-before-reload', success: false }),
+      GAME_ORIGIN,
+    ));
+    firstBridge.cleanup();
+
+    const reloadedBridge = createHarness(fetchImpl);
+    requestMessage(
+      reloadedBridge.contentWindow,
+      GAME_ORIGIN,
+      'release-after-reload',
+      'release',
+      {},
+      'ephemeral-child-new',
+    );
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(reloadedBridge.onSessionReleased).toHaveBeenCalledTimes(1));
+    expect(reloadedBridge.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'release-after-reload', success: true }),
+      GAME_ORIGIN,
+    );
+
+    expect(fetchImpl.mock.calls.map((call) => JSON.parse(call[1]?.body as string))).toEqual([
+      { gameSessionId: 'parent-game-session', clientInstanceId: AUTHORITY_CLIENT_ID },
+      { gameSessionId: 'parent-game-session', clientInstanceId: AUTHORITY_CLIENT_ID },
+    ]);
+    reloadedBridge.cleanup();
   });
 
   it('serializes release behind a pending join that settles within the bounded barrier', async () => {
@@ -481,7 +551,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     });
     await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
     expect(fetchImpl.mock.calls[1][0]).toBe(
-      '/api/games/treasure-hunt/multiplayer/matches/trusted-match?gameSessionId=parent-game-session&clientInstanceId=client-1',
+      `/api/games/treasure-hunt/multiplayer/matches/trusted-match?gameSessionId=parent-game-session&clientInstanceId=${AUTHORITY_CLIENT_ID}`,
     );
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('ATTACKER');
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('attacker-match');
@@ -552,7 +622,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     requestMessage(contentWindow, GAME_ORIGIN, 'get-a', 'get', { matchId: 'match-b' });
     await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(4));
     expect(fetchImpl.mock.calls[1][0]).toBe(
-      '/api/games/treasure-hunt/multiplayer/matches/match-a?gameSessionId=parent-game-session&clientInstanceId=client-1',
+      `/api/games/treasure-hunt/multiplayer/matches/match-a?gameSessionId=parent-game-session&clientInstanceId=${AUTHORITY_CLIENT_ID}`,
     );
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('ROOM-B');
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('match-b');

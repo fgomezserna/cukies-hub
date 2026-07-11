@@ -234,6 +234,72 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(service.heartbeat).not.toHaveBeenCalled();
   });
 
+  it('rejects stale get, heartbeat, snapshot and forfeit clients before match persistence', async () => {
+    const { handlers, dependencies, service } = createHarness();
+    dependencies.findGameSessionBySessionId.mockResolvedValue({
+      sessionId: 'game-session-1',
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: true,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+      multiplayerState: 'joined',
+      multiplayerClientInstanceId: 'parent-authority-client',
+    });
+
+    const staleGet = await handlers.get(
+      new Request(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1?gameSessionId=game-session-1&clientInstanceId=stale-iframe-client',
+      ),
+      'match-1',
+    );
+    const staleHeartbeat = await handlers.operate(
+      jsonRequest(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1',
+        {
+          action: 'heartbeat',
+          gameSessionId: 'game-session-1',
+          clientInstanceId: 'stale-iframe-client',
+        },
+      ),
+      'match-1',
+    );
+    const staleForfeit = await handlers.operate(
+      jsonRequest(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1',
+        {
+          action: 'forfeit',
+          gameSessionId: 'game-session-1',
+          clientInstanceId: 'stale-iframe-client',
+        },
+      ),
+      'match-1',
+    );
+    const staleSnapshot = await handlers.operate(
+      jsonRequest(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1',
+        {
+          action: 'snapshot',
+          gameSessionId: 'game-session-1',
+          clientInstanceId: 'stale-iframe-client',
+          snapshot: { seq: 1, score: 10, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
+        },
+      ),
+      'match-1',
+    );
+
+    expect([
+      staleGet.status,
+      staleHeartbeat.status,
+      staleSnapshot.status,
+      staleForfeit.status,
+    ]).toEqual([403, 403, 403, 403]);
+    expect(service.getForParticipant).not.toHaveBeenCalled();
+    expect(service.heartbeat).not.toHaveBeenCalled();
+    expect(service.updateSnapshot).not.toHaveBeenCalled();
+    expect(service.forfeit).not.toHaveBeenCalled();
+  });
+
   it('derives service identity from the wallet cookie and validated session', async () => {
     const { handlers, dependencies, service } = createHarness();
 
@@ -462,7 +528,7 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(await response.json()).toEqual({ success: true, match });
   });
 
-  it('replays release for an inactive locked session and still heals a late match', async () => {
+  it('replays a lost release acknowledgement with the exact lease and still heals a late match', async () => {
     const { handlers, dependencies, service } = createHarness();
     service.releaseForParticipant.mockResolvedValue(null);
     dependencies.releaseGameSessionForMultiplayer
@@ -677,12 +743,14 @@ describe('Treasure Hunt multiplayer API handlers', () => {
         const exactInProgress =
           gameSession.multiplayerState === 'joining' &&
           gameSession.multiplayerClientInstanceId === identity.clientInstanceId;
-        const joinedTakeover = gameSession.multiplayerState === 'joined';
+        const exactJoined =
+          gameSession.multiplayerState === 'joined' &&
+          gameSession.multiplayerClientInstanceId === identity.clientInstanceId;
         if (
           identity.userId !== gameSession.userId ||
           identity.gameSessionId !== gameSession.sessionId ||
           !gameSession.isActive ||
-          !(unclaimed || exactInProgress || joinedTakeover)
+          !(unclaimed || exactInProgress || exactJoined)
         ) return false;
         Object.assign(gameSession, {
           mode: 'staging_unranked',

@@ -101,23 +101,38 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
         multiplayerState: 'joining',
         multiplayerClientInstanceId: 'client-instance-1',
       },
-      { multiplayerState: 'joined' },
+      {
+        multiplayerState: 'joined',
+        multiplayerClientInstanceId: 'client-instance-1',
+      },
     ]));
   });
 
-  it('lets an explicit JOIN adopt a new client only after the previous claim is joined', async () => {
+  it('rejects ABA takeover of a joined lease by a different client', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
-    updateGameSessions.mockResolvedValue({ count: 1 });
+    updateGameSessions.mockResolvedValue({ count: 0 });
+    findGameSession.mockResolvedValue({
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: true,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+      multiplayerState: 'joined',
+      multiplayerClientInstanceId: 'client-instance-1',
+    });
 
     await expect(
       dependencies.lockGameSessionForMultiplayer({
         ...identity,
         clientInstanceId: 'new-iframe-client',
       }),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
     expect(updateGameSessions).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        OR: expect.arrayContaining([{ multiplayerState: 'joined' }]),
+        OR: expect.arrayContaining([{
+          multiplayerState: 'joined',
+          multiplayerClientInstanceId: 'new-iframe-client',
+        }]),
       }),
       data: expect.objectContaining({
         multiplayerState: 'joining',
@@ -147,7 +162,7 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
     });
   });
 
-  it('distinguishes idempotent confirm, released tombstone and superseding client', async () => {
+  it('distinguishes idempotent confirm and a released tombstone', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     updateGameSessions.mockResolvedValue({ count: 0 });
     findGameSession.mockResolvedValueOnce({
@@ -166,19 +181,10 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
       rewardEligible: false,
       multiplayerState: 'released',
       multiplayerClientInstanceId: 'client-instance-1',
-    }).mockResolvedValueOnce({
-      userId: 'wallet-user',
-      gameId: 'sybil-slayer',
-      isActive: true,
-      mode: 'staging_unranked',
-      rewardEligible: false,
-      multiplayerState: 'joining',
-      multiplayerClientInstanceId: 'new-iframe-client',
     });
 
     await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('confirmed');
     await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('released');
-    await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('superseded');
   });
 
   it('atomically tombstones an active normal or claimed session before match cleanup', async () => {
@@ -206,7 +212,7 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
     });
   });
 
-  it('accepts only the exact inactive release replay, including legacy locked rows', async () => {
+  it('accepts only the exact inactive release replay and fails closed for legacy rows', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     updateGameSessions.mockResolvedValue({ count: 0 });
     findGameSession.mockResolvedValueOnce({
@@ -236,7 +242,7 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
     });
 
     await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(true);
-    await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(true);
+    await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(false);
     await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(false);
   });
 });

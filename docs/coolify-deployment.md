@@ -49,6 +49,38 @@ Las variables `NEXT_PUBLIC_*` se inyectan tambien como build args. Tras cambiarl
 
 Treasure Hunt multiplayer (solo staging):
 
+Antes de activar el flag servidor es obligatorio ejecutar este preflight en la base indicada por `DATABASE_URL`. La coleccion `TreasureHuntMultiplayerMatch` debe ser nueva/vacia o ambas agregaciones deben devolver cero documentos:
+
+```javascript
+// Un GameSession no puede estar ligado a mas de un match, incluidos terminales.
+db.TreasureHuntMultiplayerMatch.aggregate([
+  { $unwind: "$players" },
+  { $match: { "players.gameSessionId": { $type: "string" } } },
+  { $group: { _id: "$players.gameSessionId", matches: { $addToSet: "$matchId" } } },
+  { $match: { "matches.1": { $exists: true } } }
+])
+
+// Una wallet solo puede estar activa en un match. La expresion reproduce el backfill legacy.
+db.TreasureHuntMultiplayerMatch.aggregate([
+  {
+    $set: {
+      effectiveActiveUserIds: {
+        $cond: [
+          { $in: ["$status", ["finished", "abandoned"]] },
+          [],
+          { $ifNull: ["$activeUserIds", "$players.userId"] }
+        ]
+      }
+    }
+  },
+  { $unwind: "$effectiveActiveUserIds" },
+  { $group: { _id: "$effectiveActiveUserIds", matches: { $addToSet: "$matchId" } } },
+  { $match: { "matches.1": { $exists: true } } }
+])
+```
+
+Si aparece cualquier fila, no activar `TREASURE_HUNT_MULTIPLAYER_ENABLED`: exportar/respaldar la coleccion y limpiar o terminalizar los duplicados de forma explicita, o usar una coleccion nueva. El arranque crea indices unicos sobre `players.gameSessionId` y wallets activas y debe fallar cerrado si el dataset no cumple estas invariantes.
+
 ```bash
 TREASURE_HUNT_MULTIPLAYER_ENABLED=true
 ```

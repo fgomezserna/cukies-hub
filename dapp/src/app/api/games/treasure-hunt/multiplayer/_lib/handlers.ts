@@ -15,7 +15,6 @@ interface WalletSessionIdentity {
 export type MultiplayerJoinConfirmation =
   | 'confirmed'
   | 'released'
-  | 'superseded'
   | 'invalid';
 
 export interface MultiplayerGameSession {
@@ -195,6 +194,7 @@ async function authorize(
   dependencies: TreasureHuntMultiplayerHandlerDependencies,
   walletSession: WalletSessionIdentity,
   gameSessionIdInput: unknown,
+  clientInstanceId: string | null = null,
   requireMultiplayerLock = true,
 ) {
   const authorized = await loadAuthorizedGameSession(
@@ -204,7 +204,10 @@ async function authorize(
   );
   if (
     !authorized.gameSession.isActive ||
-    (requireMultiplayerLock && !authorized.isMultiplayerLocked)
+    (requireMultiplayerLock &&
+      (!authorized.isMultiplayerLocked ||
+        authorized.gameSession.multiplayerState !== 'joined' ||
+        authorized.gameSession.multiplayerClientInstanceId !== clientInstanceId))
   ) {
     throw new MultiplayerApiError(
       403,
@@ -289,6 +292,7 @@ export function createTreasureHuntMultiplayerHandlers(
           dependencies,
           walletSession,
           gameSessionId,
+          null,
           false,
         );
         const identity = {
@@ -324,22 +328,16 @@ export function createTreasureHuntMultiplayerHandlers(
         }
         if (confirmation !== 'confirmed') {
           // RELEASE may win after the durable join claim but before match persistence.
-          // Compensate the now-stale match before refusing the late JOIN response. A
-          // superseding explicit JOIN owns its own server reconciliation and must not be
-          // forfeited by the stale iframe instance.
-          if (confirmation !== 'superseded') {
-            if (confirmation === 'released') {
-              await service.releaseForParticipant(identity);
-            } else {
-              await releaseOwnedJoinClaimBestEffort(dependencies, service, identity);
-            }
+          // Compensate the now-stale match before refusing the late JOIN response.
+          if (confirmation === 'released') {
+            await service.releaseForParticipant(identity);
+          } else {
+            await releaseOwnedJoinClaimBestEffort(dependencies, service, identity);
           }
           throw new MultiplayerApiError(
             409,
-            confirmation === 'superseded' ? 'JOIN_SUPERSEDED' : 'JOIN_RELEASED',
-            confirmation === 'superseded'
-              ? 'A newer client instance superseded this multiplayer join'
-              : 'Game session was released while joining the multiplayer match',
+            'JOIN_RELEASED',
+            'Game session was released while joining the multiplayer match',
           );
         }
         return json({ success: true, ...result });
@@ -362,7 +360,7 @@ export function createTreasureHuntMultiplayerHandlers(
         );
         requireRateLimit(dependencies, walletSession.userId, 'get');
         const identity = {
-          ...(await authorize(dependencies, walletSession, gameSessionId)),
+          ...(await authorize(dependencies, walletSession, gameSessionId, clientInstanceId)),
           clientInstanceId,
         };
         const match = await dependencies.getService().getForParticipant({ matchId, ...identity });
@@ -394,7 +392,7 @@ export function createTreasureHuntMultiplayerHandlers(
         }
         requireRateLimit(dependencies, walletSession.userId, operation);
         const identity = {
-          ...(await authorize(dependencies, walletSession, gameSessionId)),
+          ...(await authorize(dependencies, walletSession, gameSessionId, clientInstanceId)),
           clientInstanceId,
         };
 

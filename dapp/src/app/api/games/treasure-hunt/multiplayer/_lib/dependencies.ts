@@ -67,7 +67,10 @@ export function createDefaultMultiplayerHandlerDependencies(): TreasureHuntMulti
               multiplayerState: 'joining',
               multiplayerClientInstanceId: clientInstanceId,
             },
-            { multiplayerState: 'joined' },
+            {
+              multiplayerState: 'joined',
+              multiplayerClientInstanceId: clientInstanceId,
+            },
           ],
         },
         data: {
@@ -155,15 +158,6 @@ export function createDefaultMultiplayerHandlerDependencies(): TreasureHuntMulti
       ) {
         return 'released' as const;
       }
-      if (
-        current?.userId === userId &&
-        current.gameId === 'sybil-slayer' &&
-        current.isActive &&
-        (current.multiplayerState === 'joining' || current.multiplayerState === 'joined') &&
-        current.multiplayerClientInstanceId !== clientInstanceId
-      ) {
-        return 'superseded' as const;
-      }
       return 'invalid' as const;
     },
     releaseGameSessionForMultiplayer: async ({ gameSessionId, userId, clientInstanceId }) => {
@@ -235,9 +229,8 @@ export function createDefaultMultiplayerHandlerDependencies(): TreasureHuntMulti
           !current.isActive &&
           current.mode === 'staging_unranked' &&
           current.rewardEligible === false &&
-          (current.multiplayerState === 'released' || current.multiplayerState == null) &&
-          (current.multiplayerClientInstanceId === clientInstanceId ||
-            current.multiplayerClientInstanceId == null),
+          current.multiplayerState === 'released' &&
+          current.multiplayerClientInstanceId === clientInstanceId,
       );
     },
     consumeRateLimit: (input) => multiplayerRateLimiter.consume(input),
