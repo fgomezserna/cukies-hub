@@ -21,7 +21,14 @@ export function shouldBlockLocalGameControls(
   hasCanonicalResult: boolean,
   hasNonTerminalMatch = false,
 ): boolean {
-  return hasNonTerminalMatch || (isMultiplayerMode && !hasCanonicalResult);
+  return hasCanonicalResult || hasNonTerminalMatch || isMultiplayerMode;
+}
+
+export function canChangeTreasureHuntGameMode(
+  hasCanonicalResult: boolean,
+  hasNonTerminalMatch: boolean,
+): boolean {
+  return !hasCanonicalResult && !hasNonTerminalMatch;
 }
 
 export function isTreasureHuntMatchNonTerminal(

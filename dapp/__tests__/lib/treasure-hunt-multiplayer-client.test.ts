@@ -5,9 +5,13 @@ import {
   createMultiplayerRoomCode,
   createTreasureHuntParentTransport,
   deriveCanonicalDeadlineRuntimeTransition,
+  deriveCanonicalReconnectRuntimeTransition,
   deriveMultiplayerRuntimeHydration,
+  deriveReconnectResumeDecision,
   getHandshakeRoomCode,
+  isServerReconnectPause,
   resolveParentOrigin,
+  shouldPauseMultiplayerRuntime,
   type MultiplayerTransport,
   type PublicMatch,
 } from '../../../games/sybil-slayer/src/lib/multiplayer-client';
@@ -16,6 +20,7 @@ import {
   resolveConfiguredParentOrigin,
 } from '../../../games/sybil-slayer/src/lib/parent-origin';
 import {
+  canChangeTreasureHuntGameMode,
   getSuddenDeathObjectiveCopy,
   isTreasureHuntMatchNonTerminal,
   isTreasureHuntMultiplayerEnabled,
@@ -933,11 +938,16 @@ describe('multiplayer client helpers', () => {
     controller.dispose();
   });
 
-  it('locks local pause/reset while canonical multiplayer is active, but not after result', () => {
+  it('keeps local controls and mode changes locked through a canonical result', () => {
     expect(shouldBlockLocalGameControls(false, false)).toBe(false);
     expect(shouldBlockLocalGameControls(true, false)).toBe(true);
-    expect(shouldBlockLocalGameControls(true, true)).toBe(false);
+    expect(shouldBlockLocalGameControls(true, true)).toBe(true);
+    expect(shouldBlockLocalGameControls(false, true)).toBe(true);
     expect(shouldBlockLocalGameControls(false, false, true)).toBe(true);
+
+    expect(canChangeTreasureHuntGameMode(false, false)).toBe(true);
+    expect(canChangeTreasureHuntGameMode(true, false)).toBe(false);
+    expect(canChangeTreasureHuntGameMode(false, true)).toBe(false);
   });
 
   it('treats waiting and countdown as pinned matches for local mode controls', () => {
@@ -990,6 +1000,12 @@ describe('multiplayer client helpers', () => {
       localPlayerId: leader.playerId,
       localPlayer: leader,
     })).toBe(false);
+    expect(canResumeLocalPlayerInSuddenDeath({
+      matchStatus: 'sudden_death',
+      suddenDeath,
+      localPlayerId: chaser.playerId,
+      localPlayer: { ...chaser, presence: 'offline' },
+    })).toBe(false);
     expect(deriveCanonicalDeadlineRuntimeTransition({
       deadlineAt: 85_000,
       now: 25_000,
@@ -1037,6 +1053,137 @@ describe('multiplayer client helpers', () => {
       gameOverReason: 'time',
       allowTimeGameOverResume: true,
     })).toEqual({ timer: 60, shouldResume: true });
+  });
+
+  it('treats a direct resume countdown as a server pause, but not the initial countdown', () => {
+    expect(isServerReconnectPause({
+      matchStatus: 'running',
+      resumeAt: null,
+      resumeEpoch: 0,
+    })).toBe(false);
+    expect(isServerReconnectPause({
+      matchStatus: 'paused_reconnect',
+      resumeAt: null,
+      resumeEpoch: 0,
+    })).toBe(true);
+    expect(isServerReconnectPause({
+      matchStatus: 'countdown',
+      resumeAt: null,
+      resumeEpoch: 0,
+    })).toBe(false);
+    expect(isServerReconnectPause({
+      matchStatus: 'countdown',
+      resumeAt: 12_000,
+      resumeEpoch: 0,
+    })).toBe(true);
+    expect(isServerReconnectPause({
+      matchStatus: 'countdown',
+      resumeAt: null,
+      resumeEpoch: 1,
+    })).toBe(true);
+  });
+
+  it('pauses the multiplayer runtime idempotently without a toggle race', () => {
+    expect(shouldPauseMultiplayerRuntime('playing')).toBe(true);
+    expect(shouldPauseMultiplayerRuntime('paused')).toBe(false);
+    expect(shouldPauseMultiplayerRuntime('gameOver')).toBe(false);
+  });
+
+  it('consumes each running resume signal once and revives only a living timeout', () => {
+    const localPlayer = {
+      ...match(1, 'running').players[0],
+      hearts: 2,
+      lifecycle: 'playing' as const,
+      presence: 'online' as const,
+    };
+    const firstResume = deriveReconnectResumeDecision({
+      matchStatus: 'running',
+      resumeSignal: 1,
+      handledResumeSignal: 0,
+      localPlayerId: localPlayer.playerId,
+      localPlayer,
+    });
+    expect(firstResume).toEqual({
+      shouldConsumeSignal: true,
+      allowTimeGameOverResume: true,
+    });
+    expect(deriveCanonicalReconnectRuntimeTransition({
+      deadlineAt: 40_000,
+      now: 30_000,
+      currentStatus: 'paused',
+      allowTimeGameOverResume: firstResume.allowTimeGameOverResume,
+    })).toEqual({ timer: 10, shouldResume: true });
+    expect(deriveCanonicalReconnectRuntimeTransition({
+      deadlineAt: 40_000,
+      now: 30_000,
+      currentStatus: 'gameOver',
+      gameOverReason: 'time',
+      allowTimeGameOverResume: firstResume.allowTimeGameOverResume,
+    })).toEqual({ timer: 10, shouldResume: true });
+    expect(deriveCanonicalReconnectRuntimeTransition({
+      deadlineAt: 30_000,
+      now: 30_001,
+      currentStatus: 'gameOver',
+      gameOverReason: 'time',
+      allowTimeGameOverResume: firstResume.allowTimeGameOverResume,
+    })).toEqual({ timer: 0, shouldResume: false });
+    expect(deriveReconnectResumeDecision({
+      matchStatus: 'running',
+      resumeSignal: 1,
+      handledResumeSignal: 1,
+      localPlayerId: localPlayer.playerId,
+      localPlayer,
+    })).toEqual({
+      shouldConsumeSignal: false,
+      allowTimeGameOverResume: false,
+    });
+  });
+
+  it('never revives hearts game-over, offline, eliminated or finished players', () => {
+    const localPlayer = {
+      ...match(1, 'running').players[0],
+      hearts: 2,
+      lifecycle: 'playing' as const,
+      presence: 'online' as const,
+    };
+    const livingResume = deriveReconnectResumeDecision({
+      matchStatus: 'running',
+      resumeSignal: 1,
+      handledResumeSignal: 0,
+      localPlayerId: localPlayer.playerId,
+      localPlayer,
+    });
+    expect(deriveCanonicalReconnectRuntimeTransition({
+      deadlineAt: 40_000,
+      now: 30_000,
+      currentStatus: 'gameOver',
+      gameOverReason: 'hearts',
+      allowTimeGameOverResume: livingResume.allowTimeGameOverResume,
+    })).toEqual({ timer: 10, shouldResume: false });
+
+    for (const terminalPlayer of [
+      { ...localPlayer, hearts: 0, lifecycle: 'eliminated' as const },
+      { ...localPlayer, lifecycle: 'finished' as const },
+      { ...localPlayer, presence: 'offline' as const },
+    ]) {
+      const decision = deriveReconnectResumeDecision({
+        matchStatus: 'running',
+        resumeSignal: 1,
+        handledResumeSignal: 0,
+        localPlayerId: terminalPlayer.playerId,
+        localPlayer: terminalPlayer,
+      });
+      expect(decision).toEqual({
+        shouldConsumeSignal: true,
+        allowTimeGameOverResume: false,
+      });
+      expect(deriveCanonicalReconnectRuntimeTransition({
+        deadlineAt: 40_000,
+        now: 30_000,
+        currentStatus: 'paused',
+        allowTimeGameOverResume: decision.allowTimeGameOverResume,
+      })).toEqual({ timer: 10, shouldResume: false });
+    }
   });
 
   it('creates room codes using Web Crypto without Math.random', () => {

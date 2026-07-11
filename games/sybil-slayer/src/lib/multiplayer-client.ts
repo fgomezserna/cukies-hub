@@ -79,6 +79,27 @@ export function deriveCanonicalDeadlineRuntimeTransition(
   };
 }
 
+export function deriveCanonicalReconnectRuntimeTransition(
+  input: CanonicalDeadlineRuntimeInput,
+): CanonicalDeadlineRuntimeTransition {
+  const transition = deriveCanonicalDeadlineRuntimeTransition(input);
+  return {
+    ...transition,
+    shouldResume:
+      transition.shouldResume ||
+      Boolean(
+        transition.timer !== null &&
+        transition.timer > 0 &&
+        input.allowTimeGameOverResume &&
+        input.currentStatus === 'paused',
+      ),
+  };
+}
+
+export function shouldPauseMultiplayerRuntime(currentStatus: string): boolean {
+  return currentStatus === 'playing';
+}
+
 export function deriveMultiplayerRuntimeHydration(
   canonical: CanonicalRuntimeHydration,
   now: number,
@@ -157,7 +178,7 @@ export function canResumeLocalPlayerInSuddenDeath(input: {
     input.localPlayer.hearts <= 0 ||
     input.localPlayer.lifecycle === 'eliminated' ||
     input.localPlayer.lifecycle === 'finished' ||
-    input.localPlayer.presence === 'forfeited'
+    input.localPlayer.presence !== 'online'
   ) {
     return false;
   }
@@ -168,6 +189,51 @@ export function canResumeLocalPlayerInSuddenDeath(input: {
     input.suddenDeath === null ||
     input.suddenDeath.chasingPlayerId === input.localPlayerId
   );
+}
+
+export function isServerReconnectPause(input: {
+  readonly matchStatus: string | null | undefined;
+  readonly resumeAt: number | null | undefined;
+  readonly resumeEpoch: number | null | undefined;
+}): boolean {
+  if (input.matchStatus === 'paused_reconnect') return true;
+  if (input.matchStatus !== 'countdown') return false;
+  return input.resumeAt != null || (
+    Number.isSafeInteger(input.resumeEpoch) && Number(input.resumeEpoch) > 0
+  );
+}
+
+export interface ReconnectResumeDecision {
+  readonly shouldConsumeSignal: boolean;
+  readonly allowTimeGameOverResume: boolean;
+}
+
+export function deriveReconnectResumeDecision(input: {
+  readonly matchStatus: string | null | undefined;
+  readonly resumeSignal: number;
+  readonly handledResumeSignal: number;
+  readonly localPlayerId: string | null | undefined;
+  readonly localPlayer: PublicMatchPlayer | null | undefined;
+}): ReconnectResumeDecision {
+  const shouldConsumeSignal =
+    (input.matchStatus === 'running' || input.matchStatus === 'sudden_death') &&
+    Number.isSafeInteger(input.resumeSignal) &&
+    input.resumeSignal > input.handledResumeSignal;
+  if (!shouldConsumeSignal) {
+    return { shouldConsumeSignal: false, allowTimeGameOverResume: false };
+  }
+
+  const player = input.localPlayer;
+  const allowTimeGameOverResume = Boolean(
+    input.localPlayerId &&
+    player &&
+    player.playerId === input.localPlayerId &&
+    player.hearts > 0 &&
+    player.lifecycle !== 'eliminated' &&
+    player.lifecycle !== 'finished' &&
+    player.presence === 'online',
+  );
+  return { shouldConsumeSignal: true, allowTimeGameOverResume };
 }
 
 export interface PublicMatch {

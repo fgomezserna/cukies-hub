@@ -31,7 +31,9 @@ import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_NEXT_BLOCK_MI
 import { GAMEPLAY_RANDOM_STREAMS, randomManager } from '@/lib/random';
 import {
   deriveCanonicalDeadlineRuntimeTransition,
+  deriveCanonicalReconnectRuntimeTransition,
   deriveMultiplayerRuntimeHydration,
+  shouldPauseMultiplayerRuntime,
 } from '@/lib/multiplayer-client';
 
 const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
@@ -1503,6 +1505,66 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         : previous;
     });
   }, []);
+
+  const pauseMultiplayerRuntime = useCallback(() => {
+    setGameState((previous) => {
+      if (!shouldPauseMultiplayerRuntime(previous.status)) return previous;
+
+      pauseGameTime();
+      const pauseStartedAt = Date.now();
+      return {
+        ...previous,
+        status: 'paused',
+        redZones: previous.redZones.map((zone) => ({
+          ...zone,
+          visualPauseStart: zone.visualPauseStart ?? pauseStartedAt,
+        })),
+      };
+    });
+  }, [pauseGameTime]);
+
+  const resumeMultiplayerRuntime = useCallback((
+    deadlineAt: number | null,
+    allowResume: boolean,
+  ) => {
+    canonicalPlayDeadlineRef.current = deadlineAt;
+    if (deadlineAt === null) return;
+
+    const now = Date.now();
+    setGameState((previous) => {
+      const transition = deriveCanonicalReconnectRuntimeTransition({
+        deadlineAt,
+        now,
+        currentStatus: previous.status,
+        gameOverReason: previous.gameOverReason,
+        allowTimeGameOverResume: allowResume,
+      });
+      if (transition.timer === null) return previous;
+      if (!transition.shouldResume) {
+        return previous.status === 'playing'
+          ? { ...previous, timer: transition.timer }
+          : previous;
+      }
+
+      resumeGameTime();
+      const resumeAt = Date.now();
+      return {
+        ...previous,
+        status: 'playing',
+        timer: transition.timer,
+        gameOverReason: undefined,
+        redZones: previous.redZones.map((zone) => {
+          if (!zone.visualPauseStart) return zone;
+          const pausedDuration = resumeAt - zone.visualPauseStart;
+          return {
+            ...zone,
+            visualStartTime: (zone.visualStartTime ?? resumeAt) + pausedDuration,
+            visualPauseStart: undefined,
+          };
+        }),
+      };
+    });
+  }, [resumeGameTime]);
 
 
  const togglePause = useCallback(() => {
@@ -4574,6 +4636,8 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     startGame,
     startGameImmediately,
     setMultiplayerCanonicalDeadline,
+    pauseMultiplayerRuntime,
+    resumeMultiplayerRuntime,
     togglePause,
     resetGame,
     forceGameOver,
