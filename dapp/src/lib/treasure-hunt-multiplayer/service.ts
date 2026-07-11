@@ -262,7 +262,7 @@ export class TreasureHuntMultiplayerService {
         throw new MultiplayerDomainError('PLAYER_NOT_FOUND', 'Player is not in this match', 404);
       }
       if (isTerminalMatch(next)) {
-        throw new MultiplayerDomainError('MATCH_TERMINAL', `Match ${matchId} is terminal`, 409);
+        return next;
       }
       if (next.status !== 'running' && next.status !== 'sudden_death') {
         throw invalidSnapshot(`snapshots are not accepted while match status is ${next.status}`);

@@ -239,6 +239,69 @@ describe('TreasureHuntMultiplayerService', () => {
     },
   );
 
+  it('persists a terminal pending-elimination transition before ignoring a late snapshot', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 100,
+      eliminationResolutionDelayMs: 100,
+      maxHeartsDelta: 3,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    const joinedSecond = await service.createOrJoin(second);
+    clock.value = 100;
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
+    });
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      snapshot: { seq: 0, score: 200, hearts: 0, elapsedMs: 100, lifecycle: 'eliminated' },
+    });
+    clock.value = 200;
+    const lateSnapshot = {
+      seq: 1,
+      score: 999,
+      hearts: 0,
+      elapsedMs: 200,
+      lifecycle: 'eliminated',
+    };
+
+    const terminal = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      snapshot: lateSnapshot,
+    });
+
+    expect(terminal.status).toBe('finished');
+    expect(terminal.result).toMatchObject({
+      winnerPlayerId: joinedSecond.playerId,
+      reason: 'elimination',
+    });
+    expect(terminal.players.find((player) => player.playerId === joinedSecond.playerId)).toMatchObject({
+      score: 300,
+      hearts: 3,
+      lifecycle: 'playing',
+    });
+    const persisted = await repository.findByMatchId(joinedFirst.match.matchId);
+    expect(persisted).toMatchObject({ status: 'finished', pendingElimination: null });
+    expect(persisted?.players[1].snapshot).toMatchObject({ seq: 0, score: 300, hearts: 3 });
+
+    const repeated = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      snapshot: lateSnapshot,
+    });
+    expect(repeated.result).toEqual(terminal.result);
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.revision).toBe(
+      persisted?.revision,
+    );
+  });
+
   it('rejects gameplay snapshots before start, while paused and during resume countdown', async () => {
     const waitingHarness = createHarness();
     const waitingFirst = await waitingHarness.service.createOrJoin(first);
@@ -534,9 +597,21 @@ describe('TreasureHuntMultiplayerService', () => {
     expect((await expiring.service.reconcile(expiringFirst.match.matchId)).result).toBeNull();
     expiring.clock.value = 700;
 
-    const bothExpired = await expiring.service.reconcile(expiringFirst.match.matchId);
+    const bothExpired = await expiring.service.updateSnapshot({
+      matchId: expiringFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      snapshot: { seq: 0, score: 999, hearts: 0, elapsedMs: 700, lifecycle: 'eliminated' },
+    });
     expect(bothExpired.status).toBe('abandoned');
     expect(bothExpired.result).toMatchObject({ winnerPlayerId: null, reason: 'abandoned' });
+    expect(bothExpired.players.find((player) => player.slot === 1)).toMatchObject({
+      score: 0,
+      hearts: 3,
+      lifecycle: 'waiting',
+    });
+    expect((await expiring.repository.findByMatchId(expiringFirst.match.matchId))?.players[1].snapshot)
+      .toMatchObject({ seq: -1, score: 0, hearts: 3 });
   });
 });
 
