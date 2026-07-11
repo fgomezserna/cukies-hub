@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 
 import {
+  createCanonicalResultExitCoordinator,
   shouldResetLocalGameForAuthorityChange,
   useMultiplayerMatch,
 } from '../../../games/sybil-slayer/src/hooks/useMultiplayerMatch';
@@ -201,5 +202,65 @@ describe('useMultiplayerMatch GameSession authority lifecycle', () => {
     act(() => secondController.options.onSeed?.('fresh-seed'));
     expect(mockRandomSetSeed).toHaveBeenCalledWith('fresh-seed');
     unmount();
+  });
+});
+
+describe('canonical multiplayer result exit', () => {
+  it('is passive until explicit exit and retries released:false without losing completion', async () => {
+    const coordinator = createCanonicalResultExitCoordinator();
+    const release = jest
+      .fn<Promise<boolean>, []>()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    const onReleased = jest.fn(async () => undefined);
+
+    expect(release).not.toHaveBeenCalled();
+    expect(onReleased).not.toHaveBeenCalled();
+
+    await expect(coordinator.requestExit(release, onReleased)).resolves.toBe(false);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(onReleased).not.toHaveBeenCalled();
+
+    await expect(coordinator.requestExit(release, onReleased)).resolves.toBe(true);
+    expect(release).toHaveBeenCalledTimes(2);
+    expect(onReleased).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates concurrent explicit exit attempts', async () => {
+    const coordinator = createCanonicalResultExitCoordinator();
+    let resolveRelease!: (released: boolean) => void;
+    const release = jest.fn(
+      () => new Promise<boolean>((resolve) => {
+        resolveRelease = resolve;
+      }),
+    );
+    const onReleased = jest.fn(async () => undefined);
+
+    const first = coordinator.requestExit(release, onReleased);
+    const duplicate = coordinator.requestExit(release, onReleased);
+
+    expect(duplicate).toBe(first);
+    expect(release).toHaveBeenCalledTimes(1);
+    resolveRelease(true);
+    await expect(first).resolves.toBe(true);
+    expect(onReleased).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a rejected attempt so an explicit retry can complete', async () => {
+    const coordinator = createCanonicalResultExitCoordinator();
+    const release = jest
+      .fn<Promise<boolean>, []>()
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce(true);
+    const onReleased = jest.fn(async () => undefined);
+
+    await expect(coordinator.requestExit(release, onReleased)).rejects.toThrow(
+      'temporary failure',
+    );
+    expect(onReleased).not.toHaveBeenCalled();
+
+    await expect(coordinator.requestExit(release, onReleased)).resolves.toBe(true);
+    expect(release).toHaveBeenCalledTimes(2);
+    expect(onReleased).toHaveBeenCalledTimes(1);
   });
 });

@@ -112,6 +112,39 @@ export function shouldResetLocalGameForAuthorityChange(
   return previousSessionId !== null && previousSessionId !== nextSessionId;
 }
 
+export interface CanonicalResultExitCoordinator {
+  requestExit(
+    release: () => Promise<boolean>,
+    onReleased: () => void | Promise<void>,
+  ): Promise<boolean>;
+}
+
+/**
+ * Keeps a canonical result stable until the player explicitly requests to leave.
+ * Concurrent clicks share one release attempt; a failed attempt is not latched and
+ * can be retried without losing the terminal match state.
+ */
+export function createCanonicalResultExitCoordinator(): CanonicalResultExitCoordinator {
+  let inFlight: Promise<boolean> | null = null;
+
+  return {
+    requestExit(release, onReleased) {
+      if (inFlight) return inFlight;
+
+      let operation: Promise<boolean>;
+      operation = (async () => {
+        if (!(await release())) return false;
+        await onReleased();
+        return true;
+      })().finally(() => {
+        if (inFlight === operation) inFlight = null;
+      });
+      inFlight = operation;
+      return operation;
+    },
+  };
+}
+
 export function useMultiplayerMatch(
   authoritySessionId: string | null,
 ): UseMultiplayerMatchValue {

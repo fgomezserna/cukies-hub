@@ -11,6 +11,7 @@ import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
 import useMultiplayerMatch, {
+  createCanonicalResultExitCoordinator,
   shouldResetLocalGameForAuthorityChange,
 } from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
@@ -600,6 +601,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     roomCode: string;
     message: string;
   } | null>(null);
+  const [resultExitPending, setResultExitPending] = useState(false);
+  const [resultExitError, setResultExitError] = useState<string | null>(null);
+  const resultExitCoordinatorRef = useRef<ReturnType<
+    typeof createCanonicalResultExitCoordinator
+  > | null>(null);
+  const resultExitGenerationRef = useRef(0);
+  if (!resultExitCoordinatorRef.current) {
+    resultExitCoordinatorRef.current = createCanonicalResultExitCoordinator();
+  }
   const isMultiplayerMode = currentMode === 'multiplayer';
   const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
   const localControlsLocked = shouldBlockLocalGameControls(
@@ -962,6 +972,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const advantageGradient = `linear-gradient(90deg, ${localColor} 0%, ${localColor} ${advantageProgress * 100}%, ${opponentColor} ${advantageProgress * 100}%, ${opponentColor} 100%)`;
   const localPlayerId = multiplayer.playerId;
   const matchResult = multiplayer.matchResult;
+  const terminalResultKey = matchResult
+    ? `${multiplayer.matchConfig?.matchId ?? 'match'}:${matchResult.finishedAt}`
+    : null;
+  useEffect(() => {
+    resultExitGenerationRef.current += 1;
+    resultExitCoordinatorRef.current = createCanonicalResultExitCoordinator();
+    setResultExitPending(false);
+    setResultExitError(null);
+  }, [multiplayerAuthoritySessionId, terminalResultKey]);
   const localIsWinner = matchResult?.winnerPlayerId
     ? matchResult.winnerPlayerId === localPlayerId
     : null;
@@ -975,6 +994,40 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       : localIsWinner === true
         ? '¡Victoria!'
         : 'Derrota';
+  const exitCanonicalMultiplayerResult = useCallback(async () => {
+    if (!matchResult) return;
+
+    const requestGeneration = resultExitGenerationRef.current;
+    const coordinator = resultExitCoordinatorRef.current;
+    if (!coordinator) return;
+    setResultExitPending(true);
+    setResultExitError(null);
+    try {
+      const released = await coordinator.requestExit(
+        releaseMultiplayerSession,
+        () => {
+          if (resultExitGenerationRef.current !== requestGeneration) return;
+          setCurrentMode('single');
+          resetGame();
+        },
+      );
+      if (resultExitGenerationRef.current !== requestGeneration) return;
+      if (!released) {
+        setResultExitError(
+          'No se pudo liberar la sesión multijugador. El resultado sigue guardado; reinténtalo.',
+        );
+      }
+    } catch {
+      if (resultExitGenerationRef.current !== requestGeneration) return;
+      setResultExitError(
+        'No se pudo completar la salida. El resultado sigue guardado; reinténtalo.',
+      );
+    } finally {
+      if (resultExitGenerationRef.current === requestGeneration) {
+        setResultExitPending(false);
+      }
+    }
+  }, [matchResult, releaseMultiplayerSession, resetGame]);
   const advantageBar = isMultiplayerMode && multiplayer.opponent ? (
     <div className="w-full mt-3 space-y-2 lg:pr-[300px] xl:pr-[360px]" style={{ width: BASE_GAME_WIDTH }}>
       <div className="flex justify-between text-xs font-pixellari uppercase tracking-wide text-cyan-100/80">
@@ -1255,22 +1308,23 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           <p>Puntuación rival: {opponentFinalScore}</p>
           <p className="text-cyan-200/70 capitalize">Motivo: {matchResult.reason.replace('_', ' ')}</p>
         </div>
+        {resultExitError ? (
+          <p role="alert" className="text-sm font-pixellari text-rose-300">
+            {resultExitError}
+          </p>
+        ) : null}
         <button
-          onClick={() => {
-            void releaseMultiplayerSession()
-              .then((released) => {
-                if (!released) throw new Error('Multiplayer session release failed');
-                return multiplayer.reset();
-              })
-              .then(() => {
-                setCurrentMode('single');
-                resetGame();
-              })
-              .catch(() => undefined);
-          }}
-          className="mx-auto inline-flex items-center justify-center rounded-lg border border-pink-500/50 bg-pink-500/20 px-4 py-2 text-sm font-pixellari text-pink-100 hover:bg-pink-500/30"
+          type="button"
+          disabled={resultExitPending}
+          aria-busy={resultExitPending}
+          onClick={() => void exitCanonicalMultiplayerResult()}
+          className="mx-auto inline-flex items-center justify-center rounded-lg border border-pink-500/50 bg-pink-500/20 px-4 py-2 text-sm font-pixellari text-pink-100 hover:bg-pink-500/30 disabled:cursor-wait disabled:opacity-60"
         >
-          Salir a Single Player
+          {resultExitPending
+            ? 'Liberando sesión...'
+            : resultExitError
+              ? 'Reintentar salida a Single Player'
+              : 'Salir a Single Player'}
         </button>
       </div>
     </div>
@@ -1611,25 +1665,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   ]);
 
   const terminalGameOverRef = useRef<string | null>(null);
-  const terminalReleaseRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isMultiplayerMode) return;
     if (!multiplayer.matchResult) return;
-    const terminalKey = `${multiplayer.matchConfig?.matchId ?? 'match'}:${multiplayer.matchResult.finishedAt}`;
-    if (terminalGameOverRef.current === terminalKey) return;
+    if (!terminalResultKey || terminalGameOverRef.current === terminalResultKey) return;
 
-    terminalGameOverRef.current = terminalKey;
+    terminalGameOverRef.current = terminalResultKey;
     forceGameOver('multiplayer');
-    if (terminalReleaseRef.current !== terminalKey) {
-      terminalReleaseRef.current = terminalKey;
-      void releaseMultiplayerSession();
-    }
   }, [
     forceGameOver,
     isMultiplayerMode,
-    multiplayer.matchConfig?.matchId,
     multiplayer.matchResult,
-    releaseMultiplayerSession,
+    terminalResultKey,
   ]);
 
   // Helper para obtener tiempo pausable para animaciones
