@@ -5,6 +5,7 @@ import {
   createTreasureHuntMultiplayerBridge,
   resolveTreasureHuntMultiplayerAuthorityLease,
 } from '@/hooks/use-treasure-hunt-multiplayer-bridge';
+import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
 
 const GAME_ORIGIN = 'https://game.example';
 const GAME_URL = `${GAME_ORIGIN}/treasure-hunt`;
@@ -48,15 +49,37 @@ function requestMessage(
   );
 }
 
-function createHarness(fetchImpl = jest.fn()) {
+function createHarness(
+  fetchImpl = jest.fn(),
+  { initialMarkedLoads = 0 }: { initialMarkedLoads?: number } = {},
+) {
   const releaseOrder: string[] = [];
   const postMessage = jest.fn((_message: unknown, _origin: string) => {
     releaseOrder.push('response');
   });
   const contentWindow = { postMessage } as unknown as Window;
+  const iframeEvents = new EventTarget();
+  const addIframeEventListener = jest.fn(
+    (type: string, listener: EventListenerOrEventListenerObject) => {
+      iframeEvents.addEventListener(type, listener);
+    },
+  );
+  const removeIframeEventListener = jest.fn(
+    (type: string, listener: EventListenerOrEventListenerObject) => {
+      iframeEvents.removeEventListener(type, listener);
+    },
+  );
+  const iframeElement = {
+    contentWindow,
+    addEventListener: addIframeEventListener,
+    removeEventListener: removeIframeEventListener,
+  } as unknown as HTMLIFrameElement;
   const iframeRef = {
-    current: { contentWindow },
+    current: iframeElement,
   } as React.RefObject<HTMLIFrameElement>;
+  for (let load = 0; load < initialMarkedLoads; load += 1) {
+    markParentIframeNavigation(iframeElement);
+  }
   const onRoomJoined = jest.fn();
   const onSessionReleased = jest.fn(() => releaseOrder.push('callback'));
   const cleanup = createTreasureHuntMultiplayerBridge({
@@ -71,8 +94,16 @@ function createHarness(fetchImpl = jest.fn()) {
   });
   return {
     cleanup,
+    addIframeEventListener,
     contentWindow,
+    dispatchIframeLoad: () => {
+      const dispatched = iframeEvents.dispatchEvent(new Event('load'));
+      markParentIframeNavigation(iframeElement);
+      return dispatched;
+    },
+    iframeElement,
     postMessage,
+    removeIframeEventListener,
     fetchImpl,
     onRoomJoined,
     onSessionReleased,
@@ -131,6 +162,209 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     await Promise.resolve();
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(postMessage).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it('registers one iframe load listener and removes that exact listener on cleanup', () => {
+    const {
+      addIframeEventListener,
+      cleanup,
+      removeIframeEventListener,
+    } = createHarness();
+
+    expect(addIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(addIframeEventListener).toHaveBeenCalledWith('load', expect.any(Function));
+    const loadListener = addIframeEventListener.mock.calls[0][1];
+
+    cleanup();
+
+    expect(removeIframeEventListener).toHaveBeenCalledTimes(1);
+    expect(removeIframeEventListener).toHaveBeenCalledWith('load', loadListener);
+  });
+
+  it('treats the first load as the baseline for the first JOIN', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(apiResponse({
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+    }));
+    const {
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl);
+
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'first-join',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'first-join',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'running' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('accepts the first late load as baseline but rejects the second navigation', async () => {
+    const activeMatch = {
+      matchId: 'match-1',
+      roomCode: 'ROOM42',
+      status: 'running',
+    };
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: activeMatch,
+      }))
+      .mockResolvedValueOnce(apiResponse({ success: true, match: activeMatch }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { ...activeMatch, status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl);
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-before-first-load',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'heartbeat-after-first-load',
+      'heartbeat',
+      {},
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'heartbeat-after-first-load',
+        success: true,
+      }),
+      GAME_ORIGIN,
+    );
+
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'heartbeat-after-second-load',
+      'heartbeat',
+      {},
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(fetchImpl.mock.calls[2][1]?.body as string)).toEqual({
+      action: 'forfeit',
+      gameSessionId: 'parent-game-session',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
+    });
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'heartbeat-after-second-load',
+        success: false,
+        error: expect.objectContaining({ code: 'STALE_IFRAME' }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('detects the next same-UUID load when GameLayout marked initial load before bridge mount', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl, { initialMarkedLoads: 1 });
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-after-marked-load',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-after-observed-reload',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+      '/api/games/treasure-hunt/multiplayer/matches',
+    ]);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'join-after-observed-reload',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
     cleanup();
   });
 
@@ -335,6 +569,198 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     },
   );
 
+  it('forfeits an active match when the same iframe UUID JOINs after a load', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl);
+
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-before-load',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-after-load',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+      '/api/games/treasure-hunt/multiplayer/matches',
+    ]);
+    expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toEqual({
+      action: 'forfeit',
+      gameSessionId: 'parent-game-session',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
+    });
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'join-after-load',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('allows an initial countdown reload when resume markers are empty', async () => {
+    const initialCountdown = {
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: {
+        matchId: 'match-1',
+        roomCode: 'ROOM42',
+        status: 'countdown',
+        config: { resumeAt: null, resumeEpoch: 0 },
+      },
+    };
+    const fetchImpl = jest.fn(
+      (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Promise.resolve(apiResponse(initialCountdown)),
+    );
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'initial-countdown',
+      'join',
+      { roomCode: 'ROOM42' },
+      'client-old',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'initial-countdown-reload',
+      'join',
+      { roomCode: 'ROOM42' },
+      'client-new',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches',
+    ]);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'initial-countdown-reload',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'countdown' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it.each([
+    ['resumeAt', { resumeAt: Date.now() + 5_000, resumeEpoch: 0 }],
+    ['resumeEpoch', { resumeAt: null, resumeEpoch: 1 }],
+  ])('pre-forfeits a known resume countdown identified by %s', async (_marker, config) => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: {
+          matchId: 'match-1',
+          roomCode: 'ROOM42',
+          status: 'countdown',
+          config,
+        },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'resume-countdown',
+      'join',
+      { roomCode: 'ROOM42' },
+      'client-old',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'resume-countdown-reload',
+      'join',
+      { roomCode: 'ROOM42' },
+      'client-new',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+    );
+    expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toMatchObject({
+      action: 'forfeit',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
+    });
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'resume-countdown-reload',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
   it.each(['waiting', 'countdown'])(
     'rejoins %s without forfeit and updates the iframe UUID',
     async (status) => {
@@ -482,6 +908,142 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     },
   );
 
+  it('post-forfeits when a reload JOIN turns an initial countdown into a resume countdown', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: {
+          matchId: 'match-1',
+          roomCode: 'ROOM42',
+          status: 'countdown',
+          config: { resumeAt: null, resumeEpoch: 0 },
+        },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: {
+          matchId: 'match-1',
+          roomCode: 'ROOM42',
+          status: 'countdown',
+          config: { resumeAt: Date.now() + 5_000, resumeEpoch: 1 },
+        },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'initial-countdown',
+      'join',
+      { roomCode: 'ROOM42' },
+      'client-old',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'resume-countdown-reload',
+      'join',
+      { roomCode: 'ROOM42' },
+      'client-new',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+    ]);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'resume-countdown-reload',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('rechecks the navigation epoch when a load occurs during an active JOIN', async () => {
+    const delayedReloadJoin = deferred<Response>();
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'waiting' },
+      }))
+      .mockImplementationOnce(() => delayedReloadJoin.promise)
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl);
+
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-before-race',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-during-load',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    dispatchIframeLoad();
+    delayedReloadJoin.resolve(apiResponse({
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+    }));
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches',
+      '/api/games/treasure-hunt/multiplayer/matches/match-1',
+    ]);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'join-during-load',
+        success: true,
+        data: expect.objectContaining({
+          match: expect.objectContaining({ status: 'finished' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
   it('does not forfeit an active retry from the same iframe UUID', async () => {
     const activeJoin = {
       success: true,
@@ -502,6 +1064,198 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
       '/api/games/treasure-hunt/multiplayer/matches',
       '/api/games/treasure-hunt/multiplayer/matches',
     ]);
+    cleanup();
+  });
+
+  it.each([
+    ['get', 'client-new', false],
+    ['heartbeat', 'client-old', true],
+    ['snapshot', 'client-new', true],
+    ['forfeit', 'client-new', false],
+  ] as const)(
+    'does not proxy stale %s from an unjoined iframe identity',
+    async (command, clientInstanceId, dispatchLoad) => {
+      const fetchImpl = jest.fn().mockResolvedValue(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'waiting' },
+      }));
+      const {
+        cleanup,
+        contentWindow,
+        dispatchIframeLoad,
+        postMessage,
+      } = createHarness(fetchImpl);
+
+      if (dispatchLoad) dispatchIframeLoad();
+      requestMessage(
+        contentWindow,
+        GAME_ORIGIN,
+        'join-authority',
+        'join',
+        { roomCode: 'ROOM42' },
+        'client-old',
+      );
+      await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+      if (dispatchLoad) dispatchIframeLoad();
+      requestMessage(
+        contentWindow,
+        GAME_ORIGIN,
+        `stale-${command}`,
+        command,
+        command === 'snapshot' ? { snapshot: { seq: 1 } } : {},
+        clientInstanceId,
+      );
+      await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(postMessage).toHaveBeenLastCalledWith(
+        {
+          type: 'TH_MULTIPLAYER_RESPONSE',
+          requestId: `stale-${command}`,
+          success: false,
+          error: {
+            code: 'STALE_IFRAME',
+            message: 'Iframe navigation changed; join the multiplayer match again',
+          },
+        },
+        GAME_ORIGIN,
+      );
+      cleanup();
+    },
+  );
+
+  it.each(['get', 'heartbeat', 'snapshot', 'forfeit'] as const)(
+    'forces a canonical forfeit before rejecting stale active %s',
+    async (command) => {
+      const fetchImpl = jest
+        .fn()
+        .mockResolvedValueOnce(apiResponse({
+          success: true,
+          playerId: 'player-1',
+          slot: 0,
+          match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+        }))
+        .mockResolvedValueOnce(apiResponse({
+          success: true,
+          match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+        }));
+      const {
+        cleanup,
+        contentWindow,
+        dispatchIframeLoad,
+        postMessage,
+      } = createHarness(fetchImpl);
+
+      dispatchIframeLoad();
+      requestMessage(
+        contentWindow,
+        GAME_ORIGIN,
+        'join-active-authority',
+        'join',
+        { roomCode: 'ROOM42' },
+        'same-child',
+      );
+      await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+      dispatchIframeLoad();
+      requestMessage(
+        contentWindow,
+        GAME_ORIGIN,
+        `stale-active-${command}`,
+        command,
+        command === 'snapshot' ? { snapshot: { seq: 1 } } : {},
+        'same-child',
+      );
+      await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(fetchImpl.mock.calls[1][0]).toBe(
+        '/api/games/treasure-hunt/multiplayer/matches/match-1',
+      );
+      expect(fetchImpl.mock.calls[1][1]).toMatchObject({ method: 'POST' });
+      expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toEqual({
+        action: 'forfeit',
+        gameSessionId: 'parent-game-session',
+        clientInstanceId: AUTHORITY_CLIENT_ID,
+      });
+      expect(postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          requestId: `stale-active-${command}`,
+          success: false,
+          error: expect.objectContaining({ code: 'STALE_IFRAME' }),
+        }),
+        GAME_ORIGIN,
+      );
+      cleanup();
+    },
+  );
+
+  it('rechecks navigation after an authorized heartbeat await and fails closed', async () => {
+    const delayedHeartbeat = deferred<Response>();
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+      }))
+      .mockImplementationOnce(() => delayedHeartbeat.promise)
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'finished' },
+      }));
+    const {
+      cleanup,
+      contentWindow,
+      dispatchIframeLoad,
+      postMessage,
+    } = createHarness(fetchImpl);
+
+    dispatchIframeLoad();
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'join-before-heartbeat-race',
+      'join',
+      { roomCode: 'ROOM42' },
+      'same-child',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(
+      contentWindow,
+      GAME_ORIGIN,
+      'heartbeat-during-load',
+      'heartbeat',
+      {},
+      'same-child',
+    );
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    dispatchIframeLoad();
+    delayedHeartbeat.resolve(apiResponse({
+      success: true,
+      match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'running' },
+    }));
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(fetchImpl.mock.calls[1][1]?.body as string)).toMatchObject({
+      action: 'heartbeat',
+    });
+    expect(JSON.parse(fetchImpl.mock.calls[2][1]?.body as string)).toEqual({
+      action: 'forfeit',
+      gameSessionId: 'parent-game-session',
+      clientInstanceId: AUTHORITY_CLIENT_ID,
+    });
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'heartbeat-during-load',
+        success: false,
+        error: expect.objectContaining({ code: 'STALE_IFRAME' }),
+      }),
+      GAME_ORIGIN,
+    );
     cleanup();
   });
 
