@@ -13,7 +13,8 @@ import {
   MultiplayerMongoConfigurationError,
   createHubCollectionProvider,
   type MatchMongoCollection,
-  type MatchUniqueIndex,
+  type MatchMongoCursor,
+  type MatchMongoIndexOptions,
 } from '@/lib/treasure-hunt-multiplayer/mongo-repository';
 
 function clone<T>(value: T): T {
@@ -29,7 +30,7 @@ class FakeMatchMongoCollection implements MatchMongoCollection {
   private nextId = 1;
 
   readonly createIndex = jest.fn(
-    async (spec: MatchUniqueIndex, _options: { readonly unique: true }): Promise<string> =>
+    async (spec: Document, _options?: MatchMongoIndexOptions): Promise<string> =>
       `${Object.keys(spec)[0]}_1`,
   );
 
@@ -59,6 +60,14 @@ class FakeMatchMongoCollection implements MatchMongoCollection {
       const found = [...this.documents.values()].find((document) => {
         if (filter.matchId !== undefined && document.matchId !== filter.matchId) return false;
         if (filter.roomCode !== undefined && document.roomCode !== filter.roomCode) return false;
+        if (
+          filter['players.userId'] !== undefined &&
+          !(document.players as Array<{ userId: string }>).some(
+            (player) => player.userId === filter['players.userId'],
+          )
+        ) return false;
+        const excludedStatuses = (filter.status as { $nin?: string[] } | undefined)?.$nin;
+        if (excludedStatuses?.includes(String(document.status))) return false;
         return true;
       });
       if (!found) return null;
@@ -68,6 +77,37 @@ class FakeMatchMongoCollection implements MatchMongoCollection {
       return clone(found);
     },
   );
+
+  readonly find = jest.fn((filter: Document): MatchMongoCursor => {
+    let documents = [...this.documents.values()].filter((document) => {
+      const excludedStatuses = (filter.status as { $nin?: string[] } | undefined)?.$nin;
+      if (excludedStatuses?.includes(String(document.status))) return false;
+      const deadline = filter.nextReconcileAt as { $ne?: null; $lte?: number } | undefined;
+      if (deadline) {
+        if (deadline.$ne === null && document.nextReconcileAt === null) return false;
+        if (typeof deadline.$lte === 'number' && Number(document.nextReconcileAt) > deadline.$lte) {
+          return false;
+        }
+      }
+      return true;
+    });
+    const cursor: MatchMongoCursor = {
+      sort: (spec) => {
+        if (spec.nextReconcileAt === 1) {
+          documents = documents.sort(
+            (left, right) => Number(left.nextReconcileAt) - Number(right.nextReconcileAt),
+          );
+        }
+        return cursor;
+      },
+      limit: (limit) => {
+        documents = documents.slice(0, limit);
+        return cursor;
+      },
+      toArray: async () => clone(documents),
+    };
+    return cursor;
+  });
 
   readonly findOneAndUpdate = jest.fn(
     async (
@@ -133,7 +173,7 @@ function createRepository(collection = new FakeMatchMongoCollection()) {
 }
 
 describe('MongoMatchRepository', () => {
-  it('creates the two unique indexes exactly once', async () => {
+  it('creates unique, scheduler and TTL indexes exactly once', async () => {
     const { collection, repository } = createRepository();
 
     await Promise.all([
@@ -142,9 +182,13 @@ describe('MongoMatchRepository', () => {
     ]);
     await repository.findByMatchId('still-missing');
 
-    expect(collection.createIndex).toHaveBeenCalledTimes(2);
+    expect(collection.createIndex).toHaveBeenCalledTimes(5);
     expect(collection.createIndex).toHaveBeenNthCalledWith(1, { matchId: 1 }, { unique: true });
     expect(collection.createIndex).toHaveBeenNthCalledWith(2, { roomCode: 1 }, { unique: true });
+    expect(collection.createIndex).toHaveBeenCalledWith(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0 },
+    );
   });
 
   it('maps numeric Mongo duplicate-key errors on matchId and roomCode', async () => {
@@ -173,6 +217,50 @@ describe('MongoMatchRepository', () => {
       { returnDocument: 'after', includeResultMetadata: false },
     );
     expect(collection.document('match-1')?.revision).toBe(1);
+  });
+
+  it('stores terminal expiry as a BSON Date and restores Unix milliseconds', async () => {
+    const { collection, repository } = createRepository();
+    const terminal: Match = {
+      ...createMatch(),
+      status: 'abandoned',
+      nextReconcileAt: null,
+      expiresAt: 123_456,
+      result: {
+        winnerPlayerId: null,
+        reason: 'abandoned',
+        finalScores: { 'player-match-1': 0 },
+        finishedAt: 100,
+      },
+    };
+
+    await repository.create(terminal);
+
+    const inserted = collection.insertOne.mock.calls[0][0];
+    expect(inserted.expiresAt).toBeInstanceOf(Date);
+    expect((inserted.expiresAt as Date).getTime()).toBe(123_456);
+    await expect(repository.findByMatchId(terminal.matchId)).resolves.toMatchObject({
+      expiresAt: 123_456,
+    });
+  });
+
+  it('finds one active match per user and returns scheduler work ordered and limited', async () => {
+    const { repository } = createRepository();
+    await repository.create({ ...createMatch('match-1', 'ROOM-1'), nextReconcileAt: 20 });
+    await repository.create({ ...createMatch('match-2', 'ROOM-2'), nextReconcileAt: 10 });
+    await repository.create({
+      ...createMatch('match-3', 'ROOM-3'),
+      status: 'finished',
+      nextReconcileAt: 5,
+    });
+
+    await expect(repository.findNonTerminalByUserId('user-match-1')).resolves.toMatchObject({
+      matchId: 'match-1',
+    });
+    await expect(repository.findNonTerminalByUserId('missing-user')).resolves.toBeNull();
+    await expect(repository.findDue(20, 1)).resolves.toEqual([
+      expect.objectContaining({ matchId: 'match-2', nextReconcileAt: 10 }),
+    ]);
   });
 
   it('keeps concurrent CAS atomic and distinguishes conflict from not found', async () => {

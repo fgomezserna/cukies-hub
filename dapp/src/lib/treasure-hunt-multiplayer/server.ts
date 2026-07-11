@@ -22,9 +22,34 @@ export function createTreasureHuntMultiplayerRuntime(
 }
 
 let defaultRuntime: TreasureHuntMultiplayerService | undefined;
+let defaultSweepTimer: ReturnType<typeof setInterval> | undefined;
+let defaultSweepInFlight = false;
+
+function ensureDefaultSweeper(service: TreasureHuntMultiplayerService) {
+  if (process.env.NODE_ENV === 'test' || defaultSweepTimer) {
+    return;
+  }
+
+  defaultSweepTimer = setInterval(() => {
+    if (defaultSweepInFlight) {
+      return;
+    }
+    defaultSweepInFlight = true;
+    void service
+      .sweepDue()
+      .catch(() => {
+        console.error('Treasure Hunt multiplayer reconciliation sweep failed');
+      })
+      .finally(() => {
+        defaultSweepInFlight = false;
+      });
+  }, 1_000);
+  defaultSweepTimer.unref?.();
+}
 
 export function getTreasureHuntMultiplayerRuntime() {
   defaultRuntime ??= createTreasureHuntMultiplayerRuntime();
+  ensureDefaultSweeper(defaultRuntime);
   return defaultRuntime;
 }
 

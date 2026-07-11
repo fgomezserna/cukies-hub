@@ -1,5 +1,9 @@
 import { MultiplayerDomainError } from '@/lib/treasure-hunt-multiplayer';
-import { createTreasureHuntMultiplayerHandlers } from '@/app/api/games/treasure-hunt/multiplayer/_lib/handlers';
+import {
+  createTreasureHuntMultiplayerHandlers,
+  isTreasureHuntMultiplayerFeatureEnabled,
+} from '@/app/api/games/treasure-hunt/multiplayer/_lib/handlers';
+import { MultiplayerFixedWindowRateLimiter } from '@/app/api/games/treasure-hunt/multiplayer/_lib/rate-limit';
 
 const match = {
   matchId: 'match-1',
@@ -22,15 +26,21 @@ function createHarness() {
     getForParticipant: jest.fn().mockResolvedValue(match),
     heartbeat: jest.fn().mockResolvedValue(match),
     updateSnapshot: jest.fn().mockResolvedValue(match),
+    forfeit: jest.fn().mockResolvedValue(match),
   };
   const dependencies = {
+    isFeatureEnabled: jest.fn(() => true),
     readWalletSession: jest.fn().mockResolvedValue({ userId: 'wallet-user' }),
     findGameSessionBySessionId: jest.fn().mockResolvedValue({
       sessionId: 'game-session-1',
       userId: 'wallet-user',
       gameId: 'sybil-slayer',
       isActive: true,
+      mode: 'staging_unranked',
+      rewardEligible: false,
     }),
+    lockGameSessionForMultiplayer: jest.fn().mockResolvedValue(true),
+    consumeRateLimit: jest.fn(() => true),
     getService: jest.fn(() => service),
   };
   const handlers = createTreasureHuntMultiplayerHandlers(dependencies);
@@ -38,6 +48,46 @@ function createHarness() {
 }
 
 describe('Treasure Hunt multiplayer API handlers', () => {
+  it('requires an exact true feature flag in production', () => {
+    expect(isTreasureHuntMultiplayerFeatureEnabled({ NODE_ENV: 'production' })).toBe(false);
+    expect(
+      isTreasureHuntMultiplayerFeatureEnabled({
+        NODE_ENV: 'production',
+        TREASURE_HUNT_MULTIPLAYER_ENABLED: 'false',
+      }),
+    ).toBe(false);
+    expect(
+      isTreasureHuntMultiplayerFeatureEnabled({
+        NODE_ENV: 'production',
+        TREASURE_HUNT_MULTIPLAYER_ENABLED: 'true',
+      }),
+    ).toBe(true);
+    expect(isTreasureHuntMultiplayerFeatureEnabled({ NODE_ENV: 'test' })).toBe(true);
+  });
+
+  it('fails closed at the feature gate before wallet, Prisma or match persistence', async () => {
+    const { handlers, dependencies, service } = createHarness();
+    dependencies.isFeatureEnabled.mockReturnValue(false);
+
+    const response = await handlers.createOrJoin(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
+        roomCode: 'ROOM42',
+        gameSessionId: 'game-session-1',
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: { code: 'NOT_FOUND', message: 'Not found' },
+    });
+    expect(dependencies.readWalletSession).not.toHaveBeenCalled();
+    expect(dependencies.findGameSessionBySessionId).not.toHaveBeenCalled();
+    expect(dependencies.lockGameSessionForMultiplayer).not.toHaveBeenCalled();
+    expect(dependencies.getService).not.toHaveBeenCalled();
+    expect(service.createOrJoin).not.toHaveBeenCalled();
+  });
+
   it('requires the signed wallet session before looking up a game session', async () => {
     const { handlers, dependencies, service } = createHarness();
     dependencies.readWalletSession.mockResolvedValue(null);
@@ -122,12 +172,44 @@ describe('Treasure Hunt multiplayer API handlers', () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
-      error: { code: 'GAME_SESSION_NOT_FOUND' },
+      error: { code: 'NOT_FOUND', message: 'Not found' },
     });
   });
 
+  it('rejects an inactive locked multiplayer session before every match operation', async () => {
+    const { handlers, dependencies, service } = createHarness();
+    dependencies.findGameSessionBySessionId.mockResolvedValue({
+      sessionId: 'game-session-1',
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: false,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+    });
+
+    const getResponse = await handlers.get(
+      new Request(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1?gameSessionId=game-session-1',
+      ),
+      'match-1',
+    );
+    const operationResponse = await handlers.operate(
+      jsonRequest(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1',
+        { action: 'heartbeat', gameSessionId: 'game-session-1' },
+      ),
+      'match-1',
+    );
+
+    expect(getResponse.status).toBe(403);
+    expect(operationResponse.status).toBe(403);
+    expect(dependencies.getService).not.toHaveBeenCalled();
+    expect(service.getForParticipant).not.toHaveBeenCalled();
+    expect(service.heartbeat).not.toHaveBeenCalled();
+  });
+
   it('derives service identity from the wallet cookie and validated session', async () => {
-    const { handlers, service } = createHarness();
+    const { handlers, dependencies, service } = createHarness();
 
     const response = await handlers.createOrJoin(
       jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
@@ -137,6 +219,13 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(dependencies.lockGameSessionForMultiplayer).toHaveBeenCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+    });
+    expect(dependencies.lockGameSessionForMultiplayer.mock.invocationCallOrder[0]).toBeLessThan(
+      service.createOrJoin.mock.invocationCallOrder[0],
+    );
     expect(service.createOrJoin).toHaveBeenCalledWith({
       roomCode: 'ROOM42',
       userId: 'wallet-user',
@@ -148,6 +237,49 @@ describe('Treasure Hunt multiplayer API handlers', () => {
       slot: 0,
       match,
     });
+  });
+
+  it('does not lock invalid input and never creates a match when the lock fails', async () => {
+    const invalidHarness = createHarness();
+    const invalid = await invalidHarness.handlers.createOrJoin(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
+        gameSessionId: 'game-session-1',
+      }),
+    );
+    expect(invalid.status).toBe(400);
+    expect(invalidHarness.dependencies.lockGameSessionForMultiplayer).not.toHaveBeenCalled();
+
+    const deniedHarness = createHarness();
+    deniedHarness.dependencies.lockGameSessionForMultiplayer.mockResolvedValue(false);
+    const denied = await deniedHarness.handlers.createOrJoin(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
+        roomCode: 'ROOM42',
+        gameSessionId: 'game-session-1',
+      }),
+    );
+    expect(denied.status).toBe(403);
+    expect(deniedHarness.service.createOrJoin).not.toHaveBeenCalled();
+  });
+
+  it('returns a generic 429 before touching the match repository', async () => {
+    const { handlers, dependencies, service } = createHarness();
+    dependencies.consumeRateLimit.mockReturnValue(false);
+
+    const response = await handlers.operate(
+      jsonRequest(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1',
+        { action: 'heartbeat', gameSessionId: 'game-session-1' },
+      ),
+      'match-1',
+    );
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests' },
+    });
+    expect(dependencies.getService).not.toHaveBeenCalled();
+    expect(service.heartbeat).not.toHaveBeenCalled();
   });
 
   it.each(['userId', 'playerId'])('rejects client-controlled %s identity', async (field) => {
@@ -198,7 +330,7 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
       success: false,
-      error: { code: 'PLAYER_NOT_FOUND' },
+      error: { code: 'NOT_FOUND', message: 'Not found' },
     });
   });
 
@@ -250,6 +382,25 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(missing.status).toBe(400);
   });
 
+  it('dispatches authoritative self-forfeit with server-derived identity', async () => {
+    const { handlers, service } = createHarness();
+    const response = await handlers.operate(
+      jsonRequest(
+        'http://localhost/api/games/treasure-hunt/multiplayer/matches/match-1',
+        { action: 'forfeit', gameSessionId: 'game-session-1' },
+      ),
+      'match-1',
+    );
+
+    expect(response.status).toBe(200);
+    expect(service.forfeit).toHaveBeenCalledWith({
+      matchId: 'match-1',
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+    });
+    expect(await response.json()).toEqual({ success: true, match });
+  });
+
   it('preserves domain status/code and redacts unexpected errors', async () => {
     const domainHarness = createHarness();
     domainHarness.service.createOrJoin.mockRejectedValue(
@@ -280,5 +431,28 @@ describe('Treasure Hunt multiplayer API handlers', () => {
       error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
     });
     expect(JSON.stringify(failureJson)).not.toContain('secret');
+  });
+});
+
+describe('MultiplayerFixedWindowRateLimiter', () => {
+  it('limits each operation by wallet and exact game session and resets its window', () => {
+    let now = 1_000;
+    const limiter = new MultiplayerFixedWindowRateLimiter(60_000, () => now);
+    const identity = { userId: 'wallet-user', gameSessionId: 'game-session-1' };
+
+    for (let request = 0; request < 12; request += 1) {
+      expect(limiter.consume({ ...identity, operation: 'join' })).toBe(true);
+    }
+    expect(limiter.consume({ ...identity, operation: 'join' })).toBe(false);
+    expect(limiter.consume({ ...identity, operation: 'heartbeat' })).toBe(true);
+    expect(
+      limiter.consume({ ...identity, gameSessionId: 'game-session-2', operation: 'join' }),
+    ).toBe(true);
+    expect(
+      limiter.consume({ ...identity, userId: 'other-wallet', operation: 'join' }),
+    ).toBe(true);
+
+    now += 60_000;
+    expect(limiter.consume({ ...identity, operation: 'join' })).toBe(true);
   });
 });

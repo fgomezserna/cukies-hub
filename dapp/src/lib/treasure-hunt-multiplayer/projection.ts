@@ -14,6 +14,9 @@ export function projectPublicMatch(match: Match): PublicMatch {
       ...match.rules,
       seed: match.seed,
       startAt: match.startAt,
+      lobbyExpiresAt: match.lobbyExpiresAt,
+      roundEndsAt: match.roundEndsAt,
+      suddenDeathEndsAt: match.suddenDeathEndsAt,
       resumeAt: match.resumeAt,
     },
     players: match.players.map((player) => ({

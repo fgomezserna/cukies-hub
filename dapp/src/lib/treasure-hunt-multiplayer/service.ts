@@ -11,7 +11,12 @@ import {
 } from './errors';
 import { createMatchPlayer, createWaitingMatch } from './match';
 import { projectPublicMatch } from './projection';
-import { isTerminalMatch, reconcileMatch, reconnectMatchPlayer } from './reconcile';
+import {
+  forfeitMatchPlayer,
+  isTerminalMatch,
+  reconcileMatch,
+  reconnectMatchPlayer,
+} from './reconcile';
 import type { MatchRepository } from './repository';
 import { applyPlayerSnapshot } from './snapshots';
 import type {
@@ -79,6 +84,10 @@ function findPlayer(match: Match, identity: MatchIdentity): MatchPlayer | undefi
     (player) =>
       player.userId === identity.userId && player.gameSessionId === identity.gameSessionId,
   );
+}
+
+function findPlayerByUserId(match: Match, userId: string): MatchPlayer | undefined {
+  return match.players.find((player) => player.userId === userId);
 }
 
 export class TreasureHuntMultiplayerService {
@@ -151,10 +160,17 @@ export class TreasureHuntMultiplayerService {
     const roomCode = requireIdentifier(input.roomCode, 'roomCode');
 
     for (let attempt = 0; attempt < this.maxCasRetries; attempt += 1) {
-      const existing = await this.repository.findByRoomCode(roomCode);
+      let existing = await this.repository.findByRoomCode(roomCode);
       const now = this.clock.now();
 
       if (!existing) {
+        if (await this.repository.findNonTerminalByUserId(identity.userId)) {
+          throw new MultiplayerDomainError(
+            'PLAYER_ACTIVE_MATCH',
+            'Player already has a non-terminal match',
+            409,
+          );
+        }
         const playerId = this.idFactory.createPlayerId();
         const match = createWaitingMatch({
           matchId: this.idFactory.createMatchId(),
@@ -170,6 +186,18 @@ export class TreasureHuntMultiplayerService {
           return { match: projectPublicMatch(created), playerId, slot: 0 };
         } catch (error) {
           if (error instanceof MatchAlreadyExistsError) {
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      const reconciledExisting = reconcileMatch(existing, this.context(now));
+      if (reconciledExisting !== existing) {
+        try {
+          existing = await this.repository.save(reconciledExisting, existing.revision);
+        } catch (error) {
+          if (error instanceof MatchRevisionConflictError) {
             continue;
           }
           throw error;
@@ -209,12 +237,95 @@ export class TreasureHuntMultiplayerService {
         }
       }
 
+      const sameUser = findPlayerByUserId(existing, identity.userId);
+      if (sameUser) {
+        if (isTerminalMatch(existing)) {
+          return {
+            match: projectPublicMatch(existing),
+            playerId: sameUser.playerId,
+            slot: sameUser.slot,
+          };
+        }
+
+        if (existing.status === 'waiting') {
+          const rotated: Match = {
+            ...existing,
+            players: existing.players.map((player) =>
+              player.playerId === sameUser.playerId
+                ? {
+                    ...player,
+                    gameSessionId: identity.gameSessionId,
+                    presence: 'online' as const,
+                    lastHeartbeatAt: now,
+                    offlineSince: null,
+                    reconnectAccountedAt: null,
+                    reconnectBudgetRemainingMs: existing.rules.reconnectBudgetMs,
+                    lastSnapshotAcceptedAt: null,
+                  }
+                : player,
+            ),
+            updatedAt: now,
+          };
+          try {
+            const saved = await this.repository.save(
+              reconcileMatch(rotated, this.context(now)),
+              existing.revision,
+            );
+            return {
+              match: projectPublicMatch(saved),
+              playerId: sameUser.playerId,
+              slot: sameUser.slot,
+            };
+          } catch (error) {
+            if (error instanceof MatchRevisionConflictError) {
+              continue;
+            }
+            throw error;
+          }
+        }
+
+        const rotated: Match = {
+          ...existing,
+          players: existing.players.map((player) =>
+            player.playerId === sameUser.playerId
+              ? { ...player, gameSessionId: identity.gameSessionId }
+              : player,
+          ),
+          updatedAt: now,
+        };
+        try {
+          const forfeited = await this.repository.save(
+            forfeitMatchPlayer(rotated, sameUser.playerId, now),
+            existing.revision,
+          );
+          return {
+            match: projectPublicMatch(forfeited),
+            playerId: sameUser.playerId,
+            slot: sameUser.slot,
+          };
+        } catch (error) {
+          if (error instanceof MatchRevisionConflictError) {
+            continue;
+          }
+          throw error;
+        }
+      }
+
       if (existing.players.length >= 2) {
         throw new MultiplayerDomainError('MATCH_FULL', `Room ${roomCode} already has two players`, 409);
       }
 
       if (isTerminalMatch(existing)) {
         throw new MultiplayerDomainError('MATCH_TERMINAL', `Match ${existing.matchId} is terminal`, 409);
+      }
+
+      const activeMatch = await this.repository.findNonTerminalByUserId(identity.userId);
+      if (activeMatch && activeMatch.matchId !== existing.matchId) {
+        throw new MultiplayerDomainError(
+          'PLAYER_ACTIVE_MATCH',
+          'Player already has a non-terminal match',
+          409,
+        );
       }
 
       const playerId = this.idFactory.createPlayerId();
@@ -320,6 +431,21 @@ export class TreasureHuntMultiplayerService {
     return projectPublicMatch(updated);
   }
 
+  async forfeit(input: PlayerOperationInput): Promise<PublicMatch> {
+    const matchId = requireIdentifier(input.matchId, 'matchId');
+    const identity = this.normalizeIdentity(input);
+    const updated = await this.saveWithRetry(matchId, (current, now) => {
+      const player = findPlayer(current, identity);
+      if (!player) {
+        throw new MultiplayerDomainError('PLAYER_NOT_FOUND', 'Player is not in this match', 404);
+      }
+      return isTerminalMatch(current)
+        ? current
+        : forfeitMatchPlayer(current, player.playerId, now);
+    });
+    return projectPublicMatch(updated);
+  }
+
   async reconcile(matchIdInput: string): Promise<PublicMatch> {
     const matchId = requireIdentifier(matchIdInput, 'matchId');
     const updated = await this.saveWithRetry(matchId, (current, now) =>
@@ -344,5 +470,25 @@ export class TreasureHuntMultiplayerService {
 
   async getForParticipant(input: PlayerOperationInput): Promise<PublicMatch> {
     return this.reconcileForParticipant(input);
+  }
+
+  async sweepDue(limit = 100): Promise<number> {
+    if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 500) {
+      throw new TypeError('sweep limit must be an integer between 1 and 500');
+    }
+
+    const due = await this.repository.findDue(this.clock.now(), limit);
+    let reconciled = 0;
+    for (const match of due) {
+      try {
+        await this.reconcile(match.matchId);
+        reconciled += 1;
+      } catch (error) {
+        if (!(error instanceof MatchNotFoundError)) {
+          throw error;
+        }
+      }
+    }
+    return reconciled;
   }
 }

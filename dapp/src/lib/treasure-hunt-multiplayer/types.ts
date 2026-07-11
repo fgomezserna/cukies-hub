@@ -42,6 +42,10 @@ export interface MatchPlayer {
 export interface MatchRules {
   readonly winDelta: number;
   readonly initialCountdownMs: number;
+  readonly lobbyTimeoutMs: number;
+  readonly roundDurationMs: number;
+  readonly suddenDeathTimeoutMs: number;
+  readonly terminalRetentionMs: number;
   readonly offlineThresholdMs: number;
   readonly reconnectBudgetMs: number;
   readonly reconnectCountdownMs: number;
@@ -99,11 +103,19 @@ export interface Match {
   readonly players: readonly MatchPlayer[];
   readonly seed: string | null;
   readonly startAt: number | null;
+  readonly lobbyExpiresAt: number;
+  readonly roundEndsAt: number | null;
+  readonly suddenDeathEndsAt: number | null;
   readonly resumeAt: number | null;
+  readonly pauseStartedAt: number | null;
   readonly pausedFromStatus: PausableMatchStatus | null;
   readonly pendingElimination: PendingElimination | null;
   readonly suddenDeath: SuddenDeathState | null;
   readonly result: MatchResult | null;
+  /** Internal scheduler deadline. It is intentionally omitted from PublicMatch. */
+  readonly nextReconcileAt: number | null;
+  /** Unix milliseconds converted to a BSON Date by MongoMatchRepository for the TTL index. */
+  readonly expiresAt: number | null;
   readonly createdAt: number;
   readonly updatedAt: number;
 }
@@ -137,6 +149,9 @@ export interface PublicMatch {
   readonly config: MatchRules & {
     readonly seed: string | null;
     readonly startAt: number | null;
+    readonly lobbyExpiresAt: number;
+    readonly roundEndsAt: number | null;
+    readonly suddenDeathEndsAt: number | null;
     readonly resumeAt: number | null;
   };
   readonly players: readonly PublicMatchPlayer[];

@@ -50,14 +50,13 @@ export async function POST(request: NextRequest) {
     ({ sessionToken, finalScore, metadata } = await request.json());
 
     console.log('🏁 [API] End session request received:', {
-      sessionToken: sessionToken || 'missing',
+      hasSessionToken: Boolean(sessionToken),
       finalScore,
-      metadata,
       timestamp: new Date().toISOString()
     });
 
     if (!sessionToken || finalScore === undefined) {
-      console.error('❌ [API] Missing required fields:', { sessionToken, finalScore });
+      console.error('❌ [API] Missing required end-session fields');
       return addCorsHeaders(
         NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 }),
         request
@@ -77,19 +76,24 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session) {
-      console.error('❌ [API] Session not found:', {
-        sessionToken,
-        searchAttempted: 'findUnique by sessionToken'
-      });
+      console.error('❌ [API] Session not found');
       return addCorsHeaders(
         NextResponse.json({ success: false, error: 'Session not found' }, { status: 400 }),
         request
       );
     }
+    if (session.mode === 'staging_unranked' || session.rewardEligible === false) {
+      return addCorsHeaders(
+        NextResponse.json(
+          { success: false, error: 'Session is not eligible for legacy settlement' },
+          { status: 403 },
+        ),
+        request,
+      );
+    }
 
     console.log('✅ [API] Session found:', {
       sessionId: session.sessionId,
-      userId: session.userId,
       gameId: session.gameId,
       isActive: session.isActive,
       hasResult: !!session.result,
@@ -98,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Check if this session already has a result (prevent duplicates)
     if (session.result) {
-      console.log('⚠️ [API] Session already has results, preventing duplicate:', sessionToken);
+      console.log('⚠️ [API] Session already has results, preventing duplicate');
       return addCorsHeaders(
         NextResponse.json({
           success: true,
@@ -111,10 +115,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if session is still active
-    if (!session.isActive) {
-      console.log('⚠️ [API] Session is no longer active:', sessionToken);
-      // Still allow processing if no results exist yet
+    // Claim the legacy settlement before any economic write. This races safely with the
+    // multiplayer lock: only one mode can win while the session is still active.
+    const settlementClaim = await prisma.gameSession.updateMany({
+      where: {
+        id: session.id,
+        isActive: true,
+        NOT: { mode: 'staging_unranked' },
+      },
+      data: {
+        isActive: false,
+        endedAt: new Date(),
+      },
+    });
+    if (settlementClaim.count !== 1) {
+      const current = await prisma.gameSession.findUnique({
+        where: { id: session.id },
+        select: { mode: true, rewardEligible: true },
+      });
+      if (current?.mode === 'staging_unranked' || current?.rewardEligible === false) {
+        return addCorsHeaders(
+          NextResponse.json(
+            { success: false, error: 'Session is not eligible for legacy settlement' },
+            { status: 403 },
+          ),
+          request,
+        );
+      }
+      return addCorsHeaders(
+        NextResponse.json({ success: false, error: 'Session settlement conflict' }, { status: 409 }),
+        request,
+      );
     }
 
     // Calculate game time from last checkpoint or session start
@@ -166,21 +197,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Mark session as inactive
-    await prisma.gameSession.update({
-      where: { id: session.id },
-      data: {
-        isActive: false,
-        endedAt: new Date()
-      }
-    });
-
     const processingTime = Date.now() - startTime;
     console.log('🏁 [API] Game session ended successfully:', {
-      sessionToken,
       sessionId: session.sessionId,
       finalScore,
-      metadata,
       xpEarned,
       processingTimeMs: processingTime
     });
@@ -196,14 +216,10 @@ export async function POST(request: NextRequest) {
       request
     );
 
-  } catch (error) {
+  } catch {
     const processingTime = Date.now() - startTime;
     console.error('❌ [API] Error ending game session:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      sessionToken: sessionToken || 'undefined',
-      finalScore: finalScore || 'undefined',
-      metadata: metadata || 'undefined',
+      hasSessionToken: Boolean(sessionToken),
       processingTimeMs: processingTime
     });
     return addCorsHeaders(
@@ -211,4 +227,4 @@ export async function POST(request: NextRequest) {
       request
     );
   }
-} 
+}

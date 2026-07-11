@@ -9,6 +9,8 @@ export interface MatchRepository {
   create(match: Match): Promise<Match>;
   findByMatchId(matchId: string): Promise<Match | null>;
   findByRoomCode(roomCode: string): Promise<Match | null>;
+  findNonTerminalByUserId(userId: string): Promise<Match | null>;
+  findDue(now: number, limit: number): Promise<readonly Match[]>;
   save(match: Match, expectedRevision: number): Promise<Match>;
 }
 
@@ -39,6 +41,30 @@ export class InMemoryMatchRepository implements MatchRepository {
   async findByRoomCode(roomCode: string): Promise<Match | null> {
     const matchId = this.roomCodes.get(roomCode);
     return matchId ? this.findByMatchId(matchId) : null;
+  }
+
+  async findNonTerminalByUserId(userId: string): Promise<Match | null> {
+    const match = [...this.matches.values()].find(
+      (candidate) =>
+        candidate.status !== 'finished' &&
+        candidate.status !== 'abandoned' &&
+        candidate.players.some((player) => player.userId === userId),
+    );
+    return match ? cloneMatch(match) : null;
+  }
+
+  async findDue(now: number, limit: number): Promise<readonly Match[]> {
+    return [...this.matches.values()]
+      .filter(
+        (match) =>
+          match.status !== 'finished' &&
+          match.status !== 'abandoned' &&
+          match.nextReconcileAt !== null &&
+          match.nextReconcileAt <= now,
+      )
+      .sort((left, right) => (left.nextReconcileAt ?? 0) - (right.nextReconcileAt ?? 0))
+      .slice(0, limit)
+      .map(cloneMatch);
   }
 
   async save(match: Match, expectedRevision: number): Promise<Match> {

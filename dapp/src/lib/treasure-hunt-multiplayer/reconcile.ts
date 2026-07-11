@@ -14,6 +14,58 @@ export function isTerminalMatch(match: Match) {
   return match.status === 'finished' || match.status === 'abandoned';
 }
 
+function minimumDeadline(values: readonly (number | null | undefined)[]): number | null {
+  const deadlines = values.filter((value): value is number => typeof value === 'number');
+  return deadlines.length > 0 ? Math.min(...deadlines) : null;
+}
+
+function nextPresenceDeadline(match: Match): number | null {
+  return minimumDeadline(
+    match.players.map((player) => {
+      if (player.presence === 'online') {
+        // accountOfflinePlayers intentionally uses `now > offlineAt`.
+        return player.lastHeartbeatAt + match.rules.offlineThresholdMs + 1;
+      }
+      if (player.presence === 'offline') {
+        const accountedAt = player.reconnectAccountedAt ?? player.offlineSince;
+        return accountedAt === null
+          ? null
+          : accountedAt + player.reconnectBudgetRemainingMs;
+      }
+      return null;
+    }),
+  );
+}
+
+function scheduleNextReconcile(match: Match): Match {
+  if (isTerminalMatch(match)) {
+    return match.nextReconcileAt === null ? match : { ...match, nextReconcileAt: null };
+  }
+
+  let nextReconcileAt: number | null;
+  if (match.status === 'waiting') {
+    nextReconcileAt = match.lobbyExpiresAt;
+  } else {
+    const statusDeadline =
+      match.status === 'countdown'
+        ? (match.resumeAt ?? match.startAt)
+        : match.status === 'running'
+          ? match.roundEndsAt
+          : match.status === 'sudden_death'
+            ? match.suddenDeathEndsAt
+            : null;
+    nextReconcileAt = minimumDeadline([
+      statusDeadline,
+      match.pendingElimination?.resolveAt,
+      nextPresenceDeadline(match),
+    ]);
+  }
+
+  return match.nextReconcileAt === nextReconcileAt
+    ? match
+    : { ...match, nextReconcileAt };
+}
+
 function finalScores(match: Match): Readonly<Record<string, number>> {
   return Object.fromEntries(match.players.map((player) => [player.playerId, player.snapshot.score]));
 }
@@ -30,6 +82,13 @@ function finishMatch(
 
   return {
     ...match,
+    players: match.players.map((player) => ({
+      ...player,
+      snapshot:
+        player.snapshot.lifecycle === 'eliminated'
+          ? player.snapshot
+          : { ...player.snapshot, lifecycle: 'finished' as const },
+    })),
     status: reason === 'abandoned' ? 'abandoned' : 'finished',
     result: {
       winnerPlayerId,
@@ -38,8 +97,12 @@ function finishMatch(
       finishedAt: now,
     },
     resumeAt: null,
+    pauseStartedAt: null,
     pausedFromStatus: null,
     pendingElimination: null,
+    suddenDeathEndsAt: null,
+    nextReconcileAt: null,
+    expiresAt: now + match.rules.terminalRetentionMs,
     updatedAt: now,
   };
 }
@@ -94,6 +157,18 @@ function evaluateVictory(match: Match, now: number): Match {
       return finishMatch(match, now, 'sudden_death', match.suddenDeath.leaderPlayerId);
     }
 
+    return match;
+  }
+
+  if (match.status === 'sudden_death' && !match.suddenDeath) {
+    const firstOut = isPlayerOut(first);
+    const secondOut = isPlayerOut(second);
+    if (firstOut || secondOut) {
+      return winnerByScore(match, now, 'sudden_death');
+    }
+    if (first.snapshot.score !== second.snapshot.score) {
+      return winnerByScore(match, now, 'sudden_death');
+    }
     return match;
   }
 
@@ -153,6 +228,7 @@ function evaluateVictory(match: Match, now: number): Match {
       chasingPlayerId: activePlayer.playerId,
       targetScore: pending.scoreAtDeath,
     },
+    suddenDeathEndsAt: now + match.rules.suddenDeathTimeoutMs,
     updatedAt: now,
   };
 }
@@ -255,6 +331,7 @@ function reconcilePause(match: Match, now: number): Match {
       status: 'paused_reconnect',
       pausedFromStatus: statusBeforePause(match),
       resumeAt: null,
+      pauseStartedAt: match.pauseStartedAt ?? now,
       updatedAt: now,
     };
   }
@@ -282,11 +359,23 @@ function advanceCountdown(match: Match, now: number): Match {
     }
 
     const resumedStatus = match.pausedFromStatus === 'sudden_death' ? 'sudden_death' : 'running';
+    const pausedForMs = Math.max(0, now - (match.pauseStartedAt ?? now));
     return {
       ...match,
       status: resumedStatus,
       resumeAt: null,
+      pauseStartedAt: null,
       pausedFromStatus: null,
+      roundEndsAt:
+        match.roundEndsAt === null ? null : match.roundEndsAt + pausedForMs,
+      suddenDeathEndsAt:
+        match.suddenDeathEndsAt === null
+          ? null
+          : match.suddenDeathEndsAt + pausedForMs,
+      players: match.players.map((player) => ({
+        ...player,
+        lastSnapshotAcceptedAt: now,
+      })),
       updatedAt: now,
     };
   }
@@ -316,9 +405,75 @@ function lockMatchConfiguration(match: Match, context: ReconcileContext): Match 
     })),
     seed: context.createSeed(),
     startAt: context.now + match.rules.initialCountdownMs,
+    roundEndsAt:
+      context.now + match.rules.initialCountdownMs + match.rules.roundDurationMs,
     status: 'countdown',
     updatedAt: context.now,
   };
+}
+
+function reconcileDeadlines(match: Match, now: number): Match {
+  if (isTerminalMatch(match)) {
+    return match;
+  }
+
+  if (match.status === 'waiting' && now >= match.lobbyExpiresAt) {
+    return finishMatch(match, now, 'abandoned', null);
+  }
+
+  if (match.status === 'running' && match.roundEndsAt !== null && now >= match.roundEndsAt) {
+    const [first, second] = match.players;
+    if (!first || !second) {
+      return finishMatch(match, now, 'abandoned', null);
+    }
+    if (first.snapshot.score !== second.snapshot.score) {
+      return winnerByScore(match, now, 'score_difference');
+    }
+    return {
+      ...match,
+      status: 'sudden_death',
+      suddenDeath: null,
+      suddenDeathEndsAt: now + match.rules.suddenDeathTimeoutMs,
+      updatedAt: now,
+    };
+  }
+
+  if (
+    match.status === 'sudden_death' &&
+    match.suddenDeathEndsAt !== null &&
+    now >= match.suddenDeathEndsAt
+  ) {
+    return match.suddenDeath
+      ? finishMatch(match, now, 'sudden_death', match.suddenDeath.leaderPlayerId)
+      : winnerByScore(match, now, 'sudden_death');
+  }
+
+  return match;
+}
+
+export function forfeitMatchPlayer(match: Match, playerId: string, now: number): Match {
+  if (isTerminalMatch(match)) {
+    return match;
+  }
+
+  const player = match.players.find((candidate) => candidate.playerId === playerId);
+  if (!player) {
+    return match;
+  }
+
+  const withForfeit: Match = {
+    ...match,
+    players: match.players.map((candidate) =>
+      candidate.playerId === playerId
+        ? { ...candidate, presence: 'forfeited' as const }
+        : candidate,
+    ),
+    updatedAt: now,
+  };
+  const opponent = withForfeit.players.find((candidate) => candidate.playerId !== playerId);
+  return opponent
+    ? finishMatch(withForfeit, now, 'forfeit', opponent.playerId)
+    : finishMatch(withForfeit, now, 'abandoned', null);
 }
 
 export function reconnectMatchPlayer(match: Match, playerId: string, now: number): Match {
@@ -354,9 +509,14 @@ export function reconcileMatch(match: Match, context: ReconcileContext): Match {
     return match;
   }
 
-  let next = lockMatchConfiguration(match, context);
-  if (next.players.length !== 2 || next.status === 'waiting') {
+  let next = reconcileDeadlines(match, context.now);
+  if (isTerminalMatch(next)) {
     return next;
+  }
+
+  next = lockMatchConfiguration(next, context);
+  if (next.players.length !== 2 || next.status === 'waiting') {
+    return scheduleNextReconcile(next);
   }
 
   next = accountOfflinePlayers(next, context.now);
@@ -367,5 +527,7 @@ export function reconcileMatch(match: Match, context: ReconcileContext): Match {
 
   next = reconcilePause(next, context.now);
   next = advanceCountdown(next, context.now);
-  return evaluateVictory(next, context.now);
+  next = evaluateVictory(next, context.now);
+  next = reconcileDeadlines(next, context.now);
+  return scheduleNextReconcile(next);
 }

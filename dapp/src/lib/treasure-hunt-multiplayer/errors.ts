@@ -7,6 +7,7 @@ export type MultiplayerErrorCode =
   | 'MATCH_FULL'
   | 'MATCH_TERMINAL'
   | 'PLAYER_NOT_FOUND'
+  | 'PLAYER_ACTIVE_MATCH'
   | 'CONCURRENT_UPDATE_LIMIT';
 
 export class MultiplayerDomainError extends Error {

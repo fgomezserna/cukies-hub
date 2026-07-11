@@ -5,6 +5,10 @@ export const ABSOLUTE_MAX_HEARTS = 10;
 export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
   winDelta: 500,
   initialCountdownMs: 3_000,
+  lobbyTimeoutMs: 30_000,
+  roundDurationMs: 30_000,
+  suddenDeathTimeoutMs: 60_000,
+  terminalRetentionMs: 7 * 24 * 60 * 60 * 1_000,
   offlineThresholdMs: 3_000,
   reconnectBudgetMs: 15_000,
   reconnectCountdownMs: 3_000,
@@ -22,6 +26,10 @@ export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
 const POSITIVE_RULES: readonly (keyof MatchRules)[] = [
   'winDelta',
   'initialCountdownMs',
+  'lobbyTimeoutMs',
+  'roundDurationMs',
+  'suddenDeathTimeoutMs',
+  'terminalRetentionMs',
   'offlineThresholdMs',
   'reconnectBudgetMs',
   'reconnectCountdownMs',

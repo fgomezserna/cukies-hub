@@ -41,6 +41,8 @@ function createHarness(ruleOverrides: Partial<MatchRules> = {}) {
     rules: {
       initialCountdownMs: 1_000,
       offlineThresholdMs: 10_000,
+      // State-machine tests use compressed clocks; anti-cheat rates are covered separately.
+      maxScoreDeltaPerWindow: 1_000_000,
       ...ruleOverrides,
     },
   });
@@ -72,6 +74,10 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(joined.match.config).toMatchObject({
       winDelta: 500,
       initialCountdownMs: 1_000,
+      lobbyTimeoutMs: 30_000,
+      roundDurationMs: 30_000,
+      suddenDeathTimeoutMs: 60_000,
+      terminalRetentionMs: 604_800_000,
       offlineThresholdMs: 10_000,
       reconnectBudgetMs: 15_000,
       reconnectCountdownMs: 3_000,
@@ -82,7 +88,7 @@ describe('TreasureHuntMultiplayerService', () => {
       maxScore: 10_000_000,
       maxElapsedMs: 86_400_000,
       scoreDeltaWindowMs: 1_000,
-      maxScoreDeltaPerWindow: 1_000,
+      maxScoreDeltaPerWindow: 1_000_000,
       snapshotTimeToleranceMs: 250,
     });
 
@@ -91,6 +97,8 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(publicJson).not.toContain('session-a');
     expect(publicJson).not.toContain('userId');
     expect(publicJson).not.toContain('gameSessionId');
+    expect(publicJson).not.toContain('nextReconcileAt');
+    expect(publicJson).not.toContain('expiresAt');
 
     clock.value = 1_100;
     const running = await service.getForParticipant({
@@ -110,7 +118,7 @@ describe('TreasureHuntMultiplayerService', () => {
     const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
     const created = await service.createOrJoin(first);
     await service.createOrJoin(second);
-    clock.value = 100;
+    clock.value = 101;
 
     await expect(
       service.getForParticipant({
@@ -199,7 +207,7 @@ describe('TreasureHuntMultiplayerService', () => {
     const { clock, service } = createHarness();
     const joinedFirst = await service.createOrJoin(first);
     await service.createOrJoin(second);
-    clock.value = 1_000;
+    clock.value = 1_001;
     await service.reconcile(joinedFirst.match.matchId);
 
     const snapshot = { seq: 1, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' };
@@ -269,6 +277,7 @@ describe('TreasureHuntMultiplayerService', () => {
       snapshot: { seq: -1, score: 0, elapsedMs: 0 },
     });
 
+    clock.value = 101;
     const firstAccepted = await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
@@ -279,9 +288,9 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(
       (await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]
         .lastSnapshotAcceptedAt,
-    ).toBe(100);
+    ).toBe(101);
 
-    clock.value = 1_100;
+    clock.value = 1_101;
     const secondAccepted = await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
@@ -292,14 +301,14 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(
       (await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]
         .lastSnapshotAcceptedAt,
-    ).toBe(1_100);
+    ).toBe(1_101);
   });
 
   it('finishes once at the default winDelta of 500', async () => {
     const { clock, service } = createHarness();
     const joinedFirst = await service.createOrJoin(first);
     await service.createOrJoin(second);
-    clock.value = 1_000;
+    clock.value = 1_001;
 
     const finished = await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
@@ -329,7 +338,7 @@ describe('TreasureHuntMultiplayerService', () => {
       });
       const joinedFirst = await service.createOrJoin(first);
       await service.createOrJoin(second);
-      clock.value = 100;
+      clock.value = 101;
 
       const pending = await service.updateSnapshot({
         matchId: joinedFirst.match.matchId,
@@ -347,9 +356,9 @@ describe('TreasureHuntMultiplayerService', () => {
       expect(pending.result).toBeNull();
       expect(JSON.stringify(pending)).not.toContain('pendingElimination');
       expect((await repository.findByMatchId(joinedFirst.match.matchId))?.pendingElimination)
-        .toMatchObject({ playerId: joinedFirst.playerId, scoreAtDeath: firstScore, resolveAt: 200 });
+        .toMatchObject({ playerId: joinedFirst.playerId, scoreAtDeath: firstScore, resolveAt: 201 });
 
-      clock.value = 150;
+      clock.value = 151;
       const finished = await service.updateSnapshot({
         matchId: joinedFirst.match.matchId,
         userId: second.userId,
@@ -374,136 +383,23 @@ describe('TreasureHuntMultiplayerService', () => {
     },
   );
 
-  it('resolves a single finished player with positive hearts after the first-out window', async () => {
-    const { clock, service } = createHarness({
-      initialCountdownMs: 100,
-      eliminationResolutionDelayMs: 100,
-    });
+  it('rejects client-declared finished lifecycle before persisting it', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
     const joinedFirst = await service.createOrJoin(first);
-    const joinedSecond = await service.createOrJoin(second);
-    clock.value = 100;
-    await service.updateSnapshot({
-      matchId: joinedFirst.match.matchId,
-      userId: second.userId,
-      gameSessionId: second.gameSessionId,
-      snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
-    });
+    await service.createOrJoin(second);
+    clock.value = 101;
 
-    const pending = await service.updateSnapshot({
-      matchId: joinedFirst.match.matchId,
-      userId: first.userId,
-      gameSessionId: first.gameSessionId,
-      snapshot: { seq: 0, score: 200, hearts: 3, elapsedMs: 100, lifecycle: 'finished' },
-    });
-    expect(pending.status).toBe('running');
-    expect(pending.players[0]).toMatchObject({ lifecycle: 'finished', hearts: 3 });
-
-    clock.value = 200;
-    const resolved = await service.reconcile(joinedFirst.match.matchId);
-    expect(resolved.result).toMatchObject({
-      winnerPlayerId: joinedSecond.playerId,
-      reason: 'elimination',
-    });
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+        snapshot: { seq: 0, score: 0, hearts: 3, elapsedMs: 1, lifecycle: 'finished' },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.players[0].snapshot)
+      .toMatchObject({ seq: -1, lifecycle: 'waiting' });
   });
-
-  it.each([
-    { firstScore: 400, secondScore: 200, expectedWinner: 'first', reason: 'elimination' },
-    { firstScore: 300, secondScore: 300, expectedWinner: null, reason: 'draw' },
-  ])(
-    'resolves two sequential finished snapshots: $reason',
-    async ({ firstScore, secondScore, expectedWinner, reason }) => {
-      const { clock, service } = createHarness({
-        initialCountdownMs: 100,
-        eliminationResolutionDelayMs: 100,
-      });
-      const joinedFirst = await service.createOrJoin(first);
-      await service.createOrJoin(second);
-      clock.value = 100;
-      const pending = await service.updateSnapshot({
-        matchId: joinedFirst.match.matchId,
-        userId: first.userId,
-        gameSessionId: first.gameSessionId,
-        snapshot: {
-          seq: 0,
-          score: firstScore,
-          hearts: 3,
-          elapsedMs: 100,
-          lifecycle: 'finished',
-        },
-      });
-      expect(pending.result).toBeNull();
-
-      clock.value = 150;
-      const resolved = await service.updateSnapshot({
-        matchId: joinedFirst.match.matchId,
-        userId: second.userId,
-        gameSessionId: second.gameSessionId,
-        snapshot: {
-          seq: 0,
-          score: secondScore,
-          hearts: 3,
-          elapsedMs: 150,
-          lifecycle: 'finished',
-        },
-      });
-      expect(resolved.result).toMatchObject({
-        winnerPlayerId: expectedWinner === 'first' ? joinedFirst.playerId : null,
-        reason,
-      });
-    },
-  );
-
-  it.each([
-    { finalScore: 599, chaserWins: false },
-    { finalScore: 601, chaserWins: true },
-  ])(
-    'resolves a finished sudden-death chaser at $finalScore points',
-    async ({ finalScore, chaserWins }) => {
-      const { clock, service } = createHarness({
-        initialCountdownMs: 100,
-        eliminationResolutionDelayMs: 100,
-      });
-      const joinedFirst = await service.createOrJoin(first);
-      const joinedSecond = await service.createOrJoin(second);
-      clock.value = 100;
-      await service.updateSnapshot({
-        matchId: joinedFirst.match.matchId,
-        userId: second.userId,
-        gameSessionId: second.gameSessionId,
-        snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
-      });
-      await service.updateSnapshot({
-        matchId: joinedFirst.match.matchId,
-        userId: first.userId,
-        gameSessionId: first.gameSessionId,
-        snapshot: { seq: 0, score: 600, hearts: 3, elapsedMs: 100, lifecycle: 'finished' },
-      });
-      clock.value = 200;
-      const suddenDeath = await service.reconcile(joinedFirst.match.matchId);
-      expect(suddenDeath).toMatchObject({
-        status: 'sudden_death',
-        suddenDeath: { targetScore: 600, chasingPlayerId: joinedSecond.playerId },
-      });
-
-      clock.value = 201;
-      const resolved = await service.updateSnapshot({
-        matchId: joinedFirst.match.matchId,
-        userId: second.userId,
-        gameSessionId: second.gameSessionId,
-        snapshot: {
-          seq: 1,
-          score: finalScore,
-          hearts: 3,
-          elapsedMs: 201,
-          lifecycle: 'finished',
-        },
-      });
-      expect(resolved.result).toMatchObject({
-        winnerPlayerId: chaserWins ? joinedSecond.playerId : joinedFirst.playerId,
-        reason: 'sudden_death',
-      });
-    },
-  );
 
   it('persists a terminal pending-elimination transition before ignoring a late snapshot', async () => {
     const { repository, clock, service } = createHarness({
@@ -513,7 +409,7 @@ describe('TreasureHuntMultiplayerService', () => {
     });
     const joinedFirst = await service.createOrJoin(first);
     const joinedSecond = await service.createOrJoin(second);
-    clock.value = 100;
+    clock.value = 101;
     await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
@@ -526,7 +422,7 @@ describe('TreasureHuntMultiplayerService', () => {
       gameSessionId: first.gameSessionId,
       snapshot: { seq: 0, score: 200, hearts: 0, elapsedMs: 100, lifecycle: 'eliminated' },
     });
-    clock.value = 200;
+    clock.value = 201;
     const lateSnapshot = {
       seq: 1,
       score: 999,
@@ -550,7 +446,7 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(terminal.players.find((player) => player.playerId === joinedSecond.playerId)).toMatchObject({
       score: 300,
       hearts: 3,
-      lifecycle: 'playing',
+      lifecycle: 'finished',
     });
     const persisted = await repository.findByMatchId(joinedFirst.match.matchId);
     expect(persisted).toMatchObject({ status: 'finished', pendingElimination: null });
@@ -659,7 +555,7 @@ describe('TreasureHuntMultiplayerService', () => {
     });
     const joinedFirst = await service.createOrJoin(first);
     const joinedSecond = await service.createOrJoin(second);
-    clock.value = 100;
+    clock.value = 101;
     await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
@@ -682,7 +578,7 @@ describe('TreasureHuntMultiplayerService', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
 
-    clock.value = 200;
+    clock.value = 201;
     const suddenDeath = await service.reconcile(joinedFirst.match.matchId);
     expect(suddenDeath.status).toBe('sudden_death');
     expect(suddenDeath.suddenDeath?.targetScore).toBe(600);
@@ -697,7 +593,7 @@ describe('TreasureHuntMultiplayerService', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
 
-    clock.value = 201;
+    clock.value = 202;
     const finished = await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
@@ -874,10 +770,210 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(bothExpired.players.find((player) => player.slot === 1)).toMatchObject({
       score: 0,
       hearts: 3,
-      lifecycle: 'waiting',
+      lifecycle: 'finished',
     });
     expect((await expiring.repository.findByMatchId(expiringFirst.match.matchId))?.players[1].snapshot)
       .toMatchObject({ seq: -1, score: 0, hearts: 3 });
+  });
+
+  it('keeps one slot per wallet, rotates only a waiting session and forfeits an active reload', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const original = await service.createOrJoin(first);
+
+    await expect(service.createOrJoin(first)).resolves.toMatchObject({
+      playerId: original.playerId,
+      slot: 0,
+    });
+
+    const waitingSession = { ...first, gameSessionId: 'session-a-waiting' };
+    const rotated = await service.createOrJoin(waitingSession);
+    expect(rotated).toMatchObject({ playerId: original.playerId, slot: 0 });
+    expect((await repository.findByMatchId(original.match.matchId))?.players).toEqual([
+      expect.objectContaining({
+        playerId: original.playerId,
+        userId: first.userId,
+        gameSessionId: waitingSession.gameSessionId,
+      }),
+    ]);
+    await expect(
+      service.getForParticipant({ matchId: original.match.matchId, ...first }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+
+    const joinedSecond = await service.createOrJoin(second);
+    clock.value = 101;
+    const activeSession = { ...first, gameSessionId: 'session-a-active-reload' };
+    const forfeited = await service.createOrJoin(activeSession);
+    expect(forfeited.match).toMatchObject({
+      status: 'finished',
+      result: { reason: 'forfeit', winnerPlayerId: joinedSecond.playerId },
+    });
+
+    await expect(
+      service.getForParticipant({ matchId: original.match.matchId, ...waitingSession }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    await expect(
+      service.getForParticipant({ matchId: original.match.matchId, ...activeSession }),
+    ).resolves.toMatchObject({ status: 'finished' });
+
+    const terminalReplay = await service.createOrJoin({
+      ...first,
+      gameSessionId: 'session-a-after-terminal',
+    });
+    expect(terminalReplay).toMatchObject({
+      playerId: original.playerId,
+      slot: 0,
+      match: { result: forfeited.match.result },
+    });
+    expect(
+      (await repository.findByMatchId(original.match.matchId))?.players[0].gameSessionId,
+    ).toBe(activeSession.gameSessionId);
+  });
+
+  it('never allocates two slots when the same wallet races two fresh sessions', async () => {
+    const { repository, service } = createHarness();
+    const [firstAttempt, secondAttempt] = await Promise.all([
+      service.createOrJoin({ ...first, gameSessionId: 'session-race-a' }),
+      service.createOrJoin({ ...first, gameSessionId: 'session-race-b' }),
+    ]);
+
+    expect(firstAttempt.playerId).toBe(secondAttempt.playerId);
+    expect(firstAttempt.slot).toBe(0);
+    expect(secondAttempt.slot).toBe(0);
+    const stored = await repository.findByRoomCode(first.roomCode);
+    expect(stored?.players).toHaveLength(1);
+    expect(stored?.players.map((player) => player.userId)).toEqual([first.userId]);
+  });
+
+  it('allows only one sequential non-terminal room per wallet', async () => {
+    const { service } = createHarness();
+    const firstRoom = await service.createOrJoin(first);
+
+    await expect(
+      service.createOrJoin({ ...first, roomCode: 'OTHER-ROOM' }),
+    ).rejects.toMatchObject({ code: 'PLAYER_ACTIVE_MATCH', statusCode: 409 });
+
+    await service.forfeit({ matchId: firstRoom.match.matchId, ...first });
+    await expect(
+      service.createOrJoin({ ...first, roomCode: 'OTHER-ROOM' }),
+    ).resolves.toMatchObject({ slot: 0, match: { roomCode: 'OTHER-ROOM', status: 'waiting' } });
+  });
+
+  it('makes explicit self-forfeit authoritative and idempotent', async () => {
+    const waitingHarness = createHarness();
+    const waiting = await waitingHarness.service.createOrJoin(first);
+    const abandoned = await waitingHarness.service.forfeit({
+      matchId: waiting.match.matchId,
+      ...first,
+    });
+    const replay = await waitingHarness.service.forfeit({
+      matchId: waiting.match.matchId,
+      ...first,
+    });
+    expect(abandoned).toMatchObject({
+      status: 'abandoned',
+      result: { reason: 'abandoned', winnerPlayerId: null },
+    });
+    expect(replay.result).toEqual(abandoned.result);
+    expect(replay.revision).toBe(abandoned.revision);
+
+    const runningHarness = createHarness();
+    const joinedFirst = await runningHarness.service.createOrJoin(first);
+    const joinedSecond = await runningHarness.service.createOrJoin(second);
+    const finished = await runningHarness.service.forfeit({
+      matchId: joinedFirst.match.matchId,
+      ...first,
+    });
+    expect(finished).toMatchObject({
+      status: 'finished',
+      result: { reason: 'forfeit', winnerPlayerId: joinedSecond.playerId },
+    });
+    await expect(
+      runningHarness.service.forfeit({
+        matchId: joinedFirst.match.matchId,
+        userId: 'foreign-user',
+        gameSessionId: 'foreign-session',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+  });
+
+  it('uses snapshot traffic as the accepted server heartbeat', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 101;
+
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      ...first,
+      snapshot: { seq: 0, score: 1, hearts: 3, elapsedMs: 1, lifecycle: 'playing' },
+    });
+
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.players[0])
+      .toMatchObject({ lastHeartbeatAt: 101, lastSnapshotAcceptedAt: 101 });
+  });
+
+  it('sweeps lobby, round and sudden-death deadlines and schedules TTL expiry', async () => {
+    const waitingHarness = createHarness({ lobbyTimeoutMs: 30, terminalRetentionMs: 100 });
+    const waiting = await waitingHarness.service.createOrJoin(first);
+    waitingHarness.clock.value = 29;
+    await expect(waitingHarness.service.sweepDue()).resolves.toBe(0);
+    waitingHarness.clock.value = 30;
+    await expect(waitingHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await waitingHarness.repository.findByMatchId(waiting.match.matchId)).toMatchObject({
+      status: 'abandoned',
+      nextReconcileAt: null,
+      expiresAt: 130,
+      result: { reason: 'abandoned', finishedAt: 30 },
+    });
+
+    const scoreHarness = createHarness({
+      initialCountdownMs: 1,
+      roundDurationMs: 10,
+      suddenDeathTimeoutMs: 20,
+      terminalRetentionMs: 100,
+      offlineThresholdMs: 1_000,
+      winDelta: 1_000,
+    });
+    const scoreFirst = await scoreHarness.service.createOrJoin(first);
+    const scoreSecond = await scoreHarness.service.createOrJoin(second);
+    scoreHarness.clock.value = 2;
+    await scoreHarness.service.updateSnapshot({
+      matchId: scoreFirst.match.matchId,
+      ...first,
+      snapshot: { seq: 0, score: 5, hearts: 3, elapsedMs: 1, lifecycle: 'playing' },
+    });
+    scoreHarness.clock.value = 11;
+    await expect(scoreHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await scoreHarness.repository.findByMatchId(scoreFirst.match.matchId)).toMatchObject({
+      status: 'finished',
+      expiresAt: 111,
+      result: { reason: 'score_difference', winnerPlayerId: scoreFirst.playerId },
+    });
+    expect(scoreSecond.playerId).toBeTruthy();
+
+    const tieHarness = createHarness({
+      initialCountdownMs: 1,
+      roundDurationMs: 10,
+      suddenDeathTimeoutMs: 20,
+      terminalRetentionMs: 100,
+      offlineThresholdMs: 1_000,
+    });
+    const tieFirst = await tieHarness.service.createOrJoin(first);
+    await tieHarness.service.createOrJoin(second);
+    tieHarness.clock.value = 11;
+    await expect(tieHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await tieHarness.repository.findByMatchId(tieFirst.match.matchId)).toMatchObject({
+      status: 'sudden_death',
+      suddenDeathEndsAt: 31,
+      nextReconcileAt: 31,
+    });
+    tieHarness.clock.value = 31;
+    await expect(tieHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await tieHarness.repository.findByMatchId(tieFirst.match.matchId)).toMatchObject({
+      status: 'finished',
+      expiresAt: 131,
+      result: { reason: 'draw', winnerPlayerId: null, finishedAt: 31 },
+    });
   });
 });
 
@@ -903,21 +999,60 @@ describe('Treasure Hunt snapshot validation', () => {
   it('validates absolute score deltas against configurable elapsed windows', () => {
     expect(
       validatePlayerSnapshot(
-        { seq: 5, score: 200, hearts: 3, elapsedMs: 3_000, lifecycle: 'playing' },
+        { seq: 5, score: 150, hearts: 3, elapsedMs: 3_000, lifecycle: 'playing' },
         previous,
         rules,
         validationContext,
       ),
-    ).toMatchObject({ score: 200 });
+    ).toMatchObject({ score: 150 });
 
     expect(() =>
       validatePlayerSnapshot(
-        { seq: 5, score: 151, hearts: 3, elapsedMs: 1_100, lifecycle: 'playing' },
+        { seq: 5, score: 201, hearts: 3, elapsedMs: 1_100, lifecycle: 'playing' },
         previous,
         rules,
         validationContext,
       ),
     ).toThrow(/score delta/);
+  });
+
+  it('starts with a zero score quota and grows it proportionally to server-active time', () => {
+    const fresh: PlayerSnapshot = {
+      seq: -1,
+      score: 0,
+      hearts: 3,
+      elapsedMs: 0,
+      lifecycle: 'waiting',
+    };
+    const productionRateRules = createMatchRules({
+      scoreDeltaWindowMs: 1_000,
+      maxScoreDeltaPerWindow: 1_000,
+    });
+
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 0, score: 500, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
+        fresh,
+        productionRateRules,
+        { now: 1_000, startAt: 1_000, lastSnapshotAcceptedAt: null },
+      ),
+    ).toThrow(/score delta exceeds 0/);
+    expect(
+      validatePlayerSnapshot(
+        { seq: 0, score: 250, hearts: 3, elapsedMs: 250, lifecycle: 'playing' },
+        fresh,
+        productionRateRules,
+        { now: 1_250, startAt: 1_000, lastSnapshotAcceptedAt: null },
+      ),
+    ).toMatchObject({ score: 250 });
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 0, score: 251, hearts: 3, elapsedMs: 250, lifecycle: 'playing' },
+        fresh,
+        productionRateRules,
+        { now: 1_250, startAt: 1_000, lastSnapshotAcceptedAt: null },
+      ),
+    ).toThrow(/score delta exceeds 250/);
   });
 
   it('rejects decreasing elapsed time, invalid hearts and bounded heart jumps', () => {
@@ -1004,7 +1139,7 @@ describe('Treasure Hunt snapshot validation', () => {
           rules,
           validationContext,
         ),
-      ).toThrow(/is terminal/);
+      ).toThrow(/is terminal|lifecycle is invalid/);
       expect(() =>
         validatePlayerSnapshot(
           {
@@ -1023,7 +1158,7 @@ describe('Treasure Hunt snapshot validation', () => {
           rules,
           validationContext,
         ),
-      ).toThrow(/is terminal/);
+      ).toThrow(/is terminal|lifecycle is invalid/);
     }
   });
 

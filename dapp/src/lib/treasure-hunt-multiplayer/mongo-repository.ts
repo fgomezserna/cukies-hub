@@ -12,8 +12,19 @@ const DEFAULT_COLLECTION_NAME = 'TreasureHuntMultiplayerMatch';
 
 export type MatchUniqueIndex = { readonly matchId: 1 } | { readonly roomCode: 1 };
 
+export interface MatchMongoIndexOptions {
+  readonly unique?: true;
+  readonly expireAfterSeconds?: number;
+}
+
+export interface MatchMongoCursor {
+  sort(spec: Document): MatchMongoCursor;
+  limit(limit: number): MatchMongoCursor;
+  toArray(): Promise<WithId<Document>[]>;
+}
+
 export interface MatchMongoCollection {
-  createIndex(spec: MatchUniqueIndex, options: { readonly unique: true }): Promise<string>;
+  createIndex(spec: Document, options?: MatchMongoIndexOptions): Promise<string>;
   insertOne(document: Document): Promise<unknown>;
   findOne(
     filter: Document,
@@ -27,6 +38,7 @@ export interface MatchMongoCollection {
       readonly includeResultMetadata: false;
     },
   ): Promise<WithId<Document> | null>;
+  find(filter: Document): MatchMongoCursor;
 }
 
 export type MatchCollectionProvider = (collectionName: string) => Promise<MatchMongoCollection>;
@@ -79,13 +91,31 @@ function fromDocument(document: WithId<Document> | Document | null): Match | nul
   }
 
   const { _id: _discarded, ...match } = document;
-  return match as unknown as Match;
+  const rawExpiresAt = match.expiresAt;
+  return {
+    ...match,
+    expiresAt:
+      rawExpiresAt == null
+        ? null
+        : rawExpiresAt instanceof Date
+          ? rawExpiresAt.getTime()
+          : typeof rawExpiresAt === 'string'
+            ? Date.parse(rawExpiresAt)
+            : (rawExpiresAt as number),
+  } as unknown as Match;
+}
+
+function toDocument(match: Match): Document {
+  return {
+    ...match,
+    expiresAt: match.expiresAt === null ? null : new Date(match.expiresAt),
+  };
 }
 
 export class MongoMatchRepository implements MatchRepository {
   private readonly collectionName: string;
   private readonly collectionProvider: MatchCollectionProvider;
-  private indexesReady: Promise<void> | null = null;
+  private collectionReady: Promise<MatchMongoCollection> | null = null;
 
   constructor(options: MongoMatchRepositoryOptions = {}) {
     this.collectionName = options.collectionName ?? DEFAULT_COLLECTION_NAME;
@@ -93,16 +123,24 @@ export class MongoMatchRepository implements MatchRepository {
   }
 
   private async collection() {
-    const collection = await this.collectionProvider(this.collectionName);
-    if (!this.indexesReady) {
-      this.indexesReady = Promise.all([
-        collection.createIndex({ matchId: 1 }, { unique: true }),
-        collection.createIndex({ roomCode: 1 }, { unique: true }),
-      ]).then(() => undefined);
+    if (!this.collectionReady) {
+      this.collectionReady = this.collectionProvider(this.collectionName)
+        .then(async (collection) => {
+          await Promise.all([
+            collection.createIndex({ matchId: 1 }, { unique: true }),
+            collection.createIndex({ roomCode: 1 }, { unique: true }),
+            collection.createIndex({ 'players.userId': 1, status: 1 }),
+            collection.createIndex({ nextReconcileAt: 1, status: 1 }),
+            collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+          ]);
+          return collection;
+        })
+        .catch((error) => {
+          this.collectionReady = null;
+          throw error;
+        });
     }
-
-    await this.indexesReady;
-    return collection;
+    return this.collectionReady;
   }
 
   async create(match: Match): Promise<Match> {
@@ -110,7 +148,7 @@ export class MongoMatchRepository implements MatchRepository {
     const stored: Match = { ...match, revision: 0 };
 
     try {
-      await collection.insertOne({ ...stored });
+      await collection.insertOne(toDocument(stored));
       return stored;
     } catch (error) {
       if (isDuplicateKeyError(error)) {
@@ -130,6 +168,29 @@ export class MongoMatchRepository implements MatchRepository {
     return fromDocument(await collection.findOne({ roomCode }));
   }
 
+  async findNonTerminalByUserId(userId: string): Promise<Match | null> {
+    const collection = await this.collection();
+    return fromDocument(
+      await collection.findOne({
+        'players.userId': userId,
+        status: { $nin: ['finished', 'abandoned'] },
+      }),
+    );
+  }
+
+  async findDue(now: number, limit: number): Promise<readonly Match[]> {
+    const collection = await this.collection();
+    const documents = await collection
+      .find({
+        status: { $nin: ['finished', 'abandoned'] },
+        nextReconcileAt: { $ne: null, $lte: now },
+      })
+      .sort({ nextReconcileAt: 1 })
+      .limit(limit)
+      .toArray();
+    return documents.map((document) => fromDocument(document) as Match);
+  }
+
   async save(match: Match, expectedRevision: number): Promise<Match> {
     const collection = await this.collection();
     const stored: Match = { ...match, revision: expectedRevision + 1 };
@@ -138,7 +199,7 @@ export class MongoMatchRepository implements MatchRepository {
     try {
       updated = await collection.findOneAndUpdate(
         { matchId: match.matchId, revision: expectedRevision },
-        { $set: stored },
+        { $set: toDocument(stored) },
         { returnDocument: 'after', includeResultMetadata: false },
       );
     } catch (error) {

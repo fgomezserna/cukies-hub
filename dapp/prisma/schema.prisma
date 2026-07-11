@@ -101,6 +101,8 @@ model GameSession {
   user          User     @relation(fields: [userId], references: [id])
   gameId        String   // e.g., 'sybil-slayer', 'hyppie-road'
   gameVersion   String?
+  mode          String?  @default("standard")
+  rewardEligible Boolean? @default(true)
   startedAt     DateTime @default(now())
   endedAt       DateTime?
   isActive      Boolean  @default(true)

@@ -7,13 +7,12 @@ const LIFECYCLES = new Set<PlayerLifecycle>([
   'ready',
   'playing',
   'eliminated',
-  'finished',
 ]);
 
 const ALLOWED_LIFECYCLE_TRANSITIONS: Readonly<Record<PlayerLifecycle, ReadonlySet<PlayerLifecycle>>> = {
-  waiting: new Set(['waiting', 'ready', 'playing', 'eliminated', 'finished']),
-  ready: new Set(['ready', 'playing', 'eliminated', 'finished']),
-  playing: new Set(['playing', 'eliminated', 'finished']),
+  waiting: new Set(['waiting', 'ready', 'playing', 'eliminated']),
+  ready: new Set(['ready', 'playing', 'eliminated']),
+  playing: new Set(['playing', 'eliminated']),
   eliminated: new Set(['eliminated']),
   finished: new Set(['finished']),
 };
@@ -98,32 +97,26 @@ export function validatePlayerSnapshot(
     throw invalidSnapshot(`elapsedMs exceeds server clock allowance ${maxPlausibleElapsed}`);
   }
 
-  const elapsedDelta = elapsedMs - previous.elapsedMs;
   const serverElapsedSinceAcceptance = Math.max(
     0,
     context.now - (context.lastSnapshotAcceptedAt ?? context.startAt),
   );
-  const boundedDeltaMs = Math.min(
-    elapsedDelta,
-    serverElapsedSinceAcceptance + rules.snapshotTimeToleranceMs,
+  const maxScoreDelta = Math.floor(
+    (serverElapsedSinceAcceptance * rules.maxScoreDeltaPerWindow) /
+      rules.scoreDeltaWindowMs,
   );
-  const windows = Math.max(1, Math.ceil(boundedDeltaMs / rules.scoreDeltaWindowMs));
-  const maxScoreDelta = windows * rules.maxScoreDeltaPerWindow;
   if (Math.abs(score - previous.score) > maxScoreDelta) {
     throw invalidSnapshot(
       `absolute score delta exceeds ${maxScoreDelta} for the reported elapsed window`,
     );
   }
 
-  const totalServerWindows = Math.max(
-    1,
-    Math.ceil(
-      (serverElapsedSinceStart + rules.snapshotTimeToleranceMs) / rules.scoreDeltaWindowMs,
-    ),
-  );
   const maxPlausibleScore = Math.min(
     rules.maxScore,
-    totalServerWindows * rules.maxScoreDeltaPerWindow,
+    Math.floor(
+      (serverElapsedSinceStart * rules.maxScoreDeltaPerWindow) /
+        rules.scoreDeltaWindowMs,
+    ),
   );
   if (score > maxPlausibleScore) {
     throw invalidSnapshot(`score exceeds server clock allowance ${maxPlausibleScore}`);
