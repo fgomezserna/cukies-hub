@@ -42,7 +42,6 @@ export function useGameConnection() {
   const [authState, setAuthState] = useState<{
     isAuthenticated: boolean;
     user: any;
-    token?: string;
   }>({
     isAuthenticated: false,
     user: null,
@@ -50,7 +49,6 @@ export function useGameConnection() {
 
   const [gameSession, setGameSession] = useState<{
     gameId: string;
-    sessionToken: string;
     sessionId: string;
   } | null>(null);
 
@@ -91,7 +89,7 @@ export function useGameConnection() {
 
     // Send secure checkpoint message
     await sendSecureMessageToParent('GAME_CHECKPOINT', {
-      sessionToken: gameSession.sessionToken,
+      sessionId: gameSession.sessionId,
       checkpoint,
       events
     });
@@ -103,7 +101,7 @@ export function useGameConnection() {
 
     // Send secure session end message
     await sendSecureMessageToParent('GAME_SESSION_END', {
-      sessionToken: gameSession.sessionToken,
+      sessionId: gameSession.sessionId,
       finalScore,
       metadata
     });
@@ -121,7 +119,7 @@ export function useGameConnection() {
 
     // Send secure honeypot trigger message
     await sendSecureMessageToParent('HONEYPOT_TRIGGER', {
-      sessionToken: gameSession.sessionToken,
+      sessionId: gameSession.sessionId,
       event
     });
   }, [gameSession]);
@@ -170,15 +168,12 @@ export function useGameConnection() {
         return;
       }
 
-      console.log('🎮 [GAME] Received message from parent:', event.data);
+      console.log('🎮 [GAME] Received message from parent:', event.data.type);
       
       // Validate secure message
       const validation = await validateSecureMessage(event.data);
       if (!validation.isValid) {
-        logSecurityEvent('Invalid message received', { 
-          reason: validation.reason, 
-          message: event.data 
-        });
+        logSecurityEvent('Invalid message received', { reason: validation.reason });
         return;
       }
 
@@ -191,14 +186,26 @@ export function useGameConnection() {
       
       switch (messageData.type) {
         case 'AUTH_STATE_CHANGED':
-          console.log('🔐 [GAME] Auth state changed:', messageData.payload);
-          setAuthState(messageData.payload);
+          console.log('🔐 [GAME] Auth state changed');
+          setAuthState({
+            isAuthenticated: messageData.payload?.isAuthenticated === true,
+            user: messageData.payload?.user ?? null,
+          });
           break;
         
-        case 'GAME_SESSION_START':
-          console.log('🚀 [GAME] Game session started:', messageData.payload);
-          setGameSession(messageData.payload);
+        case 'GAME_SESSION_START': {
+          console.log('🚀 [GAME] Game session started');
+          const payload = messageData.payload;
+          if (
+            payload?.gameId === 'sybil-slayer' &&
+            typeof payload.sessionId === 'string' &&
+            payload.sessionId.length > 0 &&
+            payload.sessionId.length <= 128
+          ) {
+            setGameSession({ gameId: payload.gameId, sessionId: payload.sessionId });
+          }
           break;
+        }
         
         default:
           console.log('🔄 [GAME] Ignored message type:', messageData.type);
@@ -226,7 +233,6 @@ export function useGameConnection() {
   return {
     isAuthenticated: authState.isAuthenticated,
     user: authState.user,
-    token: authState.token,
     gameSession,
     sendCheckpoint,
     sendSessionEnd,

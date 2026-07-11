@@ -48,6 +48,7 @@ function latestBridgeOptions() {
   return mockUseMultiplayerBridge.mock.calls.at(-1)?.[0] as {
     currentSessionId: string | null;
     onRoomJoined?: (roomCode: string) => void;
+    onSessionReleased?: (sessionId: string) => void;
   };
 }
 
@@ -189,7 +190,6 @@ describe('SybilSlayerPage game-session handshake', () => {
         type: 'GAME_SESSION_START',
         payload: {
           gameId: 'sybil-slayer',
-          sessionToken: 'parent-session-token',
           sessionId: 'parent-session',
           gameVersion: '1.0.0',
           roomId: 'ROOM-TWO',
@@ -311,12 +311,12 @@ describe('SybilSlayerPage game-session handshake', () => {
         type: 'GAME_SESSION_START',
         payload: expect.objectContaining({
           sessionId: 'session-b',
-          sessionToken: 'token-b',
           userId: 'wallet-b',
         }),
       }),
       GAME_ORIGIN,
     );
+    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('token-b');
 
     postMessage.mockClear();
     mockUseAuth.mockReturnValue({ isLoading: false, user: null });
@@ -327,7 +327,12 @@ describe('SybilSlayerPage game-session handshake', () => {
     );
     expect(localStorage.getItem('session_token_session-b')).toBeNull();
     expect(latestBridgeOptions()).toMatchObject({ currentSessionId: null });
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'GAME_SESSION_CLEAR', sessionId: 'session-b' },
+      GAME_ORIGIN,
+    );
 
+    postMessage.mockClear();
     act(() => {
       window.dispatchEvent(
         new MessageEvent('message', {
@@ -411,5 +416,39 @@ describe('SybilSlayerPage game-session handshake', () => {
       expect.any(Object),
     );
     expect(localStorage.getItem('session_token_parent-session')).toBeNull();
+  });
+
+  it('rotates to a fresh normal GameSession only after the bridge confirms release', async () => {
+    const sessionResponse = (sessionId: string, sessionToken: string) => new Response(
+      JSON.stringify({
+        success: true,
+        sessionId,
+        sessionToken,
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(sessionResponse('staging-session', 'staging-token'))
+      .mockResolvedValueOnce(sessionResponse('fresh-single-session', 'fresh-token'));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const postMessage = jest.spyOn(iframe.contentWindow as Window, 'postMessage')
+      .mockImplementation(() => undefined);
+
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('staging-session'));
+    postMessage.mockClear();
+    act(() => latestBridgeOptions().onSessionReleased?.('staging-session'));
+
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'GAME_SESSION_CLEAR', sessionId: 'staging-session' },
+      GAME_ORIGIN,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('fresh-single-session'));
+    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('fresh-token');
   });
 });

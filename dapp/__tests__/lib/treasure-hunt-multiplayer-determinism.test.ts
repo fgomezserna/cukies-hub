@@ -22,6 +22,8 @@ interface RuntimeFactories {
     gameTime?: number,
   ): unknown;
   createObstacle(id: string, type: 'fee', width: number, height: number): unknown;
+  generateId(prefix?: string): string;
+  getRandomObstacleType(level?: number): 'fee' | 'bug' | 'hacker';
 }
 
 // Runtime import is intentional: dapp's tsconfig owns a different `@/` alias,
@@ -31,6 +33,8 @@ const {
   createObstacle,
   createRuneCollectible,
   createTreasureCollectible,
+  generateId,
+  getRandomObstacleType,
 } = jest.requireActual<RuntimeFactories>('../../../games/sybil-slayer/src/lib/utils');
 
 describe('Treasure Hunt deterministic streams', () => {
@@ -84,6 +88,15 @@ describe('Treasure Hunt deterministic streams', () => {
     expect(replayedFrame).toEqual(firstFrame);
   });
 
+  it('resets gameplay object ids when the match seed is applied again', () => {
+    randomManager.setSeed(seed);
+    expect(generateId('hazard')).toBe('hazard-1');
+    expect(generateId('hazard')).toBe('hazard-2');
+
+    randomManager.setSeed(seed);
+    expect(generateId('hazard')).toBe('hazard-1');
+  });
+
   it('keeps every runtime domain stable when the other domains consume retries', () => {
     for (const targetStream of Object.values(GAMEPLAY_RANDOM_STREAMS)) {
       randomManager.setSeed(seed);
@@ -127,6 +140,139 @@ describe('Treasure Hunt deterministic streams', () => {
     const actualNextSpawn = createEnergyCollectible('retry-item-1', width, height);
 
     expect(actualNextSpawn).toEqual(expectedNextSpawn);
+  });
+
+  it('keeps an indexed logical decision stable after raw draws in the same stream', () => {
+    randomManager.setSeed(seed);
+    const expected = randomManager.indexedInt(
+      25_000,
+      35_001,
+      GAMEPLAY_RANDOM_STREAMS.ITEMS,
+      'heart-interval',
+    );
+
+    randomManager.setSeed(seed);
+    for (let draw = 0; draw < 50; draw += 1) {
+      randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS);
+    }
+    const actual = randomManager.indexedInt(
+      25_000,
+      35_001,
+      GAMEPLAY_RANDOM_STREAMS.ITEMS,
+      'heart-interval',
+    );
+
+    expect(actual).toBe(expected);
+  });
+
+  it('keeps the real obstacle-type decision stable after same-stream noise', () => {
+    randomManager.setSeed(0);
+    const expected = getRandomObstacleType(3);
+
+    randomManager.setSeed(0);
+    randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+    const actual = getRandomObstacleType(3);
+
+    expect(actual).toBe(expected);
+  });
+
+  it('does not let extra decisions from one item subsystem shift another subsystem', () => {
+    randomManager.setSeed(seed);
+    const expectedHeart = randomManager.indexedInt(
+      25_000,
+      35_001,
+      GAMEPLAY_RANDOM_STREAMS.ITEMS,
+      'heart-interval',
+    );
+
+    randomManager.setSeed(seed);
+    for (let index = 0; index < 10; index += 1) {
+      randomManager.indexedInt(
+        15_000,
+        25_001,
+        GAMEPLAY_RANDOM_STREAMS.ITEMS,
+        'mega-node-interval',
+      );
+    }
+    const actualHeart = randomManager.indexedInt(
+      25_000,
+      35_001,
+      GAMEPLAY_RANDOM_STREAMS.ITEMS,
+      'heart-interval',
+    );
+
+    expect(actualHeart).toBe(expectedHeart);
+  });
+
+  it('does not let extra events from one entity shift another entity', () => {
+    randomManager.setSeed(seed);
+    const expectedSecondFee = randomManager.indexedRandom(
+      GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+      'fee-bounce-variation:fee-b',
+    );
+
+    randomManager.setSeed(seed);
+    for (let bounce = 0; bounce < 20; bounce += 1) {
+      randomManager.indexedRandom(
+        GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+        'fee-bounce-variation:fee-a',
+      );
+    }
+    const actualSecondFee = randomManager.indexedRandom(
+      GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+      'fee-bounce-variation:fee-b',
+    );
+
+    expect(actualSecondFee).toBe(expectedSecondFee);
+  });
+
+  it('keeps the nth indexed event stable when the prior event consumes variable draws', () => {
+    randomManager.setSeed(seed);
+    randomManager.withIndexedEvent(GAMEPLAY_RANDOM_STREAMS.HAZARDS, 'fee-speed', () => {
+      randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+    });
+    const expected = randomManager.withIndexedEvent(
+      GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+      'fee-speed',
+      () => randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+    );
+
+    randomManager.setSeed(seed);
+    randomManager.withIndexedEvent(GAMEPLAY_RANDOM_STREAMS.HAZARDS, 'fee-speed', () => {
+      for (let draw = 0; draw < 50; draw += 1) {
+        randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+      }
+    });
+    const actual = randomManager.withIndexedEvent(
+      GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+      'fee-speed',
+      () => randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+    );
+
+    expect(actual).toBe(expected);
+  });
+
+  it('uses deterministic Fisher-Yates shuffles isolated from raw item draws', () => {
+    const values = ['a', 'b', 'c', 'd', 'e'];
+    randomManager.setSeed(seed);
+    const expected = randomManager.indexedShuffle(
+      values,
+      GAMEPLAY_RANDOM_STREAMS.ITEMS,
+      'vault-enemy-selection',
+    );
+
+    randomManager.setSeed(seed);
+    for (let draw = 0; draw < 50; draw += 1) {
+      randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS);
+    }
+    const actual = randomManager.indexedShuffle(
+      values,
+      GAMEPLAY_RANDOM_STREAMS.ITEMS,
+      'vault-enemy-selection',
+    );
+
+    expect(actual).toEqual(expected);
+    expect(actual).toEqual(expect.arrayContaining(values));
   });
 });
 

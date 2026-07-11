@@ -23,6 +23,7 @@ import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
 import { createMultiplayerRoomCode, getHandshakeRoomCode } from '../lib/multiplayer-client';
 import {
+  getSuddenDeathObjectiveCopy,
   isTreasureHuntMultiplayerEnabled,
   shouldBlockLocalGameControls,
 } from '../lib/multiplayer-feature';
@@ -475,6 +476,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     channel,
   } = usePusherConnection();
   const multiplayer = useMultiplayerMatch();
+  const releaseMultiplayerSession = useCallback(async () => {
+    try {
+      if (!sessionData?.sessionId) {
+        await multiplayer.reset();
+        return true;
+      }
+      await multiplayer.release();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [multiplayer, sessionData?.sessionId]);
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para alineación horizontal con el canvas
   const [canvasHorizontalOffset, setCanvasHorizontalOffset] = useState(0);
@@ -934,7 +947,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       </div>
       {showSuddenDeathBanner ? (
         <div className="rounded-md border border-amber-400/70 bg-amber-500/10 px-3 py-1 text-xs font-pixellari uppercase tracking-wide text-amber-200">
-          Sudden Death · El rival debe superar {multiplayer.suddenDeath?.targetScore ?? localScore} pts
+          Sudden Death · {getSuddenDeathObjectiveCopy(
+            multiplayer.suddenDeath?.chasingPlayerId,
+            multiplayer.playerId,
+            multiplayer.suddenDeath?.targetScore ?? localScore,
+          )}
         </div>
       ) : (
         <div className="flex justify-between text-[11px] font-pixellari uppercase tracking-wide text-cyan-100/70">
@@ -1195,7 +1212,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         </div>
         <button
           onClick={() => {
-            void multiplayer.reset()
+            void releaseMultiplayerSession()
+              .then((released) => {
+                if (!released) throw new Error('Multiplayer session release failed');
+                return multiplayer.reset();
+              })
               .then(() => {
                 setCurrentMode('single');
                 resetGame();
@@ -1494,6 +1515,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   ]);
 
   const terminalGameOverRef = useRef<string | null>(null);
+  const terminalReleaseRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isMultiplayerMode) return;
     if (!multiplayer.matchResult) return;
@@ -1502,7 +1524,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
     terminalGameOverRef.current = terminalKey;
     forceGameOver('multiplayer');
-  }, [isMultiplayerMode, multiplayer.matchConfig?.matchId, multiplayer.matchResult, forceGameOver]);
+    if (terminalReleaseRef.current !== terminalKey) {
+      terminalReleaseRef.current = terminalKey;
+      void releaseMultiplayerSession();
+    }
+  }, [
+    forceGameOver,
+    isMultiplayerMode,
+    multiplayer.matchConfig?.matchId,
+    multiplayer.matchResult,
+    releaseMultiplayerSession,
+  ]);
 
   // Helper para obtener tiempo pausable para animaciones
   const getPausableTime = useCallback(() => {
@@ -1603,14 +1635,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     } catch {
       setCurrentMode('single');
       resetGame();
+      const released = await releaseMultiplayerSession();
       setMultiplayerJoinFailure({
         roomCode: roomId,
-        message: multiplayer.error ?? 'No se pudo entrar en la partida multijugador.',
+        message: released
+          ? (multiplayer.error ?? 'No se pudo entrar en la partida multijugador.')
+          : 'No se pudo liberar la sesión multijugador. Reinténtalo antes de volver a Single Player.',
       });
     } finally {
       multiplayerStartPendingRef.current = false;
     }
-  }, [multiplayerEnabled, multiplayer, resetGame, generateMatchRoomId]);
+  }, [multiplayerEnabled, multiplayer, releaseMultiplayerSession, resetGame, generateMatchRoomId]);
 
   const retryMultiplayerJoin = useCallback(() => {
     if (!multiplayerJoinFailure) return;
@@ -1622,6 +1657,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const exitFailedMultiplayerJoin = useCallback(async () => {
     const failedRoomCode = multiplayerJoinFailure?.roomCode ?? null;
+    if (!(await releaseMultiplayerSession())) return;
     try {
       await multiplayer.reset();
     } catch {
@@ -1634,7 +1670,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setCurrentMode('single');
     resetGame();
     setModeSelectOpen(true);
-  }, [multiplayer, multiplayerJoinFailure, resetGame]);
+  }, [multiplayer, multiplayerJoinFailure, releaseMultiplayerSession, resetGame]);
 
   const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
@@ -3172,7 +3208,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                               stopMusic();
                             }
                             if (isMultiplayerMode) {
-                              void multiplayer.reset()
+                              void releaseMultiplayerSession()
+                                .then((released) => {
+                                  if (!released) throw new Error('Multiplayer session release failed');
+                                  return multiplayer.reset();
+                                })
                                 .then(() => {
                                   setCurrentMode('single');
                                   resetGame();

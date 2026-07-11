@@ -113,6 +113,7 @@ describe('usePusherConnection session refresh', () => {
       sessionId: 'session-1',
       roomId: 'NEW-ROOM',
     });
+    expect(result.current.sessionData).not.toHaveProperty('sessionToken');
     expect(localStorage.getItem('pusher-game-session')).toBeNull();
 
     await act(async () => {
@@ -125,7 +126,8 @@ describe('usePusherConnection session refresh', () => {
   });
 
   it('requests Pusher auth from the allowlisted parent once and never sends the bearer back', async () => {
-    const { unmount } = renderHook(() => usePusherConnection());
+    const consoleSnapshot = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const { result, unmount } = renderHook(() => usePusherConnection());
     act(() => {
       window.dispatchEvent(new MessageEvent('message', {
         source: window.parent,
@@ -162,6 +164,17 @@ describe('usePusherConnection session refresh', () => {
       channelName: 'private-game-session-session-1',
     });
     expect(authRequest).not.toHaveProperty('sessionToken');
+    expect(result.current.sessionData).not.toHaveProperty('sessionToken');
+    expect(JSON.stringify(consoleSnapshot.mock.calls)).not.toContain('memory-only-token');
+    expect(JSON.stringify(localStorage)).not.toContain('memory-only-token');
+    act(() => {
+      expect(result.current.sendCheckpoint({ score: 10, gameTime: 500 })).toBe(true);
+    });
+    const checkpointPayload = mockChannelTrigger.mock.calls.find(
+      ([eventName]) => eventName === 'client-checkpoint',
+    )?.[1];
+    expect(checkpointPayload).toMatchObject({ score: 10, gameTime: 500 });
+    expect(checkpointPayload).not.toHaveProperty('sessionToken');
 
     act(() => {
       window.dispatchEvent(new MessageEvent('message', {
@@ -182,6 +195,58 @@ describe('usePusherConnection session refresh', () => {
       await jest.advanceTimersByTimeAsync(10_000);
     });
     expect(callback).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('clears the active wallet session immediately and cancels stale game-end retries', async () => {
+    const { result, unmount } = renderHook(() => usePusherConnection());
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: 'https://hub.example',
+        data: {
+          type: 'GAME_SESSION_START',
+          payload: { gameId: 'sybil-slayer', sessionId: 'session-1' },
+        },
+      }));
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(150);
+    });
+
+    mockChannelTrigger.mockImplementationOnce(() => {
+      throw new Error('temporary channel failure');
+    });
+    act(() => {
+      expect(result.current.sendGameEnd({ finalScore: 99, gameTime: 1_000 })).toBe(false);
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: 'https://hub.example',
+        data: { type: 'GAME_SESSION_CLEAR', sessionId: 'older-session' },
+      }));
+    });
+    expect(result.current.sessionData?.sessionId).toBe('session-1');
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: 'https://hub.example',
+        data: { type: 'GAME_SESSION_CLEAR', sessionId: 'session-1' },
+      }));
+    });
+    expect(result.current.sessionData).toBeNull();
+    expect(result.current.connectionState).toBe('disconnected');
+    expect(mockDisconnect).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('pending-game-result')).toBeNull();
     unmount();
   });
 

@@ -32,6 +32,7 @@ const DEFAULT_STREAM = 'default';
 
 const streams = new Map<string, RandomStream>();
 const eventStreams: Array<{ streamName: string; generator: GeneratorFn }> = [];
+const indexedEventCounters = new Map<string, number>();
 let baseSeed: number | null = null;
 let seedVersion = 0;
 
@@ -132,12 +133,40 @@ const getFloat = (min: number, max: number, streamName?: string): number => {
   return random * (max - min) + min;
 };
 
+const withEvent = <T>(
+  streamName: GameplayRandomStream,
+  eventKey: string | number,
+  run: () => T,
+): T => {
+  const generator = baseSeed === null
+    ? defaultRandom
+    : createMulberry32(deriveStreamSeed(baseSeed, `${streamName}:event:${String(eventKey)}`));
+  eventStreams.push({ streamName, generator });
+  try {
+    return run();
+  } finally {
+    eventStreams.pop();
+  }
+};
+
+const withIndexedEvent = <T>(
+  streamName: GameplayRandomStream,
+  decisionName: string,
+  run: () => T,
+): T => {
+  const counterKey = `${streamName}:${decisionName}`;
+  const index = indexedEventCounters.get(counterKey) ?? 0;
+  indexedEventCounters.set(counterKey, index + 1);
+  return withEvent(streamName, `${decisionName}:${index}`, run);
+};
+
 /**
  * Reset current streams while keeping the active base seed.
  * Useful when restarting a match but keeping deterministic order.
  */
 const resetStreams = () => {
   streams.clear();
+  indexedEventCounters.clear();
 };
 
 export const randomManager = {
@@ -193,15 +222,52 @@ export const randomManager = {
    * draws inside the event never advance the next event in the same domain.
    */
   withEvent<T>(streamName: GameplayRandomStream, eventKey: string | number, run: () => T): T {
-    const generator = baseSeed === null
-      ? defaultRandom
-      : createMulberry32(deriveStreamSeed(baseSeed, `${streamName}:event:${String(eventKey)}`));
-    eventStreams.push({ streamName, generator });
-    try {
-      return run();
-    } finally {
-      eventStreams.pop();
-    }
+    return withEvent(streamName, eventKey, run);
+  },
+
+  withIndexedEvent<T>(
+    streamName: GameplayRandomStream,
+    decisionName: string,
+    run: () => T,
+  ): T {
+    return withIndexedEvent(streamName, decisionName, run);
+  },
+
+  indexedRandom(streamName: GameplayRandomStream, decisionName: string): number {
+    return withIndexedEvent(streamName, decisionName, () => next(streamName));
+  },
+
+  indexedInt(
+    min: number,
+    max: number,
+    streamName: GameplayRandomStream,
+    decisionName: string,
+  ): number {
+    return withIndexedEvent(streamName, decisionName, () => getInt(min, max, streamName));
+  },
+
+  indexedFloat(
+    min: number,
+    max: number,
+    streamName: GameplayRandomStream,
+    decisionName: string,
+  ): number {
+    return withIndexedEvent(streamName, decisionName, () => getFloat(min, max, streamName));
+  },
+
+  indexedShuffle<T>(
+    values: readonly T[],
+    streamName: GameplayRandomStream,
+    decisionName: string,
+  ): T[] {
+    return withIndexedEvent(streamName, decisionName, () => {
+      const shuffled = [...values];
+      for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(next(streamName) * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+      }
+      return shuffled;
+    });
   },
 
   seedVersion(): number {

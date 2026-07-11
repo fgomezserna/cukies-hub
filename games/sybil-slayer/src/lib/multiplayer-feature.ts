@@ -29,3 +29,13 @@ export function isTreasureHuntMatchNonTerminal(
 ): boolean {
   return Boolean(status && status !== 'finished' && status !== 'abandoned');
 }
+
+export function getSuddenDeathObjectiveCopy(
+  chasingPlayerId: string | null | undefined,
+  localPlayerId: string | null | undefined,
+  targetScore: number,
+): string {
+  return chasingPlayerId && chasingPlayerId === localPlayerId
+    ? `Debes superar ${targetScore} pts`
+    : `El rival debe superar ${targetScore} pts`;
+}

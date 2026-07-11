@@ -14,6 +14,7 @@ import {
   resolveConfiguredParentOrigin,
 } from '../../../games/sybil-slayer/src/lib/parent-origin';
 import {
+  getSuddenDeathObjectiveCopy,
   isTreasureHuntMatchNonTerminal,
   isTreasureHuntMultiplayerEnabled,
   shouldBlockLocalGameControls,
@@ -44,6 +45,7 @@ function match(
       roundEndsAt: status === 'waiting' ? null : 31_000,
       suddenDeathEndsAt: status === 'sudden_death' ? 91_000 : null,
       resumeAt: null,
+      resumeEpoch: 0,
       winDelta: 500,
       initialCountdownMs: 3_000,
       lobbyTimeoutMs: 30_000,
@@ -104,6 +106,8 @@ class FakeTransport implements MultiplayerTransport {
   get = jest.fn(async () => ({ match: match(1) }));
   heartbeat = jest.fn(async () => ({ match: match(1) }));
   snapshot = jest.fn(async () => ({ match: match(1, 'running') }));
+  forfeit = jest.fn(async () => ({ match: match(2, 'finished') }));
+  release = jest.fn(async () => ({ released: true as const, match: null }));
   reset = jest.fn(async () => undefined);
   cancelPending = jest.fn();
   cleanup = jest.fn();
@@ -143,7 +147,7 @@ describe('Treasure Hunt multiplayer parent transport', () => {
       windowObject: window,
       fallbackOrigin: PARENT_ORIGIN,
       nodeEnv: 'production',
-      clientId: 'client-1',
+      clientInstanceId: 'client-1',
       requestIdFactory: () => 'crypto-request-1',
       timeoutMs: 2_000,
     });
@@ -152,7 +156,7 @@ describe('Treasure Hunt multiplayer parent transport', () => {
     expect(postMessage).toHaveBeenCalledWith(
       {
         type: 'TH_MULTIPLAYER_REQUEST',
-        clientId: 'client-1',
+        clientInstanceId: 'client-1',
         requestId: 'crypto-request-1',
         command: 'join',
         payload: { roomCode: 'ROOM-1' },
@@ -188,7 +192,7 @@ describe('Treasure Hunt multiplayer parent transport', () => {
       windowObject: window,
       fallbackOrigin: PARENT_ORIGIN,
       nodeEnv: 'production',
-      clientId: 'client-1',
+      clientInstanceId: 'client-1',
       requestIdFactory: () => `request-${++requestId}`,
       timeoutMs: 500,
     });
@@ -210,7 +214,7 @@ describe('Treasure Hunt multiplayer parent transport', () => {
       windowObject: window,
       fallbackOrigin: PARENT_ORIGIN,
       nodeEnv: 'production',
-      clientId: 'client-1',
+      clientInstanceId: 'client-1',
       requestIdFactory: () => 'reset-request',
     });
 
@@ -218,7 +222,7 @@ describe('Treasure Hunt multiplayer parent transport', () => {
     expect(postMessage).toHaveBeenCalledWith(
       {
         type: 'TH_MULTIPLAYER_REQUEST',
-        clientId: 'client-1',
+        clientInstanceId: 'client-1',
         requestId: 'reset-request',
         command: 'reset',
         payload: {},
@@ -238,11 +242,100 @@ describe('Treasure Hunt multiplayer parent transport', () => {
     await expect(reset).resolves.toBeUndefined();
     transport.cleanup();
   });
+
+  it('sends release with the same client instance as every other command', async () => {
+    const postMessage = jest.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const transport = createTreasureHuntParentTransport({
+      windowObject: window,
+      fallbackOrigin: PARENT_ORIGIN,
+      nodeEnv: 'production',
+      clientInstanceId: 'iframe-instance-1',
+      requestIdFactory: () => 'release-request',
+    });
+
+    const release = transport.release();
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_REQUEST',
+        clientInstanceId: 'iframe-instance-1',
+        requestId: 'release-request',
+        command: 'release',
+        payload: {},
+      },
+      PARENT_ORIGIN,
+    );
+    window.dispatchEvent(new MessageEvent('message', {
+      source: window.parent,
+      origin: PARENT_ORIGIN,
+      data: {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'release-request',
+        success: true,
+        data: { released: true, match: null },
+      },
+    }));
+    await expect(release).resolves.toEqual({ released: true, match: null });
+    transport.cleanup();
+  });
+
+  it('rejects malformed release responses from the parent bridge', async () => {
+    jest.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const transport = createTreasureHuntParentTransport({
+      windowObject: window,
+      fallbackOrigin: PARENT_ORIGIN,
+      nodeEnv: 'production',
+      clientInstanceId: 'iframe-instance-1',
+      requestIdFactory: () => 'bad-release-response',
+    });
+
+    const release = transport.release();
+    window.dispatchEvent(new MessageEvent('message', {
+      source: window.parent,
+      origin: PARENT_ORIGIN,
+      data: {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'bad-release-response',
+        success: true,
+        data: { released: 'yes', match: null },
+      },
+    }));
+    await expect(release).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+    transport.cleanup();
+  });
 });
 
 describe('Treasure Hunt multiplayer controller', () => {
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('resets pristine local state without requiring a parent bridge request', async () => {
+    const transport = new FakeTransport();
+    const controller = new TreasureHuntMultiplayerController({ transport });
+
+    await expect(controller.reset()).resolves.toBeUndefined();
+    expect(transport.reset).not.toHaveBeenCalled();
+    expect(transport.cancelPending).toHaveBeenCalledTimes(1);
+    expect(controller.getState()).toEqual(expect.objectContaining({ match: null, roomCode: null }));
+    controller.dispose();
+  });
+
+  it('releases a parent session exactly once until local reset', async () => {
+    const transport = new FakeTransport();
+    transport.join.mockRejectedValue(new MultiplayerClientError('MATCH_FULL', 'full'));
+    const controller = new TreasureHuntMultiplayerController({ transport });
+
+    await expect(controller.join('ROOM-1')).rejects.toMatchObject({ code: 'MATCH_FULL' });
+    await expect(controller.release()).resolves.toBe(true);
+    await expect(controller.release()).resolves.toBe(false);
+    expect(transport.release).toHaveBeenCalledTimes(1);
+
+    await controller.reset();
+    await expect(controller.release()).resolves.toBe(false);
+    await expect(controller.join('ROOM-2')).rejects.toMatchObject({ code: 'MATCH_FULL' });
+    await expect(controller.release()).resolves.toBe(true);
+    expect(transport.release).toHaveBeenCalledTimes(2);
+    controller.dispose();
   });
 
   it('joins idempotently by room, stores canonical identity/invite and ignores stale revisions', async () => {
@@ -298,6 +391,7 @@ describe('Treasure Hunt multiplayer controller', () => {
       roomCode: 'REAL-ROOM',
       userId: 'real-user-1',
       gameSessionId: 'real-session-1',
+      clientInstanceId: 'real-client-1',
     });
     expect(created.match.players[0].seq).toBe(-1);
     expect(created.slot).toBe(0);
@@ -604,9 +698,11 @@ describe('Treasure Hunt multiplayer controller', () => {
 
     controller.applyServerMatch(match(5, 'paused_reconnect'));
     controller.applyServerMatch(match(6, 'countdown', {
-      config: { ...match(6, 'countdown').config, resumeAt: 5_000 },
+      config: { ...match(6, 'countdown').config, resumeAt: 5_000, resumeEpoch: 1 },
     }));
-    controller.applyServerMatch(match(7, 'running'));
+    controller.applyServerMatch(match(7, 'running', {
+      config: { ...match(7, 'running').config, resumeEpoch: 1 },
+    }));
     expect(controller.getState().resumeSignal).toBe(1);
     expect(calls.filter((call) => call.startsWith('seed:'))).toHaveLength(1);
     controller.dispose();
@@ -619,18 +715,34 @@ describe('Treasure Hunt multiplayer controller', () => {
     controller.applyServerMatch(match(2, 'running'));
     controller.applyServerMatch(match(3, 'paused_reconnect'));
     controller.applyServerMatch(match(4, 'running', {
-      config: { ...match(4, 'running').config, resumeAt: 8_000 },
+      config: { ...match(4, 'running').config, resumeEpoch: 1 },
     }));
     controller.applyServerMatch(match(5, 'running', {
-      config: { ...match(5, 'running').config, resumeAt: 8_000 },
+      config: { ...match(5, 'running').config, resumeEpoch: 1 },
     }));
     expect(controller.getState().resumeSignal).toBe(1);
 
     controller.applyServerMatch(match(6, 'paused_reconnect'));
     controller.applyServerMatch(match(7, 'running', {
-      config: { ...match(7, 'running').config, resumeAt: 12_000 },
+      config: { ...match(7, 'running').config, resumeEpoch: 2 },
     }));
     expect(controller.getState().resumeSignal).toBe(2);
+    controller.dispose();
+  });
+
+  it('emits resume from a monotonic epoch even when every intermediate pause state was skipped', async () => {
+    const transport = new FakeTransport();
+    const controller = new TreasureHuntMultiplayerController({ transport });
+    await controller.join('ROOM-1');
+    controller.applyServerMatch(match(2, 'running'));
+    controller.applyServerMatch(match(3, 'running', {
+      config: { ...match(3, 'running').config, resumeEpoch: 1 },
+    }));
+    controller.applyServerMatch(match(4, 'running', {
+      config: { ...match(4, 'running').config, resumeEpoch: 1 },
+    }));
+
+    expect(controller.getState().resumeSignal).toBe(1);
     controller.dispose();
   });
 
@@ -665,6 +777,71 @@ describe('Treasure Hunt multiplayer controller', () => {
     await Promise.resolve();
     await jest.advanceTimersByTimeAsync(5_000);
     expect(transport.snapshot).toHaveBeenCalledTimes(1);
+    controller.dispose();
+  });
+
+  it('backs off transient snapshot failures instead of retrying every throttle cadence', async () => {
+    jest.useFakeTimers();
+    const transport = new FakeTransport();
+    transport.snapshot.mockRejectedValue(
+      new MultiplayerClientError('RATE_LIMITED', 'slow down', true, 429),
+    );
+    transport.get.mockResolvedValue({ match: match(2, 'running') });
+    transport.heartbeat.mockResolvedValue({ match: match(2, 'running') });
+    const controller = new TreasureHuntMultiplayerController({
+      transport,
+      now: () => 2_000,
+      snapshotThrottleMs: 500,
+      retryJitter: () => 0.5,
+    });
+    await controller.join('ROOM-1');
+    controller.applyServerMatch(match(2, 'running'));
+    controller.publishSnapshot({ score: 10, hearts: 3, lifecycle: 'playing' });
+    await Promise.resolve();
+
+    await jest.advanceTimersByTimeAsync(999);
+    expect(transport.snapshot).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(transport.snapshot).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(1_999);
+    expect(transport.snapshot).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(transport.snapshot).toHaveBeenCalledTimes(3);
+    controller.dispose();
+  });
+
+  it('resets snapshot backoff after a successful retry', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(2_000);
+    const transport = new FakeTransport();
+    const rateLimit = new MultiplayerClientError('RATE_LIMITED', 'slow down', true, 429);
+    transport.snapshot
+      .mockRejectedValueOnce(rateLimit)
+      .mockResolvedValueOnce({ match: match(3, 'running') })
+      .mockRejectedValueOnce(rateLimit)
+      .mockResolvedValue({ match: match(4, 'running') });
+    transport.get.mockResolvedValue({ match: match(2, 'running') });
+    transport.heartbeat.mockResolvedValue({ match: match(2, 'running') });
+    const controller = new TreasureHuntMultiplayerController({
+      transport,
+      snapshotThrottleMs: 500,
+      retryJitter: () => 0.5,
+    });
+    await controller.join('ROOM-1');
+    controller.applyServerMatch(match(2, 'running'));
+
+    controller.publishSnapshot({ score: 10, hearts: 3, lifecycle: 'playing' });
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(transport.snapshot).toHaveBeenCalledTimes(2);
+
+    controller.publishSnapshot({ score: 20, hearts: 3, lifecycle: 'playing' });
+    await jest.advanceTimersByTimeAsync(500);
+    expect(transport.snapshot).toHaveBeenCalledTimes(3);
+    await jest.advanceTimersByTimeAsync(999);
+    expect(transport.snapshot).toHaveBeenCalledTimes(3);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(transport.snapshot).toHaveBeenCalledTimes(4);
     controller.dispose();
   });
 
@@ -752,6 +929,13 @@ describe('multiplayer client helpers', () => {
     expect(isTreasureHuntMatchNonTerminal('finished')).toBe(false);
     expect(isTreasureHuntMatchNonTerminal('abandoned')).toBe(false);
     expect(isTreasureHuntMatchNonTerminal(null)).toBe(false);
+  });
+
+  it('describes the sudden-death target from the local player perspective', () => {
+    expect(getSuddenDeathObjectiveCopy('player-1', 'player-1', 1_500))
+      .toBe('Debes superar 1500 pts');
+    expect(getSuddenDeathObjectiveCopy('player-2', 'player-1', 1_500))
+      .toBe('El rival debe superar 1500 pts');
   });
 
   it('creates room codes using Web Crypto without Math.random', () => {

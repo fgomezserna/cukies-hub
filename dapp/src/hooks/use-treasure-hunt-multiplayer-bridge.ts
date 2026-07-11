@@ -6,11 +6,11 @@ const REQUEST_TYPE = 'TH_MULTIPLAYER_REQUEST';
 const RESPONSE_TYPE = 'TH_MULTIPLAYER_RESPONSE';
 const MULTIPLAYER_API = '/api/games/treasure-hunt/multiplayer/matches';
 
-type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot' | 'reset';
+type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot' | 'forfeit' | 'release' | 'reset';
 
 interface MultiplayerRequest {
   readonly type: typeof REQUEST_TYPE;
-  readonly clientId: string;
+  readonly clientInstanceId: string;
   readonly requestId: string;
   readonly command: MultiplayerCommand;
   readonly payload: Record<string, unknown>;
@@ -42,6 +42,7 @@ export interface TreasureHuntMultiplayerBridgeOptions {
   readonly fetchImpl?: typeof fetch;
   readonly windowObject?: Window;
   readonly onRoomJoined?: (roomCode: string) => void;
+  readonly onSessionReleased?: (sessionId: string) => void;
 }
 
 export interface UseTreasureHuntMultiplayerBridgeOptions {
@@ -49,6 +50,7 @@ export interface UseTreasureHuntMultiplayerBridgeOptions {
   readonly gameUrl: string | null | undefined;
   readonly currentSessionId: string | null;
   readonly onRoomJoined?: (roomCode: string) => void;
+  readonly onSessionReleased?: (sessionId: string) => void;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,22 +62,22 @@ function parseRequest(value: unknown): MultiplayerRequest | null {
     return null;
   }
   if (
-    typeof value.clientId !== 'string' ||
-    value.clientId.length === 0 ||
-    value.clientId.length > 128 ||
+    typeof value.clientInstanceId !== 'string' ||
+    value.clientInstanceId.length === 0 ||
+    value.clientInstanceId.length > 128 ||
     typeof value.requestId !== 'string' ||
     value.requestId.length === 0 ||
     value.requestId.length > 128
   ) {
     return null;
   }
-  if (!['join', 'get', 'heartbeat', 'snapshot', 'reset'].includes(String(value.command))) {
+  if (!['join', 'get', 'heartbeat', 'snapshot', 'forfeit', 'release', 'reset'].includes(String(value.command))) {
     return null;
   }
 
   return {
     type: REQUEST_TYPE,
-    clientId: value.clientId,
+    clientInstanceId: value.clientInstanceId,
     requestId: value.requestId,
     command: value.command as MultiplayerCommand,
     payload: isRecord(value.payload) ? value.payload : {},
@@ -166,10 +168,8 @@ export function createTreasureHuntMultiplayerBridge(
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
   let knownMatchStatus: string | null = null;
-  let knownPlayerId: string | null = null;
-  let knownSlot: 0 | 1 | null = null;
-  let knownClientId: string | null = null;
   let pendingRoomCode: string | null = null;
+  let sessionReleased = false;
   let generation = 0;
   let disposed = false;
 
@@ -241,9 +241,6 @@ export function createTreasureHuntMultiplayerBridge(
       knownMatchId = null;
       knownRoomCode = null;
       knownMatchStatus = null;
-      knownPlayerId = null;
-      knownSlot = null;
-      knownClientId = null;
       pendingRoomCode = null;
       frameWindow.postMessage(
         {
@@ -265,6 +262,7 @@ export function createTreasureHuntMultiplayerBridge(
 
     void (async () => {
       let ownedPendingRoomCode: string | null = null;
+      let notifySessionReleased = false;
       try {
         let data: Record<string, unknown>;
 
@@ -284,46 +282,18 @@ export function createTreasureHuntMultiplayerBridge(
           }
           pendingRoomCode = roomCode;
           ownedPendingRoomCode = roomCode;
-          const isReloadOfStartedMatch = Boolean(
-            knownMatchId &&
-            knownClientId &&
-            request.clientId !== knownClientId &&
-            knownMatchStatus !== 'waiting' &&
-            !isTerminalMatchStatus(knownMatchStatus),
-          );
-
-          if (isReloadOfStartedMatch) {
-            if (!knownMatchId || !knownPlayerId || knownSlot === null) {
-              throw new BridgeError('INVALID_STATE', 'Multiplayer bridge state is incomplete');
-            }
-            const response = await fetchImpl(
-              `${MULTIPLAYER_API}/${encodeURIComponent(knownMatchId)}`,
-              {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'forfeit',
-                  gameSessionId: options.currentSessionId,
-                }),
-                signal: abortController.signal,
-              },
-            );
-            const forfeitData = await readApiResponse(response);
-            data = { ...forfeitData, playerId: knownPlayerId, slot: knownSlot };
-          } else {
-            const response = await fetchImpl(MULTIPLAYER_API, {
-              method: 'POST',
-              credentials: 'same-origin',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                roomCode,
-                gameSessionId: options.currentSessionId,
-              }),
-              signal: abortController.signal,
-            });
-            data = await readApiResponse(response);
-          }
+          const response = await fetchImpl(MULTIPLAYER_API, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roomCode,
+              gameSessionId: options.currentSessionId,
+              clientInstanceId: request.clientInstanceId,
+            }),
+            signal: abortController.signal,
+          });
+          data = await readApiResponse(response);
           if (
             disposed ||
             abortController.signal.aborted ||
@@ -353,12 +323,22 @@ export function createTreasureHuntMultiplayerBridge(
           ) {
             throw new BridgeError('INVALID_RESPONSE', 'Multiplayer request failed');
           }
-          knownPlayerId = data.playerId;
-          knownSlot = data.slot;
-          knownClientId = request.clientId;
           const inviteUrl = buildTreasureHuntInviteUrl(windowObject, canonicalRoomCode);
           options.onRoomJoined?.(canonicalRoomCode);
           data = { ...data, inviteUrl };
+        } else if (request.command === 'release') {
+          const response = await fetchImpl(`${MULTIPLAYER_API}/release`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              gameSessionId: options.currentSessionId,
+              clientInstanceId: request.clientInstanceId,
+            }),
+            signal: abortController.signal,
+          });
+          data = await readApiResponse(response);
+          notifySessionReleased = data.released === true;
         } else {
           if (!knownMatchId) {
             throw new BridgeError('MATCH_NOT_JOINED', 'Multiplayer match is not joined');
@@ -368,6 +348,7 @@ export function createTreasureHuntMultiplayerBridge(
           if (request.command === 'get') {
             const query = new URLSearchParams({
               gameSessionId: options.currentSessionId,
+              clientInstanceId: request.clientInstanceId,
             });
             const response = await fetchImpl(`${matchPath}?${query.toString()}`, {
               method: 'GET',
@@ -379,6 +360,7 @@ export function createTreasureHuntMultiplayerBridge(
             const body: Record<string, unknown> = {
               action: request.command,
               gameSessionId: options.currentSessionId,
+              clientInstanceId: request.clientInstanceId,
             };
             if (request.command === 'snapshot') {
               body.snapshot = request.payload.snapshot;
@@ -419,6 +401,10 @@ export function createTreasureHuntMultiplayerBridge(
             },
             targetOrigin,
           );
+          if (notifySessionReleased && !sessionReleased) {
+            sessionReleased = true;
+            options.onSessionReleased?.(options.currentSessionId);
+          }
         }
       } catch (error) {
         if (
@@ -474,6 +460,7 @@ export function useTreasureHuntMultiplayerBridge(
         gameUrl: options.gameUrl,
         currentSessionId: options.currentSessionId,
         onRoomJoined: options.onRoomJoined,
+        onSessionReleased: options.onSessionReleased,
       });
     } catch {
       return undefined;
@@ -483,6 +470,7 @@ export function useTreasureHuntMultiplayerBridge(
     options.gameUrl,
     options.iframeRef,
     options.onRoomJoined,
+    options.onSessionReleased,
   ]);
 }
 

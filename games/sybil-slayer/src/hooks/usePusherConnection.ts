@@ -25,7 +25,6 @@ interface GameEndData {
 
 export interface SessionData {
   gameId: string;
-  sessionToken: string;
   sessionId: string;
   gameVersion?: string;
   roomId?: string;
@@ -45,7 +44,7 @@ export function usePusherConnection() {
   // Ref to track cleanup timeout
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Bearer/session data intentionally lives only in this mounted hook instance.
+  // The iframe only receives an opaque session id. The bearer remains in the parent dapp.
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
 
   // Refs to prevent stale closures
@@ -54,18 +53,82 @@ export function usePusherConnection() {
   const sessionDataRef = useRef<SessionData | null>(sessionData);
   const pusherSessionIdRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
+  const sessionGenerationRef = useRef(0);
+  const gameEndRetryTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  const clearGameEndRetries = useCallback(() => {
+    for (const timeout of gameEndRetryTimeoutsRef.current) clearTimeout(timeout);
+    gameEndRetryTimeoutsRef.current.clear();
+  }, []);
+
+  const clearSessionData = useCallback((expectedSessionId?: string) => {
+    const current = sessionDataRef.current;
+    if (expectedSessionId && current?.sessionId !== expectedSessionId) return;
+
+    sessionGenerationRef.current += 1;
+    clearGameEndRetries();
+    localStorage.removeItem('pending-game-result');
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+      cleanupTimeoutRef.current = null;
+    }
+    if (channelRef.current && current) {
+      pusherRef.current?.unsubscribe(`private-game-session-${current.sessionId}`);
+    }
+    pusherRef.current?.disconnect();
+    pusherRef.current = null;
+    pusherSessionIdRef.current = null;
+    channelRef.current = null;
+    isConnectingRef.current = false;
+    sessionDataRef.current = null;
+    setSessionData(null);
+    setPusher(null);
+    setChannel(null);
+    setConnectionState('disconnected');
+    setHasParentHandshake(false);
+  }, [clearGameEndRetries]);
 
   const acceptSessionData = useCallback((sessionInfo: SessionData) => {
-    if (!sessionInfo || typeof sessionInfo.sessionId !== 'string') return;
+    if (
+      !sessionInfo ||
+      typeof sessionInfo.sessionId !== 'string' ||
+      sessionInfo.sessionId.length === 0 ||
+      sessionInfo.sessionId.length > 128 ||
+      sessionInfo.gameId !== 'sybil-slayer'
+    ) return;
+    const normalized: SessionData = {
+      gameId: sessionInfo.gameId,
+      sessionId: sessionInfo.sessionId,
+      ...(typeof sessionInfo.gameVersion === 'string'
+        ? { gameVersion: sessionInfo.gameVersion }
+        : {}),
+      ...(typeof sessionInfo.roomId === 'string' ? { roomId: sessionInfo.roomId } : {}),
+      ...(typeof sessionInfo.userId === 'string' ? { userId: sessionInfo.userId } : {}),
+    };
     const current = sessionDataRef.current;
-    if (current?.sessionId !== sessionInfo.sessionId && !sessionInfo.sessionToken) return;
-    const next = current?.sessionId === sessionInfo.sessionId
-      ? { ...current, ...sessionInfo }
-      : sessionInfo;
+    if (current?.sessionId !== normalized.sessionId) {
+      sessionGenerationRef.current += 1;
+      clearGameEndRetries();
+      localStorage.removeItem('pending-game-result');
+      if (channelRef.current && current) {
+        pusherRef.current?.unsubscribe(`private-game-session-${current.sessionId}`);
+      }
+      pusherRef.current?.disconnect();
+      pusherRef.current = null;
+      pusherSessionIdRef.current = null;
+      channelRef.current = null;
+      isConnectingRef.current = false;
+      setPusher(null);
+      setChannel(null);
+      setConnectionState('disconnected');
+    }
+    const next = current?.sessionId === normalized.sessionId
+      ? { ...current, ...normalized }
+      : normalized;
 
     sessionDataRef.current = next;
     setSessionData(next);
-  }, []);
+  }, [clearGameEndRetries]);
 
   useEffect(() => {
     localStorage.removeItem('pusher-game-session');
@@ -81,6 +144,8 @@ export function usePusherConnection() {
       localStorage.removeItem('pending-game-result');
     }
   }, []);
+
+  useEffect(() => () => clearGameEndRetries(), [clearGameEndRetries]);
 
   // Listen for session data from parent (dapp) via postMessage
   // This is the initial handshake - after this, everything uses Pusher
@@ -104,6 +169,11 @@ export function usePusherConnection() {
           console.log('📝 [GAME-PUSHER] New session detected, storing:', newSessionId);
         }
         acceptSessionData(sessionInfo);
+      } else if (event.data?.type === 'GAME_SESSION_CLEAR') {
+        const sessionId = typeof event.data.sessionId === 'string'
+          ? event.data.sessionId
+          : undefined;
+        clearSessionData(sessionId);
       }
     };
 
@@ -133,7 +203,7 @@ export function usePusherConnection() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [acceptSessionData]);
+  }, [acceptSessionData, clearSessionData]);
 
   // Connect to Pusher when we have session data
   const connectionSessionId = sessionData?.sessionId ?? null;
@@ -339,10 +409,8 @@ export function usePusherConnection() {
 
           if (currentSessionId === newSessionId) {
             console.log('🔄 [GAME-PUSHER] Same session refreshed via Pusher:', newSessionId);
-          } else {
-            console.log('📝 [GAME-PUSHER] New session detected via Pusher, storing:', newSessionId);
+            acceptSessionData(data);
           }
-          acceptSessionData(data);
         });
 
         // NEW: Listen for game commands from dapp
@@ -356,7 +424,6 @@ export function usePusherConnection() {
           console.error('❌ [GAME-PUSHER] Subscription error details:', {
             error,
             channelName,
-            hasSessionToken: !!sessionData.sessionToken,
             pusherState: pusherInstance.connection.state
           });
           isConnectingRef.current = false;
@@ -480,6 +547,7 @@ export function usePusherConnection() {
       console.warn('⚠️ [GAME-PUSHER] Cannot send game end - missing session data');
       return false;
     }
+    const generationSnapshot = sessionGenerationRef.current;
 
     const gameEndData: GameEndData = {
       ...endData,
@@ -487,59 +555,39 @@ export function usePusherConnection() {
     };
 
     const persistPendingResult = () => {
+      if (
+        sessionGenerationRef.current !== generationSnapshot ||
+        sessionDataRef.current?.sessionId !== sessionIdSnapshot
+      ) return;
       localStorage.setItem('pending-game-result', JSON.stringify({
         ...gameEndData,
-        sessionId: sessionDataRef.current?.sessionId,
+        sessionId: sessionIdSnapshot,
         timestamp: Date.now(),
       }));
     };
 
-    const handleGameEndFailure = async () => {
-      console.error('❌ [GAME-PUSHER] All Pusher attempts failed - trying HTTP fallback');
+    const isCurrentSession = () => (
+      sessionGenerationRef.current === generationSnapshot &&
+      sessionDataRef.current?.sessionId === sessionIdSnapshot
+    );
 
-      const dappUrl = getParentOrigin();
-      if (!dappUrl || !sessionDataRef.current?.sessionToken) {
-        persistPendingResult();
-        return false;
-      }
+    const scheduleRetry = (callback: () => void, delayMs: number) => {
+      const timeout = setTimeout(() => {
+        gameEndRetryTimeoutsRef.current.delete(timeout);
+        if (isCurrentSession()) callback();
+      }, delayMs);
+      gameEndRetryTimeoutsRef.current.add(timeout);
+    };
 
-      const endSessionUrl = `${dappUrl}/api/games/end-session`;
-
-      try {
-        console.log('🌐 [GAME-PUSHER] Attempting HTTP fallback to:', endSessionUrl);
-
-        const response = await fetch(endSessionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            sessionToken: sessionDataRef.current?.sessionToken,
-            finalScore: gameEndData.finalScore,
-            metadata: gameEndData.metadata
-          })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          console.log('✅ [GAME-PUSHER] HTTP fallback successful:', result);
-          // Clear any pending result from localStorage
-          localStorage.removeItem('pending-game-result');
-          return true;
-        } else {
-          console.error('❌ [GAME-PUSHER] HTTP fallback failed:', result);
-          persistPendingResult();
-          return false;
-        }
-      } catch (error) {
-        console.error('❌ [GAME-PUSHER] HTTP fallback error:', error);
-        persistPendingResult();
-        return false;
-      }
+    const handleGameEndFailure = () => {
+      if (!isCurrentSession()) return false;
+      console.error('❌ [GAME-PUSHER] All parent-proxied attempts failed; persisting tokenless result');
+      persistPendingResult();
+      return false;
     };
 
     const attemptSend = (attempt = 1, maxAttempts = 5) => {
+      if (!isCurrentSession()) return false;
       console.log(`🔍 [GAME-PUSHER] Game end attempt ${attempt} - channel status:`, {
         hasChannel: !!channelRef.current,
         hasPusher: !!pusherRef.current,
@@ -550,14 +598,14 @@ export function usePusherConnection() {
       });
 
       // Try to reconnect channel if we have pusher but no channel
-      if (!channelRef.current && pusherRef.current && sessionDataRef.current) {
+      if (!channelRef.current && pusherRef.current) {
         console.log('🔄 [GAME-PUSHER] Attempting to reconnect channel for game end');
         try {
-          const channelName = `private-game-session-${sessionDataRef.current.sessionId}`;
+          const channelName = `private-game-session-${sessionIdSnapshot}`;
           const newChannel = pusherRef.current.subscribe(channelName);
 
           // Wait a bit for subscription to be ready
-          setTimeout(() => {
+          scheduleRetry(() => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if ((newChannel as any).state === 'subscribed' || (newChannel as any).subscribed) {
               channelRef.current = newChannel;
@@ -566,7 +614,7 @@ export function usePusherConnection() {
             } else {
               console.warn('⚠️ [GAME-PUSHER] Channel reconnection failed, continuing with retry logic');
               if (attempt < maxAttempts) {
-                setTimeout(() => attemptSend(attempt + 1, maxAttempts), 1000);
+                scheduleRetry(() => attemptSend(attempt + 1, maxAttempts), 1000);
               } else {
                 handleGameEndFailure();
               }
@@ -583,15 +631,7 @@ export function usePusherConnection() {
 
         if (attempt < maxAttempts) {
           console.log(`🔄 [GAME-PUSHER] Retrying game end in 1s (attempt ${attempt + 1}/${maxAttempts})`);
-          setTimeout(() => {
-            // Check if we still have the same session before retrying
-            if (sessionDataRef.current?.sessionId === sessionIdSnapshot) {
-              attemptSend(attempt + 1, maxAttempts);
-            } else {
-              console.log('🚫 [GAME-PUSHER] Session changed, cancelling retry');
-              handleGameEndFailure();
-            }
-          }, 1000);
+          scheduleRetry(() => attemptSend(attempt + 1, maxAttempts), 1000);
           return;
         } else {
           handleGameEndFailure();
@@ -611,15 +651,7 @@ export function usePusherConnection() {
 
         if (attempt < maxAttempts) {
           console.log(`🔄 [GAME-PUSHER] Retrying game end in 1s (attempt ${attempt + 1}/${maxAttempts})`);
-          setTimeout(() => {
-            // Check if we still have the same session before retrying
-            if (sessionDataRef.current?.sessionId === sessionIdSnapshot) {
-              attemptSend(attempt + 1, maxAttempts);
-            } else {
-              console.log('🚫 [GAME-PUSHER] Session changed, cancelling retry');
-              handleGameEndFailure();
-            }
-          }, 1000);
+          scheduleRetry(() => attemptSend(attempt + 1, maxAttempts), 1000);
         } else {
           handleGameEndFailure();
         }

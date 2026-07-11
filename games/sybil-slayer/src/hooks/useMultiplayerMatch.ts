@@ -38,6 +38,7 @@ export interface MatchConfig {
   readonly roundEndsAt: number | null;
   readonly suddenDeathEndsAt: number | null;
   readonly resumeAt: number | null;
+  readonly resumeEpoch: number;
 }
 
 export interface PlayerSnapshot extends PublicMatchPlayer {
@@ -74,6 +75,7 @@ export interface UseMultiplayerMatchValue {
   }): void;
   notifyGameStart(): void;
   notifyGameOver(reason: string, finalScore: number, lifecycle?: PlayerLifecycle): void;
+  release(): Promise<boolean>;
   reset(): Promise<void>;
 }
 
@@ -196,6 +198,10 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
     randomManager.clear();
   }, []);
 
+  const release = useCallback(async () => {
+    return (await controllerRef.current?.release()) ?? false;
+  }, []);
+
   return useMemo(() => {
     const match = controllerState.match;
     const local = match?.players.find((player) => player.playerId === controllerState.playerId);
@@ -221,6 +227,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
             roundEndsAt: match.config.roundEndsAt,
             suddenDeathEndsAt: match.config.suddenDeathEndsAt,
             resumeAt: match.config.resumeAt,
+            resumeEpoch: match.config.resumeEpoch,
           }
         : null,
       localPlayer,
@@ -239,6 +246,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       publishLocalSnapshot,
       notifyGameStart,
       notifyGameOver,
+      release,
       reset,
     };
   }, [
@@ -247,6 +255,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
     notifyGameOver,
     notifyGameStart,
     publishLocalSnapshot,
+    release,
     reset,
     setupError,
   ]);

@@ -52,6 +52,36 @@ export default function SybilSlayerPage() {
   const activeParentGameSession =
     parentGameSession?.ownerUserId === user?.id ? parentGameSession : null;
   const currentSessionId = activeParentGameSession?.sessionId ?? null;
+  const gameOrigin = useMemo(() => {
+    if (!gameConfig?.gameUrl || typeof window === 'undefined') {
+      return null;
+    }
+    try {
+      return new URL(gameConfig.gameUrl, window.location.href).origin;
+    } catch {
+      return null;
+    }
+  }, [gameConfig?.gameUrl]);
+  const gameOriginRef = useRef<string | null>(gameOrigin);
+  gameOriginRef.current = gameOrigin;
+
+  const sendSessionClear = useCallback((sessionId: string | null) => {
+    const frameWindow = iframeRef.current?.contentWindow;
+    const targetOrigin = gameOriginRef.current;
+    if (!frameWindow || !targetOrigin) return;
+    frameWindow.postMessage({ type: 'GAME_SESSION_CLEAR', sessionId }, targetOrigin);
+  }, []);
+
+  const rotateParentSession = useCallback((expectedSessionId: string) => {
+    const current = latestParentGameSessionRef.current;
+    if (!current || current.sessionId !== expectedSessionId) return false;
+    sendSessionClear(current.sessionId);
+    sessionStarterRef.current?.reset();
+    setParentGameSession((candidate) =>
+      candidate?.sessionId === expectedSessionId ? null : candidate,
+    );
+    return true;
+  }, [sendSessionClear]);
 
   useEffect(() => {
     for (const key of Object.keys(localStorage)) {
@@ -70,28 +100,19 @@ export default function SybilSlayerPage() {
       return;
     }
 
+    sendSessionClear(latestParentGameSessionRef.current?.sessionId ?? null);
     sessionStarterRef.current?.reset();
     setParentGameSession(null);
     cleanedWalletUserIdRef.current = nextWalletUserId;
-  }, [parentGameSession, user?.id]);
+  }, [sendSessionClear, user?.id]);
 
   useEffect(
     () => () => {
+      sendSessionClear(latestParentGameSessionRef.current?.sessionId ?? null);
       sessionStarterRef.current?.reset();
     },
-    [],
+    [sendSessionClear],
   );
-
-  const gameOrigin = useMemo(() => {
-    if (!gameConfig?.gameUrl || typeof window === 'undefined') {
-      return null;
-    }
-    try {
-      return new URL(gameConfig.gameUrl, window.location.href).origin;
-    } catch {
-      return null;
-    }
-  }, [gameConfig?.gameUrl]);
 
   const onSessionStart = useCallback(
     (_sessionData: { sessionToken: string; sessionId: string }) => {
@@ -134,12 +155,9 @@ export default function SybilSlayerPage() {
       ) {
         return;
       }
-      sessionStarterRef.current?.reset();
-      setParentGameSession((current) =>
-        current?.sessionId === endingSession.sessionId ? null : current,
-      );
+      rotateParentSession(endingSession.sessionId);
     },
-    [activeParentGameSession, refetch],
+    [activeParentGameSession, refetch, rotateParentSession],
   );
 
   const onHoneypotDetected = useCallback((event: string) => {
@@ -180,7 +198,6 @@ export default function SybilSlayerPage() {
         type: 'GAME_SESSION_START',
         payload: {
           gameId: GAME_ID,
-          sessionToken: activeParentGameSession.sessionToken,
           sessionId: activeParentGameSession.sessionId,
           gameVersion: activeParentGameSession.gameVersion,
           roomId,
@@ -200,6 +217,7 @@ export default function SybilSlayerPage() {
     gameUrl: gameConfig?.gameUrl,
     currentSessionId,
     onRoomJoined: handleRoomJoined,
+    onSessionReleased: rotateParentSession,
   });
 
   useEffect(() => {

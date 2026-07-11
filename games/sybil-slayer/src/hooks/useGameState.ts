@@ -228,37 +228,47 @@ const getFeeSpeedForLevel = (level: number) => {
 };
 
 // Nueva función para generar velocidad aleatoria para cada fee individual con variaciones dramáticas
-const getRandomFeeSpeed = (level: number): number => {
-  const baseSpeed = getFeeSpeedForLevel(level);
-  
-  // Definir categorías de velocidad con probabilidades y rangos MUY EXAGERADOS
-  const random = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-  let speedMultiplier: number;
-  let category: string;
-  
-  if (random < 0.3) {
-    // 30% - Fees MUY LENTOS (30% - 50% de velocidad base)
-    speedMultiplier = 0.3 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 0.2; // 0.3x a 0.5x
-    category = "MUY LENTO";
-  } else if (random < 0.7) {
-    // 40% - Fees NORMALES (80% - 120% de velocidad base)  
-    speedMultiplier = 0.8 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 0.4; // 0.8x a 1.2x
-    category = "NORMAL";
-  } else if (random < 0.9) {
-    // 20% - Fees VELOCES (150% - 200% de velocidad base)
-    speedMultiplier = 1.5 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 0.5; // 1.5x a 2.0x
-    category = "VELOZ";
-  } else {
-    // 10% - Fees SÚPER RÁPIDOS (250% - 350% de velocidad base)
-    speedMultiplier = 2.5 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 1.0; // 2.5x a 3.5x
-    category = "SÚPER RÁPIDO";
-  }
-  
-  const finalSpeed = baseSpeed * speedMultiplier;
-  
-  
-  return finalSpeed;
+const getRandomFeeSpeed = (level: number, logicalFeeId: string): number => {
+  return randomManager.withEvent(
+    GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+    `fee-speed:${logicalFeeId}`,
+    () => {
+      const baseSpeed = getFeeSpeedForLevel(level);
+      const random = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+      let speedMultiplier: number;
+
+      if (random < 0.3) {
+        speedMultiplier = 0.3 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 0.2;
+      } else if (random < 0.7) {
+        speedMultiplier = 0.8 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 0.4;
+      } else if (random < 0.9) {
+        speedMultiplier = 1.5 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 0.5;
+      } else {
+        speedMultiplier = 2.5 + randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * 1.0;
+      }
+
+      return baseSpeed * speedMultiplier;
+    },
+  );
 };
+
+const getFeeFallbackVelocity = (eventKey: string, fallbackMagnitude = 0.5) =>
+  randomManager.withEvent(GAMEPLAY_RANDOM_STREAMS.HAZARDS, eventKey, () => ({
+    x: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS) ||
+      (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5
+        ? fallbackMagnitude
+        : -fallbackMagnitude),
+    y: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS) ||
+      (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5
+        ? fallbackMagnitude
+        : -fallbackMagnitude),
+  }));
+
+const getFeeDiagonalDirection = (eventKey: string, speed: number) =>
+  randomManager.withEvent(GAMEPLAY_RANDOM_STREAMS.HAZARDS, eventKey, () => ({
+    x: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * speed * 0.7,
+    y: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * speed * 0.7,
+  }));
 
 const getBugAngularVelocityForLevel = (level: number) => {
   // Progresión más suave: de 0.05 base a incrementos de 0.01 por nivel
@@ -435,7 +445,9 @@ interface ZoneBounds {
 }
 
 const getRandomOrientation = (): RayOrientation =>
-  (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < 0.5 ? 'vertical' : 'horizontal');
+  (randomManager.indexedRandom(GAMEPLAY_RANDOM_STREAMS.HAZARDS, 'ray-orientation') < 0.5
+    ? 'vertical'
+    : 'horizontal');
 
 const computeTokenZone = (
   token: Token,
@@ -531,9 +543,17 @@ const safeCreateRayInZone = (
   maxAttempts: number = 20
 ): RayHazard | null => {
   let attempts = 0;
+  const rayId = generateId('ray');
   
   while (attempts < maxAttempts) {
-    const candidate = createRayInZone(orientation, zone, canvasSize, warningStartTime);
+    const candidate = createRayInZone(
+      rayId,
+      attempts,
+      orientation,
+      zone,
+      canvasSize,
+      warningStartTime,
+    );
     
     if (!candidate) {
       return null; // No se puede crear el rayo en esta zona
@@ -557,11 +577,17 @@ const safeCreateRayInZone = (
 };
 
 const createRayInZone = (
+  rayId: string,
+  attempt: number,
   orientation: RayOrientation,
   zone: ZoneBounds,
   canvasSize: { width: number; height: number },
   warningStartTime: number
 ): RayHazard | null => {
+  return randomManager.withEvent(
+    GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+    `ray-placement:${rayId}:attempt:${attempt}`,
+    () => {
   if (orientation === 'vertical') {
     const availableWidth = zone.xMax - zone.xMin;
     if (availableWidth <= 0) {
@@ -586,7 +612,7 @@ const createRayInZone = (
     x = clamp(x, 0, Math.max(0, canvasSize.width - width));
 
     return {
-      id: generateId(),
+      id: rayId,
       orientation,
       phase: 'warning',
       warningStartTime,
@@ -620,7 +646,7 @@ const createRayInZone = (
   y = clamp(y, 0, Math.max(0, canvasSize.height - height));
 
   return {
-    id: generateId(),
+    id: rayId,
     orientation,
     phase: 'warning',
     warningStartTime,
@@ -629,6 +655,8 @@ const createRayInZone = (
     width: canvasSize.width,
     height,
   };
+    },
+  );
 };
 
 const isTokenCollidingWithRay = (token: Token, ray: RayHazard): boolean => {
@@ -644,9 +672,15 @@ const isTokenCollidingWithRay = (token: Token, ray: RayHazard): boolean => {
 };
 
 const createRedZone = (
+  zoneId: string,
+  attempt: number,
   canvasSize: { width: number; height: number },
   warningStartTime: number
 ): RedZone => {
+  return randomManager.withEvent(
+    GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+    `red-zone-shape:${zoneId}:attempt:${attempt}`,
+    () => {
   const widthRatio = getRandomFloat(RED_ZONE_MIN_WIDTH_RATIO, RED_ZONE_MAX_WIDTH_RATIO, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
   const heightRatio = getRandomFloat(RED_ZONE_MIN_HEIGHT_RATIO, RED_ZONE_MAX_HEIGHT_RATIO, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
   const width = Math.max(20, Math.min(canvasSize.width * widthRatio, canvasSize.width));
@@ -658,7 +692,7 @@ const createRedZone = (
   const activeDuration = getRandomFloat(RED_ZONE_ACTIVE_DURATION_MIN_MS, RED_ZONE_ACTIVE_DURATION_MAX_MS, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
 
   return {
-    id: generateId(),
+    id: zoneId,
     phase: 'warning',
     warningStartTime,
     activeDuration,
@@ -668,6 +702,8 @@ const createRedZone = (
     height,
     visualStartTime: Date.now(),
   };
+    },
+  );
 };
 
 // Verifica si dos zonas rojas se solapan o están demasiado cerca
@@ -713,9 +749,10 @@ const safeCreateRedZone = (
   maxAttempts: number = 30
 ): RedZone | null => {
   let attempts = 0;
+  const zoneId = generateId('red-zone');
   
   while (attempts < maxAttempts) {
-    const newZone = createRedZone(canvasSize, warningStartTime);
+    const newZone = createRedZone(zoneId, attempts, canvasSize, warningStartTime);
     
     // Verificar si esta zona se solapa con alguna zona existente
     const hasOverlap = existingZones.some(existingZone => 
@@ -763,8 +800,17 @@ const createInitialTreasureState = (): TreasureState => ({
 
 // --- FUNCIONES HELPER PARA SISTEMA DE TIMING INDEPENDIENTE ---
 // Función para generar intervalo aleatorio entre min y max
-const getRandomInterval = (minMs: number, maxMs: number): number => {
-  return getRandomInt(minMs, maxMs + 1, GAMEPLAY_RANDOM_STREAMS.ITEMS); // +1 para incluir maxMs
+const getRandomInterval = (
+  minMs: number,
+  maxMs: number,
+  decisionName: 'mega-node-interval' | 'heart-interval',
+): number => {
+  return randomManager.indexedInt(
+    minMs,
+    maxMs + 1,
+    GAMEPLAY_RANDOM_STREAMS.ITEMS,
+    decisionName,
+  );
 };
 
 // --- SISTEMA DE RONDAS EQUILIBRADAS PARA ASSETS POSITIVOS ---
@@ -775,7 +821,10 @@ const getNextPositiveAsset = (availableAssets: ('megaNode' | 'heart' | 'purr' | 
   }
   
   // Seleccionar aleatoriamente entre los assets disponibles
-  const randomIndex = Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) * availableAssets.length);
+  const randomIndex = Math.floor(
+    randomManager.indexedRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, 'positive-asset-type') *
+      availableAssets.length,
+  );
   return availableAssets[randomIndex];
 };
 
@@ -898,7 +947,7 @@ const createObstaclesByPattern = (
         newObstacle = createObstacle(generateId(), 'fee', width, height);
         // Asignar velocidad aleatoria para el nivel actual
         if (newObstacle.velocity) {
-          const randomFeeSpeed = getRandomFeeSpeed(level);
+          const randomFeeSpeed = getRandomFeeSpeed(level, newObstacle.id);
           const magnitude = Math.sqrt(newObstacle.velocity.x * newObstacle.velocity.x + newObstacle.velocity.y * newObstacle.velocity.y);
           if (magnitude > 0) {
             const normalizedX = newObstacle.velocity.x / magnitude;
@@ -941,10 +990,7 @@ const upgradeFeeSpeed = (obstacles: Obstacle[], level: number): Obstacle[] => {
       
       // Asegurar que los fees siempre tengan velocidad
       if (!obs.velocity) {
-        obs.velocity = { 
-          x: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS) || (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 0.5 : -0.5),
-          y: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS) || (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 0.5 : -0.5)
-        };
+        obs.velocity = getFeeFallbackVelocity(`fee-upgrade-fallback:${obs.id}`);
       }
       
       // Incrementar la magnitud de la velocidad manteniendo la dirección
@@ -971,30 +1017,29 @@ const upgradeFeeSpeed = (obstacles: Obstacle[], level: number): Obstacle[] => {
  * Returns a random obstacle type that respects the configured quantities per level
  */
 const getObstacleTypeWithLevelAdjustment = (level: number): ObstacleType => {
-  // Esta función se asegura de que las probabilidades se alineen con las cantidades
-  // fijas establecidas en getObstacleCountByTypeAndLevel
-  if (level === 1) {
-    // Nivel 1: 50% fees, 50% bugs, 0% hackers
-    return randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < 0.5 ? 'fee' : 'bug';
-  } else if (level === 2) {
-    // Nivel 2: ~37.5% fees, ~50% bugs, ~12.5% hackers (3:4:1 ratio)
-    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-    if (rand < 0.375) return 'fee';
-    if (rand < 0.875) return 'bug';
-    return 'hacker';
-  } else if (level === 3) {
-    // Nivel 3: ~31% fees, ~46% bugs, ~23% hackers (4:6:3 ratio)
-    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-    if (rand < 0.31) return 'fee';
-    if (rand < 0.77) return 'bug';
-    return 'hacker';
-  } else {
-    // Nivel 4+: ~29% fees, ~47% bugs, ~24% hackers (5:8:4 ratio)
-    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-    if (rand < 0.29) return 'fee';
-    if (rand < 0.76) return 'bug';
-    return 'hacker';
-  }
+  return randomManager.withIndexedEvent(
+    GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+    'level-adjusted-obstacle-type',
+    () => {
+      if (level === 1) {
+        return randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < 0.5 ? 'fee' : 'bug';
+      } else if (level === 2) {
+        const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+        if (rand < 0.375) return 'fee';
+        if (rand < 0.875) return 'bug';
+        return 'hacker';
+      } else if (level === 3) {
+        const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+        if (rand < 0.31) return 'fee';
+        if (rand < 0.77) return 'bug';
+        return 'hacker';
+      }
+      const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+      if (rand < 0.29) return 'fee';
+      if (rand < 0.76) return 'bug';
+      return 'hacker';
+    },
+  );
 };
 
 // Mejorar la inteligencia de los hackers existentes de forma más gradual
@@ -1019,6 +1064,7 @@ const upgradeHackers = (obstacles: Obstacle[], level: number): Obstacle[] => {
 
 // Función para generar específicamente un hacker inteligente
 const createSmartHacker = (id: string, width: number, height: number, token: Token, level: number): Obstacle => {
+  return randomManager.withEvent(GAMEPLAY_RANDOM_STREAMS.HAZARDS, `smart-hacker:${id}`, () => {
   // Decidir si el hacker aparece lejos o cerca de forma más gradual
   const ambushProbability = Math.min(0.4, (level - 2) * 0.1); // 0% en nivel 2, aumenta 10% por nivel hasta 40%
   const isAmbush = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < ambushProbability;
@@ -1084,6 +1130,7 @@ const createSmartHacker = (id: string, width: number, height: number, token: Tok
     hackerAccelFactor: getHackerAccelerationForLevel(level) * speedMultiplier,
     energyCollected: 0, // NUEVO: Inicializar contador de energy recogidas
   };
+  });
 };
 
 // Función para obtener la cantidad exacta de obstáculos por nivel y tipo
@@ -1179,7 +1226,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
        initialFee = createObstacle(generateId(), 'fee', width, height);
        // Asignar velocidad aleatoria para el nivel actual
        if (initialFee.velocity) {
-         const randomFeeSpeed = getRandomFeeSpeed(level);
+         const randomFeeSpeed = getRandomFeeSpeed(level, initialFee.id);
          const magnitude = Math.sqrt(initialFee.velocity.x * initialFee.velocity.x + initialFee.velocity.y * initialFee.velocity.y);
                  if (magnitude > 0) {
            const normalizedX = initialFee.velocity.x / magnitude;
@@ -1189,10 +1236,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                          y: normalizedY * randomFeeSpeed
                      };
                  } else {
-           initialFee.velocity = {
-                         x: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7,
-                         y: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7
-                     };
+           initialFee.velocity = getFeeDiagonalDirection(
+             `initial-fee-diagonal:${initialFee.id}`,
+             randomFeeSpeed,
+           );
                  }
              }
              attempts++;
@@ -1252,9 +1299,19 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         const countdownStartTime = getGameTime();
         const { obstacles, collectibles } = initializeGameObjects(1, prev.canvasSize.width, prev.canvasSize.height); // Obtener datos
         const initialTreasureState = createInitialTreasureState();
-        initialTreasureState.nextSpawnTime = countdownStartTime + getRandomFloat(0, 30000, GAMEPLAY_RANDOM_STREAMS.CHESTS);
+        initialTreasureState.nextSpawnTime = countdownStartTime + randomManager.indexedFloat(
+          0,
+          30000,
+          GAMEPLAY_RANDOM_STREAMS.CHESTS,
+          'initial-treasure-delay',
+        );
         // Configurar primer spawn del corazón entre 25-35s
-        const initialHeartInterval = getRandomFloat(25000, 35000, GAMEPLAY_RANDOM_STREAMS.ITEMS);
+        const initialHeartInterval = randomManager.indexedFloat(
+          25000,
+          35000,
+          GAMEPLAY_RANDOM_STREAMS.ITEMS,
+          'initial-heart-interval',
+        );
         return {
           ...prev, // Keep the newly initialized objects
           status: 'countdown',
@@ -1364,7 +1421,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         prev.canvasSize.height,
       );
       const treasureState = createInitialTreasureState();
-      treasureState.nextSpawnTime = gameStartTime + getRandomFloat(0, 30_000, GAMEPLAY_RANDOM_STREAMS.CHESTS);
+      treasureState.nextSpawnTime = gameStartTime + randomManager.indexedFloat(
+        0,
+        30_000,
+        GAMEPLAY_RANDOM_STREAMS.CHESTS,
+        'initial-treasure-delay',
+      );
 
       return {
         ...initial,
@@ -1376,7 +1438,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         gameOverReason: hydration.gameOverReason,
         obstacles,
         collectibles,
-        nextHeartInterval: getRandomFloat(25_000, 35_000, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+        nextHeartInterval: randomManager.indexedFloat(
+          25_000,
+          35_000,
+          GAMEPLAY_RANDOM_STREAMS.ITEMS,
+          'initial-heart-interval',
+        ),
         treasureState,
         runeState: {
           ...initial.runeState,
@@ -1797,7 +1864,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         let newObs = { ...obs };
         switch (newObs.type) {
           case 'fee':
-             if (!newObs.velocity) newObs.velocity = { x: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS), y: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS) };
+             if (!newObs.velocity) {
+               newObs.velocity = getFeeFallbackVelocity(`runtime-fee-fallback:${newObs.id}`, 1);
+             }
             
             // Mover usando la velocidad individual del fee - LOS FEES ATRAVIESAN BUGS
             newObs.x += newObs.velocity.x * (deltaTime / (1000 / 60));
@@ -1944,8 +2013,14 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                  // Agregar un poco de variación aleatoria cerca de la esquina más lejana
                  // para evitar que siempre aparezca en el mismo píxel exacto
                  const randomOffset = 50; // 50px de variación
-                 const offsetX = getRandomFloat(-randomOffset, randomOffset, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-                 const offsetY = getRandomFloat(-randomOffset, randomOffset, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+                 const { offsetX, offsetY } = randomManager.withEvent(
+                   GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+                   `hacker-reposition:${newObs.id}:${newObs.energyCollected ?? 0}`,
+                   () => ({
+                     offsetX: getRandomFloat(-randomOffset, randomOffset, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+                     offsetY: getRandomFloat(-randomOffset, randomOffset, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+                   }),
+                 );
                  
                  newObs.x = clamp(
                    bestCorner.x + offsetX, 
@@ -2389,7 +2464,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                
                // Si rebotó en un límite, agregar variación aleatoria para evitar patrones repetitivos
                if (bounced) {
-                 const randomVariation = (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) - 0.5) * 0.3; // ±15% de variación
+                 const randomVariation = (
+                   randomManager.indexedRandom(
+                     GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+                     `fee-bounce-variation:${newObs.id}`,
+                   ) - 0.5
+                 ) * 0.3; // ±15% de variación
                  if (newObs.velocity) {
                    newObs.velocity.x *= (1 + randomVariation);
                    newObs.velocity.y *= (1 + randomVariation);
@@ -2504,11 +2584,23 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
         if (!runeOnField && runeState.nextSpawnTime !== null && now >= runeState.nextSpawnTime) {
           const missingRunes = runeState.slots.filter(slot => !slot.collected).map(slot => slot.type);
-          let candidatePool: RuneType[] = RUNE_TYPES;
-          if (missingRunes.length > 0) {
-        candidatePool = randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) < 0.7 ? missingRunes : RUNE_TYPES;
-          }
-          const selectedRuneType = candidatePool[Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) * candidatePool.length)];
+          const selectedRuneType = randomManager.withIndexedEvent(
+            GAMEPLAY_RANDOM_STREAMS.RUNES,
+            'rune-selection',
+            () => {
+              let candidatePool: RuneType[] = RUNE_TYPES;
+              if (missingRunes.length > 0) {
+                candidatePool = randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) < 0.7
+                  ? missingRunes
+                  : RUNE_TYPES;
+              }
+              return candidatePool[
+                Math.floor(
+                  randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) * candidatePool.length,
+                )
+              ];
+            },
+          );
           const runeFactory = (id: string, width: number, height: number, gameTime?: number) =>
             createRuneCollectible(id, width, height, selectedRuneType, gameTime);
           const runeCollectible = safeSpawnCollectible(
@@ -2707,7 +2799,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
 
         // --- Update Red Zones ---
         if (nextRedZoneSpawnTime === null) {
-          nextRedZoneSpawnTime = now + getRandomFloat(RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+          nextRedZoneSpawnTime = now + randomManager.indexedFloat(
+            RED_ZONE_SPAWN_INTERVAL_MIN_MS,
+            RED_ZONE_SPAWN_INTERVAL_MAX_MS,
+            GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+            'red-zone-interval',
+          );
         }
 
         const updatedRedZones: RedZone[] = [];
@@ -2745,7 +2842,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           } else {
             console.log('[RED ZONE] No se pudo crear zona sin solapamiento, se reintentará en el siguiente ciclo');
           }
-          nextRedZoneSpawnTime = now + getRandomFloat(RED_ZONE_SPAWN_INTERVAL_MIN_MS, RED_ZONE_SPAWN_INTERVAL_MAX_MS, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+          nextRedZoneSpawnTime = now + randomManager.indexedFloat(
+            RED_ZONE_SPAWN_INTERVAL_MIN_MS,
+            RED_ZONE_SPAWN_INTERVAL_MAX_MS,
+            GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+            'red-zone-interval',
+          );
         }
 
         if (
@@ -2759,10 +2861,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
           treasureState.treasuresCollectedInBlock = 0;
           treasureState.lastTreasurePosition = null; // Resetear posición al reiniciar bloque
           // CORREGIDO: NO resetear successfulBlocks - mantener el progreso de bloques completados
-          treasureState.nextSpawnTime = now + getRandomFloat(
+          treasureState.nextSpawnTime = now + randomManager.indexedFloat(
             TREASURE_NEXT_BLOCK_MIN_S * 1000,
             TREASURE_NEXT_BLOCK_MAX_S * 1000,
-            GAMEPLAY_RANDOM_STREAMS.CHESTS
+            GAMEPLAY_RANDOM_STREAMS.CHESTS,
+            'treasure-block-interval',
           );
           console.log(`[TREASURE] 🛑 Tesoro expirado sin recoger. Reiniciando bloque (multiplicador mantiene: ${treasureState.successfulBlocks + 1}).`);
         }
@@ -2968,10 +3071,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               treasureState.successfulBlocks += 1;
               treasureState.treasuresCollectedInBlock = 0;
               treasureState.lastTreasurePosition = null; // Resetear posición al completar bloque
-              treasureState.nextSpawnTime = now + getRandomFloat(
+              treasureState.nextSpawnTime = now + randomManager.indexedFloat(
                 TREASURE_NEXT_BLOCK_MIN_S * 1000,
                 TREASURE_NEXT_BLOCK_MAX_S * 1000,
-                GAMEPLAY_RANDOM_STREAMS.CHESTS
+                GAMEPLAY_RANDOM_STREAMS.CHESTS,
+                'treasure-block-interval',
               );
               console.log(`[TREASURE] ✅ Bloque completado. Siguiente bloque en ${(treasureState.nextSpawnTime - now) / 1000}s`);
             } else {
@@ -3014,7 +3118,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
              // Verificar si se ha completado la activación
              if ((collectible.activationProgress || 0) >= 1 && !collectible.isActivated) {
              // ¡Vault activado! Elegir efecto aleatorio
-            const randomIndex = Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) * VAUL_EFFECT_TYPES.length);
+            const randomIndex = Math.floor(
+              randomManager.indexedRandom(
+                GAMEPLAY_RANDOM_STREAMS.ITEMS,
+                `vaul-effect-type:${collectible.id}`,
+              ) *
+                VAUL_EFFECT_TYPES.length,
+            );
              const selectedEffect = VAUL_EFFECT_TYPES[randomIndex];
               
               const newVaulCount = (prev.vaulCollectedCount || 0) + 1;
@@ -3026,7 +3136,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               if (selectedEffect === 'multiplier') {
                 // Efecto 1: Multiplicador x5 fijo durante 10-15 segundos
                 const multiplier = VAUL_MULTIPLIER; // x5 fijo
-                const duration = Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) * (VAUL_MULTIPLIER_DURATION_MAX_MS - VAUL_MULTIPLIER_DURATION_MIN_MS + 1)) + VAUL_MULTIPLIER_DURATION_MIN_MS;
+                const duration = Math.floor(randomManager.indexedRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, `vaul-multiplier-duration:${collectible.id}`) * (VAUL_MULTIPLIER_DURATION_MAX_MS - VAUL_MULTIPLIER_DURATION_MIN_MS + 1)) + VAUL_MULTIPLIER_DURATION_MIN_MS;
                 
                 // CORREGIDO: Usar tiempo pausable para el multiplicador (igual que MegaNode y Purr)
                 // Guardar datos del efecto usando tiempo pausable
@@ -3038,7 +3148,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 
               } else if (selectedEffect === 'double_collectibles') {
                 // Efecto 2: Doble de energy (20) y uki (6) durante 10-15 segundos
-                const duration = Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) * (VAUL_DOUBLE_DURATION_MAX_MS - VAUL_DOUBLE_DURATION_MIN_MS + 1)) + VAUL_DOUBLE_DURATION_MIN_MS;
+                const duration = Math.floor(randomManager.indexedRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, `vaul-double-duration:${collectible.id}`) * (VAUL_DOUBLE_DURATION_MAX_MS - VAUL_DOUBLE_DURATION_MIN_MS + 1)) + VAUL_DOUBLE_DURATION_MIN_MS;
                 
                 // CORREGIDO: Usar tiempo pausable
                 vaulEffectData = { duration };
@@ -3049,7 +3159,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 
               } else if (selectedEffect === 'energy_to_uki') {
                 // Efecto 3: Energy se convierten en uki durante 10-15 segundos
-                const duration = Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) * (VAUL_ENERGY_TO_UKI_DURATION_MAX_MS - VAUL_ENERGY_TO_UKI_DURATION_MIN_MS + 1)) + VAUL_ENERGY_TO_UKI_DURATION_MIN_MS;
+                const duration = Math.floor(randomManager.indexedRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, `vaul-energy-to-uki-duration:${collectible.id}`) * (VAUL_ENERGY_TO_UKI_DURATION_MAX_MS - VAUL_ENERGY_TO_UKI_DURATION_MIN_MS + 1)) + VAUL_ENERGY_TO_UKI_DURATION_MIN_MS;
                 
                 // CORREGIDO: Usar tiempo pausable
                 vaulEffectData = { duration };
@@ -3060,7 +3170,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 
               } else if (selectedEffect === 'eliminate_enemies') {
                 // Efecto 4: Eliminar 3-5 enemigos aleatorios
-                const randomValue = randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS);
+                const randomValue = randomManager.indexedRandom(
+                  GAMEPLAY_RANDOM_STREAMS.ITEMS,
+                  `vaul-enemy-count:${collectible.id}`,
+                );
                 const range = VAUL_ELIMINATE_ENEMIES_MAX - VAUL_ELIMINATE_ENEMIES_MIN + 1;
                 const enemiesToEliminate = Math.floor(randomValue * range) + VAUL_ELIMINATE_ENEMIES_MIN;
                 
@@ -3077,7 +3190,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                 console.log(`[VAUL] Enemigos disponibles: ${eliminableObstacles.length}, a eliminar: ${toEliminate}`);
                 
                 // Seleccionar enemigos aleatorios
-                const shuffled = [...eliminableObstacles].sort(() => randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) - 0.5);
+                const shuffled = randomManager.indexedShuffle(
+                  eliminableObstacles,
+                  GAMEPLAY_RANDOM_STREAMS.ITEMS,
+                  `vaul-enemy-selection:${collectible.id}`,
+                );
                 const eliminated = shuffled.slice(0, toEliminate);
                 
                 // Eliminar los enemigos seleccionados
@@ -3764,7 +3881,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         if (totalUkis > 0) {
           // Seleccionar aleatoriamente 3 uki para mantener como uki
           const ukisToKeep = Math.min(3, totalUkis);
-          const shuffledUkis = [...allUkis].sort(() => randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) - 0.5);
+          const shuffledUkis = randomManager.indexedShuffle(
+            allUkis,
+            GAMEPLAY_RANDOM_STREAMS.ITEMS,
+            'energy-to-uki-restore-selection',
+          );
           const ukisToKeepList = shuffledUkis.slice(0, ukisToKeep);
           const ukiIdsToKeep = new Set(ukisToKeepList.map(u => u.id));
           
@@ -3824,7 +3945,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (energyCount > maxEnergy) {
         const energyCollectibles = remainingCollectibles.filter(c => c.type === 'energy');
         const toRemove = energyCount - maxEnergy;
-        const shuffled = [...energyCollectibles].sort(() => randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) - 0.5);
+        const shuffled = randomManager.indexedShuffle(
+          energyCollectibles,
+          GAMEPLAY_RANDOM_STREAMS.ITEMS,
+          'trim-energy-selection',
+        );
         const toRemoveIds = shuffled.slice(0, toRemove).map(c => c.id);
         remainingCollectibles = remainingCollectibles.filter(c => !toRemoveIds.includes(c.id));
         console.log(`[VAUL] Eliminando ${toRemove} energy sobrantes (tenía ${energyCount}, máximo ${maxEnergy})`);
@@ -3834,7 +3959,11 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       if (ukiCount > maxUki) {
         const ukiCollectibles = remainingCollectibles.filter(c => c.type === 'uki');
         const toRemove = ukiCount - maxUki;
-        const shuffled = [...ukiCollectibles].sort(() => randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS) - 0.5);
+        const shuffled = randomManager.indexedShuffle(
+          ukiCollectibles,
+          GAMEPLAY_RANDOM_STREAMS.ITEMS,
+          'trim-uki-selection',
+        );
         const toRemoveIds = shuffled.slice(0, toRemove).map(c => c.id);
         remainingCollectibles = remainingCollectibles.filter(c => !toRemoveIds.includes(c.id));
         console.log(`[VAUL] Eliminando ${toRemove} uki sobrantes (tenía ${ukiCount}, máximo ${maxUki})`);
@@ -4054,9 +4183,12 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
            obstaclesToSpawn = obstaclesToSpawn.map(obs => {
                if (obs.type === 'fee') {
                    // Asignar nueva velocidad aleatoria para el nuevo nivel
-                   const newRandomSpeed = getRandomFeeSpeed(currentLevel);
+                   const newRandomSpeed = getRandomFeeSpeed(currentLevel, obs.id);
                    // Normalizar el vector de velocidad y aplicar la nueva velocidad aleatoria
-                   const currentVelocity = obs.velocity || { x: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS), y: getRandomFloat(-1, 1, GAMEPLAY_RANDOM_STREAMS.HAZARDS) };
+                   const currentVelocity = obs.velocity || getFeeFallbackVelocity(
+                       `level-up-fee-fallback:${obs.id}`,
+                       1,
+                   );
                    const magnitude = Math.sqrt(currentVelocity.x * currentVelocity.x + currentVelocity.y * currentVelocity.y);
                    if (magnitude > 0) {
                        const normalizedX = currentVelocity.x / magnitude;
@@ -4066,10 +4198,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                            y: normalizedY * newRandomSpeed
                        };
                    } else {
-                       obs.velocity = {
-                           x: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * newRandomSpeed * 0.7,
-                           y: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * newRandomSpeed * 0.7
-                       };
+                       obs.velocity = getFeeDiagonalDirection(
+                         `level-up-existing-fee-diagonal:${obs.id}`,
+                         newRandomSpeed,
+                       );
                    }
                    console.log(`[FEE] Fee existente actualizado con nueva velocidad aleatoria: ${newRandomSpeed.toFixed(2)}`);
                }
@@ -4095,7 +4227,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                    fee = createObstacle(generateId(), 'fee', prev.canvasSize.width, prev.canvasSize.height);
                    // Asignar velocidad aleatoria única para cada nuevo fee
                    if (fee.velocity) {
-                       const randomFeeSpeed = getRandomFeeSpeed(currentLevel);
+                       const randomFeeSpeed = getRandomFeeSpeed(currentLevel, fee.id);
                        const magnitude = Math.sqrt(fee.velocity.x * fee.velocity.x + fee.velocity.y * fee.velocity.y);
                        if (magnitude > 0) {
                            const normalizedX = fee.velocity.x / magnitude;
@@ -4105,10 +4237,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
                                y: normalizedY * randomFeeSpeed
                            };
                        } else {
-                           fee.velocity = {
-                               x: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7,
-                               y: (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1) * randomFeeSpeed * 0.7
-                           };
+                           fee.velocity = getFeeDiagonalDirection(
+                             `level-up-new-fee-diagonal:${fee.id}`,
+                             randomFeeSpeed,
+                           );
                        }
                        console.log(`[FEE] Nuevo fee añadido en level-up con velocidad: ${randomFeeSpeed.toFixed(2)}`);
                    }
@@ -4180,28 +4312,28 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         // Si el boost acaba de terminar, actualizar el timestamp para el próximo spawn
         if (boostJustEnded) {
           newLastMegaNodeSpawn = currentTime;
-          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, 'mega-node-interval');
           console.log(`[MEGANODE] Boost terminado. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
         }
         
         // Si un megaNode expiró sin ser recogido, actualizar el timestamp para el próximo spawn
         if (megaNodeExpired) {
           newLastMegaNodeSpawn = currentTime;
-          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, 'mega-node-interval');
           console.log(`[MEGANODE] Haku expiró. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
         }
         
         // NUEVA LÓGICA: Si se recogió la piel de GOAT, resetear timer del Haku
         if (goatSkinCollected) {
           newLastMegaNodeSpawn = currentTime;
-          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+          newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, 'mega-node-interval');
           console.log(`[MEGANODE] Piel GOAT recogida. Próximo Haku en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
         }
         
         // Si un corazón fue recogido o expiró, actualizar el timestamp para el próximo spawn
         if (heartCollected || heartExpired) {
           newLastHeartSpawn = currentTime;
-          newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS);
+          newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, 'heart-interval');
           const action = heartCollected ? 'recogido' : 'expiró';
           console.log(`[HEART] Corazón ${action}. Próximo corazón en ${newNextHeartInterval/1000}s (aleatorio)`);
         }
@@ -4227,7 +4359,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         if (!hasMegaNode && !hasGoatSkin) {
           // Generar primer intervalo si no existe
           if (newNextMegaNodeInterval === null) {
-            newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+            newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, 'mega-node-interval');
             console.log(`[MEGANODE] Primer intervalo generado: ${newNextMegaNodeInterval/1000}s`);
           }
           
@@ -4240,7 +4372,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               remainingCollectibles.push(newCollectible);
               newLastMegaNodeSpawn = currentTime;
               // Generar próximo intervalo aleatorio
-              newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS);
+              newNextMegaNodeInterval = getRandomInterval(MEGA_NODE_SPAWN_INTERVAL_MIN_MS, MEGA_NODE_SPAWN_INTERVAL_MAX_MS, 'mega-node-interval');
               console.log(`[MEGANODE] Spawned independientemente - próximo en ${newNextMegaNodeInterval/1000}s (aleatorio)`);
             }
           }
@@ -4253,7 +4385,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         if (!hasHeart) {
           // Generar primer intervalo si no existe
           if (newNextHeartInterval === null) {
-            newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS);
+            newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, 'heart-interval');
             console.log(`[HEART] Primer intervalo generado: ${newNextHeartInterval/1000}s`);
           }
           
@@ -4266,7 +4398,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
               remainingCollectibles.push(newCollectible);
               newLastHeartSpawn = currentTime;
               // Generar próximo intervalo aleatorio
-              newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS);
+              newNextHeartInterval = getRandomInterval(HEART_SPAWN_INTERVAL_MIN_MS, HEART_SPAWN_INTERVAL_MAX_MS, 'heart-interval');
               console.log(`[HEART] Spawned independientemente - próximo en ${newNextHeartInterval/1000}s (aleatorio)`);
             }
           }

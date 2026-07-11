@@ -139,33 +139,30 @@ export function distanceBetweenPoints(p1: Vector2D, p2: Vector2D): number {
  * no para la generación inicial de los obstáculos de cada nivel, que sigue un número fijo.
  */
 export function getRandomObstacleType(level: number = 1): ObstacleType {
-  // Para asegurar que se respetan las cantidades exactas definidas en getObstacleCountByTypeAndLevel,
-  // esta función solo debe usarse para crear obstáculos adicionales, no para reemplazar la lógica
-  // de cantidades específicas por nivel.
-  
-  // Ajustar probabilidades para que coincidan con la dificultad de cada nivel
-  if (level === 1) {
-    // Nivel 1: principalmente fees y bugs (no hackers)
-    return randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < 0.5 ? 'fee' : 'bug';
-  } else if (level === 2) {
-    // Nivel 2: más bugs que fees, pocos hackers
-    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-    if (rand < 0.4) return 'fee';
-    if (rand < 0.9) return 'bug';
-    return 'hacker';
-  } else if (level === 3) {
-    // Nivel 3: distribución más equilibrada
-    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-    if (rand < 0.35) return 'fee';
-    if (rand < 0.75) return 'bug';
-    return 'hacker';
-  } else {
-    // Nivel 4+: más hackers
-    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-    if (rand < 0.3) return 'fee';
-    if (rand < 0.7) return 'bug';
-    return 'hacker';
-  }
+  return randomManager.withIndexedEvent(
+    GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+    'obstacle-type',
+    () => {
+      // Ajustar probabilidades para que coincidan con la dificultad de cada nivel
+      if (level === 1) {
+        return randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < 0.5 ? 'fee' : 'bug';
+      } else if (level === 2) {
+        const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+        if (rand < 0.4) return 'fee';
+        if (rand < 0.9) return 'bug';
+        return 'hacker';
+      } else if (level === 3) {
+        const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+        if (rand < 0.35) return 'fee';
+        if (rand < 0.75) return 'bug';
+        return 'hacker';
+      }
+      const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+      if (rand < 0.3) return 'fee';
+      if (rand < 0.7) return 'bug';
+      return 'hacker';
+    },
+  );
 }
 
 /**
@@ -226,7 +223,13 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
  * Generates a unique ID string.
  */
 let generatedIdCounter = 0;
+let generatedIdSeedVersion = randomManager.seedVersion();
 export function generateId(prefix: string = 'obj'): string {
+  const currentSeedVersion = randomManager.seedVersion();
+  if (generatedIdSeedVersion !== currentSeedVersion) {
+    generatedIdCounter = 0;
+    generatedIdSeedVersion = currentSeedVersion;
+  }
   generatedIdCounter += 1;
   return `${prefix}-${generatedIdCounter}`;
 }
