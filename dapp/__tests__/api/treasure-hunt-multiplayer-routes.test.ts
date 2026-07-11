@@ -2,11 +2,15 @@ import { MultiplayerDomainError } from '@/lib/treasure-hunt-multiplayer';
 import {
   createTreasureHuntMultiplayerHandlers,
   isTreasureHuntMultiplayerFeatureEnabled,
+  type MultiplayerGameSession,
 } from '@/app/api/games/treasure-hunt/multiplayer/_lib/handlers';
 import {
   MultiplayerFixedWindowRateLimiter,
   type MultiplayerRateLimitOperation,
 } from '@/app/api/games/treasure-hunt/multiplayer/_lib/rate-limit';
+import { InMemoryMatchRepository } from '@/lib/treasure-hunt-multiplayer/repository';
+import { TreasureHuntMultiplayerService } from '@/lib/treasure-hunt-multiplayer/service';
+import type { Match } from '@/lib/treasure-hunt-multiplayer/types';
 
 const match = {
   matchId: 'match-1',
@@ -21,6 +25,14 @@ function jsonRequest(url: string, body: unknown, method = 'POST') {
     headers: { 'Content-Type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
 }
 
 function createHarness() {
@@ -42,8 +54,11 @@ function createHarness() {
       isActive: true,
       mode: 'staging_unranked',
       rewardEligible: false,
+      multiplayerState: 'joined',
+      multiplayerClientInstanceId: 'client-instance-1',
     }),
     lockGameSessionForMultiplayer: jest.fn().mockResolvedValue(true),
+    confirmGameSessionForMultiplayer: jest.fn().mockResolvedValue('confirmed'),
     releaseGameSessionForMultiplayer: jest.fn().mockResolvedValue(true),
     consumeRateLimit: jest.fn(
       (_input: { userId: string; operation: MultiplayerRateLimitOperation }) => true,
@@ -234,6 +249,7 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(dependencies.lockGameSessionForMultiplayer).toHaveBeenCalledWith({
       userId: 'wallet-user',
       gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
     });
     expect(dependencies.lockGameSessionForMultiplayer.mock.invocationCallOrder[0]).toBeLessThan(
       service.createOrJoin.mock.invocationCallOrder[0],
@@ -244,6 +260,14 @@ describe('Treasure Hunt multiplayer API handlers', () => {
       gameSessionId: 'game-session-1',
       clientInstanceId: 'client-instance-1',
     });
+    expect(dependencies.confirmGameSessionForMultiplayer).toHaveBeenCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
+    expect(service.createOrJoin.mock.invocationCallOrder[0]).toBeLessThan(
+      dependencies.confirmGameSessionForMultiplayer.mock.invocationCallOrder[0],
+    );
     expect(await response.json()).toEqual({
       success: true,
       playerId: 'player-1',
@@ -438,8 +462,13 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(await response.json()).toEqual({ success: true, match });
   });
 
-  it('acknowledges an already inactive locked session without touching match state', async () => {
+  it('replays release for an inactive locked session and still heals a late match', async () => {
     const { handlers, dependencies, service } = createHarness();
+    service.releaseForParticipant.mockResolvedValue(null);
+    dependencies.releaseGameSessionForMultiplayer
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
     dependencies.findGameSessionBySessionId.mockResolvedValue({
       sessionId: 'game-session-1',
       userId: 'wallet-user',
@@ -447,6 +476,8 @@ describe('Treasure Hunt multiplayer API handlers', () => {
       isActive: false,
       mode: 'staging_unranked',
       rewardEligible: false,
+      multiplayerState: 'released',
+      multiplayerClientInstanceId: 'client-instance-1',
     });
 
     const request = (clientInstanceId: string) =>
@@ -458,19 +489,21 @@ describe('Treasure Hunt multiplayer API handlers', () => {
         },
       );
     const firstResponse = await handlers.release(request('client-instance-1'));
-    const replayResponse = await handlers.release(request('client-instance-after-reload'));
+    const replayResponse = await handlers.release(request('client-instance-1'));
+    const staleResponse = await handlers.release(request('client-instance-after-reload'));
 
-    expect(service.releaseForParticipant).not.toHaveBeenCalled();
-    expect(dependencies.releaseGameSessionForMultiplayer).not.toHaveBeenCalled();
+    expect(service.releaseForParticipant).toHaveBeenCalledTimes(2);
+    expect(dependencies.releaseGameSessionForMultiplayer).toHaveBeenCalledTimes(3);
     await expect(firstResponse.json()).resolves.toEqual({
       success: true,
       released: true,
       match: null,
     });
     expect(replayResponse.status).toBe(200);
+    expect(staleResponse.status).toBe(403);
   });
 
-  it('returns released false for a normal session when join failed before the lock', async () => {
+  it('durably releases a normal session so a delayed join cannot acquire it later', async () => {
     const { handlers, dependencies, service } = createHarness();
     dependencies.findGameSessionBySessionId.mockResolvedValue({
       sessionId: 'game-session-1',
@@ -479,6 +512,8 @@ describe('Treasure Hunt multiplayer API handlers', () => {
       isActive: true,
       mode: null,
       rewardEligible: null,
+      multiplayerState: 'idle',
+      multiplayerClientInstanceId: null,
     });
 
     const response = await handlers.release(
@@ -492,12 +527,20 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, released: false, match: null });
-    expect(service.releaseForParticipant).not.toHaveBeenCalled();
-    expect(dependencies.releaseGameSessionForMultiplayer).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({ success: true, released: true, match });
+    expect(dependencies.releaseGameSessionForMultiplayer).toHaveBeenCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
+    expect(service.releaseForParticipant).toHaveBeenCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
   });
 
-  it('forfeits match state before releasing an active locked staging session', async () => {
+  it('persists the release tombstone before forfeiting an active match', async () => {
     const { handlers, dependencies, service } = createHarness();
 
     const response = await handlers.release(
@@ -515,8 +558,8 @@ describe('Treasure Hunt multiplayer API handlers', () => {
       gameSessionId: 'game-session-1',
       clientInstanceId: 'client-instance-1',
     });
-    expect(service.releaseForParticipant.mock.invocationCallOrder[0]).toBeLessThan(
-      dependencies.releaseGameSessionForMultiplayer.mock.invocationCallOrder[0],
+    expect(dependencies.releaseGameSessionForMultiplayer.mock.invocationCallOrder[0]).toBeLessThan(
+      service.releaseForParticipant.mock.invocationCallOrder[0],
     );
     expect(await response.json()).toEqual({ success: true, released: true, match });
   });
@@ -540,6 +583,205 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     expect(dependencies.releaseGameSessionForMultiplayer).toHaveBeenCalledWith({
       userId: 'wallet-user',
       gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
+  });
+
+  it('compensates a JOIN that commits after a concurrent durable RELEASE', async () => {
+    const { handlers, dependencies, service } = createHarness();
+    const delayedJoin = deferred<{ playerId: string; slot: 0; match: typeof match }>();
+    const joinStarted = deferred<void>();
+    service.createOrJoin.mockImplementationOnce(() => {
+      joinStarted.resolve();
+      return delayedJoin.promise;
+    });
+    service.releaseForParticipant.mockResolvedValueOnce(null).mockResolvedValueOnce(match);
+    dependencies.confirmGameSessionForMultiplayer.mockResolvedValueOnce('released');
+
+    const joinPromise = handlers.createOrJoin(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
+        roomCode: 'ROOM42',
+        gameSessionId: 'game-session-1',
+        clientInstanceId: 'client-instance-1',
+      }),
+    );
+    await joinStarted.promise;
+    expect(service.createOrJoin).toHaveBeenCalledTimes(1);
+
+    const releaseResponse = await handlers.release(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches/release', {
+        gameSessionId: 'game-session-1',
+        clientInstanceId: 'client-instance-1',
+      }),
+    );
+    expect(await releaseResponse.json()).toEqual({ success: true, released: true, match: null });
+
+    delayedJoin.resolve({ playerId: 'player-1', slot: 0, match });
+    const joinResponse = await joinPromise;
+    expect(joinResponse.status).toBe(409);
+    expect(await joinResponse.json()).toMatchObject({
+      success: false,
+      error: { code: 'JOIN_RELEASED' },
+    });
+    expect(service.releaseForParticipant).toHaveBeenLastCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
+    expect(service.releaseForParticipant).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps GameSession and match authority coherent when RELEASE wins during repository.create', async () => {
+    const createEntered = deferred<void>();
+    const allowCreate = deferred<void>();
+    class DelayedCreateRepository extends InMemoryMatchRepository {
+      override async create(candidate: Match) {
+        createEntered.resolve();
+        await allowCreate.promise;
+        return super.create(candidate);
+      }
+    }
+
+    const repository = new DelayedCreateRepository();
+    const service = new TreasureHuntMultiplayerService(repository, {
+      clock: { now: () => 1_000 },
+      idFactory: {
+        createMatchId: () => 'match-race',
+        createPlayerId: () => 'player-race',
+        createSeed: () => 'seed-race',
+      },
+    });
+    const gameSession: MultiplayerGameSession = {
+      sessionId: 'game-session-race',
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: true,
+      mode: 'standard',
+      rewardEligible: true,
+      multiplayerState: 'idle',
+      multiplayerClientInstanceId: null,
+    };
+    const dependencies = {
+      isFeatureEnabled: () => true,
+      readWalletSession: async () => ({ userId: 'wallet-user' }),
+      findGameSessionBySessionId: async () => ({ ...gameSession }),
+      lockGameSessionForMultiplayer: async (identity: {
+        userId: string;
+        gameSessionId: string;
+        clientInstanceId: string;
+      }) => {
+        const unclaimed =
+          (gameSession.multiplayerState == null || gameSession.multiplayerState === 'idle') &&
+          (gameSession.multiplayerClientInstanceId == null ||
+            gameSession.multiplayerClientInstanceId === identity.clientInstanceId);
+        const exactInProgress =
+          gameSession.multiplayerState === 'joining' &&
+          gameSession.multiplayerClientInstanceId === identity.clientInstanceId;
+        const joinedTakeover = gameSession.multiplayerState === 'joined';
+        if (
+          identity.userId !== gameSession.userId ||
+          identity.gameSessionId !== gameSession.sessionId ||
+          !gameSession.isActive ||
+          !(unclaimed || exactInProgress || joinedTakeover)
+        ) return false;
+        Object.assign(gameSession, {
+          mode: 'staging_unranked',
+          rewardEligible: false,
+          multiplayerState: 'joining',
+          multiplayerClientInstanceId: identity.clientInstanceId,
+        });
+        return true;
+      },
+      confirmGameSessionForMultiplayer: async (identity: {
+        userId: string;
+        gameSessionId: string;
+        clientInstanceId: string;
+      }) => {
+        if (
+          !gameSession.isActive ||
+          gameSession.multiplayerState !== 'joining' ||
+          gameSession.multiplayerClientInstanceId !== identity.clientInstanceId
+        ) return 'released' as const;
+        Object.assign(gameSession, { multiplayerState: 'joined' });
+        return 'confirmed' as const;
+      },
+      releaseGameSessionForMultiplayer: async (identity: {
+        userId: string;
+        gameSessionId: string;
+        clientInstanceId: string;
+      }) => {
+        const exactClaim =
+          (gameSession.multiplayerState === 'joining' ||
+            gameSession.multiplayerState === 'joined') &&
+          gameSession.multiplayerClientInstanceId === identity.clientInstanceId;
+        const unclaimed =
+          (gameSession.multiplayerState == null || gameSession.multiplayerState === 'idle') &&
+          (gameSession.multiplayerClientInstanceId == null ||
+            gameSession.multiplayerClientInstanceId === identity.clientInstanceId);
+        if (gameSession.isActive && (exactClaim || unclaimed)) {
+          Object.assign(gameSession, {
+            isActive: false,
+            mode: 'staging_unranked',
+            rewardEligible: false,
+            multiplayerState: 'released',
+            multiplayerClientInstanceId: identity.clientInstanceId,
+          });
+          return true;
+        }
+        return Boolean(
+          !gameSession.isActive &&
+            gameSession.multiplayerState === 'released' &&
+            gameSession.multiplayerClientInstanceId === identity.clientInstanceId,
+        );
+      },
+      consumeRateLimit: () => true,
+      getService: () => service,
+    };
+    const handlers = createTreasureHuntMultiplayerHandlers(dependencies);
+
+    const joinPromise = handlers.createOrJoin(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
+        roomCode: 'ROOM-RACE',
+        gameSessionId: 'game-session-race',
+        clientInstanceId: 'client-race',
+      }),
+    );
+    await createEntered.promise;
+
+    const fencedJoinResponse = await handlers.createOrJoin(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches', {
+        roomCode: 'ROOM-RACE',
+        gameSessionId: 'game-session-race',
+        clientInstanceId: 'client-race-new-iframe',
+      }),
+    );
+    expect(fencedJoinResponse.status).toBe(403);
+    expect(gameSession).toMatchObject({
+      multiplayerState: 'joining',
+      multiplayerClientInstanceId: 'client-race',
+    });
+
+    const releaseResponse = await handlers.release(
+      jsonRequest('http://localhost/api/games/treasure-hunt/multiplayer/matches/release', {
+        gameSessionId: 'game-session-race',
+        clientInstanceId: 'client-race',
+      }),
+    );
+    expect(await releaseResponse.json()).toEqual({ success: true, released: true, match: null });
+
+    allowCreate.resolve();
+    const joinResponse = await joinPromise;
+    expect(joinResponse.status).toBe(409);
+    const compensated = await repository.findByGameSession('wallet-user', 'game-session-race');
+    expect(gameSession).toMatchObject({
+      isActive: false,
+      multiplayerState: 'released',
+      multiplayerClientInstanceId: 'client-race',
+    });
+    expect(compensated).toMatchObject({
+      status: 'abandoned',
+      activeUserIds: [],
+      result: { reason: 'abandoned', winnerPlayerId: null },
     });
   });
 
@@ -558,6 +800,16 @@ describe('Treasure Hunt multiplayer API handlers', () => {
     const domainResponse = await domainHarness.handlers.createOrJoin(request());
     expect(domainResponse.status).toBe(409);
     expect(await domainResponse.json()).toMatchObject({ error: { code: 'MATCH_FULL' } });
+    expect(domainHarness.dependencies.releaseGameSessionForMultiplayer).toHaveBeenCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
+    expect(domainHarness.service.releaseForParticipant).toHaveBeenCalledWith({
+      userId: 'wallet-user',
+      gameSessionId: 'game-session-1',
+      clientInstanceId: 'client-instance-1',
+    });
 
     const failureHarness = createHarness();
     failureHarness.service.createOrJoin.mockRejectedValue(

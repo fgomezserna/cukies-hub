@@ -19,24 +19,24 @@ import { prisma } from '@/lib/prisma';
 
 const findGameSession = prisma.gameSession.findUnique as unknown as jest.Mock;
 const updateGameSessions = prisma.gameSession.updateMany as unknown as jest.Mock;
+const identity = {
+  userId: 'wallet-user',
+  gameSessionId: 'game-session-1',
+  clientInstanceId: 'client-instance-1',
+};
 
 describe('Treasure Hunt multiplayer default dependencies', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('loads reward authority fields and atomically locks the active owned session', async () => {
+  it('loads durable authority fields and atomically claims the active owned session', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     findGameSession.mockResolvedValue({ sessionId: 'game-session-1' });
     updateGameSessions.mockResolvedValue({ count: 1 });
 
     await dependencies.findGameSessionBySessionId('game-session-1');
-    await expect(
-      dependencies.lockGameSessionForMultiplayer({
-        userId: 'wallet-user',
-        gameSessionId: 'game-session-1',
-      }),
-    ).resolves.toBe(true);
+    await expect(dependencies.lockGameSessionForMultiplayer(identity)).resolves.toBe(true);
 
     expect(findGameSession).toHaveBeenCalledWith({
       where: { sessionId: 'game-session-1' },
@@ -47,33 +47,36 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
         isActive: true,
         mode: true,
         rewardEligible: true,
+        multiplayerState: true,
+        multiplayerClientInstanceId: true,
       },
     });
     expect(updateGameSessions).toHaveBeenCalledWith({
-      where: {
+      where: expect.objectContaining({
         sessionId: 'game-session-1',
         userId: 'wallet-user',
         gameId: 'sybil-slayer',
         isActive: true,
+        OR: expect.any(Array),
+      }),
+      data: {
+        mode: 'staging_unranked',
+        rewardEligible: false,
+        multiplayerState: 'joining',
+        multiplayerClientInstanceId: 'client-instance-1',
       },
-      data: { mode: 'staging_unranked', rewardEligible: false },
     });
   });
 
-  it('fails the lock when no exact active session was updated', async () => {
+  it('fails a claim when no exact active safe state was updated', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     updateGameSessions.mockResolvedValue({ count: 0 });
     findGameSession.mockResolvedValue(null);
 
-    await expect(
-      dependencies.lockGameSessionForMultiplayer({
-        userId: 'wallet-user',
-        gameSessionId: 'missing-session',
-      }),
-    ).resolves.toBe(false);
+    await expect(dependencies.lockGameSessionForMultiplayer(identity)).resolves.toBe(false);
   });
 
-  it('accepts an idempotent lock replay only when the exact session is still active and locked', async () => {
+  it('replays an in-progress claim only for the exact iframe client', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     updateGameSessions.mockResolvedValue({ count: 0 });
     findGameSession.mockResolvedValue({
@@ -82,36 +85,52 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
       isActive: true,
       mode: 'staging_unranked',
       rewardEligible: false,
+      multiplayerState: 'joining',
+      multiplayerClientInstanceId: 'client-instance-1',
     });
 
+    await expect(dependencies.lockGameSessionForMultiplayer(identity)).resolves.toBe(true);
     await expect(
       dependencies.lockGameSessionForMultiplayer({
-        userId: 'wallet-user',
-        gameSessionId: 'game-session-1',
+        ...identity,
+        clientInstanceId: 'stale-iframe-client',
       }),
-    ).resolves.toBe(true);
-    expect(findGameSession).toHaveBeenCalledWith({
-      where: { sessionId: 'game-session-1' },
-      select: {
-        userId: true,
-        gameId: true,
-        isActive: true,
-        mode: true,
-        rewardEligible: true,
+    ).resolves.toBe(false);
+    expect(updateGameSessions.mock.calls[0][0].where.OR).toEqual(expect.arrayContaining([
+      {
+        multiplayerState: 'joining',
+        multiplayerClientInstanceId: 'client-instance-1',
       },
-    });
+      { multiplayerState: 'joined' },
+    ]));
   });
 
-  it('atomically releases only an active owned staging multiplayer session', async () => {
+  it('lets an explicit JOIN adopt a new client only after the previous claim is joined', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     updateGameSessions.mockResolvedValue({ count: 1 });
 
     await expect(
-      dependencies.releaseGameSessionForMultiplayer({
-        userId: 'wallet-user',
-        gameSessionId: 'game-session-1',
+      dependencies.lockGameSessionForMultiplayer({
+        ...identity,
+        clientInstanceId: 'new-iframe-client',
       }),
     ).resolves.toBe(true);
+    expect(updateGameSessions).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([{ multiplayerState: 'joined' }]),
+      }),
+      data: expect.objectContaining({
+        multiplayerState: 'joining',
+        multiplayerClientInstanceId: 'new-iframe-client',
+      }),
+    }));
+  });
+
+  it('confirms only an exact active durable join claim', async () => {
+    const dependencies = createDefaultMultiplayerHandlerDependencies();
+    updateGameSessions.mockResolvedValue({ count: 1 });
+
+    await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('confirmed');
 
     expect(updateGameSessions).toHaveBeenCalledWith({
       where: {
@@ -121,42 +140,103 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
         isActive: true,
         mode: 'staging_unranked',
         rewardEligible: false,
+        multiplayerState: 'joining',
+        multiplayerClientInstanceId: 'client-instance-1',
       },
-      data: { isActive: false, endedAt: expect.any(Date) },
+      data: { multiplayerState: 'joined' },
     });
-    expect(findGameSession).not.toHaveBeenCalled();
   });
 
-  it('accepts only an exact already-inactive release replay', async () => {
+  it('distinguishes idempotent confirm, released tombstone and superseding client', async () => {
     const dependencies = createDefaultMultiplayerHandlerDependencies();
     updateGameSessions.mockResolvedValue({ count: 0 });
-    findGameSession.mockResolvedValue({
+    findGameSession.mockResolvedValueOnce({
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: true,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+      multiplayerState: 'joined',
+      multiplayerClientInstanceId: 'client-instance-1',
+    }).mockResolvedValueOnce({
       userId: 'wallet-user',
       gameId: 'sybil-slayer',
       isActive: false,
       mode: 'staging_unranked',
       rewardEligible: false,
+      multiplayerState: 'released',
+      multiplayerClientInstanceId: 'client-instance-1',
+    }).mockResolvedValueOnce({
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: true,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+      multiplayerState: 'joining',
+      multiplayerClientInstanceId: 'new-iframe-client',
     });
 
-    await expect(
-      dependencies.releaseGameSessionForMultiplayer({
-        userId: 'wallet-user',
-        gameSessionId: 'game-session-1',
-      }),
-    ).resolves.toBe(true);
+    await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('confirmed');
+    await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('released');
+    await expect(dependencies.confirmGameSessionForMultiplayer(identity)).resolves.toBe('superseded');
+  });
 
-    findGameSession.mockResolvedValue({
+  it('atomically tombstones an active normal or claimed session before match cleanup', async () => {
+    const dependencies = createDefaultMultiplayerHandlerDependencies();
+    updateGameSessions.mockResolvedValue({ count: 1 });
+
+    await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(true);
+
+    expect(updateGameSessions).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        sessionId: 'game-session-1',
+        userId: 'wallet-user',
+        gameId: 'sybil-slayer',
+        isActive: true,
+        OR: expect.any(Array),
+      }),
+      data: {
+        isActive: false,
+        endedAt: expect.any(Date),
+        mode: 'staging_unranked',
+        rewardEligible: false,
+        multiplayerState: 'released',
+        multiplayerClientInstanceId: 'client-instance-1',
+      },
+    });
+  });
+
+  it('accepts only the exact inactive release replay, including legacy locked rows', async () => {
+    const dependencies = createDefaultMultiplayerHandlerDependencies();
+    updateGameSessions.mockResolvedValue({ count: 0 });
+    findGameSession.mockResolvedValueOnce({
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: false,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+      multiplayerState: 'released',
+      multiplayerClientInstanceId: 'client-instance-1',
+    }).mockResolvedValueOnce({
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: false,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+      multiplayerState: null,
+      multiplayerClientInstanceId: null,
+    }).mockResolvedValueOnce({
       userId: 'other-wallet',
       gameId: 'sybil-slayer',
       isActive: false,
       mode: 'staging_unranked',
       rewardEligible: false,
+      multiplayerState: 'released',
+      multiplayerClientInstanceId: 'client-instance-1',
     });
-    await expect(
-      dependencies.releaseGameSessionForMultiplayer({
-        userId: 'wallet-user',
-        gameSessionId: 'game-session-1',
-      }),
-    ).resolves.toBe(false);
+
+    await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(true);
+    await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(true);
+    await expect(dependencies.releaseGameSessionForMultiplayer(identity)).resolves.toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import { useEffect, type RefObject } from 'react';
 const REQUEST_TYPE = 'TH_MULTIPLAYER_REQUEST';
 const RESPONSE_TYPE = 'TH_MULTIPLAYER_RESPONSE';
 const MULTIPLAYER_API = '/api/games/treasure-hunt/multiplayer/matches';
+const JOIN_RELEASE_BARRIER_MS = 250;
 
 type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot' | 'forfeit' | 'release' | 'reset';
 
@@ -111,6 +112,29 @@ function isTerminalMatchStatus(value: unknown): boolean {
   return value === 'finished' || value === 'abandoned';
 }
 
+function waitForPendingJoins(
+  operations: readonly Promise<void>[],
+  signal: AbortSignal,
+): Promise<void> {
+  if (operations.length === 0 || signal.aborted) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timeoutId = setTimeout(finish, JOIN_RELEASE_BARRIER_MS);
+    signal.addEventListener('abort', finish, { once: true });
+    void Promise.allSettled(operations).then(finish);
+  });
+}
+
 async function readApiResponse(response: Response) {
   let value: unknown;
   try {
@@ -165,6 +189,7 @@ export function createTreasureHuntMultiplayerBridge(
   const targetOrigin = new URL(options.gameUrl, windowObject.location.href).origin;
   const abortControllers = new Set<AbortController>();
   const inFlightRequestIds = new Set<string>();
+  const pendingJoinOperations = new Set<Promise<void>>();
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
   let knownMatchStatus: string | null = null;
@@ -259,12 +284,30 @@ export function createTreasureHuntMultiplayerBridge(
     const abortController = new AbortController();
     abortControllers.add(abortController);
     const requestGeneration = generation;
+    const joinBarrier = request.command === 'release'
+      ? [...pendingJoinOperations]
+      : [];
 
-    void (async () => {
+    let operation: Promise<void>;
+    operation = (async () => {
       let ownedPendingRoomCode: string | null = null;
       let notifySessionReleased = false;
       try {
         let data: Record<string, unknown>;
+
+        if (request.command === 'release' && joinBarrier.length > 0) {
+          // Prefer observing the canonical JOIN result before releasing, but never make
+          // authority depend on an in-memory promise that a lost network response could
+          // leave pending forever. The server-side CAS resolves the remaining race.
+          await waitForPendingJoins(joinBarrier, abortController.signal);
+          if (
+            disposed ||
+            abortController.signal.aborted ||
+            requestGeneration !== generation
+          ) {
+            return;
+          }
+        }
 
         if (request.command === 'join') {
           const roomCode = requireRoomCode(request.payload.roomCode);
@@ -430,6 +473,12 @@ export function createTreasureHuntMultiplayerBridge(
         abortControllers.delete(abortController);
       }
     })();
+    if (request.command === 'join') {
+      pendingJoinOperations.add(operation);
+      const removeJoinOperation = () => pendingJoinOperations.delete(operation);
+      void operation.then(removeJoinOperation, removeJoinOperation);
+    }
+    void operation;
   };
 
   windowObject.addEventListener('message', handleMessage);
@@ -442,6 +491,7 @@ export function createTreasureHuntMultiplayerBridge(
     }
     abortControllers.clear();
     inFlightRequestIds.clear();
+    pendingJoinOperations.clear();
     pendingRoomCode = null;
   };
 }

@@ -15,6 +15,14 @@ function apiResponse(payload: unknown, status = 200) {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 function requestMessage(
   source: MessageEventSource,
   origin: string,
@@ -80,6 +88,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('ignores messages from a different iframe source or origin', async () => {
@@ -327,6 +336,85 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     requestMessage(contentWindow, GAME_ORIGIN, 'release-replay', 'release');
     await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
     expect(onSessionReleased).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it('serializes release behind a pending join that settles within the bounded barrier', async () => {
+    const delayedJoin = deferred<Response>();
+    const fetchImpl = jest.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/release')) {
+        return Promise.resolve(apiResponse({ success: true, released: true, match: null }));
+      }
+      return delayedJoin.promise;
+    });
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-delayed', 'join', { roomCode: 'ROOM42' });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    requestMessage(contentWindow, GAME_ORIGIN, 'release-after-join', 'release');
+    await Promise.resolve();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    delayedJoin.resolve(apiResponse({
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: { matchId: 'match-1', roomCode: 'ROOM42', status: 'waiting' },
+    }));
+
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      '/api/games/treasure-hunt/multiplayer/matches/release',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'release-after-join', success: true }),
+      GAME_ORIGIN,
+    ));
+    cleanup();
+  });
+
+  it('bounds the join barrier and lets durable server CAS resolve a hung join', async () => {
+    const fetchImpl = jest.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/release')) {
+        return Promise.resolve(apiResponse({ success: true, released: true, match: null }));
+      }
+      return new Promise<Response>(() => undefined);
+    });
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-hung', 'join', { roomCode: 'ROOM42' });
+    await Promise.resolve();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    requestMessage(contentWindow, GAME_ORIGIN, 'release-bounded', 'release');
+    await Promise.resolve();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2), { timeout: 1_500 });
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'release-bounded', success: true }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('does not retain a synchronously rejected join in the release barrier', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(
+      apiResponse({ success: true, released: true, match: null }),
+    );
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-invalid', 'join', {});
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'join-invalid', success: false }),
+      GAME_ORIGIN,
+    ));
+    requestMessage(contentWindow, GAME_ORIGIN, 'release-after-invalid', 'release');
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    expect(fetchImpl.mock.calls[0][0]).toBe(
+      '/api/games/treasure-hunt/multiplayer/matches/release',
+    );
     cleanup();
   });
 
