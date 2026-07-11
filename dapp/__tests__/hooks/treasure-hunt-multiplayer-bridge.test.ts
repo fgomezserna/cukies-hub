@@ -237,6 +237,110 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     cleanup();
   });
 
+  it('serializes concurrent joins before the first room fetch resolves', async () => {
+    let resolveFirstJoin: ((response: Response) => void) | undefined;
+    const firstJoin = new Promise<Response>((resolve) => {
+      resolveFirstJoin = resolve;
+    });
+    const fetchImpl = jest
+      .fn()
+      .mockImplementationOnce(() => firstJoin)
+      .mockResolvedValue(apiResponse({ success: true, match: { matchId: 'match-a' } }));
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-a', 'join', { roomCode: 'ROOM-A' });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-b', 'join', { roomCode: 'ROOM-B' });
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-a-duplicate', 'join', {
+      roomCode: 'ROOM-A',
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(postMessage.mock.calls[0]).toEqual([
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'join-b',
+        success: false,
+        error: {
+          code: 'JOIN_IN_PROGRESS',
+          message: 'A multiplayer room join is already in progress',
+        },
+      },
+      GAME_ORIGIN,
+    ]);
+    expect(postMessage.mock.calls[1]).toEqual([
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'join-a-duplicate',
+        success: false,
+        error: {
+          code: 'JOIN_IN_PROGRESS',
+          message: 'A multiplayer room join is already in progress',
+        },
+      },
+      GAME_ORIGIN,
+    ]);
+
+    resolveFirstJoin?.(
+      apiResponse({
+        success: true,
+        playerId: 'player-a',
+        slot: 0,
+        match: { matchId: 'match-a', roomCode: 'ROOM-A' },
+      }),
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
+    expect(postMessage.mock.calls[2][0]).toMatchObject({
+      requestId: 'join-a',
+      success: true,
+      data: { match: { matchId: 'match-a', roomCode: 'ROOM-A' } },
+    });
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'get-a', 'get', { matchId: 'match-b' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(4));
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      '/api/games/treasure-hunt/multiplayer/matches/match-a?gameSessionId=parent-game-session',
+    );
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('ROOM-B');
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('match-b');
+    cleanup();
+  });
+
+  it('clears a failed pending join so the same room can retry', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce(
+        apiResponse({
+          success: true,
+          playerId: 'player-retry',
+          slot: 0,
+          match: { matchId: 'match-retry', roomCode: 'RETRY' },
+        }),
+      );
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-failed', 'join', { roomCode: 'RETRY' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    expect(postMessage.mock.calls[0][0]).toMatchObject({
+      requestId: 'join-failed',
+      success: false,
+      error: { code: 'REQUEST_FAILED' },
+    });
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-retry', 'join', { roomCode: 'RETRY' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(postMessage.mock.calls[1][0]).toMatchObject({
+      requestId: 'join-retry',
+      success: true,
+      data: { match: { matchId: 'match-retry', roomCode: 'RETRY' } },
+    });
+    cleanup();
+  });
+
   it('rejects match operations before join without issuing an API request', async () => {
     const { cleanup, contentWindow, postMessage, fetchImpl } = createHarness();
     requestMessage(contentWindow, GAME_ORIGIN, 'get-before-join', 'get', {
@@ -262,17 +366,32 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
 
   it('aborts in-flight requests and removes the listener during cleanup', async () => {
     let capturedSignal: AbortSignal | undefined;
+    let resolveFetch: ((response: Response) => void) | undefined;
     const fetchImpl = jest.fn((_input: RequestInfo | URL, init?: RequestInit) => {
       capturedSignal = init?.signal ?? undefined;
-      return new Promise<Response>(() => undefined);
+      return new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      });
     });
-    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+    const { cleanup, contentWindow, postMessage, onRoomJoined } = createHarness(fetchImpl);
 
     requestMessage(contentWindow, GAME_ORIGIN, 'pending', 'join', { roomCode: 'ROOM42' });
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
     cleanup();
 
     expect(capturedSignal?.aborted).toBe(true);
+    resolveFetch?.(
+      apiResponse({
+        success: true,
+        playerId: 'late-player',
+        slot: 0,
+        match: { matchId: 'late-match', roomCode: 'LATE-ROOM' },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onRoomJoined).not.toHaveBeenCalled();
+    expect(window.location.search).not.toContain('LATE-ROOM');
+
     requestMessage(contentWindow, GAME_ORIGIN, 'after-cleanup', 'join', { roomCode: 'ROOM42' });
     await Promise.resolve();
     expect(fetchImpl).toHaveBeenCalledTimes(1);

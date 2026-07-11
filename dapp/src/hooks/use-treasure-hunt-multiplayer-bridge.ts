@@ -158,6 +158,7 @@ export function createTreasureHuntMultiplayerBridge(
   const abortControllers = new Set<AbortController>();
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
+  let pendingRoomCode: string | null = null;
   let disposed = false;
 
   const handleMessage = (event: MessageEvent) => {
@@ -175,6 +176,7 @@ export function createTreasureHuntMultiplayerBridge(
     abortControllers.add(abortController);
 
     void (async () => {
+      let ownedPendingRoomCode: string | null = null;
       try {
         let data: Record<string, unknown>;
 
@@ -186,6 +188,14 @@ export function createTreasureHuntMultiplayerBridge(
               'Multiplayer bridge is already pinned to another room',
             );
           }
+          if (pendingRoomCode) {
+            throw new BridgeError(
+              'JOIN_IN_PROGRESS',
+              'A multiplayer room join is already in progress',
+            );
+          }
+          pendingRoomCode = roomCode;
+          ownedPendingRoomCode = roomCode;
           const response = await fetchImpl(MULTIPLAYER_API, {
             method: 'POST',
             credentials: 'same-origin',
@@ -197,6 +207,9 @@ export function createTreasureHuntMultiplayerBridge(
             signal: abortController.signal,
           });
           data = await readApiResponse(response);
+          if (disposed || abortController.signal.aborted) {
+            return;
+          }
 
           if (!isRecord(data.match) || typeof data.match.matchId !== 'string') {
             throw new BridgeError('INVALID_RESPONSE', 'Multiplayer request failed');
@@ -275,6 +288,9 @@ export function createTreasureHuntMultiplayerBridge(
           );
         }
       } finally {
+        if (ownedPendingRoomCode && pendingRoomCode === ownedPendingRoomCode) {
+          pendingRoomCode = null;
+        }
         abortControllers.delete(abortController);
       }
     })();
@@ -288,6 +304,7 @@ export function createTreasureHuntMultiplayerBridge(
       controller.abort();
     }
     abortControllers.clear();
+    pendingRoomCode = null;
   };
 }
 
