@@ -62,8 +62,12 @@ function winnerByScore(match: Match, now: number, reason: MatchResultReason): Ma
   );
 }
 
-function isDead(player: MatchPlayer) {
-  return player.snapshot.hearts === 0 || player.snapshot.lifecycle === 'eliminated';
+function isPlayerOut(player: MatchPlayer) {
+  return (
+    player.snapshot.hearts === 0 ||
+    player.snapshot.lifecycle === 'eliminated' ||
+    player.snapshot.lifecycle === 'finished'
+  );
 }
 
 function evaluateVictory(match: Match, now: number): Match {
@@ -86,17 +90,17 @@ function evaluateVictory(match: Match, now: number): Match {
       return finishMatch(match, now, 'sudden_death', chaser.playerId);
     }
 
-    if (isDead(chaser)) {
+    if (isPlayerOut(chaser)) {
       return finishMatch(match, now, 'sudden_death', match.suddenDeath.leaderPlayerId);
     }
 
     return match;
   }
 
-  const firstDead = isDead(first);
-  const secondDead = isDead(second);
+  const firstOut = isPlayerOut(first);
+  const secondOut = isPlayerOut(second);
 
-  if (firstDead && secondDead) {
+  if (firstOut && secondOut) {
     return winnerByScore(match, now, 'elimination');
   }
 
@@ -110,21 +114,21 @@ function evaluateVictory(match: Match, now: number): Match {
     );
   }
 
-  if (!firstDead && !secondDead) {
+  if (!firstOut && !secondOut) {
     return match.pendingElimination
       ? { ...match, pendingElimination: null, updatedAt: now }
       : match;
   }
 
-  const deadPlayer = firstDead ? first : second;
-  const livingPlayer = firstDead ? second : first;
+  const outPlayer = firstOut ? first : second;
+  const activePlayer = firstOut ? second : first;
   const pending = match.pendingElimination;
-  if (!pending || pending.playerId !== deadPlayer.playerId) {
+  if (!pending || pending.playerId !== outPlayer.playerId) {
     return {
       ...match,
       pendingElimination: {
-        playerId: deadPlayer.playerId,
-        scoreAtDeath: deadPlayer.snapshot.score,
+        playerId: outPlayer.playerId,
+        scoreAtDeath: outPlayer.snapshot.score,
         detectedAt: now,
         resolveAt: now + match.rules.eliminationResolutionDelayMs,
       },
@@ -136,8 +140,8 @@ function evaluateVictory(match: Match, now: number): Match {
     return match;
   }
 
-  if (pending.scoreAtDeath <= livingPlayer.snapshot.score) {
-    return finishMatch(match, now, 'elimination', livingPlayer.playerId);
+  if (pending.scoreAtDeath <= activePlayer.snapshot.score) {
+    return finishMatch(match, now, 'elimination', activePlayer.playerId);
   }
 
   return {
@@ -145,8 +149,8 @@ function evaluateVictory(match: Match, now: number): Match {
     status: 'sudden_death',
     pendingElimination: null,
     suddenDeath: {
-      leaderPlayerId: deadPlayer.playerId,
-      chasingPlayerId: livingPlayer.playerId,
+      leaderPlayerId: outPlayer.playerId,
+      chasingPlayerId: activePlayer.playerId,
       targetScore: pending.scoreAtDeath,
     },
     updatedAt: now,

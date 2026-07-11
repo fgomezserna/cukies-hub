@@ -331,6 +331,137 @@ describe('TreasureHuntMultiplayerService', () => {
     },
   );
 
+  it('resolves a single finished player with positive hearts after the first-out window', async () => {
+    const { clock, service } = createHarness({
+      initialCountdownMs: 100,
+      eliminationResolutionDelayMs: 100,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    const joinedSecond = await service.createOrJoin(second);
+    clock.value = 100;
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
+    });
+
+    const pending = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      snapshot: { seq: 0, score: 200, hearts: 3, elapsedMs: 100, lifecycle: 'finished' },
+    });
+    expect(pending.status).toBe('running');
+    expect(pending.players[0]).toMatchObject({ lifecycle: 'finished', hearts: 3 });
+
+    clock.value = 200;
+    const resolved = await service.reconcile(joinedFirst.match.matchId);
+    expect(resolved.result).toMatchObject({
+      winnerPlayerId: joinedSecond.playerId,
+      reason: 'elimination',
+    });
+  });
+
+  it.each([
+    { firstScore: 400, secondScore: 200, expectedWinner: 'first', reason: 'elimination' },
+    { firstScore: 300, secondScore: 300, expectedWinner: null, reason: 'draw' },
+  ])(
+    'resolves two sequential finished snapshots: $reason',
+    async ({ firstScore, secondScore, expectedWinner, reason }) => {
+      const { clock, service } = createHarness({
+        initialCountdownMs: 100,
+        eliminationResolutionDelayMs: 100,
+      });
+      const joinedFirst = await service.createOrJoin(first);
+      await service.createOrJoin(second);
+      clock.value = 100;
+      const pending = await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+        snapshot: {
+          seq: 0,
+          score: firstScore,
+          hearts: 3,
+          elapsedMs: 100,
+          lifecycle: 'finished',
+        },
+      });
+      expect(pending.result).toBeNull();
+
+      clock.value = 150;
+      const resolved = await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: second.userId,
+        gameSessionId: second.gameSessionId,
+        snapshot: {
+          seq: 0,
+          score: secondScore,
+          hearts: 3,
+          elapsedMs: 150,
+          lifecycle: 'finished',
+        },
+      });
+      expect(resolved.result).toMatchObject({
+        winnerPlayerId: expectedWinner === 'first' ? joinedFirst.playerId : null,
+        reason,
+      });
+    },
+  );
+
+  it.each([
+    { finalScore: 599, chaserWins: false },
+    { finalScore: 601, chaserWins: true },
+  ])(
+    'resolves a finished sudden-death chaser at $finalScore points',
+    async ({ finalScore, chaserWins }) => {
+      const { clock, service } = createHarness({
+        initialCountdownMs: 100,
+        eliminationResolutionDelayMs: 100,
+      });
+      const joinedFirst = await service.createOrJoin(first);
+      const joinedSecond = await service.createOrJoin(second);
+      clock.value = 100;
+      await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: second.userId,
+        gameSessionId: second.gameSessionId,
+        snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
+      });
+      await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+        snapshot: { seq: 0, score: 600, hearts: 3, elapsedMs: 100, lifecycle: 'finished' },
+      });
+      clock.value = 200;
+      const suddenDeath = await service.reconcile(joinedFirst.match.matchId);
+      expect(suddenDeath).toMatchObject({
+        status: 'sudden_death',
+        suddenDeath: { targetScore: 600, chasingPlayerId: joinedSecond.playerId },
+      });
+
+      clock.value = 201;
+      const resolved = await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: second.userId,
+        gameSessionId: second.gameSessionId,
+        snapshot: {
+          seq: 1,
+          score: finalScore,
+          hearts: 3,
+          elapsedMs: 201,
+          lifecycle: 'finished',
+        },
+      });
+      expect(resolved.result).toMatchObject({
+        winnerPlayerId: chaserWins ? joinedSecond.playerId : joinedFirst.playerId,
+        reason: 'sudden_death',
+      });
+    },
+  );
+
   it('persists a terminal pending-elimination transition before ignoring a late snapshot', async () => {
     const { repository, clock, service } = createHarness({
       initialCountdownMs: 100,

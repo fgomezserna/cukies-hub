@@ -272,7 +272,7 @@ export class TreasureHuntMultiplayerService {
       }
       const startAt = next.startAt;
       if (next.pendingElimination?.playerId === player.playerId) {
-        throw invalidSnapshot('the first eliminated player snapshot is frozen');
+        throw invalidSnapshot('the first-out player snapshot is frozen');
       }
       if (
         next.status === 'sudden_death' &&
