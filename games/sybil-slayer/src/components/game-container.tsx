@@ -582,6 +582,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const localControlsLocked = shouldBlockLocalGameControls(
     isMultiplayerMode,
     Boolean(multiplayer.matchResult),
+    multiplayer.hasNonTerminalMatch,
   );
   const lastPublishedSnapshotRef = useRef<{
     score: number;
@@ -1162,9 +1163,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         </div>
         <button
           onClick={() => {
-            void multiplayer.reset();
-            setCurrentMode('single');
-            resetGame();
+            void multiplayer.reset()
+              .then(() => {
+                setCurrentMode('single');
+                resetGame();
+              })
+              .catch(() => undefined);
           }}
           className="mx-auto inline-flex items-center justify-center rounded-lg border border-pink-500/50 bg-pink-500/20 px-4 py-2 text-sm font-pixellari text-pink-100 hover:bg-pink-500/30"
         >
@@ -1240,9 +1244,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (gameState.status !== 'idle') return;
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
+    if (multiplayer.hasNonTerminalMatch) return;
     playSound('game_start');
     startGame();
-  }, [startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
+  }, [
+    startToggled,
+    gameState.status,
+    startGame,
+    playSound,
+    modeSelectOpen,
+    currentMode,
+    multiplayer.hasNonTerminalMatch,
+  ]);
   
   // Reset flags when starting a new game (moved after gameState initialization)
   useEffect(() => {
@@ -1338,7 +1351,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         startToggled &&
         (gameState.status === 'idle' || gameState.status === 'gameOver')
       ) {
-        setModeSelectOpen(true);
+        if (!multiplayer.hasNonTerminalMatch) {
+          setModeSelectOpen(true);
+        }
+        // Always consume Space here so useGameState cannot start local play behind a pinned match.
         nextInputState.startToggled = false;
       }
 
@@ -1346,7 +1362,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     });
 
     return unsubscribe;
-  }, [subscribeToDirection, pauseToggled, startToggled, updateInputRef, gameState.status]);
+  }, [
+    subscribeToDirection,
+    pauseToggled,
+    startToggled,
+    updateInputRef,
+    gameState.status,
+    multiplayer.hasNonTerminalMatch,
+  ]);
 
   const hasStartedMultiplayerRef = useRef(false);
   const serverPauseActiveRef = useRef(false);
@@ -1448,12 +1471,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     forceGameOver('multiplayer');
   }, [isMultiplayerMode, multiplayer.matchConfig?.matchId, multiplayer.matchResult, forceGameOver]);
 
-  useEffect(() => {
-    return () => {
-      void multiplayer.reset();
-    };
-  }, []);
-
   // Helper para obtener tiempo pausable para animaciones
   const getPausableTime = useCallback(() => {
     if (gameState.status === 'paused') {
@@ -1532,23 +1549,44 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   };
 
   const autoJoinedRoomRef = useRef<string | null>(null);
-  const startMultiplayerGame = useCallback((roomIdOverride?: string | null) => {
-    if (!multiplayerEnabled) return;
+  const multiplayerStartPendingRef = useRef(false);
+  const startMultiplayerGame = useCallback(async (roomIdOverride?: string | null) => {
+    if (
+      !multiplayerEnabled ||
+      multiplayer.hasNonTerminalMatch ||
+      multiplayerStartPendingRef.current
+    ) return;
+
     const roomId = roomIdOverride ?? generateMatchRoomId();
-    autoJoinedRoomRef.current = roomId;
-    resetGame();
-    void multiplayer.reset();
-    void multiplayer.initiateMatch(roomId);
+    multiplayerStartPendingRef.current = true;
+    try {
+      // A trusted parent invitation may represent the bridge's existing pin after iframe reload.
+      if (!roomIdOverride) await multiplayer.reset();
+      resetGame();
+      autoJoinedRoomRef.current = roomId;
+      setCurrentMode('multiplayer');
+      await multiplayer.initiateMatch(roomId);
+    } catch {
+      // Controller/hook preserve the canonical state and propagate the sanitized failure here.
+    } finally {
+      multiplayerStartPendingRef.current = false;
+    }
   }, [multiplayerEnabled, multiplayer, resetGame, generateMatchRoomId]);
 
-  const handleModeSelected = useCallback((mode: GameMode) => {
+  const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
     setModeSelectOpen(false);
-    setCurrentMode(mode);
+
+    if (multiplayer.hasNonTerminalMatch) return;
 
     if (mode === 'single') {
       console.log('🎮 [MODE] Starting single player mode');
-      void multiplayer.reset();
+      try {
+        await multiplayer.reset();
+      } catch {
+        return;
+      }
+      setCurrentMode('single');
       if (gameState.status === 'gameOver') {
         console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
         stopMusic();
@@ -1559,13 +1597,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
 
     if (!multiplayerEnabled) {
-      setCurrentMode('single');
       return;
     }
 
     console.log('🎮 [MODE] Starting multiplayer mode');
     playSound('button_click');
-    startMultiplayerGame();
+    await startMultiplayerGame();
   }, [gameState.status, multiplayerEnabled, playSound, startGame, startMultiplayerGame, stopMusic, multiplayer]);
 
   // La invitación llega únicamente por el handshake autenticado del padre.
@@ -1573,10 +1610,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (!hasParentHandshake) return;
     const roomCode = getHandshakeRoomCode(sessionData, multiplayerEnabled);
     if (!roomCode || autoJoinedRoomRef.current === roomCode) return;
-    autoJoinedRoomRef.current = roomCode;
     setModeSelectOpen(false);
-    setCurrentMode('multiplayer');
-    startMultiplayerGame(roomCode);
+    void startMultiplayerGame(roomCode);
   }, [hasParentHandshake, multiplayerEnabled, sessionData, startMultiplayerGame]);
 
    const handleResetClick = () => {
@@ -2260,7 +2295,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center min-h-screen">
       <ModeSelectModal
-        open={modeSelectOpen}
+        open={modeSelectOpen && !multiplayer.hasNonTerminalMatch}
         onClose={() => setModeSelectOpen(false)}
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
@@ -3048,8 +3083,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                               stopMusic();
                             }
                             if (isMultiplayerMode) {
-                              void multiplayer.reset();
-                              setCurrentMode('single');
+                              void multiplayer.reset()
+                                .then(() => {
+                                  setCurrentMode('single');
+                                  resetGame();
+                                  setModeSelectOpen(true);
+                                })
+                                .catch(() => undefined);
+                              return;
                             }
                             resetGame();
                             setModeSelectOpen(true);

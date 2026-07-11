@@ -12,7 +12,10 @@ import {
   type MultiplayerControllerState,
 } from '@/lib/multiplayer-client';
 import { randomManager } from '@/lib/random';
-import { isTreasureHuntMultiplayerEnabled } from '@/lib/multiplayer-feature';
+import {
+  isTreasureHuntMatchNonTerminal,
+  isTreasureHuntMultiplayerEnabled,
+} from '@/lib/multiplayer-feature';
 
 export type MultiplayerStatus =
   | 'idle'
@@ -56,6 +59,7 @@ export interface UseMultiplayerMatchValue {
   readonly resumeSignal: number;
   readonly error: string | null;
   readonly hasOpponent: boolean;
+  readonly hasNonTerminalMatch: boolean;
   readonly scoreDifference: number;
   readonly targetDifference: number;
   initiateMatch(roomCode: string): Promise<void>;
@@ -137,11 +141,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       setSetupError(setupError ?? 'El cliente multiplayer aún no está disponible');
       return;
     }
-    try {
-      await controller.join(roomCode);
-    } catch {
-      // The controller already exposes a sanitized public error through state.
-    }
+    await controller.join(roomCode);
   }, [multiplayerEnabled, setupError]);
 
   const publishLocalSnapshot = useCallback(
@@ -188,12 +188,8 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
   );
 
   const reset = useCallback(async () => {
-    try {
-      await controllerRef.current?.reset();
-      randomManager.clear();
-    } catch {
-      // The controller already publishes a sanitized reset error.
-    }
+    await controllerRef.current?.reset();
+    randomManager.clear();
   }, []);
 
   return useMemo(() => {
@@ -229,6 +225,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       resumeSignal: controllerState.resumeSignal,
       error: setupError ?? controllerState.error,
       hasOpponent: Boolean(opponent),
+      hasNonTerminalMatch: isTreasureHuntMatchNonTerminal(match?.status),
       scoreDifference: localPlayer && opponent ? localPlayer.score - opponent.score : 0,
       targetDifference,
       initiateMatch,

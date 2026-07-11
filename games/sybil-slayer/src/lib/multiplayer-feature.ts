@@ -19,6 +19,13 @@ export function isTreasureHuntMultiplayerEnabled(
 export function shouldBlockLocalGameControls(
   isMultiplayerMode: boolean,
   hasCanonicalResult: boolean,
+  hasNonTerminalMatch = false,
 ): boolean {
-  return isMultiplayerMode && !hasCanonicalResult;
+  return hasNonTerminalMatch || (isMultiplayerMode && !hasCanonicalResult);
+}
+
+export function isTreasureHuntMatchNonTerminal(
+  status: string | null | undefined,
+): boolean {
+  return Boolean(status && status !== 'finished' && status !== 'abandoned');
 }

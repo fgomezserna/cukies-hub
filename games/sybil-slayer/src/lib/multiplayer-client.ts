@@ -177,7 +177,7 @@ function isPublicMatchPayload(value: unknown): value is PublicMatch {
         isRecord(player) &&
         typeof player.playerId === 'string' &&
         Number.isSafeInteger(player.seq) &&
-        (player.seq as number) >= 0,
+        ((player.seq as number) === -1 || (player.seq as number) >= 0),
     )
   );
 }
@@ -771,34 +771,34 @@ export class TreasureHuntMultiplayerController {
         ),
       );
     }
-    this.generation += 1;
+    if (this.resetPromise) return this.resetPromise;
+
     const generation = this.generation;
-    this.stopScheduledWork();
-    this.options.transport.cancelPending?.();
-    this.joinPromise = null;
-    this.joinedRoom = null;
-    this.pollFlight = null;
-    this.heartbeatFlight = null;
-    this.snapshotFlight = null;
-    this.pollFailures = 0;
-    this.heartbeatFailures = 0;
-    this.snapshotSequence = 0;
-    this.lastSnapshotAt = Number.NEGATIVE_INFINITY;
-    this.lastElapsedMs = 0;
-    this.lastSnapshotHash = null;
-    this.seed = null;
-    this.seedApplied = false;
-    this.hasStarted = false;
-    this.state = INITIAL_CONTROLLER_STATE;
-    this.options.onState?.(this.state);
     let operation: Promise<void>;
-    operation = this.options.transport
-      .reset()
-      .catch((error) => {
-        if (this.generation === generation && !this.disposed) {
-          this.emit({ error: publicControllerError(error) });
-        }
-        throw error;
+    operation = Promise.resolve()
+      .then(() => this.options.transport.reset())
+      .then(() => {
+        if (this.generation !== generation || this.disposed) return;
+
+        this.generation += 1;
+        this.stopScheduledWork();
+        this.options.transport.cancelPending?.();
+        this.joinPromise = null;
+        this.joinedRoom = null;
+        this.pollFlight = null;
+        this.heartbeatFlight = null;
+        this.snapshotFlight = null;
+        this.pollFailures = 0;
+        this.heartbeatFailures = 0;
+        this.snapshotSequence = 0;
+        this.lastSnapshotAt = Number.NEGATIVE_INFINITY;
+        this.lastElapsedMs = 0;
+        this.lastSnapshotHash = null;
+        this.seed = null;
+        this.seedApplied = false;
+        this.hasStarted = false;
+        this.state = INITIAL_CONTROLLER_STATE;
+        this.options.onState?.(this.state);
       })
       .finally(() => {
         if (this.resetPromise === operation) this.resetPromise = null;

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Pusher from 'pusher-js';
 import type { Channel } from 'pusher-js';
-import { randomManager } from '@/lib/random';
-import { resolveParentOrigin } from '@/lib/multiplayer-client';
+import { randomManager } from '../lib/random';
+import { resolveParentOrigin } from '../lib/multiplayer-client';
 
 // Enable pusher logging for development
 if (process.env.NODE_ENV === 'development') {
@@ -63,7 +63,20 @@ export function usePusherConnection() {
   const pusherRef = useRef<Pusher | null>(null);
   const channelRef = useRef<Channel | null>(null);
   const sessionDataRef = useRef<SessionData | null>(sessionData);
+  const pusherSessionIdRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
+
+  const acceptSessionData = useCallback((sessionInfo: SessionData) => {
+    if (!sessionInfo || typeof sessionInfo.sessionId !== 'string') return;
+    const current = sessionDataRef.current;
+    const next = current?.sessionId === sessionInfo.sessionId
+      ? { ...current, ...sessionInfo }
+      : sessionInfo;
+
+    sessionDataRef.current = next;
+    localStorage.setItem('pusher-game-session', JSON.stringify(next));
+    setSessionData(next);
+  }, []);
 
   // Listen for session data from parent (dapp) via postMessage
   // This is the initial handshake - after this, everything uses Pusher
@@ -78,17 +91,15 @@ export function usePusherConnection() {
         console.log('🚀 [GAME-PUSHER] Session start received');
         setHasParentHandshake(true);
 
-        // Store in localStorage for persistence ONLY if it's a new session
         const currentSessionId = sessionDataRef.current?.sessionId;
         const newSessionId = sessionInfo.sessionId;
 
-        if (currentSessionId !== newSessionId) {
-          console.log('📝 [GAME-PUSHER] New session detected, storing:', newSessionId);
-          localStorage.setItem('pusher-game-session', JSON.stringify(sessionInfo));
-          setSessionData(sessionInfo);
+        if (currentSessionId === newSessionId) {
+          console.log('🔄 [GAME-PUSHER] Same session refreshed:', newSessionId);
         } else {
-          console.log('🔄 [GAME-PUSHER] Same session received, ignoring:', newSessionId);
+          console.log('📝 [GAME-PUSHER] New session detected, storing:', newSessionId);
         }
+        acceptSessionData(sessionInfo);
       }
     };
 
@@ -118,17 +129,20 @@ export function usePusherConnection() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [acceptSessionData]);
 
   // Connect to Pusher when we have session data
+  const connectionSessionId = sessionData?.sessionId ?? null;
   useEffect(() => {
+    const sessionData = sessionDataRef.current;
     if (!sessionData) {
       console.log('🔄 [GAME-PUSHER] Waiting for session data...');
       return;
     }
+    if (sessionData.sessionId !== connectionSessionId) return;
 
     // Prevent duplicate connections - más estricto
-    if (sessionDataRef.current?.sessionId === sessionData.sessionId && pusherRef.current) {
+    if (pusherSessionIdRef.current === sessionData.sessionId && pusherRef.current) {
       console.log('🔄 [GAME-PUSHER] Already connected to session:', sessionData.sessionId, 'State:', connectionState);
       return;
     }
@@ -161,6 +175,7 @@ export function usePusherConnection() {
       pusherRef.current.disconnect();
       console.log('🧹 [GAME-PUSHER] Clearing refs (immediate cleanup)');
       pusherRef.current = null;
+      pusherSessionIdRef.current = null;
       channelRef.current = null;
     }
 
@@ -353,13 +368,12 @@ export function usePusherConnection() {
           const currentSessionId = sessionDataRef.current?.sessionId;
           const newSessionId = data.sessionId;
 
-          if (currentSessionId !== newSessionId) {
-            console.log('📝 [GAME-PUSHER] New session detected via Pusher, storing:', newSessionId);
-            localStorage.setItem('pusher-game-session', JSON.stringify(data));
-            setSessionData(data);
+          if (currentSessionId === newSessionId) {
+            console.log('🔄 [GAME-PUSHER] Same session refreshed via Pusher:', newSessionId);
           } else {
-            console.log('🔄 [GAME-PUSHER] Same session received via Pusher, ignoring:', newSessionId);
+            console.log('📝 [GAME-PUSHER] New session detected via Pusher, storing:', newSessionId);
           }
+          acceptSessionData(data);
         });
 
         // NEW: Listen for game commands from dapp
@@ -394,6 +408,7 @@ export function usePusherConnection() {
 
         // Update refs and state (channelRef already set above, but ensure everything is consistent)
         pusherRef.current = pusherInstance;
+        pusherSessionIdRef.current = sessionData.sessionId;
         if (!channelRef.current) {
           channelRef.current = gameChannel;
         }
@@ -437,7 +452,7 @@ export function usePusherConnection() {
         console.log('🧹 [GAME-PUSHER] Delayed cleanup starting...');
 
         if (channelRef.current && sessionDataRef.current) {
-          const channelName = `private-game-session-${sessionDataRef.current.sessionId}`;
+          const channelName = `private-game-session-${sessionData.sessionId}`;
           pusherRef.current?.unsubscribe(channelName);
         }
 
@@ -447,6 +462,7 @@ export function usePusherConnection() {
 
         console.log('🧹 [GAME-PUSHER] Clearing all refs');
         pusherRef.current = null;
+        pusherSessionIdRef.current = null;
         channelRef.current = null;
         sessionDataRef.current = null;
 
@@ -457,7 +473,7 @@ export function usePusherConnection() {
       }, 2000); // 2 second delay to allow game end to complete
     };
 
-  }, [sessionData]);
+  }, [acceptSessionData, connectionSessionId]);
 
   // Send checkpoint to dapp
   const sendCheckpoint = useCallback((checkpointData: Omit<GameCheckpoint, 'timestamp'>) => {
