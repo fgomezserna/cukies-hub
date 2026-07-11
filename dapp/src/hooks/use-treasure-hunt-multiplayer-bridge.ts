@@ -24,7 +24,7 @@ const SENSITIVE_QUERY_PARAMETERS = new Set([
   'walletaddress',
 ]);
 
-type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot';
+type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot' | 'reset';
 
 interface MultiplayerRequest {
   readonly type: typeof REQUEST_TYPE;
@@ -76,7 +76,7 @@ function parseRequest(value: unknown): MultiplayerRequest | null {
   ) {
     return null;
   }
-  if (!['join', 'get', 'heartbeat', 'snapshot'].includes(String(value.command))) {
+  if (!['join', 'get', 'heartbeat', 'snapshot', 'reset'].includes(String(value.command))) {
     return null;
   }
 
@@ -104,6 +104,10 @@ function publicBridgeError(error: unknown): BridgeErrorPayload {
     return { code: error.code, message: error.message };
   }
   return { code: 'REQUEST_FAILED', message: 'Multiplayer request failed' };
+}
+
+function isTerminalMatchStatus(value: unknown): boolean {
+  return value === 'finished' || value === 'abandoned';
 }
 
 async function readApiResponse(response: Response) {
@@ -159,7 +163,9 @@ export function createTreasureHuntMultiplayerBridge(
   const inFlightRequestIds = new Set<string>();
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
+  let knownMatchStatus: string | null = null;
   let pendingRoomCode: string | null = null;
+  let generation = 0;
   let disposed = false;
 
   const handleMessage = (event: MessageEvent) => {
@@ -187,10 +193,67 @@ export function createTreasureHuntMultiplayerBridge(
       );
       return;
     }
+
+    if (request.command === 'reset') {
+      if (Object.keys(request.payload).length !== 0) {
+        frameWindow.postMessage(
+          {
+            type: RESPONSE_TYPE,
+            requestId: request.requestId,
+            success: false,
+            error: {
+              code: 'INVALID_REQUEST',
+              message: 'Reset payload must be empty',
+            },
+          },
+          targetOrigin,
+        );
+        return;
+      }
+
+      if (knownMatchId && !isTerminalMatchStatus(knownMatchStatus)) {
+        frameWindow.postMessage(
+          {
+            type: RESPONSE_TYPE,
+            requestId: request.requestId,
+            success: false,
+            error: {
+              code: 'MATCH_ACTIVE',
+              message: 'An active multiplayer match cannot be reset',
+            },
+          },
+          targetOrigin,
+        );
+        return;
+      }
+
+      generation += 1;
+      for (const controller of abortControllers) {
+        controller.abort();
+      }
+      abortControllers.clear();
+      inFlightRequestIds.clear();
+      knownMatchId = null;
+      knownRoomCode = null;
+      knownMatchStatus = null;
+      pendingRoomCode = null;
+      frameWindow.postMessage(
+        {
+          type: RESPONSE_TYPE,
+          requestId: request.requestId,
+          success: true,
+          data: { reset: true },
+        },
+        targetOrigin,
+      );
+      return;
+    }
+
     inFlightRequestIds.add(request.requestId);
 
     const abortController = new AbortController();
     abortControllers.add(abortController);
+    const requestGeneration = generation;
 
     void (async () => {
       let ownedPendingRoomCode: string | null = null;
@@ -224,7 +287,11 @@ export function createTreasureHuntMultiplayerBridge(
             signal: abortController.signal,
           });
           data = await readApiResponse(response);
-          if (disposed || abortController.signal.aborted) {
+          if (
+            disposed ||
+            abortController.signal.aborted ||
+            requestGeneration !== generation
+          ) {
             return;
           }
 
@@ -281,7 +348,22 @@ export function createTreasureHuntMultiplayerBridge(
           }
         }
 
-        if (!disposed && options.iframeRef.current?.contentWindow === frameWindow) {
+        if (
+          disposed ||
+          abortController.signal.aborted ||
+          requestGeneration !== generation
+        ) {
+          return;
+        }
+        if (isRecord(data.match) && typeof data.match.status === 'string') {
+          knownMatchStatus = data.match.status;
+        }
+
+        if (
+          !disposed &&
+          requestGeneration === generation &&
+          options.iframeRef.current?.contentWindow === frameWindow
+        ) {
           frameWindow.postMessage(
             {
               type: RESPONSE_TYPE,
@@ -293,7 +375,11 @@ export function createTreasureHuntMultiplayerBridge(
           );
         }
       } catch (error) {
-        if (!disposed && options.iframeRef.current?.contentWindow === frameWindow) {
+        if (
+          !disposed &&
+          requestGeneration === generation &&
+          options.iframeRef.current?.contentWindow === frameWindow
+        ) {
           frameWindow.postMessage(
             {
               type: RESPONSE_TYPE,
@@ -317,6 +403,7 @@ export function createTreasureHuntMultiplayerBridge(
   windowObject.addEventListener('message', handleMessage);
   return () => {
     disposed = true;
+    generation += 1;
     windowObject.removeEventListener('message', handleMessage);
     for (const controller of abortControllers) {
       controller.abort();

@@ -1,7 +1,7 @@
 const REQUEST_TYPE = 'TH_MULTIPLAYER_REQUEST' as const;
 const RESPONSE_TYPE = 'TH_MULTIPLAYER_RESPONSE' as const;
 
-export type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot';
+export type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot' | 'reset';
 export type MatchStatus =
   | 'waiting'
   | 'countdown'
@@ -34,9 +34,35 @@ export interface LocalSnapshotInput {
   readonly lifecycle: PlayerLifecycle;
 }
 
+export interface CanonicalRuntimeHydration {
+  readonly score: number;
+  readonly hearts: number;
+  readonly elapsedMs: number;
+  readonly lifecycle: PlayerLifecycle;
+}
+
+export function deriveMultiplayerRuntimeHydration(
+  canonical: CanonicalRuntimeHydration,
+  now: number,
+  durationSeconds: number,
+) {
+  const elapsedMs = Math.max(0, Math.floor(canonical.elapsedMs));
+  const terminal = canonical.lifecycle === 'eliminated' || canonical.lifecycle === 'finished';
+  return {
+    status: terminal ? 'gameOver' as const : 'playing' as const,
+    score: Math.max(0, Math.floor(canonical.score)),
+    hearts: Math.max(0, Math.floor(canonical.hearts)),
+    elapsedMs,
+    gameStartTime: now - elapsedMs,
+    timer: Math.max(0, durationSeconds - elapsedMs / 1_000),
+    gameOverReason: terminal ? 'multiplayer' as const : undefined,
+  };
+}
+
 export interface PublicMatchPlayer {
   readonly playerId: string;
   readonly slot: 0 | 1;
+  readonly seq: number;
   readonly score: number;
   readonly hearts: number;
   readonly elapsedMs: number;
@@ -112,6 +138,7 @@ export interface MultiplayerTransport {
   get(): Promise<MatchResponse>;
   heartbeat(): Promise<MatchResponse>;
   snapshot(snapshot: PlayerSnapshotPayload): Promise<MatchResponse>;
+  reset(): Promise<void>;
   cancelPending?(): void;
   cleanup(): void;
 }
@@ -144,7 +171,14 @@ function isPublicMatchPayload(value: unknown): value is PublicMatch {
     typeof value.roomCode === 'string' &&
     Number.isSafeInteger(value.revision) &&
     typeof value.status === 'string' &&
-    MATCH_STATUSES.has(value.status as MatchStatus)
+    MATCH_STATUSES.has(value.status as MatchStatus) &&
+    value.players.every(
+      (player) =>
+        isRecord(player) &&
+        typeof player.playerId === 'string' &&
+        Number.isSafeInteger(player.seq) &&
+        (player.seq as number) >= 0,
+    )
   );
 }
 
@@ -327,6 +361,9 @@ export function createTreasureHuntParentTransport(
           lifecycle: snapshot.lifecycle,
         },
       }),
+    reset: async () => {
+      await request<{ readonly reset: true }>('reset', {});
+    },
     cancelPending: () => rejectPending('REQUEST_CANCELLED'),
     cleanup: () => {
       if (closed) return;
@@ -351,6 +388,7 @@ export interface MultiplayerControllerState {
 
 export interface MultiplayerControllerOptions {
   readonly transport: MultiplayerTransport;
+  readonly enabled?: boolean;
   readonly now?: () => number;
   readonly onState?: (state: MultiplayerControllerState) => void;
   readonly onSeed?: (seed: string) => void;
@@ -398,11 +436,13 @@ export class TreasureHuntMultiplayerController {
   private generation = 0;
   private disposed = false;
   private joinPromise: Promise<void> | null = null;
+  private resetPromise: Promise<void> | null = null;
   private joinedRoom: string | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   private snapshotTimer: ReturnType<typeof setTimeout> | null = null;
-  private syncFlight: symbol | null = null;
+  private pollFlight: symbol | null = null;
+  private heartbeatFlight: symbol | null = null;
   private snapshotFlight: symbol | null = null;
   private pollFailures = 0;
   private heartbeatFailures = 0;
@@ -439,6 +479,14 @@ export class TreasureHuntMultiplayerController {
   }
 
   async join(rawRoomCode: string): Promise<void> {
+    if (this.options.enabled === false) {
+      throw new MultiplayerClientError(
+        'FEATURE_DISABLED',
+        'El modo multiplayer no está habilitado',
+      );
+    }
+    const pendingReset = this.resetPromise;
+    if (pendingReset) await pendingReset;
     if (this.disposed) {
       throw new MultiplayerClientError('CLIENT_CLOSED', 'El cliente multiplayer está cerrado');
     }
@@ -500,6 +548,19 @@ export class TreasureHuntMultiplayerController {
     if (!this.seed && incomingSeed) this.seed = incomingSeed;
     if (this.seed && incomingSeed && incomingSeed !== this.seed) {
       next = { ...incoming, config: { ...incoming.config, seed: this.seed } };
+    }
+
+    const localPlayer = this.state.playerId
+      ? next.players.find((player) => player.playerId === this.state.playerId)
+      : undefined;
+    if (localPlayer) {
+      this.snapshotSequence = Math.max(this.snapshotSequence, localPlayer.seq);
+      this.lastElapsedMs = Math.max(this.lastElapsedMs, localPlayer.elapsedMs);
+      this.lastSnapshotHash = JSON.stringify({
+        score: localPlayer.score,
+        hearts: localPlayer.hearts,
+        lifecycle: localPlayer.lifecycle,
+      });
     }
 
     let startSignal = this.state.startSignal;
@@ -609,12 +670,12 @@ export class TreasureHuntMultiplayerController {
 
   private async runPoll(generation: number): Promise<void> {
     if (this.generation !== generation || this.disposed) return;
-    if (this.syncFlight) {
+    if (this.pollFlight) {
       this.schedulePoll(this.pollIntervalMs, generation);
       return;
     }
     const flight = Symbol('poll');
-    this.syncFlight = flight;
+    this.pollFlight = flight;
     try {
       const response = await this.options.transport.get();
       if (this.generation !== generation || this.disposed) return;
@@ -626,19 +687,19 @@ export class TreasureHuntMultiplayerController {
       this.emit({ error: publicControllerError(error) });
     } finally {
       if (
-        this.syncFlight === flight &&
+        this.pollFlight === flight &&
         this.generation === generation &&
         !this.disposed &&
         !this.isCurrentMatchTerminal()
       ) {
-        this.syncFlight = null;
+        this.pollFlight = null;
         const delay = Math.min(
           this.maxBackoffMs,
           this.pollIntervalMs * Math.max(1, 2 ** this.pollFailures),
         );
         this.schedulePoll(delay, generation);
-      } else if (this.syncFlight === flight) {
-        this.syncFlight = null;
+      } else if (this.pollFlight === flight) {
+        this.pollFlight = null;
       }
     }
   }
@@ -653,12 +714,12 @@ export class TreasureHuntMultiplayerController {
 
   private async runHeartbeat(generation: number): Promise<void> {
     if (this.generation !== generation || this.disposed) return;
-    if (this.syncFlight) {
+    if (this.heartbeatFlight) {
       this.scheduleHeartbeat(this.heartbeatIntervalMs, generation);
       return;
     }
     const flight = Symbol('heartbeat');
-    this.syncFlight = flight;
+    this.heartbeatFlight = flight;
     try {
       const response = await this.options.transport.heartbeat();
       if (this.generation !== generation || this.disposed) return;
@@ -670,19 +731,19 @@ export class TreasureHuntMultiplayerController {
       this.emit({ error: publicControllerError(error) });
     } finally {
       if (
-        this.syncFlight === flight &&
+        this.heartbeatFlight === flight &&
         this.generation === generation &&
         !this.disposed &&
         !this.isCurrentMatchTerminal()
       ) {
-        this.syncFlight = null;
+        this.heartbeatFlight = null;
         const delay = Math.min(
           this.maxBackoffMs,
           this.heartbeatIntervalMs * Math.max(1, 2 ** this.heartbeatFailures),
         );
         this.scheduleHeartbeat(delay, generation);
-      } else if (this.syncFlight === flight) {
-        this.syncFlight = null;
+      } else if (this.heartbeatFlight === flight) {
+        this.heartbeatFlight = null;
       }
     }
   }
@@ -701,13 +762,23 @@ export class TreasureHuntMultiplayerController {
     this.pendingSnapshot = null;
   }
 
-  reset(): void {
+  reset(): Promise<void> {
+    if (this.state.match && !isTerminal(this.state.match.status)) {
+      return Promise.reject(
+        new MultiplayerClientError(
+          'MATCH_ACTIVE',
+          'Una partida multiplayer activa no se puede resetear localmente',
+        ),
+      );
+    }
     this.generation += 1;
+    const generation = this.generation;
     this.stopScheduledWork();
     this.options.transport.cancelPending?.();
     this.joinPromise = null;
     this.joinedRoom = null;
-    this.syncFlight = null;
+    this.pollFlight = null;
+    this.heartbeatFlight = null;
     this.snapshotFlight = null;
     this.pollFailures = 0;
     this.heartbeatFailures = 0;
@@ -720,6 +791,20 @@ export class TreasureHuntMultiplayerController {
     this.hasStarted = false;
     this.state = INITIAL_CONTROLLER_STATE;
     this.options.onState?.(this.state);
+    let operation: Promise<void>;
+    operation = this.options.transport
+      .reset()
+      .catch((error) => {
+        if (this.generation === generation && !this.disposed) {
+          this.emit({ error: publicControllerError(error) });
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (this.resetPromise === operation) this.resetPromise = null;
+      });
+    this.resetPromise = operation;
+    return operation;
   }
 
   dispose(): void {
@@ -727,9 +812,11 @@ export class TreasureHuntMultiplayerController {
     this.disposed = true;
     this.generation += 1;
     this.stopScheduledWork();
-    this.syncFlight = null;
+    this.pollFlight = null;
+    this.heartbeatFlight = null;
     this.snapshotFlight = null;
     this.joinPromise = null;
+    this.resetPromise = null;
     this.options.transport.cleanup();
   }
 }
@@ -738,7 +825,11 @@ export function createMultiplayerRoomCode(cryptoApi: Crypto = globalThis.crypto)
   return `room-${defaultRequestIdFactory(cryptoApi)}`;
 }
 
-export function getHandshakeRoomCode(session: { readonly roomId?: unknown } | null): string | null {
+export function getHandshakeRoomCode(
+  session: { readonly roomId?: unknown } | null,
+  enabled = true,
+): string | null {
+  if (!enabled) return null;
   if (!session || typeof session.roomId !== 'string') return null;
   const roomCode = session.roomId.trim();
   return roomCode.length > 0 && roomCode.length <= 128 ? roomCode : null;

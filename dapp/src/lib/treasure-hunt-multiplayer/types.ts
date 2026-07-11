@@ -116,6 +116,7 @@ export interface MatchIdentity {
 export interface PublicMatchPlayer {
   readonly playerId: string;
   readonly slot: MatchSlot;
+  readonly seq: number;
   readonly score: number;
   readonly hearts: number;
   readonly elapsedMs: number;

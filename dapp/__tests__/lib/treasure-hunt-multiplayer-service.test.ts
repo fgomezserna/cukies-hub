@@ -203,12 +203,13 @@ describe('TreasureHuntMultiplayerService', () => {
     await service.reconcile(joinedFirst.match.matchId);
 
     const snapshot = { seq: 1, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' };
-    await service.updateSnapshot({
+    const updated = await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
       snapshot,
     });
+    expect(updated.players.find((player) => player.playerId === joinedFirst.playerId)?.seq).toBe(1);
 
     await expect(
       service.updateSnapshot({

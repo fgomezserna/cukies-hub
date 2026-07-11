@@ -15,3 +15,10 @@ export function isTreasureHuntMultiplayerEnabled(
     environment.NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED === 'true'
   );
 }
+
+export function shouldBlockLocalGameControls(
+  isMultiplayerMode: boolean,
+  hasCanonicalResult: boolean,
+): boolean {
+  return isMultiplayerMode && !hasCanonicalResult;
+}

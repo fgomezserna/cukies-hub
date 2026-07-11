@@ -3,11 +3,16 @@ import {
   TreasureHuntMultiplayerController,
   createMultiplayerRoomCode,
   createTreasureHuntParentTransport,
+  deriveMultiplayerRuntimeHydration,
   getHandshakeRoomCode,
   resolveParentOrigin,
   type MultiplayerTransport,
   type PublicMatch,
 } from '../../../games/sybil-slayer/src/lib/multiplayer-client';
+import {
+  isTreasureHuntMultiplayerEnabled,
+  shouldBlockLocalGameControls,
+} from '../../../games/sybil-slayer/src/lib/multiplayer-feature';
 
 const PARENT_ORIGIN = 'https://hub.example';
 
@@ -48,6 +53,7 @@ function match(
       {
         playerId: 'player-1',
         slot: 0,
+        seq: 0,
         score: 0,
         hearts: 3,
         elapsedMs: 0,
@@ -84,6 +90,8 @@ class FakeTransport implements MultiplayerTransport {
   get = jest.fn(async () => ({ match: match(1) }));
   heartbeat = jest.fn(async () => ({ match: match(1) }));
   snapshot = jest.fn(async () => ({ match: match(1, 'running') }));
+  reset = jest.fn(async () => undefined);
+  cancelPending = jest.fn();
   cleanup = jest.fn();
 }
 
@@ -162,6 +170,38 @@ describe('Treasure Hunt multiplayer parent transport', () => {
     await expect(pendingA).rejects.toMatchObject({ code: 'CLIENT_CLOSED' });
     await expect(pendingB).rejects.toMatchObject({ code: 'CLIENT_CLOSED' });
   });
+
+  it('sends reset as a correlated empty-payload command', async () => {
+    const postMessage = jest.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const transport = createTreasureHuntParentTransport({
+      windowObject: window,
+      parentOrigin: PARENT_ORIGIN,
+      requestIdFactory: () => 'reset-request',
+    });
+
+    const reset = transport.reset();
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_REQUEST',
+        requestId: 'reset-request',
+        command: 'reset',
+        payload: {},
+      },
+      PARENT_ORIGIN,
+    );
+    window.dispatchEvent(new MessageEvent('message', {
+      source: window.parent,
+      origin: PARENT_ORIGIN,
+      data: {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'reset-request',
+        success: true,
+        data: { reset: true },
+      },
+    }));
+    await expect(reset).resolves.toBeUndefined();
+    transport.cleanup();
+  });
 });
 
 describe('Treasure Hunt multiplayer controller', () => {
@@ -188,38 +228,106 @@ describe('Treasure Hunt multiplayer controller', () => {
     controller.dispose();
   });
 
-  it('single-flights poll and heartbeat and cancels all scheduled work on reset', async () => {
+  it('rejects a canonical player snapshot without a safe sequence', async () => {
+    const transport = new FakeTransport();
+    transport.join.mockResolvedValueOnce({
+      playerId: 'player-1',
+      slot: 0,
+      inviteUrl: 'https://hub.example/?room=ROOM-1',
+      match: match(1, 'waiting', {
+        players: [{ ...match(1).players[0], seq: Number.NaN }],
+      }),
+    });
+    const controller = new TreasureHuntMultiplayerController({ transport });
+
+    await expect(controller.join('ROOM-1')).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+    expect(controller.getState().match).toBeNull();
+    controller.dispose();
+  });
+
+  it('keeps heartbeat running while a GET remains pending beyond offlineThreshold', async () => {
     jest.useFakeTimers();
     const transport = new FakeTransport();
     const pendingGet = deferred<{ match: PublicMatch }>();
-    const pendingHeartbeat = deferred<{ match: PublicMatch }>();
     transport.get.mockImplementation(() => pendingGet.promise);
-    transport.heartbeat.mockImplementation(() => pendingHeartbeat.promise);
     const controller = new TreasureHuntMultiplayerController({
       transport,
       pollIntervalMs: 600,
-      heartbeatIntervalMs: 1_500,
+      heartbeatIntervalMs: 1_000,
     });
     await controller.join('ROOM-1');
 
-    jest.advanceTimersByTime(3_000);
+    await jest.advanceTimersByTimeAsync(3_500);
     expect(transport.get).toHaveBeenCalledTimes(1);
-    expect(transport.heartbeat).not.toHaveBeenCalled();
+    expect(transport.heartbeat.mock.calls.length).toBeGreaterThanOrEqual(3);
 
+    const heartbeatCallsBeforeReset = transport.heartbeat.mock.calls.length;
     pendingGet.resolve({ match: match(2) });
-    await Promise.resolve();
-    await Promise.resolve();
-    await jest.advanceTimersByTimeAsync(3_000);
-    expect(transport.heartbeat).toHaveBeenCalledTimes(1);
-
     const getCallsBeforeReset = transport.get.mock.calls.length;
-    controller.reset();
-    pendingHeartbeat.resolve({ match: match(2) });
+    controller.applyServerMatch(match(3, 'finished'));
+    await controller.reset();
     await Promise.resolve();
     jest.advanceTimersByTime(10_000);
     expect(transport.get).toHaveBeenCalledTimes(getCallsBeforeReset);
-    expect(transport.heartbeat).toHaveBeenCalledTimes(1);
+    expect(transport.heartbeat).toHaveBeenCalledTimes(heartbeatCallsBeforeReset);
     expect(controller.getState().match).toBeNull();
+    controller.dispose();
+  });
+
+  it('waits for bridge reset before joining a second room and ignores a late old join', async () => {
+    const transport = new FakeTransport();
+    const oldJoin = deferred<{
+      playerId: string;
+      slot: 0;
+      inviteUrl: string;
+      match: PublicMatch;
+    }>();
+    const bridgeReset = deferred<undefined>();
+    transport.join
+      .mockImplementationOnce(() => oldJoin.promise)
+      .mockResolvedValueOnce({
+        playerId: 'player-1',
+        slot: 0,
+        inviteUrl: 'https://hub.example/?room=ROOM-2',
+        match: match(1, 'waiting', { roomCode: 'ROOM-2', matchId: 'match-2' }),
+      });
+    transport.reset.mockImplementationOnce(() => bridgeReset.promise);
+    const controller = new TreasureHuntMultiplayerController({ transport });
+
+    void controller.join('ROOM-OLD');
+    expect(transport.join).toHaveBeenCalledTimes(1);
+    const reset = controller.reset();
+    const nextJoin = controller.join('ROOM-2');
+    expect(transport.cancelPending).toHaveBeenCalledTimes(1);
+    expect(transport.join).toHaveBeenCalledTimes(1);
+
+    oldJoin.resolve({
+      playerId: 'old-player',
+      slot: 0,
+      inviteUrl: 'https://hub.example/?room=ROOM-OLD',
+      match: match(99, 'waiting', { roomCode: 'ROOM-OLD', matchId: 'old-match' }),
+    });
+    bridgeReset.resolve(undefined);
+    await reset;
+    await nextJoin;
+    expect(transport.join).toHaveBeenCalledTimes(2);
+    expect(controller.getState()).toMatchObject({
+      roomCode: 'ROOM-2',
+      playerId: 'player-1',
+      match: { matchId: 'match-2' },
+    });
+    controller.dispose();
+  });
+
+  it('rejects local reset while the canonical match is active', async () => {
+    const transport = new FakeTransport();
+    const controller = new TreasureHuntMultiplayerController({ transport });
+    await controller.join('ROOM-1');
+    controller.applyServerMatch(match(2, 'running'));
+
+    await expect(controller.reset()).rejects.toMatchObject({ code: 'MATCH_ACTIVE' });
+    expect(transport.reset).not.toHaveBeenCalled();
+    expect(controller.getState().match?.status).toBe('running');
     controller.dispose();
   });
 
@@ -233,7 +341,8 @@ describe('Treasure Hunt multiplayer controller', () => {
     controller.publishSnapshot({ score: 1, hearts: 3, lifecycle: 'playing' });
     expect(transport.snapshot).toHaveBeenCalledTimes(1);
 
-    controller.reset();
+    controller.applyServerMatch(match(3, 'finished'));
+    await controller.reset();
     pendingSnapshot.resolve({ match: match(99, 'finished') });
     await Promise.resolve();
     await Promise.resolve();
@@ -288,6 +397,60 @@ describe('Treasure Hunt multiplayer controller', () => {
     controller.dispose();
   });
 
+  it('continues from the canonical snapshot sequence and rehydrates local state', async () => {
+    const transport = new FakeTransport();
+    transport.join.mockResolvedValueOnce({
+      playerId: 'player-1',
+      slot: 0,
+      inviteUrl: 'https://hub.example/?room=ROOM-1',
+      match: match(7, 'running', {
+        players: [{
+          ...match(7, 'running').players[0],
+          seq: 41,
+          score: 900,
+          hearts: 2,
+          elapsedMs: 12_000,
+          lifecycle: 'playing',
+        }],
+      }),
+    });
+    const controller = new TreasureHuntMultiplayerController({
+      transport,
+      now: () => 13_000,
+    });
+    await controller.join('ROOM-1');
+
+    expect(controller.getState().match?.players[0]).toMatchObject({
+      seq: 41,
+      score: 900,
+      hearts: 2,
+      elapsedMs: 12_000,
+      lifecycle: 'playing',
+    });
+    expect(deriveMultiplayerRuntimeHydration(
+      controller.getState().match!.players[0],
+      20_000,
+      30,
+    )).toEqual({
+      status: 'playing',
+      score: 900,
+      hearts: 2,
+      elapsedMs: 12_000,
+      gameStartTime: 8_000,
+      timer: 18,
+      gameOverReason: undefined,
+    });
+    controller.publishSnapshot({ score: 901, hearts: 2, lifecycle: 'playing' });
+    await Promise.resolve();
+    expect(transport.snapshot).toHaveBeenCalledWith(expect.objectContaining({
+      seq: 42,
+      score: 901,
+      hearts: 2,
+      elapsedMs: 12_000,
+    }));
+    controller.dispose();
+  });
+
   it('sets the shared seed once before the initial start and emits a separate resume signal', async () => {
     const calls: string[] = [];
     let lastStartSignal = 0;
@@ -325,6 +488,27 @@ describe('multiplayer client helpers', () => {
     expect(getHandshakeRoomCode({ roomId: ' INVITED ' })).toBe('INVITED');
     expect(getHandshakeRoomCode({ roomId: '' })).toBeNull();
     expect(getHandshakeRoomCode({ room: 'QUERY-SPOOF' } as never)).toBeNull();
+  });
+
+  it('blocks invitation autojoin and direct join when production flag is off', async () => {
+    const productionDisabled = isTreasureHuntMultiplayerEnabled({ NODE_ENV: 'production' });
+    expect(productionDisabled).toBe(false);
+    expect(getHandshakeRoomCode({ roomId: 'INVITED' }, productionDisabled)).toBeNull();
+
+    const transport = new FakeTransport();
+    const controller = new TreasureHuntMultiplayerController({
+      transport,
+      enabled: productionDisabled,
+    });
+    await expect(controller.join('INVITED')).rejects.toMatchObject({ code: 'FEATURE_DISABLED' });
+    expect(transport.join).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
+  it('locks local pause/reset while canonical multiplayer is active, but not after result', () => {
+    expect(shouldBlockLocalGameControls(false, false)).toBe(false);
+    expect(shouldBlockLocalGameControls(true, false)).toBe(true);
+    expect(shouldBlockLocalGameControls(true, true)).toBe(false);
   });
 
   it('creates room codes using Web Crypto without Math.random', () => {

@@ -12,6 +12,7 @@ import {
   type MultiplayerControllerState,
 } from '@/lib/multiplayer-client';
 import { randomManager } from '@/lib/random';
+import { isTreasureHuntMultiplayerEnabled } from '@/lib/multiplayer-feature';
 
 export type MultiplayerStatus =
   | 'idle'
@@ -66,7 +67,7 @@ export interface UseMultiplayerMatchValue {
   }): void;
   notifyGameStart(): void;
   notifyGameOver(reason: string, finalScore: number, lifecycle?: PlayerLifecycle): void;
-  reset(): void;
+  reset(): Promise<void>;
 }
 
 const INITIAL_STATE: MultiplayerControllerState = {
@@ -96,6 +97,7 @@ function toStatus(state: MultiplayerControllerState, setupError: string | null):
 }
 
 export function useMultiplayerMatch(): UseMultiplayerMatchValue {
+  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
   const controllerRef = useRef<TreasureHuntMultiplayerController | null>(null);
   const [controllerState, setControllerState] = useState<MultiplayerControllerState>(INITIAL_STATE);
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -105,6 +107,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       const transport = createTreasureHuntParentTransport();
       const controller = new TreasureHuntMultiplayerController({
         transport,
+        enabled: multiplayerEnabled,
         onSeed: (seed) => randomManager.setSeed(seed),
         onState: (state) => setControllerState({ ...state }),
       });
@@ -122,9 +125,13 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       );
       return undefined;
     }
-  }, []);
+  }, [multiplayerEnabled]);
 
   const initiateMatch = useCallback(async (roomCode: string) => {
+    if (!multiplayerEnabled) {
+      setSetupError('El modo multiplayer no está habilitado');
+      return;
+    }
     const controller = controllerRef.current;
     if (!controller) {
       setSetupError(setupError ?? 'El cliente multiplayer aún no está disponible');
@@ -135,7 +142,7 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
     } catch {
       // The controller already exposes a sanitized public error through state.
     }
-  }, [setupError]);
+  }, [multiplayerEnabled, setupError]);
 
   const publishLocalSnapshot = useCallback(
     (snapshot: {
@@ -180,9 +187,13 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
     [],
   );
 
-  const reset = useCallback(() => {
-    controllerRef.current?.reset();
-    randomManager.clear();
+  const reset = useCallback(async () => {
+    try {
+      await controllerRef.current?.reset();
+      randomManager.clear();
+    } catch {
+      // The controller already publishes a sanitized reset error.
+    }
   }, []);
 
   return useMemo(() => {

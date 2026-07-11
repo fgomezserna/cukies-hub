@@ -19,6 +19,7 @@ export function projectPublicMatch(match: Match): PublicMatch {
     players: match.players.map((player) => ({
       playerId: player.playerId,
       slot: player.slot,
+      seq: player.snapshot.seq,
       score: player.snapshot.score,
       hearts: player.snapshot.hearts,
       elapsedMs: player.snapshot.elapsedMs,

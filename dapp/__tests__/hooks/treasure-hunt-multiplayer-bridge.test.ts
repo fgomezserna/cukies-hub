@@ -19,7 +19,7 @@ function requestMessage(
   source: MessageEventSource,
   origin: string,
   requestId: string,
-  command: 'join' | 'get' | 'heartbeat' | 'snapshot',
+  command: 'join' | 'get' | 'heartbeat' | 'snapshot' | 'reset',
   payload: Record<string, unknown> = {},
 ) {
   window.dispatchEvent(
@@ -481,6 +481,149 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
       GAME_ORIGIN,
     );
     expect(JSON.stringify(postMessage.mock.calls)).not.toContain('secret');
+    cleanup();
+  });
+
+  it('reset aborts and generation-ignores a late join before allowing a new room', async () => {
+    let resolveOldJoin: ((response: Response) => void) | undefined;
+    const oldJoinSignals: AbortSignal[] = [];
+    const fetchImpl = jest
+      .fn()
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal) oldJoinSignals.push(init.signal);
+        return new Promise<Response>((resolve) => {
+          resolveOldJoin = resolve;
+        });
+      })
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'new-player',
+        slot: 0,
+        match: { matchId: 'new-match', roomCode: 'NEW-ROOM' },
+      }));
+    const { cleanup, contentWindow, postMessage, onRoomJoined } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'old-join', 'join', { roomCode: 'OLD-ROOM' });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    requestMessage(contentWindow, GAME_ORIGIN, 'reset-1', 'reset');
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'reset-1',
+        success: true,
+        data: { reset: true },
+      },
+      GAME_ORIGIN,
+    ));
+    expect(oldJoinSignals[0]?.aborted).toBe(true);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'new-join', 'join', { roomCode: 'NEW-ROOM' });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(onRoomJoined).toHaveBeenCalledWith('NEW-ROOM'));
+
+    resolveOldJoin?.(apiResponse({
+      success: true,
+      playerId: 'old-player',
+      slot: 0,
+      match: { matchId: 'old-match', roomCode: 'OLD-ROOM' },
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onRoomJoined).not.toHaveBeenCalledWith('OLD-ROOM');
+    expect(window.location.search).toContain('room=NEW-ROOM');
+    expect(postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'old-join', success: true }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
+  it('rejects non-empty reset payloads without unpinning the current room', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(apiResponse({
+      success: true,
+      playerId: 'player-1',
+      slot: 0,
+      match: { matchId: 'match-1', roomCode: 'ROOM-1', status: 'running' },
+    }));
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-room-1', 'join', { roomCode: 'ROOM-1' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'bad-reset', 'reset', { matchId: 'spoofed' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+    expect(postMessage).toHaveBeenLastCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'bad-reset',
+        success: false,
+        error: { code: 'INVALID_REQUEST', message: 'Reset payload must be empty' },
+      },
+      GAME_ORIGIN,
+    );
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'active-reset', 'reset');
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
+    expect(postMessage).toHaveBeenLastCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'active-reset',
+        success: false,
+        error: {
+          code: 'MATCH_ACTIVE',
+          message: 'An active multiplayer match cannot be reset',
+        },
+      },
+      GAME_ORIGIN,
+    );
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'other-room', 'join', { roomCode: 'ROOM-2' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(4));
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'other-room',
+        success: false,
+        error: expect.objectContaining({ code: 'MATCH_PINNED' }),
+      }),
+      GAME_ORIGIN,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it('unpins a canonically terminal match and permits a second room', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-1', roomCode: 'ROOM-1', status: 'finished' },
+      }))
+      .mockResolvedValueOnce(apiResponse({
+        success: true,
+        playerId: 'player-1',
+        slot: 0,
+        match: { matchId: 'match-2', roomCode: 'ROOM-2', status: 'waiting' },
+      }));
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+    requestMessage(contentWindow, GAME_ORIGIN, 'terminal-join', 'join', { roomCode: 'ROOM-1' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+    requestMessage(contentWindow, GAME_ORIGIN, 'terminal-reset', 'reset');
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ requestId: 'terminal-reset', success: true }),
+      GAME_ORIGIN,
+    );
+    requestMessage(contentWindow, GAME_ORIGIN, 'second-room', 'join', { roomCode: 'ROOM-2' });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestId: 'second-room',
+        success: true,
+        data: expect.objectContaining({ match: expect.objectContaining({ matchId: 'match-2' }) }),
+      }),
+      GAME_ORIGIN,
+    );
     cleanup();
   });
 });

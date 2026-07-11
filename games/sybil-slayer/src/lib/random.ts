@@ -8,6 +8,21 @@
 
 type GeneratorFn = () => number;
 
+/**
+ * Stable gameplay domains. A consumer must use one of these streams for every
+ * random decision that affects the shared match layout. Keeping the domains
+ * coarse-grained means retries in one system cannot advance another system.
+ */
+export const GAMEPLAY_RANDOM_STREAMS = {
+  ITEMS: 'items',
+  CHESTS: 'chests',
+  RUNES: 'runes',
+  HAZARDS: 'hazards',
+} as const;
+
+export type GameplayRandomStream =
+  (typeof GAMEPLAY_RANDOM_STREAMS)[keyof typeof GAMEPLAY_RANDOM_STREAMS];
+
 interface RandomStream {
   name: string;
   generator: GeneratorFn;

@@ -22,6 +22,10 @@ import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
 import { createMultiplayerRoomCode, getHandshakeRoomCode } from '../lib/multiplayer-client';
+import {
+  isTreasureHuntMultiplayerEnabled,
+  shouldBlockLocalGameControls,
+} from '../lib/multiplayer-feature';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
 
@@ -574,6 +578,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
   const isMultiplayerMode = currentMode === 'multiplayer';
+  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
+  const localControlsLocked = shouldBlockLocalGameControls(
+    isMultiplayerMode,
+    Boolean(multiplayer.matchResult),
+  );
   const lastPublishedSnapshotRef = useRef<{
     score: number;
     hearts: number;
@@ -807,6 +816,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
   useEffect(() => {
+    if (localControlsLocked) return;
     // Solo aplicar en móviles
     if (!isMobile) return;
 
@@ -824,7 +834,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       // El juego permanecerá pausado hasta que el usuario presione Play
       pausedByOrientationRef.current = false;
     }
-  }, [isPortrait, gameState.status, isMobile, togglePause]);
+  }, [localControlsLocked, isPortrait, gameState.status, isMobile, togglePause]);
 
   // Resetear el flag cuando el usuario presiona Play manualmente
   useEffect(() => {
@@ -1152,7 +1162,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         </div>
         <button
           onClick={() => {
-            multiplayer.reset();
+            void multiplayer.reset();
             setCurrentMode('single');
             resetGame();
           }}
@@ -1351,8 +1361,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     hasStartedMultiplayerRef.current = true;
     serverPauseActiveRef.current = false;
     playSound('game_start');
-    startGameImmediately();
-  }, [isMultiplayerMode, multiplayer.startSignal, playSound, startGameImmediately]);
+    startGameImmediately(multiplayer.localPlayer ? {
+      score: multiplayer.localPlayer.score,
+      hearts: multiplayer.localPlayer.hearts,
+      elapsedMs: multiplayer.localPlayer.elapsedMs,
+      lifecycle: multiplayer.localPlayer.lifecycle,
+    } : undefined);
+  }, [
+    isMultiplayerMode,
+    multiplayer.localPlayer,
+    multiplayer.startSignal,
+    playSound,
+    startGameImmediately,
+  ]);
 
   useEffect(() => {
     if (!isMultiplayerMode) {
@@ -1429,7 +1450,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   useEffect(() => {
     return () => {
-      multiplayer.reset();
+      void multiplayer.reset();
     };
   }, []);
 
@@ -1445,6 +1466,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // NUEVO: Pausa automática cuando se cambia de pestaña
   useEffect(() => {
+    if (localControlsLocked) return undefined;
     let wasPlayingBeforeHidden = false;
 
     const handleVisibilityChange = () => {
@@ -1473,7 +1495,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
+  }, [localControlsLocked, gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
 
 
  // Game loop integration using the custom hook
@@ -1486,6 +1508,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // UI Button Handlers
   const handleStartPauseClick = () => {
+    if (localControlsLocked) return;
     if (gameState.status === 'playing') {
       playSound('pause');
       togglePause();
@@ -1510,12 +1533,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const autoJoinedRoomRef = useRef<string | null>(null);
   const startMultiplayerGame = useCallback((roomIdOverride?: string | null) => {
+    if (!multiplayerEnabled) return;
     const roomId = roomIdOverride ?? generateMatchRoomId();
     autoJoinedRoomRef.current = roomId;
     resetGame();
-    multiplayer.reset();
+    void multiplayer.reset();
     void multiplayer.initiateMatch(roomId);
-  }, [multiplayer, resetGame, generateMatchRoomId]);
+  }, [multiplayerEnabled, multiplayer, resetGame, generateMatchRoomId]);
 
   const handleModeSelected = useCallback((mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
@@ -1524,7 +1548,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
     if (mode === 'single') {
       console.log('🎮 [MODE] Starting single player mode');
-      multiplayer.reset();
+      void multiplayer.reset();
       if (gameState.status === 'gameOver') {
         console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
         stopMusic();
@@ -1534,23 +1558,29 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       return;
     }
 
+    if (!multiplayerEnabled) {
+      setCurrentMode('single');
+      return;
+    }
+
     console.log('🎮 [MODE] Starting multiplayer mode');
     playSound('button_click');
     startMultiplayerGame();
-  }, [gameState.status, playSound, startGame, startMultiplayerGame, stopMusic, multiplayer]);
+  }, [gameState.status, multiplayerEnabled, playSound, startGame, startMultiplayerGame, stopMusic, multiplayer]);
 
   // La invitación llega únicamente por el handshake autenticado del padre.
   useEffect(() => {
     if (!hasParentHandshake) return;
-    const roomCode = getHandshakeRoomCode(sessionData);
+    const roomCode = getHandshakeRoomCode(sessionData, multiplayerEnabled);
     if (!roomCode || autoJoinedRoomRef.current === roomCode) return;
     autoJoinedRoomRef.current = roomCode;
     setModeSelectOpen(false);
     setCurrentMode('multiplayer');
     startMultiplayerGame(roomCode);
-  }, [hasParentHandshake, sessionData, startMultiplayerGame]);
+  }, [hasParentHandshake, multiplayerEnabled, sessionData, startMultiplayerGame]);
 
    const handleResetClick = () => {
+      if (localControlsLocked) return;
       playSound('button_click');
       
       // Si estamos en game over, detener el sonido de game over
@@ -1598,7 +1628,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         setIsInfoModalOpen(!isInfoModalOpen);
       } else {
         // Si está en playing o paused, pausar si es necesario y abrir el modal
-        if (currentStatus === 'playing') {
+        if (!localControlsLocked && currentStatus === 'playing') {
           console.log('[INFO] Pausing game before opening modal');
           togglePause();
         }
@@ -1616,7 +1646,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
    const handleOpenInfo = () => {
       playSound('button_click');
       // Si el juego está en playing, pausar automáticamente
-      if (gameState.status === 'playing') {
+      if (!localControlsLocked && gameState.status === 'playing') {
         togglePause();
       }
       setIsInfoModalOpen(true);
@@ -2988,7 +3018,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   />
                   
                   {/* Botones de game over */}
-                  {gameState.status === 'gameOver' && (
+                  {gameState.status === 'gameOver' && (!isMultiplayerMode || Boolean(matchResult)) && (
                     <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
                       <div className="flex flex-row items-center gap-4">
                         {/* Botón Score Details */}
@@ -3016,6 +3046,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                             if (gameState.status === 'gameOver') {
                               console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
                               stopMusic();
+                            }
+                            if (isMultiplayerMode) {
+                              void multiplayer.reset();
+                              setCurrentMode('single');
                             }
                             resetGame();
                             setModeSelectOpen(true);
@@ -3067,7 +3101,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             >
               <button 
                 onClick={handleStartPauseClick} 
-                className="focus:outline-none game-button relative"
+                disabled={localControlsLocked}
+                className={`focus:outline-none game-button relative ${localControlsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label={gameState.status === 'playing' ? 'Pause' : gameState.status === 'paused' ? 'Resume' : 'Start'}
               >
                 <Image 
@@ -3083,7 +3118,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </button>
               <button 
                 onClick={handleResetClick} 
-                className="focus:outline-none game-button relative"
+                disabled={localControlsLocked}
+                className={`focus:outline-none game-button relative ${localControlsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label="Reset game"
               >
                 <Image 

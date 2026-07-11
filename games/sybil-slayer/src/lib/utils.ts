@@ -1,8 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Vector2D, GameObject, RuneType } from "@/types/game";
-import { Obstacle, ObstacleType, Collectible, CollectibleType } from "@/types/game";
-import { randomManager } from "@/lib/random";
+import type { Vector2D, GameObject, RuneType, Obstacle, ObstacleType, Collectible } from "../types/game";
+import { GAMEPLAY_RANDOM_STREAMS, randomManager } from "./random";
 import {
   ENERGY_POINT_RADIUS,
   ENERGY_POINT_COLOR,
@@ -33,7 +32,7 @@ import {
   RUNE_RADIUS,
   RUNE_CONFIG,
   RUNE_TYPES,
-} from "@/lib/constants";
+} from "./constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -42,17 +41,17 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Generates a random integer between min (inclusive) and max (exclusive).
  */
-export function getRandomInt(min: number, max: number): number {
+export function getRandomInt(min: number, max: number, streamName?: string): number {
   min = Math.ceil(min);
   max = Math.floor(max);
-  return Math.floor(randomManager.random() * (max - min) + min);
+  return Math.floor(randomManager.random(streamName) * (max - min) + min);
 }
 
 /**
  * Generates a random float between min (inclusive) and max (exclusive).
  */
-export function getRandomFloat(min: number, max: number): number {
-  return randomManager.random() * (max - min) + min;
+export function getRandomFloat(min: number, max: number, streamName?: string): number {
+  return randomManager.random(streamName) * (max - min) + min;
 }
 
 
@@ -117,22 +116,22 @@ export function getRandomObstacleType(level: number = 1): ObstacleType {
   // Ajustar probabilidades para que coincidan con la dificultad de cada nivel
   if (level === 1) {
     // Nivel 1: principalmente fees y bugs (no hackers)
-    return randomManager.random('obstacleType-l1') < 0.5 ? 'fee' : 'bug';
+    return randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) < 0.5 ? 'fee' : 'bug';
   } else if (level === 2) {
     // Nivel 2: más bugs que fees, pocos hackers
-    const rand = randomManager.random('obstacleType-l2');
+    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
     if (rand < 0.4) return 'fee';
     if (rand < 0.9) return 'bug';
     return 'hacker';
   } else if (level === 3) {
     // Nivel 3: distribución más equilibrada
-    const rand = randomManager.random('obstacleType-l3');
+    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
     if (rand < 0.35) return 'fee';
     if (rand < 0.75) return 'bug';
     return 'hacker';
   } else {
     // Nivel 4+: más hackers
-    const rand = randomManager.random('obstacleType-l4');
+    const rand = randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS);
     if (rand < 0.3) return 'fee';
     if (rand < 0.7) return 'bug';
     return 'hacker';
@@ -145,8 +144,8 @@ export function getRandomObstacleType(level: number = 1): ObstacleType {
 export function createObstacle(id: string, type: ObstacleType, canvasWidth: number, canvasHeight: number): Obstacle {
   const baseProps = {
     id,
-    x: getRandomFloat(0, canvasWidth),
-    y: getRandomFloat(0, canvasHeight),
+    x: getRandomFloat(0, canvasWidth, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+    y: getRandomFloat(0, canvasHeight, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
   };
 
   switch (type) {
@@ -155,26 +154,26 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         ...baseProps,
         type: 'fee',
         radius: FEE_RADIUS,
-        color: `hsl(${getRandomInt(0, 30)} 100% 60%)`, // Red/Orange hues
+        color: `hsl(${getRandomInt(0, 30, GAMEPLAY_RANDOM_STREAMS.HAZARDS)} 100% 60%)`, // Red/Orange hues
         velocity: {
-          x: getRandomFloat(-2, 2) || (randomManager.random('fee-velocity') > 0.5 ? 1 : -1), // Ensure non-zero initial velocity
-          y: getRandomFloat(-2, 2) || (randomManager.random('fee-velocity') > 0.5 ? 1 : -1),
+          x: getRandomFloat(-2, 2, GAMEPLAY_RANDOM_STREAMS.HAZARDS) || (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1), // Ensure non-zero initial velocity
+          y: getRandomFloat(-2, 2, GAMEPLAY_RANDOM_STREAMS.HAZARDS) || (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1),
         },
          glow: false,
       };
     case 'bug':
       // CORREGIDO: Usar zona segura para evitar que bugs se queden atrapados en los extremos
-      const safeBugX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE);
-      const safeBugY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE);
+      const safeBugX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+      const safeBugY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
       return {
         ...baseProps,
         x: safeBugX,
         y: safeBugY,
         type: 'bug',
         radius: BUG_RADIUS,
-        color: `hsl(${getRandomInt(45, 75)} 100% 60%)`, // Yellow hues
-        rotation: getRandomFloat(0, Math.PI * 2),
-        angularVelocity: getRandomFloat(0.03, 0.07) * (randomManager.random('bug-rotation') > 0.5 ? 1 : -1), // Random direction
+        color: `hsl(${getRandomInt(45, 75, GAMEPLAY_RANDOM_STREAMS.HAZARDS)} 100% 60%)`, // Yellow hues
+        rotation: getRandomFloat(0, Math.PI * 2, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+        angularVelocity: getRandomFloat(0.03, 0.07, GAMEPLAY_RANDOM_STREAMS.HAZARDS) * (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1), // Random direction
         glow: false,
       };
     case 'hacker':
@@ -182,7 +181,7 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         ...baseProps,
         type: 'hacker',
         radius: HACKER_RADIUS,
-        color: `hsl(${getRandomInt(260, 290)} 100% 70%)`, // Purple hues
+        color: `hsl(${getRandomInt(260, 290, GAMEPLAY_RANDOM_STREAMS.HAZARDS)} 100% 70%)`, // Purple hues
         velocity: { x: 0, y: 0 }, // Starts stationary, then chases
         glow: false,
         energyCollected: 0, // NUEVO: Inicializar contador de energy recogidas
@@ -210,8 +209,8 @@ export function createEnergyCollectible(id: string, canvasWidth: number, canvasH
   return {
     id,
     type: 'energy',
-    x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS),
-    y: getRandomFloat(ENERGY_POINT_RADIUS, canvasHeight - ENERGY_POINT_RADIUS),
+    x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(ENERGY_POINT_RADIUS, canvasHeight - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: ENERGY_POINT_RADIUS,
     color: ENERGY_POINT_COLOR,
     value: ENERGY_POINT_VALUE,
@@ -226,8 +225,8 @@ export function createUkiCollectible(id: string, canvasWidth: number, canvasHeig
   return {
     id,
     type: 'uki',
-    x: getRandomFloat(UKI_RADIUS, canvasWidth - UKI_RADIUS),
-    y: getRandomFloat(UKI_RADIUS, canvasHeight - UKI_RADIUS),
+    x: getRandomFloat(UKI_RADIUS, canvasWidth - UKI_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(UKI_RADIUS, canvasHeight - UKI_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: UKI_RADIUS,
     color: UKI_COLOR,
     value: UKI_VALUE,
@@ -257,8 +256,8 @@ export function createTreasureCollectible(id: string, canvasWidth: number, canva
     id,
     type: treasureType,
     radius: treasureRadius,
-    x: getRandomFloat(treasureRadius, canvasWidth - treasureRadius),
-    y: getRandomFloat(treasureRadius, canvasHeight - treasureRadius),
+    x: getRandomFloat(treasureRadius, canvasWidth - treasureRadius, GAMEPLAY_RANDOM_STREAMS.CHESTS),
+    y: getRandomFloat(treasureRadius, canvasHeight - treasureRadius, GAMEPLAY_RANDOM_STREAMS.CHESTS),
     color: TREASURE_COLOR,
     value: 0, // valor dinámico por bloque, se suma en lógica
     glow: false,
@@ -273,8 +272,8 @@ export function createMegaNodeCollectible(id: string, canvasWidth: number, canva
   return {
     id,
     type: 'megaNode',
-    x: getRandomFloat(MEGA_NODE_RADIUS, canvasWidth - MEGA_NODE_RADIUS),
-    y: getRandomFloat(MEGA_NODE_RADIUS, canvasHeight - MEGA_NODE_RADIUS),
+    x: getRandomFloat(MEGA_NODE_RADIUS, canvasWidth - MEGA_NODE_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(MEGA_NODE_RADIUS, canvasHeight - MEGA_NODE_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: MEGA_NODE_RADIUS,
     color: MEGA_NODE_COLOR,
     value: MEGA_NODE_VALUE,
@@ -291,8 +290,8 @@ export function createCheckpointCollectible(id: string, canvasWidth: number, can
   return {
     id,
     type: 'checkpoint',
-    x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS),
-    y: getRandomFloat(ENERGY_POINT_RADIUS, canvasHeight - ENERGY_POINT_RADIUS),
+    x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(ENERGY_POINT_RADIUS, canvasHeight - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: 32, // Aumentado de 28 a 32 para ajustarse mejor a la altura de la imagen rectangular
     color: '#FFD700', // Amarillo dorado, solo como fallback
     value: 0, // No da puntos, solo tiempo
@@ -310,8 +309,8 @@ export function createHeartCollectible(id: string, canvasWidth: number, canvasHe
   return {
     id,
     type: 'heart',
-    x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS),
-    y: getRandomFloat(ENERGY_POINT_RADIUS, canvasHeight - ENERGY_POINT_RADIUS),
+    x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(ENERGY_POINT_RADIUS, canvasHeight - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: 28, // Tamaño similar a energy
     color: '#FF4B6E', // Rosa/rojo, solo como fallback
     value: 0, // No da puntos, solo vida
@@ -327,8 +326,8 @@ export function createGoatSkinCollectible(id: string, canvasWidth: number, canva
   return {
     id,
     type: 'goatSkin',
-    x: getRandomFloat(GOAT_SKIN_RADIUS, canvasWidth - GOAT_SKIN_RADIUS),
-    y: getRandomFloat(GOAT_SKIN_RADIUS, canvasHeight - GOAT_SKIN_RADIUS),
+    x: getRandomFloat(GOAT_SKIN_RADIUS, canvasWidth - GOAT_SKIN_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(GOAT_SKIN_RADIUS, canvasHeight - GOAT_SKIN_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: GOAT_SKIN_RADIUS,
     color: GOAT_SKIN_COLOR,
     value: GOAT_SKIN_VALUE,
@@ -349,15 +348,15 @@ export function createRuneCollectible(
   runeType?: RuneType,
   gameTime?: number
 ): Collectible {
-  const selectedRune = runeType ?? RUNE_TYPES[Math.floor(randomManager.random('rune-type') * RUNE_TYPES.length)];
+  const selectedRune = runeType ?? RUNE_TYPES[Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) * RUNE_TYPES.length)];
   const runeConfig = RUNE_CONFIG[selectedRune];
 
   return {
     id,
     type: 'rune',
     runeType: selectedRune,
-    x: getRandomFloat(RUNE_RADIUS, canvasWidth - RUNE_RADIUS),
-    y: getRandomFloat(RUNE_RADIUS, canvasHeight - RUNE_RADIUS),
+    x: getRandomFloat(RUNE_RADIUS, canvasWidth - RUNE_RADIUS, GAMEPLAY_RANDOM_STREAMS.RUNES),
+    y: getRandomFloat(RUNE_RADIUS, canvasHeight - RUNE_RADIUS, GAMEPLAY_RANDOM_STREAMS.RUNES),
     radius: RUNE_RADIUS,
     color: runeConfig?.color ?? '#ffffff',
     value: 0,
@@ -446,12 +445,12 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
   
   if (freeCells.length > 0) {
     // Seleccionar aleatoriamente una celda libre
-    const randomCell = freeCells[Math.floor(randomManager.random('grid-cell') * freeCells.length)];
+    const randomCell = freeCells[Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) * freeCells.length)];
     
     // Posicionar en el centro de la celda con una pequeña variación
     // CORREGIDO: Convertir coordenadas de zona segura a coordenadas globales
-    const safeX = randomCell.col * gridSize + gridSize/2 + getRandomFloat(-10, 10);
-    const safeY = randomCell.row * gridSize + gridSize/2 + getRandomFloat(-10, 10);
+    const safeX = randomCell.col * gridSize + gridSize/2 + getRandomFloat(-10, 10, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+    const safeY = randomCell.row * gridSize + gridSize/2 + getRandomFloat(-10, 10, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
     posX = safeX + BUG_SAFE_ZONE; // Añadir offset de zona segura
     posY = safeY + BUG_SAFE_ZONE; // Añadir offset de zona segura
   } else {
@@ -460,14 +459,14 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
     const maxAttempts = 50;
     
     // CORREGIDO: Valores iniciales por defecto usando zona segura
-    posX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE);
-    posY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE);
+    posX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+    posY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
     
     let validPosition = false;
     
     while (attempt < maxAttempts && !validPosition) {
-      posX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE);
-      posY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE);
+      posX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+      posY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
       
       // Comprobar si esta posición está lo suficientemente lejos de otros bugs
       validPosition = !existingObstacles.some(obs => 
@@ -493,9 +492,9 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
     x: posX,
     y: posY,
     radius: BUG_RADIUS,
-    color: `hsl(${getRandomInt(45, 75)} 100% 60%)`, // Yellow hues
-    rotation: getRandomFloat(0, Math.PI * 2),
-    angularVelocity: angularVelocityBase * (randomManager.random('bug-aoe') > 0.5 ? 1 : -1), // Random direction
+    color: `hsl(${getRandomInt(45, 75, GAMEPLAY_RANDOM_STREAMS.HAZARDS)} 100% 60%)`, // Yellow hues
+    rotation: getRandomFloat(0, Math.PI * 2, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+    angularVelocity: angularVelocityBase * (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1), // Random direction
     glow: false,
   };
   
@@ -510,8 +509,8 @@ export function createPurrCollectible(id: string, canvasWidth: number, canvasHei
   return {
     id,
     type: 'purr',
-    x: getRandomFloat(PURR_RADIUS, canvasWidth - PURR_RADIUS),
-    y: getRandomFloat(PURR_RADIUS, canvasHeight - PURR_RADIUS),
+    x: getRandomFloat(PURR_RADIUS, canvasWidth - PURR_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(PURR_RADIUS, canvasHeight - PURR_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: PURR_RADIUS,
     color: PURR_COLOR,
     value: PURR_VALUE,
@@ -527,8 +526,8 @@ export function createVaulCollectible(id: string, canvasWidth: number, canvasHei
   return {
     id,
     type: 'vaul',
-    x: getRandomFloat(VAUL_RADIUS, canvasWidth - VAUL_RADIUS),
-    y: getRandomFloat(VAUL_RADIUS, canvasHeight - VAUL_RADIUS),
+    x: getRandomFloat(VAUL_RADIUS, canvasWidth - VAUL_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
+    y: getRandomFloat(VAUL_RADIUS, canvasHeight - VAUL_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
     radius: VAUL_RADIUS,
     color: VAUL_COLOR,
     value: VAUL_VALUE,
