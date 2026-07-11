@@ -193,11 +193,7 @@ describe('SybilSlayerPage game-session handshake', () => {
           sessionId: 'parent-session',
           gameVersion: '1.0.0',
           roomId: 'ROOM-TWO',
-          user: {
-            id: 'wallet-user',
-            name: 'Player One',
-            email: 'player@example.test',
-          },
+          userId: 'wallet-user',
         },
       },
       GAME_ORIGIN,
@@ -296,9 +292,7 @@ describe('SybilSlayerPage game-session handshake', () => {
         ),
       );
     });
-    await waitFor(() =>
-      expect(localStorage.getItem('session_token_session-b')).toBe('token-b'),
-    );
+    expect(localStorage.getItem('session_token_session-b')).toBeNull();
     expect(latestBridgeOptions()).toMatchObject({ currentSessionId: 'session-b' });
     expect(JSON.stringify(postMessage.mock.calls)).not.toContain('session-a');
 
@@ -318,7 +312,7 @@ describe('SybilSlayerPage game-session handshake', () => {
         payload: expect.objectContaining({
           sessionId: 'session-b',
           sessionToken: 'token-b',
-          user: expect.objectContaining({ id: 'wallet-b' }),
+          userId: 'wallet-b',
         }),
       }),
       GAME_ORIGIN,
@@ -331,7 +325,7 @@ describe('SybilSlayerPage game-session handshake', () => {
         <SybilSlayerPage />
       </StrictMode>,
     );
-    await waitFor(() => expect(localStorage.getItem('session_token_session-b')).toBeNull());
+    expect(localStorage.getItem('session_token_session-b')).toBeNull();
     expect(latestBridgeOptions()).toMatchObject({ currentSessionId: null });
 
     act(() => {
@@ -345,5 +339,77 @@ describe('SybilSlayerPage game-session handshake', () => {
     });
     expect(postMessage).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('authorizes only the active session channel using the parent memory bearer', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        sessionId: 'parent-session',
+        sessionToken: 'parent-memory-token',
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ auth: 'signed-auth' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('parent-session'));
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'PUSHER_AUTH_REQUEST',
+          authId: 'bad-channel',
+          socketId: '123.456',
+          channelName: 'private-game-session-attacker',
+          sessionToken: 'attacker-token',
+        },
+      }));
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'PUSHER_AUTH_REQUEST',
+          authId: 'valid-auth',
+          socketId: '123.456',
+          channelName: 'private-game-session-parent-session',
+          sessionToken: 'attacker-token',
+        },
+      }));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/pusher/auth');
+    const authBody = new URLSearchParams(fetchMock.mock.calls[1][1]?.body as string);
+    expect(authBody.get('session_token')).toBe('parent-memory-token');
+    expect(authBody.get('channel_name')).toBe('private-game-session-parent-session');
+    expect(authBody.toString()).not.toContain('attacker-token');
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'PUSHER_AUTH_RESPONSE',
+        authId: 'valid-auth',
+        success: true,
+      }),
+      GAME_ORIGIN,
+    ));
+    expect(mockUsePusherGameConnection).toHaveBeenLastCalledWith(
+      'parent-session',
+      expect.objectContaining({ sessionToken: 'parent-memory-token' }),
+      expect.any(Object),
+    );
+    expect(localStorage.getItem('session_token_parent-session')).toBeNull();
   });
 });

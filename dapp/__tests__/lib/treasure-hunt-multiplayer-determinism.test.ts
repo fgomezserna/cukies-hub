@@ -99,6 +99,35 @@ describe('Treasure Hunt deterministic streams', () => {
       expect(factories[targetStream]()).toEqual(expected);
     }
   });
+
+  it('keeps the next real item spawn indexed when item actions consume variable draws', () => {
+    randomManager.setSeed(seed);
+    createEnergyCollectible('item-0', width, height);
+    const expectedNextSpawn = createEnergyCollectible('item-1', width, height);
+
+    randomManager.setSeed(seed);
+    createEnergyCollectible('item-0', width, height);
+    for (let draw = 0; draw < 50; draw += 1) {
+      randomManager.random(GAMEPLAY_RANDOM_STREAMS.ITEMS);
+    }
+    const actualNextSpawn = createEnergyCollectible('item-1', width, height);
+
+    expect(actualNextSpawn).toEqual(expectedNextSpawn);
+  });
+
+  it('keeps the next real spawn stable when placement retries vary for the prior entity', () => {
+    randomManager.setSeed(seed);
+    createEnergyCollectible('retry-item-0', width, height);
+    const expectedNextSpawn = createEnergyCollectible('retry-item-1', width, height);
+
+    randomManager.setSeed(seed);
+    for (let retry = 0; retry < 20; retry += 1) {
+      createEnergyCollectible('retry-item-0', width, height);
+    }
+    const actualNextSpawn = createEnergyCollectible('retry-item-1', width, height);
+
+    expect(actualNextSpawn).toEqual(expectedNextSpawn);
+  });
 });
 
 describe('Treasure Hunt multiplayer feature gate', () => {

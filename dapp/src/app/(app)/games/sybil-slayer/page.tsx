@@ -54,6 +54,12 @@ export default function SybilSlayerPage() {
   const currentSessionId = activeParentGameSession?.sessionId ?? null;
 
   useEffect(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('session_token_')) localStorage.removeItem(key);
+    }
+  }, []);
+
+  useEffect(() => {
     const roomParam = new URLSearchParams(window.location.search).get('room');
     setRoomId(roomParam);
   }, []);
@@ -65,9 +71,6 @@ export default function SybilSlayerPage() {
     }
 
     sessionStarterRef.current?.reset();
-    if (parentGameSession) {
-      localStorage.removeItem(`session_token_${parentGameSession.sessionId}`);
-    }
     setParentGameSession(null);
     cleanedWalletUserIdRef.current = nextWalletUserId;
   }, [parentGameSession, user?.id]);
@@ -114,8 +117,6 @@ export default function SybilSlayerPage() {
       ) {
         return;
       }
-      localStorage.removeItem(`session_token_${endingSession.sessionId}`);
-
       setLocalGameStats((previous) => ({
         ...previous,
         bestScore: Math.max(previous.bestScore, result.finalScore),
@@ -161,8 +162,9 @@ export default function SybilSlayerPage() {
     () => ({
       isAuthenticated: Boolean(user) && !isLoading,
       user,
+      sessionToken: activeParentGameSession?.sessionToken ?? null,
     }),
-    [user, isLoading],
+    [activeParentGameSession?.sessionToken, user, isLoading],
   );
 
   usePusherGameConnection(currentSessionId, authData, gameConnectionOptions);
@@ -182,11 +184,7 @@ export default function SybilSlayerPage() {
           sessionId: activeParentGameSession.sessionId,
           gameVersion: activeParentGameSession.gameVersion,
           roomId,
-          user: {
-            id: user.id,
-            name: user.username || 'Anonymous',
-            email: user.email,
-          },
+          userId: user.id,
         },
       },
       gameOrigin,
@@ -223,19 +221,44 @@ export default function SybilSlayerPage() {
         return;
       }
 
+      const sessionAtRequest = latestParentGameSessionRef.current;
+      const walletUserIdAtRequest = latestWalletUserIdRef.current;
+      const expectedChannel = sessionAtRequest
+        ? `private-game-session-${sessionAtRequest.sessionId}`
+        : null;
+      if (
+        !sessionAtRequest ||
+        !expectedChannel ||
+        !walletUserIdAtRequest ||
+        sessionAtRequest.ownerUserId !== walletUserIdAtRequest ||
+        typeof event.data.authId !== 'string' ||
+        event.data.authId.length === 0 ||
+        event.data.authId.length > 128 ||
+        typeof event.data.socketId !== 'string' ||
+        event.data.socketId.length === 0 ||
+        event.data.socketId.length > 128 ||
+        event.data.channelName !== expectedChannel
+      ) {
+        return;
+      }
+
       try {
         const params = new URLSearchParams();
         params.append('socket_id', event.data.socketId);
-        params.append('channel_name', event.data.channelName);
-        params.append('session_token', event.data.sessionToken);
+        params.append('channel_name', expectedChannel);
+        params.append('session_token', sessionAtRequest.sessionToken);
 
-        const response = await fetch('/api/pusher/auth-simple', {
+        const response = await fetch('/api/pusher/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: params.toString(),
         });
 
-        if (iframeRef.current?.contentWindow !== frameWindow) {
+        if (
+          iframeRef.current?.contentWindow !== frameWindow ||
+          latestWalletUserIdRef.current !== walletUserIdAtRequest ||
+          latestParentGameSessionRef.current?.sessionId !== sessionAtRequest.sessionId
+        ) {
           return;
         }
         if (response.ok) {
@@ -261,7 +284,11 @@ export default function SybilSlayerPage() {
           );
         }
       } catch {
-        if (iframeRef.current?.contentWindow === frameWindow) {
+        if (
+          iframeRef.current?.contentWindow === frameWindow &&
+          latestWalletUserIdRef.current === walletUserIdAtRequest &&
+          latestParentGameSessionRef.current?.sessionId === sessionAtRequest.sessionId
+        ) {
           frameWindow.postMessage(
             {
               type: 'PUSHER_AUTH_RESPONSE',
@@ -297,7 +324,6 @@ export default function SybilSlayerPage() {
           return;
         }
         setParentGameSession({ ...session, ownerUserId: requestedWalletUserId });
-        localStorage.setItem(`session_token_${session.sessionId}`, session.sessionToken);
         onSessionStart({
           sessionToken: session.sessionToken,
           sessionId: session.sessionId,

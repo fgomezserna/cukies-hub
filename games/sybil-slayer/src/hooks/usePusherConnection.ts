@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Pusher from 'pusher-js';
 import type { Channel } from 'pusher-js';
-import { randomManager } from '../lib/random';
 import { resolveParentOrigin } from '../lib/multiplayer-client';
 
 // Enable pusher logging for development
@@ -22,7 +21,6 @@ interface GameEndData {
   finalScore: number;
   gameTime: number;
   metadata?: any;
-  sessionToken?: string;
 }
 
 export interface SessionData {
@@ -31,6 +29,7 @@ export interface SessionData {
   sessionId: string;
   gameVersion?: string;
   roomId?: string;
+  userId?: string;
 }
 
 /**
@@ -46,18 +45,8 @@ export function usePusherConnection() {
   // Ref to track cleanup timeout
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize session data from localStorage if available
-  const [sessionData, setSessionData] = useState<SessionData | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('pusher-game-session');
-        return stored ? JSON.parse(stored) : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
+  // Bearer/session data intentionally lives only in this mounted hook instance.
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
 
   // Refs to prevent stale closures
   const pusherRef = useRef<Pusher | null>(null);
@@ -69,13 +58,28 @@ export function usePusherConnection() {
   const acceptSessionData = useCallback((sessionInfo: SessionData) => {
     if (!sessionInfo || typeof sessionInfo.sessionId !== 'string') return;
     const current = sessionDataRef.current;
+    if (current?.sessionId !== sessionInfo.sessionId && !sessionInfo.sessionToken) return;
     const next = current?.sessionId === sessionInfo.sessionId
       ? { ...current, ...sessionInfo }
       : sessionInfo;
 
     sessionDataRef.current = next;
-    localStorage.setItem('pusher-game-session', JSON.stringify(next));
     setSessionData(next);
+  }, []);
+
+  useEffect(() => {
+    localStorage.removeItem('pusher-game-session');
+    const pendingResult = localStorage.getItem('pending-game-result');
+    if (!pendingResult) return;
+    try {
+      const parsed = JSON.parse(pendingResult) as Record<string, unknown>;
+      if ('sessionToken' in parsed) {
+        const { sessionToken: _discardedBearer, ...tokenlessResult } = parsed;
+        localStorage.setItem('pending-game-result', JSON.stringify(tokenlessResult));
+      }
+    } catch {
+      localStorage.removeItem('pending-game-result');
+    }
   }, []);
 
   // Listen for session data from parent (dapp) via postMessage
@@ -203,94 +207,59 @@ export function usePusherConnection() {
                   channelName: channel.name,
                 });
 
-                // Use postMessage to request auth from parent instead of direct fetch
-                const randomSuffix = Math.floor(randomManager.random('pusher-auth') * Number.MAX_SAFE_INTEGER)
-                  .toString(36)
-                  .padStart(9, '0');
-                const authId = `auth_${Date.now()}_${randomSuffix}`;
-                let responded = false;
+                const parentOrigin = getParentOrigin();
+                if (!parentOrigin) {
+                  callback(new Error('Secure parent origin unavailable'), null);
+                  return;
+                }
+
+                const authId = typeof window.crypto.randomUUID === 'function'
+                  ? window.crypto.randomUUID()
+                  : Array.from(window.crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+                    byte.toString(16).padStart(2, '0')).join('');
+                let settled = false;
+                let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+                const settle = (
+                  error: Error | null,
+                  authData?: { auth: string; channel_data?: string; shared_secret?: string },
+                ) => {
+                  if (settled) return;
+                  settled = true;
+                  if (timeoutId) clearTimeout(timeoutId);
+                  window.removeEventListener('message', handleAuthResponse);
+                  callback(error, error ? null : (authData ?? null));
+                };
 
                 // Set up listener for auth response
                 const handleAuthResponse = (event: MessageEvent) => {
                   if (event.source !== window.parent || event.origin !== parentOrigin) return;
 
                   if (event.data?.type === 'PUSHER_AUTH_RESPONSE' && event.data?.authId === authId) {
-                    // Stop timeout and listener once we handle a matching response
-                    responded = true;
-                    clearTimeout(timeoutId);
-                    window.removeEventListener('message', handleAuthResponse);
-
-                    if (event.data.success) {
+                    if (
+                      event.data.success === true &&
+                      event.data.authData &&
+                      typeof event.data.authData.auth === 'string'
+                    ) {
                       console.log('✅ [GAME-PUSHER] Auth successful via postMessage');
-                      callback(null, event.data.authData);
+                      settle(null, event.data.authData);
                     } else {
-                      console.error('❌ [GAME-PUSHER] Auth failed via postMessage:', event.data.error);
-                      callback(new Error(event.data.error), null);
+                      settle(new Error('Pusher authorization failed'));
                     }
                   }
                 };
 
                 window.addEventListener('message', handleAuthResponse);
-
-                // Send auth request to parent
-                const parentOrigin = getParentOrigin();
-                if (!parentOrigin) {
-                  callback(new Error('Secure parent origin unavailable'), null);
-                  return;
-                }
                 window.parent?.postMessage({
                   type: 'PUSHER_AUTH_REQUEST',
                   authId,
                   socketId,
                   channelName: channel.name,
-                  sessionToken: sessionData.sessionToken
                 }, parentOrigin);
 
-                // Fallback: try direct auth to simple endpoint
-                setTimeout(() => {
-                  if (!responded) {
-                    console.log('🔄 [GAME-PUSHER] Trying direct auth to simple endpoint');
-                    fetch('http://localhost:3000/api/pusher/auth-simple', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                      body: new URLSearchParams({
-                        socket_id: socketId,
-                        channel_name: channel.name
-                      })
-                    })
-                      .then(res => {
-                        console.log('🔄 [GAME-PUSHER] Direct auth response status:', res.status);
-                        return res.json();
-                      })
-                      .then(authData => {
-                        if (!responded) {
-                          console.log('✅ [GAME-PUSHER] Direct auth successful:', authData);
-                          callback(null, authData);
-                        }
-                      })
-                      .catch(err => {
-                        console.error('❌ [GAME-PUSHER] Direct auth failed:', err);
-                        // Try one more time with a different approach
-                        if (!responded) {
-                          console.log('🔄 [GAME-PUSHER] Trying mock auth as last resort');
-                          callback(null, {
-                            auth: 'mock_auth_token_' + Date.now(),
-                            channel_data: JSON.stringify({
-                              user_id: 'dev-user-' + Date.now(),
-                              user_info: { name: 'Dev User' }
-                            })
-                          });
-                        }
-                      });
-                  }
-                }, 1000); // Reduced timeout
-
-                // Timeout fallback
-                const timeoutId = setTimeout(() => {
-                  if (responded) return; // Guard against late timeout firing
-                  window.removeEventListener('message', handleAuthResponse);
-                  callback(new Error('Auth request timeout'), null);
-                }, 10000);
+                timeoutId = setTimeout(() => {
+                  settle(new Error('Pusher authorization timed out'));
+                }, 10_000);
               }
             })
           }
@@ -343,16 +312,16 @@ export function usePusherConnection() {
           const pendingResult = localStorage.getItem('pending-game-result');
           if (pendingResult) {
             try {
-              const gameResult = JSON.parse(pendingResult);
+              const parsed = JSON.parse(pendingResult) as Record<string, unknown>;
+              const { sessionToken: _discardedBearer, sessionId, ...gameResult } = parsed;
+              if (sessionId !== sessionData.sessionId) {
+                console.warn('⚠️ [GAME-PUSHER] Discarding pending result for another session');
+                localStorage.removeItem('pending-game-result');
+                return;
+              }
               console.log('🔄 [GAME-PUSHER] Found pending game result, sending');
 
-              // Ensure sessionToken is included in pending result
-              const gameResultWithToken = {
-                ...gameResult,
-                sessionToken: gameResult.sessionToken || sessionData?.sessionToken
-              };
-
-              gameChannel.trigger('client-game-end', gameResultWithToken);
+              gameChannel.trigger('client-game-end', gameResult);
               localStorage.removeItem('pending-game-result');
               console.log('✅ [GAME-PUSHER] Pending game result sent successfully');
             } catch (error) {
@@ -517,14 +486,22 @@ export function usePusherConnection() {
       gameTime: endData.gameTime
     };
 
+    const persistPendingResult = () => {
+      localStorage.setItem('pending-game-result', JSON.stringify({
+        ...gameEndData,
+        sessionId: sessionDataRef.current?.sessionId,
+        timestamp: Date.now(),
+      }));
+    };
+
     const handleGameEndFailure = async () => {
       console.error('❌ [GAME-PUSHER] All Pusher attempts failed - trying HTTP fallback');
 
-      // Try HTTP fallback to API
-      const dappUrl = process.env.NEXT_PUBLIC_PARENT_URL
-        || (typeof window !== 'undefined' && window.location.origin.includes('localhost')
-          ? 'http://localhost:3000'
-          : 'https://hyppieliquid.com');
+      const dappUrl = getParentOrigin();
+      if (!dappUrl || !sessionDataRef.current?.sessionToken) {
+        persistPendingResult();
+        return false;
+      }
 
       const endSessionUrl = `${dappUrl}/api/games/end-session`;
 
@@ -552,24 +529,12 @@ export function usePusherConnection() {
           return true;
         } else {
           console.error('❌ [GAME-PUSHER] HTTP fallback failed:', result);
-          // Store in localStorage as last resort
-          localStorage.setItem('pending-game-result', JSON.stringify({
-            ...gameEndData,
-            sessionToken: sessionDataRef.current?.sessionToken,
-            sessionId: sessionDataRef.current?.sessionId,
-            timestamp: Date.now()
-          }));
+          persistPendingResult();
           return false;
         }
       } catch (error) {
         console.error('❌ [GAME-PUSHER] HTTP fallback error:', error);
-        // Store in localStorage as last resort
-        localStorage.setItem('pending-game-result', JSON.stringify({
-          ...gameEndData,
-          sessionToken: sessionDataRef.current?.sessionToken,
-          sessionId: sessionDataRef.current?.sessionId,
-          timestamp: Date.now()
-        }));
+        persistPendingResult();
         return false;
       }
     };
@@ -635,13 +600,7 @@ export function usePusherConnection() {
       }
 
       try {
-        // Include sessionToken in the game end data
-        const gameEndWithToken = {
-          ...gameEndData,
-          sessionToken: sessionDataRef.current?.sessionToken
-        };
-
-        channelRef.current.trigger('client-game-end', gameEndWithToken);
+        channelRef.current.trigger('client-game-end', gameEndData);
         console.log(`📤 [GAME-PUSHER] Game end sent successfully (attempt ${attempt})`);
 
         // Clear any pending result from localStorage
@@ -730,7 +689,12 @@ export function usePusherConnection() {
 function getParentOrigin(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return resolveParentOrigin(document.referrer, process.env.NEXT_PUBLIC_DAPP_ORIGIN);
+    return resolveParentOrigin(
+      document.referrer,
+      process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+      process.env.NEXT_PUBLIC_PARENT_URL,
+      process.env.NODE_ENV,
+    );
   } catch {
     console.error('❌ [GAME-PUSHER] Secure parent origin unavailable');
     return null;

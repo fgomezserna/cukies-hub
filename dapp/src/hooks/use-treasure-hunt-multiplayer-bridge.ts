@@ -5,29 +5,12 @@ import { useEffect, type RefObject } from 'react';
 const REQUEST_TYPE = 'TH_MULTIPLAYER_REQUEST';
 const RESPONSE_TYPE = 'TH_MULTIPLAYER_RESPONSE';
 const MULTIPLAYER_API = '/api/games/treasure-hunt/multiplayer/matches';
-const SENSITIVE_QUERY_PARAMETERS = new Set([
-  'access_token',
-  'auth',
-  'authorization',
-  'email',
-  'gamesessionid',
-  'id_token',
-  'matchid',
-  'playerid',
-  'refresh_token',
-  'session_token',
-  'sessionid',
-  'sessiontoken',
-  'token',
-  'userid',
-  'wallet',
-  'walletaddress',
-]);
 
 type MultiplayerCommand = 'join' | 'get' | 'heartbeat' | 'snapshot' | 'reset';
 
 interface MultiplayerRequest {
   readonly type: typeof REQUEST_TYPE;
+  readonly clientId: string;
   readonly requestId: string;
   readonly command: MultiplayerCommand;
   readonly payload: Record<string, unknown>;
@@ -36,10 +19,17 @@ interface MultiplayerRequest {
 interface BridgeErrorPayload {
   readonly code: string;
   readonly message: string;
+  readonly retryable?: true;
+  readonly httpStatus?: number;
 }
 
 class BridgeError extends Error {
-  constructor(readonly code: string, message: string) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly retryable = false,
+    readonly httpStatus?: number,
+  ) {
     super(message);
     this.name = 'BridgeError';
   }
@@ -70,6 +60,9 @@ function parseRequest(value: unknown): MultiplayerRequest | null {
     return null;
   }
   if (
+    typeof value.clientId !== 'string' ||
+    value.clientId.length === 0 ||
+    value.clientId.length > 128 ||
     typeof value.requestId !== 'string' ||
     value.requestId.length === 0 ||
     value.requestId.length > 128
@@ -82,6 +75,7 @@ function parseRequest(value: unknown): MultiplayerRequest | null {
 
   return {
     type: REQUEST_TYPE,
+    clientId: value.clientId,
     requestId: value.requestId,
     command: value.command as MultiplayerCommand,
     payload: isRecord(value.payload) ? value.payload : {},
@@ -101,9 +95,14 @@ function requireRoomCode(value: unknown) {
 
 function publicBridgeError(error: unknown): BridgeErrorPayload {
   if (error instanceof BridgeError) {
-    return { code: error.code, message: error.message };
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.retryable ? { retryable: true as const } : {}),
+      ...(error.httpStatus ? { httpStatus: error.httpStatus } : {}),
+    };
   }
-  return { code: 'REQUEST_FAILED', message: 'Multiplayer request failed' };
+  return { code: 'REQUEST_FAILED', message: 'Multiplayer request failed', retryable: true };
 }
 
 function isTerminalMatchStatus(value: unknown): boolean {
@@ -115,7 +114,12 @@ async function readApiResponse(response: Response) {
   try {
     value = await response.json();
   } catch {
-    throw new BridgeError('REQUEST_FAILED', 'Multiplayer request failed');
+    throw new BridgeError(
+      'REQUEST_FAILED',
+      'Multiplayer request failed',
+      response.status >= 500,
+      response.status,
+    );
   }
 
   if (!isRecord(value)) {
@@ -127,7 +131,12 @@ async function readApiResponse(response: Response) {
       apiError && typeof apiError.code === 'string' && apiError.code.length <= 64
         ? apiError.code
         : 'REQUEST_FAILED';
-    throw new BridgeError(code, 'Multiplayer request failed');
+    throw new BridgeError(
+      code,
+      'Multiplayer request failed',
+      response.status === 408 || response.status === 429 || response.status >= 500,
+      response.status,
+    );
   }
 
   const { success: _success, ...data } = value;
@@ -135,15 +144,8 @@ async function readApiResponse(response: Response) {
 }
 
 export function buildTreasureHuntInviteUrl(windowObject: Window, roomCode: string) {
-  const inviteUrl = new URL(windowObject.location.href);
-  const keys = [...inviteUrl.searchParams.keys()];
-  for (const key of keys) {
-    if (SENSITIVE_QUERY_PARAMETERS.has(key.toLowerCase())) {
-      inviteUrl.searchParams.delete(key);
-    }
-  }
+  const inviteUrl = new URL(windowObject.location.pathname, windowObject.location.origin);
   inviteUrl.searchParams.set('room', roomCode);
-  inviteUrl.hash = '';
 
   windowObject.history.replaceState(
     windowObject.history.state,
@@ -164,6 +166,9 @@ export function createTreasureHuntMultiplayerBridge(
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
   let knownMatchStatus: string | null = null;
+  let knownPlayerId: string | null = null;
+  let knownSlot: 0 | 1 | null = null;
+  let knownClientId: string | null = null;
   let pendingRoomCode: string | null = null;
   let generation = 0;
   let disposed = false;
@@ -236,6 +241,9 @@ export function createTreasureHuntMultiplayerBridge(
       knownMatchId = null;
       knownRoomCode = null;
       knownMatchStatus = null;
+      knownPlayerId = null;
+      knownSlot = null;
+      knownClientId = null;
       pendingRoomCode = null;
       frameWindow.postMessage(
         {
@@ -276,17 +284,46 @@ export function createTreasureHuntMultiplayerBridge(
           }
           pendingRoomCode = roomCode;
           ownedPendingRoomCode = roomCode;
-          const response = await fetchImpl(MULTIPLAYER_API, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              roomCode,
-              gameSessionId: options.currentSessionId,
-            }),
-            signal: abortController.signal,
-          });
-          data = await readApiResponse(response);
+          const isReloadOfStartedMatch = Boolean(
+            knownMatchId &&
+            knownClientId &&
+            request.clientId !== knownClientId &&
+            knownMatchStatus !== 'waiting' &&
+            !isTerminalMatchStatus(knownMatchStatus),
+          );
+
+          if (isReloadOfStartedMatch) {
+            if (!knownMatchId || !knownPlayerId || knownSlot === null) {
+              throw new BridgeError('INVALID_STATE', 'Multiplayer bridge state is incomplete');
+            }
+            const response = await fetchImpl(
+              `${MULTIPLAYER_API}/${encodeURIComponent(knownMatchId)}`,
+              {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'forfeit',
+                  gameSessionId: options.currentSessionId,
+                }),
+                signal: abortController.signal,
+              },
+            );
+            const forfeitData = await readApiResponse(response);
+            data = { ...forfeitData, playerId: knownPlayerId, slot: knownSlot };
+          } else {
+            const response = await fetchImpl(MULTIPLAYER_API, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomCode,
+                gameSessionId: options.currentSessionId,
+              }),
+              signal: abortController.signal,
+            });
+            data = await readApiResponse(response);
+          }
           if (
             disposed ||
             abortController.signal.aborted ||
@@ -310,6 +347,15 @@ export function createTreasureHuntMultiplayerBridge(
           }
           knownMatchId ??= data.match.matchId;
           knownRoomCode ??= canonicalRoomCode;
+          if (
+            typeof data.playerId !== 'string' ||
+            (data.slot !== 0 && data.slot !== 1)
+          ) {
+            throw new BridgeError('INVALID_RESPONSE', 'Multiplayer request failed');
+          }
+          knownPlayerId = data.playerId;
+          knownSlot = data.slot;
+          knownClientId = request.clientId;
           const inviteUrl = buildTreasureHuntInviteUrl(windowObject, canonicalRoomCode);
           options.onRoomJoined?.(canonicalRoomCode);
           data = { ...data, inviteUrl };

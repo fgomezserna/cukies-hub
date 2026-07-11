@@ -577,6 +577,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
+  const [multiplayerJoinFailure, setMultiplayerJoinFailure] = useState<{
+    roomCode: string;
+    message: string;
+  } | null>(null);
   const isMultiplayerMode = currentMode === 'multiplayer';
   const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
   const localControlsLocked = shouldBlockLocalGameControls(
@@ -600,7 +604,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       case 'paused':
         return 'playing';
       case 'gameOver':
-        return state.hearts > 0 ? 'finished' : 'eliminated';
+        // A timed/client-side game over publishes the last score as playing;
+        // the server owns the transition to `finished`.
+        return state.hearts > 0 ? 'playing' : 'eliminated';
       default:
         return 'waiting';
     }
@@ -873,13 +879,29 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const countdownTarget = multiplayer.matchConfig?.resumeAt ?? multiplayer.matchConfig?.startAt ?? null;
   const countdownMs = countdownTarget !== null ? countdownTarget - now : null;
   const countdownSeconds = countdownMs !== null ? Math.max(0, Math.ceil(countdownMs / 1000)) : null;
+  const canonicalPlayDeadline = matchStatus === 'sudden_death'
+    ? multiplayer.matchConfig?.suddenDeathEndsAt ?? null
+    : matchStatus === 'running'
+      ? multiplayer.matchConfig?.roundEndsAt ?? null
+      : null;
+  const canonicalTimer = canonicalPlayDeadline === null
+    ? gameState.timer
+    : Math.max(0, (canonicalPlayDeadline - now) / 1_000);
+  const lobbySeconds = matchStatus === 'waiting' && multiplayer.matchConfig
+    ? Math.max(0, Math.ceil((multiplayer.matchConfig.lobbyExpiresAt - now) / 1_000))
+    : null;
+  const disconnectedPlayer = [multiplayer.localPlayer, multiplayer.opponent]
+    .find((player) => player?.presence === 'offline');
+  const reconnectSeconds = disconnectedPlayer
+    ? Math.max(0, Math.ceil(disconnectedPlayer.reconnectBudgetRemainingMs / 1_000))
+    : null;
   const showCountdownOverlay = isMultiplayerMode && matchStatus === 'countdown';
   const showReconnectOverlay = isMultiplayerMode && matchStatus === 'paused_reconnect';
   const showSuddenDeathBanner = isMultiplayerMode && matchStatus === 'sudden_death';
   const opponentHearts = multiplayer.opponent?.hearts ?? 0;
   const opponentColor = 'rgba(244, 63, 94, 0.65)';
   const localColor = 'rgba(16, 185, 129, 0.75)';
-  const advantageGradient = `linear-gradient(90deg, ${opponentColor} 0%, ${opponentColor} ${advantageProgress * 100}%, ${localColor} ${advantageProgress * 100}%, ${localColor} 100%)`;
+  const advantageGradient = `linear-gradient(90deg, ${localColor} 0%, ${localColor} ${advantageProgress * 100}%, ${opponentColor} ${advantageProgress * 100}%, ${opponentColor} 100%)`;
   const localPlayerId = multiplayer.playerId;
   const matchResult = multiplayer.matchResult;
   const localIsWinner = matchResult?.winnerPlayerId
@@ -1017,6 +1039,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         <p className="text-sm font-pixellari text-cyan-200/70">
           Comparte el enlace de la partida o espera a que otro jugador se conecte.
         </p>
+        {lobbySeconds !== null ? (
+          <p className="text-xs font-pixellari text-amber-200/80">
+            La sala expira en {lobbySeconds}s
+          </p>
+        ) : null}
         {multiplayer.error ? (
           <p role="alert" className="text-sm font-pixellari text-rose-300">
             {multiplayer.error}
@@ -1146,6 +1173,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         <p className="text-sm font-pixellari text-amber-100/70">
           Esperando que el jugador desconectado vuelva a la sala.
         </p>
+        {reconnectSeconds !== null ? (
+          <p className="text-sm font-pixellari text-amber-200">
+            Gracia restante: {reconnectSeconds}s
+          </p>
+        ) : null}
       </div>
     </div>
   ) : null;
@@ -1343,7 +1375,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     const unsubscribe = subscribeToDirection((direction) => {
       const nextInputState = {
         direction,
-        pauseToggled,
+        pauseToggled: localControlsLocked ? false : pauseToggled,
         startToggled,
       };
 
@@ -1368,6 +1400,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     startToggled,
     updateInputRef,
     gameState.status,
+    localControlsLocked,
     multiplayer.hasNonTerminalMatch,
   ]);
 
@@ -1559,6 +1592,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
     const roomId = roomIdOverride ?? generateMatchRoomId();
     multiplayerStartPendingRef.current = true;
+    setMultiplayerJoinFailure(null);
     try {
       // A trusted parent invitation may represent the bridge's existing pin after iframe reload.
       if (!roomIdOverride) await multiplayer.reset();
@@ -1567,11 +1601,40 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       setCurrentMode('multiplayer');
       await multiplayer.initiateMatch(roomId);
     } catch {
-      // Controller/hook preserve the canonical state and propagate the sanitized failure here.
+      setCurrentMode('single');
+      resetGame();
+      setMultiplayerJoinFailure({
+        roomCode: roomId,
+        message: multiplayer.error ?? 'No se pudo entrar en la partida multijugador.',
+      });
     } finally {
       multiplayerStartPendingRef.current = false;
     }
   }, [multiplayerEnabled, multiplayer, resetGame, generateMatchRoomId]);
+
+  const retryMultiplayerJoin = useCallback(() => {
+    if (!multiplayerJoinFailure) return;
+    const { roomCode } = multiplayerJoinFailure;
+    autoJoinedRoomRef.current = null;
+    setMultiplayerJoinFailure(null);
+    void startMultiplayerGame(roomCode);
+  }, [multiplayerJoinFailure, startMultiplayerGame]);
+
+  const exitFailedMultiplayerJoin = useCallback(async () => {
+    const failedRoomCode = multiplayerJoinFailure?.roomCode ?? null;
+    try {
+      await multiplayer.reset();
+    } catch {
+      return;
+    }
+    // Mark this invitation as consumed so the handshake effect does not
+    // immediately autojoin it again after the user explicitly exits.
+    autoJoinedRoomRef.current = failedRoomCode;
+    setMultiplayerJoinFailure(null);
+    setCurrentMode('single');
+    resetGame();
+    setModeSelectOpen(true);
+  }, [multiplayer, multiplayerJoinFailure, resetGame]);
 
   const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
@@ -1882,14 +1945,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Advertencia de tiempo bajo
   useEffect(() => {
-    if (gameState.status === 'playing' && gameState.timer <= 10 && gameState.timer > 0) {
+    if (gameState.status === 'playing' && canonicalTimer <= 10 && canonicalTimer > 0) {
       // Solo mostrar advertencia en intervalos específicos para evitar spam
-      const timeLeft = Math.ceil(gameState.timer);
+      const timeLeft = Math.ceil(canonicalTimer);
       if (timeLeft === 10 || timeLeft === 5 || timeLeft === 3 || timeLeft === 1) {
         console.log(`¡Advertencia! Quedan ${timeLeft} segundos`);
       }
     }
-  }, [gameState.timer, gameState.status]);
+  }, [canonicalTimer, gameState.status]);
 
   // Manejar música de fondo según el estado del juego
   useEffect(() => {
@@ -2305,6 +2368,32 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       {countdownOverlay}
       {reconnectOverlay}
       {resultOverlay}
+      {multiplayerJoinFailure ? (
+        <div className="absolute inset-0 z-[75] flex items-center justify-center bg-slate-950/90 px-5 text-center backdrop-blur-sm">
+          <div className="w-full max-w-md space-y-4 rounded-xl border border-rose-400/60 bg-slate-900/95 p-6 shadow-2xl shadow-rose-500/20">
+            <h3 className="text-xl font-pixellari text-rose-200">No se pudo entrar en la sala</h3>
+            <p role="alert" className="text-sm font-pixellari text-rose-100/80">
+              {multiplayerJoinFailure.message}
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={retryMultiplayerJoin}
+                className="rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-4 py-2 font-pixellari text-cyan-100"
+              >
+                Reintentar
+              </button>
+              <button
+                type="button"
+                onClick={() => void exitFailedMultiplayerJoin()}
+                className="rounded-lg border border-pink-400/50 bg-pink-500/15 px-4 py-2 font-pixellari text-pink-100"
+              >
+                Salir
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Menú de bienvenida */}
       {gameState.status === 'idle' ? (
         <>
@@ -2460,7 +2549,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Time: {Math.ceil(gameState.timer)}
+                    Time: {Math.ceil(canonicalTimer)}
                   </span>
                 </div>
               </div>
@@ -2759,8 +2848,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className={gameState.timer <= 10 ? 'text-destructive' : 'text-white'} style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Time: {Math.ceil(gameState.timer)}
+                  <span className={canonicalTimer <= 10 ? 'text-destructive' : 'text-white'} style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                    Time: {Math.ceil(canonicalTimer)}
                   </span>
                 </div>
               </div>

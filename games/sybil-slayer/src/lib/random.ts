@@ -31,7 +31,9 @@ interface RandomStream {
 const DEFAULT_STREAM = 'default';
 
 const streams = new Map<string, RandomStream>();
+const eventStreams: Array<{ streamName: string; generator: GeneratorFn }> = [];
 let baseSeed: number | null = null;
+let seedVersion = 0;
 
 // Mulberry32 PRNG - fast, deterministic with 32-bit seed
 const createMulberry32 = (seed: number): GeneratorFn => {
@@ -88,6 +90,11 @@ const getOrCreateStream = (name: string): GeneratorFn => {
 };
 
 const next = (streamName: string = DEFAULT_STREAM): number => {
+  for (let index = eventStreams.length - 1; index >= 0; index -= 1) {
+    if (eventStreams[index].streamName === streamName) {
+      return eventStreams[index].generator();
+    }
+  }
   const generator = getOrCreateStream(streamName);
   return generator();
 };
@@ -140,6 +147,7 @@ export const randomManager = {
    */
   setSeed(seed: string | number) {
     baseSeed = normalizeSeed(seed);
+    seedVersion += 1;
     resetStreams();
   },
 
@@ -148,6 +156,7 @@ export const randomManager = {
    */
   clear() {
     baseSeed = null;
+    seedVersion += 1;
     resetStreams();
   },
 
@@ -177,6 +186,26 @@ export const randomManager = {
    */
   next(streamName?: string): number {
     return next(streamName);
+  },
+
+  /**
+   * Runs one logical gameplay event on a stateless indexed substream. Variable
+   * draws inside the event never advance the next event in the same domain.
+   */
+  withEvent<T>(streamName: GameplayRandomStream, eventKey: string | number, run: () => T): T {
+    const generator = baseSeed === null
+      ? defaultRandom
+      : createMulberry32(deriveStreamSeed(baseSeed, `${streamName}:event:${String(eventKey)}`));
+    eventStreams.push({ streamName, generator });
+    try {
+      return run();
+    } finally {
+      eventStreams.pop();
+    }
+  },
+
+  seedVersion(): number {
+    return seedVersion;
   },
 };
 

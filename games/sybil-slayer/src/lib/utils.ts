@@ -38,6 +38,36 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+type SpawnRandomRecord = { readonly index: number; attempts: number };
+const spawnRandomCounters: Record<string, number> = {};
+const spawnRandomRecords = new Map<string, SpawnRandomRecord>();
+let observedSeedVersion = randomManager.seedVersion();
+
+function resetSpawnRandomEvents() {
+  for (const key of Object.keys(spawnRandomCounters)) delete spawnRandomCounters[key];
+  spawnRandomRecords.clear();
+  observedSeedVersion = randomManager.seedVersion();
+}
+
+function withSpawnRandom<T>(
+  streamName: (typeof GAMEPLAY_RANDOM_STREAMS)[keyof typeof GAMEPLAY_RANDOM_STREAMS],
+  logicalSpawnId: string,
+  run: () => T,
+): T {
+  if (observedSeedVersion !== randomManager.seedVersion()) resetSpawnRandomEvents();
+  const recordKey = `${streamName}:${logicalSpawnId}`;
+  let record = spawnRandomRecords.get(recordKey);
+  if (!record) {
+    const index = spawnRandomCounters[streamName] ?? 0;
+    spawnRandomCounters[streamName] = index + 1;
+    record = { index, attempts: 0 };
+    spawnRandomRecords.set(recordKey, record);
+  }
+  const attempt = record.attempts;
+  record.attempts += 1;
+  return randomManager.withEvent(streamName, `${record.index}:attempt:${attempt}`, run);
+}
+
 /**
  * Generates a random integer between min (inclusive) and max (exclusive).
  */
@@ -142,15 +172,16 @@ export function getRandomObstacleType(level: number = 1): ObstacleType {
  * Creates a new obstacle with random properties based on type.
  */
 export function createObstacle(id: string, type: ObstacleType, canvasWidth: number, canvasHeight: number): Obstacle {
-  const baseProps = {
-    id,
-    x: getRandomFloat(0, canvasWidth, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
-    y: getRandomFloat(0, canvasHeight, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
-  };
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.HAZARDS, id, () => {
+    const baseProps = {
+      id,
+      x: getRandomFloat(0, canvasWidth, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+      y: getRandomFloat(0, canvasHeight, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
+    };
 
-  switch (type) {
-    case 'fee':
-      return {
+    switch (type) {
+      case 'fee':
+        return {
         ...baseProps,
         type: 'fee',
         radius: FEE_RADIUS,
@@ -161,11 +192,11 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         },
          glow: false,
       };
-    case 'bug':
-      // CORREGIDO: Usar zona segura para evitar que bugs se queden atrapados en los extremos
-      const safeBugX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-      const safeBugY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
-      return {
+      case 'bug': {
+        // CORREGIDO: Usar zona segura para evitar que bugs se queden atrapados en los extremos
+        const safeBugX = getRandomFloat(BUG_SAFE_ZONE, canvasWidth - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+        const safeBugY = getRandomFloat(BUG_SAFE_ZONE, canvasHeight - BUG_SAFE_ZONE, GAMEPLAY_RANDOM_STREAMS.HAZARDS);
+        return {
         ...baseProps,
         x: safeBugX,
         y: safeBugY,
@@ -175,9 +206,10 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         rotation: getRandomFloat(0, Math.PI * 2, GAMEPLAY_RANDOM_STREAMS.HAZARDS),
         angularVelocity: getRandomFloat(0.03, 0.07, GAMEPLAY_RANDOM_STREAMS.HAZARDS) * (randomManager.random(GAMEPLAY_RANDOM_STREAMS.HAZARDS) > 0.5 ? 1 : -1), // Random direction
         glow: false,
-      };
-    case 'hacker':
-      return {
+        };
+      }
+      case 'hacker':
+        return {
         ...baseProps,
         type: 'hacker',
         radius: HACKER_RADIUS,
@@ -185,8 +217,9 @@ export function createObstacle(id: string, type: ObstacleType, canvasWidth: numb
         velocity: { x: 0, y: 0 }, // Starts stationary, then chases
         glow: false,
         energyCollected: 0, // NUEVO: Inicializar contador de energy recogidas
-      };
-  }
+        };
+    }
+  });
 }
 
 /**
@@ -200,13 +233,14 @@ export function generateId(prefix: string = 'obj'): string {
 
 export function resetIdCounter() {
   generatedIdCounter = 0;
+  resetSpawnRandomEvents();
 }
 
 /**
  * Creates a new energy collectible.
  */
 export function createEnergyCollectible(id: string, canvasWidth: number, canvasHeight: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'energy',
     x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -215,14 +249,14 @@ export function createEnergyCollectible(id: string, canvasWidth: number, canvasH
     color: ENERGY_POINT_COLOR,
     value: ENERGY_POINT_VALUE,
     glow: false,
-  };
+  }));
 }
 
 /**
  * Creates a new uki collectible.
  */
 export function createUkiCollectible(id: string, canvasWidth: number, canvasHeight: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'uki',
     x: getRandomFloat(UKI_RADIUS, canvasWidth - UKI_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -231,45 +265,47 @@ export function createUkiCollectible(id: string, canvasWidth: number, canvasHeig
     color: UKI_COLOR,
     value: UKI_VALUE,
     glow: false,
-  };
+  }));
 }
 
 /**
  * Creates a new treasure collectible (tesoro).
  */
 export function createTreasureCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number, treasureNumber?: number): Collectible {
-  // Asignación defensiva del tipo de tesoro según su orden en el bloque.
-  // Mapeo esperado: 1 -> treasure, 2 -> treasure2, 3+ -> treasure3; undefined/0 -> treasure
-  const ordinal = Math.max(1, Math.min(3, (treasureNumber ?? 1))); // normaliza a [1,3]
-  let treasureType: 'treasure' | 'treasure2' | 'treasure3' = 'treasure';
-  let treasureRadius = TREASURE_RADIUS;
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.CHESTS, id, () => {
+    // Asignación defensiva del tipo de tesoro según su orden en el bloque.
+    // Mapeo esperado: 1 -> treasure, 2 -> treasure2, 3+ -> treasure3; undefined/0 -> treasure
+    const ordinal = Math.max(1, Math.min(3, (treasureNumber ?? 1))); // normaliza a [1,3]
+    let treasureType: 'treasure' | 'treasure2' | 'treasure3' = 'treasure';
+    let treasureRadius = TREASURE_RADIUS;
 
-  if (ordinal === 2) {
-    treasureType = 'treasure2';
-    treasureRadius = TREASURE2_RADIUS;
-  } else if (ordinal === 3) {
-    treasureType = 'treasure3';
-    treasureRadius = TREASURE3_RADIUS;
-  }
+    if (ordinal === 2) {
+      treasureType = 'treasure2';
+      treasureRadius = TREASURE2_RADIUS;
+    } else if (ordinal === 3) {
+      treasureType = 'treasure3';
+      treasureRadius = TREASURE3_RADIUS;
+    }
 
-  return {
-    id,
-    type: treasureType,
-    radius: treasureRadius,
-    x: getRandomFloat(treasureRadius, canvasWidth - treasureRadius, GAMEPLAY_RANDOM_STREAMS.CHESTS),
-    y: getRandomFloat(treasureRadius, canvasHeight - treasureRadius, GAMEPLAY_RANDOM_STREAMS.CHESTS),
-    color: TREASURE_COLOR,
-    value: 0, // valor dinámico por bloque, se suma en lógica
-    glow: false,
-    createdAt: gameTime ?? Date.now(),
-  };
+    return {
+      id,
+      type: treasureType,
+      radius: treasureRadius,
+      x: getRandomFloat(treasureRadius, canvasWidth - treasureRadius, GAMEPLAY_RANDOM_STREAMS.CHESTS),
+      y: getRandomFloat(treasureRadius, canvasHeight - treasureRadius, GAMEPLAY_RANDOM_STREAMS.CHESTS),
+      color: TREASURE_COLOR,
+      value: 0, // valor dinámico por bloque, se suma en lógica
+      glow: false,
+      createdAt: gameTime ?? Date.now(),
+    };
+  });
 }
 
 /**
  * Creates a new mega node collectible.
  */
 export function createMegaNodeCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'megaNode',
     x: getRandomFloat(MEGA_NODE_RADIUS, canvasWidth - MEGA_NODE_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -280,14 +316,14 @@ export function createMegaNodeCollectible(id: string, canvasWidth: number, canva
     glow: false,
     createdAt: gameTime ?? Date.now(), // ✅ Usar tiempo de juego pausable si está disponible
     // Eliminadas propiedades de pulsación
-  };
+  }));
 }
 
 /**
  * Creates a new checkpoint collectible.
  */
 export function createCheckpointCollectible(id: string, canvasWidth: number, canvasHeight: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'checkpoint',
     x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -299,14 +335,14 @@ export function createCheckpointCollectible(id: string, canvasWidth: number, can
     pulseEffect: true,
     pulseScale: 1.0,
     pulseDirection: 1,
-  };
+  }));
 }
 
 /**
  * Creates a new heart collectible.
  */
 export function createHeartCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'heart',
     x: getRandomFloat(ENERGY_POINT_RADIUS, canvasWidth - ENERGY_POINT_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -316,14 +352,14 @@ export function createHeartCollectible(id: string, canvasWidth: number, canvasHe
     value: 0, // No da puntos, solo vida
     glow: false,
     createdAt: gameTime ?? Date.now(), // ✅ Usar tiempo de juego pausable si está disponible
-  };
+  }));
 }
 
 /**
  * Creates a new GOAT skin collectible (special power-up).
  */
 export function createGoatSkinCollectible(id: string, canvasWidth: number, canvasHeight: number, _gameTime?: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'goatSkin',
     x: getRandomFloat(GOAT_SKIN_RADIUS, canvasWidth - GOAT_SKIN_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -335,7 +371,7 @@ export function createGoatSkinCollectible(id: string, canvasWidth: number, canva
     pulseEffect: true,
     pulseScale: 1.0,
     pulseDirection: 1,
-  };
+  }));
 }
 
 /**
@@ -348,21 +384,23 @@ export function createRuneCollectible(
   runeType?: RuneType,
   gameTime?: number
 ): Collectible {
-  const selectedRune = runeType ?? RUNE_TYPES[Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) * RUNE_TYPES.length)];
-  const runeConfig = RUNE_CONFIG[selectedRune];
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.RUNES, id, () => {
+    const selectedRune = runeType ?? RUNE_TYPES[Math.floor(randomManager.random(GAMEPLAY_RANDOM_STREAMS.RUNES) * RUNE_TYPES.length)];
+    const runeConfig = RUNE_CONFIG[selectedRune];
 
-  return {
-    id,
-    type: 'rune',
-    runeType: selectedRune,
-    x: getRandomFloat(RUNE_RADIUS, canvasWidth - RUNE_RADIUS, GAMEPLAY_RANDOM_STREAMS.RUNES),
-    y: getRandomFloat(RUNE_RADIUS, canvasHeight - RUNE_RADIUS, GAMEPLAY_RANDOM_STREAMS.RUNES),
-    radius: RUNE_RADIUS,
-    color: runeConfig?.color ?? '#ffffff',
-    value: 0,
-    glow: false,
-    createdAt: gameTime ?? Date.now(),
-  };
+    return {
+      id,
+      type: 'rune',
+      runeType: selectedRune,
+      x: getRandomFloat(RUNE_RADIUS, canvasWidth - RUNE_RADIUS, GAMEPLAY_RANDOM_STREAMS.RUNES),
+      y: getRandomFloat(RUNE_RADIUS, canvasHeight - RUNE_RADIUS, GAMEPLAY_RANDOM_STREAMS.RUNES),
+      radius: RUNE_RADIUS,
+      color: runeConfig?.color ?? '#ffffff',
+      value: 0,
+      glow: false,
+      createdAt: gameTime ?? Date.now(),
+    };
+  });
 }
 
 /**
@@ -370,6 +408,21 @@ export function createRuneCollectible(
  * MEJORADO: Evita spawn sobre assets positivos (energy, megaNode, purr, vaul, heart, checkpoint)
  */
 export function createStrategicBug(id: string, canvasWidth: number, canvasHeight: number, existingObstacles: Obstacle[], level: number = 1, existingCollectibles: any[] = []): Obstacle {
+  return withSpawnRandom(
+    GAMEPLAY_RANDOM_STREAMS.HAZARDS,
+    id,
+    () => createStrategicBugForEvent(
+      id,
+      canvasWidth,
+      canvasHeight,
+      existingObstacles,
+      level,
+      existingCollectibles,
+    ),
+  );
+}
+
+function createStrategicBugForEvent(id: string, canvasWidth: number, canvasHeight: number, existingObstacles: Obstacle[], level: number = 1, existingCollectibles: any[] = []): Obstacle {
   // CORREGIDO: Usar zona segura para evitar bugs en los extremos
   const safeWidth = canvasWidth - (2 * BUG_SAFE_ZONE);
   const safeHeight = canvasHeight - (2 * BUG_SAFE_ZONE);
@@ -506,7 +559,7 @@ export function createStrategicBug(id: string, canvasWidth: number, canvasHeight
  * Creates a new purr collectible.
  */
 export function createPurrCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'purr',
     x: getRandomFloat(PURR_RADIUS, canvasWidth - PURR_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -516,14 +569,14 @@ export function createPurrCollectible(id: string, canvasWidth: number, canvasHei
     value: PURR_VALUE,
     glow: false,
     createdAt: gameTime ?? Date.now(), // ✅ Usar tiempo de juego pausable si está disponible
-  };
+  }));
 }
 
 /**
  * Creates a new vaul collectible.
  */
 export function createVaulCollectible(id: string, canvasWidth: number, canvasHeight: number, gameTime?: number): Collectible {
-  return {
+  return withSpawnRandom(GAMEPLAY_RANDOM_STREAMS.ITEMS, id, () => ({
     id,
     type: 'vaul',
     x: getRandomFloat(VAUL_RADIUS, canvasWidth - VAUL_RADIUS, GAMEPLAY_RANDOM_STREAMS.ITEMS),
@@ -537,5 +590,5 @@ export function createVaulCollectible(id: string, canvasWidth: number, canvasHei
     isBeingTouched: false,
     isActivated: false,
     timeOnTouch: 0, // Inicializar tiempo acumulado de contacto en 0
-  };
+  }));
 }

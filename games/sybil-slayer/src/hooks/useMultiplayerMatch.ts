@@ -34,6 +34,9 @@ export interface MatchConfig {
   readonly seed: string | null;
   readonly targetDifference: number;
   readonly startAt: number | null;
+  readonly lobbyExpiresAt: number;
+  readonly roundEndsAt: number | null;
+  readonly suddenDeathEndsAt: number | null;
   readonly resumeAt: number | null;
 }
 
@@ -181,7 +184,8 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       controllerRef.current?.publishSnapshot({
         score: finalScore,
         hearts: lifecycle === 'eliminated' ? 0 : (local?.hearts ?? 1),
-        lifecycle,
+        // Only the server resolves a non-elimination terminal result.
+        lifecycle: lifecycle === 'finished' ? 'playing' : lifecycle,
       });
     },
     [],
@@ -213,6 +217,9 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
             seed: match.config.seed,
             targetDifference,
             startAt: match.config.startAt,
+            lobbyExpiresAt: match.config.lobbyExpiresAt,
+            roundEndsAt: match.config.roundEndsAt,
+            suddenDeathEndsAt: match.config.suddenDeathEndsAt,
             resumeAt: match.config.resumeAt,
           }
         : null,

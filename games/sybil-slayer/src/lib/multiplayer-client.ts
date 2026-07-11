@@ -1,3 +1,5 @@
+import { resolveConfiguredParentOrigin } from './parent-origin';
+
 const REQUEST_TYPE = 'TH_MULTIPLAYER_REQUEST' as const;
 const RESPONSE_TYPE = 'TH_MULTIPLAYER_RESPONSE' as const;
 
@@ -74,6 +76,10 @@ export interface PublicMatchPlayer {
 export interface MatchRules {
   readonly winDelta: number;
   readonly initialCountdownMs: number;
+  readonly lobbyTimeoutMs: number;
+  readonly roundDurationMs: number;
+  readonly suddenDeathTimeoutMs: number;
+  readonly terminalRetentionMs: number;
   readonly offlineThresholdMs: number;
   readonly reconnectBudgetMs: number;
   readonly reconnectCountdownMs: number;
@@ -113,6 +119,9 @@ export interface PublicMatch {
   readonly config: MatchRules & {
     readonly seed: string | null;
     readonly startAt: number | null;
+    readonly lobbyExpiresAt: number;
+    readonly roundEndsAt: number | null;
+    readonly suddenDeathEndsAt: number | null;
     readonly resumeAt: number | null;
   };
   readonly players: readonly PublicMatchPlayer[];
@@ -144,7 +153,12 @@ export interface MultiplayerTransport {
 }
 
 export class MultiplayerClientError extends Error {
-  constructor(readonly code: string, message: string) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly retryable = false,
+    readonly httpStatus?: number,
+  ) {
     super(message);
     this.name = 'MultiplayerClientError';
   }
@@ -163,46 +177,76 @@ const MATCH_STATUSES = new Set<MatchStatus>([
   'finished',
   'abandoned',
 ]);
+const PLAYER_LIFECYCLES = new Set<PlayerLifecycle>([
+  'waiting',
+  'ready',
+  'playing',
+  'eliminated',
+  'finished',
+]);
+const PLAYER_PRESENCES = new Set<PlayerPresence>(['online', 'offline', 'forfeited']);
+
+function isTimestampOrNull(value: unknown): value is number | null {
+  return value === null || (Number.isSafeInteger(value) && (value as number) >= 0);
+}
 
 function isPublicMatchPayload(value: unknown): value is PublicMatch {
   if (!isRecord(value) || !isRecord(value.config) || !Array.isArray(value.players)) return false;
   return (
     typeof value.matchId === 'string' &&
     typeof value.roomCode === 'string' &&
-    Number.isSafeInteger(value.revision) &&
+    value.gameId === 'treasure-hunt' &&
+    value.mode === 'staging_unranked' &&
+    value.rewardEligible === false &&
+    Number.isSafeInteger(value.revision) && (value.revision as number) >= 0 &&
     typeof value.status === 'string' &&
     MATCH_STATUSES.has(value.status as MatchStatus) &&
+    (value.config.seed === null || typeof value.config.seed === 'string') &&
+    isTimestampOrNull(value.config.startAt) &&
+    Number.isSafeInteger(value.config.lobbyExpiresAt) &&
+    (value.config.lobbyExpiresAt as number) >= 0 &&
+    isTimestampOrNull(value.config.roundEndsAt) &&
+    isTimestampOrNull(value.config.suddenDeathEndsAt) &&
+    isTimestampOrNull(value.config.resumeAt) &&
     value.players.every(
       (player) =>
         isRecord(player) &&
         typeof player.playerId === 'string' &&
+        (player.slot === 0 || player.slot === 1) &&
         Number.isSafeInteger(player.seq) &&
-        ((player.seq as number) === -1 || (player.seq as number) >= 0),
+        ((player.seq as number) === -1 || (player.seq as number) >= 0) &&
+        Number.isSafeInteger(player.score) && (player.score as number) >= 0 &&
+        Number.isSafeInteger(player.hearts) && (player.hearts as number) >= 0 &&
+        Number.isSafeInteger(player.elapsedMs) && (player.elapsedMs as number) >= 0 &&
+        typeof player.lifecycle === 'string' &&
+        PLAYER_LIFECYCLES.has(player.lifecycle as PlayerLifecycle) &&
+        typeof player.presence === 'string' &&
+        PLAYER_PRESENCES.has(player.presence as PlayerPresence) &&
+        Number.isSafeInteger(player.reconnectBudgetRemainingMs) &&
+        (player.reconnectBudgetRemainingMs as number) >= 0,
     )
   );
 }
 
-function safeOrigin(candidate: string | undefined): string | null {
-  if (!candidate) return null;
+export function resolveParentOrigin(
+  referrer: string,
+  dappOrigin?: string,
+  parentUrl: string | undefined = process.env.NEXT_PUBLIC_PARENT_URL,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): string {
   try {
-    const url = new URL(candidate);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.origin !== 'null'
-      ? url.origin
-      : null;
+    return resolveConfiguredParentOrigin(
+      referrer,
+      dappOrigin,
+      parentUrl,
+      nodeEnv,
+    );
   } catch {
-    return null;
-  }
-}
-
-export function resolveParentOrigin(referrer: string, fallbackOrigin?: string): string {
-  const origin = safeOrigin(referrer) ?? safeOrigin(fallbackOrigin);
-  if (!origin) {
     throw new MultiplayerClientError(
       'PARENT_ORIGIN_UNAVAILABLE',
       'No se pudo determinar el origen seguro del hub',
     );
   }
-  return origin;
 }
 
 function defaultRequestIdFactory(cryptoApi: Crypto): string {
@@ -226,7 +270,16 @@ function publicResponseError(value: unknown): MultiplayerClientError {
     error && typeof error.code === 'string' && /^[A-Z0-9_]{1,64}$/.test(error.code)
       ? error.code
       : 'REQUEST_FAILED';
-  return new MultiplayerClientError(code, 'No se pudo completar la solicitud multiplayer');
+  const retryable = error?.retryable === true;
+  const httpStatus = error && Number.isSafeInteger(error.httpStatus)
+    ? error.httpStatus as number
+    : undefined;
+  return new MultiplayerClientError(
+    code,
+    'No se pudo completar la solicitud multiplayer',
+    retryable,
+    httpStatus,
+  );
 }
 
 interface PendingRequest {
@@ -239,9 +292,11 @@ export interface ParentTransportOptions {
   readonly windowObject?: Window;
   readonly referrer?: string;
   readonly fallbackOrigin?: string;
-  readonly parentOrigin?: string;
+  readonly parentUrl?: string;
+  readonly nodeEnv?: string;
   readonly cryptoApi?: Crypto;
   readonly requestIdFactory?: () => string;
+  readonly clientId?: string;
   readonly timeoutMs?: number;
 }
 
@@ -249,15 +304,28 @@ export function createTreasureHuntParentTransport(
   options: ParentTransportOptions = {},
 ): MultiplayerTransport {
   const windowObject = options.windowObject ?? window;
-  const parentOrigin =
-    safeOrigin(options.parentOrigin) ??
-    resolveParentOrigin(
-      options.referrer ?? windowObject.document.referrer,
-      options.fallbackOrigin ?? process.env.NEXT_PUBLIC_DAPP_ORIGIN,
-    );
+  const parentOrigin = (() => {
+      try {
+        return resolveConfiguredParentOrigin(
+          options.referrer ?? windowObject.document.referrer,
+          options.fallbackOrigin ?? process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+          options.parentUrl ?? process.env.NEXT_PUBLIC_PARENT_URL,
+          options.nodeEnv ?? process.env.NODE_ENV,
+        );
+      } catch {
+        throw new MultiplayerClientError(
+          'PARENT_ORIGIN_UNAVAILABLE',
+          'No se pudo determinar el origen seguro del hub',
+        );
+      }
+    })();
   const cryptoApi = options.cryptoApi ?? windowObject.crypto;
   const timeoutMs = options.timeoutMs ?? 8_000;
   const pending = new Map<string, PendingRequest>();
+  const clientId = options.clientId ?? defaultRequestIdFactory(cryptoApi);
+  if (clientId.length === 0 || clientId.length > 128) {
+    throw new MultiplayerClientError('INVALID_CLIENT_ID', 'El cliente multiplayer no es válido');
+  }
   let closed = false;
 
   const nextRequestId = (): string => {
@@ -306,6 +374,7 @@ export function createTreasureHuntParentTransport(
           new MultiplayerClientError(
             'REQUEST_TIMEOUT',
             'La solicitud multiplayer ha agotado el tiempo de espera',
+            true,
           ),
         );
       }, timeoutMs);
@@ -316,7 +385,7 @@ export function createTreasureHuntParentTransport(
       });
       try {
         windowObject.parent.postMessage(
-          { type: REQUEST_TYPE, requestId, command, payload },
+          { type: REQUEST_TYPE, clientId, requestId, command, payload },
           parentOrigin,
         );
       } catch {
@@ -326,6 +395,7 @@ export function createTreasureHuntParentTransport(
           new MultiplayerClientError(
             'REQUEST_FAILED',
             'No se pudo completar la solicitud multiplayer',
+            true,
           ),
         );
       }
@@ -396,6 +466,7 @@ export interface MultiplayerControllerOptions {
   readonly heartbeatIntervalMs?: number;
   readonly snapshotThrottleMs?: number;
   readonly maxBackoffMs?: number;
+  readonly retryJitter?: () => number;
 }
 
 const INITIAL_CONTROLLER_STATE: MultiplayerControllerState = {
@@ -454,19 +525,23 @@ export class TreasureHuntMultiplayerController {
   private seed: string | null = null;
   private seedApplied = false;
   private hasStarted = false;
+  private lastResumeAtSignaled: number | null = null;
+  private lastPresenceWriteAt = Number.NEGATIVE_INFINITY;
 
   private readonly now: () => number;
   private readonly pollIntervalMs: number;
   private readonly heartbeatIntervalMs: number;
   private readonly snapshotThrottleMs: number;
   private readonly maxBackoffMs: number;
+  private readonly retryJitter: () => number;
 
   constructor(private readonly options: MultiplayerControllerOptions) {
     this.now = options.now ?? Date.now;
-    this.pollIntervalMs = options.pollIntervalMs ?? 650;
-    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 1_500;
-    this.snapshotThrottleMs = options.snapshotThrottleMs ?? 250;
+    this.pollIntervalMs = Math.min(750, Math.max(250, options.pollIntervalMs ?? 700));
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 2_000;
+    this.snapshotThrottleMs = options.snapshotThrottleMs ?? 500;
     this.maxBackoffMs = options.maxBackoffMs ?? 4_000;
+    this.retryJitter = options.retryJitter ?? Math.random;
   }
 
   getState(): MultiplayerControllerState {
@@ -521,6 +596,7 @@ export class TreasureHuntMultiplayerController {
           error: null,
         });
         this.applyServerMatch(response.match);
+        this.lastPresenceWriteAt = this.now();
         if (!this.isCurrentMatchTerminal()) {
           this.schedulePoll(this.pollIntervalMs, generation);
           this.scheduleHeartbeat(this.heartbeatIntervalMs, generation);
@@ -575,13 +651,20 @@ export class TreasureHuntMultiplayerController {
         this.seedApplied = true;
       }
       this.hasStarted = true;
+      this.lastResumeAtSignaled = next.config.resumeAt;
       startSignal += 1;
     } else if (
       isActive(next.status) &&
       this.hasStarted &&
-      previous?.status === 'countdown' &&
-      previous.config.resumeAt !== null
+      (next.config.resumeAt ?? previous?.config.resumeAt) !== null &&
+      (next.config.resumeAt ?? previous?.config.resumeAt) !== this.lastResumeAtSignaled &&
+      (
+        previous?.status === 'paused_reconnect' ||
+        previous?.status === 'countdown' ||
+        previous?.config.resumeAt !== next.config.resumeAt
+      )
     ) {
+      this.lastResumeAtSignaled = next.config.resumeAt ?? previous?.config.resumeAt ?? null;
       resumeSignal += 1;
     }
 
@@ -593,10 +676,13 @@ export class TreasureHuntMultiplayerController {
   publishSnapshot(input: LocalSnapshotInput): void {
     const status = this.state.match?.status;
     if (!status || !isActive(status) || !this.state.playerId) return;
+    // `finished` is a server-derived terminal state. The client may publish
+    // its last score, but it must not be able to finish the canonical match.
+    const lifecycle = input.lifecycle === 'finished' ? 'playing' : input.lifecycle;
     const normalized: LocalSnapshotInput = {
       score: Math.max(0, Math.floor(input.score)),
       hearts: Math.max(0, Math.floor(input.hearts)),
-      lifecycle: input.lifecycle,
+      lifecycle,
     };
     const hash = JSON.stringify(normalized);
     if (hash === this.lastSnapshotHash || hash === JSON.stringify(this.pendingSnapshot)) return;
@@ -644,11 +730,17 @@ export class TreasureHuntMultiplayerController {
     try {
       const response = await this.options.transport.snapshot(snapshot);
       if (this.generation !== generation || this.disposed) return;
+      this.lastPresenceWriteAt = this.now();
       this.lastSnapshotHash = JSON.stringify(source);
       this.applyServerMatch(response.match);
     } catch (error) {
       if (this.generation !== generation || this.disposed) return;
-      if (this.state.match && isActive(this.state.match.status) && !this.pendingSnapshot) {
+      if (
+        (!(error instanceof MultiplayerClientError) || error.retryable) &&
+        this.state.match &&
+        isActive(this.state.match.status) &&
+        !this.pendingSnapshot
+      ) {
         this.pendingSnapshot = source;
       }
       this.emit({ error: publicControllerError(error) });
@@ -676,6 +768,7 @@ export class TreasureHuntMultiplayerController {
     }
     const flight = Symbol('poll');
     this.pollFlight = flight;
+    let shouldRetry = true;
     try {
       const response = await this.options.transport.get();
       if (this.generation !== generation || this.disposed) return;
@@ -683,20 +776,20 @@ export class TreasureHuntMultiplayerController {
       this.applyServerMatch(response.match);
     } catch (error) {
       if (this.generation !== generation || this.disposed) return;
+      shouldRetry = !(error instanceof MultiplayerClientError) || error.retryable;
       this.pollFailures += 1;
       this.emit({ error: publicControllerError(error) });
+      if (!shouldRetry) this.stopScheduledWork();
     } finally {
       if (
         this.pollFlight === flight &&
         this.generation === generation &&
         !this.disposed &&
+        shouldRetry &&
         !this.isCurrentMatchTerminal()
       ) {
         this.pollFlight = null;
-        const delay = Math.min(
-          this.maxBackoffMs,
-          this.pollIntervalMs * Math.max(1, 2 ** this.pollFailures),
-        );
+        const delay = this.retryDelay(this.pollIntervalMs, this.pollFailures);
         this.schedulePoll(delay, generation);
       } else if (this.pollFlight === flight) {
         this.pollFlight = null;
@@ -714,33 +807,40 @@ export class TreasureHuntMultiplayerController {
 
   private async runHeartbeat(generation: number): Promise<void> {
     if (this.generation !== generation || this.disposed) return;
+    const presenceAge = this.now() - this.lastPresenceWriteAt;
+    if (presenceAge >= 0 && presenceAge < this.heartbeatIntervalMs) {
+      this.scheduleHeartbeat(this.heartbeatIntervalMs - presenceAge, generation);
+      return;
+    }
     if (this.heartbeatFlight) {
       this.scheduleHeartbeat(this.heartbeatIntervalMs, generation);
       return;
     }
     const flight = Symbol('heartbeat');
     this.heartbeatFlight = flight;
+    let shouldRetry = true;
     try {
       const response = await this.options.transport.heartbeat();
       if (this.generation !== generation || this.disposed) return;
+      this.lastPresenceWriteAt = this.now();
       this.heartbeatFailures = 0;
       this.applyServerMatch(response.match);
     } catch (error) {
       if (this.generation !== generation || this.disposed) return;
+      shouldRetry = !(error instanceof MultiplayerClientError) || error.retryable;
       this.heartbeatFailures += 1;
       this.emit({ error: publicControllerError(error) });
+      if (!shouldRetry) this.stopScheduledWork();
     } finally {
       if (
         this.heartbeatFlight === flight &&
         this.generation === generation &&
         !this.disposed &&
+        shouldRetry &&
         !this.isCurrentMatchTerminal()
       ) {
         this.heartbeatFlight = null;
-        const delay = Math.min(
-          this.maxBackoffMs,
-          this.heartbeatIntervalMs * Math.max(1, 2 ** this.heartbeatFailures),
-        );
+        const delay = this.retryDelay(this.heartbeatIntervalMs, this.heartbeatFailures);
         this.scheduleHeartbeat(delay, generation);
       } else if (this.heartbeatFlight === flight) {
         this.heartbeatFlight = null;
@@ -750,6 +850,15 @@ export class TreasureHuntMultiplayerController {
 
   private isCurrentMatchTerminal(): boolean {
     return Boolean(this.state.match && isTerminal(this.state.match.status));
+  }
+
+  private retryDelay(baseDelay: number, failures: number): number {
+    const exponential = Math.min(
+      this.maxBackoffMs,
+      baseDelay * Math.max(1, 2 ** failures),
+    );
+    const jitter = 0.85 + Math.min(1, Math.max(0, this.retryJitter())) * 0.3;
+    return Math.min(this.maxBackoffMs, Math.max(baseDelay, Math.round(exponential * jitter)));
   }
 
   private stopScheduledWork(): void {
@@ -797,6 +906,8 @@ export class TreasureHuntMultiplayerController {
         this.seed = null;
         this.seedApplied = false;
         this.hasStarted = false;
+        this.lastResumeAtSignaled = null;
+        this.lastPresenceWriteAt = Number.NEGATIVE_INFINITY;
         this.state = INITIAL_CONTROLLER_STATE;
         this.options.onState?.(this.state);
       })
