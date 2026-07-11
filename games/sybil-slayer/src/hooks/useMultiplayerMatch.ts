@@ -10,12 +10,12 @@ import {
   type PublicMatchPlayer,
   type SuddenDeathState,
   type MultiplayerControllerState,
-} from '@/lib/multiplayer-client';
-import { randomManager } from '@/lib/random';
+} from '../lib/multiplayer-client';
+import { randomManager } from '../lib/random';
 import {
   isTreasureHuntMatchNonTerminal,
   isTreasureHuntMultiplayerEnabled,
-} from '@/lib/multiplayer-feature';
+} from '../lib/multiplayer-feature';
 
 export type MultiplayerStatus =
   | 'idle'
@@ -105,25 +105,56 @@ function toStatus(state: MultiplayerControllerState, setupError: string | null):
   return state.match.status;
 }
 
-export function useMultiplayerMatch(): UseMultiplayerMatchValue {
+export function shouldResetLocalGameForAuthorityChange(
+  previousSessionId: string | null,
+  nextSessionId: string | null,
+): boolean {
+  return previousSessionId !== null && previousSessionId !== nextSessionId;
+}
+
+export function useMultiplayerMatch(
+  authoritySessionId: string | null,
+): UseMultiplayerMatchValue {
   const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
   const controllerRef = useRef<TreasureHuntMultiplayerController | null>(null);
+  const authorityGenerationRef = useRef(0);
   const [controllerState, setControllerState] = useState<MultiplayerControllerState>(INITIAL_STATE);
   const [setupError, setSetupError] = useState<string | null>(null);
 
   useEffect(() => {
+    const authorityGeneration = ++authorityGenerationRef.current;
+    controllerRef.current = null;
+    setControllerState(INITIAL_STATE);
+    setSetupError(null);
+    randomManager.clear();
+
+    if (!authoritySessionId || !multiplayerEnabled) {
+      return undefined;
+    }
+
     try {
       const transport = createTreasureHuntParentTransport();
       const controller = new TreasureHuntMultiplayerController({
         transport,
         enabled: multiplayerEnabled,
-        onSeed: (seed) => randomManager.setSeed(seed),
-        onState: (state) => setControllerState({ ...state }),
+        onSeed: (seed) => {
+          if (authorityGenerationRef.current === authorityGeneration) {
+            randomManager.setSeed(seed);
+          }
+        },
+        onState: (state) => {
+          if (authorityGenerationRef.current === authorityGeneration) {
+            setControllerState({ ...state });
+          }
+        },
       });
       controllerRef.current = controller;
-      setSetupError(null);
       return () => {
+        if (authorityGenerationRef.current === authorityGeneration) {
+          authorityGenerationRef.current += 1;
+        }
         controller.dispose();
+        randomManager.clear();
         if (controllerRef.current === controller) controllerRef.current = null;
       };
     } catch (error) {
@@ -134,20 +165,30 @@ export function useMultiplayerMatch(): UseMultiplayerMatchValue {
       );
       return undefined;
     }
-  }, [multiplayerEnabled]);
+  }, [authoritySessionId, multiplayerEnabled]);
 
   const initiateMatch = useCallback(async (roomCode: string) => {
     if (!multiplayerEnabled) {
-      setSetupError('El modo multiplayer no está habilitado');
-      return;
+      throw new MultiplayerClientError(
+        'FEATURE_DISABLED',
+        'El modo multiplayer no está habilitado',
+      );
+    }
+    if (!authoritySessionId) {
+      throw new MultiplayerClientError(
+        'AUTHORITY_SESSION_UNAVAILABLE',
+        'La sesión autorizada del juego aún no está disponible',
+      );
     }
     const controller = controllerRef.current;
     if (!controller) {
-      setSetupError(setupError ?? 'El cliente multiplayer aún no está disponible');
-      return;
+      throw new MultiplayerClientError(
+        'AUTHORITY_SESSION_UNAVAILABLE',
+        setupError ?? 'El cliente multiplayer aún no está disponible',
+      );
     }
     await controller.join(roomCode);
-  }, [multiplayerEnabled, setupError]);
+  }, [authoritySessionId, multiplayerEnabled, setupError]);
 
   const publishLocalSnapshot = useCallback(
     (snapshot: {

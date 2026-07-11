@@ -10,7 +10,9 @@ import { useGameState } from '../hooks/useGameState';
 import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
-import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
+import useMultiplayerMatch, {
+  shouldResetLocalGameForAuthorityChange,
+} from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
@@ -479,7 +481,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     startCheckpointInterval,
     channel,
   } = usePusherConnection();
-  const multiplayer = useMultiplayerMatch();
+  const multiplayerAuthoritySessionId = sessionData?.sessionId ?? null;
+  const multiplayer = useMultiplayerMatch(multiplayerAuthoritySessionId);
   const releaseMultiplayerSession = useCallback(async () => {
     try {
       if (!sessionData?.sessionId) {
@@ -853,6 +856,28 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     playSound,
     handleHackerEscape,
   );
+
+  const previousMultiplayerAuthoritySessionRef = useRef<string | null>(
+    multiplayerAuthoritySessionId,
+  );
+  useEffect(() => {
+    const previousSessionId = previousMultiplayerAuthoritySessionRef.current;
+    if (previousSessionId === multiplayerAuthoritySessionId) return;
+
+    previousMultiplayerAuthoritySessionRef.current = multiplayerAuthoritySessionId;
+    if (!shouldResetLocalGameForAuthorityChange(
+      previousSessionId,
+      multiplayerAuthoritySessionId,
+    )) return;
+
+    // The old controller belongs to a different wallet/GameSession. Never try
+    // to release it through the new cookie authority; the server sweeper owns
+    // disconnect resolution. Locally, drop every UI/gameplay remnant at once.
+    setMultiplayerJoinFailure(null);
+    setModeSelectOpen(false);
+    setCurrentMode('single');
+    resetGame();
+  }, [multiplayerAuthoritySessionId, resetGame]);
 
   // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
   useEffect(() => {
