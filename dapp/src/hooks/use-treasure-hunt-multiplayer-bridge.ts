@@ -135,6 +135,10 @@ function isTerminalMatchStatus(value: unknown): boolean {
   return value === 'finished' || value === 'abandoned';
 }
 
+function requiresReloadForfeit(value: unknown): boolean {
+  return value === 'running' || value === 'sudden_death' || value === 'paused_reconnect';
+}
+
 function waitForPendingJoins(
   operations: readonly Promise<void>[],
   signal: AbortSignal,
@@ -221,10 +225,37 @@ export function createTreasureHuntMultiplayerBridge(
   let knownMatchId: string | null = null;
   let knownRoomCode: string | null = null;
   let knownMatchStatus: string | null = null;
+  let knownIframeClientInstanceId: string | null = null;
   let pendingRoomCode: string | null = null;
   let sessionReleased = false;
   let generation = 0;
   let disposed = false;
+
+  const forfeitCanonicalMatch = async (matchId: string, signal: AbortSignal) => {
+    const response = await fetchImpl(
+      `${MULTIPLAYER_API}/${encodeURIComponent(matchId)}`,
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'forfeit',
+          gameSessionId: options.currentSessionId,
+          clientInstanceId: authorityClientInstanceId,
+        }),
+        signal,
+      },
+    );
+    const data = await readApiResponse(response);
+    if (
+      !isRecord(data.match) ||
+      data.match.matchId !== matchId ||
+      !isTerminalMatchStatus(data.match.status)
+    ) {
+      throw new BridgeError('INVALID_RESPONSE', 'Multiplayer forfeit failed');
+    }
+    return data.match;
+  };
 
   const handleMessage = (event: MessageEvent) => {
     const frameWindow = options.iframeRef.current?.contentWindow;
@@ -294,6 +325,7 @@ export function createTreasureHuntMultiplayerBridge(
       knownMatchId = null;
       knownRoomCode = null;
       knownMatchStatus = null;
+      knownIframeClientInstanceId = null;
       pendingRoomCode = null;
       frameWindow.postMessage(
         {
@@ -339,6 +371,11 @@ export function createTreasureHuntMultiplayerBridge(
 
         if (request.command === 'join') {
           const roomCode = requireRoomCode(request.payload.roomCode);
+          const isIframeReload = Boolean(
+            knownMatchId &&
+            knownIframeClientInstanceId &&
+            request.clientInstanceId !== knownIframeClientInstanceId,
+          );
           if (knownRoomCode && roomCode !== knownRoomCode) {
             throw new BridgeError(
               'MATCH_PINNED',
@@ -353,6 +390,20 @@ export function createTreasureHuntMultiplayerBridge(
           }
           pendingRoomCode = roomCode;
           ownedPendingRoomCode = roomCode;
+          if (isIframeReload && knownMatchId && requiresReloadForfeit(knownMatchStatus)) {
+            const forfeitedMatch = await forfeitCanonicalMatch(
+              knownMatchId,
+              abortController.signal,
+            );
+            knownMatchStatus = forfeitedMatch.status as string;
+            if (
+              disposed ||
+              abortController.signal.aborted ||
+              requestGeneration !== generation
+            ) {
+              return;
+            }
+          }
           const response = await fetchImpl(MULTIPLAYER_API, {
             method: 'POST',
             credentials: 'same-origin',
@@ -394,6 +445,25 @@ export function createTreasureHuntMultiplayerBridge(
           ) {
             throw new BridgeError('INVALID_RESPONSE', 'Multiplayer request failed');
           }
+          knownMatchStatus = typeof data.match.status === 'string'
+            ? data.match.status
+            : knownMatchStatus;
+          if (isIframeReload && requiresReloadForfeit(data.match.status)) {
+            const forfeitedMatch = await forfeitCanonicalMatch(
+              data.match.matchId,
+              abortController.signal,
+            );
+            if (
+              disposed ||
+              abortController.signal.aborted ||
+              requestGeneration !== generation
+            ) {
+              return;
+            }
+            knownMatchStatus = forfeitedMatch.status as string;
+            data = { ...data, match: forfeitedMatch };
+          }
+          knownIframeClientInstanceId = request.clientInstanceId;
           const inviteUrl = buildTreasureHuntInviteUrl(windowObject, canonicalRoomCode);
           options.onRoomJoined?.(canonicalRoomCode);
           data = { ...data, inviteUrl };

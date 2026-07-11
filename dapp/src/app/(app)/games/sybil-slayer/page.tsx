@@ -96,10 +96,21 @@ export default function SybilSlayerPage() {
 
   useEffect(() => {
     const nextWalletUserId = user?.id ?? null;
-    if (cleanedWalletUserIdRef.current === nextWalletUserId) {
+    const previousWalletUserId = cleanedWalletUserIdRef.current;
+    if (previousWalletUserId === nextWalletUserId) {
       return;
     }
 
+    if (previousWalletUserId !== null) {
+      setRoomId(null);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('room');
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
     sendSessionClear(latestParentGameSessionRef.current?.sessionId ?? null);
     sessionStarterRef.current?.reset();
     setParentGameSession(null);

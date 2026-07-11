@@ -219,6 +219,95 @@ describe('SybilSlayerPage game-session handshake', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves an invite for the first wallet but clears it before another wallet handshakes', async () => {
+    window.history.replaceState(
+      { navigation: 'test' },
+      '',
+      '/games/sybil-slayer?room=INVITED&campaign=summer#score',
+    );
+    mockUseAuth.mockReturnValue({ isLoading: false, user: null });
+    const sessionResponse = (sessionId: string) => new Response(
+      JSON.stringify({
+        success: true,
+        sessionId,
+        sessionToken: `${sessionId}-token`,
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(sessionResponse('session-a'))
+      .mockResolvedValueOnce(sessionResponse('session-b'));
+    global.fetch = fetchMock as typeof fetch;
+
+    const view = render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      user: { id: 'wallet-a', username: 'Wallet A', email: 'a@example.test' },
+    });
+    view.rerender(<SybilSlayerPage />);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('session-a'));
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'GAME_SESSION_START',
+        payload: expect.objectContaining({
+          sessionId: 'session-a',
+          roomId: 'INVITED',
+          userId: 'wallet-a',
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+    expect(new URLSearchParams(window.location.search).get('room')).toBe('INVITED');
+
+    postMessage.mockClear();
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      user: { id: 'wallet-b', username: 'Wallet B', email: 'b@example.test' },
+    });
+    view.rerender(<SybilSlayerPage />);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('session-b'));
+    expect(new URLSearchParams(window.location.search).get('room')).toBeNull();
+    expect(new URLSearchParams(window.location.search).get('campaign')).toBe('summer');
+    expect(window.location.hash).toBe('#score');
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'GAME_SESSION_START',
+        payload: expect.objectContaining({
+          sessionId: 'session-b',
+          roomId: null,
+          userId: 'wallet-b',
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+  });
+
   it('aborts wallet A, ignores its late response, starts wallet B and clears B on disconnect', async () => {
     const pendingRequests: Array<{
       resolve: (response: Response) => void;
