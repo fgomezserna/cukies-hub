@@ -49,8 +49,18 @@ function createHarness(ruleOverrides: Partial<MatchRules> = {}) {
   return { repository, clock, service };
 }
 
-const first = { roomCode: 'ROOM', userId: 'user-a', gameSessionId: 'session-a' };
-const second = { roomCode: 'ROOM', userId: 'user-b', gameSessionId: 'session-b' };
+const first = {
+  roomCode: 'ROOM',
+  userId: 'user-a',
+  gameSessionId: 'session-a',
+  clientInstanceId: 'instance-a',
+};
+const second = {
+  roomCode: 'ROOM',
+  userId: 'user-b',
+  gameSessionId: 'session-b',
+  clientInstanceId: 'instance-b',
+};
 
 describe('TreasureHuntMultiplayerService', () => {
   it('creates and joins idempotently, keeps config stable and exposes no internal identity', async () => {
@@ -97,6 +107,7 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(publicJson).not.toContain('session-a');
     expect(publicJson).not.toContain('userId');
     expect(publicJson).not.toContain('gameSessionId');
+    expect(publicJson).not.toContain('clientInstanceId');
     expect(publicJson).not.toContain('nextReconcileAt');
     expect(publicJson).not.toContain('expiresAt');
 
@@ -105,6 +116,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: created.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
     });
     expect(running.status).toBe('running');
     expect(running.config.seed).toBe(joined.match.config.seed);
@@ -125,6 +137,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: created.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       }),
     ).resolves.toMatchObject({ status: 'running' });
 
@@ -137,6 +150,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: created.match.matchId,
         userId: first.userId,
         gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       }),
     ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
     await expect(
@@ -144,6 +158,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: created.match.matchId,
         userId: 'not-a-player',
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       }),
     ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
 
@@ -182,7 +197,12 @@ describe('TreasureHuntMultiplayerService', () => {
 
     const results = await Promise.allSettled([
       service.createOrJoin(second),
-      service.createOrJoin({ roomCode: 'ROOM', userId: 'user-c', gameSessionId: 'session-c' }),
+      service.createOrJoin({
+        roomCode: 'ROOM',
+        userId: 'user-c',
+        gameSessionId: 'session-c',
+        clientInstanceId: 'instance-c',
+      }),
     ]);
 
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
@@ -199,7 +219,12 @@ describe('TreasureHuntMultiplayerService', () => {
     await service.createOrJoin(second);
 
     await expect(
-      service.createOrJoin({ roomCode: 'ROOM', userId: 'user-c', gameSessionId: 'session-c' }),
+      service.createOrJoin({
+        roomCode: 'ROOM',
+        userId: 'user-c',
+        gameSessionId: 'session-c',
+        clientInstanceId: 'instance-c',
+      }),
     ).rejects.toMatchObject({ code: 'MATCH_FULL', statusCode: 409 });
   });
 
@@ -215,6 +240,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       snapshot,
     });
     expect(updated.players.find((player) => player.playerId === joinedFirst.playerId)?.seq).toBe(1);
@@ -224,6 +250,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
@@ -233,6 +260,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: { ...snapshot, seq: 0 },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
@@ -249,6 +277,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: {
           seq: 0,
           score: 10_000_000,
@@ -263,6 +292,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: {
           seq: 0,
           score: 10_000_000,
@@ -282,6 +312,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       snapshot: { seq: 0, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
     });
     expect(firstAccepted.players[0]).toMatchObject({ score: 100, elapsedMs: 0 });
@@ -295,6 +326,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       snapshot: { seq: 1, score: 200, hearts: 3, elapsedMs: 1_000, lifecycle: 'playing' },
     });
     expect(secondAccepted.players[0]).toMatchObject({ score: 200, elapsedMs: 1_000 });
@@ -305,7 +337,7 @@ describe('TreasureHuntMultiplayerService', () => {
   });
 
   it('finishes once at the default winDelta of 500', async () => {
-    const { clock, service } = createHarness();
+    const { repository, clock, service } = createHarness();
     const joinedFirst = await service.createOrJoin(first);
     await service.createOrJoin(second);
     clock.value = 1_001;
@@ -314,6 +346,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       snapshot: { seq: 0, score: 500, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
     });
 
@@ -322,6 +355,7 @@ describe('TreasureHuntMultiplayerService', () => {
       winnerPlayerId: joinedFirst.playerId,
       reason: 'score_difference',
     });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.activeUserIds).toEqual([]);
     expect((await service.reconcile(joinedFirst.match.matchId)).result).toEqual(finished.result);
   });
 
@@ -344,6 +378,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: {
           seq: 0,
           score: firstScore,
@@ -363,6 +398,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: second.userId,
         gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
         snapshot: {
           seq: 0,
           score: secondScore,
@@ -394,6 +430,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: { seq: 0, score: 0, hearts: 3, elapsedMs: 1, lifecycle: 'finished' },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
@@ -414,12 +451,14 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
     });
     await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       snapshot: { seq: 0, score: 200, hearts: 0, elapsedMs: 100, lifecycle: 'eliminated' },
     });
     clock.value = 201;
@@ -435,6 +474,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       snapshot: lateSnapshot,
     });
 
@@ -456,6 +496,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       snapshot: lateSnapshot,
     });
     expect(repeated.result).toEqual(terminal.result);
@@ -474,6 +515,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: waitingFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
@@ -484,6 +526,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: waitingFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
@@ -504,23 +547,27 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: pausedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
     });
     await pausedHarness.service.heartbeat({
       matchId: pausedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     pausedHarness.clock.value = 250;
     await pausedHarness.service.heartbeat({
       matchId: pausedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     await expect(
       pausedHarness.service.updateSnapshot({
         matchId: pausedFirst.match.matchId,
         userId: second.userId,
         gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
         snapshot,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
@@ -530,12 +577,14 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: pausedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
     });
     await expect(
       pausedHarness.service.updateSnapshot({
         matchId: pausedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
@@ -560,12 +609,14 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
     });
     await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
       snapshot: { seq: 0, score: 600, hearts: 0, elapsedMs: 100, lifecycle: 'eliminated' },
     });
 
@@ -574,6 +625,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: { seq: 1, score: 650, hearts: 0, elapsedMs: 150, lifecycle: 'eliminated' },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
@@ -589,6 +641,7 @@ describe('TreasureHuntMultiplayerService', () => {
         matchId: joinedFirst.match.matchId,
         userId: first.userId,
         gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
         snapshot: { seq: 1, score: 650, hearts: 0, elapsedMs: 200, lifecycle: 'eliminated' },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
@@ -598,6 +651,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       snapshot: { seq: 1, score: 601, hearts: 0, elapsedMs: 201, lifecycle: 'eliminated' },
     });
     expect(finished.result).toMatchObject({
@@ -621,11 +675,13 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
     });
     await service.heartbeat({
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
 
     clock.value = 250;
@@ -633,8 +689,10 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     expect(paused.status).toBe('paused_reconnect');
+    expect(paused.config.resumeEpoch).toBe(0);
     expect(paused.players.find((player) => player.playerId === joinedFirst.playerId)).toMatchObject({
       slot: 0,
       presence: 'offline',
@@ -646,9 +704,11 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
     });
     expect(resuming.status).toBe('countdown');
     expect(resuming.config.resumeAt).toBe(3_300);
+    expect(resuming.config.resumeEpoch).toBe(1);
     expect(resuming.players.find((player) => player.playerId === joinedFirst.playerId)).toMatchObject({
       slot: 0,
       presence: 'online',
@@ -660,12 +720,14 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     clock.value = 801;
     const forfeited = await service.heartbeat({
       matchId: joinedFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     expect(forfeited.result).toMatchObject({
       winnerPlayerId: forfeited.players.find((player) => player.slot === 1)?.playerId,
@@ -673,8 +735,53 @@ describe('TreasureHuntMultiplayerService', () => {
     });
   });
 
+  it('increments resumeEpoch exactly once for each persisted resume sequence', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 10,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 1_000,
+      reconnectCountdownMs: 50,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 10;
+    await service.reconcile(joinedFirst.match.matchId);
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second });
+
+    clock.value = 111;
+    expect(
+      (await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second })).status,
+    ).toBe('paused_reconnect');
+    clock.value = 120;
+    const firstResume = await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    expect(firstResume).toMatchObject({
+      status: 'countdown',
+      config: { resumeEpoch: 1, resumeAt: 170 },
+    });
+    clock.value = 121;
+    expect(
+      (await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first })).config.resumeEpoch,
+    ).toBe(1);
+
+    clock.value = 170;
+    await service.reconcile(joinedFirst.match.matchId);
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second });
+    clock.value = 271;
+    expect(
+      (await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second })).status,
+    ).toBe('paused_reconnect');
+    clock.value = 280;
+    const secondResume = await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    expect(secondResume.config.resumeEpoch).toBe(2);
+    expect(
+      (await repository.findByMatchId(joinedFirst.match.matchId))?.resumeEpoch,
+    ).toBe(2);
+  });
+
   it('abandons through persisted reconciliation when both grace budgets expire', async () => {
-    const { clock, service } = createHarness({
+    const { repository, clock, service } = createHarness({
       initialCountdownMs: 100,
       offlineThresholdMs: 100,
       reconnectBudgetMs: 500,
@@ -689,6 +796,7 @@ describe('TreasureHuntMultiplayerService', () => {
 
     expect(abandoned.status).toBe('abandoned');
     expect(abandoned.result).toMatchObject({ winnerPlayerId: null, reason: 'abandoned' });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.activeUserIds).toEqual([]);
   });
 
   it('waits when one offline player expires, then resolves on survivor return or abandonment', async () => {
@@ -704,6 +812,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: returningFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     returning.clock.value = 600;
     const waitingForReturn = await returning.service.reconcile(returningFirst.match.matchId);
@@ -724,6 +833,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: returningFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
     });
     expect(expiredCannotReturn.result).toBeNull();
     expect(expiredCannotReturn.players.find((player) => player.slot === 0)).toMatchObject({
@@ -736,6 +846,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: returningFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     expect(survivorReturned.result).toMatchObject({
       winnerPlayerId: returningSecond.playerId,
@@ -754,6 +865,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: expiringFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
     });
     expiring.clock.value = 600;
     expect((await expiring.service.reconcile(expiringFirst.match.matchId)).result).toBeNull();
@@ -763,6 +875,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: expiringFirst.match.matchId,
       userId: second.userId,
       gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
       snapshot: { seq: 0, score: 999, hearts: 0, elapsedMs: 700, lifecycle: 'eliminated' },
     });
     expect(bothExpired.status).toBe('abandoned');
@@ -776,7 +889,7 @@ describe('TreasureHuntMultiplayerService', () => {
       .toMatchObject({ seq: -1, score: 0, hearts: 3 });
   });
 
-  it('keeps one slot per wallet, rotates only a waiting session and forfeits an active reload', async () => {
+  it('rotates only client instances, forfeits active reload and adopts terminal reloads', async () => {
     const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
     const original = await service.createOrJoin(first);
 
@@ -785,7 +898,10 @@ describe('TreasureHuntMultiplayerService', () => {
       slot: 0,
     });
 
-    const waitingSession = { ...first, gameSessionId: 'session-a-waiting' };
+    const waitingSession = {
+      ...first,
+      clientInstanceId: 'instance-a-waiting',
+    };
     const rotated = await service.createOrJoin(waitingSession);
     expect(rotated).toMatchObject({ playerId: original.playerId, slot: 0 });
     expect((await repository.findByMatchId(original.match.matchId))?.players).toEqual([
@@ -793,15 +909,29 @@ describe('TreasureHuntMultiplayerService', () => {
         playerId: original.playerId,
         userId: first.userId,
         gameSessionId: waitingSession.gameSessionId,
+        clientInstanceId: waitingSession.clientInstanceId,
       }),
     ]);
     await expect(
       service.getForParticipant({ matchId: original.match.matchId, ...first }),
     ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    await expect(
+      service.createOrJoin({
+        ...waitingSession,
+        gameSessionId: 'session-a-rotation-forbidden',
+        clientInstanceId: 'instance-a-rotation-forbidden',
+      }),
+    ).rejects.toMatchObject({ code: 'GAME_SESSION_MATCH_CONFLICT', statusCode: 409 });
+    expect(
+      (await repository.findByMatchId(original.match.matchId))?.players[0].gameSessionId,
+    ).toBe(first.gameSessionId);
 
     const joinedSecond = await service.createOrJoin(second);
     clock.value = 101;
-    const activeSession = { ...first, gameSessionId: 'session-a-active-reload' };
+    const activeSession = {
+      ...waitingSession,
+      clientInstanceId: 'instance-a-active-reload',
+    };
     const forfeited = await service.createOrJoin(activeSession);
     expect(forfeited.match).toMatchObject({
       status: 'finished',
@@ -815,25 +945,56 @@ describe('TreasureHuntMultiplayerService', () => {
       service.getForParticipant({ matchId: original.match.matchId, ...activeSession }),
     ).resolves.toMatchObject({ status: 'finished' });
 
-    const terminalReplay = await service.createOrJoin({
-      ...first,
-      gameSessionId: 'session-a-after-terminal',
-    });
+    const terminalIdentity = {
+      ...activeSession,
+      clientInstanceId: 'instance-a-terminal-reload',
+    };
+    const terminalReplay = await service.createOrJoin(terminalIdentity);
     expect(terminalReplay).toMatchObject({
       playerId: original.playerId,
       slot: 0,
       match: { result: forfeited.match.result },
     });
     expect(
-      (await repository.findByMatchId(original.match.matchId))?.players[0].gameSessionId,
-    ).toBe(activeSession.gameSessionId);
+      (await repository.findByMatchId(original.match.matchId))?.players[0],
+    ).toMatchObject({
+      gameSessionId: activeSession.gameSessionId,
+      clientInstanceId: terminalIdentity.clientInstanceId,
+    });
+
+    await expect(
+      service.createOrJoin({
+        ...terminalIdentity,
+        gameSessionId: 'session-a-foreign-terminal',
+        clientInstanceId: 'instance-a-foreign-terminal',
+      }),
+    ).rejects.toMatchObject({ code: 'GAME_SESSION_MATCH_CONFLICT', statusCode: 409 });
+
+    const released = await service.releaseForParticipant(terminalIdentity);
+    expect(released?.result).toEqual(forfeited.match.result);
+    await expect(
+      service.releaseForParticipant({
+        ...terminalIdentity,
+        clientInstanceId: 'instance-a-terminal-release-replay',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+
+    await expect(
+      service.createOrJoin({ ...first, roomCode: 'REUSED-GAME-SESSION' }),
+    ).rejects.toMatchObject({ code: 'GAME_SESSION_MATCH_CONFLICT', statusCode: 409 });
   });
 
-  it('never allocates two slots when the same wallet races two fresh sessions', async () => {
+  it('never allocates two slots when the same wallet races two fresh instances', async () => {
     const { repository, service } = createHarness();
     const [firstAttempt, secondAttempt] = await Promise.all([
-      service.createOrJoin({ ...first, gameSessionId: 'session-race-a' }),
-      service.createOrJoin({ ...first, gameSessionId: 'session-race-b' }),
+      service.createOrJoin({
+        ...first,
+        clientInstanceId: 'instance-race-a',
+      }),
+      service.createOrJoin({
+        ...first,
+        clientInstanceId: 'instance-race-b',
+      }),
     ]);
 
     expect(firstAttempt.playerId).toBe(secondAttempt.playerId);
@@ -842,6 +1003,59 @@ describe('TreasureHuntMultiplayerService', () => {
     const stored = await repository.findByRoomCode(first.roomCode);
     expect(stored?.players).toHaveLength(1);
     expect(stored?.players.map((player) => player.userId)).toEqual([first.userId]);
+  });
+
+  it('atomically rejects concurrent creation of two active rooms for one wallet', async () => {
+    const { repository, service } = createHarness();
+    const results = await Promise.allSettled([
+      service.createOrJoin({ ...first, roomCode: 'ROOM-A' }),
+      service.createOrJoin({ ...first, roomCode: 'ROOM-B' }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    expect(rejected?.reason).toMatchObject({ code: 'PLAYER_ACTIVE_MATCH', statusCode: 409 });
+    const stored = [
+      await repository.findByRoomCode('ROOM-A'),
+      await repository.findByRoomCode('ROOM-B'),
+    ].filter(Boolean);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.activeUserIds).toEqual([first.userId]);
+  });
+
+  it('atomically rejects one wallet joining two different rooms concurrently', async () => {
+    const { repository, service } = createHarness();
+    await service.createOrJoin({ ...first, roomCode: 'ROOM-A' });
+    await service.createOrJoin({
+      ...second,
+      roomCode: 'ROOM-B',
+    });
+    const joiningIdentity = {
+      roomCode: 'ROOM-A',
+      userId: 'user-c',
+      gameSessionId: 'session-c',
+      clientInstanceId: 'instance-c',
+    };
+
+    const results = await Promise.allSettled([
+      service.createOrJoin(joiningIdentity),
+      service.createOrJoin({ ...joiningIdentity, roomCode: 'ROOM-B' }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    expect(rejected?.reason).toMatchObject({ code: 'PLAYER_ACTIVE_MATCH', statusCode: 409 });
+    const joinedRooms = await Promise.all([
+      repository.findByRoomCode('ROOM-A'),
+      repository.findByRoomCode('ROOM-B'),
+    ]);
+    expect(
+      joinedRooms.filter((room) => room?.players.some((player) => player.userId === 'user-c')),
+    ).toHaveLength(1);
   });
 
   it('allows only one sequential non-terminal room per wallet', async () => {
@@ -854,7 +1068,12 @@ describe('TreasureHuntMultiplayerService', () => {
 
     await service.forfeit({ matchId: firstRoom.match.matchId, ...first });
     await expect(
-      service.createOrJoin({ ...first, roomCode: 'OTHER-ROOM' }),
+      service.createOrJoin({
+        ...first,
+        roomCode: 'OTHER-ROOM',
+        gameSessionId: 'session-a-next-match',
+        clientInstanceId: 'instance-a-next-match',
+      }),
     ).resolves.toMatchObject({ slot: 0, match: { roomCode: 'OTHER-ROOM', status: 'waiting' } });
   });
 
@@ -873,6 +1092,9 @@ describe('TreasureHuntMultiplayerService', () => {
       status: 'abandoned',
       result: { reason: 'abandoned', winnerPlayerId: null },
     });
+    expect(
+      (await waitingHarness.repository.findByMatchId(waiting.match.matchId))?.activeUserIds,
+    ).toEqual([]);
     expect(replay.result).toEqual(abandoned.result);
     expect(replay.revision).toBe(abandoned.revision);
 
@@ -887,13 +1109,70 @@ describe('TreasureHuntMultiplayerService', () => {
       status: 'finished',
       result: { reason: 'forfeit', winnerPlayerId: joinedSecond.playerId },
     });
+    expect(
+      (await runningHarness.repository.findByMatchId(joinedFirst.match.matchId))?.activeUserIds,
+    ).toEqual([]);
     await expect(
       runningHarness.service.forfeit({
         matchId: joinedFirst.match.matchId,
         userId: 'foreign-user',
         gameSessionId: 'foreign-session',
+        clientInstanceId: 'foreign-instance',
       }),
     ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+  });
+
+  it('releases only the exact active instance, forfeits it and permits terminal replay', async () => {
+    const waitingHarness = createHarness();
+    const waiting = await waitingHarness.service.createOrJoin(first);
+
+    await expect(
+      waitingHarness.service.releaseForParticipant({
+        ...first,
+        clientInstanceId: 'stale-instance',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    expect(
+      await waitingHarness.repository.findByMatchId(waiting.match.matchId),
+    ).toMatchObject({ status: 'waiting', activeUserIds: [first.userId] });
+
+    const released = await waitingHarness.service.releaseForParticipant(first);
+    expect(released).toMatchObject({
+      status: 'abandoned',
+      result: { reason: 'abandoned', winnerPlayerId: null },
+    });
+    expect(
+      (await waitingHarness.repository.findByMatchId(waiting.match.matchId))?.activeUserIds,
+    ).toEqual([]);
+    await expect(
+      waitingHarness.service.releaseForParticipant({
+        ...first,
+        clientInstanceId: 'terminal-replay-instance',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    const adoptedTerminal = {
+      ...first,
+      clientInstanceId: 'terminal-replay-instance',
+    };
+    await waitingHarness.service.createOrJoin(adoptedTerminal);
+    await expect(
+      waitingHarness.service.releaseForParticipant(adoptedTerminal),
+    ).resolves.toMatchObject({ result: released?.result });
+    await expect(
+      waitingHarness.service.releaseForParticipant({
+        userId: 'missing-user',
+        gameSessionId: 'missing-session',
+        clientInstanceId: 'missing-instance',
+      }),
+    ).resolves.toBeNull();
+
+    const runningHarness = createHarness();
+    const joinedFirst = await runningHarness.service.createOrJoin(first);
+    await runningHarness.service.createOrJoin(second);
+    await expect(runningHarness.service.releaseForParticipant(second)).resolves.toMatchObject({
+      status: 'finished',
+      result: { reason: 'forfeit', winnerPlayerId: joinedFirst.playerId },
+    });
   });
 
   it('uses snapshot traffic as the accepted server heartbeat', async () => {
@@ -1190,7 +1469,12 @@ describe('InMemoryMatchRepository CAS contract', () => {
     const match = createWaitingMatch({
       matchId: 'cas-match',
       roomCode: 'CAS',
-      firstPlayer: { playerId: 'p', userId: 'u', gameSessionId: 's' },
+      firstPlayer: {
+        playerId: 'p',
+        userId: 'u',
+        gameSessionId: 's',
+        clientInstanceId: 'i',
+      },
       rules,
       now: 0,
     });

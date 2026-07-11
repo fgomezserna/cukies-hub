@@ -15,7 +15,12 @@ function createRunningMatch(ruleOverrides: Partial<MatchRules> = {}): Match {
   const waiting = createWaitingMatch({
     matchId: 'match-1',
     roomCode: 'ROOM',
-    firstPlayer: { playerId: 'player-a', userId: 'user-a', gameSessionId: 'session-a' },
+    firstPlayer: {
+      playerId: 'player-a',
+      userId: 'user-a',
+      gameSessionId: 'session-a',
+      clientInstanceId: 'client-a',
+    },
     rules,
     now: 0,
   });
@@ -27,6 +32,7 @@ function createRunningMatch(ruleOverrides: Partial<MatchRules> = {}): Match {
         playerId: 'player-b',
         userId: 'user-b',
         gameSessionId: 'session-b',
+        clientInstanceId: 'client-b',
         slot: 1,
         rules,
         now: 0,
@@ -81,7 +87,12 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
     const waiting = createWaitingMatch({
       matchId: 'match-seed',
       roomCode: 'SEED',
-      firstPlayer: { playerId: 'a', userId: 'u-a', gameSessionId: 's-a' },
+      firstPlayer: {
+        playerId: 'a',
+        userId: 'u-a',
+        gameSessionId: 's-a',
+        clientInstanceId: 'client-a',
+      },
       rules,
       now: 10,
     });
@@ -93,6 +104,7 @@ describe('Treasure Hunt multiplayer reconciliation rules', () => {
           playerId: 'b',
           userId: 'u-b',
           gameSessionId: 's-b',
+          clientInstanceId: 'client-b',
           slot: 1,
           rules,
           now: 100,

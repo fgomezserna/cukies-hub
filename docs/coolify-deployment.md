@@ -47,6 +47,23 @@ NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL=abierta
 
 Las variables `NEXT_PUBLIC_*` se inyectan tambien como build args. Tras cambiarlas en Coolify hay que reconstruir la imagen, no solo reiniciar el contenedor.
 
+Treasure Hunt multiplayer (solo staging):
+
+```bash
+TREASURE_HUNT_MULTIPLAYER_ENABLED=true
+```
+
+El compose mantiene este flag servidor en `false` por defecto. Solo debe activarse en el recurso de staging/integracion mientras el modo siga siendo `staging_unranked`; produccion debe conservarlo en `false`. El rate limiter de estas rutas vive en memoria del proceso y presupone una unica replica de `dapp`. Antes de escalar a varias replicas hay que mover los buckets a un almacenamiento compartido y distribuido.
+
+El juego `sybil-slayer` se despliega como recurso separado y necesita estas variables de build para el mismo gate:
+
+```bash
+NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED=true
+NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com
+```
+
+Ambas se incorporan al bundle de Next.js: tras cambiarlas hay que reconstruir la imagen del juego. En produccion, `NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED` debe seguir en `false` y `NEXT_PUBLIC_DAPP_ORIGIN` debe ser el origen real de la dapp de produccion. Ese origen tambien delimita el `frame-ancestors` del CSP; no se debe usar `*` ni mezclar el origen de staging con produccion.
+
 Indexer:
 
 ```bash

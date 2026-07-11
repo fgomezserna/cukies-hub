@@ -3,7 +3,8 @@ export type MultiplayerRateLimitOperation =
   | 'get'
   | 'heartbeat'
   | 'snapshot'
-  | 'forfeit';
+  | 'forfeit'
+  | 'release';
 
 interface RateLimitBucket {
   count: number;
@@ -16,6 +17,7 @@ const LIMITS: Readonly<Record<MultiplayerRateLimitOperation, number>> = {
   heartbeat: 120,
   snapshot: 600,
   forfeit: 20,
+  release: 20,
 };
 
 export class MultiplayerFixedWindowRateLimiter {
@@ -28,11 +30,10 @@ export class MultiplayerFixedWindowRateLimiter {
 
   consume(input: {
     userId: string;
-    gameSessionId: string;
     operation: MultiplayerRateLimitOperation;
   }): boolean {
     const now = this.now();
-    const key = `${input.operation}:${input.userId}:${input.gameSessionId}`;
+    const key = `${input.operation}:${input.userId}`;
     const current = this.buckets.get(key);
     if (!current || now >= current.resetAt) {
       this.buckets.set(key, { count: 1, resetAt: now + this.windowMs });

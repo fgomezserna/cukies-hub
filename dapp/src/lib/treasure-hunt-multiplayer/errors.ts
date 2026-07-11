@@ -8,6 +8,7 @@ export type MultiplayerErrorCode =
   | 'MATCH_TERMINAL'
   | 'PLAYER_NOT_FOUND'
   | 'PLAYER_ACTIVE_MATCH'
+  | 'GAME_SESSION_MATCH_CONFLICT'
   | 'CONCURRENT_UPDATE_LIMIT';
 
 export class MultiplayerDomainError extends Error {
@@ -25,6 +26,20 @@ export class MatchAlreadyExistsError extends MultiplayerDomainError {
   constructor(message = 'A match already exists for that match id or room code') {
     super('MATCH_ALREADY_EXISTS', message, 409);
     this.name = 'MatchAlreadyExistsError';
+  }
+}
+
+export class ActiveUserMatchConflictError extends MultiplayerDomainError {
+  constructor(message = 'A player already has a non-terminal match') {
+    super('PLAYER_ACTIVE_MATCH', message, 409);
+    this.name = 'ActiveUserMatchConflictError';
+  }
+}
+
+export class GameSessionMatchConflictError extends MultiplayerDomainError {
+  constructor(message = 'Game session is already bound to another match') {
+    super('GAME_SESSION_MATCH_CONFLICT', message, 409);
+    this.name = 'GameSessionMatchConflictError';
   }
 }
 

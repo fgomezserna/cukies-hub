@@ -1,15 +1,20 @@
 import {
+  ActiveUserMatchConflictError,
+  GameSessionMatchConflictError,
   MatchAlreadyExistsError,
   MatchNotFoundError,
   MatchRevisionConflictError,
 } from './errors';
-import type { Match } from './types';
+import type { Match, MatchIdentity } from './types';
 
 export interface MatchRepository {
   create(match: Match): Promise<Match>;
   findByMatchId(matchId: string): Promise<Match | null>;
   findByRoomCode(roomCode: string): Promise<Match | null>;
   findNonTerminalByUserId(userId: string): Promise<Match | null>;
+  findNonTerminalByIdentity(identity: MatchIdentity): Promise<Match | null>;
+  findNonTerminalByGameSession(userId: string, gameSessionId: string): Promise<Match | null>;
+  findByGameSession(userId: string, gameSessionId: string): Promise<Match | null>;
   findDue(now: number, limit: number): Promise<readonly Match[]>;
   save(match: Match, expectedRevision: number): Promise<Match>;
 }
@@ -25,6 +30,24 @@ export class InMemoryMatchRepository implements MatchRepository {
   async create(match: Match): Promise<Match> {
     if (this.matches.has(match.matchId) || this.roomCodes.has(match.roomCode)) {
       throw new MatchAlreadyExistsError();
+    }
+    if (
+      [...this.matches.values()].some((candidate) =>
+        candidate.activeUserIds.some((userId) => match.activeUserIds.includes(userId)),
+      )
+    ) {
+      throw new ActiveUserMatchConflictError();
+    }
+    if (
+      [...this.matches.values()].some((candidate) =>
+        candidate.players.some((candidatePlayer) =>
+          match.players.some(
+            (player) => player.gameSessionId === candidatePlayer.gameSessionId,
+          ),
+        ),
+      )
+    ) {
+      throw new GameSessionMatchConflictError();
     }
 
     const stored = cloneMatch({ ...match, revision: 0 });
@@ -45,10 +68,44 @@ export class InMemoryMatchRepository implements MatchRepository {
 
   async findNonTerminalByUserId(userId: string): Promise<Match | null> {
     const match = [...this.matches.values()].find(
+      (candidate) => candidate.activeUserIds.includes(userId),
+    );
+    return match ? cloneMatch(match) : null;
+  }
+
+  async findNonTerminalByIdentity(identity: MatchIdentity): Promise<Match | null> {
+    const match = [...this.matches.values()].find(
       (candidate) =>
-        candidate.status !== 'finished' &&
-        candidate.status !== 'abandoned' &&
-        candidate.players.some((player) => player.userId === userId),
+        candidate.activeUserIds.includes(identity.userId) &&
+        candidate.players.some(
+          (player) =>
+            player.userId === identity.userId &&
+            player.gameSessionId === identity.gameSessionId &&
+            player.clientInstanceId === identity.clientInstanceId,
+        ),
+    );
+    return match ? cloneMatch(match) : null;
+  }
+
+  async findNonTerminalByGameSession(
+    userId: string,
+    gameSessionId: string,
+  ): Promise<Match | null> {
+    const match = [...this.matches.values()].find(
+      (candidate) =>
+        candidate.activeUserIds.includes(userId) &&
+        candidate.players.some(
+          (player) => player.userId === userId && player.gameSessionId === gameSessionId,
+        ),
+    );
+    return match ? cloneMatch(match) : null;
+  }
+
+  async findByGameSession(userId: string, gameSessionId: string): Promise<Match | null> {
+    const match = [...this.matches.values()].find((candidate) =>
+      candidate.players.some(
+        (player) => player.userId === userId && player.gameSessionId === gameSessionId,
+      ),
     );
     return match ? cloneMatch(match) : null;
   }
@@ -80,6 +137,29 @@ export class InMemoryMatchRepository implements MatchRepository {
     const roomOwner = this.roomCodes.get(match.roomCode);
     if (roomOwner && roomOwner !== match.matchId) {
       throw new MatchAlreadyExistsError(`Room code ${match.roomCode} is already in use`);
+    }
+
+    if (
+      [...this.matches.values()].some(
+        (candidate) =>
+          candidate.matchId !== match.matchId &&
+          candidate.activeUserIds.some((userId) => match.activeUserIds.includes(userId)),
+      )
+    ) {
+      throw new ActiveUserMatchConflictError();
+    }
+    if (
+      [...this.matches.values()].some(
+        (candidate) =>
+          candidate.matchId !== match.matchId &&
+          candidate.players.some((candidatePlayer) =>
+            match.players.some(
+              (player) => player.gameSessionId === candidatePlayer.gameSessionId,
+            ),
+          ),
+      )
+    ) {
+      throw new GameSessionMatchConflictError();
     }
 
     if (current.roomCode !== match.roomCode) {

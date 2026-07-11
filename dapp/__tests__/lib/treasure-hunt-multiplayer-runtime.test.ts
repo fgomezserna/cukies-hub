@@ -24,6 +24,7 @@ describe('Treasure Hunt multiplayer server runtime', () => {
         matchId: 'match-1',
         userId: 'user-1',
         gameSessionId: 'session-1',
+        clientInstanceId: 'client-1',
       }),
     ).rejects.toBe(unavailable);
     expect(collectionProvider).toHaveBeenCalledTimes(1);

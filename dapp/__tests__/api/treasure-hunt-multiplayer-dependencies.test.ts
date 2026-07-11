@@ -101,4 +101,62 @@ describe('Treasure Hunt multiplayer default dependencies', () => {
       },
     });
   });
+
+  it('atomically releases only an active owned staging multiplayer session', async () => {
+    const dependencies = createDefaultMultiplayerHandlerDependencies();
+    updateGameSessions.mockResolvedValue({ count: 1 });
+
+    await expect(
+      dependencies.releaseGameSessionForMultiplayer({
+        userId: 'wallet-user',
+        gameSessionId: 'game-session-1',
+      }),
+    ).resolves.toBe(true);
+
+    expect(updateGameSessions).toHaveBeenCalledWith({
+      where: {
+        sessionId: 'game-session-1',
+        userId: 'wallet-user',
+        gameId: 'sybil-slayer',
+        isActive: true,
+        mode: 'staging_unranked',
+        rewardEligible: false,
+      },
+      data: { isActive: false, endedAt: expect.any(Date) },
+    });
+    expect(findGameSession).not.toHaveBeenCalled();
+  });
+
+  it('accepts only an exact already-inactive release replay', async () => {
+    const dependencies = createDefaultMultiplayerHandlerDependencies();
+    updateGameSessions.mockResolvedValue({ count: 0 });
+    findGameSession.mockResolvedValue({
+      userId: 'wallet-user',
+      gameId: 'sybil-slayer',
+      isActive: false,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+    });
+
+    await expect(
+      dependencies.releaseGameSessionForMultiplayer({
+        userId: 'wallet-user',
+        gameSessionId: 'game-session-1',
+      }),
+    ).resolves.toBe(true);
+
+    findGameSession.mockResolvedValue({
+      userId: 'other-wallet',
+      gameId: 'sybil-slayer',
+      isActive: false,
+      mode: 'staging_unranked',
+      rewardEligible: false,
+    });
+    await expect(
+      dependencies.releaseGameSessionForMultiplayer({
+        userId: 'wallet-user',
+        gameSessionId: 'game-session-1',
+      }),
+    ).resolves.toBe(false);
+  });
 });

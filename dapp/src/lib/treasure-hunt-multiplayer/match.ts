@@ -13,6 +13,7 @@ export interface NewMatchInput {
     readonly playerId: string;
     readonly userId: string;
     readonly gameSessionId: string;
+    readonly clientInstanceId: string;
   };
   readonly rules: MatchRules;
   readonly now: number;
@@ -23,6 +24,7 @@ export function createMatchPlayer(input: {
   playerId: string;
   userId: string;
   gameSessionId: string;
+  clientInstanceId: string;
   slot: MatchSlot;
   rules: MatchRules;
   now: number;
@@ -31,6 +33,7 @@ export function createMatchPlayer(input: {
     playerId: input.playerId,
     userId: input.userId,
     gameSessionId: input.gameSessionId,
+    clientInstanceId: input.clientInstanceId,
     slot: input.slot,
     joinedAt: input.now,
     snapshot: {
@@ -68,12 +71,14 @@ export function createWaitingMatch(input: NewMatchInput): Match {
         now: input.now,
       }),
     ],
+    activeUserIds: [input.firstPlayer.userId],
     seed: null,
     startAt: null,
     lobbyExpiresAt: input.now + input.rules.lobbyTimeoutMs,
     roundEndsAt: null,
     suddenDeathEndsAt: null,
     resumeAt: null,
+    resumeEpoch: 0,
     pauseStartedAt: null,
     pausedFromStatus: null,
     pendingElimination: null,

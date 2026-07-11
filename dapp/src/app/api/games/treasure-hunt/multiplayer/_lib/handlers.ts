@@ -23,7 +23,12 @@ export interface MultiplayerGameSession {
 
 type MultiplayerService = Pick<
   TreasureHuntMultiplayerService,
-  'createOrJoin' | 'getForParticipant' | 'heartbeat' | 'updateSnapshot' | 'forfeit'
+  | 'createOrJoin'
+  | 'getForParticipant'
+  | 'heartbeat'
+  | 'updateSnapshot'
+  | 'forfeit'
+  | 'releaseForParticipant'
 >;
 
 export interface TreasureHuntMultiplayerHandlerDependencies {
@@ -36,9 +41,12 @@ export interface TreasureHuntMultiplayerHandlerDependencies {
     readonly userId: string;
     readonly gameSessionId: string;
   }) => Promise<boolean>;
-  readonly consumeRateLimit: (input: {
+  readonly releaseGameSessionForMultiplayer: (identity: {
     readonly userId: string;
     readonly gameSessionId: string;
+  }) => Promise<boolean>;
+  readonly consumeRateLimit: (input: {
+    readonly userId: string;
     readonly operation: MultiplayerRateLimitOperation;
   }) => boolean;
   readonly getService: () => MultiplayerService;
@@ -82,10 +90,10 @@ export function isTreasureHuntMultiplayerFeatureEnabled(
 
 function requireRateLimit(
   dependencies: TreasureHuntMultiplayerHandlerDependencies,
-  identity: { readonly userId: string; readonly gameSessionId: string },
+  userId: string,
   operation: MultiplayerRateLimitOperation,
 ) {
-  if (!dependencies.consumeRateLimit({ ...identity, operation })) {
+  if (!dependencies.consumeRateLimit({ userId, operation })) {
     throw new MultiplayerApiError(429, 'RATE_LIMITED', 'Too many requests');
   }
 }
@@ -135,11 +143,10 @@ async function requireWalletIdentity(
   return walletSession;
 }
 
-async function authorize(
+async function loadAuthorizedGameSession(
   dependencies: TreasureHuntMultiplayerHandlerDependencies,
   walletSession: WalletSessionIdentity,
   gameSessionIdInput: unknown,
-  requireMultiplayerLock = true,
 ) {
   const gameSessionId = requireIdentifier(gameSessionIdInput, 'gameSessionId');
   const gameSession = await dependencies.findGameSessionBySessionId(gameSessionId);
@@ -158,11 +165,31 @@ async function authorize(
     );
   }
 
-  const isMultiplayerLocked =
-    gameSession.mode === 'staging_unranked' && gameSession.rewardEligible === false;
+  return {
+    gameSession,
+    identity: {
+      userId: walletSession.userId,
+      gameSessionId: gameSession.sessionId,
+    },
+    isMultiplayerLocked:
+      gameSession.mode === 'staging_unranked' && gameSession.rewardEligible === false,
+  };
+}
+
+async function authorize(
+  dependencies: TreasureHuntMultiplayerHandlerDependencies,
+  walletSession: WalletSessionIdentity,
+  gameSessionIdInput: unknown,
+  requireMultiplayerLock = true,
+) {
+  const authorized = await loadAuthorizedGameSession(
+    dependencies,
+    walletSession,
+    gameSessionIdInput,
+  );
   if (
-    !gameSession.isActive ||
-    (requireMultiplayerLock && !isMultiplayerLocked)
+    !authorized.gameSession.isActive ||
+    (requireMultiplayerLock && !authorized.isMultiplayerLocked)
   ) {
     throw new MultiplayerApiError(
       403,
@@ -171,10 +198,7 @@ async function authorize(
     );
   }
 
-  return {
-    userId: walletSession.userId,
-    gameSessionId: gameSession.sessionId,
-  };
+  return authorized.identity;
 }
 
 async function execute(operation: () => Promise<NextResponse>): Promise<NextResponse> {
@@ -228,14 +252,20 @@ export function createTreasureHuntMultiplayerHandlers(
         const body = await parseBody(request);
         rejectClientIdentity(body);
         const roomCode = requireIdentifier(body.roomCode, 'roomCode');
-        const identity = await authorize(
+        const gameSessionId = requireIdentifier(body.gameSessionId, 'gameSessionId');
+        const clientInstanceId = requireIdentifier(body.clientInstanceId, 'clientInstanceId');
+        requireRateLimit(dependencies, walletSession.userId, 'join');
+        const authorizedSession = await authorize(
           dependencies,
           walletSession,
-          body.gameSessionId,
+          gameSessionId,
           false,
         );
-        requireRateLimit(dependencies, identity, 'join');
-        if (!(await dependencies.lockGameSessionForMultiplayer(identity))) {
+        const identity = {
+          ...authorizedSession,
+          clientInstanceId,
+        };
+        if (!(await dependencies.lockGameSessionForMultiplayer(authorizedSession))) {
           throw new MultiplayerApiError(
             403,
             'GAME_SESSION_FORBIDDEN',
@@ -256,9 +286,20 @@ export function createTreasureHuntMultiplayerHandlers(
         requireFeatureEnabled(dependencies);
         const walletSession = await requireWalletIdentity(dependencies);
         const matchId = requireIdentifier(matchIdInput, 'matchId');
-        const gameSessionId = new URL(request.url).searchParams.get('gameSessionId');
-        const identity = await authorize(dependencies, walletSession, gameSessionId);
-        requireRateLimit(dependencies, identity, 'get');
+        const searchParams = new URL(request.url).searchParams;
+        const gameSessionId = requireIdentifier(
+          searchParams.get('gameSessionId'),
+          'gameSessionId',
+        );
+        const clientInstanceId = requireIdentifier(
+          searchParams.get('clientInstanceId'),
+          'clientInstanceId',
+        );
+        requireRateLimit(dependencies, walletSession.userId, 'get');
+        const identity = {
+          ...(await authorize(dependencies, walletSession, gameSessionId)),
+          clientInstanceId,
+        };
         const match = await dependencies.getService().getForParticipant({ matchId, ...identity });
         return json({ success: true, match });
       });
@@ -271,19 +312,33 @@ export function createTreasureHuntMultiplayerHandlers(
         const matchId = requireIdentifier(matchIdInput, 'matchId');
         const body = await parseBody(request);
         rejectClientIdentity(body);
-        const identity = await authorize(dependencies, walletSession, body.gameSessionId);
+        const gameSessionId = requireIdentifier(body.gameSessionId, 'gameSessionId');
+        const clientInstanceId = requireIdentifier(body.clientInstanceId, 'clientInstanceId');
+        let operation: MultiplayerRateLimitOperation;
+        if (body.action === 'heartbeat') {
+          operation = 'heartbeat';
+        } else if (body.action === 'snapshot') {
+          if (!Object.prototype.hasOwnProperty.call(body, 'snapshot')) {
+            return invalidRequest('snapshot is required for the snapshot action');
+          }
+          operation = 'snapshot';
+        } else if (body.action === 'forfeit') {
+          operation = 'forfeit';
+        } else {
+          return invalidRequest('action must be heartbeat, snapshot or forfeit');
+        }
+        requireRateLimit(dependencies, walletSession.userId, operation);
+        const identity = {
+          ...(await authorize(dependencies, walletSession, gameSessionId)),
+          clientInstanceId,
+        };
 
         if (body.action === 'heartbeat') {
-          requireRateLimit(dependencies, identity, 'heartbeat');
           const service = dependencies.getService();
           const match = await service.heartbeat({ matchId, ...identity });
           return json({ success: true, match });
         }
         if (body.action === 'snapshot') {
-          requireRateLimit(dependencies, identity, 'snapshot');
-          if (!Object.prototype.hasOwnProperty.call(body, 'snapshot')) {
-            return invalidRequest('snapshot is required for the snapshot action');
-          }
           const service = dependencies.getService();
           const match = await service.updateSnapshot({
             matchId,
@@ -294,13 +349,48 @@ export function createTreasureHuntMultiplayerHandlers(
         }
 
         if (body.action === 'forfeit') {
-          requireRateLimit(dependencies, identity, 'forfeit');
           const service = dependencies.getService();
           const match = await service.forfeit({ matchId, ...identity });
           return json({ success: true, match });
         }
-
         return invalidRequest('action must be heartbeat, snapshot or forfeit');
+      });
+    },
+
+    release(request: Request) {
+      return execute(async () => {
+        requireFeatureEnabled(dependencies);
+        const walletSession = await requireWalletIdentity(dependencies);
+        const body = await parseBody(request);
+        rejectClientIdentity(body);
+        const gameSessionId = requireIdentifier(body.gameSessionId, 'gameSessionId');
+        const clientInstanceId = requireIdentifier(body.clientInstanceId, 'clientInstanceId');
+        requireRateLimit(dependencies, walletSession.userId, 'release');
+        const authorized = await loadAuthorizedGameSession(
+          dependencies,
+          walletSession,
+          gameSessionId,
+        );
+        if (!authorized.isMultiplayerLocked) {
+          return json({ success: true, released: false, match: null });
+        }
+        if (!authorized.gameSession.isActive) {
+          return json({ success: true, released: true, match: null });
+        }
+        const authorizedSession = authorized.identity;
+        const identity = {
+          ...authorizedSession,
+          clientInstanceId,
+        };
+        const match = await dependencies.getService().releaseForParticipant(identity);
+        if (!(await dependencies.releaseGameSessionForMultiplayer(authorizedSession))) {
+          throw new MultiplayerApiError(
+            403,
+            'GAME_SESSION_FORBIDDEN',
+            'Game session is not authorized for this operation',
+          );
+        }
+        return json({ success: true, released: true, match });
       });
     },
   };

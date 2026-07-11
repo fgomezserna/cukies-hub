@@ -28,6 +28,7 @@ export interface MatchPlayer {
   readonly playerId: string;
   readonly userId: string;
   readonly gameSessionId: string;
+  readonly clientInstanceId: string;
   readonly slot: MatchSlot;
   readonly joinedAt: number;
   readonly snapshot: PlayerSnapshot;
@@ -101,12 +102,15 @@ export interface Match {
   readonly status: MatchStatus;
   readonly rules: MatchRules;
   readonly players: readonly MatchPlayer[];
+  /** Unique-indexed while non-terminal; emptied for every terminal transition. */
+  readonly activeUserIds: readonly string[];
   readonly seed: string | null;
   readonly startAt: number | null;
   readonly lobbyExpiresAt: number;
   readonly roundEndsAt: number | null;
   readonly suddenDeathEndsAt: number | null;
   readonly resumeAt: number | null;
+  readonly resumeEpoch: number;
   readonly pauseStartedAt: number | null;
   readonly pausedFromStatus: PausableMatchStatus | null;
   readonly pendingElimination: PendingElimination | null;
@@ -123,6 +127,7 @@ export interface Match {
 export interface MatchIdentity {
   readonly userId: string;
   readonly gameSessionId: string;
+  readonly clientInstanceId: string;
 }
 
 export interface PublicMatchPlayer {
@@ -153,6 +158,7 @@ export interface PublicMatch {
     readonly roundEndsAt: number | null;
     readonly suddenDeathEndsAt: number | null;
     readonly resumeAt: number | null;
+    readonly resumeEpoch: number;
   };
   readonly players: readonly PublicMatchPlayer[];
   readonly suddenDeath: SuddenDeathState | null;

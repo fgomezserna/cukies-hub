@@ -66,6 +66,40 @@ export function createDefaultMultiplayerHandlerDependencies(): TreasureHuntMulti
           current.rewardEligible === false,
       );
     },
+    releaseGameSessionForMultiplayer: async ({ gameSessionId, userId }) => {
+      const endedAt = new Date();
+      const result = await prisma.gameSession.updateMany({
+        where: {
+          sessionId: gameSessionId,
+          userId,
+          gameId: 'sybil-slayer',
+          isActive: true,
+          mode: 'staging_unranked',
+          rewardEligible: false,
+        },
+        data: { isActive: false, endedAt },
+      });
+      if (result.count === 1) {
+        return true;
+      }
+      const current = await prisma.gameSession.findUnique({
+        where: { sessionId: gameSessionId },
+        select: {
+          userId: true,
+          gameId: true,
+          isActive: true,
+          mode: true,
+          rewardEligible: true,
+        },
+      });
+      return Boolean(
+        current?.userId === userId &&
+          current.gameId === 'sybil-slayer' &&
+          !current.isActive &&
+          current.mode === 'staging_unranked' &&
+          current.rewardEligible === false,
+      );
+    },
     consumeRateLimit: (input) => multiplayerRateLimiter.consume(input),
     getService: getTreasureHuntMultiplayerRuntime,
   };

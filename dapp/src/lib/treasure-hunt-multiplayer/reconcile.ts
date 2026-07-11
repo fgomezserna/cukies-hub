@@ -82,6 +82,7 @@ function finishMatch(
 
   return {
     ...match,
+    activeUserIds: [],
     players: match.players.map((player) => ({
       ...player,
       snapshot:
@@ -341,6 +342,7 @@ function reconcilePause(match: Match, now: number): Match {
       ...match,
       status: 'countdown',
       resumeAt: now + match.rules.reconnectCountdownMs,
+      resumeEpoch: match.resumeEpoch + 1,
       updatedAt: now,
     };
   }

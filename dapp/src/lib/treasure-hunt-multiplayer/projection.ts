@@ -18,6 +18,7 @@ export function projectPublicMatch(match: Match): PublicMatch {
       roundEndsAt: match.roundEndsAt,
       suddenDeathEndsAt: match.suddenDeathEndsAt,
       resumeAt: match.resumeAt,
+      resumeEpoch: match.resumeEpoch,
     },
     players: match.players.map((player) => ({
       playerId: player.playerId,
