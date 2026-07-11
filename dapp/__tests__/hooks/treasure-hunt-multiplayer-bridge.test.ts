@@ -308,6 +308,62 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     cleanup();
   });
 
+  it('rejects a duplicate in-flight requestId and releases it after completion', async () => {
+    let resolveFirstRequest: ((response: Response) => void) | undefined;
+    const firstRequest = new Promise<Response>((resolve) => {
+      resolveFirstRequest = resolve;
+    });
+    const successfulJoin = () =>
+      apiResponse({
+        success: true,
+        playerId: 'player-request-id',
+        slot: 0,
+        match: { matchId: 'match-request-id', roomCode: 'REQUEST-ID' },
+      });
+    const fetchImpl = jest
+      .fn()
+      .mockImplementationOnce(() => firstRequest)
+      .mockImplementationOnce(async () => successfulJoin());
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'same-request', 'join', {
+      roomCode: 'REQUEST-ID',
+    });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    requestMessage(contentWindow, GAME_ORIGIN, 'same-request', 'join', {
+      roomCode: 'OTHER-ROOM',
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'same-request',
+        success: false,
+        error: {
+          code: 'DUPLICATE_REQUEST_ID',
+          message: 'A request with this requestId is already in progress',
+        },
+      },
+      GAME_ORIGIN,
+    );
+
+    resolveFirstRequest?.(successfulJoin());
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'same-request', 'join', {
+      roomCode: 'REQUEST-ID',
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ requestId: 'same-request', success: true }),
+      GAME_ORIGIN,
+    );
+    cleanup();
+  });
+
   it('clears a failed pending join so the same room can retry', async () => {
     const fetchImpl = jest
       .fn()
@@ -444,9 +500,9 @@ describe('game session single-flight starter', () => {
       gameVersion: '1.0.0',
     });
 
-    const first = starter.start();
-    const second = starter.start();
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const first = starter.start('wallet-user');
+    const second = starter.start('wallet-user');
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
     expect(JSON.parse(fetchImpl.mock.calls[0][1]?.body as string)).toEqual({
       gameId: 'sybil-slayer',
       gameVersion: '1.0.0',
@@ -464,7 +520,55 @@ describe('game session single-flight starter', () => {
 
     await expect(first).resolves.toMatchObject({ sessionId: 'session-1' });
     await expect(second).resolves.toMatchObject({ sessionId: 'session-1' });
-    await starter.start();
+    await starter.start('wallet-user');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries one transient failure and then caches the successful owner session', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary network failure'))
+      .mockResolvedValueOnce(
+        apiResponse({
+          success: true,
+          sessionId: 'session-after-retry',
+          sessionToken: 'retry-token',
+          gameId: 'sybil-slayer',
+          gameVersion: '1.0.0',
+        }),
+      );
+    const starter = createSingleFlightGameSessionStarter({
+      fetchImpl: fetchImpl as typeof fetch,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      maxAttempts: 2,
+      retryDelayMs: 0,
+    });
+
+    await expect(starter.start('wallet-user')).resolves.toMatchObject({
+      sessionId: 'session-after-retry',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    await starter.start('wallet-user');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels a scheduled retry when its wallet generation is reset', async () => {
+    const fetchImpl = jest.fn().mockRejectedValueOnce(new Error('temporary network failure'));
+    const starter = createSingleFlightGameSessionStarter({
+      fetchImpl: fetchImpl as typeof fetch,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      maxAttempts: 2,
+      retryDelayMs: 10_000,
+    });
+
+    const start = starter.start('wallet-a');
+    const rejection = expect(start).rejects.toMatchObject({ name: 'AbortError' });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    starter.reset();
+
+    await rejection;
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

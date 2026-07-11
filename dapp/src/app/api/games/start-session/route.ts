@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { readWalletSession } from '@/lib/wallet-auth';
 
-const SUPPORTED_GAME_ID = 'sybil-slayer';
+const SUPPORTED_GAME_IDS: ReadonlySet<string> = new Set([
+  'sybil-slayer',
+  'hyppie-road',
+  'tower-builder',
+]);
 const DEFAULT_GAME_VERSION = '1.0.0';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -39,9 +43,10 @@ export async function POST(request: NextRequest) {
       return json({ success: false, error: 'User identity does not match wallet session' }, 403);
     }
 
-    if (input.gameId !== SUPPORTED_GAME_ID) {
+    if (typeof input.gameId !== 'string' || !SUPPORTED_GAME_IDS.has(input.gameId)) {
       return json({ success: false, error: 'Unsupported game' }, 400);
     }
+    const gameId = input.gameId;
 
     const gameVersion = input.gameVersion ?? DEFAULT_GAME_VERSION;
     if (
@@ -61,14 +66,14 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionToken = `session_${randomBytes(32).toString('base64url')}`;
-    const sessionId = `game_${SUPPORTED_GAME_ID}_${randomUUID()}`;
+    const sessionId = `game_${gameId}_${randomUUID()}`;
 
     await prisma.gameSession.create({
       data: {
         sessionToken,
         sessionId,
         userId: walletSession.userId,
-        gameId: SUPPORTED_GAME_ID,
+        gameId,
         gameVersion: gameVersion.trim(),
         isActive: true,
       },
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
       success: true,
       sessionToken,
       sessionId,
-      gameId: SUPPORTED_GAME_ID,
+      gameId,
       gameVersion: gameVersion.trim(),
     });
   } catch {

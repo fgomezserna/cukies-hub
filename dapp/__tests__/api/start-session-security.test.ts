@@ -58,11 +58,27 @@ describe('POST /api/games/start-session security', () => {
   it.each([
     ['invalid JSON', '{bad-json'],
     ['missing gameId', {}],
-    ['unsupported gameId', { gameId: 'hyppie-road' }],
+    ['unsupported gameId', { gameId: 'unknown-game' }],
   ])('returns 400 for %s', async (_label, body) => {
     const response = await POST(request(body));
     expect(response.status).toBe(400);
     expect(mockCreateGameSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['hyppie-road', 'tower-builder'])('keeps the existing %s caller supported', async (gameId) => {
+    const response = await POST(request({ gameId, gameVersion: '1.0.0' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockCreateGameSession).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'cookie-user',
+        gameId,
+        isActive: true,
+      }),
+    });
+    expect(json).toMatchObject({ success: true, gameId });
+    expect(json.sessionId).toMatch(new RegExp(`^game_${gameId}_[0-9a-f-]{36}$`));
   });
 
   it('creates the supported game session for the cookie user, not request identity', async () => {

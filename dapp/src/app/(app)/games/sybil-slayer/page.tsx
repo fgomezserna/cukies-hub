@@ -16,6 +16,10 @@ import { useAuth } from '@/providers/auth-provider';
 const GAME_ID = 'sybil-slayer';
 const GAME_VERSION = '1.0.0';
 
+interface OwnedParentGameSession extends ParentGameSession {
+  readonly ownerUserId: string;
+}
+
 export default function SybilSlayerPage() {
   const { user, isLoading } = useAuth();
   const { gameConfig, gameStats, leaderboardData, loading, error, refetch } =
@@ -24,6 +28,9 @@ export default function SybilSlayerPage() {
   const sessionStarterRef = useRef<
     ReturnType<typeof createSingleFlightGameSessionStarter> | null
   >(null);
+  const latestWalletUserIdRef = useRef(user?.id ?? null);
+  const cleanedWalletUserIdRef = useRef(user?.id ?? null);
+  latestWalletUserIdRef.current = user?.id ?? null;
   if (!sessionStarterRef.current) {
     sessionStarterRef.current = createSingleFlightGameSessionStarter({
       gameId: GAME_ID,
@@ -31,8 +38,10 @@ export default function SybilSlayerPage() {
     });
   }
 
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [parentGameSession, setParentGameSession] = useState<ParentGameSession | null>(null);
+  const [parentGameSession, setParentGameSession] =
+    useState<OwnedParentGameSession | null>(null);
+  const latestParentGameSessionRef = useRef<OwnedParentGameSession | null>(null);
+  latestParentGameSessionRef.current = parentGameSession;
   const [roomId, setRoomId] = useState<string | null>(null);
   const [localGameStats, setLocalGameStats] = useState({
     currentScore: 0,
@@ -40,11 +49,35 @@ export default function SybilSlayerPage() {
     sessionsPlayed: 0,
     validSessions: 0,
   });
+  const activeParentGameSession =
+    parentGameSession?.ownerUserId === user?.id ? parentGameSession : null;
+  const currentSessionId = activeParentGameSession?.sessionId ?? null;
 
   useEffect(() => {
     const roomParam = new URLSearchParams(window.location.search).get('room');
     setRoomId(roomParam);
   }, []);
+
+  useEffect(() => {
+    const nextWalletUserId = user?.id ?? null;
+    if (cleanedWalletUserIdRef.current === nextWalletUserId) {
+      return;
+    }
+
+    sessionStarterRef.current?.reset();
+    if (parentGameSession) {
+      localStorage.removeItem(`session_token_${parentGameSession.sessionId}`);
+    }
+    setParentGameSession(null);
+    cleanedWalletUserIdRef.current = nextWalletUserId;
+  }, [parentGameSession, user?.id]);
+
+  useEffect(
+    () => () => {
+      sessionStarterRef.current?.reset();
+    },
+    [],
+  );
 
   const gameOrigin = useMemo(() => {
     if (!gameConfig?.gameUrl || typeof window === 'undefined') {
@@ -73,9 +106,15 @@ export default function SybilSlayerPage() {
 
   const onSessionEnd = useCallback(
     async (result: { finalScore: number; isValid: boolean }) => {
-      if (currentSessionId) {
-        localStorage.removeItem(`session_token_${currentSessionId}`);
+      const endingSession = activeParentGameSession;
+      if (
+        !endingSession ||
+        latestWalletUserIdRef.current !== endingSession.ownerUserId ||
+        latestParentGameSessionRef.current?.sessionId !== endingSession.sessionId
+      ) {
+        return;
       }
+      localStorage.removeItem(`session_token_${endingSession.sessionId}`);
 
       setLocalGameStats((previous) => ({
         ...previous,
@@ -88,11 +127,18 @@ export default function SybilSlayerPage() {
         await refetch();
       }
 
+      if (
+        latestWalletUserIdRef.current !== endingSession.ownerUserId ||
+        latestParentGameSessionRef.current?.sessionId !== endingSession.sessionId
+      ) {
+        return;
+      }
       sessionStarterRef.current?.reset();
-      setParentGameSession(null);
-      setCurrentSessionId(null);
+      setParentGameSession((current) =>
+        current?.sessionId === endingSession.sessionId ? null : current,
+      );
     },
-    [currentSessionId, refetch],
+    [activeParentGameSession, refetch],
   );
 
   const onHoneypotDetected = useCallback((event: string) => {
@@ -123,7 +169,7 @@ export default function SybilSlayerPage() {
 
   const sendSessionHandshake = useCallback(() => {
     const frameWindow = iframeRef.current?.contentWindow;
-    if (!frameWindow || !gameOrigin || !parentGameSession || !user) {
+    if (!frameWindow || !gameOrigin || !activeParentGameSession || !user) {
       return;
     }
 
@@ -132,9 +178,9 @@ export default function SybilSlayerPage() {
         type: 'GAME_SESSION_START',
         payload: {
           gameId: GAME_ID,
-          sessionToken: parentGameSession.sessionToken,
-          sessionId: parentGameSession.sessionId,
-          gameVersion: parentGameSession.gameVersion,
+          sessionToken: activeParentGameSession.sessionToken,
+          sessionId: activeParentGameSession.sessionId,
+          gameVersion: activeParentGameSession.gameVersion,
           roomId,
           user: {
             id: user.id,
@@ -145,7 +191,7 @@ export default function SybilSlayerPage() {
       },
       gameOrigin,
     );
-  }, [gameOrigin, parentGameSession, roomId, user]);
+  }, [activeParentGameSession, gameOrigin, roomId, user]);
 
   const handleRoomJoined = useCallback((roomCode: string) => {
     setRoomId(roomCode);
@@ -237,29 +283,32 @@ export default function SybilSlayerPage() {
     if (
       !authData.isAuthenticated ||
       !user?.id ||
-      currentSessionId ||
-      parentGameSession
+      activeParentGameSession
     ) {
       return undefined;
     }
 
+    const requestedWalletUserId = user.id;
     let cancelled = false;
     void sessionStarterRef.current
-      ?.start()
+      ?.start(requestedWalletUserId)
       .then((session) => {
-        if (cancelled) {
+        if (cancelled || latestWalletUserIdRef.current !== requestedWalletUserId) {
           return;
         }
-        setParentGameSession(session);
-        setCurrentSessionId(session.sessionId);
+        setParentGameSession({ ...session, ownerUserId: requestedWalletUserId });
         localStorage.setItem(`session_token_${session.sessionId}`, session.sessionToken);
         onSessionStart({
           sessionToken: session.sessionToken,
           sessionId: session.sessionId,
         });
       })
-      .catch(() => {
-        if (!cancelled) {
+      .catch((error: unknown) => {
+        if (
+          !cancelled &&
+          latestWalletUserIdRef.current === requestedWalletUserId &&
+          !(error instanceof DOMException && error.name === 'AbortError')
+        ) {
           console.error('Game session could not be started');
         }
       });
@@ -269,9 +318,8 @@ export default function SybilSlayerPage() {
     };
   }, [
     authData.isAuthenticated,
-    currentSessionId,
+    activeParentGameSession,
     onSessionStart,
-    parentGameSession,
     user?.id,
   ]);
 

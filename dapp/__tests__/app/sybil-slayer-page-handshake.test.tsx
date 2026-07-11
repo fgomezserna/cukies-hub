@@ -46,6 +46,7 @@ const mockUseMultiplayerBridge = useTreasureHuntMultiplayerBridge as unknown as 
 
 function latestBridgeOptions() {
   return mockUseMultiplayerBridge.mock.calls.at(-1)?.[0] as {
+    currentSessionId: string | null;
     onRoomJoined?: (roomCode: string) => void;
   };
 }
@@ -215,5 +216,129 @@ describe('SybilSlayerPage game-session handshake', () => {
       ),
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts wallet A, ignores its late response, starts wallet B and clears B on disconnect', async () => {
+    const pendingRequests: Array<{
+      resolve: (response: Response) => void;
+      signal: AbortSignal | null;
+    }> = [];
+    const fetchMock = jest.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((resolve) => {
+          pendingRequests.push({ resolve, signal: init?.signal ?? null });
+        }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      user: { id: 'wallet-a', username: 'Wallet A', email: 'a@example.test' },
+    });
+
+    const view = render(
+      <StrictMode>
+        <SybilSlayerPage />
+      </StrictMode>,
+    );
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      user: { id: 'wallet-b', username: 'Wallet B', email: 'b@example.test' },
+    });
+    view.rerender(
+      <StrictMode>
+        <SybilSlayerPage />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(pendingRequests[0].signal?.aborted).toBe(true));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(latestBridgeOptions()).toMatchObject({ currentSessionId: null });
+
+    await act(async () => {
+      pendingRequests[0].resolve(
+        new Response(
+          JSON.stringify({
+            success: true,
+            sessionId: 'session-a',
+            sessionToken: 'token-a',
+            gameId: 'sybil-slayer',
+            gameVersion: '1.0.0',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      await Promise.resolve();
+    });
+    expect(localStorage.getItem('session_token_session-a')).toBeNull();
+    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('session-a');
+
+    await act(async () => {
+      pendingRequests[1].resolve(
+        new Response(
+          JSON.stringify({
+            success: true,
+            sessionId: 'session-b',
+            sessionToken: 'token-b',
+            gameId: 'sybil-slayer',
+            gameVersion: '1.0.0',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    await waitFor(() =>
+      expect(localStorage.getItem('session_token_session-b')).toBe('token-b'),
+    );
+    expect(latestBridgeOptions()).toMatchObject({ currentSessionId: 'session-b' });
+    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('session-a');
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: frameWindow,
+          origin: GAME_ORIGIN,
+          data: { type: 'GAME_READY' },
+        }),
+      );
+    });
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'GAME_SESSION_START',
+        payload: expect.objectContaining({
+          sessionId: 'session-b',
+          sessionToken: 'token-b',
+          user: expect.objectContaining({ id: 'wallet-b' }),
+        }),
+      }),
+      GAME_ORIGIN,
+    );
+
+    postMessage.mockClear();
+    mockUseAuth.mockReturnValue({ isLoading: false, user: null });
+    view.rerender(
+      <StrictMode>
+        <SybilSlayerPage />
+      </StrictMode>,
+    );
+    await waitFor(() => expect(localStorage.getItem('session_token_session-b')).toBeNull());
+    expect(latestBridgeOptions()).toMatchObject({ currentSessionId: null });
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: frameWindow,
+          origin: GAME_ORIGIN,
+          data: { type: 'GAME_READY' },
+        }),
+      );
+    });
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
