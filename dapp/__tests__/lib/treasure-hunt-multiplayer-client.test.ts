@@ -466,57 +466,47 @@ describe('Treasure Hunt multiplayer controller', () => {
     controller.dispose();
   });
 
-  it('keeps local state until bridge reset ACK, then joins a second room and ignores a late old join', async () => {
+  it('rejects reset while JOIN is pending and retains the canonical join result', async () => {
     const transport = new FakeTransport();
-    const oldJoin = deferred<{
+    const pendingJoin = deferred<{
       playerId: string;
       slot: 0;
       inviteUrl: string;
       match: PublicMatch;
     }>();
-    const bridgeReset = deferred<undefined>();
-    transport.join
-      .mockImplementationOnce(() => oldJoin.promise)
-      .mockResolvedValueOnce({
-        playerId: 'player-1',
-        slot: 0,
-        inviteUrl: 'https://hub.example/?room=ROOM-2',
-        match: match(1, 'waiting', { roomCode: 'ROOM-2', matchId: 'match-2' }),
-      });
-    transport.reset.mockImplementationOnce(() => bridgeReset.promise);
+    transport.join.mockImplementationOnce(() => pendingJoin.promise);
     const controller = new TreasureHuntMultiplayerController({ transport });
 
-    const oldJoinPromise = controller.join('ROOM-OLD');
-    expect(transport.join).toHaveBeenCalledTimes(1);
-    const reset = controller.reset();
-    const nextJoin = controller.join('ROOM-2');
-    await Promise.resolve();
-
-    expect(transport.reset).toHaveBeenCalledTimes(1);
-    expect(transport.cancelPending).not.toHaveBeenCalled();
+    const joinPromise = controller.join('ROOM-PENDING');
     expect(transport.join).toHaveBeenCalledTimes(1);
     expect(controller.getState()).toMatchObject({
-      roomCode: 'ROOM-OLD',
+      roomCode: 'ROOM-PENDING',
+      joining: true,
+      match: null,
+    });
+    await expect(controller.reset()).rejects.toMatchObject({ code: 'JOIN_PENDING' });
+    expect(transport.reset).not.toHaveBeenCalled();
+    expect(transport.cancelPending).not.toHaveBeenCalled();
+    expect(controller.getState()).toMatchObject({
+      roomCode: 'ROOM-PENDING',
       joining: true,
     });
 
-    bridgeReset.resolve(undefined);
-    await reset;
-    await nextJoin;
-    expect(transport.cancelPending).toHaveBeenCalledTimes(1);
-    expect(transport.join).toHaveBeenCalledTimes(2);
-
-    oldJoin.resolve({
-      playerId: 'old-player',
+    pendingJoin.resolve({
+      playerId: 'joined-player',
       slot: 0,
-      inviteUrl: 'https://hub.example/?room=ROOM-OLD',
-      match: match(99, 'waiting', { roomCode: 'ROOM-OLD', matchId: 'old-match' }),
+      inviteUrl: 'https://hub.example/?room=ROOM-PENDING',
+      match: match(1, 'waiting', {
+        roomCode: 'ROOM-PENDING',
+        matchId: 'joined-match',
+      }),
     });
-    await oldJoinPromise;
+    await joinPromise;
     expect(controller.getState()).toMatchObject({
-      roomCode: 'ROOM-2',
-      playerId: 'player-1',
-      match: { matchId: 'match-2' },
+      roomCode: 'ROOM-PENDING',
+      playerId: 'joined-player',
+      joining: false,
+      match: { matchId: 'joined-match' },
     });
     controller.dispose();
   });
@@ -938,16 +928,18 @@ describe('multiplayer client helpers', () => {
     controller.dispose();
   });
 
-  it('keeps local controls and mode changes locked through a canonical result', () => {
+  it('locks controls and mode changes through a result, active match or pending JOIN', () => {
     expect(shouldBlockLocalGameControls(false, false)).toBe(false);
     expect(shouldBlockLocalGameControls(true, false)).toBe(true);
     expect(shouldBlockLocalGameControls(true, true)).toBe(true);
     expect(shouldBlockLocalGameControls(false, true)).toBe(true);
     expect(shouldBlockLocalGameControls(false, false, true)).toBe(true);
+    expect(shouldBlockLocalGameControls(false, false, false, true)).toBe(true);
 
     expect(canChangeTreasureHuntGameMode(false, false)).toBe(true);
     expect(canChangeTreasureHuntGameMode(true, false)).toBe(false);
     expect(canChangeTreasureHuntGameMode(false, true)).toBe(false);
+    expect(canChangeTreasureHuntGameMode(false, false, true)).toBe(false);
   });
 
   it('treats waiting and countdown as pinned matches for local mode controls', () => {

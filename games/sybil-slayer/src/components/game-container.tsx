@@ -606,6 +606,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   } | null>(null);
   const [resultExitPending, setResultExitPending] = useState(false);
   const [resultExitError, setResultExitError] = useState<string | null>(null);
+  const [multiplayerStartPending, setMultiplayerStartPending] = useState(false);
+  const multiplayerStartPendingRef = useRef(false);
   const resultExitCoordinatorRef = useRef<ReturnType<
     typeof createCanonicalResultExitCoordinator
   > | null>(null);
@@ -615,14 +617,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }
   const isMultiplayerMode = currentMode === 'multiplayer';
   const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
+  const isMultiplayerJoinPending = multiplayerStartPending || multiplayer.isJoinPending;
   const localControlsLocked = shouldBlockLocalGameControls(
     isMultiplayerMode,
     Boolean(multiplayer.matchResult),
     multiplayer.hasNonTerminalMatch,
+    isMultiplayerJoinPending,
   );
   const canChangeGameMode = canChangeTreasureHuntGameMode(
     Boolean(multiplayer.matchResult),
     multiplayer.hasNonTerminalMatch,
+    isMultiplayerJoinPending,
   );
   const lastPublishedSnapshotRef = useRef<{
     score: number;
@@ -1408,6 +1413,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Handle start game from keyboard (Space key)
   useEffect(() => {
     if (!startToggled) return;
+    if (multiplayerStartPendingRef.current || multiplayer.isJoinPending) return;
     if (gameState.status !== 'idle') return;
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
@@ -1421,6 +1427,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     playSound,
     modeSelectOpen,
     currentMode,
+    multiplayer.isJoinPending,
     multiplayer.hasNonTerminalMatch,
   ]);
   
@@ -1508,9 +1515,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
     const unsubscribe = subscribeToDirection((direction) => {
+      const joinPending = multiplayerStartPendingRef.current || multiplayer.isJoinPending;
       const nextInputState = {
         direction,
-        pauseToggled: localControlsLocked ? false : pauseToggled,
+        pauseToggled: localControlsLocked || joinPending ? false : pauseToggled,
         startToggled,
       };
 
@@ -1518,7 +1526,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         startToggled &&
         (gameState.status === 'idle' || gameState.status === 'gameOver')
       ) {
-        if (canChangeGameMode) {
+        if (canChangeGameMode && !joinPending) {
           setModeSelectOpen(true);
         }
         // Always consume Space here so useGameState cannot start local play behind a pinned match.
@@ -1537,6 +1545,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     gameState.status,
     canChangeGameMode,
     localControlsLocked,
+    multiplayer.isJoinPending,
   ]);
 
   const hasStartedMultiplayerRef = useRef(false);
@@ -1759,7 +1768,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // UI Button Handlers
   const handleStartPauseClick = () => {
-    if (localControlsLocked) return;
+    if (multiplayerStartPendingRef.current || localControlsLocked) return;
     if (gameState.status === 'playing') {
       playSound('pause');
       togglePause();
@@ -1783,7 +1792,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   };
 
   const autoJoinedRoomRef = useRef<string | null>(null);
-  const multiplayerStartPendingRef = useRef(false);
   const startMultiplayerGame = useCallback(async (roomIdOverride?: string | null) => {
     if (
       !multiplayerEnabled ||
@@ -1793,6 +1801,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
     const roomId = roomIdOverride ?? generateMatchRoomId();
     multiplayerStartPendingRef.current = true;
+    setMultiplayerStartPending(true);
     setMultiplayerJoinFailure(null);
     try {
       // A trusted parent invitation may represent the bridge's existing pin after iframe reload.
@@ -1813,6 +1822,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       });
     } finally {
       multiplayerStartPendingRef.current = false;
+      setMultiplayerStartPending(false);
     }
   }, [
     canChangeGameMode,
@@ -1850,9 +1860,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
+    if (multiplayerStartPendingRef.current || !canChangeGameMode) return;
     setModeSelectOpen(false);
-
-    if (!canChangeGameMode) return;
 
     if (mode === 'single') {
       console.log('🎮 [MODE] Starting single player mode');
@@ -1899,7 +1908,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [hasParentHandshake, multiplayerEnabled, sessionData, startMultiplayerGame]);
 
    const handleResetClick = () => {
-      if (localControlsLocked) return;
+      if (multiplayerStartPendingRef.current || localControlsLocked) return;
       playSound('button_click');
       
       // Si estamos en game over, detener el sonido de game over
@@ -3387,6 +3396,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         {/* Botón Play Again */}
                         <button
                           onClick={() => {
+                            if (multiplayerStartPendingRef.current) return;
                             playSound('button_click');
                             if (gameState.status === 'gameOver') {
                               console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');

@@ -143,8 +143,21 @@ describe('useMultiplayerMatch GameSession authority lifecycle', () => {
     expect(mockControllerInstances).toHaveLength(1);
     const firstController = mockControllerInstances[0];
 
+    act(() => firstController.emit({
+      ...ACTIVE_STATE,
+      playerId: null,
+      slot: null,
+      inviteUrl: null,
+      match: null,
+      joining: true,
+      startSignal: 0,
+    }));
+    expect(result.current.status).toBe('searching');
+    expect(result.current.isJoinPending).toBe(true);
+
     act(() => firstController.emit(ACTIVE_STATE));
     expect(result.current.status).toBe('running');
+    expect(result.current.isJoinPending).toBe(false);
     expect(result.current.roomCode).toBe('ROOM-A');
     expect(result.current.hasNonTerminalMatch).toBe(true);
 

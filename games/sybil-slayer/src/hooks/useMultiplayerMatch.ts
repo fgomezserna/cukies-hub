@@ -62,6 +62,7 @@ export interface UseMultiplayerMatchValue {
   readonly startSignal: number;
   readonly resumeSignal: number;
   readonly error: string | null;
+  readonly isJoinPending: boolean;
   readonly hasOpponent: boolean;
   readonly hasNonTerminalMatch: boolean;
   readonly scoreDifference: number;
@@ -312,6 +313,7 @@ export function useMultiplayerMatch(
       startSignal: controllerState.startSignal,
       resumeSignal: controllerState.resumeSignal,
       error: setupError ?? controllerState.error,
+      isJoinPending: controllerState.joining,
       hasOpponent: Boolean(opponent),
       hasNonTerminalMatch: isTreasureHuntMatchNonTerminal(match?.status),
       scoreDifference: localPlayer && opponent ? localPlayer.score - opponent.score : 0,

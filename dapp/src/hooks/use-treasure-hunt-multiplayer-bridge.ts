@@ -412,6 +412,22 @@ export function createTreasureHuntMultiplayerBridge(
         return;
       }
 
+      if (pendingRoomCode || pendingJoinOperations.size > 0) {
+        frameWindow.postMessage(
+          {
+            type: RESPONSE_TYPE,
+            requestId: request.requestId,
+            success: false,
+            error: {
+              code: 'JOIN_PENDING',
+              message: 'A multiplayer room join is still in progress',
+            },
+          },
+          targetOrigin,
+        );
+        return;
+      }
+
       if (knownMatchId && !isTerminalMatchStatus(knownMatchStatus)) {
         frameWindow.postMessage(
           {

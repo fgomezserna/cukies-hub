@@ -2189,56 +2189,48 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     cleanup();
   });
 
-  it('reset aborts and generation-ignores a late join before allowing a new room', async () => {
-    let resolveOldJoin: ((response: Response) => void) | undefined;
-    const oldJoinSignals: AbortSignal[] = [];
-    const fetchImpl = jest
-      .fn()
-      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
-        if (init?.signal) oldJoinSignals.push(init.signal);
-        return new Promise<Response>((resolve) => {
-          resolveOldJoin = resolve;
-        });
-      })
-      .mockResolvedValueOnce(apiResponse({
-        success: true,
-        playerId: 'new-player',
-        slot: 0,
-        match: { matchId: 'new-match', roomCode: 'NEW-ROOM' },
-      }));
+  it('rejects reset while JOIN is pending and preserves the canonical join authority', async () => {
+    const pendingJoin = deferred<Response>();
+    const joinSignals: AbortSignal[] = [];
+    const fetchImpl = jest.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal) joinSignals.push(init.signal);
+        return pendingJoin.promise;
+      },
+    );
     const { cleanup, contentWindow, postMessage, onRoomJoined } = createHarness(fetchImpl);
 
-    requestMessage(contentWindow, GAME_ORIGIN, 'old-join', 'join', { roomCode: 'OLD-ROOM' });
+    requestMessage(contentWindow, GAME_ORIGIN, 'pending-join', 'join', { roomCode: 'PENDING-ROOM' });
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
     requestMessage(contentWindow, GAME_ORIGIN, 'reset-1', 'reset');
     await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
       {
         type: 'TH_MULTIPLAYER_RESPONSE',
         requestId: 'reset-1',
-        success: true,
-        data: { reset: true },
+        success: false,
+        error: {
+          code: 'JOIN_PENDING',
+          message: 'A multiplayer room join is still in progress',
+        },
       },
       GAME_ORIGIN,
     ));
-    expect(oldJoinSignals[0]?.aborted).toBe(true);
+    expect(joinSignals[0]?.aborted).toBe(false);
+    expect(onRoomJoined).not.toHaveBeenCalled();
 
-    requestMessage(contentWindow, GAME_ORIGIN, 'new-join', 'join', { roomCode: 'NEW-ROOM' });
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(onRoomJoined).toHaveBeenCalledWith('NEW-ROOM'));
-
-    resolveOldJoin?.(apiResponse({
+    pendingJoin.resolve(apiResponse({
       success: true,
-      playerId: 'old-player',
+      playerId: 'joined-player',
       slot: 0,
-      match: { matchId: 'old-match', roomCode: 'OLD-ROOM' },
+      match: { matchId: 'joined-match', roomCode: 'PENDING-ROOM' },
     }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(onRoomJoined).not.toHaveBeenCalledWith('OLD-ROOM');
-    expect(window.location.search).toContain('room=NEW-ROOM');
-    expect(postMessage).not.toHaveBeenCalledWith(
-      expect.objectContaining({ requestId: 'old-join', success: true }),
+    await waitFor(() => expect(onRoomJoined).toHaveBeenCalledWith('PENDING-ROOM'));
+    expect(window.location.search).toContain('room=PENDING-ROOM');
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'pending-join', success: true }),
       GAME_ORIGIN,
     );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     cleanup();
   });
 

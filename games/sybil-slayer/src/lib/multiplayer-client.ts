@@ -1092,6 +1092,14 @@ export class TreasureHuntMultiplayerController {
   }
 
   reset(): Promise<void> {
+    if (this.joinPromise || this.state.joining) {
+      return Promise.reject(
+        new MultiplayerClientError(
+          'JOIN_PENDING',
+          'No se puede resetear el cliente mientras la entrada a la sala sigue pendiente',
+        ),
+      );
+    }
     if (this.state.match && !isTerminal(this.state.match.status)) {
       return Promise.reject(
         new MultiplayerClientError(
