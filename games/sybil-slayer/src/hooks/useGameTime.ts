@@ -51,10 +51,10 @@ export function useGameTime() {
   }, [getElapsedTime]);
 
   // Iniciar el juego
-  const startGame = useCallback(() => {
+  const startGame = useCallback((elapsedMs = 0) => {
     const now = Date.now();
     timeStateRef.current = {
-      gameStartTime: now,
+      gameStartTime: now - Math.max(0, Math.floor(elapsedMs)),
       totalPausedTime: 0,
       lastPauseStartTime: null,
       isPaused: false
@@ -123,4 +123,4 @@ export function useGameTime() {
     getGameStartTime: () => timeStateRef.current.gameStartTime,
     getTotalPausedTime: () => timeStateRef.current.totalPausedTime
   };
-} 
+}

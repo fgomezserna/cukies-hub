@@ -1,6 +1,4 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { pusherClient } from '@/lib/pusher-client';
-import { triggerPusherEvent } from '@/lib/pusher-server';
 import type { Channel } from 'pusher-js';
 
 interface GameCheckpoint {
@@ -16,7 +14,6 @@ interface GameEndData {
   finalScore: number;
   gameTime: number;
   metadata?: any;
-  sessionToken?: string;
 }
 
 interface PusherGameConnectionOptions {
@@ -34,12 +31,11 @@ interface PusherGameConnectionOptions {
  */
 export function usePusherGameConnection(
   sessionId: string | null,
-  authData: { isAuthenticated: boolean; user: any },
+  authData: { isAuthenticated: boolean; user: any; sessionToken?: string | null },
   options: PusherGameConnectionOptions
 ) {
   const [channel, setChannel] = useState<Channel | null>(null);
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
-  const [sessionTokenReady, setSessionTokenReady] = useState(false);
   const [gameStats, setGameStats] = useState({
     checkpointsReceived: 0,
     honeypotEvents: 0,
@@ -61,16 +57,10 @@ export function usePusherGameConnection(
   const isConnectingRef = useRef(false);
   const connectionPromiseRef = useRef<Promise<void> | null>(null);
 
-  // Reset token ready state when sessionId changes
-  useEffect(() => {
-    if (sessionId !== sessionIdRef.current) {
-      setSessionTokenReady(false);
-    }
-  }, [sessionId]);
-
   // Connect to Pusher channel when sessionId is available and session token exists
   useEffect(() => {
-    if (!sessionId || !authData.isAuthenticated || !authData.user?.id) {
+    const sessionToken = authData.sessionToken;
+    if (!sessionId || !sessionToken || !authData.isAuthenticated || !authData.user?.id) {
       console.log('🔄 [PUSHER] Waiting for session and auth:', {
         hasSessionId: !!sessionId,
         isAuthenticated: authData.isAuthenticated,
@@ -88,37 +78,6 @@ export function usePusherGameConnection(
     // Prevent concurrent connections
     if (isConnectingRef.current || connectionPromiseRef.current) {
       console.log('🔄 [PUSHER] Connection already in progress...');
-      return;
-    }
-
-    // Check if session token is available, if not wait for it
-    const storedSessionToken = localStorage.getItem(`session_token_${sessionId}`);
-    if (!storedSessionToken) {
-      console.log('⏳ [PUSHER] Waiting for session token to be stored...');
-      
-      // Set up an interval to check for the token
-      const tokenCheckInterval = setInterval(() => {
-        const token = localStorage.getItem(`session_token_${sessionId}`);
-        if (token) {
-          console.log('✅ [PUSHER] Session token found, setting ready state...');
-          clearInterval(tokenCheckInterval);
-          setSessionTokenReady(true);
-        }
-      }, 100); // Check every 100ms
-      
-      // Clean up interval after 10 seconds to prevent infinite polling
-      setTimeout(() => {
-        clearInterval(tokenCheckInterval);
-        console.warn('⚠️ [PUSHER] Timeout waiting for session token');
-      }, 10000);
-      
-      return () => clearInterval(tokenCheckInterval);
-    } else {
-      setSessionTokenReady(true);
-    }
-
-    // Only proceed if we have the session token
-    if (!sessionTokenReady && !storedSessionToken) {
       return;
     }
 
@@ -161,22 +120,11 @@ export function usePusherGameConnection(
                 sessionId
               });
 
-              // For dapp, we need to find the session token based on the sessionId
-              // Try to get it from localStorage first (set during session start)
-              const storedSessionToken = localStorage.getItem(`session_token_${sessionId}`);
-              if (!storedSessionToken) {
-                console.error('❌ [PUSHER DAPP] No session token found in localStorage for session:', sessionId);
-                callback(new Error('No session token available'));
-                return;
-              }
-
               // Use URLSearchParams for better compatibility instead of FormData
               const params = new URLSearchParams();
               params.append('socket_id', socketId);
               params.append('channel_name', channel.name);
-              params.append('session_token', storedSessionToken);
-
-              console.log('🔐 [PUSHER DAPP] Using stored session token for auth');
+              params.append('session_token', sessionToken);
 
               fetch('/api/pusher/auth', {
                 method: 'POST',
@@ -276,14 +224,6 @@ export function usePusherGameConnection(
         
         // Process checkpoint (validate and save to DB)
         try {
-          // Get sessionToken from localStorage for this session
-          const sessionToken = localStorage.getItem(`session_token_${sessionId}`);
-          
-          if (!sessionToken) {
-            console.error('❌ [PUSHER] No session token available for checkpoint');
-            return;
-          }
-          
           const response = await fetch('/api/games/checkpoint', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -324,7 +264,6 @@ export function usePusherGameConnection(
         console.log('🏁 [PUSHER] Game end details:', {
           finalScore: data.finalScore,
           gameTime: data.gameTime,
-          hasSessionToken: !!data.sessionToken,
           sessionId: sessionId,
           channelName: channelName,
           channelState: newChannel.state
@@ -332,18 +271,6 @@ export function usePusherGameConnection(
         
         // Process game end
         try {
-          // Get sessionToken from the data itself or from localStorage
-          const sessionToken = data.sessionToken || localStorage.getItem(`session_token_${sessionId}`);
-          
-          if (!sessionToken) {
-            console.error('❌ [PUSHER] No session token available for game end', {
-              sessionId,
-              hasDataToken: !!data.sessionToken,
-              localStorageKeys: Object.keys(localStorage).filter(k => k.startsWith('session_token'))
-            });
-            return;
-          }
-          
           const response = await fetch('/api/games/end-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -410,15 +337,14 @@ export function usePusherGameConnection(
         // Trigger session start event to game
         newChannel.trigger('client-session-start', {
           gameId,
-          sessionToken: storedSessionToken,
           sessionId: sessionId,
           gameVersion: gameVersion || '1.0.0',
-          user: authData.user
+          userId: authData.user.id,
         });
         
         // Also notify the callback
         onSessionStart({
-          sessionToken: storedSessionToken,
+          sessionToken,
           sessionId: sessionId
         });
       }
@@ -458,6 +384,7 @@ export function usePusherGameConnection(
   }, [
     sessionId,
     authData.isAuthenticated,
+    authData.sessionToken,
     authData.user,
     authData.user?.id,
     gameId,
@@ -466,7 +393,6 @@ export function usePusherGameConnection(
     onHoneypotDetected,
     onSessionEnd,
     onSessionStart,
-    sessionTokenReady,
   ]);
 
   // Send session start notification to game
@@ -479,7 +405,6 @@ export function usePusherGameConnection(
     try {
       await channel.trigger('client-session-start', {
         gameId,
-        sessionToken: sessionData.sessionToken,
         sessionId: sessionData.sessionId,
         gameVersion,
         timestamp: Date.now()

@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { useIsMobile } from '../hooks/use-mobile';
+import { isTreasureHuntMultiplayerEnabled } from '../lib/multiplayer-feature';
 
 type GameMode = 'single' | 'multiplayer';
 
@@ -34,6 +35,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
   const isMobile = useIsMobile();
+  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
 
   React.useEffect(() => {
     if (!open) {
@@ -137,8 +139,16 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           </button>
 
           {/* Multiplayer Mode */}
-          <div
-            className="group relative flex flex-col p-4 rounded-lg border border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none w-full max-w-[280px]"
+          <button
+            type="button"
+            data-testid="treasure-hunt-multiplayer-mode"
+            disabled={!multiplayerEnabled}
+            onClick={() => multiplayerEnabled && onSelectMode('multiplayer')}
+            className={`group relative flex flex-col p-4 rounded-lg border w-full max-w-[280px] transition-all duration-200 ${
+              multiplayerEnabled
+                ? 'border-cyan-400/60 bg-slate-800/70 hover:border-cyan-300 hover:bg-slate-800/90 focus:outline-none'
+                : 'border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 cursor-not-allowed select-none'
+            }`}
           >
             <div className="flex flex-col gap-4 items-center">
               <div className="flex items-center justify-center gap-3 text-center">
@@ -149,8 +159,8 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   <h3 className="font-pixellari text-2xl text-pink-200/60">
                     {modeCopy.multiplayer.title}
                   </h3>
-                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-pink-300/50">
-                    NUEVO DESAFÍO
+                  <p className="text-xs uppercase tracking-[0.2em] font-pixellari text-pink-300/70">
+                    STAGING · SIN RANKING
                   </p>
                 </div>
               </div>
@@ -162,18 +172,20 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     width={600}
                     height={300}
                     quality={100}
-                    className="object-contain w-[240px] h-[120px] opacity-60"
+                    className={`object-contain w-[240px] h-[120px] ${multiplayerEnabled ? '' : 'opacity-60'}`}
                   />
                 </div>
               </div>
-              {/* "Coming soon" badge - debajo de todo */}
               <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
                 <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
-                  PRÓXIMAMENTE
+                  {multiplayerEnabled ? 'JUGAR 2P' : 'PRÓXIMAMENTE'}
                 </span>
               </div>
+              <p className="text-center text-xs font-pixellari text-cyan-100/70">
+                Prueba sin ranking ni recompensas.
+              </p>
             </div>
-          </div>
+          </button>
           </div>
         </div>
       </div>
@@ -273,8 +285,16 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           </button>
 
           {/* Multiplayer Mode */}
-          <div
-            className="group relative flex flex-col p-6 rounded-lg border border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 pointer-events-none select-none w-[280px]"
+          <button
+            type="button"
+            data-testid="treasure-hunt-multiplayer-mode"
+            disabled={!multiplayerEnabled}
+            onClick={() => multiplayerEnabled && onSelectMode('multiplayer')}
+            className={`group relative flex flex-col p-6 rounded-lg border w-[280px] transition-all duration-200 ${
+              multiplayerEnabled
+                ? 'border-cyan-400/60 bg-slate-800/70 hover:border-cyan-300 hover:bg-slate-800/90 focus:outline-none'
+                : 'border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 cursor-not-allowed select-none'
+            }`}
           >
             <div className="flex flex-col gap-4 items-center">
               <div className="flex items-center justify-center gap-3 text-center">
@@ -285,8 +305,8 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   <h3 className="font-pixellari text-2xl text-pink-200/60">
                     {modeCopy.multiplayer.title}
                   </h3>
-                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-pink-300/50">
-                    NUEVO DESAFÍO
+                  <p className="text-xs uppercase tracking-[0.2em] font-pixellari text-pink-300/70">
+                    STAGING · SIN RANKING
                   </p>
                 </div>
               </div>
@@ -298,18 +318,20 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     width={600}
                     height={300}
                     quality={100}
-                    className="object-contain w-[240px] h-[120px] opacity-60"
+                    className={`object-contain w-[240px] h-[120px] ${multiplayerEnabled ? '' : 'opacity-60'}`}
                   />
                 </div>
               </div>
-              {/* "Coming soon" badge - debajo de todo */}
               <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
                 <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
-                  PRÓXIMAMENTE
+                  {multiplayerEnabled ? 'JUGAR 2P' : 'PRÓXIMAMENTE'}
                 </span>
               </div>
+              <p className="text-center text-xs font-pixellari text-cyan-100/70">
+                Prueba sin ranking ni recompensas.
+              </p>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </div>

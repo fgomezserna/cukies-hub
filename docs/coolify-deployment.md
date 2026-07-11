@@ -47,6 +47,55 @@ NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL=abierta
 
 Las variables `NEXT_PUBLIC_*` se inyectan tambien como build args. Tras cambiarlas en Coolify hay que reconstruir la imagen, no solo reiniciar el contenedor.
 
+Treasure Hunt multiplayer (solo staging):
+
+Antes de activar el flag servidor es obligatorio ejecutar este preflight en la base indicada por `DATABASE_URL`. La coleccion `TreasureHuntMultiplayerMatch` debe ser nueva/vacia o ambas agregaciones deben devolver cero documentos:
+
+```javascript
+// Un GameSession no puede estar ligado a mas de un match, incluidos terminales.
+db.TreasureHuntMultiplayerMatch.aggregate([
+  { $unwind: "$players" },
+  { $match: { "players.gameSessionId": { $type: "string" } } },
+  { $group: { _id: "$players.gameSessionId", matches: { $addToSet: "$matchId" } } },
+  { $match: { "matches.1": { $exists: true } } }
+])
+
+// Una wallet solo puede estar activa en un match. La expresion reproduce el backfill legacy.
+db.TreasureHuntMultiplayerMatch.aggregate([
+  {
+    $set: {
+      effectiveActiveUserIds: {
+        $cond: [
+          { $in: ["$status", ["finished", "abandoned"]] },
+          [],
+          { $ifNull: ["$activeUserIds", "$players.userId"] }
+        ]
+      }
+    }
+  },
+  { $unwind: "$effectiveActiveUserIds" },
+  { $group: { _id: "$effectiveActiveUserIds", matches: { $addToSet: "$matchId" } } },
+  { $match: { "matches.1": { $exists: true } } }
+])
+```
+
+Si aparece cualquier fila, no activar `TREASURE_HUNT_MULTIPLAYER_ENABLED`: exportar/respaldar la coleccion y limpiar o terminalizar los duplicados de forma explicita, o usar una coleccion nueva. El arranque crea indices unicos sobre `players.gameSessionId` y wallets activas y debe fallar cerrado si el dataset no cumple estas invariantes.
+
+```bash
+TREASURE_HUNT_MULTIPLAYER_ENABLED=true
+```
+
+El compose mantiene este flag servidor en `false` por defecto. Solo debe activarse en el recurso de staging/integracion mientras el modo siga siendo `staging_unranked`; produccion debe conservarlo en `false`. El rate limiter de estas rutas vive en memoria del proceso y presupone una unica replica de `dapp`. Antes de escalar a varias replicas hay que mover los buckets a un almacenamiento compartido y distribuido.
+
+El juego `sybil-slayer` se despliega como recurso separado y necesita estas variables de build para el mismo gate:
+
+```bash
+NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED=true
+NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com
+```
+
+Ambas se incorporan al bundle de Next.js: tras cambiarlas hay que reconstruir la imagen del juego. En produccion, `NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED` debe seguir en `false` y `NEXT_PUBLIC_DAPP_ORIGIN` debe ser el origen real de la dapp de produccion. Ese origen tambien delimita el `frame-ancestors` del CSP; no se debe usar `*` ni mezclar el origen de staging con produccion.
+
 Indexer:
 
 ```bash

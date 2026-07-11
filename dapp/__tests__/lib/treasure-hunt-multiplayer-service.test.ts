@@ -1,0 +1,1491 @@
+import {
+  InMemoryMatchRepository,
+  MatchNotFoundError,
+  MatchRevisionConflictError,
+  createMatchRules,
+  createWaitingMatch,
+  validatePlayerSnapshot,
+  type MatchRules,
+  type PlayerSnapshot,
+} from '@/lib/treasure-hunt-multiplayer';
+import {
+  TreasureHuntMultiplayerService,
+  type MultiplayerClock,
+  type MultiplayerIdFactory,
+} from '@/lib/treasure-hunt-multiplayer/service';
+
+class TestClock implements MultiplayerClock {
+  value = 0;
+  now() {
+    return this.value;
+  }
+}
+
+function createIdFactory(): MultiplayerIdFactory {
+  let match = 0;
+  let player = 0;
+  let seed = 0;
+  return {
+    createMatchId: () => `match-${++match}`,
+    createPlayerId: () => `player-${++player}`,
+    createSeed: () => `seed-${++seed}`,
+  };
+}
+
+function createHarness(ruleOverrides: Partial<MatchRules> = {}) {
+  const repository = new InMemoryMatchRepository();
+  const clock = new TestClock();
+  const service = new TreasureHuntMultiplayerService(repository, {
+    clock,
+    idFactory: createIdFactory(),
+    rules: {
+      initialCountdownMs: 1_000,
+      offlineThresholdMs: 10_000,
+      // State-machine tests use compressed clocks; anti-cheat rates are covered separately.
+      maxScoreDeltaPerWindow: 1_000_000,
+      ...ruleOverrides,
+    },
+  });
+  return { repository, clock, service };
+}
+
+const first = {
+  roomCode: 'ROOM',
+  userId: 'user-a',
+  gameSessionId: 'session-a',
+  clientInstanceId: 'instance-a',
+};
+const second = {
+  roomCode: 'ROOM',
+  userId: 'user-b',
+  gameSessionId: 'session-b',
+  clientInstanceId: 'instance-b',
+};
+
+describe('TreasureHuntMultiplayerService', () => {
+  it('creates and joins idempotently, keeps config stable and exposes no internal identity', async () => {
+    const { repository, clock, service } = createHarness();
+
+    const created = await service.createOrJoin(first);
+    const repeatedFirst = await service.createOrJoin(first);
+    clock.value = 100;
+    const joined = await service.createOrJoin(second);
+    const repeatedSecond = await service.createOrJoin(second);
+
+    expect(created.playerId).toBe(repeatedFirst.playerId);
+    expect(joined.playerId).toBe(repeatedSecond.playerId);
+    expect(joined.match.players).toHaveLength(2);
+    expect(joined.match.config.seed).toBe('seed-1');
+    expect(joined.match.config.startAt).toBe(1_100);
+    expect(joined.match.rewardEligible).toBe(false);
+    expect(joined.match.gameId).toBe('treasure-hunt');
+    expect(joined.match.mode).toBe('staging_unranked');
+    expect(joined.match.rulesVersion).toBeTruthy();
+    expect(joined.match.config).toMatchObject({
+      winDelta: 500,
+      initialCountdownMs: 1_000,
+      lobbyTimeoutMs: 30_000,
+      roundDurationMs: 30_000,
+      suddenDeathTimeoutMs: 60_000,
+      terminalRetentionMs: 604_800_000,
+      offlineThresholdMs: 10_000,
+      reconnectBudgetMs: 15_000,
+      reconnectCountdownMs: 3_000,
+      eliminationResolutionDelayMs: 250,
+      initialHearts: 3,
+      maxHearts: 10,
+      maxHeartsDelta: 1,
+      maxScore: 10_000_000,
+      maxElapsedMs: 86_400_000,
+      scoreDeltaWindowMs: 1_000,
+      maxScoreDeltaPerWindow: 1_000_000,
+      snapshotTimeToleranceMs: 250,
+    });
+
+    const publicJson = JSON.stringify(joined.match);
+    expect(publicJson).not.toContain('user-a');
+    expect(publicJson).not.toContain('session-a');
+    expect(publicJson).not.toContain('userId');
+    expect(publicJson).not.toContain('gameSessionId');
+    expect(publicJson).not.toContain('clientInstanceId');
+    expect(publicJson).not.toContain('nextReconcileAt');
+    expect(publicJson).not.toContain('expiresAt');
+
+    clock.value = 1_100;
+    const running = await service.getForParticipant({
+      matchId: created.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+    });
+    expect(running.status).toBe('running');
+    expect(running.config.seed).toBe(joined.match.config.seed);
+    expect(running.config.startAt).toBe(joined.match.config.startAt);
+
+    const internal = await repository.findByMatchId(created.match.matchId);
+    expect(internal?.players.map((player) => player.slot)).toEqual([0, 1]);
+  });
+
+  it('authorizes participant reads by both wallet user and game session identity', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const created = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 101;
+
+    await expect(
+      service.getForParticipant({
+        matchId: created.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      }),
+    ).resolves.toMatchObject({ status: 'running' });
+
+    const revisionAfterAuthorizedRead = (
+      await repository.findByMatchId(created.match.matchId)
+    )?.revision;
+
+    await expect(
+      service.getForParticipant({
+        matchId: created.match.matchId,
+        userId: first.userId,
+        gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    await expect(
+      service.getForParticipant({
+        matchId: created.match.matchId,
+        userId: 'not-a-player',
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+
+    expect((await repository.findByMatchId(created.match.matchId))?.revision).toBe(
+      revisionAfterAuthorizedRead,
+    );
+  });
+
+  it('forms a healthy countdown after a long one-player lobby wait', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 1_000,
+      offlineThresholdMs: 1_000,
+      reconnectBudgetMs: 5_000,
+    });
+    const created = await service.createOrJoin(first);
+    clock.value = 18_000;
+
+    const joined = await service.createOrJoin(second);
+
+    expect(joined.match.matchId).toBe(created.match.matchId);
+    expect(joined.match.status).toBe('countdown');
+    expect(joined.match.result).toBeNull();
+    expect(joined.match.config.startAt).toBe(19_000);
+    expect(joined.match.players).toEqual([
+      expect.objectContaining({ presence: 'online', reconnectBudgetRemainingMs: 5_000 }),
+      expect.objectContaining({ presence: 'online', reconnectBudgetRemainingMs: 5_000 }),
+    ]);
+    const stored = await repository.findByMatchId(created.match.matchId);
+    expect(stored?.players.map((player) => player.lastHeartbeatAt)).toEqual([18_000, 18_000]);
+    expect(stored?.players.map((player) => player.lastSnapshotAcceptedAt)).toEqual([null, null]);
+  });
+
+  it('uses CAS retries so concurrent joins never exceed two slots', async () => {
+    const { repository, service } = createHarness();
+    await service.createOrJoin(first);
+
+    const results = await Promise.allSettled([
+      service.createOrJoin(second),
+      service.createOrJoin({
+        roomCode: 'ROOM',
+        userId: 'user-c',
+        gameSessionId: 'session-c',
+        clientInstanceId: 'instance-c',
+      }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    expect(rejected?.reason).toMatchObject({ code: 'MATCH_FULL', statusCode: 409 });
+    expect((await repository.findByRoomCode('ROOM'))?.players).toHaveLength(2);
+  });
+
+  it('returns a 409-ready domain error for a third player', async () => {
+    const { service } = createHarness();
+    await service.createOrJoin(first);
+    await service.createOrJoin(second);
+
+    await expect(
+      service.createOrJoin({
+        roomCode: 'ROOM',
+        userId: 'user-c',
+        gameSessionId: 'session-c',
+        clientInstanceId: 'instance-c',
+      }),
+    ).rejects.toMatchObject({ code: 'MATCH_FULL', statusCode: 409 });
+  });
+
+  it('rejects duplicate or reordered snapshot sequences', async () => {
+    const { clock, service } = createHarness();
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 1_001;
+    await service.reconcile(joinedFirst.match.matchId);
+
+    const snapshot = { seq: 1, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' };
+    const updated = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      snapshot,
+    });
+    expect(updated.players.find((player) => player.playerId === joinedFirst.playerId)?.seq).toBe(1);
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: { ...snapshot, seq: 0 },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
+  });
+
+  it('binds elapsed and score acceptance to the injected server clock', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 100;
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: {
+          seq: 0,
+          score: 10_000_000,
+          hearts: 3,
+          elapsedMs: 86_400_000,
+          lifecycle: 'playing',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: {
+          seq: 0,
+          score: 10_000_000,
+          hearts: 3,
+          elapsedMs: 0,
+          lifecycle: 'playing',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]).toMatchObject({
+      lastSnapshotAcceptedAt: null,
+      snapshot: { seq: -1, score: 0, elapsedMs: 0 },
+    });
+
+    clock.value = 101;
+    const firstAccepted = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      snapshot: { seq: 0, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
+    });
+    expect(firstAccepted.players[0]).toMatchObject({ score: 100, elapsedMs: 0 });
+    expect(
+      (await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]
+        .lastSnapshotAcceptedAt,
+    ).toBe(101);
+
+    clock.value = 1_101;
+    const secondAccepted = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      snapshot: { seq: 1, score: 200, hearts: 3, elapsedMs: 1_000, lifecycle: 'playing' },
+    });
+    expect(secondAccepted.players[0]).toMatchObject({ score: 200, elapsedMs: 1_000 });
+    expect(
+      (await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]
+        .lastSnapshotAcceptedAt,
+    ).toBe(1_101);
+  });
+
+  it('finishes once at the default winDelta of 500', async () => {
+    const { repository, clock, service } = createHarness();
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 1_001;
+
+    const finished = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      snapshot: { seq: 0, score: 500, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
+    });
+
+    expect(finished.status).toBe('finished');
+    expect(finished.result).toMatchObject({
+      winnerPlayerId: joinedFirst.playerId,
+      reason: 'score_difference',
+    });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.activeUserIds).toEqual([]);
+    expect((await service.reconcile(joinedFirst.match.matchId)).result).toEqual(finished.result);
+  });
+
+  it.each([
+    { firstScore: 400, secondScore: 200, expectedWinner: 'first', reason: 'elimination' },
+    { firstScore: 300, secondScore: 300, expectedWinner: null, reason: 'draw' },
+  ])(
+    'resolves sequential death snapshots inside the pending window: $reason',
+    async ({ firstScore, secondScore, expectedWinner, reason }) => {
+      const { repository, clock, service } = createHarness({
+        initialCountdownMs: 100,
+        eliminationResolutionDelayMs: 100,
+        maxHeartsDelta: 3,
+      });
+      const joinedFirst = await service.createOrJoin(first);
+      await service.createOrJoin(second);
+      clock.value = 101;
+
+      const pending = await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: {
+          seq: 0,
+          score: firstScore,
+          hearts: 0,
+          elapsedMs: 100,
+          lifecycle: 'eliminated',
+        },
+      });
+      expect(pending.status).toBe('running');
+      expect(pending.result).toBeNull();
+      expect(JSON.stringify(pending)).not.toContain('pendingElimination');
+      expect((await repository.findByMatchId(joinedFirst.match.matchId))?.pendingElimination)
+        .toMatchObject({ playerId: joinedFirst.playerId, scoreAtDeath: firstScore, resolveAt: 201 });
+
+      clock.value = 151;
+      const finished = await service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: second.userId,
+        gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+        snapshot: {
+          seq: 0,
+          score: secondScore,
+          hearts: 0,
+          elapsedMs: 150,
+          lifecycle: 'eliminated',
+        },
+      });
+
+      expect(finished.status).toBe('finished');
+      expect(finished.result).toMatchObject({
+        winnerPlayerId: expectedWinner === 'first' ? joinedFirst.playerId : null,
+        reason,
+      });
+      expect(
+        (await repository.findByMatchId(joinedFirst.match.matchId))?.pendingElimination,
+      ).toBeNull();
+    },
+  );
+
+  it('rejects client-declared finished lifecycle before persisting it', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 101;
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: { seq: 0, score: 0, hearts: 3, elapsedMs: 1, lifecycle: 'finished' },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.players[0].snapshot)
+      .toMatchObject({ seq: -1, lifecycle: 'waiting' });
+  });
+
+  it('persists a terminal pending-elimination transition before ignoring a late snapshot', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 100,
+      eliminationResolutionDelayMs: 100,
+      maxHeartsDelta: 3,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    const joinedSecond = await service.createOrJoin(second);
+    clock.value = 101;
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
+    });
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      snapshot: { seq: 0, score: 200, hearts: 0, elapsedMs: 100, lifecycle: 'eliminated' },
+    });
+    clock.value = 201;
+    const lateSnapshot = {
+      seq: 1,
+      score: 999,
+      hearts: 0,
+      elapsedMs: 200,
+      lifecycle: 'eliminated',
+    };
+
+    const terminal = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      snapshot: lateSnapshot,
+    });
+
+    expect(terminal.status).toBe('finished');
+    expect(terminal.result).toMatchObject({
+      winnerPlayerId: joinedSecond.playerId,
+      reason: 'elimination',
+    });
+    expect(terminal.players.find((player) => player.playerId === joinedSecond.playerId)).toMatchObject({
+      score: 300,
+      hearts: 3,
+      lifecycle: 'finished',
+    });
+    const persisted = await repository.findByMatchId(joinedFirst.match.matchId);
+    expect(persisted).toMatchObject({ status: 'finished', pendingElimination: null });
+    expect(persisted?.players[1].snapshot).toMatchObject({ seq: 0, score: 300, hearts: 3 });
+
+    const repeated = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      snapshot: lateSnapshot,
+    });
+    expect(repeated.result).toEqual(terminal.result);
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.revision).toBe(
+      persisted?.revision,
+    );
+  });
+
+  it('rejects gameplay snapshots before start, while paused and during resume countdown', async () => {
+    const waitingHarness = createHarness();
+    const waitingFirst = await waitingHarness.service.createOrJoin(first);
+    const snapshot = { seq: 0, score: 50, hearts: 2, elapsedMs: 50, lifecycle: 'playing' };
+
+    await expect(
+      waitingHarness.service.updateSnapshot({
+        matchId: waitingFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    await waitingHarness.service.createOrJoin(second);
+    waitingHarness.clock.value = 500;
+    await expect(
+      waitingHarness.service.updateSnapshot({
+        matchId: waitingFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    expect(
+      (await waitingHarness.repository.findByMatchId(waitingFirst.match.matchId))?.players[0]
+        .snapshot,
+    ).toMatchObject({ seq: -1, score: 0, hearts: 3 });
+
+    const pausedHarness = createHarness({
+      initialCountdownMs: 100,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 500,
+    });
+    const pausedFirst = await pausedHarness.service.createOrJoin(first);
+    await pausedHarness.service.createOrJoin(second);
+    pausedHarness.clock.value = 100;
+    await pausedHarness.service.heartbeat({
+      matchId: pausedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+    });
+    await pausedHarness.service.heartbeat({
+      matchId: pausedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    pausedHarness.clock.value = 250;
+    await pausedHarness.service.heartbeat({
+      matchId: pausedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    await expect(
+      pausedHarness.service.updateSnapshot({
+        matchId: pausedFirst.match.matchId,
+        userId: second.userId,
+        gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+        snapshot,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+
+    pausedHarness.clock.value = 300;
+    await pausedHarness.service.heartbeat({
+      matchId: pausedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+    });
+    await expect(
+      pausedHarness.service.updateSnapshot({
+        matchId: pausedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    const unchanged = await pausedHarness.repository.findByMatchId(pausedFirst.match.matchId);
+    expect(unchanged?.status).toBe('countdown');
+    expect(unchanged?.players.map((player) => player.snapshot)).toEqual([
+      expect.objectContaining({ seq: -1, score: 0, hearts: 3 }),
+      expect.objectContaining({ seq: -1, score: 0, hearts: 3 }),
+    ]);
+  });
+
+  it('freezes the first dead player through pending elimination and sudden death', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 100,
+      eliminationResolutionDelayMs: 100,
+      maxHeartsDelta: 3,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    const joinedSecond = await service.createOrJoin(second);
+    clock.value = 101;
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      snapshot: { seq: 0, score: 300, hearts: 3, elapsedMs: 100, lifecycle: 'playing' },
+    });
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+      snapshot: { seq: 0, score: 600, hearts: 0, elapsedMs: 100, lifecycle: 'eliminated' },
+    });
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: { seq: 1, score: 650, hearts: 0, elapsedMs: 150, lifecycle: 'eliminated' },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+
+    clock.value = 201;
+    const suddenDeath = await service.reconcile(joinedFirst.match.matchId);
+    expect(suddenDeath.status).toBe('sudden_death');
+    expect(suddenDeath.suddenDeath?.targetScore).toBe(600);
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.pendingElimination).toBeNull();
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+        snapshot: { seq: 1, score: 650, hearts: 0, elapsedMs: 200, lifecycle: 'eliminated' },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+
+    clock.value = 202;
+    const finished = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      snapshot: { seq: 1, score: 601, hearts: 0, elapsedMs: 201, lifecycle: 'eliminated' },
+    });
+    expect(finished.result).toMatchObject({
+      winnerPlayerId: joinedSecond.playerId,
+      reason: 'sudden_death',
+    });
+    expect(finished.result?.finalScores[joinedFirst.playerId]).toBe(600);
+  });
+
+  it('reconnects through heartbeat in the same slot after consuming, not resetting, grace', async () => {
+    const { clock, service } = createHarness({
+      initialCountdownMs: 100,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 500,
+      reconnectCountdownMs: 3_000,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 100;
+    await service.heartbeat({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+    });
+    await service.heartbeat({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+
+    clock.value = 250;
+    const paused = await service.heartbeat({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    expect(paused.status).toBe('paused_reconnect');
+    expect(paused.config.resumeEpoch).toBe(0);
+    expect(paused.players.find((player) => player.playerId === joinedFirst.playerId)).toMatchObject({
+      slot: 0,
+      presence: 'offline',
+      reconnectBudgetRemainingMs: 450,
+    });
+
+    clock.value = 300;
+    const resuming = await service.heartbeat({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+    });
+    expect(resuming.status).toBe('countdown');
+    expect(resuming.config.resumeAt).toBe(3_300);
+    expect(resuming.config.resumeEpoch).toBe(1);
+    expect(resuming.players.find((player) => player.playerId === joinedFirst.playerId)).toMatchObject({
+      slot: 0,
+      presence: 'online',
+      reconnectBudgetRemainingMs: 400,
+    });
+
+    clock.value = 350;
+    await service.heartbeat({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    clock.value = 801;
+    const forfeited = await service.heartbeat({
+      matchId: joinedFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    expect(forfeited.result).toMatchObject({
+      winnerPlayerId: forfeited.players.find((player) => player.slot === 1)?.playerId,
+      reason: 'forfeit',
+    });
+  });
+
+  it('increments resumeEpoch exactly once for each persisted resume sequence', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 10,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 1_000,
+      reconnectCountdownMs: 50,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 10;
+    await service.reconcile(joinedFirst.match.matchId);
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second });
+
+    clock.value = 111;
+    expect(
+      (await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second })).status,
+    ).toBe('paused_reconnect');
+    clock.value = 120;
+    const firstResume = await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    expect(firstResume).toMatchObject({
+      status: 'countdown',
+      config: { resumeEpoch: 1, resumeAt: 170 },
+    });
+    clock.value = 121;
+    expect(
+      (await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first })).config.resumeEpoch,
+    ).toBe(1);
+
+    clock.value = 170;
+    await service.reconcile(joinedFirst.match.matchId);
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second });
+    clock.value = 271;
+    expect(
+      (await service.heartbeat({ matchId: joinedFirst.match.matchId, ...second })).status,
+    ).toBe('paused_reconnect');
+    clock.value = 280;
+    const secondResume = await service.heartbeat({ matchId: joinedFirst.match.matchId, ...first });
+    expect(secondResume.config.resumeEpoch).toBe(2);
+    expect(
+      (await repository.findByMatchId(joinedFirst.match.matchId))?.resumeEpoch,
+    ).toBe(2);
+  });
+
+  it('abandons through persisted reconciliation when both grace budgets expire', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 100,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 500,
+    });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 100;
+    await service.reconcile(joinedFirst.match.matchId);
+    clock.value = 600;
+
+    const abandoned = await service.reconcile(joinedFirst.match.matchId);
+
+    expect(abandoned.status).toBe('abandoned');
+    expect(abandoned.result).toMatchObject({ winnerPlayerId: null, reason: 'abandoned' });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.activeUserIds).toEqual([]);
+  });
+
+  it('waits when one offline player expires, then resolves on survivor return or abandonment', async () => {
+    const returning = createHarness({
+      initialCountdownMs: 100,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 500,
+    });
+    const returningFirst = await returning.service.createOrJoin(first);
+    const returningSecond = await returning.service.createOrJoin(second);
+    returning.clock.value = 100;
+    await returning.service.heartbeat({
+      matchId: returningFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    returning.clock.value = 600;
+    const waitingForReturn = await returning.service.reconcile(returningFirst.match.matchId);
+
+    expect(waitingForReturn.status).toBe('paused_reconnect');
+    expect(waitingForReturn.result).toBeNull();
+    expect(waitingForReturn.players.find((player) => player.slot === 0)).toMatchObject({
+      presence: 'offline',
+      reconnectBudgetRemainingMs: 0,
+    });
+    expect(waitingForReturn.players.find((player) => player.slot === 1)).toMatchObject({
+      presence: 'offline',
+      reconnectBudgetRemainingMs: 100,
+    });
+
+    returning.clock.value = 625;
+    const expiredCannotReturn = await returning.service.heartbeat({
+      matchId: returningFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      clientInstanceId: first.clientInstanceId,
+    });
+    expect(expiredCannotReturn.result).toBeNull();
+    expect(expiredCannotReturn.players.find((player) => player.slot === 0)).toMatchObject({
+      presence: 'offline',
+      reconnectBudgetRemainingMs: 0,
+    });
+
+    returning.clock.value = 650;
+    const survivorReturned = await returning.service.heartbeat({
+      matchId: returningFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    expect(survivorReturned.result).toMatchObject({
+      winnerPlayerId: returningSecond.playerId,
+      reason: 'forfeit',
+    });
+
+    const expiring = createHarness({
+      initialCountdownMs: 100,
+      offlineThresholdMs: 100,
+      reconnectBudgetMs: 500,
+    });
+    const expiringFirst = await expiring.service.createOrJoin(first);
+    await expiring.service.createOrJoin(second);
+    expiring.clock.value = 100;
+    await expiring.service.heartbeat({
+      matchId: expiringFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+    });
+    expiring.clock.value = 600;
+    expect((await expiring.service.reconcile(expiringFirst.match.matchId)).result).toBeNull();
+    expiring.clock.value = 700;
+
+    const bothExpired = await expiring.service.updateSnapshot({
+      matchId: expiringFirst.match.matchId,
+      userId: second.userId,
+      gameSessionId: second.gameSessionId,
+      clientInstanceId: second.clientInstanceId,
+      snapshot: { seq: 0, score: 999, hearts: 0, elapsedMs: 700, lifecycle: 'eliminated' },
+    });
+    expect(bothExpired.status).toBe('abandoned');
+    expect(bothExpired.result).toMatchObject({ winnerPlayerId: null, reason: 'abandoned' });
+    expect(bothExpired.players.find((player) => player.slot === 1)).toMatchObject({
+      score: 0,
+      hearts: 3,
+      lifecycle: 'finished',
+    });
+    expect((await expiring.repository.findByMatchId(expiringFirst.match.matchId))?.players[1].snapshot)
+      .toMatchObject({ seq: -1, score: 0, hearts: 3 });
+  });
+
+  it('rotates only client instances, forfeits active reload and adopts terminal reloads', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const original = await service.createOrJoin(first);
+
+    await expect(service.createOrJoin(first)).resolves.toMatchObject({
+      playerId: original.playerId,
+      slot: 0,
+    });
+
+    const waitingSession = {
+      ...first,
+      clientInstanceId: 'instance-a-waiting',
+    };
+    const rotated = await service.createOrJoin(waitingSession);
+    expect(rotated).toMatchObject({ playerId: original.playerId, slot: 0 });
+    expect((await repository.findByMatchId(original.match.matchId))?.players).toEqual([
+      expect.objectContaining({
+        playerId: original.playerId,
+        userId: first.userId,
+        gameSessionId: waitingSession.gameSessionId,
+        clientInstanceId: waitingSession.clientInstanceId,
+      }),
+    ]);
+    await expect(
+      service.getForParticipant({ matchId: original.match.matchId, ...first }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    await expect(
+      service.createOrJoin({
+        ...waitingSession,
+        gameSessionId: 'session-a-rotation-forbidden',
+        clientInstanceId: 'instance-a-rotation-forbidden',
+      }),
+    ).rejects.toMatchObject({ code: 'GAME_SESSION_MATCH_CONFLICT', statusCode: 409 });
+    expect(
+      (await repository.findByMatchId(original.match.matchId))?.players[0].gameSessionId,
+    ).toBe(first.gameSessionId);
+
+    const joinedSecond = await service.createOrJoin(second);
+    clock.value = 101;
+    const activeSession = {
+      ...waitingSession,
+      clientInstanceId: 'instance-a-active-reload',
+    };
+    const forfeited = await service.createOrJoin(activeSession);
+    expect(forfeited.match).toMatchObject({
+      status: 'finished',
+      result: { reason: 'forfeit', winnerPlayerId: joinedSecond.playerId },
+    });
+
+    await expect(
+      service.getForParticipant({ matchId: original.match.matchId, ...waitingSession }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    await expect(
+      service.getForParticipant({ matchId: original.match.matchId, ...activeSession }),
+    ).resolves.toMatchObject({ status: 'finished' });
+
+    const terminalIdentity = {
+      ...activeSession,
+      clientInstanceId: 'instance-a-terminal-reload',
+    };
+    const terminalReplay = await service.createOrJoin(terminalIdentity);
+    expect(terminalReplay).toMatchObject({
+      playerId: original.playerId,
+      slot: 0,
+      match: { result: forfeited.match.result },
+    });
+    expect(
+      (await repository.findByMatchId(original.match.matchId))?.players[0],
+    ).toMatchObject({
+      gameSessionId: activeSession.gameSessionId,
+      clientInstanceId: terminalIdentity.clientInstanceId,
+    });
+
+    await expect(
+      service.createOrJoin({
+        ...terminalIdentity,
+        gameSessionId: 'session-a-foreign-terminal',
+        clientInstanceId: 'instance-a-foreign-terminal',
+      }),
+    ).rejects.toMatchObject({ code: 'GAME_SESSION_MATCH_CONFLICT', statusCode: 409 });
+
+    const released = await service.releaseForParticipant(terminalIdentity);
+    expect(released?.result).toEqual(forfeited.match.result);
+    await expect(
+      service.releaseForParticipant({
+        ...terminalIdentity,
+        clientInstanceId: 'instance-a-terminal-release-replay',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+
+    await expect(
+      service.createOrJoin({ ...first, roomCode: 'REUSED-GAME-SESSION' }),
+    ).rejects.toMatchObject({ code: 'GAME_SESSION_MATCH_CONFLICT', statusCode: 409 });
+  });
+
+  it('never allocates two slots when the same wallet races two fresh instances', async () => {
+    const { repository, service } = createHarness();
+    const [firstAttempt, secondAttempt] = await Promise.all([
+      service.createOrJoin({
+        ...first,
+        clientInstanceId: 'instance-race-a',
+      }),
+      service.createOrJoin({
+        ...first,
+        clientInstanceId: 'instance-race-b',
+      }),
+    ]);
+
+    expect(firstAttempt.playerId).toBe(secondAttempt.playerId);
+    expect(firstAttempt.slot).toBe(0);
+    expect(secondAttempt.slot).toBe(0);
+    const stored = await repository.findByRoomCode(first.roomCode);
+    expect(stored?.players).toHaveLength(1);
+    expect(stored?.players.map((player) => player.userId)).toEqual([first.userId]);
+  });
+
+  it('atomically rejects concurrent creation of two active rooms for one wallet', async () => {
+    const { repository, service } = createHarness();
+    const results = await Promise.allSettled([
+      service.createOrJoin({ ...first, roomCode: 'ROOM-A' }),
+      service.createOrJoin({ ...first, roomCode: 'ROOM-B' }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    expect(rejected?.reason).toMatchObject({ code: 'PLAYER_ACTIVE_MATCH', statusCode: 409 });
+    const stored = [
+      await repository.findByRoomCode('ROOM-A'),
+      await repository.findByRoomCode('ROOM-B'),
+    ].filter(Boolean);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.activeUserIds).toEqual([first.userId]);
+  });
+
+  it('atomically rejects one wallet joining two different rooms concurrently', async () => {
+    const { repository, service } = createHarness();
+    await service.createOrJoin({ ...first, roomCode: 'ROOM-A' });
+    await service.createOrJoin({
+      ...second,
+      roomCode: 'ROOM-B',
+    });
+    const joiningIdentity = {
+      roomCode: 'ROOM-A',
+      userId: 'user-c',
+      gameSessionId: 'session-c',
+      clientInstanceId: 'instance-c',
+    };
+
+    const results = await Promise.allSettled([
+      service.createOrJoin(joiningIdentity),
+      service.createOrJoin({ ...joiningIdentity, roomCode: 'ROOM-B' }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    expect(rejected?.reason).toMatchObject({ code: 'PLAYER_ACTIVE_MATCH', statusCode: 409 });
+    const joinedRooms = await Promise.all([
+      repository.findByRoomCode('ROOM-A'),
+      repository.findByRoomCode('ROOM-B'),
+    ]);
+    expect(
+      joinedRooms.filter((room) => room?.players.some((player) => player.userId === 'user-c')),
+    ).toHaveLength(1);
+  });
+
+  it('allows only one sequential non-terminal room per wallet', async () => {
+    const { service } = createHarness();
+    const firstRoom = await service.createOrJoin(first);
+
+    await expect(
+      service.createOrJoin({ ...first, roomCode: 'OTHER-ROOM' }),
+    ).rejects.toMatchObject({ code: 'PLAYER_ACTIVE_MATCH', statusCode: 409 });
+
+    await service.forfeit({ matchId: firstRoom.match.matchId, ...first });
+    await expect(
+      service.createOrJoin({
+        ...first,
+        roomCode: 'OTHER-ROOM',
+        gameSessionId: 'session-a-next-match',
+        clientInstanceId: 'instance-a-next-match',
+      }),
+    ).resolves.toMatchObject({ slot: 0, match: { roomCode: 'OTHER-ROOM', status: 'waiting' } });
+  });
+
+  it('makes explicit self-forfeit authoritative and idempotent', async () => {
+    const waitingHarness = createHarness();
+    const waiting = await waitingHarness.service.createOrJoin(first);
+    const abandoned = await waitingHarness.service.forfeit({
+      matchId: waiting.match.matchId,
+      ...first,
+    });
+    const replay = await waitingHarness.service.forfeit({
+      matchId: waiting.match.matchId,
+      ...first,
+    });
+    expect(abandoned).toMatchObject({
+      status: 'abandoned',
+      result: { reason: 'abandoned', winnerPlayerId: null },
+    });
+    expect(
+      (await waitingHarness.repository.findByMatchId(waiting.match.matchId))?.activeUserIds,
+    ).toEqual([]);
+    expect(replay.result).toEqual(abandoned.result);
+    expect(replay.revision).toBe(abandoned.revision);
+
+    const runningHarness = createHarness();
+    const joinedFirst = await runningHarness.service.createOrJoin(first);
+    const joinedSecond = await runningHarness.service.createOrJoin(second);
+    const finished = await runningHarness.service.forfeit({
+      matchId: joinedFirst.match.matchId,
+      ...first,
+    });
+    expect(finished).toMatchObject({
+      status: 'finished',
+      result: { reason: 'forfeit', winnerPlayerId: joinedSecond.playerId },
+    });
+    expect(
+      (await runningHarness.repository.findByMatchId(joinedFirst.match.matchId))?.activeUserIds,
+    ).toEqual([]);
+    await expect(
+      runningHarness.service.forfeit({
+        matchId: joinedFirst.match.matchId,
+        userId: 'foreign-user',
+        gameSessionId: 'foreign-session',
+        clientInstanceId: 'foreign-instance',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+  });
+
+  it('releases only the exact active instance, forfeits it and permits terminal replay', async () => {
+    const waitingHarness = createHarness();
+    const waiting = await waitingHarness.service.createOrJoin(first);
+
+    await expect(
+      waitingHarness.service.releaseForParticipant({
+        ...first,
+        clientInstanceId: 'stale-instance',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    expect(
+      await waitingHarness.repository.findByMatchId(waiting.match.matchId),
+    ).toMatchObject({ status: 'waiting', activeUserIds: [first.userId] });
+
+    const released = await waitingHarness.service.releaseForParticipant(first);
+    expect(released).toMatchObject({
+      status: 'abandoned',
+      result: { reason: 'abandoned', winnerPlayerId: null },
+    });
+    expect(
+      (await waitingHarness.repository.findByMatchId(waiting.match.matchId))?.activeUserIds,
+    ).toEqual([]);
+    await expect(
+      waitingHarness.service.releaseForParticipant({
+        ...first,
+        clientInstanceId: 'terminal-replay-instance',
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    const adoptedTerminal = {
+      ...first,
+      clientInstanceId: 'terminal-replay-instance',
+    };
+    await waitingHarness.service.createOrJoin(adoptedTerminal);
+    await expect(
+      waitingHarness.service.releaseForParticipant(adoptedTerminal),
+    ).resolves.toMatchObject({ result: released?.result });
+    await expect(
+      waitingHarness.service.releaseForParticipant({
+        userId: 'missing-user',
+        gameSessionId: 'missing-session',
+        clientInstanceId: 'missing-instance',
+      }),
+    ).resolves.toBeNull();
+
+    const runningHarness = createHarness();
+    const joinedFirst = await runningHarness.service.createOrJoin(first);
+    await runningHarness.service.createOrJoin(second);
+    await expect(runningHarness.service.releaseForParticipant(second)).resolves.toMatchObject({
+      status: 'finished',
+      result: { reason: 'forfeit', winnerPlayerId: joinedFirst.playerId },
+    });
+  });
+
+  it('uses snapshot traffic as the accepted server heartbeat', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 101;
+
+    await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      ...first,
+      snapshot: { seq: 0, score: 1, hearts: 3, elapsedMs: 1, lifecycle: 'playing' },
+    });
+
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.players[0])
+      .toMatchObject({ lastHeartbeatAt: 101, lastSnapshotAcceptedAt: 101 });
+  });
+
+  it('sweeps lobby, round and sudden-death deadlines and schedules TTL expiry', async () => {
+    const waitingHarness = createHarness({ lobbyTimeoutMs: 30, terminalRetentionMs: 100 });
+    const waiting = await waitingHarness.service.createOrJoin(first);
+    waitingHarness.clock.value = 29;
+    await expect(waitingHarness.service.sweepDue()).resolves.toBe(0);
+    waitingHarness.clock.value = 30;
+    await expect(waitingHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await waitingHarness.repository.findByMatchId(waiting.match.matchId)).toMatchObject({
+      status: 'abandoned',
+      nextReconcileAt: null,
+      expiresAt: 130,
+      result: { reason: 'abandoned', finishedAt: 30 },
+    });
+
+    const scoreHarness = createHarness({
+      initialCountdownMs: 1,
+      roundDurationMs: 10,
+      suddenDeathTimeoutMs: 20,
+      terminalRetentionMs: 100,
+      offlineThresholdMs: 1_000,
+      winDelta: 1_000,
+    });
+    const scoreFirst = await scoreHarness.service.createOrJoin(first);
+    const scoreSecond = await scoreHarness.service.createOrJoin(second);
+    scoreHarness.clock.value = 2;
+    await scoreHarness.service.updateSnapshot({
+      matchId: scoreFirst.match.matchId,
+      ...first,
+      snapshot: { seq: 0, score: 5, hearts: 3, elapsedMs: 1, lifecycle: 'playing' },
+    });
+    scoreHarness.clock.value = 11;
+    await expect(scoreHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await scoreHarness.repository.findByMatchId(scoreFirst.match.matchId)).toMatchObject({
+      status: 'finished',
+      expiresAt: 111,
+      result: { reason: 'score_difference', winnerPlayerId: scoreFirst.playerId },
+    });
+    expect(scoreSecond.playerId).toBeTruthy();
+
+    const tieHarness = createHarness({
+      initialCountdownMs: 1,
+      roundDurationMs: 10,
+      suddenDeathTimeoutMs: 20,
+      terminalRetentionMs: 100,
+      offlineThresholdMs: 1_000,
+    });
+    const tieFirst = await tieHarness.service.createOrJoin(first);
+    await tieHarness.service.createOrJoin(second);
+    tieHarness.clock.value = 11;
+    await expect(tieHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await tieHarness.repository.findByMatchId(tieFirst.match.matchId)).toMatchObject({
+      status: 'sudden_death',
+      suddenDeathEndsAt: 31,
+      nextReconcileAt: 31,
+    });
+    tieHarness.clock.value = 31;
+    await expect(tieHarness.service.sweepDue()).resolves.toBe(1);
+    expect(await tieHarness.repository.findByMatchId(tieFirst.match.matchId)).toMatchObject({
+      status: 'finished',
+      expiresAt: 131,
+      result: { reason: 'draw', winnerPlayerId: null, finishedAt: 31 },
+    });
+  });
+});
+
+describe('Treasure Hunt snapshot validation', () => {
+  const previous: PlayerSnapshot = {
+    seq: 4,
+    score: 100,
+    hearts: 3,
+    elapsedMs: 1_000,
+    lifecycle: 'playing',
+  };
+  const rules = createMatchRules({
+    scoreDeltaWindowMs: 1_000,
+    maxScoreDeltaPerWindow: 50,
+    maxHeartsDelta: 1,
+  });
+  const validationContext = {
+    now: 3_000,
+    startAt: 0,
+    lastSnapshotAcceptedAt: 1_000,
+  };
+
+  it('validates absolute score deltas against configurable elapsed windows', () => {
+    expect(
+      validatePlayerSnapshot(
+        { seq: 5, score: 150, hearts: 3, elapsedMs: 3_000, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toMatchObject({ score: 150 });
+
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 201, hearts: 3, elapsedMs: 1_100, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/score delta/);
+  });
+
+  it('starts with a zero score quota and grows it proportionally to server-active time', () => {
+    const fresh: PlayerSnapshot = {
+      seq: -1,
+      score: 0,
+      hearts: 3,
+      elapsedMs: 0,
+      lifecycle: 'waiting',
+    };
+    const productionRateRules = createMatchRules({
+      scoreDeltaWindowMs: 1_000,
+      maxScoreDeltaPerWindow: 1_000,
+    });
+
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 0, score: 500, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
+        fresh,
+        productionRateRules,
+        { now: 1_000, startAt: 1_000, lastSnapshotAcceptedAt: null },
+      ),
+    ).toThrow(/score delta exceeds 0/);
+    expect(
+      validatePlayerSnapshot(
+        { seq: 0, score: 250, hearts: 3, elapsedMs: 250, lifecycle: 'playing' },
+        fresh,
+        productionRateRules,
+        { now: 1_250, startAt: 1_000, lastSnapshotAcceptedAt: null },
+      ),
+    ).toMatchObject({ score: 250 });
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 0, score: 251, hearts: 3, elapsedMs: 250, lifecycle: 'playing' },
+        fresh,
+        productionRateRules,
+        { now: 1_250, startAt: 1_000, lastSnapshotAcceptedAt: null },
+      ),
+    ).toThrow(/score delta exceeds 250/);
+  });
+
+  it('rejects decreasing elapsed time, invalid hearts and bounded heart jumps', () => {
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 3, elapsedMs: 999, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/elapsedMs cannot decrease/);
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 11, elapsedMs: 1_100, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/hearts/);
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 1, elapsedMs: 1_100, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/hearts delta/);
+  });
+
+  it('enforces the absolute 0..10 hearts contract in rules and snapshots', () => {
+    expect(() => createMatchRules({ maxHearts: 11 })).toThrow(/cannot exceed 10/);
+    expect(() => createMatchRules({ initialHearts: 3, maxHearts: 2 })).toThrow(
+      /initialHearts cannot exceed maxHearts/,
+    );
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 11, elapsedMs: 1_100, lifecycle: 'playing' },
+        previous,
+        createMatchRules({ maxHearts: 10, maxHeartsDelta: 10 }),
+        validationContext,
+      ),
+    ).toThrow(/between 0 and 10/);
+  });
+
+  it('rejects lifecycle regressions, terminal escapes and hearts inconsistencies', () => {
+    for (const lifecycle of ['waiting', 'ready'] as const) {
+      expect(() =>
+        validatePlayerSnapshot(
+          { seq: 5, score: 100, hearts: 3, elapsedMs: 1_100, lifecycle },
+          previous,
+          rules,
+          validationContext,
+        ),
+      ).toThrow(/lifecycle cannot transition/);
+    }
+
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 1, elapsedMs: 1_100, lifecycle: 'eliminated' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/zero hearts/);
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 0, elapsedMs: 1_100, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/zero hearts/);
+
+    for (const terminalLifecycle of ['eliminated', 'finished'] as const) {
+      expect(() =>
+        validatePlayerSnapshot(
+          { seq: 6, score: 100, hearts: 3, elapsedMs: 1_200, lifecycle: 'playing' },
+          {
+            ...previous,
+            seq: 5,
+            hearts: terminalLifecycle === 'eliminated' ? 0 : 3,
+            lifecycle: terminalLifecycle,
+          },
+          rules,
+          validationContext,
+        ),
+      ).toThrow(/is terminal|lifecycle is invalid/);
+      expect(() =>
+        validatePlayerSnapshot(
+          {
+            seq: 6,
+            score: 100,
+            hearts: terminalLifecycle === 'eliminated' ? 0 : 3,
+            elapsedMs: 1_200,
+            lifecycle: terminalLifecycle,
+          },
+          {
+            ...previous,
+            seq: 5,
+            hearts: terminalLifecycle === 'eliminated' ? 0 : 3,
+            lifecycle: terminalLifecycle,
+          },
+          rules,
+          validationContext,
+        ),
+      ).toThrow(/is terminal|lifecycle is invalid/);
+    }
+  });
+
+  it('rejects attempts to set authoritative match fields', () => {
+    expect(() =>
+      validatePlayerSnapshot(
+        {
+          seq: 5,
+          score: 100,
+          hearts: 3,
+          elapsedMs: 1_100,
+          lifecycle: 'playing',
+          status: 'finished',
+          winnerPlayerId: 'attacker',
+          seed: 'controlled',
+        },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/not allowed/);
+  });
+});
+
+describe('InMemoryMatchRepository CAS contract', () => {
+  it('distinguishes revision conflicts from not found', async () => {
+    const repository = new InMemoryMatchRepository();
+    const rules = createMatchRules();
+    const match = createWaitingMatch({
+      matchId: 'cas-match',
+      roomCode: 'CAS',
+      firstPlayer: {
+        playerId: 'p',
+        userId: 'u',
+        gameSessionId: 's',
+        clientInstanceId: 'i',
+      },
+      rules,
+      now: 0,
+    });
+    const created = await repository.create(match);
+    await repository.save({ ...created, updatedAt: 1 }, 0);
+
+    await expect(repository.save({ ...created, updatedAt: 2 }, 0)).rejects.toBeInstanceOf(
+      MatchRevisionConflictError,
+    );
+    await expect(
+      repository.save({ ...created, matchId: 'missing', updatedAt: 2 }, 0),
+    ).rejects.toBeInstanceOf(MatchNotFoundError);
+  });
+});

@@ -18,6 +18,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid or inactive session' }, { status: 400 });
     }
 
+    if (session.mode === 'staging_unranked' || session.rewardEligible === false) {
+      return NextResponse.json(
+        { success: false, error: 'Session is not eligible for legacy checkpoints' },
+        { status: 403 },
+      );
+    }
+
     // Save checkpoint to database
     const gameCheckpoint = await prisma.gameCheckpoint.create({
       data: {
@@ -31,7 +38,7 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('📍 [API] Checkpoint received:', {
-      sessionToken,
+      sessionId: session.sessionId,
       score: checkpoint.score,
       gameTime: checkpoint.gameTime,
       events: events?.length || 0
@@ -46,8 +53,8 @@ export async function POST(request: NextRequest) {
       honeypotDetected
     });
 
-  } catch (error) {
-    console.error('❌ [API] Error processing checkpoint:', error);
+  } catch {
+    console.error('❌ [API] Error processing checkpoint');
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
-} 
+}
