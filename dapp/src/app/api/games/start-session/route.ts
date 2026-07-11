@@ -1,74 +1,88 @@
+import { randomBytes, randomUUID } from 'node:crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
+
 import { prisma } from '@/lib/prisma';
+import { readWalletSession } from '@/lib/wallet-auth';
+
+const SUPPORTED_GAME_ID = 'sybil-slayer';
+const DEFAULT_GAME_VERSION = '1.0.0';
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+function json(payload: unknown, status = 200) {
+  return NextResponse.json(payload, { status, headers: NO_STORE_HEADERS });
+}
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🎮 [API] Start session request received');
-    const { gameId, gameVersion, userId } = await request.json();
-    console.log('🎮 [API] Request data:', { gameId, gameVersion, userId });
-
-    if (!gameId || !userId) {
-      console.log('❌ [API] Missing required fields');
-      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
+    const walletSession = await readWalletSession();
+    if (!walletSession) {
+      return json({ success: false, error: 'Wallet session is required' }, 401);
     }
 
-    // Verify user exists in database
-    console.log('🔍 [API] Looking up user:', userId);
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ success: false, error: 'Request body must be valid JSON' }, 400);
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return json({ success: false, error: 'Request body must be a JSON object' }, 400);
+    }
+
+    const input = body as Record<string, unknown>;
+    if (
+      Object.prototype.hasOwnProperty.call(input, 'userId') &&
+      input.userId !== walletSession.userId
+    ) {
+      return json({ success: false, error: 'User identity does not match wallet session' }, 403);
+    }
+
+    if (input.gameId !== SUPPORTED_GAME_ID) {
+      return json({ success: false, error: 'Unsupported game' }, 400);
+    }
+
+    const gameVersion = input.gameVersion ?? DEFAULT_GAME_VERSION;
+    if (
+      typeof gameVersion !== 'string' ||
+      gameVersion.trim().length === 0 ||
+      gameVersion.length > 64
+    ) {
+      return json({ success: false, error: 'Invalid game version' }, 400);
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: walletSession.userId },
+      select: { id: true },
     });
-    console.log('🔍 [API] User found:', !!user);
-
     if (!user) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      return json({ success: false, error: 'User not found' }, 404);
     }
 
-    // Generate session data
-    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    const sessionId = `game_${gameId}_${Date.now()}`;
-    console.log('🎮 [API] Generated session data:', { sessionToken: sessionToken.substring(0, 20) + '...', sessionId });
+    const sessionToken = `session_${randomBytes(32).toString('base64url')}`;
+    const sessionId = `game_${SUPPORTED_GAME_ID}_${randomUUID()}`;
 
-    // Save session to database
-    console.log('💾 [API] Creating game session in database...');
-    const gameSession = await prisma.gameSession.create({
+    await prisma.gameSession.create({
       data: {
         sessionToken,
         sessionId,
-        userId,
-        gameId,
-        gameVersion: gameVersion || '1.0.0',
-        isActive: true
-      }
-    });
-    console.log('✅ [API] Game session created in database:', gameSession.id);
-
-    console.log('🎮 [API] Game session started:', {
-      sessionId,
-      sessionToken,
-      gameId,
-      gameVersion,
-      userId
+        userId: walletSession.userId,
+        gameId: SUPPORTED_GAME_ID,
+        gameVersion: gameVersion.trim(),
+        isActive: true,
+      },
     });
 
-    return NextResponse.json({
+    return json({
       success: true,
       sessionToken,
       sessionId,
-      gameId,
-      gameVersion
+      gameId: SUPPORTED_GAME_ID,
+      gameVersion: gameVersion.trim(),
     });
-
-  } catch (error) {
-    console.error('❌ [API] Error starting game session:', error);
-    console.error('❌ [API] Error details:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : 'No stack trace',
-      name: error instanceof Error ? error.name : 'Unknown'
-    });
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+  } catch {
+    console.error('Unexpected error while starting game session');
+    return json({ success: false, error: 'Internal server error' }, 500);
   }
-} 
+}

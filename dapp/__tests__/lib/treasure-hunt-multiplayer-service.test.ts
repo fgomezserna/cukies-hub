@@ -93,13 +93,55 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(publicJson).not.toContain('gameSessionId');
 
     clock.value = 1_100;
-    const running = await service.get(created.match.matchId);
+    const running = await service.getForParticipant({
+      matchId: created.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+    });
     expect(running.status).toBe('running');
     expect(running.config.seed).toBe(joined.match.config.seed);
     expect(running.config.startAt).toBe(joined.match.config.startAt);
 
     const internal = await repository.findByMatchId(created.match.matchId);
     expect(internal?.players.map((player) => player.slot)).toEqual([0, 1]);
+  });
+
+  it('authorizes participant reads by both wallet user and game session identity', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const created = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 100;
+
+    await expect(
+      service.getForParticipant({
+        matchId: created.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+      }),
+    ).resolves.toMatchObject({ status: 'running' });
+
+    const revisionAfterAuthorizedRead = (
+      await repository.findByMatchId(created.match.matchId)
+    )?.revision;
+
+    await expect(
+      service.getForParticipant({
+        matchId: created.match.matchId,
+        userId: first.userId,
+        gameSessionId: second.gameSessionId,
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+    await expect(
+      service.getForParticipant({
+        matchId: created.match.matchId,
+        userId: 'not-a-player',
+        gameSessionId: first.gameSessionId,
+      }),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_FOUND', statusCode: 404 });
+
+    expect((await repository.findByMatchId(created.match.matchId))?.revision).toBe(
+      revisionAfterAuthorizedRead,
+    );
   });
 
   it('forms a healthy countdown after a long one-player lobby wait', async () => {

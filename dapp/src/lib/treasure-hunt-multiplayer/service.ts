@@ -328,7 +328,21 @@ export class TreasureHuntMultiplayerService {
     return projectPublicMatch(updated);
   }
 
-  async get(matchId: string): Promise<PublicMatch> {
-    return this.reconcile(matchId);
+  async reconcileForParticipant(input: PlayerOperationInput): Promise<PublicMatch> {
+    const matchId = requireIdentifier(input.matchId, 'matchId');
+    const identity = this.normalizeIdentity(input);
+    const updated = await this.saveWithRetry(matchId, (current, now) => {
+      if (!findPlayer(current, identity)) {
+        throw new MultiplayerDomainError('PLAYER_NOT_FOUND', 'Player is not in this match', 404);
+      }
+
+      return reconcileMatch(current, this.context(now));
+    });
+
+    return projectPublicMatch(updated);
+  }
+
+  async getForParticipant(input: PlayerOperationInput): Promise<PublicMatch> {
+    return this.reconcileForParticipant(input);
   }
 }
