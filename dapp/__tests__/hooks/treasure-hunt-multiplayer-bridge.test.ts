@@ -187,6 +187,56 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     cleanup();
   });
 
+  it('never lets a second join move the bridge to a different room or match', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(
+        apiResponse({
+          success: true,
+          playerId: 'player-1',
+          slot: 0,
+          match: { matchId: 'trusted-match', roomCode: 'TRUSTED' },
+        }),
+      )
+      .mockResolvedValue(apiResponse({ success: true, match: { matchId: 'trusted-match' } }));
+    const { cleanup, contentWindow, postMessage } = createHarness(fetchImpl);
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-trusted', 'join', {
+      roomCode: 'TRUSTED',
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1));
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'join-attacker', 'join', {
+      roomCode: 'ATTACKER',
+      matchId: 'attacker-match',
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenLastCalledWith(
+      {
+        type: 'TH_MULTIPLAYER_RESPONSE',
+        requestId: 'join-attacker',
+        success: false,
+        error: {
+          code: 'MATCH_PINNED',
+          message: 'Multiplayer bridge is already pinned to another room',
+        },
+      },
+      GAME_ORIGIN,
+    );
+
+    requestMessage(contentWindow, GAME_ORIGIN, 'get-after-attacker', 'get', {
+      matchId: 'attacker-match',
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledTimes(3));
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      '/api/games/treasure-hunt/multiplayer/matches/trusted-match?gameSessionId=parent-game-session',
+    );
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('ATTACKER');
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('attacker-match');
+    cleanup();
+  });
+
   it('rejects match operations before join without issuing an API request', async () => {
     const { cleanup, contentWindow, postMessage, fetchImpl } = createHarness();
     requestMessage(contentWindow, GAME_ORIGIN, 'get-before-join', 'get', {

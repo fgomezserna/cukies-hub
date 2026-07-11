@@ -157,6 +157,7 @@ export function createTreasureHuntMultiplayerBridge(
   const targetOrigin = new URL(options.gameUrl, windowObject.location.href).origin;
   const abortControllers = new Set<AbortController>();
   let knownMatchId: string | null = null;
+  let knownRoomCode: string | null = null;
   let disposed = false;
 
   const handleMessage = (event: MessageEvent) => {
@@ -179,6 +180,12 @@ export function createTreasureHuntMultiplayerBridge(
 
         if (request.command === 'join') {
           const roomCode = requireRoomCode(request.payload.roomCode);
+          if (knownRoomCode && roomCode !== knownRoomCode) {
+            throw new BridgeError(
+              'MATCH_PINNED',
+              'Multiplayer bridge is already pinned to another room',
+            );
+          }
           const response = await fetchImpl(MULTIPLAYER_API, {
             method: 'POST',
             credentials: 'same-origin',
@@ -195,7 +202,17 @@ export function createTreasureHuntMultiplayerBridge(
             throw new BridgeError('INVALID_RESPONSE', 'Multiplayer request failed');
           }
           const canonicalRoomCode = requireRoomCode(data.match.roomCode ?? roomCode);
-          knownMatchId = data.match.matchId;
+          if (
+            (knownMatchId && data.match.matchId !== knownMatchId) ||
+            (knownRoomCode && canonicalRoomCode !== knownRoomCode)
+          ) {
+            throw new BridgeError(
+              'MATCH_PINNED',
+              'Multiplayer bridge is already pinned to another match',
+            );
+          }
+          knownMatchId ??= data.match.matchId;
+          knownRoomCode ??= canonicalRoomCode;
           const inviteUrl = buildTreasureHuntInviteUrl(windowObject, canonicalRoomCode);
           options.onRoomJoined?.(canonicalRoomCode);
           data = { ...data, inviteUrl };
