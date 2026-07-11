@@ -10,6 +10,20 @@ const LIFECYCLES = new Set<PlayerLifecycle>([
   'finished',
 ]);
 
+const ALLOWED_LIFECYCLE_TRANSITIONS: Readonly<Record<PlayerLifecycle, ReadonlySet<PlayerLifecycle>>> = {
+  waiting: new Set(['waiting', 'ready', 'playing', 'eliminated', 'finished']),
+  ready: new Set(['ready', 'playing', 'eliminated', 'finished']),
+  playing: new Set(['playing', 'eliminated', 'finished']),
+  eliminated: new Set(['eliminated']),
+  finished: new Set(['finished']),
+};
+
+export interface SnapshotValidationContext {
+  readonly now: number;
+  readonly startAt: number;
+  readonly lastSnapshotAcceptedAt: number | null;
+}
+
 function requireSafeInteger(
   value: unknown,
   field: string,
@@ -27,6 +41,7 @@ export function validatePlayerSnapshot(
   input: unknown,
   previous: PlayerSnapshot,
   rules: MatchRules,
+  context: SnapshotValidationContext,
 ): PlayerSnapshot {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw invalidSnapshot('snapshot must be an object');
@@ -62,13 +77,56 @@ export function validatePlayerSnapshot(
     throw invalidSnapshot('elapsedMs cannot decrease');
   }
 
+  const lifecycle = record.lifecycle as PlayerLifecycle;
+  if (previous.lifecycle === 'eliminated' || previous.lifecycle === 'finished') {
+    throw invalidSnapshot(`lifecycle ${previous.lifecycle} is terminal`);
+  }
+  if (!ALLOWED_LIFECYCLE_TRANSITIONS[previous.lifecycle].has(lifecycle)) {
+    throw invalidSnapshot(`lifecycle cannot transition from ${previous.lifecycle} to ${lifecycle}`);
+  }
+
+  if ((lifecycle === 'eliminated') !== (hearts === 0)) {
+    throw invalidSnapshot('eliminated lifecycle requires exactly zero hearts and vice versa');
+  }
+
+  const serverElapsedSinceStart = Math.max(0, context.now - context.startAt);
+  const maxPlausibleElapsed = Math.min(
+    rules.maxElapsedMs,
+    serverElapsedSinceStart + rules.snapshotTimeToleranceMs,
+  );
+  if (elapsedMs > maxPlausibleElapsed) {
+    throw invalidSnapshot(`elapsedMs exceeds server clock allowance ${maxPlausibleElapsed}`);
+  }
+
   const elapsedDelta = elapsedMs - previous.elapsedMs;
-  const windows = Math.max(1, Math.ceil(elapsedDelta / rules.scoreDeltaWindowMs));
+  const serverElapsedSinceAcceptance = Math.max(
+    0,
+    context.now - (context.lastSnapshotAcceptedAt ?? context.startAt),
+  );
+  const boundedDeltaMs = Math.min(
+    elapsedDelta,
+    serverElapsedSinceAcceptance + rules.snapshotTimeToleranceMs,
+  );
+  const windows = Math.max(1, Math.ceil(boundedDeltaMs / rules.scoreDeltaWindowMs));
   const maxScoreDelta = windows * rules.maxScoreDeltaPerWindow;
   if (Math.abs(score - previous.score) > maxScoreDelta) {
     throw invalidSnapshot(
       `absolute score delta exceeds ${maxScoreDelta} for the reported elapsed window`,
     );
+  }
+
+  const totalServerWindows = Math.max(
+    1,
+    Math.ceil(
+      (serverElapsedSinceStart + rules.snapshotTimeToleranceMs) / rules.scoreDeltaWindowMs,
+    ),
+  );
+  const maxPlausibleScore = Math.min(
+    rules.maxScore,
+    totalServerWindows * rules.maxScoreDeltaPerWindow,
+  );
+  if (score > maxPlausibleScore) {
+    throw invalidSnapshot(`score exceeds server clock allowance ${maxPlausibleScore}`);
   }
 
   if (Math.abs(hearts - previous.hearts) > rules.maxHeartsDelta) {
@@ -80,7 +138,7 @@ export function validatePlayerSnapshot(
     score,
     hearts,
     elapsedMs,
-    lifecycle: record.lifecycle as PlayerLifecycle,
+    lifecycle,
   };
 }
 
@@ -88,9 +146,14 @@ export function applyPlayerSnapshot(
   player: MatchPlayer,
   input: unknown,
   rules: MatchRules,
+  context: Omit<SnapshotValidationContext, 'lastSnapshotAcceptedAt'>,
 ): MatchPlayer {
   return {
     ...player,
-    snapshot: validatePlayerSnapshot(input, player.snapshot, rules),
+    snapshot: validatePlayerSnapshot(input, player.snapshot, rules, {
+      ...context,
+      lastSnapshotAcceptedAt: player.lastSnapshotAcceptedAt,
+    }),
+    lastSnapshotAcceptedAt: context.now,
   };
 }

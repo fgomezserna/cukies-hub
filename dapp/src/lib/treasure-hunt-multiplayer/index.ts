@@ -4,6 +4,5 @@ export * from './match';
 export * from './projection';
 export * from './reconcile';
 export * from './repository';
-export * from './service';
 export * from './snapshots';
 export * from './types';

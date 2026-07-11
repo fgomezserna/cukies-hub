@@ -45,6 +45,7 @@ export function createMatchPlayer(input: {
     offlineSince: null,
     reconnectAccountedAt: null,
     reconnectBudgetRemainingMs: input.rules.reconnectBudgetMs,
+    lastSnapshotAcceptedAt: null,
   };
 }
 

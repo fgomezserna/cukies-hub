@@ -2,15 +2,17 @@ import {
   InMemoryMatchRepository,
   MatchNotFoundError,
   MatchRevisionConflictError,
-  TreasureHuntMultiplayerService,
   createMatchRules,
   createWaitingMatch,
   validatePlayerSnapshot,
-  type MultiplayerClock,
-  type MultiplayerIdFactory,
   type MatchRules,
   type PlayerSnapshot,
 } from '@/lib/treasure-hunt-multiplayer';
+import {
+  TreasureHuntMultiplayerService,
+  type MultiplayerClock,
+  type MultiplayerIdFactory,
+} from '@/lib/treasure-hunt-multiplayer/service';
 
 class TestClock implements MultiplayerClock {
   value = 0;
@@ -81,6 +83,7 @@ describe('TreasureHuntMultiplayerService', () => {
       maxElapsedMs: 86_400_000,
       scoreDeltaWindowMs: 1_000,
       maxScoreDeltaPerWindow: 1_000,
+      snapshotTimeToleranceMs: 250,
     });
 
     const publicJson = JSON.stringify(joined.match);
@@ -97,6 +100,30 @@ describe('TreasureHuntMultiplayerService', () => {
 
     const internal = await repository.findByMatchId(created.match.matchId);
     expect(internal?.players.map((player) => player.slot)).toEqual([0, 1]);
+  });
+
+  it('forms a healthy countdown after a long one-player lobby wait', async () => {
+    const { repository, clock, service } = createHarness({
+      initialCountdownMs: 1_000,
+      offlineThresholdMs: 1_000,
+      reconnectBudgetMs: 5_000,
+    });
+    const created = await service.createOrJoin(first);
+    clock.value = 18_000;
+
+    const joined = await service.createOrJoin(second);
+
+    expect(joined.match.matchId).toBe(created.match.matchId);
+    expect(joined.match.status).toBe('countdown');
+    expect(joined.match.result).toBeNull();
+    expect(joined.match.config.startAt).toBe(19_000);
+    expect(joined.match.players).toEqual([
+      expect.objectContaining({ presence: 'online', reconnectBudgetRemainingMs: 5_000 }),
+      expect.objectContaining({ presence: 'online', reconnectBudgetRemainingMs: 5_000 }),
+    ]);
+    const stored = await repository.findByMatchId(created.match.matchId);
+    expect(stored?.players.map((player) => player.lastHeartbeatAt)).toEqual([18_000, 18_000]);
+    expect(stored?.players.map((player) => player.lastSnapshotAcceptedAt)).toEqual([null, null]);
   });
 
   it('uses CAS retries so concurrent joins never exceed two slots', async () => {
@@ -133,7 +160,7 @@ describe('TreasureHuntMultiplayerService', () => {
     clock.value = 1_000;
     await service.reconcile(joinedFirst.match.matchId);
 
-    const snapshot = { seq: 1, score: 100, hearts: 3, elapsedMs: 1_000, lifecycle: 'playing' };
+    const snapshot = { seq: 1, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' };
     await service.updateSnapshot({
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
@@ -160,6 +187,71 @@ describe('TreasureHuntMultiplayerService', () => {
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT', statusCode: 422 });
   });
 
+  it('binds elapsed and score acceptance to the injected server clock', async () => {
+    const { repository, clock, service } = createHarness({ initialCountdownMs: 100 });
+    const joinedFirst = await service.createOrJoin(first);
+    await service.createOrJoin(second);
+    clock.value = 100;
+
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+        snapshot: {
+          seq: 0,
+          score: 10_000_000,
+          hearts: 3,
+          elapsedMs: 86_400_000,
+          lifecycle: 'playing',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    await expect(
+      service.updateSnapshot({
+        matchId: joinedFirst.match.matchId,
+        userId: first.userId,
+        gameSessionId: first.gameSessionId,
+        snapshot: {
+          seq: 0,
+          score: 10_000_000,
+          hearts: 3,
+          elapsedMs: 0,
+          lifecycle: 'playing',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
+    expect((await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]).toMatchObject({
+      lastSnapshotAcceptedAt: null,
+      snapshot: { seq: -1, score: 0, elapsedMs: 0 },
+    });
+
+    const firstAccepted = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      snapshot: { seq: 0, score: 100, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
+    });
+    expect(firstAccepted.players[0]).toMatchObject({ score: 100, elapsedMs: 0 });
+    expect(
+      (await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]
+        .lastSnapshotAcceptedAt,
+    ).toBe(100);
+
+    clock.value = 1_100;
+    const secondAccepted = await service.updateSnapshot({
+      matchId: joinedFirst.match.matchId,
+      userId: first.userId,
+      gameSessionId: first.gameSessionId,
+      snapshot: { seq: 1, score: 200, hearts: 3, elapsedMs: 1_000, lifecycle: 'playing' },
+    });
+    expect(secondAccepted.players[0]).toMatchObject({ score: 200, elapsedMs: 1_000 });
+    expect(
+      (await repository.findByMatchId(joinedFirst.match.matchId))?.players[0]
+        .lastSnapshotAcceptedAt,
+    ).toBe(1_100);
+  });
+
   it('finishes once at the default winDelta of 500', async () => {
     const { clock, service } = createHarness();
     const joinedFirst = await service.createOrJoin(first);
@@ -170,7 +262,7 @@ describe('TreasureHuntMultiplayerService', () => {
       matchId: joinedFirst.match.matchId,
       userId: first.userId,
       gameSessionId: first.gameSessionId,
-      snapshot: { seq: 0, score: 500, hearts: 3, elapsedMs: 1_000, lifecycle: 'playing' },
+      snapshot: { seq: 0, score: 500, hearts: 3, elapsedMs: 0, lifecycle: 'playing' },
     });
 
     expect(finished.status).toBe('finished');
@@ -628,6 +720,11 @@ describe('Treasure Hunt snapshot validation', () => {
     maxScoreDeltaPerWindow: 50,
     maxHeartsDelta: 1,
   });
+  const validationContext = {
+    now: 3_000,
+    startAt: 0,
+    lastSnapshotAcceptedAt: 1_000,
+  };
 
   it('validates absolute score deltas against configurable elapsed windows', () => {
     expect(
@@ -635,6 +732,7 @@ describe('Treasure Hunt snapshot validation', () => {
         { seq: 5, score: 200, hearts: 3, elapsedMs: 3_000, lifecycle: 'playing' },
         previous,
         rules,
+        validationContext,
       ),
     ).toMatchObject({ score: 200 });
 
@@ -643,6 +741,7 @@ describe('Treasure Hunt snapshot validation', () => {
         { seq: 5, score: 151, hearts: 3, elapsedMs: 1_100, lifecycle: 'playing' },
         previous,
         rules,
+        validationContext,
       ),
     ).toThrow(/score delta/);
   });
@@ -653,6 +752,7 @@ describe('Treasure Hunt snapshot validation', () => {
         { seq: 5, score: 100, hearts: 3, elapsedMs: 999, lifecycle: 'playing' },
         previous,
         rules,
+        validationContext,
       ),
     ).toThrow(/elapsedMs cannot decrease/);
     expect(() =>
@@ -660,6 +760,7 @@ describe('Treasure Hunt snapshot validation', () => {
         { seq: 5, score: 100, hearts: 11, elapsedMs: 1_100, lifecycle: 'playing' },
         previous,
         rules,
+        validationContext,
       ),
     ).toThrow(/hearts/);
     expect(() =>
@@ -667,6 +768,7 @@ describe('Treasure Hunt snapshot validation', () => {
         { seq: 5, score: 100, hearts: 1, elapsedMs: 1_100, lifecycle: 'playing' },
         previous,
         rules,
+        validationContext,
       ),
     ).toThrow(/hearts delta/);
   });
@@ -681,8 +783,74 @@ describe('Treasure Hunt snapshot validation', () => {
         { seq: 5, score: 100, hearts: 11, elapsedMs: 1_100, lifecycle: 'playing' },
         previous,
         createMatchRules({ maxHearts: 10, maxHeartsDelta: 10 }),
+        validationContext,
       ),
     ).toThrow(/between 0 and 10/);
+  });
+
+  it('rejects lifecycle regressions, terminal escapes and hearts inconsistencies', () => {
+    for (const lifecycle of ['waiting', 'ready'] as const) {
+      expect(() =>
+        validatePlayerSnapshot(
+          { seq: 5, score: 100, hearts: 3, elapsedMs: 1_100, lifecycle },
+          previous,
+          rules,
+          validationContext,
+        ),
+      ).toThrow(/lifecycle cannot transition/);
+    }
+
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 1, elapsedMs: 1_100, lifecycle: 'eliminated' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/zero hearts/);
+    expect(() =>
+      validatePlayerSnapshot(
+        { seq: 5, score: 100, hearts: 0, elapsedMs: 1_100, lifecycle: 'playing' },
+        previous,
+        rules,
+        validationContext,
+      ),
+    ).toThrow(/zero hearts/);
+
+    for (const terminalLifecycle of ['eliminated', 'finished'] as const) {
+      expect(() =>
+        validatePlayerSnapshot(
+          { seq: 6, score: 100, hearts: 3, elapsedMs: 1_200, lifecycle: 'playing' },
+          {
+            ...previous,
+            seq: 5,
+            hearts: terminalLifecycle === 'eliminated' ? 0 : 3,
+            lifecycle: terminalLifecycle,
+          },
+          rules,
+          validationContext,
+        ),
+      ).toThrow(/is terminal/);
+      expect(() =>
+        validatePlayerSnapshot(
+          {
+            seq: 6,
+            score: 100,
+            hearts: terminalLifecycle === 'eliminated' ? 0 : 3,
+            elapsedMs: 1_200,
+            lifecycle: terminalLifecycle,
+          },
+          {
+            ...previous,
+            seq: 5,
+            hearts: terminalLifecycle === 'eliminated' ? 0 : 3,
+            lifecycle: terminalLifecycle,
+          },
+          rules,
+          validationContext,
+        ),
+      ).toThrow(/is terminal/);
+    }
   });
 
   it('rejects attempts to set authoritative match fields', () => {
@@ -700,6 +868,7 @@ describe('Treasure Hunt snapshot validation', () => {
         },
         previous,
         rules,
+        validationContext,
       ),
     ).toThrow(/not allowed/);
   });

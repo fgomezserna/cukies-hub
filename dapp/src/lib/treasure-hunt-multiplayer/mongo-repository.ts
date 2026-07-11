@@ -1,6 +1,5 @@
 import type { Document, WithId } from 'mongodb';
 
-import { getHubCollection } from '../mongodb-hub';
 import {
   MatchAlreadyExistsError,
   MatchNotFoundError,
@@ -11,8 +10,64 @@ import type { Match } from './types';
 
 const DEFAULT_COLLECTION_NAME = 'TreasureHuntMultiplayerMatch';
 
-type HubCollection = Awaited<ReturnType<typeof getHubCollection>>;
-type CollectionFactory = (collectionName: string) => Promise<HubCollection>;
+export type MatchUniqueIndex = { readonly matchId: 1 } | { readonly roomCode: 1 };
+
+export interface MatchMongoCollection {
+  createIndex(spec: MatchUniqueIndex, options: { readonly unique: true }): Promise<string>;
+  insertOne(document: Document): Promise<unknown>;
+  findOne(
+    filter: Document,
+    options?: { readonly projection?: Document },
+  ): Promise<WithId<Document> | null>;
+  findOneAndUpdate(
+    filter: Document,
+    update: { readonly $set: Document },
+    options: {
+      readonly returnDocument: 'after';
+      readonly includeResultMetadata: false;
+    },
+  ): Promise<WithId<Document> | null>;
+}
+
+export type MatchCollectionProvider = (collectionName: string) => Promise<MatchMongoCollection>;
+
+interface HubCollectionModule {
+  getHubCollection(collectionName: string): Promise<unknown>;
+}
+
+export interface HubCollectionProviderOptions {
+  readonly getDatabaseUrl?: () => string | undefined;
+  readonly loadHubCollection?: () => Promise<HubCollectionModule>;
+}
+
+export interface MongoMatchRepositoryOptions {
+  readonly collectionName?: string;
+  readonly collectionProvider?: MatchCollectionProvider;
+}
+
+export class MultiplayerMongoConfigurationError extends Error {
+  constructor() {
+    super('DATABASE_URL is required for Treasure Hunt multiplayer persistence');
+    this.name = 'MultiplayerMongoConfigurationError';
+  }
+}
+
+export function createHubCollectionProvider(
+  options: HubCollectionProviderOptions = {},
+): MatchCollectionProvider {
+  const getDatabaseUrl = options.getDatabaseUrl ?? (() => process.env.DATABASE_URL);
+  const loadHubCollection =
+    options.loadHubCollection ?? (() => import('../mongodb-hub') as Promise<HubCollectionModule>);
+
+  return async (collectionName) => {
+    if (!getDatabaseUrl()?.trim()) {
+      throw new MultiplayerMongoConfigurationError();
+    }
+
+    const { getHubCollection } = await loadHubCollection();
+    return (await getHubCollection(collectionName)) as MatchMongoCollection;
+  };
+}
 
 function isDuplicateKeyError(error: unknown) {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 11000);
@@ -28,15 +83,17 @@ function fromDocument(document: WithId<Document> | Document | null): Match | nul
 }
 
 export class MongoMatchRepository implements MatchRepository {
+  private readonly collectionName: string;
+  private readonly collectionProvider: MatchCollectionProvider;
   private indexesReady: Promise<void> | null = null;
 
-  constructor(
-    private readonly collectionName = DEFAULT_COLLECTION_NAME,
-    private readonly collectionFactory: CollectionFactory = getHubCollection,
-  ) {}
+  constructor(options: MongoMatchRepositoryOptions = {}) {
+    this.collectionName = options.collectionName ?? DEFAULT_COLLECTION_NAME;
+    this.collectionProvider = options.collectionProvider ?? createHubCollectionProvider();
+  }
 
   private async collection() {
-    const collection = await this.collectionFactory(this.collectionName);
+    const collection = await this.collectionProvider(this.collectionName);
     if (!this.indexesReady) {
       this.indexesReady = Promise.all([
         collection.createIndex({ matchId: 1 }, { unique: true }),
@@ -82,7 +139,7 @@ export class MongoMatchRepository implements MatchRepository {
       updated = await collection.findOneAndUpdate(
         { matchId: match.matchId, revision: expectedRevision },
         { $set: stored },
-        { returnDocument: 'after' },
+        { returnDocument: 'after', includeResultMetadata: false },
       );
     } catch (error) {
       if (isDuplicateKeyError(error)) {

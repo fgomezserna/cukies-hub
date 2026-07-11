@@ -267,6 +267,10 @@ export class TreasureHuntMultiplayerService {
       if (next.status !== 'running' && next.status !== 'sudden_death') {
         throw invalidSnapshot(`snapshots are not accepted while match status is ${next.status}`);
       }
+      if (next.startAt === null) {
+        throw invalidSnapshot('match startAt is required before accepting snapshots');
+      }
+      const startAt = next.startAt;
       if (next.pendingElimination?.playerId === player.playerId) {
         throw invalidSnapshot('the first eliminated player snapshot is frozen');
       }
@@ -282,7 +286,10 @@ export class TreasureHuntMultiplayerService {
         ...next,
         players: next.players.map((candidate) =>
           candidate.playerId === player.playerId
-            ? applyPlayerSnapshot(candidate, input.snapshot, next.rules)
+            ? applyPlayerSnapshot(candidate, input.snapshot, next.rules, {
+                now,
+                startAt,
+              })
             : candidate,
         ),
         updatedAt: now,

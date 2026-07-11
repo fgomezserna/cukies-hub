@@ -36,6 +36,7 @@ export interface MatchPlayer {
   readonly offlineSince: number | null;
   readonly reconnectAccountedAt: number | null;
   readonly reconnectBudgetRemainingMs: number;
+  readonly lastSnapshotAcceptedAt: number | null;
 }
 
 export interface MatchRules {
@@ -52,6 +53,7 @@ export interface MatchRules {
   readonly maxElapsedMs: number;
   readonly scoreDeltaWindowMs: number;
   readonly maxScoreDeltaPerWindow: number;
+  readonly snapshotTimeToleranceMs: number;
 }
 
 export type MatchResultReason =

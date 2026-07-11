@@ -301,6 +301,15 @@ function lockMatchConfiguration(match: Match, context: ReconcileContext): Match 
 
   return {
     ...match,
+    players: match.players.map((player) => ({
+      ...player,
+      presence: 'online' as const,
+      lastHeartbeatAt: context.now,
+      offlineSince: null,
+      reconnectAccountedAt: null,
+      reconnectBudgetRemainingMs: match.rules.reconnectBudgetMs,
+      lastSnapshotAcceptedAt: null,
+    })),
     seed: context.createSeed(),
     startAt: context.now + match.rules.initialCountdownMs,
     status: 'countdown',

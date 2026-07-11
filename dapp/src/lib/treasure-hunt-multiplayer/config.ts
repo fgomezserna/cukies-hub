@@ -16,6 +16,7 @@ export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
   maxElapsedMs: 24 * 60 * 60 * 1_000,
   scoreDeltaWindowMs: 1_000,
   maxScoreDeltaPerWindow: 1_000,
+  snapshotTimeToleranceMs: 250,
 });
 
 const POSITIVE_RULES: readonly (keyof MatchRules)[] = [
@@ -44,6 +45,10 @@ export function createMatchRules(overrides: Partial<MatchRules> = {}): MatchRule
 
   if (!Number.isSafeInteger(rules.initialHearts) || rules.initialHearts < 0) {
     throw new TypeError('initialHearts must be a non-negative safe integer');
+  }
+
+  if (!Number.isSafeInteger(rules.snapshotTimeToleranceMs) || rules.snapshotTimeToleranceMs < 0) {
+    throw new TypeError('snapshotTimeToleranceMs must be a non-negative safe integer');
   }
 
   if (rules.initialHearts > rules.maxHearts) {
