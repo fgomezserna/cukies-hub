@@ -21,7 +21,11 @@ import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/cons
 import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
-import { createMultiplayerRoomCode, getHandshakeRoomCode } from '../lib/multiplayer-client';
+import {
+  canResumeLocalPlayerInSuddenDeath,
+  createMultiplayerRoomCode,
+  getHandshakeRoomCode,
+} from '../lib/multiplayer-client';
 import {
   getSuddenDeathObjectiveCopy,
   isTreasureHuntMultiplayerEnabled,
@@ -482,8 +486,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         await multiplayer.reset();
         return true;
       }
-      await multiplayer.release();
-      return true;
+      return await multiplayer.release();
     } catch {
       return false;
     }
@@ -832,7 +835,24 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     };
   }, [isMobile]);
   
-  const { gameState, updateGame, updateInputRef, startGame, startGameImmediately, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+  const {
+    gameState,
+    updateGame,
+    updateInputRef,
+    startGame,
+    startGameImmediately,
+    setMultiplayerCanonicalDeadline,
+    togglePause,
+    resetGame,
+    forceGameOver,
+  } = useGameState(
+    canvasSize.width,
+    canvasSize.height,
+    handleEnergyCollected,
+    handleDamage,
+    playSound,
+    handleHackerEscape,
+  );
 
   // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
   useEffect(() => {
@@ -1429,6 +1449,57 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const serverPauseActiveRef = useRef(false);
   useEffect(() => {
     if (!isMultiplayerMode) {
+      setMultiplayerCanonicalDeadline(null);
+      return;
+    }
+
+    if (
+      matchStatus === 'running' &&
+      typeof multiplayer.matchConfig?.roundEndsAt === 'number'
+    ) {
+      setMultiplayerCanonicalDeadline(multiplayer.matchConfig.roundEndsAt, false);
+      return;
+    }
+
+    if (
+      matchStatus === 'sudden_death' &&
+      typeof multiplayer.matchConfig?.suddenDeathEndsAt === 'number'
+    ) {
+      setMultiplayerCanonicalDeadline(
+        multiplayer.matchConfig.suddenDeathEndsAt,
+        canResumeLocalPlayerInSuddenDeath({
+          matchStatus,
+          suddenDeath: multiplayer.suddenDeath,
+          localPlayerId: multiplayer.playerId,
+          localPlayer: multiplayer.localPlayer,
+        }),
+      );
+      return;
+    }
+
+    if (
+      matchStatus === 'idle' ||
+      matchStatus === 'searching' ||
+      matchStatus === 'waiting' ||
+      matchStatus === 'completed' ||
+      matchStatus === 'abandoned' ||
+      matchStatus === 'error'
+    ) {
+      setMultiplayerCanonicalDeadline(null);
+    }
+  }, [
+    isMultiplayerMode,
+    matchStatus,
+    multiplayer.localPlayer,
+    multiplayer.matchConfig?.roundEndsAt,
+    multiplayer.matchConfig?.suddenDeathEndsAt,
+    multiplayer.playerId,
+    multiplayer.suddenDeath,
+    setMultiplayerCanonicalDeadline,
+  ]);
+
+  useEffect(() => {
+    if (!isMultiplayerMode) {
       hasStartedMultiplayerRef.current = false;
       return;
     }
@@ -1992,7 +2063,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Manejar música de fondo según el estado del juego
   useEffect(() => {
-    if (gameState.status === 'gameOver') {
+    if (gameState.status === 'gameOver' && (!isMultiplayerMode || Boolean(matchResult))) {
       // Reproducir sonido de game over independientemente del control de música
       console.log('💀 Game Over - Reproduciendo sonido de game over');
       playGameOverSound();
@@ -2002,7 +2073,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       playMusic('background_music');
     }
     // En estado 'idle' o 'paused' no cambiar la música
-  }, [gameState.status, playGameOverSound]); // CORREGIDO: Removido playMusic, stopMusic, y gameState.score
+  }, [gameState.status, isMultiplayerMode, matchResult, playGameOverSound]); // CORREGIDO: Removido playMusic, stopMusic, y gameState.score
 
   // Iniciar música de fondo automáticamente al cargar el componente
   useEffect(() => {

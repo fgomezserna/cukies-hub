@@ -43,6 +43,42 @@ export interface CanonicalRuntimeHydration {
   readonly lifecycle: PlayerLifecycle;
 }
 
+export interface CanonicalDeadlineRuntimeInput {
+  readonly deadlineAt: number | null;
+  readonly now: number;
+  readonly currentStatus: 'idle' | 'countdown' | 'playing' | 'paused' | 'gameOver';
+  readonly gameOverReason?: string;
+  readonly allowTimeGameOverResume: boolean;
+}
+
+export interface CanonicalDeadlineRuntimeTransition {
+  readonly timer: number | null;
+  readonly shouldResume: boolean;
+}
+
+/**
+ * Converts a server-owned wall-clock deadline into the local engine transition.
+ * A canonical deadline may revive only a time-expired runtime; elimination and
+ * every other game-over reason remain terminal locally until the server result.
+ */
+export function deriveCanonicalDeadlineRuntimeTransition(
+  input: CanonicalDeadlineRuntimeInput,
+): CanonicalDeadlineRuntimeTransition {
+  if (input.deadlineAt === null) {
+    return { timer: null, shouldResume: false };
+  }
+
+  const timer = Math.max(0, (input.deadlineAt - input.now) / 1_000);
+  return {
+    timer,
+    shouldResume:
+      timer > 0 &&
+      input.allowTimeGameOverResume &&
+      input.currentStatus === 'gameOver' &&
+      input.gameOverReason === 'time',
+  };
+}
+
 export function deriveMultiplayerRuntimeHydration(
   canonical: CanonicalRuntimeHydration,
   now: number,
@@ -105,6 +141,33 @@ export interface SuddenDeathState {
   readonly leaderPlayerId: string;
   readonly chasingPlayerId: string;
   readonly targetScore: number;
+}
+
+export function canResumeLocalPlayerInSuddenDeath(input: {
+  readonly matchStatus: MatchStatus;
+  readonly suddenDeath: SuddenDeathState | null;
+  readonly localPlayerId: string | null;
+  readonly localPlayer: PublicMatchPlayer | null;
+}): boolean {
+  if (
+    input.matchStatus !== 'sudden_death' ||
+    !input.localPlayerId ||
+    !input.localPlayer ||
+    input.localPlayer.playerId !== input.localPlayerId ||
+    input.localPlayer.hearts <= 0 ||
+    input.localPlayer.lifecycle === 'eliminated' ||
+    input.localPlayer.lifecycle === 'finished' ||
+    input.localPlayer.presence === 'forfeited'
+  ) {
+    return false;
+  }
+
+  // A tied round has no frozen leader: both surviving players continue. When
+  // elimination created sudden death, only the designated chaser may resume.
+  return (
+    input.suddenDeath === null ||
+    input.suddenDeath.chasingPlayerId === input.localPlayerId
+  );
 }
 
 export interface PublicMatch {
@@ -931,7 +994,7 @@ export class TreasureHuntMultiplayerController {
   }
 
   release(): Promise<boolean> {
-    if (this.released) return Promise.resolve(false);
+    if (this.released) return Promise.resolve(true);
     if (this.releasePromise) return this.releasePromise;
     if (!this.joinedRoom && !this.state.match && !this.joinPromise) {
       return Promise.resolve(false);
@@ -944,6 +1007,13 @@ export class TreasureHuntMultiplayerController {
       .then((response) => {
         if (this.generation !== generation || this.disposed) return false;
         if (response.match) this.applyServerMatch(response.match);
+        if (!response.released) {
+          if (this.state.playerId && !this.isCurrentMatchTerminal()) {
+            this.schedulePoll(this.pollIntervalMs, generation);
+            this.scheduleHeartbeat(this.heartbeatIntervalMs, generation);
+          }
+          return false;
+        }
         this.released = true;
         this.stopScheduledWork();
         return true;

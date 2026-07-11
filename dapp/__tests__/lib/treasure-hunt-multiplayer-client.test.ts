@@ -1,8 +1,10 @@
 import {
   MultiplayerClientError,
   TreasureHuntMultiplayerController,
+  canResumeLocalPlayerInSuddenDeath,
   createMultiplayerRoomCode,
   createTreasureHuntParentTransport,
+  deriveCanonicalDeadlineRuntimeTransition,
   deriveMultiplayerRuntimeHydration,
   getHandshakeRoomCode,
   resolveParentOrigin,
@@ -107,7 +109,7 @@ class FakeTransport implements MultiplayerTransport {
   heartbeat = jest.fn(async () => ({ match: match(1) }));
   snapshot = jest.fn(async () => ({ match: match(1, 'running') }));
   forfeit = jest.fn(async () => ({ match: match(2, 'finished') }));
-  release = jest.fn(async () => ({ released: true as const, match: null }));
+  release = jest.fn(async () => ({ released: true, match: null }));
   reset = jest.fn(async () => undefined);
   cancelPending = jest.fn();
   cleanup = jest.fn();
@@ -327,12 +329,28 @@ describe('Treasure Hunt multiplayer controller', () => {
 
     await expect(controller.join('ROOM-1')).rejects.toMatchObject({ code: 'MATCH_FULL' });
     await expect(controller.release()).resolves.toBe(true);
-    await expect(controller.release()).resolves.toBe(false);
+    await expect(controller.release()).resolves.toBe(true);
     expect(transport.release).toHaveBeenCalledTimes(1);
 
     await controller.reset();
     await expect(controller.release()).resolves.toBe(false);
     await expect(controller.join('ROOM-2')).rejects.toMatchObject({ code: 'MATCH_FULL' });
+    await expect(controller.release()).resolves.toBe(true);
+    expect(transport.release).toHaveBeenCalledTimes(2);
+    controller.dispose();
+  });
+
+  it('keeps released:false retryable and only latches after canonical release success', async () => {
+    const transport = new FakeTransport();
+    transport.join.mockRejectedValue(new MultiplayerClientError('MATCH_FULL', 'full'));
+    transport.release
+      .mockResolvedValueOnce({ released: false, match: null })
+      .mockResolvedValueOnce({ released: true, match: null });
+    const controller = new TreasureHuntMultiplayerController({ transport });
+
+    await expect(controller.join('ROOM-1')).rejects.toMatchObject({ code: 'MATCH_FULL' });
+    await expect(controller.release()).resolves.toBe(false);
+    await expect(controller.release()).resolves.toBe(true);
     await expect(controller.release()).resolves.toBe(true);
     expect(transport.release).toHaveBeenCalledTimes(2);
     controller.dispose();
@@ -936,6 +954,89 @@ describe('multiplayer client helpers', () => {
       .toBe('Debes superar 1500 pts');
     expect(getSuddenDeathObjectiveCopy('player-2', 'player-1', 1_500))
       .toBe('El rival debe superar 1500 pts');
+  });
+
+  it('extends the chaser engine from second 25 without reviving the eliminated leader', () => {
+    const basePlayer = match(1, 'sudden_death').players[0];
+    const chaser = {
+      ...basePlayer,
+      playerId: 'player-chaser',
+      score: 500,
+      hearts: 2,
+      lifecycle: 'playing' as const,
+    };
+    const leader = {
+      ...basePlayer,
+      playerId: 'player-leader',
+      score: 600,
+      hearts: 0,
+      lifecycle: 'eliminated' as const,
+    };
+    const suddenDeath = {
+      leaderPlayerId: leader.playerId,
+      chasingPlayerId: chaser.playerId,
+      targetScore: leader.score,
+    };
+
+    expect(canResumeLocalPlayerInSuddenDeath({
+      matchStatus: 'sudden_death',
+      suddenDeath,
+      localPlayerId: chaser.playerId,
+      localPlayer: chaser,
+    })).toBe(true);
+    expect(canResumeLocalPlayerInSuddenDeath({
+      matchStatus: 'sudden_death',
+      suddenDeath,
+      localPlayerId: leader.playerId,
+      localPlayer: leader,
+    })).toBe(false);
+    expect(deriveCanonicalDeadlineRuntimeTransition({
+      deadlineAt: 85_000,
+      now: 25_000,
+      currentStatus: 'playing',
+      allowTimeGameOverResume: true,
+    })).toEqual({ timer: 60, shouldResume: false });
+    expect(deriveCanonicalDeadlineRuntimeTransition({
+      deadlineAt: 85_000,
+      now: 30_000,
+      currentStatus: 'gameOver',
+      gameOverReason: 'time',
+      allowTimeGameOverResume: true,
+    })).toEqual({ timer: 55, shouldResume: true });
+    expect(deriveCanonicalDeadlineRuntimeTransition({
+      deadlineAt: 85_000,
+      now: 30_000,
+      currentStatus: 'gameOver',
+      gameOverReason: 'hearts',
+      allowTimeGameOverResume: true,
+    })).toEqual({ timer: 55, shouldResume: false });
+  });
+
+  it('revives both surviving players for a tied round sudden death at second 30', () => {
+    const first = {
+      ...match(1, 'sudden_death').players[0],
+      playerId: 'player-1',
+      score: 400,
+      hearts: 2,
+      lifecycle: 'playing' as const,
+    };
+    const second = { ...first, playerId: 'player-2' };
+
+    for (const player of [first, second]) {
+      expect(canResumeLocalPlayerInSuddenDeath({
+        matchStatus: 'sudden_death',
+        suddenDeath: null,
+        localPlayerId: player.playerId,
+        localPlayer: player,
+      })).toBe(true);
+    }
+    expect(deriveCanonicalDeadlineRuntimeTransition({
+      deadlineAt: 90_000,
+      now: 30_000,
+      currentStatus: 'gameOver',
+      gameOverReason: 'time',
+      allowTimeGameOverResume: true,
+    })).toEqual({ timer: 60, shouldResume: true });
   });
 
   it('creates room codes using Web Crypto without Math.random', () => {

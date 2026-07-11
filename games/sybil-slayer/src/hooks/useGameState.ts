@@ -29,7 +29,10 @@ import { clamp, checkCollision, getRandomInt, getRandomFloat, normalizeVector, d
 import { useGameTime } from './useGameTime';
 import { TREASURE_LIFETIME_MS, TREASURE_BLINK_WARNING_MS, TREASURE_NEXT_BLOCK_MIN_S, TREASURE_NEXT_BLOCK_MAX_S, TREASURE_BLOCK_BASE_POINTS } from '../lib/constants';
 import { GAMEPLAY_RANDOM_STREAMS, randomManager } from '@/lib/random';
-import { deriveMultiplayerRuntimeHydration } from '@/lib/multiplayer-client';
+import {
+  deriveCanonicalDeadlineRuntimeTransition,
+  deriveMultiplayerRuntimeHydration,
+} from '@/lib/multiplayer-client';
 
 const initialTokenState = (canvasWidth: number, canvasHeight: number): Token => ({
   id: 'token',
@@ -1175,6 +1178,10 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
    // Ref para invulnerabilidad inicial tras empezar partida
    const gameStartInvulnRef = useRef<number>(0);
 
+   // Multiplayer lifecycle and time remain server-owned. This wall-clock
+   // deadline replaces local bonuses/penalties while a canonical round is active.
+   const canonicalPlayDeadlineRef = useRef<number | null>(null);
+
    // Sistema de tiempo pausable
    const { 
      getGameTime, 
@@ -1203,6 +1210,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     checkpointCountRef.current = 0;
     tokenFrozenUntilRef.current = 0;
     gameStartInvulnRef.current = 0;
+    canonicalPlayDeadlineRef.current = null;
     lastCheckpointTime = 0;
     resetIdCounter();
     
@@ -1283,6 +1291,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
   const startGame = useCallback(() => {
     if (gameState.status === 'idle' || gameState.status === 'gameOver') {
       console.log("Starting countdown...");
+      canonicalPlayDeadlineRef.current = null;
       
       // Resetear referencias al empezar nueva partida
       checkpointCountRef.current = 0;
@@ -1412,6 +1421,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         now,
         GAME_DURATION_SECONDS,
       );
+      const canonicalRuntime = deriveCanonicalDeadlineRuntimeTransition({
+        deadlineAt: canonicalPlayDeadlineRef.current,
+        now: Date.now(),
+        currentStatus: hydration.status,
+        gameOverReason: hydration.gameOverReason,
+        allowTimeGameOverResume: false,
+      });
       const gameStartTime = hydration.gameStartTime;
       gameStartInvulnRef.current = now;
       const initial = getInitialGameState(prev.canvasSize.width, prev.canvasSize.height);
@@ -1434,7 +1450,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
         gameStartTime,
         score: hydration.score,
         hearts: hydration.hearts,
-        timer: hydration.timer,
+        timer: canonicalRuntime.timer ?? hydration.timer,
         gameOverReason: hydration.gameOverReason,
         obstacles,
         collectibles,
@@ -1454,6 +1470,39 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       };
     });
   }, [getGameTime, initializeGameObjects, resetTime, startGameTime]);
+
+  const setMultiplayerCanonicalDeadline = useCallback((
+    deadlineAt: number | null,
+    allowTimeGameOverResume = false,
+  ) => {
+    canonicalPlayDeadlineRef.current = deadlineAt;
+    if (deadlineAt === null) return;
+
+    const now = Date.now();
+    setGameState((previous) => {
+      const transition = deriveCanonicalDeadlineRuntimeTransition({
+        deadlineAt,
+        now,
+        currentStatus: previous.status,
+        gameOverReason: previous.gameOverReason,
+        allowTimeGameOverResume,
+      });
+      if (transition.timer === null) return previous;
+
+      if (transition.shouldResume) {
+        return {
+          ...previous,
+          status: 'playing',
+          timer: transition.timer,
+          gameOverReason: undefined,
+        };
+      }
+
+      return previous.status === 'playing'
+        ? { ...previous, timer: transition.timer }
+        : previous;
+    });
+  }, []);
 
 
  const togglePause = useCallback(() => {
@@ -1602,8 +1651,13 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
       // Esto incluye: timer principal, multiplicador vault, boost megaNode, inmunidad purr
       const now = getGameTime();
       let remainingTime;
-      
-      if (prev.gameStartTime) {
+
+      const canonicalDeadlineAt = canonicalPlayDeadlineRef.current;
+      if (canonicalDeadlineAt !== null) {
+        // Server timestamps are wall-clock deadlines. Local checkpoint bonuses,
+        // penalties and pause accounting must not extend or shorten a 1v1 round.
+        remainingTime = Math.max(0, (canonicalDeadlineAt - Date.now()) / 1_000);
+      } else if (prev.gameStartTime) {
         // Calcular tiempo transcurrido pausable desde que empezó el juego
         const gameTimeElapsed = (now - prev.gameStartTime) / 1000; // en segundos
         remainingTime = GAME_DURATION_SECONDS - gameTimeElapsed;
@@ -4513,7 +4567,17 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
 
-  return { gameState, updateGame, updateInputRef, startGame, startGameImmediately, togglePause, resetGame, forceGameOver };
+  return {
+    gameState,
+    updateGame,
+    updateInputRef,
+    startGame,
+    startGameImmediately,
+    setMultiplayerCanonicalDeadline,
+    togglePause,
+    resetGame,
+    forceGameOver,
+  };
 }
 
 // Función específica para spawnear tesoros con distancia mínima entre ellos en el mismo bloque
