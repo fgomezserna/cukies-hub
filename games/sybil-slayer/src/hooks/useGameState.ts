@@ -1328,6 +1328,44 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     }
   }, [gameState.status, initializeGameObjects, resetTime, startGameTime, getGameTime]);
 
+  const startGameImmediately = useCallback(() => {
+    checkpointCountRef.current = 0;
+    tokenFrozenUntilRef.current = 0;
+    lastCheckpointTime = 0;
+    resetIdCounter();
+    resetTime();
+    startGameTime();
+
+    setGameState(prev => {
+      const gameStartTime = getGameTime();
+      gameStartInvulnRef.current = gameStartTime;
+      const initial = getInitialGameState(prev.canvasSize.width, prev.canvasSize.height);
+      const { obstacles, collectibles } = initializeGameObjects(
+        1,
+        prev.canvasSize.width,
+        prev.canvasSize.height,
+      );
+      const treasureState = createInitialTreasureState();
+      treasureState.nextSpawnTime = gameStartTime + getRandomFloat(0, 30_000);
+
+      return {
+        ...initial,
+        status: 'playing',
+        gameStartTime,
+        obstacles,
+        collectibles,
+        nextHeartInterval: getRandomFloat(25_000, 35_000),
+        treasureState,
+        runeState: {
+          ...initial.runeState,
+          nextSpawnTime: gameStartTime + RUNE_FIRST_SPAWN_MS,
+        },
+        levelStats: [createEmptyLevelStatsEntry(1, gameStartTime)],
+        currentLevelStartTime: gameStartTime,
+      };
+    });
+  }, [getGameTime, initializeGameObjects, resetTime, startGameTime]);
+
 
  const togglePause = useCallback(() => {
      setGameState(prev => {
@@ -4319,7 +4357,7 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     });
   }, [startGame, togglePause, getGameTime]); // Dependencies - Removido gameState para evitar stale closures
 
-  return { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver };
+  return { gameState, updateGame, updateInputRef, startGame, startGameImmediately, togglePause, resetGame, forceGameOver };
 }
 
 // Función específica para spawnear tesoros con distancia mínima entre ellos en el mismo bloque

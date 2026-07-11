@@ -105,7 +105,7 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
       // Limpiar joystick anterior si existe
       if (joystickRef.current) {
         const container = containerRef.current;
-        const canvas = container.querySelector('canvas');
+        const canvas = container?.querySelector('canvas');
         if (canvas) {
           canvas.remove();
         }
@@ -293,5 +293,4 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
 };
 
 export default JoystickWrapper;
-
 

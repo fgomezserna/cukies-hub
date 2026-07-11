@@ -77,6 +77,27 @@ const next = (streamName: string = DEFAULT_STREAM): number => {
   return generator();
 };
 
+/**
+ * Isolated deterministic generator for tests and simulations. Unlike the shared
+ * manager, each instance owns its streams so unrelated consumers cannot shift it.
+ */
+export const createDeterministicRandom = (seed: string | number) => {
+  const normalized = normalizeSeed(seed);
+  const localStreams = new Map<string, GeneratorFn>();
+
+  return {
+    next(streamName: string = DEFAULT_STREAM): number {
+      const name = streamName || DEFAULT_STREAM;
+      let generator = localStreams.get(name);
+      if (!generator) {
+        generator = createMulberry32(deriveStreamSeed(normalized, name));
+        localStreams.set(name, generator);
+      }
+      return generator();
+    },
+  };
+};
+
 const getInt = (min: number, max: number, streamName?: string): number => {
   const random = next(streamName);
   const minCeil = Math.ceil(min);
@@ -145,4 +166,3 @@ export const randomManager = {
 };
 
 export default randomManager;
-

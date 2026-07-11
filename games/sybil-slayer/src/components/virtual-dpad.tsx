@@ -299,7 +299,6 @@ const VirtualDPad: React.FC<VirtualDPadProps> = ({
               top: buttonPos.top,
               width: `${buttonSize}px`,
               height: `${buttonSize}px`,
-              transform: 'translate(-50%, -50%)',
               borderRadius: '50%',
               backgroundColor: isActive
                 ? 'rgba(59, 130, 246, 0.6)'
@@ -331,4 +330,3 @@ const VirtualDPad: React.FC<VirtualDPadProps> = ({
 };
 
 export default VirtualDPad;
-

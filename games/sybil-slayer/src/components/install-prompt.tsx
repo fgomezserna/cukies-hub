@@ -8,6 +8,11 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+interface InstallDebugInfo {
+  readonly serviceWorker?: { readonly registered?: boolean; [key: string]: unknown };
+  readonly manifest?: { readonly exists?: boolean; [key: string]: unknown };
+}
+
 /**
  * Verifica si la app está instalada usando múltiples métodos de detección
  * @returns Promise<boolean> - true si la app está instalada
@@ -61,7 +66,7 @@ export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<InstallDebugInfo>({});
   const [showManualInstall, setShowManualInstall] = useState(false);
   const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -513,4 +518,3 @@ export default function InstallPrompt() {
     </>
   );
 }
-
