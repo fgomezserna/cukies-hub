@@ -3,6 +3,29 @@ export interface MultiplayerFeatureEnvironment {
   readonly NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED?: string;
 }
 
+export type TreasureHuntMultiplayerEntryState =
+  | 'disabled'
+  | 'connecting'
+  | 'hub'
+  | 'ready';
+
+export function resolveTreasureHuntMultiplayerEntryState({
+  enabled,
+  authorityReady,
+  standaloneRuntime,
+  hubUrlAvailable,
+}: {
+  readonly enabled: boolean;
+  readonly authorityReady: boolean;
+  readonly standaloneRuntime: boolean;
+  readonly hubUrlAvailable: boolean;
+}): TreasureHuntMultiplayerEntryState {
+  if (!enabled) return 'disabled';
+  if (authorityReady) return 'ready';
+  if (standaloneRuntime && hubUrlAvailable) return 'hub';
+  return 'connecting';
+}
+
 export function isTreasureHuntMultiplayerEnabled(
   environment: MultiplayerFeatureEnvironment = {
     NODE_ENV: process.env.NODE_ENV,

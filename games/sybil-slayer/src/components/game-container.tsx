@@ -35,8 +35,10 @@ import {
   canChangeTreasureHuntGameMode,
   getSuddenDeathObjectiveCopy,
   isTreasureHuntMultiplayerEnabled,
+  resolveTreasureHuntMultiplayerEntryState,
   shouldBlockLocalGameControls,
 } from '../lib/multiplayer-feature';
+import { buildTreasureHuntHubEntryUrl } from '../lib/parent-origin';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
 
@@ -487,6 +489,28 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   } = usePusherConnection();
   const multiplayerAuthoritySessionId = sessionData?.sessionId ?? null;
   const multiplayer = useMultiplayerMatch(multiplayerAuthoritySessionId);
+  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
+  const [isStandaloneRuntime, setIsStandaloneRuntime] = useState(false);
+  useEffect(() => {
+    setIsStandaloneRuntime(window.parent === window);
+  }, []);
+  const multiplayerHubEntryUrl = useMemo(() => {
+    if (!isStandaloneRuntime || typeof window === 'undefined') return null;
+    return buildTreasureHuntHubEntryUrl(
+      window.location.search,
+      process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+      process.env.NEXT_PUBLIC_PARENT_URL,
+      process.env.NODE_ENV,
+    );
+  }, [isStandaloneRuntime]);
+  const multiplayerAuthorityReady =
+    hasParentHandshake && Boolean(multiplayerAuthoritySessionId);
+  const multiplayerEntryState = resolveTreasureHuntMultiplayerEntryState({
+    enabled: multiplayerEnabled,
+    authorityReady: multiplayerAuthorityReady,
+    standaloneRuntime: isStandaloneRuntime,
+    hubUrlAvailable: Boolean(multiplayerHubEntryUrl),
+  });
   const releaseMultiplayerSession = useCallback(async () => {
     try {
       if (!sessionData?.sessionId) {
@@ -616,7 +640,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     resultExitCoordinatorRef.current = createCanonicalResultExitCoordinator();
   }
   const isMultiplayerMode = currentMode === 'multiplayer';
-  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
   const isMultiplayerJoinPending = multiplayerStartPending || multiplayer.isJoinPending;
   const localControlsLocked = shouldBlockLocalGameControls(
     isMultiplayerMode,
@@ -1795,6 +1818,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const startMultiplayerGame = useCallback(async (roomIdOverride?: string | null) => {
     if (
       !multiplayerEnabled ||
+      !multiplayerAuthorityReady ||
       !canChangeGameMode ||
       multiplayerStartPendingRef.current
     ) return;
@@ -1828,6 +1852,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     canChangeGameMode,
     generateMatchRoomId,
     multiplayer,
+    multiplayerAuthorityReady,
     multiplayerEnabled,
     releaseMultiplayerSession,
     resetGame,
@@ -1880,7 +1905,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       return;
     }
 
-    if (!multiplayerEnabled) {
+    if (multiplayerEntryState === 'hub') {
+      if (multiplayerHubEntryUrl) window.location.assign(multiplayerHubEntryUrl);
+      return;
+    }
+
+    if (multiplayerEntryState !== 'ready') {
       return;
     }
 
@@ -1891,7 +1921,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     canChangeGameMode,
     gameState.status,
     multiplayer,
-    multiplayerEnabled,
+    multiplayerEntryState,
+    multiplayerHubEntryUrl,
     playSound,
     startGame,
     startMultiplayerGame,
@@ -2593,6 +2624,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
         onRulesClick={handleOpenInfo}
+        multiplayerEntryState={multiplayerEntryState}
       />
       {waitingOverlay}
       {countdownOverlay}

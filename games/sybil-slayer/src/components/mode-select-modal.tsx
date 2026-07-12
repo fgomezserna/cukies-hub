@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { useIsMobile } from '../hooks/use-mobile';
-import { isTreasureHuntMultiplayerEnabled } from '../lib/multiplayer-feature';
+import type { TreasureHuntMultiplayerEntryState } from '../lib/multiplayer-feature';
 
 type GameMode = 'single' | 'multiplayer';
 
@@ -13,6 +13,7 @@ interface ModeSelectModalProps {
   onSelectMode: (mode: GameMode) => void;
   defaultMode?: GameMode;
   onRulesClick?: () => void;
+  multiplayerEntryState: TreasureHuntMultiplayerEntryState;
 }
 
 const modeCopy: Record<GameMode, { title: string; description: string }> = {
@@ -32,10 +33,26 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   onSelectMode,
   defaultMode = 'single',
   onRulesClick,
+  multiplayerEntryState,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
   const isMobile = useIsMobile();
-  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
+  const multiplayerInteractive =
+    multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
+  const multiplayerActionCopy =
+    multiplayerEntryState === 'ready'
+      ? 'JUGAR 2P'
+      : multiplayerEntryState === 'hub'
+        ? 'ABRIR HUB'
+        : multiplayerEntryState === 'connecting'
+          ? 'CONECTA WALLET'
+          : 'PRÓXIMAMENTE';
+  const multiplayerDescription =
+    multiplayerEntryState === 'hub'
+      ? 'Abre Cukies Hub y conecta la wallet para jugar.'
+      : multiplayerEntryState === 'connecting'
+        ? 'Conecta la wallet en Cukies Hub para activar el modo 2P.'
+        : 'Prueba sin ranking ni recompensas.';
 
   React.useEffect(() => {
     if (!open) {
@@ -142,10 +159,11 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           <button
             type="button"
             data-testid="treasure-hunt-multiplayer-mode"
-            disabled={!multiplayerEnabled}
-            onClick={() => multiplayerEnabled && onSelectMode('multiplayer')}
+            data-multiplayer-entry={multiplayerEntryState}
+            disabled={!multiplayerInteractive}
+            onClick={() => multiplayerInteractive && onSelectMode('multiplayer')}
             className={`group relative flex flex-col p-4 rounded-lg border w-full max-w-[280px] transition-all duration-200 ${
-              multiplayerEnabled
+              multiplayerInteractive
                 ? 'border-cyan-400/60 bg-slate-800/70 hover:border-cyan-300 hover:bg-slate-800/90 focus:outline-none'
                 : 'border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 cursor-not-allowed select-none'
             }`}
@@ -172,17 +190,17 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     width={600}
                     height={300}
                     quality={100}
-                    className={`object-contain w-[240px] h-[120px] ${multiplayerEnabled ? '' : 'opacity-60'}`}
+                    className={`object-contain w-[240px] h-[120px] ${multiplayerInteractive ? '' : 'opacity-60'}`}
                   />
                 </div>
               </div>
               <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
                 <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
-                  {multiplayerEnabled ? 'JUGAR 2P' : 'PRÓXIMAMENTE'}
+                  {multiplayerActionCopy}
                 </span>
               </div>
               <p className="text-center text-xs font-pixellari text-cyan-100/70">
-                Prueba sin ranking ni recompensas.
+                {multiplayerDescription}
               </p>
             </div>
           </button>
@@ -288,10 +306,11 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           <button
             type="button"
             data-testid="treasure-hunt-multiplayer-mode"
-            disabled={!multiplayerEnabled}
-            onClick={() => multiplayerEnabled && onSelectMode('multiplayer')}
+            data-multiplayer-entry={multiplayerEntryState}
+            disabled={!multiplayerInteractive}
+            onClick={() => multiplayerInteractive && onSelectMode('multiplayer')}
             className={`group relative flex flex-col p-6 rounded-lg border w-[280px] transition-all duration-200 ${
-              multiplayerEnabled
+              multiplayerInteractive
                 ? 'border-cyan-400/60 bg-slate-800/70 hover:border-cyan-300 hover:bg-slate-800/90 focus:outline-none'
                 : 'border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 cursor-not-allowed select-none'
             }`}
@@ -318,17 +337,17 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     width={600}
                     height={300}
                     quality={100}
-                    className={`object-contain w-[240px] h-[120px] ${multiplayerEnabled ? '' : 'opacity-60'}`}
+                    className={`object-contain w-[240px] h-[120px] ${multiplayerInteractive ? '' : 'opacity-60'}`}
                   />
                 </div>
               </div>
               <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
                 <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
-                  {multiplayerEnabled ? 'JUGAR 2P' : 'PRÓXIMAMENTE'}
+                  {multiplayerActionCopy}
                 </span>
               </div>
               <p className="text-center text-xs font-pixellari text-cyan-100/70">
-                Prueba sin ranking ni recompensas.
+                {multiplayerDescription}
               </p>
             </div>
           </button>
