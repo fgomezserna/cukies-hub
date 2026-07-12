@@ -1,7 +1,7 @@
 export const TREASURE_HUNT_GAME_ID = 'treasure-hunt' as const;
 export const TREASURE_HUNT_MODE = 'staging_unranked' as const;
 export const TREASURE_HUNT_REWARD_ELIGIBLE = false as const;
-export const TREASURE_HUNT_RULES_VERSION = 'treasure-hunt-multiplayer-v1' as const;
+export const TREASURE_HUNT_RULES_VERSION = 'treasure-hunt-multiplayer-v2' as const;
 
 export type MatchStatus =
   | 'waiting'
