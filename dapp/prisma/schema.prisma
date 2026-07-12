@@ -101,6 +101,11 @@ model GameSession {
   user          User     @relation(fields: [userId], references: [id])
   gameId        String   // e.g., 'sybil-slayer', 'hyppie-road'
   gameVersion   String?
+  mode          String?  @default("standard")
+  rewardEligible Boolean? @default(true)
+  // Durable multiplayer authority; optional so legacy Mongo rows remain readable.
+  multiplayerState String? @default("idle")
+  multiplayerClientInstanceId String?
   startedAt     DateTime @default(now())
   endedAt       DateTime?
   isActive      Boolean  @default(true)

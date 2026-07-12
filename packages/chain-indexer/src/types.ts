@@ -85,6 +85,7 @@ export type IndexerConfig = {
   dbName: string;
   chains: ChainName[];
   bscRpcUrl: string;
+  bscRpcUrls: string[];
   tronApiBaseUrl: string;
   tronApiKey?: string;
   bscStartBlock: number;

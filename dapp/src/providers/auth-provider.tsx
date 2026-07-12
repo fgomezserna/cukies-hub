@@ -72,6 +72,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { address: tronAddress, isConnected: isTronConnected, connect: connectTron, disconnect: disconnectTron } = useTronLink();
 
   const { toast } = useToast();
+  const hasObservedWalletStateRef = useRef(false);
   const previousAddressRef = useRef<string | undefined>(evmAddress || tronAddress || undefined);
 
   // Determine current wallet address and type
@@ -203,8 +204,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       previousAddress: previousAddressRef.current
     });
 
-    // Skip on initial render
-    if (previousAddressRef.current === undefined) {
+    // Skip only the first observed wallet state. A restored wallet can arrive
+    // after an initial disconnected render and must still trigger session restore.
+    if (!hasObservedWalletStateRef.current) {
+      hasObservedWalletStateRef.current = true;
       previousAddressRef.current = currentAddress || undefined;
       return;
     }

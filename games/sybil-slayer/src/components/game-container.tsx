@@ -10,7 +10,10 @@ import { useGameState } from '../hooks/useGameState';
 import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { useAudio } from '../hooks/useAudio';
-import useMultiplayerMatch from '../hooks/useMultiplayerMatch';
+import useMultiplayerMatch, {
+  createCanonicalResultExitCoordinator,
+  shouldResetLocalGameForAuthorityChange,
+} from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
@@ -21,6 +24,19 @@ import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/cons
 import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
+import {
+  canResumeLocalPlayerInSuddenDeath,
+  createMultiplayerRoomCode,
+  deriveReconnectResumeDecision,
+  getHandshakeRoomCode,
+  isServerReconnectPause,
+} from '../lib/multiplayer-client';
+import {
+  canChangeTreasureHuntGameMode,
+  getSuddenDeathObjectiveCopy,
+  isTreasureHuntMultiplayerEnabled,
+  shouldBlockLocalGameControls,
+} from '../lib/multiplayer-feature';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
 
@@ -460,23 +476,28 @@ interface GameContainerProps {
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const parentContainerRef = useRef<HTMLDivElement | null>(null);
-  const [matchRoomId, setMatchRoomId] = useState<string | null>(null);
   const { 
     isConnected,
     connectionState,
-    sessionData, 
-    sendCheckpoint, 
+    sessionData,
+    hasParentHandshake,
     sendGameEnd, 
     startCheckpointInterval,
     channel,
-    matchChannel,
-  } = usePusherConnection({ matchRoomId });
-  const multiplayer = useMultiplayerMatch({
-    channel: matchChannel ?? channel,
-    sessionData,
-    isConnected,
-    targetDifference: 500,
-  });
+  } = usePusherConnection();
+  const multiplayerAuthoritySessionId = sessionData?.sessionId ?? null;
+  const multiplayer = useMultiplayerMatch(multiplayerAuthoritySessionId);
+  const releaseMultiplayerSession = useCallback(async () => {
+    try {
+      if (!sessionData?.sessionId) {
+        await multiplayer.reset();
+        return true;
+      }
+      return await multiplayer.release();
+    } catch {
+      return false;
+    }
+  }, [multiplayer, sessionData?.sessionId]);
   const [canvasSize, setCanvasSize] = useState({ width: width || 800, height: height || 600 });
   // Estado para alineación horizontal con el canvas
   const [canvasHorizontalOffset, setCanvasHorizontalOffset] = useState(0);
@@ -579,13 +600,39 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
+  const [multiplayerJoinFailure, setMultiplayerJoinFailure] = useState<{
+    roomCode: string;
+    message: string;
+  } | null>(null);
+  const [resultExitPending, setResultExitPending] = useState(false);
+  const [resultExitError, setResultExitError] = useState<string | null>(null);
+  const [multiplayerStartPending, setMultiplayerStartPending] = useState(false);
+  const multiplayerStartPendingRef = useRef(false);
+  const resultExitCoordinatorRef = useRef<ReturnType<
+    typeof createCanonicalResultExitCoordinator
+  > | null>(null);
+  const resultExitGenerationRef = useRef(0);
+  if (!resultExitCoordinatorRef.current) {
+    resultExitCoordinatorRef.current = createCanonicalResultExitCoordinator();
+  }
   const isMultiplayerMode = currentMode === 'multiplayer';
+  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
+  const isMultiplayerJoinPending = multiplayerStartPending || multiplayer.isJoinPending;
+  const localControlsLocked = shouldBlockLocalGameControls(
+    isMultiplayerMode,
+    Boolean(multiplayer.matchResult),
+    multiplayer.hasNonTerminalMatch,
+    isMultiplayerJoinPending,
+  );
+  const canChangeGameMode = canChangeTreasureHuntGameMode(
+    Boolean(multiplayer.matchResult),
+    multiplayer.hasNonTerminalMatch,
+    isMultiplayerJoinPending,
+  );
   const lastPublishedSnapshotRef = useRef<{
     score: number;
     hearts: number;
-    status: 'waiting' | 'ready' | 'playing' | 'eliminated' | 'finished';
-    gameStatus: GameState['status'];
-    gameOverReason?: GameState['gameOverReason'];
+    lifecycle: 'waiting' | 'ready' | 'playing' | 'eliminated' | 'finished';
   } | null>(null);
 
   const resolveLifecycleStatus = useCallback((state: GameState): 'waiting' | 'ready' | 'playing' | 'eliminated' | 'finished' => {
@@ -598,7 +645,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       case 'paused':
         return 'playing';
       case 'gameOver':
-        return state.hearts > 0 ? 'finished' : 'eliminated';
+        // A timed/client-side game over publishes the last score as playing;
+        // the server owns the transition to `finished`.
+        return state.hearts > 0 ? 'playing' : 'eliminated';
       default:
         return 'waiting';
     }
@@ -606,9 +655,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Generar ID único para la sala de partida
   const generateMatchRoomId = useCallback(() => {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `room-${timestamp}-${random}`;
+    return createMultiplayerRoomCode();
   }, []);
   
   // Sincronizar estado inicial con el hook de audio
@@ -813,10 +860,52 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     };
   }, [isMobile]);
   
-  const { gameState, updateGame, updateInputRef, startGame, togglePause, resetGame, forceGameOver } = useGameState(canvasSize.width, canvasSize.height, handleEnergyCollected, handleDamage, playSound, handleHackerEscape);
+  const {
+    gameState,
+    updateGame,
+    updateInputRef,
+    startGame,
+    startGameImmediately,
+    setMultiplayerCanonicalDeadline,
+    pauseMultiplayerRuntime,
+    resumeMultiplayerRuntime,
+    togglePause,
+    resetGame,
+    forceGameOver,
+  } = useGameState(
+    canvasSize.width,
+    canvasSize.height,
+    handleEnergyCollected,
+    handleDamage,
+    playSound,
+    handleHackerEscape,
+  );
+
+  const previousMultiplayerAuthoritySessionRef = useRef<string | null>(
+    multiplayerAuthoritySessionId,
+  );
+  useEffect(() => {
+    const previousSessionId = previousMultiplayerAuthoritySessionRef.current;
+    if (previousSessionId === multiplayerAuthoritySessionId) return;
+
+    previousMultiplayerAuthoritySessionRef.current = multiplayerAuthoritySessionId;
+    if (!shouldResetLocalGameForAuthorityChange(
+      previousSessionId,
+      multiplayerAuthoritySessionId,
+    )) return;
+
+    // The old controller belongs to a different wallet/GameSession. Never try
+    // to release it through the new cookie authority; the server sweeper owns
+    // disconnect resolution. Locally, drop every UI/gameplay remnant at once.
+    setMultiplayerJoinFailure(null);
+    setModeSelectOpen(false);
+    setCurrentMode('single');
+    resetGame();
+  }, [multiplayerAuthoritySessionId, resetGame]);
 
   // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
   useEffect(() => {
+    if (localControlsLocked) return;
     // Solo aplicar en móviles
     if (!isMobile) return;
 
@@ -834,7 +923,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       // El juego permanecerá pausado hasta que el usuario presione Play
       pausedByOrientationRef.current = false;
     }
-  }, [isPortrait, gameState.status, isMobile, togglePause]);
+  }, [localControlsLocked, isPortrait, gameState.status, isMobile, togglePause]);
 
   // Resetear el flag cuando el usuario presiona Play manualmente
   useEffect(() => {
@@ -843,7 +932,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       pausedByOrientationRef.current = false;
     }
   }, [gameState.status]);
-  const localScore = Math.floor(gameState.score);
+  const localScore = Math.floor(
+    isMultiplayerMode ? (multiplayer.localPlayer?.score ?? gameState.score) : gameState.score,
+  );
   const opponentScore = Math.floor(multiplayer.opponent?.score ?? 0);
   const scoreDifference = isMultiplayerMode ? multiplayer.scoreDifference : 0;
   const advantageTarget = multiplayer.targetDifference;
@@ -865,22 +956,98 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     });
   }, [matchStatus, isMultiplayerMode, multiplayer.hasOpponent, multiplayer.isHost, isConnected, channel]);
 
-  const showWaitingOverlay = isMultiplayerMode && ['searching', 'waiting', 'configuring'].includes(matchStatus) && !multiplayer.matchConfig;
+  const showWaitingOverlay = isMultiplayerMode && ['idle', 'searching', 'waiting', 'error'].includes(matchStatus);
   const now = Date.now();
-  const countdownMs = multiplayer.matchConfig ? multiplayer.matchConfig.startAt - now : null;
+  const countdownTarget = multiplayer.matchConfig?.resumeAt ?? multiplayer.matchConfig?.startAt ?? null;
+  const countdownMs = countdownTarget !== null ? countdownTarget - now : null;
   const countdownSeconds = countdownMs !== null ? Math.max(0, Math.ceil(countdownMs / 1000)) : null;
-  const showCountdownOverlay = isMultiplayerMode && matchStatus === 'countdown' && gameState.status === 'idle';
+  const canonicalPlayDeadline = matchStatus === 'sudden_death'
+    ? multiplayer.matchConfig?.suddenDeathEndsAt ?? null
+    : matchStatus === 'running'
+      ? multiplayer.matchConfig?.roundEndsAt ?? null
+      : null;
+  const canonicalTimer = canonicalPlayDeadline === null
+    ? gameState.timer
+    : Math.max(0, (canonicalPlayDeadline - now) / 1_000);
+  const lobbySeconds = matchStatus === 'waiting' && multiplayer.matchConfig
+    ? Math.max(0, Math.ceil((multiplayer.matchConfig.lobbyExpiresAt - now) / 1_000))
+    : null;
+  const disconnectedPlayer = [multiplayer.localPlayer, multiplayer.opponent]
+    .find((player) => player?.presence === 'offline');
+  const reconnectSeconds = disconnectedPlayer
+    ? Math.max(0, Math.ceil(disconnectedPlayer.reconnectBudgetRemainingMs / 1_000))
+    : null;
+  const showCountdownOverlay = isMultiplayerMode && matchStatus === 'countdown';
+  const showReconnectOverlay = isMultiplayerMode && matchStatus === 'paused_reconnect';
   const showSuddenDeathBanner = isMultiplayerMode && matchStatus === 'sudden_death';
   const opponentHearts = multiplayer.opponent?.hearts ?? 0;
   const opponentColor = 'rgba(244, 63, 94, 0.65)';
   const localColor = 'rgba(16, 185, 129, 0.75)';
-  const advantageGradient = `linear-gradient(90deg, ${opponentColor} 0%, ${opponentColor} ${advantageProgress * 100}%, ${localColor} ${advantageProgress * 100}%, ${localColor} 100%)`;
-  const localSessionId = sessionData?.sessionId ?? 'local';
+  const advantageGradient = `linear-gradient(90deg, ${localColor} 0%, ${localColor} ${advantageProgress * 100}%, ${opponentColor} ${advantageProgress * 100}%, ${opponentColor} 100%)`;
+  const localPlayerId = multiplayer.playerId;
   const matchResult = multiplayer.matchResult;
-  const localIsWinner = matchResult ? matchResult.winnerId === localSessionId : null;
+  const terminalResultKey = matchResult
+    ? `${multiplayer.matchConfig?.matchId ?? 'match'}:${matchResult.finishedAt}`
+    : null;
+  useEffect(() => {
+    resultExitGenerationRef.current += 1;
+    resultExitCoordinatorRef.current = createCanonicalResultExitCoordinator();
+    setResultExitPending(false);
+    setResultExitError(null);
+  }, [multiplayerAuthoritySessionId, terminalResultKey]);
+  useEffect(() => {
+    if (!matchResult) return;
+    setModeSelectOpen(false);
+    setMultiplayerJoinFailure(null);
+  }, [matchResult]);
+  const localIsWinner = matchResult?.winnerPlayerId
+    ? matchResult.winnerPlayerId === localPlayerId
+    : null;
   const opponentId = multiplayer.opponentId;
-  const localFinalScore = matchResult?.finalScores?.[localSessionId] ?? localScore;
+  const localFinalScore = localPlayerId ? (matchResult?.finalScores?.[localPlayerId] ?? localScore) : localScore;
   const opponentFinalScore = opponentId ? (matchResult?.finalScores?.[opponentId] ?? opponentScore) : opponentScore;
+  const resultTitle = matchResult?.reason === 'draw'
+    ? 'Empate'
+    : matchResult?.reason === 'abandoned'
+      ? 'Partida abandonada'
+      : localIsWinner === true
+        ? '¡Victoria!'
+        : 'Derrota';
+  const exitCanonicalMultiplayerResult = useCallback(async () => {
+    if (!matchResult) return;
+
+    const requestGeneration = resultExitGenerationRef.current;
+    const coordinator = resultExitCoordinatorRef.current;
+    if (!coordinator) return;
+    setResultExitPending(true);
+    setResultExitError(null);
+    try {
+      const released = await coordinator.requestExit(
+        releaseMultiplayerSession,
+        async () => {
+          if (resultExitGenerationRef.current !== requestGeneration) return;
+          setCurrentMode('single');
+          resetGame();
+          await multiplayer.reset();
+        },
+      );
+      if (resultExitGenerationRef.current !== requestGeneration) return;
+      if (!released) {
+        setResultExitError(
+          'No se pudo liberar la sesión multijugador. El resultado sigue guardado; reinténtalo.',
+        );
+      }
+    } catch {
+      if (resultExitGenerationRef.current !== requestGeneration) return;
+      setResultExitError(
+        'No se pudo completar la salida. El resultado sigue guardado; reinténtalo.',
+      );
+    } finally {
+      if (resultExitGenerationRef.current === requestGeneration) {
+        setResultExitPending(false);
+      }
+    }
+  }, [matchResult, multiplayer, releaseMultiplayerSession, resetGame]);
   const advantageBar = isMultiplayerMode && multiplayer.opponent ? (
     <div className="w-full mt-3 space-y-2 lg:pr-[300px] xl:pr-[360px]" style={{ width: BASE_GAME_WIDTH }}>
       <div className="flex justify-between text-xs font-pixellari uppercase tracking-wide text-cyan-100/80">
@@ -898,7 +1065,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       </div>
       {showSuddenDeathBanner ? (
         <div className="rounded-md border border-amber-400/70 bg-amber-500/10 px-3 py-1 text-xs font-pixellari uppercase tracking-wide text-amber-200">
-          Sudden Death · El rival debe superar {multiplayer.suddenDeath?.targetScore ?? localScore} pts
+          Sudden Death · {getSuddenDeathObjectiveCopy(
+            multiplayer.suddenDeath?.chasingPlayerId,
+            multiplayer.playerId,
+            multiplayer.suddenDeath?.targetScore ?? localScore,
+          )}
         </div>
       ) : (
         <div className="flex justify-between text-[11px] font-pixellari uppercase tracking-wide text-cyan-100/70">
@@ -1003,21 +1174,25 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         <p className="text-sm font-pixellari text-cyan-200/70">
           Comparte el enlace de la partida o espera a que otro jugador se conecte.
         </p>
+        {lobbySeconds !== null ? (
+          <p className="text-xs font-pixellari text-amber-200/80">
+            La sala expira en {lobbySeconds}s
+          </p>
+        ) : null}
+        {multiplayer.error ? (
+          <p role="alert" className="text-sm font-pixellari text-rose-300">
+            {multiplayer.error}
+          </p>
+        ) : null}
         
         {/* Botón para generar enlace de invitación */}
         <div className="space-y-3">
           <button
             onClick={async () => {
-              if (!matchRoomId) {
-                console.warn('⚠️ [MULTIPLAYER] No room ID available yet');
+              const invitationUrl = multiplayer.inviteUrl;
+              if (!invitationUrl) {
                 return;
               }
-              
-              // Generar URL del dapp con el juego embebido y sala específica
-              const baseUrl = process.env.NODE_ENV === 'development' 
-                ? 'http://localhost:3000/games/sybil-slayer'
-                : 'https://cukiesworld.com/games/sybil-slayer';
-              const invitationUrl = `${baseUrl}?room=${matchRoomId}`;
               
               // Copiar al portapapeles con fallbacks por políticas/iframes
               const legacyCopy = (text: string) => {
@@ -1089,23 +1264,23 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               }
             }}
             data-invite-button
-            disabled={!matchRoomId}
+            disabled={!multiplayer.inviteUrl}
             className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-pixellari transition-colors ${
-              matchRoomId 
+              multiplayer.inviteUrl
                 ? 'border-pink-500/50 bg-pink-500/20 text-pink-100 hover:bg-pink-500/30' 
                 : 'border-gray-500/50 bg-gray-500/20 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {matchRoomId ? '📋 Copiar enlace de invitación' : '⏳ Generando sala...'}
+            {multiplayer.inviteUrl ? '📋 Copiar enlace de invitación' : '⏳ Generando sala...'}
           </button>
           
-          {matchRoomId && (
+          {multiplayer.roomCode && (
             <div className="space-y-2">
               <p className="text-xs text-cyan-200/60">
                 El segundo jugador debe abrir este enlace en un perfil diferente del navegador
               </p>
               <p className="text-xs text-cyan-300/80 font-mono">
-                ID de sala: {matchRoomId}
+                ID de sala: {multiplayer.roomCode}
               </p>
             </div>
           )}
@@ -1118,8 +1293,26 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     <div className="absolute inset-0 z-[58] flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur">
       <div className="rounded-xl border border-pink-400/60 bg-slate-900/90 px-6 py-4 shadow-pink-400/30">
         <p className="text-xl font-pixellari text-pink-200">
-          La partida comienza en {countdownSeconds ?? 0}s
+          {multiplayer.matchConfig?.resumeAt
+            ? `La partida se reanuda en ${countdownSeconds ?? 0}s`
+            : `La partida comienza en ${countdownSeconds ?? 0}s`}
         </p>
+      </div>
+    </div>
+  ) : null;
+
+  const reconnectOverlay = showReconnectOverlay ? (
+    <div className="absolute inset-0 z-[59] flex flex-col items-center justify-center bg-slate-950/75 backdrop-blur-sm px-6 text-center">
+      <div className="rounded-xl border border-amber-400/70 bg-slate-900/95 px-6 py-5 shadow-2xl shadow-amber-500/20 space-y-2">
+        <p className="text-xl font-pixellari text-amber-200">Partida pausada</p>
+        <p className="text-sm font-pixellari text-amber-100/70">
+          Esperando que el jugador desconectado vuelva a la sala.
+        </p>
+        {reconnectSeconds !== null ? (
+          <p className="text-sm font-pixellari text-amber-200">
+            Gracia restante: {reconnectSeconds}s
+          </p>
+        ) : null}
       </div>
     </div>
   ) : null;
@@ -1127,23 +1320,31 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const resultOverlay = isMultiplayerMode && matchResult ? (
     <div className="absolute inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-sm px-4">
       <div className="w-full max-w-md rounded-2xl border border-cyan-500/50 bg-slate-900/95 p-6 text-center shadow-[0_30px_80px_rgba(8,145,178,0.35)] space-y-4">
-        <h3 className={`text-2xl font-pixellari ${localIsWinner ? 'text-emerald-300' : 'text-rose-300'}`}>
-          {localIsWinner ? '¡Victoria!' : 'Derrota'}
+        <h3 className={`text-2xl font-pixellari ${localIsWinner === true ? 'text-emerald-300' : localIsWinner === false ? 'text-rose-300' : 'text-amber-200'}`}>
+          {resultTitle}
         </h3>
         <div className="space-y-2 text-sm font-pixellari text-cyan-100">
           <p>Tu puntuación: {localFinalScore}</p>
           <p>Puntuación rival: {opponentFinalScore}</p>
           <p className="text-cyan-200/70 capitalize">Motivo: {matchResult.reason.replace('_', ' ')}</p>
         </div>
+        {resultExitError ? (
+          <p role="alert" className="text-sm font-pixellari text-rose-300">
+            {resultExitError}
+          </p>
+        ) : null}
         <button
-          onClick={() => {
-            multiplayer.reset();
-            setCurrentMode('single');
-            resetGame();
-          }}
-          className="mx-auto inline-flex items-center justify-center rounded-lg border border-pink-500/50 bg-pink-500/20 px-4 py-2 text-sm font-pixellari text-pink-100 hover:bg-pink-500/30"
+          type="button"
+          disabled={resultExitPending}
+          aria-busy={resultExitPending}
+          onClick={() => void exitCanonicalMultiplayerResult()}
+          className="mx-auto inline-flex items-center justify-center rounded-lg border border-pink-500/50 bg-pink-500/20 px-4 py-2 text-sm font-pixellari text-pink-100 hover:bg-pink-500/30 disabled:cursor-wait disabled:opacity-60"
         >
-          Salir a Single Player
+          {resultExitPending
+            ? 'Liberando sesión...'
+            : resultExitError
+              ? 'Reintentar salida a Single Player'
+              : 'Salir a Single Player'}
         </button>
       </div>
     </div>
@@ -1152,6 +1353,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const opponentStatusLabel = (() => {
     if (!isMultiplayerMode) return '';
     if (!multiplayer.opponent) return 'Esperando rival';
+    if (multiplayer.opponent.presence === 'offline') return 'Desconectado';
+    if (multiplayer.opponent.presence === 'forfeited') return 'Abandonó';
     switch (multiplayer.opponent.status) {
       case 'waiting':
         return 'Preparando';
@@ -1210,12 +1413,23 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Handle start game from keyboard (Space key)
   useEffect(() => {
     if (!startToggled) return;
+    if (multiplayerStartPendingRef.current || multiplayer.isJoinPending) return;
     if (gameState.status !== 'idle') return;
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
+    if (multiplayer.hasNonTerminalMatch) return;
     playSound('game_start');
     startGame();
-  }, [startToggled, gameState.status, startGame, playSound, modeSelectOpen, currentMode]);
+  }, [
+    startToggled,
+    gameState.status,
+    startGame,
+    playSound,
+    modeSelectOpen,
+    currentMode,
+    multiplayer.isJoinPending,
+    multiplayer.hasNonTerminalMatch,
+  ]);
   
   // Reset flags when starting a new game (moved after gameState initialization)
   useEffect(() => {
@@ -1248,7 +1462,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Handle game session start with Pusher
   useEffect(() => {
-    if (isConnected && sessionData && gameState.status === 'playing') {
+    if (!isMultiplayerMode && isConnected && sessionData && gameState.status === 'playing') {
       console.log('🎮 [GAME-PUSHER] Starting checkpoint interval for session:', sessionData.sessionId);
       
       const stopInterval = startCheckpointInterval(
@@ -1262,13 +1476,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       
       return stopInterval;
     }
-  }, [isConnected, sessionData, gameState.status, startCheckpointInterval]);
+  }, [isMultiplayerMode, isConnected, sessionData, gameState.status, startCheckpointInterval]);
 
   // Handle game session end with Pusher
   const gameEndSentRef = useRef<string | null>(null); // Track which session already sent game end
   
   useEffect(() => {
-    if (sessionData && gameState.status === 'gameOver') {
+    if (!isMultiplayerMode && sessionData && gameState.status === 'gameOver') {
       // Prevent duplicate sends for the same session
       const sessionKey = `${sessionData.sessionId}_${gameState.score}`;
       if (gameEndSentRef.current === sessionKey) {
@@ -1296,14 +1510,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       // Mark this session as having sent game end
       gameEndSentRef.current = sessionKey;
     }
-  }, [sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
+  }, [isMultiplayerMode, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
     const unsubscribe = subscribeToDirection((direction) => {
+      const joinPending = multiplayerStartPendingRef.current || multiplayer.isJoinPending;
       const nextInputState = {
         direction,
-        pauseToggled,
+        pauseToggled: localControlsLocked || joinPending ? false : pauseToggled,
         startToggled,
       };
 
@@ -1311,7 +1526,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         startToggled &&
         (gameState.status === 'idle' || gameState.status === 'gameOver')
       ) {
-        setModeSelectOpen(true);
+        if (canChangeGameMode && !joinPending) {
+          setModeSelectOpen(true);
+        }
+        // Always consume Space here so useGameState cannot start local play behind a pinned match.
         nextInputState.startToggled = false;
       }
 
@@ -1319,9 +1537,91 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     });
 
     return unsubscribe;
-  }, [subscribeToDirection, pauseToggled, startToggled, updateInputRef, gameState.status]);
+  }, [
+    subscribeToDirection,
+    pauseToggled,
+    startToggled,
+    updateInputRef,
+    gameState.status,
+    canChangeGameMode,
+    localControlsLocked,
+    multiplayer.isJoinPending,
+  ]);
 
   const hasStartedMultiplayerRef = useRef(false);
+  const handledReconnectResumeSignalRef = useRef(0);
+  useEffect(() => {
+    if (!isMultiplayerMode) {
+      handledReconnectResumeSignalRef.current = 0;
+      setMultiplayerCanonicalDeadline(null);
+      return;
+    }
+
+    if (
+      matchStatus === 'running' &&
+      typeof multiplayer.matchConfig?.roundEndsAt === 'number'
+    ) {
+      const resumeDecision = deriveReconnectResumeDecision({
+        matchStatus,
+        resumeSignal: multiplayer.resumeSignal,
+        handledResumeSignal: handledReconnectResumeSignalRef.current,
+        localPlayerId: multiplayer.playerId,
+        localPlayer: multiplayer.localPlayer,
+      });
+      if (resumeDecision.shouldConsumeSignal) {
+        handledReconnectResumeSignalRef.current = multiplayer.resumeSignal;
+        resumeMultiplayerRuntime(
+          multiplayer.matchConfig.roundEndsAt,
+          resumeDecision.allowTimeGameOverResume,
+        );
+      } else {
+        setMultiplayerCanonicalDeadline(multiplayer.matchConfig.roundEndsAt, false);
+      }
+      return;
+    }
+
+    if (
+      matchStatus === 'sudden_death' &&
+      typeof multiplayer.matchConfig?.suddenDeathEndsAt === 'number'
+    ) {
+      resumeMultiplayerRuntime(
+        multiplayer.matchConfig.suddenDeathEndsAt,
+        canResumeLocalPlayerInSuddenDeath({
+          matchStatus,
+          suddenDeath: multiplayer.suddenDeath,
+          localPlayerId: multiplayer.playerId,
+          localPlayer: multiplayer.localPlayer,
+        }),
+      );
+      return;
+    }
+
+    if (
+      matchStatus === 'idle' ||
+      matchStatus === 'searching' ||
+      matchStatus === 'waiting' ||
+      matchStatus === 'completed' ||
+      matchStatus === 'abandoned' ||
+      matchStatus === 'error'
+    ) {
+      if (multiplayer.resumeSignal === 0) {
+        handledReconnectResumeSignalRef.current = 0;
+      }
+      setMultiplayerCanonicalDeadline(null);
+    }
+  }, [
+    isMultiplayerMode,
+    matchStatus,
+    multiplayer.localPlayer,
+    multiplayer.matchConfig?.roundEndsAt,
+    multiplayer.matchConfig?.suddenDeathEndsAt,
+    multiplayer.playerId,
+    multiplayer.resumeSignal,
+    multiplayer.suddenDeath,
+    resumeMultiplayerRuntime,
+    setMultiplayerCanonicalDeadline,
+  ]);
+
   useEffect(() => {
     if (!isMultiplayerMode) {
       hasStartedMultiplayerRef.current = false;
@@ -1330,36 +1630,58 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (!multiplayer.startSignal) return;
     if (hasStartedMultiplayerRef.current) return;
 
-    if (gameState.status !== 'idle') {
-      resetGame();
-    }
-
     hasStartedMultiplayerRef.current = true;
     playSound('game_start');
-    startGame();
-  }, [isMultiplayerMode, multiplayer.startSignal, gameState.status, resetGame, playSound, startGame]);
+    startGameImmediately(multiplayer.localPlayer ? {
+      score: multiplayer.localPlayer.score,
+      hearts: multiplayer.localPlayer.hearts,
+      elapsedMs: multiplayer.localPlayer.elapsedMs,
+      lifecycle: multiplayer.localPlayer.lifecycle,
+    } : undefined);
+  }, [
+    isMultiplayerMode,
+    multiplayer.localPlayer,
+    multiplayer.startSignal,
+    playSound,
+    startGameImmediately,
+  ]);
+
+  useEffect(() => {
+    if (!isMultiplayerMode) return;
+    if (isServerReconnectPause({
+      matchStatus,
+      resumeAt: multiplayer.matchConfig?.resumeAt,
+      resumeEpoch: multiplayer.matchConfig?.resumeEpoch,
+    })) {
+      pauseMultiplayerRuntime();
+    }
+  }, [
+    isMultiplayerMode,
+    matchStatus,
+    multiplayer.matchConfig?.resumeAt,
+    multiplayer.matchConfig?.resumeEpoch,
+    pauseMultiplayerRuntime,
+  ]);
 
   useEffect(() => {
     if (!isMultiplayerMode) {
       lastPublishedSnapshotRef.current = null;
       return;
     }
+    if (matchStatus !== 'running' && matchStatus !== 'sudden_death') return;
+    if (gameState.status !== 'playing' && gameState.status !== 'gameOver') return;
     const lifecycle = resolveLifecycleStatus(gameState);
     const snapshot = {
       score: Math.floor(gameState.score),
       hearts: gameState.hearts,
-      status: lifecycle,
-      gameStatus: gameState.status,
-      gameOverReason: gameState.gameOverReason,
+      lifecycle,
     };
 
     const lastSnapshot = lastPublishedSnapshotRef.current;
     const hasChanged = !lastSnapshot
       || lastSnapshot.score !== snapshot.score
       || lastSnapshot.hearts !== snapshot.hearts
-      || lastSnapshot.status !== snapshot.status
-      || lastSnapshot.gameStatus !== snapshot.gameStatus
-      || lastSnapshot.gameOverReason !== snapshot.gameOverReason;
+      || lastSnapshot.lifecycle !== snapshot.lifecycle;
 
     if (!hasChanged) {
       return;
@@ -1372,49 +1694,25 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     gameState.score,
     gameState.hearts,
     gameState.status,
-    gameState.gameOverReason,
+    matchStatus,
     resolveLifecycleStatus,
     multiplayer,
   ]);
 
-  const hasAnnouncedStartRef = useRef(false);
-  useEffect(() => {
-    if (!isMultiplayerMode || gameState.status === 'idle') {
-      hasAnnouncedStartRef.current = false;
-      return;
-    }
-    if (gameState.status === 'playing' && !hasAnnouncedStartRef.current) {
-      multiplayer.notifyGameStart();
-      hasAnnouncedStartRef.current = true;
-    }
-  }, [isMultiplayerMode, gameState.status, multiplayer]);
-
-  const hasAnnouncedGameOverRef = useRef(false);
-  useEffect(() => {
-    if (!isMultiplayerMode || gameState.status === 'idle') {
-      hasAnnouncedGameOverRef.current = false;
-      return;
-    }
-    if (gameState.status === 'gameOver' && !hasAnnouncedGameOverRef.current) {
-      const lifecycleStatus = gameState.hearts > 0 ? 'finished' : 'eliminated';
-      multiplayer.notifyGameOver(gameState.gameOverReason ?? 'multiplayer', Math.floor(gameState.score), lifecycleStatus);
-      hasAnnouncedGameOverRef.current = true;
-    }
-  }, [isMultiplayerMode, gameState.status, gameState.gameOverReason, gameState.score, gameState.hearts, multiplayer]);
-
+  const terminalGameOverRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isMultiplayerMode) return;
     if (!multiplayer.matchResult) return;
-    if (gameState.status === 'gameOver') return;
+    if (!terminalResultKey || terminalGameOverRef.current === terminalResultKey) return;
 
+    terminalGameOverRef.current = terminalResultKey;
     forceGameOver('multiplayer');
-  }, [isMultiplayerMode, multiplayer.matchResult, gameState.status, forceGameOver]);
-
-  useEffect(() => {
-    return () => {
-      multiplayer.reset();
-    };
-  }, []);
+  }, [
+    forceGameOver,
+    isMultiplayerMode,
+    multiplayer.matchResult,
+    terminalResultKey,
+  ]);
 
   // Helper para obtener tiempo pausable para animaciones
   const getPausableTime = useCallback(() => {
@@ -1428,6 +1726,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // NUEVO: Pausa automática cuando se cambia de pestaña
   useEffect(() => {
+    if (localControlsLocked) return undefined;
     let wasPlayingBeforeHidden = false;
 
     const handleVisibilityChange = () => {
@@ -1456,7 +1755,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
+  }, [localControlsLocked, gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
 
 
  // Game loop integration using the custom hook
@@ -1469,6 +1768,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // UI Button Handlers
   const handleStartPauseClick = () => {
+    if (multiplayerStartPendingRef.current || localControlsLocked) return;
     if (gameState.status === 'playing') {
       playSound('pause');
       togglePause();
@@ -1491,38 +1791,86 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   };
 
-  const startMultiplayerGame = useCallback((roomIdOverride?: string | null) => {
-    // Permitir reutilizar una sala existente (invitación) o crear una nueva
-    const roomId = roomIdOverride ?? generateMatchRoomId();
-    setMatchRoomId(roomId);
-    
-    console.log('🎮 [MULTIPLAYER] Starting multiplayer game...', {
-      hasSessionData: !!sessionData,
-      sessionId: sessionData?.sessionId,
-      isConnected,
-      hasChannel: !!channel,
-      roomId
-    });
-    
-    console.log('🎮 [MULTIPLAYER] Resetting game and multiplayer state...');
-    resetGame();
-    multiplayer.reset();
-    
-    console.log('🎮 [MULTIPLAYER] Initiating match...');
-    // Even if session isn't ready yet, call initiateMatch so it enters 'searching'
-    // and will auto-continue once the connection/session is available
-    multiplayer.initiateMatch();
-  }, [multiplayer, resetGame, sessionData, isConnected, channel, generateMatchRoomId]);
+  const autoJoinedRoomRef = useRef<string | null>(null);
+  const startMultiplayerGame = useCallback(async (roomIdOverride?: string | null) => {
+    if (
+      !multiplayerEnabled ||
+      !canChangeGameMode ||
+      multiplayerStartPendingRef.current
+    ) return;
 
-  const handleModeSelected = useCallback((mode: GameMode) => {
+    const roomId = roomIdOverride ?? generateMatchRoomId();
+    multiplayerStartPendingRef.current = true;
+    setMultiplayerStartPending(true);
+    setMultiplayerJoinFailure(null);
+    try {
+      // A trusted parent invitation may represent the bridge's existing pin after iframe reload.
+      if (!roomIdOverride) await multiplayer.reset();
+      resetGame();
+      autoJoinedRoomRef.current = roomId;
+      setCurrentMode('multiplayer');
+      await multiplayer.initiateMatch(roomId);
+    } catch {
+      setCurrentMode('single');
+      resetGame();
+      const released = await releaseMultiplayerSession();
+      setMultiplayerJoinFailure({
+        roomCode: roomId,
+        message: released
+          ? (multiplayer.error ?? 'No se pudo entrar en la partida multijugador.')
+          : 'No se pudo liberar la sesión multijugador. Reinténtalo antes de volver a Single Player.',
+      });
+    } finally {
+      multiplayerStartPendingRef.current = false;
+      setMultiplayerStartPending(false);
+    }
+  }, [
+    canChangeGameMode,
+    generateMatchRoomId,
+    multiplayer,
+    multiplayerEnabled,
+    releaseMultiplayerSession,
+    resetGame,
+  ]);
+
+  const retryMultiplayerJoin = useCallback(() => {
+    if (!multiplayerJoinFailure) return;
+    const { roomCode } = multiplayerJoinFailure;
+    autoJoinedRoomRef.current = null;
+    setMultiplayerJoinFailure(null);
+    void startMultiplayerGame(roomCode);
+  }, [multiplayerJoinFailure, startMultiplayerGame]);
+
+  const exitFailedMultiplayerJoin = useCallback(async () => {
+    const failedRoomCode = multiplayerJoinFailure?.roomCode ?? null;
+    if (!(await releaseMultiplayerSession())) return;
+    try {
+      await multiplayer.reset();
+    } catch {
+      return;
+    }
+    // Mark this invitation as consumed so the handshake effect does not
+    // immediately autojoin it again after the user explicitly exits.
+    autoJoinedRoomRef.current = failedRoomCode;
+    setMultiplayerJoinFailure(null);
+    setCurrentMode('single');
+    resetGame();
+    setModeSelectOpen(true);
+  }, [multiplayer, multiplayerJoinFailure, releaseMultiplayerSession, resetGame]);
+
+  const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
+    if (multiplayerStartPendingRef.current || !canChangeGameMode) return;
     setModeSelectOpen(false);
-    setCurrentMode(mode);
 
     if (mode === 'single') {
       console.log('🎮 [MODE] Starting single player mode');
-      multiplayer.reset();
-      setMatchRoomId(null); // Limpiar room ID al cambiar a single
+      try {
+        await multiplayer.reset();
+      } catch {
+        return;
+      }
+      setCurrentMode('single');
       if (gameState.status === 'gameOver') {
         console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
         stopMusic();
@@ -1532,32 +1880,35 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       return;
     }
 
+    if (!multiplayerEnabled) {
+      return;
+    }
+
     console.log('🎮 [MODE] Starting multiplayer mode');
     playSound('button_click');
-    startMultiplayerGame();
-  }, [gameState.status, playSound, startGame, startMultiplayerGame, stopMusic, multiplayer]);
+    await startMultiplayerGame();
+  }, [
+    canChangeGameMode,
+    gameState.status,
+    multiplayer,
+    multiplayerEnabled,
+    playSound,
+    startGame,
+    startMultiplayerGame,
+    stopMusic,
+  ]);
 
-  // Detectar si se está uniendo a una sala específica
+  // La invitación llega únicamente por el handshake autenticado del padre.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
-    
-    if (roomParam && !matchRoomId) {
-      console.log('🎮 [MULTIPLAYER] Joining existing room:', roomParam);
-      setMatchRoomId(roomParam);
-      // Si hay un room ID en la URL, automáticamente iniciar multiplayer
-      if (!isMultiplayerMode) {
-        setCurrentMode('multiplayer');
-        startMultiplayerGame(roomParam);
-      } else {
-        startMultiplayerGame(roomParam);
-      }
-    }
-  }, [matchRoomId, isMultiplayerMode, startMultiplayerGame]);
+    if (!hasParentHandshake) return;
+    const roomCode = getHandshakeRoomCode(sessionData, multiplayerEnabled);
+    if (!roomCode || autoJoinedRoomRef.current === roomCode) return;
+    setModeSelectOpen(false);
+    void startMultiplayerGame(roomCode);
+  }, [hasParentHandshake, multiplayerEnabled, sessionData, startMultiplayerGame]);
 
    const handleResetClick = () => {
+      if (multiplayerStartPendingRef.current || localControlsLocked) return;
       playSound('button_click');
       
       // Si estamos en game over, detener el sonido de game over
@@ -1605,7 +1956,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         setIsInfoModalOpen(!isInfoModalOpen);
       } else {
         // Si está en playing o paused, pausar si es necesario y abrir el modal
-        if (currentStatus === 'playing') {
+        if (!localControlsLocked && currentStatus === 'playing') {
           console.log('[INFO] Pausing game before opening modal');
           togglePause();
         }
@@ -1623,7 +1974,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
    const handleOpenInfo = () => {
       playSound('button_click');
       // Si el juego está en playing, pausar automáticamente
-      if (gameState.status === 'playing') {
+      if (!localControlsLocked && gameState.status === 'playing') {
         togglePause();
       }
       setIsInfoModalOpen(true);
@@ -1824,18 +2175,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Advertencia de tiempo bajo
   useEffect(() => {
-    if (gameState.status === 'playing' && gameState.timer <= 10 && gameState.timer > 0) {
+    if (gameState.status === 'playing' && canonicalTimer <= 10 && canonicalTimer > 0) {
       // Solo mostrar advertencia en intervalos específicos para evitar spam
-      const timeLeft = Math.ceil(gameState.timer);
+      const timeLeft = Math.ceil(canonicalTimer);
       if (timeLeft === 10 || timeLeft === 5 || timeLeft === 3 || timeLeft === 1) {
         console.log(`¡Advertencia! Quedan ${timeLeft} segundos`);
       }
     }
-  }, [gameState.timer, gameState.status]);
+  }, [canonicalTimer, gameState.status]);
 
   // Manejar música de fondo según el estado del juego
   useEffect(() => {
-    if (gameState.status === 'gameOver') {
+    if (gameState.status === 'gameOver' && (!isMultiplayerMode || Boolean(matchResult))) {
       // Reproducir sonido de game over independientemente del control de música
       console.log('💀 Game Over - Reproduciendo sonido de game over');
       playGameOverSound();
@@ -1845,7 +2196,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       playMusic('background_music');
     }
     // En estado 'idle' o 'paused' no cambiar la música
-  }, [gameState.status, playGameOverSound]); // CORREGIDO: Removido playMusic, stopMusic, y gameState.score
+  }, [gameState.status, isMultiplayerMode, matchResult, playGameOverSound]); // CORREGIDO: Removido playMusic, stopMusic, y gameState.score
 
   // Iniciar música de fondo automáticamente al cargar el componente
   useEffect(() => {
@@ -2237,7 +2588,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center min-h-screen">
       <ModeSelectModal
-        open={modeSelectOpen}
+        open={modeSelectOpen && canChangeGameMode}
         onClose={() => setModeSelectOpen(false)}
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
@@ -2245,7 +2596,34 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       />
       {waitingOverlay}
       {countdownOverlay}
+      {reconnectOverlay}
       {resultOverlay}
+      {multiplayerJoinFailure ? (
+        <div className="absolute inset-0 z-[75] flex items-center justify-center bg-slate-950/90 px-5 text-center backdrop-blur-sm">
+          <div className="w-full max-w-md space-y-4 rounded-xl border border-rose-400/60 bg-slate-900/95 p-6 shadow-2xl shadow-rose-500/20">
+            <h3 className="text-xl font-pixellari text-rose-200">No se pudo entrar en la sala</h3>
+            <p role="alert" className="text-sm font-pixellari text-rose-100/80">
+              {multiplayerJoinFailure.message}
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={retryMultiplayerJoin}
+                className="rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-4 py-2 font-pixellari text-cyan-100"
+              >
+                Reintentar
+              </button>
+              <button
+                type="button"
+                onClick={() => void exitFailedMultiplayerJoin()}
+                className="rounded-lg border border-pink-400/50 bg-pink-500/15 px-4 py-2 font-pixellari text-pink-100"
+              >
+                Salir
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Menú de bienvenida */}
       {gameState.status === 'idle' ? (
         <>
@@ -2401,7 +2779,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
                   <span className="text-white" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Time: {Math.ceil(gameState.timer)}
+                    Time: {Math.ceil(canonicalTimer)}
                   </span>
                 </div>
               </div>
@@ -2424,56 +2802,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         damageFlag={damageFlag}
                       />
                       
-                      {/* Botones de game over */}
-                      {gameState.status === 'gameOver' && (
-                        <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
-                          <div className="flex flex-row items-center gap-4">
-                            {/* Botón Score Details */}
-                            <button
-                              onClick={() => setIsLevelStatsVisible(true)}
-                              className="focus:outline-none game-button relative"
-                              aria-label="Score Details"
-                            >
-                              <Image 
-                                src="/assets/ui/buttons/caja-texto2.png"
-                                alt="Score Details" 
-                                width={180} 
-                                height={50}
-                                className="game-img"
-                              />
-                              <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                                SCORE DETAILS
-                              </span>
-                            </button>
-                            
-                            {/* Botón Play Again */}
-                            <button
-                              onClick={() => {
-                                playSound('button_click');
-                                if (gameState.status === 'gameOver') {
-                                  console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
-                                  stopMusic();
-                                }
-                                resetGame();
-                                setModeSelectOpen(true);
-                              }}
-                              className="focus:outline-none game-button relative"
-                              aria-label="Play Again"
-                            >
-                              <Image 
-                                src="/assets/ui/buttons/caja-texto2.png" 
-                                alt="Play Again" 
-                                width={180} 
-                                height={50}
-                                className="game-img"
-                              />
-                              <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                                PLAY AGAIN
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -2622,7 +2950,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             className="fixed inset-0 w-full h-full overflow-hidden -z-10"
             style={{
               backgroundImage: "url('/assets/ui/game-container/fondo2.PNG')",
-              backgroundImage: "url('/assets/ui/game-container/fondo2.PNG')",
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundAttachment: 'fixed',
@@ -2751,8 +3078,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="game-img"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-shadow">
-                  <span className={gameState.timer <= 10 ? 'text-destructive' : 'text-white'} style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    Time: {Math.ceil(gameState.timer)}
+                  <span className={canonicalTimer <= 10 ? 'text-destructive' : 'text-white'} style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
+                    Time: {Math.ceil(canonicalTimer)}
                   </span>
                 </div>
               </div>
@@ -3045,7 +3372,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   />
                   
                   {/* Botones de game over */}
-                  {gameState.status === 'gameOver' && (
+                  {gameState.status === 'gameOver' && !isMultiplayerMode && (
                     <div className="absolute inset-0 flex items-end justify-center pointer-events-auto pb-16">
                       <div className="flex flex-row items-center gap-4">
                         {/* Botón Score Details */}
@@ -3069,6 +3396,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         {/* Botón Play Again */}
                         <button
                           onClick={() => {
+                            if (multiplayerStartPendingRef.current) return;
                             playSound('button_click');
                             if (gameState.status === 'gameOver') {
                               console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
@@ -3124,7 +3452,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             >
               <button 
                 onClick={handleStartPauseClick} 
-                className="focus:outline-none game-button relative"
+                disabled={localControlsLocked}
+                className={`focus:outline-none game-button relative ${localControlsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label={gameState.status === 'playing' ? 'Pause' : gameState.status === 'paused' ? 'Resume' : 'Start'}
               >
                 <Image 
@@ -3140,7 +3469,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </button>
               <button 
                 onClick={handleResetClick} 
-                className="focus:outline-none game-button relative"
+                disabled={localControlsLocked}
+                className={`focus:outline-none game-button relative ${localControlsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label="Reset game"
               >
                 <Image 
@@ -3243,7 +3573,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       )}
 
       {/* Modal de información - Siempre disponible */}
-      {process.env.NODE_ENV === 'development' && console.log('[INFO] Rendering InfoModal, isOpen:', isInfoModalOpen)}
       <InfoModal 
         isOpen={isInfoModalOpen}
         onClose={() => {
@@ -3337,7 +3666,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       {/* Always render in development to debug, or when isMobile is true */}
       {(process.env.NODE_ENV === 'development' || isMobile) && (
         <>
-          {process.env.NODE_ENV === 'development' && console.log('[GameContainer] Rendering TouchZones, isMobile:', isMobile)}
           <TouchZones
             onDirectionChange={setTouchDirection}
             onDirectionClear={clearTouchDirection}

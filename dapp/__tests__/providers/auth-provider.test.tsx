@@ -281,6 +281,48 @@ describe('providers/AuthProvider', () => {
     })
   })
 
+  it('should restore the wallet session when wagmi reconnects after reload', async () => {
+    mockUseAccount.mockReturnValue({
+      address: undefined,
+      isConnected: false,
+    } as any)
+
+    const { rerender } = render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    expect(mockFetch).not.toHaveBeenCalled()
+
+    const walletAddress = '0x123456789'
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      isConnected: true,
+    } as any)
+
+    rerender(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user')).toHaveTextContent('testuser')
+    })
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletAddress }),
+    })
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/auth/challenge',
+      expect.anything(),
+    )
+  })
+
   it('should clear user when wallet disconnects', async () => {
     const walletAddress = '0x123456789'
     

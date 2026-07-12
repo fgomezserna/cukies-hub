@@ -44,6 +44,7 @@ const envSchema = z.object({
   CHAIN_INDEXER_DB_NAME: z.string().default('cukieshub-new'),
   CHAIN_INDEXER_CHAINS: z.string().default('BSC,TRON'),
   CHAIN_INDEXER_CONTRACT_ALIASES: z.string().optional(),
+  CHAIN_INDEXER_BSC_RPC_URLS: z.string().optional(),
   CHAIN_INDEXER_BSC_RPC_URL: z.string().optional(),
   BSC_RPC_URL: z.string().optional(),
   CHAIN_INDEXER_PRESALE_ADDRESS: z.string().optional(),
@@ -95,6 +96,15 @@ function parseContractAliases(value?: string): ContractAlias[] | undefined {
   return valid.length > 0 ? valid : undefined;
 }
 
+function parseRpcUrls(...values: Array<string | undefined>) {
+  const urls = values
+    .flatMap((value) => value?.split(',') ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set(urls)];
+}
+
 export function getIndexerConfig(): IndexerConfig {
   loadIndexerEnvFiles();
   const env = envSchema.parse(process.env);
@@ -106,15 +116,27 @@ export function getIndexerConfig(): IndexerConfig {
     );
   }
 
+  const chains = parseChains(env.CHAIN_INDEXER_CHAINS);
+  const contractAliases = parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES);
+  const presaleAddress = env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS;
+  const bscRpcUrls = parseRpcUrls(
+    env.CHAIN_INDEXER_BSC_RPC_URLS,
+    env.CHAIN_INDEXER_BSC_RPC_URL,
+    env.BSC_RPC_URL,
+    'https://bsc.rpc.blxrbdn.com',
+  );
+
+  if (contractAliases?.includes('PRESALE') && !presaleAddress) {
+    throw new Error('Falta CHAIN_INDEXER_PRESALE_ADDRESS o NEXT_PUBLIC_UKI_PRESALE_ADDRESS para indexar la preventa.');
+  }
+
   return {
     mongoUrl,
     dbName: env.CHAIN_INDEXER_DB_NAME,
-    chains: parseChains(env.CHAIN_INDEXER_CHAINS),
-    contractAliases: parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES),
-    bscRpcUrl:
-      env.CHAIN_INDEXER_BSC_RPC_URL ??
-      env.BSC_RPC_URL ??
-      'https://bsc-rpc.publicnode.com',
+    chains,
+    contractAliases,
+    bscRpcUrl: bscRpcUrls[0],
+    bscRpcUrls,
     tronApiBaseUrl: env.CHAIN_INDEXER_TRON_API_BASE_URL.replace(/\/$/, ''),
     tronApiKey: env.TRON_API_KEY ?? env.TRONGRID_API_KEY,
     bscStartBlock: env.CHAIN_INDEXER_START_BSC_BLOCK,
@@ -125,7 +147,7 @@ export function getIndexerConfig(): IndexerConfig {
     tronRequestDelayMs: env.CHAIN_INDEXER_TRON_REQUEST_DELAY_MS,
     pollIntervalMs: env.CHAIN_INDEXER_POLL_INTERVAL_MS,
     projectBatchSize: env.CHAIN_INDEXER_PROJECT_BATCH_SIZE,
-    presaleAddress: env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS,
+    presaleAddress,
   };
 }
 

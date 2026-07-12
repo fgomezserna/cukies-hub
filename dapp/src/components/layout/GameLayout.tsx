@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Maximize, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
+import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
 import { GameConfig, GameStats, GameLayoutProps } from '@/types/game';
 import { LeaderboardPlayer } from '@/types';
 
@@ -84,6 +85,13 @@ export default function GameLayout({
     }
   };
 
+  const handleIframeLoad = useCallback(
+    (event: React.SyntheticEvent<HTMLIFrameElement>) => {
+      markParentIframeNavigation(event.currentTarget);
+    },
+    [],
+  );
+
   // Calculate user-specific data
   const userHighScore = gameStats.userStats?.bestScore ?? 0;
   const userXP = user?.xp ?? 0;
@@ -127,6 +135,7 @@ export default function GameLayout({
               title={gameConfig.name}
               allow="clipboard-read; clipboard-write"
               allowFullScreen
+              onLoad={handleIframeLoad}
             />
             <Button
               variant="ghost"

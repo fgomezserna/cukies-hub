@@ -22,7 +22,7 @@ import { usePresaleLock } from './presale-countdown';
 import { WalletConnectorDialog } from './wallet-connector-dialog';
 
 const TOKEN_DECIMALS = 18;
-const DEFAULT_AMOUNT = '10';
+const DEFAULT_AMOUNT = '1';
 
 type PurchaseHistoryItem = {
   eventId: string;
@@ -101,8 +101,9 @@ export function PresalePurchasePanel() {
   const { isLocked: isPublicPresaleLocked, startShortLabel } = usePresaleLock();
   const hasMounted = useHasMounted();
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
-  const [lastAction, setLastAction] = useState<'approve' | 'buy' | null>(null);
+  const [lastAction, setLastAction] = useState<'approve' | 'approved' | 'buy' | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<bigint | null>(null);
+  const [locallyApprovedAmount, setLocallyApprovedAmount] = useState<bigint | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -123,6 +124,8 @@ export function PresalePurchasePanel() {
 
   const {
     data: asmBalance,
+    isError: isAsmBalanceError,
+    isLoading: isAsmBalanceLoading,
     refetch: refetchBalance,
   } = useReadContract({
     chainId: UKI_PRESALE_CHAIN_ID,
@@ -130,7 +133,10 @@ export function PresalePurchasePanel() {
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && readsEnabled) },
+    query: {
+      enabled: Boolean(address && readsEnabled),
+      staleTime: 0,
+    },
   });
 
   const {
@@ -212,15 +218,25 @@ export function PresalePurchasePanel() {
     query: { enabled: Boolean(txHash) },
   });
 
-  const needsApproval = Boolean(parsedAmount && allowance !== undefined && allowance < parsedAmount);
+  const effectiveAllowance = locallyApprovedAmount && (!allowance || locallyApprovedAmount > allowance)
+    ? locallyApprovedAmount
+    : allowance;
+  const needsApproval = Boolean(parsedAmount && effectiveAllowance !== undefined && effectiveAllowance < parsedAmount);
   const hasEnoughBalance = Boolean(parsedAmount && asmBalance !== undefined && asmBalance >= parsedAmount);
-  const hasAllowanceData = !isReady || allowance !== undefined;
+  const hasAllowanceData = !isReady || effectiveAllowance !== undefined;
   const hasMinPurchaseData = !isReady || minAsmPerPurchase !== undefined;
+  const hasBalanceData = !isReady || asmBalance !== undefined;
+  const asmBalanceLabel = isAsmBalanceError
+    ? 'Error de lectura'
+    : isAsmBalanceLoading && asmBalance === undefined
+      ? 'Cargando...'
+      : formatTokenAmount(asmBalance);
   const isBelowMinPurchase = isBelowContractMinimumPurchase(parsedAmount, minAsmPerPurchase);
   const canSubmit = Boolean(
     isReady &&
     parsedAmount &&
     hasEnoughBalance &&
+    hasBalanceData &&
     hasAllowanceData &&
     hasMinPurchaseData &&
     !isBelowMinPurchase &&
@@ -232,6 +248,13 @@ export function PresalePurchasePanel() {
   const canConnect = Boolean(hasMounted && !isConnected && evmConnectors.length > 0 && !isConnecting);
   const canSwitch = Boolean(isWrongChain && !isSwitching);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
+
+  useEffect(() => {
+    setLastAction(null);
+    setApprovalAmount(null);
+    setLocallyApprovedAmount(null);
+    handledReceiptHashRef.current = null;
+  }, [address, asmTokenAddress, presaleAddress]);
 
   useEffect(() => {
     if (!isHistoryOpen || !address) return;
@@ -282,33 +305,32 @@ export function PresalePurchasePanel() {
     void refetchPurchasedAsm();
     void refetchPurchasedUki();
 
-    if (lastAction === 'approve' && approvalAmount && presaleAddress) {
-      toast({
-        title: 'Aprobación confirmada',
-        description: 'Abriendo ahora la transacción de compra.',
-      });
-      setLastAction('buy');
+    if (lastAction === 'approve' && approvalAmount) {
+      setLocallyApprovedAmount(approvalAmount);
+      setLastAction('approved');
       setApprovalAmount(null);
-      writeContract({
-        address: presaleAddress,
-        abi: presaleAbi,
-        functionName: 'buy',
-        args: [approvalAmount],
+      toast({
+        title: 'ASM aprobado',
+        description: 'Permiso confirmado. Pulsa Comprar UKI para abrir la compra final.',
       });
       return;
     }
 
     if (lastAction === 'buy') {
+      setLastAction(null);
+      setApprovalAmount(null);
+      setLocallyApprovedAmount(null);
       toast({
         title: 'Compra confirmada',
         description: 'Se ha creado la asignación de vesting UKI para tu wallet.',
       });
     }
-  }, [approvalAmount, isSuccess, lastAction, presaleAddress, refetchAllowance, refetchBalance, refetchIsOpen, refetchMinAsmPerPurchase, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash, writeContract]);
+  }, [approvalAmount, isSuccess, lastAction, refetchAllowance, refetchBalance, refetchIsOpen, refetchMinAsmPerPurchase, refetchPurchasedAsm, refetchPurchasedUki, refetchQuote, toast, txHash]);
 
   useEffect(() => {
     if (!error) return;
 
+    setLastAction(null);
     setApprovalAmount(null);
     toast({
       title: 'Transacción fallida',
@@ -323,12 +345,25 @@ export function PresalePurchasePanel() {
     const params = new URLSearchParams({
       walletAddress: address,
       origin: window.location.origin,
+      applyReferral: '1',
     });
     const response = await fetch(`/api/presale/referral/status?${params.toString()}`, {
       cache: 'no-store',
     });
 
-    return response.ok;
+    if (!response.ok) return false;
+
+    const data = await response.json().catch(() => null) as {
+      referralAttribution?: {
+        applied: boolean;
+        reason?: 'invalid_or_locked_code' | 'self_referral' | 'sponsor_already_locked';
+      } | null;
+    } | null;
+    const attribution = data?.referralAttribution;
+
+    if (!attribution || attribution.applied) return true;
+
+    return attribution.reason === 'self_referral' || attribution.reason === 'sponsor_already_locked';
   }
 
   async function connectEvmForPurchase(connector: Connector) {
@@ -421,7 +456,7 @@ export function PresalePurchasePanel() {
       return;
     }
 
-    if (allowance === undefined) {
+    if (effectiveAllowance === undefined) {
       toast({
         title: 'Revisando permisos',
         description: 'Espera a que cargue la aprobación de ASM antes de comprar.',
@@ -479,6 +514,10 @@ export function PresalePurchasePanel() {
       return;
     }
 
+    toast({
+      title: 'Confirma la compra',
+      description: 'Revisa y firma la compra final en tu wallet.',
+    });
     setLastAction('buy');
     writeContract({
       address: presaleAddress,
@@ -524,7 +563,7 @@ export function PresalePurchasePanel() {
       </div>
 
       <div className="mt-2 grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)] sm:grid-cols-2">
-        <span>Balance ASM: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(asmBalance)}</strong></span>
+        <span>Balance ASM: <strong className="text-[var(--uki-cream)]">{asmBalanceLabel}</strong></span>
         {isConnected ? (
           <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
             <SheetTrigger asChild>
@@ -613,7 +652,7 @@ export function PresalePurchasePanel() {
           value={amount}
           onChange={(event) => setAmount(event.target.value.replace(',', '.'))}
           inputMode="decimal"
-          placeholder="10"
+          placeholder="1"
           className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#0b0719]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-cyan)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-cyan)]"
           style={{
             backgroundColor: '#0b0719',
@@ -644,12 +683,42 @@ export function PresalePurchasePanel() {
         </div>
       ) : null}
 
-      {isReady && !hasEnoughBalance && parsedAmount ? (
+      {isReady && !hasBalanceData && parsedAmount ? (
+        <div className="uki-state-callout uki-state-callout-warning mt-2">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>Balance ASM pendiente</p>
+            <span>Espera a que la dapp lea el saldo de ASM en BNB Smart Chain.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {isReady && isAsmBalanceError ? (
+        <div className="uki-state-callout uki-state-callout-warning mt-2">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>No se pudo leer ASM</p>
+            <span>Revisa la conexión RPC de BNB Smart Chain o vuelve a conectar la wallet.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {isReady && hasBalanceData && !hasEnoughBalance && parsedAmount ? (
         <div className="uki-state-callout uki-state-callout-warning mt-2">
           <WalletCards className="h-4 w-4" strokeWidth={1.8} />
           <div>
             <p>ASM insuficiente</p>
             <span>Baja el importe o añade más ASM a esta wallet.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {lastAction === 'approved' && !isPending && !isConfirming ? (
+        <div className="uki-state-callout mt-2 border-[var(--uki-cyan)]/35 bg-[var(--uki-cyan)]/10">
+          <WalletCards className="h-4 w-4" strokeWidth={1.8} />
+          <div>
+            <p>ASM aprobado</p>
+            <span>Permiso confirmado. Pulsa Comprar UKI para firmar la compra final.</span>
           </div>
         </div>
       ) : null}
@@ -690,7 +759,9 @@ export function PresalePurchasePanel() {
 
       {isConfirming ? (
         <p className="mt-2 text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-          {lastAction === 'approve' ? 'Confirmando aprobación antes de comprar...' : 'Confirmando compra...'}
+          {lastAction === 'approve'
+            ? 'Confirmando permiso ASM. Luego pulsa Comprar UKI para la compra final.'
+            : 'Confirmando compra UKI. Espera la confirmación on-chain.'}
         </p>
       ) : null}
 

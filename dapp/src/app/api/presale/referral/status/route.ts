@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const origin = getPublicOrigin(request, searchParams.get('origin'));
   const walletAddress = searchParams.get('walletAddress');
+  const shouldApplyReferral = searchParams.get('applyReferral') === '1';
 
   if (!walletAddress) {
     return NextResponse.json({ error: 'walletAddress is required' }, { status: 400 });
@@ -49,14 +50,21 @@ export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const cookieReferralCode = cookieStore.get('ukiReferralCode')?.value;
+    let referralAttribution: Awaited<ReturnType<typeof applyPresaleReferralCode>> | null = null;
 
-    if (cookieReferralCode) {
-      await applyPresaleReferralCode(walletAddress, cookieReferralCode);
-      cookieStore.set('ukiReferralCode', '', { expires: new Date(0), path: '/' });
+    if (shouldApplyReferral && cookieReferralCode) {
+      referralAttribution = await applyPresaleReferralCode(walletAddress, cookieReferralCode);
+
+      if (referralAttribution.applied) {
+        cookieStore.set('ukiReferralCode', '', { expires: new Date(0), path: '/' });
+      }
     }
 
     const status = await getPresaleReferralStatus(walletAddress, origin);
-    return NextResponse.json(status);
+    return NextResponse.json({
+      ...status,
+      referralAttribution,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

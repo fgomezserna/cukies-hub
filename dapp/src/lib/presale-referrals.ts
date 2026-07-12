@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 import { MongoClient, type Db } from 'mongodb';
 
+import { readOnChainPresalePurchaseTotals } from './presale-onchain';
 import { normalizeWalletAddress } from './wallet-address';
 
 const PRESALE_DATABASE_URL =
@@ -74,6 +75,20 @@ async function getCampaignConfig(db: Db) {
   };
 }
 
+function hasPurchasedEnoughToUnlockReferralLink(totalUkiPurchased: number, minimumUkiToUnlockLink: number) {
+  if (minimumUkiToUnlockLink > 0) return totalUkiPurchased >= minimumUkiToUnlockLink;
+  return totalUkiPurchased > 0;
+}
+
+async function readOnChainPresalePurchaseTotalsSafely(walletAddress: string) {
+  try {
+    return await readOnChainPresalePurchaseTotals(walletAddress);
+  } catch (error) {
+    console.warn('No se pudo leer compra de preventa on-chain:', error);
+    return null;
+  }
+}
+
 async function getReferralLevelCounts(db: Db, sponsorWalletNormalized?: string | null) {
   if (!sponsorWalletNormalized) return emptyReferralLevelCounts;
 
@@ -114,7 +129,6 @@ export function toPublicPresaleParticipantStatus(
   referralLevelCounts: ReferralLevelCounts,
   origin?: string | null,
 ) {
-  const isUnlocked = Boolean(participant.referralUnlockedAt);
   const normalizedWalletAddress = String(participant.normalizedWalletAddress);
   const referralCode =
     typeof participant.referralCode === 'string' && participant.referralCode.trim()
@@ -122,6 +136,9 @@ export function toPublicPresaleParticipantStatus(
       : referralCodeForWallet(normalizedWalletAddress);
   const totalUkiPurchased = Number(participant.totalUkiPurchased ?? 0);
   const minimumUkiToUnlockLink = campaignConfig.minimumUkiToUnlockLink;
+  const isUnlocked =
+    Boolean(participant.referralUnlockedAt) ||
+    hasPurchasedEnoughToUnlockReferralLink(totalUkiPurchased, minimumUkiToUnlockLink);
   const unlockProgress = minimumUkiToUnlockLink > 0
     ? Math.min(totalUkiPurchased / minimumUkiToUnlockLink, 1)
     : isUnlocked
@@ -207,9 +224,45 @@ export async function getOrCreatePresaleParticipant(walletAddress: string) {
 
 export async function getPresaleReferralStatus(walletAddress: string, origin?: string | null) {
   const db = await getPresaleDb();
-  const participant = await getOrCreatePresaleParticipant(walletAddress);
+  let participant = await getOrCreatePresaleParticipant(walletAddress);
   if (!participant) throw new Error('No se pudo cargar participante de preventa.');
   const campaignConfig = await getCampaignConfig(db);
+
+  const onChainTotals = await readOnChainPresalePurchaseTotalsSafely(walletAddress);
+  const indexedUkiPurchased = Number(participant.totalUkiPurchased ?? 0);
+  if (onChainTotals && onChainTotals.totalUkiPurchased > indexedUkiPurchased) {
+    const observedAt = new Date();
+    const shouldUnlock = hasPurchasedEnoughToUnlockReferralLink(
+      onChainTotals.totalUkiPurchased,
+      campaignConfig.minimumUkiToUnlockLink,
+    );
+    const update: Record<string, unknown> = {
+      walletAddress: participant.walletAddress ?? normalizeWalletAddress(walletAddress),
+      normalizedWalletAddress: participant.normalizedWalletAddress,
+      totalAsmPurchased: onChainTotals.totalAsmPurchased,
+      totalAsmPurchasedRaw: onChainTotals.asmPurchasedRaw.toString(),
+      totalUkiPurchased: onChainTotals.totalUkiPurchased,
+      totalUkiPurchasedRaw: onChainTotals.ukiPurchasedRaw.toString(),
+      onChainPurchaseObservedAt: observedAt,
+      updatedAt: observedAt,
+    };
+
+    if (shouldUnlock && !participant.referralUnlockedAt) {
+      update.referralUnlockedAt = observedAt;
+      update.referralMinimumUkiSnapshot =
+        Number(participant.referralMinimumUkiSnapshot ?? campaignConfig.minimumUkiToUnlockLink);
+    }
+
+    await db.collection('presale_participants').updateOne(
+      { normalizedWalletAddress: participant.normalizedWalletAddress },
+      { $set: update },
+    );
+    participant = {
+      ...participant,
+      ...update,
+    };
+  }
+
   const referralLevelCounts = await getReferralLevelCounts(
     db,
     participant.normalizedWalletAddress,
@@ -226,10 +279,19 @@ export async function applyPresaleReferralCode(walletAddress: string, referralCo
   const participants = db.collection('presale_participants');
   const buyer = await getOrCreatePresaleParticipant(normalizedWalletAddress);
   const sponsor = await participants.findOne({ referralCode: cleanCode });
+  const campaignConfig = await getCampaignConfig(db);
 
   if (!buyer) throw new Error('No se pudo cargar comprador.');
 
-  if (!sponsor || !sponsor.referralUnlockedAt) {
+  const sponsorTotalUkiPurchased = Number(sponsor?.totalUkiPurchased ?? 0);
+  const sponsorCanRefer =
+    Boolean(sponsor?.referralUnlockedAt) ||
+    hasPurchasedEnoughToUnlockReferralLink(
+      sponsorTotalUkiPurchased,
+      campaignConfig.minimumUkiToUnlockLink,
+    );
+
+  if (!sponsor || !sponsorCanRefer) {
     return { applied: false, reason: 'invalid_or_locked_code' as const };
   }
 
@@ -238,6 +300,11 @@ export async function applyPresaleReferralCode(walletAddress: string, referralCo
   }
 
   if (buyer.firstPurchaseAt || buyer.lockedSponsorWalletAddress) {
+    return { applied: false, reason: 'sponsor_already_locked' as const };
+  }
+
+  const buyerOnChainTotals = await readOnChainPresalePurchaseTotalsSafely(walletAddress);
+  if ((buyerOnChainTotals?.totalUkiPurchased ?? 0) > 0) {
     return { applied: false, reason: 'sponsor_already_locked' as const };
   }
 

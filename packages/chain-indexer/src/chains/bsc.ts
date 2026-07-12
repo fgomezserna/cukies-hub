@@ -8,14 +8,65 @@ import type { ChainEvent, IndexerConfig } from '../types.js';
 import { now, toJsonRecord } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
 
-function isRpcLimitError(error: unknown) {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
+type BscClient = ReturnType<typeof createPublicClient>;
+type BscRpcClient = {
+  url: string;
+  host: string;
+  client: BscClient;
+};
+
+function rpcHost(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return 'invalid-rpc-url';
+  }
+}
+
+function createBscRpcClients(urls: string[]) {
+  return urls.map((url) => ({
+    url,
+    host: rpcHost(url),
+    client: createPublicClient({
+      chain: bsc,
+      transport: http(url),
+    }),
+  }));
+}
+
+function errorMessage(error: unknown) {
+  if (!(error instanceof Error)) return String(error);
+
+  return error.message;
+}
+
+function isRpcRangeLimitError(error: unknown) {
+  const message = errorMessage(error).toLowerCase();
   return message.includes('limit exceeded') || message.includes('request exceeds defined limit');
 }
 
+async function withBscRpcFallback<T>(
+  rpcClients: BscRpcClient[],
+  operation: (rpc: BscRpcClient) => Promise<T>,
+) {
+  const failures: string[] = [];
+
+  for (const rpc of rpcClients) {
+    try {
+      return {
+        value: await operation(rpc),
+        rpc,
+      };
+    } catch (error) {
+      failures.push(`${rpc.host}: ${errorMessage(error) || String(error)}`);
+    }
+  }
+
+  throw new Error(`Todos los RPC BSC fallaron: ${failures.join(' | ')}`);
+}
+
 async function getLogsWithFallback(
-  client: ReturnType<typeof createPublicClient>,
+  client: BscClient,
   params: {
     address: Address;
     event: (typeof bscEventAbis)[keyof typeof bscEventAbis];
@@ -30,7 +81,7 @@ async function getLogsWithFallback(
       toBlock: BigInt(toBlock),
     });
   } catch (error) {
-    if (!isRpcLimitError(error) || fromBlock >= toBlock) throw error;
+    if (!isRpcRangeLimitError(error) || fromBlock >= toBlock) throw error;
 
     const middleBlock = Math.floor((fromBlock + toBlock) / 2);
     const [left, right] = await Promise.all([
@@ -45,12 +96,13 @@ async function getLogsWithFallback(
 export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) {
   if (!config.chains.includes('BSC')) return { inserted: 0, ranges: 0 };
 
-  const client = createPublicClient({
-    chain: bsc,
-    transport: http(config.bscRpcUrl),
-  });
+  const rpcClients = createBscRpcClients(config.bscRpcUrls.length > 0 ? config.bscRpcUrls : [config.bscRpcUrl]);
 
-  const latestBlock = Number(await client.getBlockNumber());
+  const { value: latestBlockValue, rpc: latestBlockRpc } = await withBscRpcFallback(
+    rpcClients,
+    (rpc) => rpc.client.getBlockNumber(),
+  );
+  const latestBlock = Number(latestBlockValue);
   const safeBlock = Math.max(0, latestBlock - config.bscConfirmations);
   const contractEvents = getContractEventConfigs(['BSC'], {
     presaleAddress: config.presaleAddress,
@@ -71,14 +123,17 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
     }
 
     const toBlock = Math.min(fromBlock + config.maxBlockRange - 1, safeBlock);
-    const logs = await getLogsWithFallback(
-      client,
-      {
-        address: contractEvent.contractAddress as Address,
-        event: bscEventAbis[contractEvent.eventName],
-      },
-      fromBlock,
-      toBlock,
+    const { value: logs, rpc: logsRpc } = await withBscRpcFallback(
+      rpcClients,
+      (rpc) => getLogsWithFallback(
+        rpc.client,
+        {
+          address: contractEvent.contractAddress as Address,
+          event: bscEventAbis[contractEvent.eventName],
+        },
+        fromBlock,
+        toBlock,
+      ),
     );
 
     const events: ChainEvent[] = [];
@@ -90,7 +145,10 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
       let timestampMs = timestampCache.get(blockNumber);
 
       if (!timestampMs) {
-        const block = await client.getBlock({ blockNumber: BigInt(blockNumber) });
+        const { value: block } = await withBscRpcFallback(
+          [logsRpc, ...rpcClients.filter((rpc) => rpc.host !== logsRpc.host)],
+          (rpc) => rpc.client.getBlock({ blockNumber: BigInt(blockNumber) }),
+        );
         timestampMs = Number(block.timestamp) * 1000;
         timestampCache.set(blockNumber, timestampMs);
       }
@@ -137,5 +195,11 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
     });
   }
 
-  return { inserted, ranges, safeBlock };
+  return {
+    inserted,
+    ranges,
+    safeBlock,
+    rpcHosts: rpcClients.map((rpc) => rpc.host),
+    latestBlockRpcHost: latestBlockRpc.host,
+  };
 }
