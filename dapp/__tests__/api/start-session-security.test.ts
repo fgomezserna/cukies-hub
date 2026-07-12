@@ -5,19 +5,24 @@ jest.mock('@/lib/wallet-auth', () => ({
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findUnique: jest.fn() },
-    gameSession: { create: jest.fn(), findUnique: jest.fn() },
+    gameSession: { findUnique: jest.fn() },
   },
+}));
+
+jest.mock('@/lib/game-session-store', () => ({
+  createGameSessionDirectly: jest.fn(),
 }));
 
 import { NextRequest } from 'next/server';
 
 import { POST } from '@/app/api/games/start-session/route';
+import { createGameSessionDirectly } from '@/lib/game-session-store';
 import { prisma } from '@/lib/prisma';
 import { readWalletSession } from '@/lib/wallet-auth';
 
 const mockReadWalletSession = readWalletSession as unknown as jest.Mock;
 const mockFindUser = prisma.user.findUnique as unknown as jest.Mock;
-const mockCreateGameSession = prisma.gameSession.create as unknown as jest.Mock;
+const mockCreateGameSessionDirectly = createGameSessionDirectly as unknown as jest.Mock;
 const mockFindGameSession = prisma.gameSession.findUnique as unknown as jest.Mock;
 
 function request(body: unknown) {
@@ -34,7 +39,7 @@ describe('POST /api/games/start-session security', () => {
     mockReadWalletSession.mockResolvedValue({ userId: 'cookie-user' });
     mockFindUser.mockResolvedValue({ id: 'cookie-user' });
     mockFindGameSession.mockResolvedValue(null);
-    mockCreateGameSession.mockImplementation(async ({ data }) => ({ id: 'mongo-id', ...data }));
+    mockCreateGameSessionDirectly.mockResolvedValue(undefined);
   });
 
   it('returns 401 without a wallet session and performs no database lookup', async () => {
@@ -45,7 +50,7 @@ describe('POST /api/games/start-session security', () => {
     expect(response.status).toBe(401);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(mockFindUser).not.toHaveBeenCalled();
-    expect(mockCreateGameSession).not.toHaveBeenCalled();
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
   });
 
   it('rejects a client userId that differs from the signed wallet identity', async () => {
@@ -54,7 +59,7 @@ describe('POST /api/games/start-session security', () => {
     );
 
     expect(response.status).toBe(403);
-    expect(mockCreateGameSession).not.toHaveBeenCalled();
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -65,7 +70,7 @@ describe('POST /api/games/start-session security', () => {
   ])('returns 400 for %s', async (_label, body) => {
     const response = await POST(request(body));
     expect(response.status).toBe(400);
-    expect(mockCreateGameSession).not.toHaveBeenCalled();
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
   });
 
   it.each(['hyppie-road', 'tower-builder'])('keeps the existing %s caller supported', async (gameId) => {
@@ -73,13 +78,12 @@ describe('POST /api/games/start-session security', () => {
     const json = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mockCreateGameSession).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(mockCreateGameSessionDirectly).toHaveBeenCalledWith(
+      expect.objectContaining({
         userId: 'cookie-user',
         gameId,
-        isActive: true,
       }),
-    });
+    );
     expect(json).toMatchObject({ success: true, gameId });
     expect(json.sessionId).toMatch(/^game_[0-9a-f]{64}$/);
   });
@@ -95,14 +99,13 @@ describe('POST /api/games/start-session security', () => {
       where: { id: 'cookie-user' },
       select: { id: true },
     });
-    expect(mockCreateGameSession).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(mockCreateGameSessionDirectly).toHaveBeenCalledWith(
+      expect.objectContaining({
         userId: 'cookie-user',
         gameId: 'sybil-slayer',
         gameVersion: '1.2.3',
-        isActive: true,
       }),
-    });
+    );
     expect(json).toMatchObject({
       success: true,
       gameId: 'sybil-slayer',
@@ -134,7 +137,7 @@ describe('POST /api/games/start-session security', () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(200);
     expect(second).toEqual(first);
-    expect(mockCreateGameSession).toHaveBeenCalledTimes(1);
+    expect(mockCreateGameSessionDirectly).toHaveBeenCalledTimes(1);
   });
 
   it('creates a different opaque session for a different idempotency key', async () => {
@@ -157,10 +160,10 @@ describe('POST /api/games/start-session security', () => {
 
     expect(first.sessionId).not.toBe(second.sessionId);
     expect(first.sessionToken).not.toBe(second.sessionToken);
-    expect(mockCreateGameSession).toHaveBeenCalledTimes(2);
+    expect(mockCreateGameSessionDirectly).toHaveBeenCalledTimes(2);
   });
 
-  it('recovers a concurrent P2002 race by returning the winning session', async () => {
+  it('recovers a concurrent Mongo duplicate-key race by returning the winning session', async () => {
     let stored:
       | {
           sessionId: string;
@@ -171,9 +174,9 @@ describe('POST /api/games/start-session security', () => {
         }
       | null = null;
     mockFindGameSession.mockImplementation(async () => stored);
-    mockCreateGameSession.mockImplementation(async ({ data }) => {
+    mockCreateGameSessionDirectly.mockImplementation(async (data) => {
       if (stored) {
-        throw { code: 'P2002' };
+        throw { code: 11000 };
       }
       stored = {
         sessionId: data.sessionId,
@@ -182,7 +185,6 @@ describe('POST /api/games/start-session security', () => {
         gameId: data.gameId,
         gameVersion: data.gameVersion,
       };
-      return { id: 'winner-id', ...data };
     });
     const body = {
       gameId: 'sybil-slayer',
@@ -204,7 +206,54 @@ describe('POST /api/games/start-session security', () => {
       sessionId: expect.stringMatching(/^game_[0-9a-f]{64}$/),
       sessionToken: expect.stringMatching(/^session_[A-Za-z0-9_-]{43}$/),
     });
-    expect(mockCreateGameSession).toHaveBeenCalledTimes(2);
+    expect(mockCreateGameSessionDirectly).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails generically when a duplicate-key race has no readable winner', async () => {
+    mockCreateGameSessionDirectly.mockRejectedValue({
+      code: 11000,
+      keyValue: { sessionToken: 'must-not-leak' },
+    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const response = await POST(
+      request({
+        gameId: 'sybil-slayer',
+        idempotencyKey: 'missing-race-winner-key-0001',
+      }),
+    );
+    const json = await response.json();
+    errorSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(json).toEqual({ success: false, error: 'Internal server error' });
+    expect(JSON.stringify(json)).not.toContain('must-not-leak');
+  });
+
+  it('returns 409 when a duplicate-key race resolves to an incompatible session', async () => {
+    mockFindGameSession
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        sessionId: `game_${'a'.repeat(64)}`,
+        sessionToken: `session_${'b'.repeat(43)}`,
+        userId: 'another-user',
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      });
+    mockCreateGameSessionDirectly.mockRejectedValue({ code: 11000 });
+
+    const response = await POST(
+      request({
+        gameId: 'sybil-slayer',
+        idempotencyKey: 'incompatible-race-winner-0001',
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Game session conflict',
+    });
   });
 
   it('returns a generic 409 for an incoherent deterministic session collision', async () => {
@@ -228,7 +277,7 @@ describe('POST /api/games/start-session security', () => {
       success: false,
       error: 'Game session conflict',
     });
-    expect(mockCreateGameSession).not.toHaveBeenCalled();
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
   });
 
   it('uses non-deterministic cryptographic identifiers for consecutive sessions', async () => {
