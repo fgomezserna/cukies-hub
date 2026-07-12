@@ -167,7 +167,20 @@ Reglas operativas:
 | `PUSHER_SECRET` | Secret staging | Secret production | Separado. |
 | `TELEGRAM_BOT_TOKEN` | Bot staging | Bot production | Evitar publicar en chats reales durante QA. |
 | `TELEGRAM_CHAT_ID` | Chat staging | Chat production | Separado. |
+| `TELEGRAM_WEBHOOK_SECRET` | Secret webhook staging | Secret webhook production | Obligatorio, distinto por entorno y registrado como `secret_token` en `setWebhook`. |
 | `TELEGRAM_CLEANUP_SECRET` | Secret staging | Secret production | Separado. |
+
+Tras configurar la URL y los secretos de cada entorno, registra el webhook con el
+`secret_token` del mismo entorno. Telegram lo enviará en
+`X-Telegram-Bot-Api-Secret-Token`; la DApp rechaza el webhook si falta o no coincide.
+No reutilices el token del bot como secreto del webhook.
+
+```bash
+curl --fail-with-body --silent --show-error \
+  "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  --data-urlencode "url=${NEXTAUTH_URL}/api/telegram/webhook" \
+  --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+```
 
 ### Contracts deploy
 

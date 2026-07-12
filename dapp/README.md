@@ -31,6 +31,7 @@ TWITTER_CLIENT_SECRET="your-twitter-client-secret"
 TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
 TELEGRAM_CHAT_ID="your-telegram-group-chat-id"
 TELEGRAM_GROUP_INVITE="https://t.me/your-group-invite"
+TELEGRAM_WEBHOOK_SECRET="a-separate-random-webhook-secret"
 
 # Social Media URLs (for frontend)
 NEXT_PUBLIC_TWITTER_PROFILE_URL="https://x.com/cukiesworld"
@@ -59,6 +60,20 @@ To set up Telegram verification:
 4. Add the bot to your Telegram group as an administrator
 5. Get the chat ID by sending a message to your group, then visiting: `https://api.telegram.org/bot<YourBotToken>/getUpdates`
 6. Find the chat ID in the response and save it as `TELEGRAM_CHAT_ID`
+7. Generate a separate `TELEGRAM_WEBHOOK_SECRET` for each environment (for example, `openssl rand -hex 32`)
+8. Register the webhook and its secret token:
+
+```bash
+curl --fail-with-body --silent --show-error \
+  "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  --data-urlencode "url=${NEXTAUTH_URL}/api/telegram/webhook" \
+  --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+```
+
+Telegram sends that value in `X-Telegram-Bot-Api-Secret-Token`. The webhook fails
+closed when it is missing or invalid. Users must send the generated `/verify ...`
+command only in a private chat with the bot; joining the configured group is a
+separate membership step.
 
 ## Database Configuration
 
