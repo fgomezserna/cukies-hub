@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
+import { createGameSessionDirectly } from '@/lib/game-session-store';
 import { readWalletSession } from '@/lib/wallet-auth';
 
 const SUPPORTED_GAME_IDS: ReadonlySet<string> = new Set([
@@ -41,7 +42,12 @@ function createSessionId(userId: string, gameId: string, idempotencyKey: string)
 }
 
 function isUniqueConstraintError(error: unknown) {
-  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error.code === 'P2002' || error.code === 11000),
+  );
 }
 
 function isCompatibleSession(
@@ -149,11 +155,12 @@ export async function POST(request: NextRequest) {
     };
 
     try {
-      await prisma.gameSession.create({
-        data: {
-          ...candidate,
-          isActive: true,
-        },
+      // Prisma's Mongo connector wraps relation-backed writes in a transaction.
+      // The integration database is intentionally standalone, so use the driver
+      // for this atomic insert while preserving the Prisma-shaped document.
+      await createGameSessionDirectly({
+        ...candidate,
+        gameVersion: candidate.gameVersion ?? DEFAULT_GAME_VERSION,
       });
       return successResponse(candidate);
     } catch (error) {
