@@ -14,13 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Bell, Wallet, Settings, LogOut, PanelLeft } from 'lucide-react';
@@ -32,7 +25,8 @@ import { useAuth } from '@/providers/auth-provider';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useAccount, useConnect, useDisconnect, type Connector } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
-import { getConnectorDescription, getConnectorDisplayName, getConnectorLogoSrc, getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import { HeaderWalletDialog } from '@/components/layout/header-wallet-dialog';
 
 
 
@@ -48,38 +42,6 @@ const getRank = (xp: number): string => {
   const userRank = ranks.find(rank => xp >= rank.xp);
   return userRank ? userRank.name : 'Sin rango';
 };
-
-function HeaderWalletLogo({ connector }: { connector: Connector }) {
-  const logoSrc = getConnectorLogoSrc(connector);
-
-  if (logoSrc) {
-    return (
-      <Image
-        src={logoSrc}
-        alt={`${getConnectorDisplayName(connector)} logo`}
-        width={24}
-        height={24}
-        unoptimized
-        className="h-6 w-6 object-contain"
-      />
-    );
-  }
-
-  return <Wallet className="h-6 w-6 text-white" />;
-}
-
-function HeaderTronLinkLogo() {
-  return (
-    <Image
-      src="/brand/wallets/tronlink.png"
-      alt="TronLink logo"
-      width={24}
-      height={24}
-      unoptimized
-      className="h-6 w-6 object-contain"
-    />
-  );
-}
 
 export default function Header() {
   const { toggleSidebar, state, isMobile } = useSidebar();
@@ -291,70 +253,18 @@ export default function Header() {
               )}
             </Button>
 
-            <Dialog open={isWalletDialogOpen} onOpenChange={setIsWalletDialogOpen}>
-              <DialogContent className="sm:max-w-md border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold text-foreground">
-                    Elige tipo de wallet
-                  </DialogTitle>
-                  <DialogDescription className="text-muted-foreground">
-                    Selecciona la wallet que quieres conectar
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  {evmConnectors.length > 0 ? (
-                    evmConnectors.map((connector) => (
-                      <Button
-                        key={connector.id}
-                        onClick={() => void handleConnectEVM(connector)}
-                        className="w-full h-auto p-5 flex flex-col items-start gap-3 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 hover:from-teal-400/20 hover:to-cyan-400/20 border-2 border-cyan-300/30 hover:border-cyan-300/50 transition-all duration-300"
-                      >
-                        <div className="flex items-center gap-3 w-full">
-                          <div className="grid h-10 w-10 place-items-center rounded-lg border border-cyan-300/20 bg-white">
-                            <HeaderWalletLogo connector={connector} />
-                          </div>
-                          <div className="flex-1 text-left">
-                            <div className="font-bold text-lg text-foreground">{getConnectorDisplayName(connector)}</div>
-                            <div className="text-sm text-muted-foreground">{getConnectorDescription(connector)}</div>
-                          </div>
-                        </div>
-                      </Button>
-                    ))
-                  ) : (
-                    <div className="rounded-[8px] border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
-                      Instala una wallet EVM o configura WalletConnect para conectar.
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleConnectTron}
-                    disabled={!isTronInstalled || isTronLoading}
-                    className="w-full h-auto p-6 flex flex-col items-start gap-3 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 hover:from-teal-400/20 hover:to-cyan-400/20 border-2 border-cyan-300/30 hover:border-cyan-300/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="grid h-10 w-10 place-items-center rounded-lg border border-cyan-300/20 bg-white">
-                        <HeaderTronLinkLogo />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <div className="font-bold text-lg text-foreground">TronLink</div>
-                        <div className="text-sm text-muted-foreground">
-                          {isTronInstalled
-                            ? isTronLoading
-                              ? 'Esperando confirmacion en TronLink...'
-                              : 'Conecta tu wallet TronLink'
-                            : 'Instala la extensión TronLink'}
-                        </div>
-                      </div>
-                    </div>
-                  </Button>
-                  {tronError && (
-                    <p className="rounded-[8px] border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
-                      {tronError}
-                    </p>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
+            <HeaderWalletDialog
+              open={isWalletDialogOpen}
+              onOpenChange={setIsWalletDialogOpen}
+              connectors={evmConnectors}
+              onSelectConnector={(connector) => void handleConnectEVM(connector)}
+              tronLink={{
+                error: tronError,
+                isInstalled: isTronInstalled,
+                isLoading: isTronLoading,
+                onSelect: () => void handleConnectTron(),
+              }}
+            />
           </>
         )}
       </div>

@@ -80,11 +80,11 @@ describe('TreasureHuntMultiplayerService', () => {
     expect(joined.match.rewardEligible).toBe(false);
     expect(joined.match.gameId).toBe('treasure-hunt');
     expect(joined.match.mode).toBe('staging_unranked');
-    expect(joined.match.rulesVersion).toBeTruthy();
+    expect(joined.match.rulesVersion).toBe('treasure-hunt-multiplayer-v2');
     expect(joined.match.config).toMatchObject({
       winDelta: 500,
       initialCountdownMs: 1_000,
-      lobbyTimeoutMs: 30_000,
+      lobbyTimeoutMs: 300_000,
       roundDurationMs: 30_000,
       suddenDeathTimeoutMs: 60_000,
       terminalRetentionMs: 604_800_000,
@@ -174,20 +174,21 @@ describe('TreasureHuntMultiplayerService', () => {
       reconnectBudgetMs: 5_000,
     });
     const created = await service.createOrJoin(first);
-    clock.value = 18_000;
+    clock.value = 240_000;
 
     const joined = await service.createOrJoin(second);
 
     expect(joined.match.matchId).toBe(created.match.matchId);
     expect(joined.match.status).toBe('countdown');
     expect(joined.match.result).toBeNull();
-    expect(joined.match.config.startAt).toBe(19_000);
+    expect(joined.match.config.startAt).toBe(241_000);
     expect(joined.match.players).toEqual([
       expect.objectContaining({ presence: 'online', reconnectBudgetRemainingMs: 5_000 }),
       expect.objectContaining({ presence: 'online', reconnectBudgetRemainingMs: 5_000 }),
     ]);
     const stored = await repository.findByMatchId(created.match.matchId);
-    expect(stored?.players.map((player) => player.lastHeartbeatAt)).toEqual([18_000, 18_000]);
+    expect(stored?.lobbyExpiresAt).toBe(300_000);
+    expect(stored?.players.map((player) => player.lastHeartbeatAt)).toEqual([240_000, 240_000]);
     expect(stored?.players.map((player) => player.lastSnapshotAcceptedAt)).toEqual([null, null]);
   });
 
