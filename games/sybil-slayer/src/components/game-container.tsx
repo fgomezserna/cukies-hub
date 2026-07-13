@@ -18,6 +18,7 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
 import OrientationOverlay from './orientation-overlay';
+import { BookOpenIcon, HeartIcon, PlayIcon, ShieldIcon, SwordsIcon, TimerIcon } from './treasure-icons';
 import {
   HeartMeter,
   HudMetric,
@@ -2678,7 +2679,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     const newScale = Math.min(
       viewportWidth / BASE_GAME_WIDTH,
       viewportHeight / BASE_GAME_HEIGHT,
-      1 // no ampliamos por encima del 100%
     );
     setScale(newScale);
   }, []);
@@ -2746,7 +2746,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, []);
 
   // Recalcular al montar y al redimensionar
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleResize = () => {
       calculateScale();
       calculateCanvasHorizontalOffset();
@@ -2896,83 +2896,67 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               />
               <main className="th-menu-screen">
                 <section className="th-menu-copy" aria-labelledby="treasure-hunt-title">
-                  <p className="th-menu-kicker">Cukies World presenta</p>
+                  <span className="th-menu-title-rule" aria-hidden="true" />
                   <h1 id="treasure-hunt-title" className="th-menu-title">
-                    Treasure<br />Hunt
+                    Treasure Hunt
                   </h1>
+                  <span className="th-menu-title-rule" aria-hidden="true" />
                   <p className="th-menu-description">
-                    Entra en la cámara del tesoro, esquiva los fees y conserva tus tres vidas
-                    mientras haces crecer el botín.
+                    Encuentra tesoros. Completa el tótem.<br />
+                    Escapa antes de que se agote el tiempo.
                   </p>
                   <div className="th-menu-meta" aria-label="Datos de la partida">
-                    <span>30 segundos</span>
-                    <span>3 vidas</span>
-                    <span>5 runas</span>
+                    <span><TimerIcon aria-hidden="true" /> Partidas rápidas</span>
+                    <i aria-hidden="true">•</i>
+                    <span><HeartIcon aria-hidden="true" /> 3 vidas</span>
                   </div>
                   <div className="th-menu-actions">
                     <TreasureButton
                       size="large"
+                      className="th-menu-cta"
                       onClick={() => void handleModeSelected('single')}
-                      icon={<span>1P</span>}
+                      icon={<PlayIcon strokeWidth={2.5} />}
                     >
                       Jugar solo
                     </TreasureButton>
                     <TreasureButton
                       variant="secondary"
                       size="large"
+                      className={`th-menu-cta${
+                        multiplayerMenuLabel.length > 18 || multiplayerMenuLabel === '1v1 no disponible'
+                          ? ' th-menu-cta--long'
+                          : ''
+                      }`}
                       disabled={!multiplayerMenuEnabled || isMultiplayerJoinPending}
                       onClick={() => void handleModeSelected('multiplayer')}
-                      icon={<span>VS</span>}
+                      icon={<SwordsIcon strokeWidth={2.15} />}
                     >
                       {multiplayerMenuLabel}
                     </TreasureButton>
-                    <div className="th-menu-secondary-actions">
-                      <TreasureButton
-                        variant="quiet"
-                        size="small"
-                        onClick={() => setModeSelectOpen(true)}
-                      >
-                        Comparar modos
-                      </TreasureButton>
-                      <TreasureButton
-                        variant="quiet"
-                        size="small"
-                        onClick={handleOpenInfo}
-                      >
-                        Ver reglas
-                      </TreasureButton>
-                    </div>
+                    <p className="th-menu-disclaimer">
+                      <ShieldIcon aria-hidden="true" />
+                      Sin ranking ni recompensas
+                    </p>
+                    <TreasureButton
+                      variant="secondary"
+                      size="small"
+                      className="th-menu-rules-button"
+                      onClick={handleOpenInfo}
+                      icon={<BookOpenIcon strokeWidth={2.1} />}
+                    >
+                      Cómo se juega
+                    </TreasureButton>
+                    <TreasureButton
+                      variant="quiet"
+                      size="small"
+                      className="th-menu-compare-button"
+                      onClick={() => setModeSelectOpen(true)}
+                    >
+                      Comparar modos
+                    </TreasureButton>
                   </div>
-                  <p className="th-menu-disclaimer">Partida de prueba · sin ranking ni recompensas</p>
                 </section>
 
-                <div className="th-menu-art" aria-hidden="true">
-                  <Image
-                    src="/assets/totem/totemlateral.png"
-                    alt=""
-                    width={256}
-                    height={600}
-                    className="th-menu-art__totem"
-                  />
-                  <Image
-                    src="/assets/characters/2p.png"
-                    alt=""
-                    width={360}
-                    height={420}
-                    className="th-menu-art__two"
-                  />
-                  <Image
-                    src="/assets/characters/1p.png"
-                    alt=""
-                    width={400}
-                    height={460}
-                    priority
-                    className="th-menu-art__one"
-                  />
-                  <Image src="/assets/collectibles/pruebamoneda.png" alt="" width={64} height={64} className="th-menu-art__coin th-menu-art__coin--one" />
-                  <Image src="/assets/collectibles/pruebamoneda.png" alt="" width={64} height={64} className="th-menu-art__coin th-menu-art__coin--two" />
-                  <Image src="/assets/collectibles/pruebamoneda.png" alt="" width={64} height={64} className="th-menu-art__coin th-menu-art__coin--three" />
-                </div>
               </main>
             </div>
           ) : (

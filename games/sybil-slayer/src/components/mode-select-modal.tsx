@@ -128,7 +128,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               style={{
                 margin: '5px 0 0',
                 color: 'var(--th-cream-muted)',
-                font: "15px/21px 'Mitr-Bold', sans-serif",
+                font: "600 15px/21px var(--th-font-ui)",
               }}
             >
               Misma caza. Dos formas de conquistar el tesoro.
@@ -159,9 +159,16 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           }}
         >
           <section
+            className="th-mode-card"
             aria-labelledby="single-mode-title"
             onMouseEnter={() => setHoveredMode('single')}
             onMouseLeave={() => setHoveredMode(null)}
+            onFocus={() => setHoveredMode('single')}
+            onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setHoveredMode(null);
+              }
+            }}
             style={{
               ...cardStyle,
               borderColor:
@@ -185,7 +192,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 <span
                   style={{
                     color: 'var(--th-teal)',
-                    font: "15px/20px 'Mitr-Bold', sans-serif",
+                    font: "800 15px/20px var(--th-font-ui)",
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
                   }}
@@ -213,7 +220,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   placeItems: 'center',
                   flex: '0 0 auto',
                   color: 'var(--th-cream)',
-                  font: "22px/1 'Mitr-Bold', sans-serif",
+                  font: "800 22px/1 var(--th-font-ui)",
                   border: '2px solid var(--th-teal)',
                   background: 'rgba(33, 221, 212, 0.12)',
                   transform: 'rotate(45deg)',
@@ -263,7 +270,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 minHeight: 44,
                 margin: '0 4px 14px',
                 color: 'var(--th-cream-muted)',
-                font: "15px/22px 'Mitr-Bold', sans-serif",
+                font: "600 15px/22px var(--th-font-ui)",
                 textAlign: 'center',
               }}
             >
@@ -281,9 +288,16 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
           </section>
 
           <section
+            className="th-mode-card"
             aria-labelledby="multiplayer-mode-title"
             onMouseEnter={() => setHoveredMode('multiplayer')}
             onMouseLeave={() => setHoveredMode(null)}
+            onFocus={() => setHoveredMode('multiplayer')}
+            onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setHoveredMode(null);
+              }
+            }}
             style={{
               ...cardStyle,
               borderColor:
@@ -309,7 +323,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 <span
                   style={{
                     color: multiplayerInteractive ? 'var(--th-teal)' : 'var(--th-gold-light)',
-                    font: "15px/20px 'Mitr-Bold', sans-serif",
+                    font: "800 15px/20px var(--th-font-ui)",
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
                   }}
@@ -337,7 +351,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   placeItems: 'center',
                   flex: '0 0 auto',
                   color: 'var(--th-cream)',
-                  font: "22px/1 'Mitr-Bold', sans-serif",
+                  font: "800 22px/1 var(--th-font-ui)",
                   border: `2px solid ${multiplayerInteractive ? 'var(--th-teal)' : 'var(--th-gold)'}`,
                   background: multiplayerInteractive
                     ? 'rgba(33, 221, 212, 0.12)'
@@ -390,7 +404,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 style={{
                   margin: 0,
                   color: 'var(--th-cream-muted)',
-                  font: "15px/20px 'Mitr-Bold', sans-serif",
+                  font: "700 15px/20px var(--th-font-ui)",
                 }}
               >
                 {multiplayerDescription}
@@ -398,7 +412,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               <span
                 style={{
                   color: 'var(--th-gold-light)',
-                  font: "12px/18px 'Mitr-Bold', sans-serif",
+                  font: "650 12px/18px var(--th-font-ui)",
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                 }}
@@ -429,7 +443,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               alignSelf: 'center',
               marginTop: 16,
               color: 'var(--th-gold-light)',
-              font: "14px/20px 'Mitr-Bold', sans-serif",
+              font: "650 14px/20px var(--th-font-ui)",
               letterSpacing: '0.08em',
               textDecoration: 'underline',
               textDecorationColor: 'rgba(215, 163, 67, 0.48)',

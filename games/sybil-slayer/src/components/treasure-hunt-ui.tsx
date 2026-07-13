@@ -3,6 +3,9 @@
 import Image from 'next/image';
 import React from 'react';
 
+import { BASE_GAME_HEIGHT, BASE_GAME_WIDTH } from '../lib/constants';
+import { InfoIcon, MusicIcon, VolumeIcon, VolumeMutedIcon } from './treasure-icons';
+
 type TreasureButtonVariant = 'primary' | 'secondary' | 'danger' | 'quiet';
 type TreasureButtonSize = 'large' | 'medium' | 'small';
 
@@ -58,7 +61,7 @@ export function TreasureStage({ scale, children, label = 'Treasure Hunt' }: Trea
     <div className="th-viewport">
       <div
         className="th-stage-slot"
-        style={{ width: 1100 * scale, height: 800 * scale }}
+        style={{ width: BASE_GAME_WIDTH * scale, height: BASE_GAME_HEIGHT * scale }}
       >
         <section
           className="th-stage"
@@ -146,7 +149,7 @@ export function TreasureTopBar({
           aria-pressed={musicEnabled}
           aria-label={musicEnabled ? 'Desactivar música' : 'Activar música'}
         >
-          <span aria-hidden="true">{musicEnabled ? '♫' : '♪'}</span>
+          <MusicIcon aria-hidden="true" width={20} height={20} strokeWidth={2.4} />
           <span>Música</span>
         </button>
         <button
@@ -156,7 +159,11 @@ export function TreasureTopBar({
           aria-pressed={soundsEnabled}
           aria-label={soundsEnabled ? 'Desactivar efectos' : 'Activar efectos'}
         >
-          <span aria-hidden="true">{soundsEnabled ? '◕' : '○'}</span>
+          {soundsEnabled ? (
+            <VolumeIcon aria-hidden="true" width={20} height={20} strokeWidth={2.4} />
+          ) : (
+            <VolumeMutedIcon aria-hidden="true" width={20} height={20} strokeWidth={2.4} />
+          )}
           <span>Efectos</span>
         </button>
         <button
@@ -166,7 +173,7 @@ export function TreasureTopBar({
           disabled={infoDisabled}
           aria-label="Abrir reglas"
         >
-          <span aria-hidden="true">ⓘ</span>
+          <InfoIcon aria-hidden="true" width={20} height={20} strokeWidth={2.4} />
           <span>Info</span>
         </button>
       </div>
