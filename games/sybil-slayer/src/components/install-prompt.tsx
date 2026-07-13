@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useIsMobile } from '../hooks/use-mobile';
+import { TreasureButton, TreasurePanel } from './treasure-hunt-ui';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -68,7 +70,21 @@ export default function InstallPrompt() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [debugInfo, setDebugInfo] = useState<InstallDebugInfo>({});
   const [showManualInstall, setShowManualInstall] = useState(false);
+  const [stageRoot, setStageRoot] = useState<HTMLElement | null>(null);
+  const [gameShellActive, setGameShellActive] = useState(false);
   const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const syncStageRoot = () => {
+      const stage = document.querySelector<HTMLElement>('.th-stage');
+      setStageRoot(stage);
+      setGameShellActive(Boolean(stage?.querySelector('.th-game-shell')));
+    };
+    syncStageRoot();
+    const observer = new MutationObserver(syncStageRoot);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Listener para cambios en display-mode (debe estar siempre activo)
@@ -151,14 +167,8 @@ export default function InstallPrompt() {
         return;
       }
 
-      // IMPORTANTE: Si la app NO está instalada, limpiar el flag de rechazo
-      // Esto permite que el prompt aparezca de nuevo si el usuario desinstaló la app
-      const installPromptDismissed = localStorage.getItem('install-prompt-dismissed');
-      if (installPromptDismissed) {
-        console.log('[INSTALL] Flag de rechazo encontrado, pero app no está instalada');
-        console.log('[INSTALL] Limpiando flag para permitir mostrar prompt de nuevo');
-        localStorage.removeItem('install-prompt-dismissed');
-      }
+      // Respetar el rechazo del usuario entre sesiones. El aviso solo vuelve a
+      // aparecer si se limpia explícitamente el almacenamiento del navegador.
     });
 
     // Verificar Service Worker
@@ -403,118 +413,42 @@ export default function InstallPrompt() {
     return null;
   }
 
-  // Mostrar información de debug en desarrollo
-  const isDev = process.env.NODE_ENV === 'development';
-  const showDebug = isDev && debugInfo;
+  if (!stageRoot || gameShellActive) return null;
 
-  return (
+  const dismissManualInstall = () => {
+    localStorage.setItem('install-prompt-dismissed', 'true');
+    setShowManualInstall(false);
+  };
+
+  return createPortal(
     <>
-      {/* Debug info en desarrollo */}
-      {showDebug && (
-        <div className="fixed bottom-4 left-4 z-[100] bg-black/80 text-white text-xs p-3 rounded max-w-xs">
-          <div className="font-bold mb-2">🔍 Debug Install Prompt</div>
-          <div className="space-y-1">
-            <div>Mobile: {isMobile ? '✅' : '❌'}</div>
-            <div>SW: {debugInfo.serviceWorker?.registered ? '✅' : '❌'}</div>
-            <div>Manifest: {debugInfo.manifest?.exists ? '✅' : '❌'}</div>
-            <div>Prompt: {deferredPrompt ? '✅' : '⏳'}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Prompt automático */}
       {isMobile && showPrompt && deferredPrompt && !isInstalled && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md w-full shadow-2xl">
-            <div className="flex flex-col items-center gap-4 text-center">
-              {/* Icono de instalación */}
-              <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center">
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-white"
-                >
-                  <path d="M12 2v20M2 12h20" />
-                </svg>
-              </div>
-
-              {/* Título y mensaje */}
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-white">
-                  Instalar como App
-                </h3>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Instala Sybil Slayer en tu dispositivo para una mejor experiencia:
-                </p>
-                <ul className="text-slate-400 text-sm text-left space-y-1 mt-3">
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-400 mt-0.5">✓</span>
-                    <span>Pantalla completa sin barras del navegador</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-400 mt-0.5">✓</span>
-                    <span>Acceso rápido desde el escritorio</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-400 mt-0.5">✓</span>
-                    <span>Mejor rendimiento y experiencia</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Botones */}
-              <div className="flex gap-3 w-full mt-2">
-                <button
-                  onClick={handleDismiss}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm font-medium"
-                >
-                  Ahora no
-                </button>
-                <button
-                  onClick={handleInstallClick}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-                >
-                  Instalar
-                </button>
-              </div>
+        <div className="th-overlay th-overlay--critical" data-install-prompt>
+          <TreasurePanel className="th-dialog th-dialog--small" role="dialog" aria-modal="true" aria-labelledby="install-game-title">
+            <p className="th-screen-kicker">Acceso rápido</p>
+            <h2 id="install-game-title" className="th-overlay-title">Instalar Treasure Hunt</h2>
+            <p className="th-dialog-copy">
+              Añade el juego a tu dispositivo para abrirlo a pantalla completa y acceder desde el inicio.
+            </p>
+            <div className="th-dialog-actions">
+              <TreasureButton variant="secondary" size="small" onClick={handleDismiss}>Ahora no</TreasureButton>
+              <TreasureButton size="small" onClick={handleInstallClick}>Instalar</TreasureButton>
             </div>
-          </div>
+          </TreasurePanel>
         </div>
       )}
 
-      {/* Opción manual si el prompt automático no aparece */}
       {isMobile && showManualInstall && !deferredPrompt && !isInstalled && (
-        <div className="fixed bottom-4 right-4 z-[90] bg-slate-900 border border-slate-700 rounded-lg p-4 max-w-xs shadow-2xl">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <div className="text-white font-medium text-sm mb-1">
-                ¿Quieres instalar la app?
-              </div>
-              <div className="text-slate-400 text-xs">
-                Toca para ver instrucciones
-              </div>
-            </div>
-            <button
-              onClick={handleManualInstall}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-            >
-              Instalar
-            </button>
-            <button
-              onClick={() => setShowManualInstall(false)}
-              className="text-slate-400 hover:text-slate-300"
-            >
-              ✕
-            </button>
+        <TreasurePanel className="th-install-toast" role="status" data-install-prompt>
+          <div>
+            <strong>¿Instalar el juego?</strong>
+            <span>Ábrelo a pantalla completa desde tu dispositivo.</span>
           </div>
-        </div>
+          <TreasureButton size="small" onClick={handleManualInstall}>Ver cómo</TreasureButton>
+          <button type="button" className="th-close-button" onClick={dismissManualInstall} aria-label="Cerrar aviso de instalación">×</button>
+        </TreasurePanel>
       )}
-    </>
+    </>,
+    stageRoot,
   );
 }

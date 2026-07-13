@@ -18,8 +18,17 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
 import OrientationOverlay from './orientation-overlay';
-import { Button } from "./ui/button";
-import { Github, Play, Pause, RotateCcw } from 'lucide-react';
+import {
+  HeartMeter,
+  HudMetric,
+  OrnamentalDivider,
+  PlayerPortrait,
+  StageBackdrop,
+  TreasureButton,
+  TreasurePanel,
+  TreasureStage,
+  TreasureTopBar,
+} from './treasure-hunt-ui';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
 import { spriteManager } from '../lib/spriteManager';
@@ -153,6 +162,118 @@ const RuneTotemSidebar: React.FC<{ runeState: RuneState; height: number }> = ({ 
 
 const numberFormatter = new Intl.NumberFormat('es-ES');
 
+const MULTIPLAYER_STATUS_COPY: Record<string, string> = {
+  idle: 'Preparando sala',
+  searching: 'Buscando rival',
+  waiting: 'Esperando rival',
+  countdown: 'Preparando duelo',
+  running: '1v1 en curso · marcador oficial del servidor',
+  paused_reconnect: 'Esperando reconexión',
+  sudden_death: 'Muerte súbita',
+  completed: 'Resultado confirmado',
+  abandoned: 'Partida abandonada',
+  error: 'Error de sincronización',
+};
+
+const MATCH_RESULT_REASON_COPY: Record<string, string> = {
+  score_difference: 'diferencia de puntuación',
+  elimination: 'eliminación',
+  sudden_death: 'muerte súbita',
+  forfeit: 'abandono',
+  draw: 'empate',
+  abandoned: 'partida abandonada',
+};
+
+const getMultiplayerStatusCopy = (status: string): string =>
+  MULTIPLAYER_STATUS_COPY[status] ?? 'Estado de partida actualizado';
+
+const getMatchResultReasonCopy = (reason: string): string =>
+  MATCH_RESULT_REASON_COPY[reason] ?? 'cierre oficial de la partida';
+
+interface ModalFocusManagerProps {
+  active: boolean;
+  refreshKey: string;
+  rootRef: React.RefObject<HTMLDivElement>;
+  lastBackgroundFocusRef: React.MutableRefObject<HTMLElement | null>;
+}
+
+const ModalFocusManager: React.FC<ModalFocusManagerProps> = ({
+  active,
+  refreshKey,
+  rootRef,
+  lastBackgroundFocusRef,
+}) => {
+  const wasActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (!active) {
+      if (!wasActiveRef.current) return;
+      wasActiveRef.current = false;
+      const focusTarget = lastBackgroundFocusRef.current?.isConnected
+        ? lastBackgroundFocusRef.current
+        : rootRef.current?.querySelector<HTMLElement>(
+            'button:not([disabled]):not([inert]), a[href]:not([inert]), [tabindex]:not([tabindex="-1"]):not([inert])',
+          );
+      lastBackgroundFocusRef.current = null;
+      if (!focusTarget) return;
+      const frameId = window.requestAnimationFrame(() => focusTarget.focus());
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    wasActiveRef.current = true;
+    const root = rootRef.current;
+    if (!root) return;
+    const dialogs = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
+      ),
+    ).filter(dialog => dialog.getClientRects().length > 0);
+    const dialog = dialogs.at(-1);
+    if (!dialog) return;
+
+    const getFocusableElements = () => Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter(element => !element.closest('[inert]') && element.getClientRects().length > 0);
+
+    const focusableElements = getFocusableElements();
+    const initialFocus = focusableElements[0] ?? dialog;
+    if (focusableElements.length === 0) {
+      dialog.tabIndex = -1;
+    }
+    const frameId = window.requestAnimationFrame(() => initialFocus.focus());
+
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const elements = getFocusableElements();
+      if (elements.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const activeElement = document.activeElement;
+      if (event.shiftKey && (activeElement === first || !dialog.contains(activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (activeElement === last || !dialog.contains(activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', trapFocus);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      document.removeEventListener('keydown', trapFocus);
+    };
+  }, [active, lastBackgroundFocusRef, refreshKey, rootRef]);
+
+  return null;
+};
+
 const formatDuration = (ms?: number | null): string => {
   if (!ms || ms <= 0) {
     return '0:00';
@@ -236,7 +357,8 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
     );
   };
 
-  if (isMobile) {
+  // El stage ya se escala de forma uniforme; no bifurcamos el layout por viewport.
+  if (false && isMobile) {
     if (!hasStats) {
       return (
         <div
@@ -391,22 +513,28 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
-      <div className="w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10 relative">
+    <div className="th-overlay th-overlay--critical" onClick={onClose}>
+      <div
+        className="th-panel th-breakdown"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="treasure-breakdown-title"
+        onClick={event => event.stopPropagation()}
+      >
         {/* Botón de cierre */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50"
+          className="th-close-button absolute right-6 top-6"
           aria-label="Cerrar"
         >
           ×
         </button>
-        <h2 className="mb-4 text-center text-3xl font-pixellari text-pink-200 tracking-wide">
-          Estadísticas por nivel
+        <h2 id="treasure-breakdown-title" className="th-screen-title pr-16">
+          Desglose de la expedición
         </h2>
         {hasStats ? (
-          <div className="max-h-[70vh] overflow-y-auto pr-1">
-            <div className="grid gap-4 md:grid-cols-2">
+          <div className="max-h-[470px] overflow-y-auto pr-2">
+            <div className={`grid gap-4 ${sortedStats.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
               {sortedStats.map(entry => {
                 const rows = buildRows(entry);
                 const totalPoints = rows.reduce((sum, row) => sum + Math.round(row.points || 0), 0);
@@ -414,13 +542,13 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                 return (
                   <div
                     key={entry.level}
-                    className="rounded-lg border border-pink-400/40 bg-slate-800/60 p-4 shadow-lg shadow-pink-500/10"
+                    className="border border-[#d7a343]/40 bg-[#021210]/70 p-4"
                   >
-                    <h3 className="mb-3 text-center text-xl font-pixellari text-pink-100">
+                    <h3 className="mb-3 text-center text-xl font-pixellari text-[#f3e6c9]">
                       Nivel {entry.level}
                     </h3>
-                    <table className="w-full text-sm font-pixellari text-pink-100">
-                      <thead className="text-xs uppercase tracking-wide text-pink-300">
+                    <table className="w-full text-sm font-pixellari text-[#f3e6c9]">
+                      <thead className="text-xs uppercase tracking-wide text-[#cbbf9f]">
                         <tr>
                           <th className="px-2 py-1 text-left">Elemento</th>
                           <th className="px-2 py-1 text-right">Recogidos</th>
@@ -434,25 +562,25 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
                             <td className="px-2 py-1 text-right">
                               {numberFormatter.format(row.count)}
                             </td>
-                            <td className="px-2 py-1 text-right text-amber-200">
+                            <td className="px-2 py-1 text-right text-[#f5d681]">
                               {numberFormatter.format(Math.round(row.points || 0))}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="border-t border-pink-400/40 text-pink-200">
+                        <tr className="border-t border-[#d7a343]/40 text-[#f3e6c9]">
                           <td className="px-2 pt-2 text-sm font-semibold">Total</td>
                           <td className="px-2 pt-2" />
-                          <td className="px-2 pt-2 text-right text-amber-300 font-semibold">
+                          <td className="px-2 pt-2 text-right text-[#21ddd4] font-semibold">
                             {numberFormatter.format(totalPoints)}
                           </td>
                         </tr>
                       </tfoot>
                     </table>
-                    <div className="mt-3 flex items-center justify-between text-xs font-pixellari text-pink-200 uppercase tracking-wide">
+                    <div className="mt-3 flex items-center justify-between text-xs font-pixellari text-[#cbbf9f] uppercase tracking-wide">
                       <span>Tiempo:</span>
-                      <span className="text-pink-200">{formatDuration(entry.durationMs)}</span>
+                      <span className="text-[#f5d681]">{formatDuration(entry.durationMs)}</span>
                     </div>
                   </div>
                 );
@@ -460,7 +588,7 @@ const LevelStatsOverlay: React.FC<{ stats: LevelStatsEntry[]; onClose: () => voi
             </div>
           </div>
         ) : (
-          <p className="text-center font-pixellari text-pink-200">
+          <p className="th-dialog-copy text-center">
             No se registraron estadísticas en esta partida.
           </p>
         )}
@@ -478,6 +606,8 @@ interface GameContainerProps {
 const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const parentContainerRef = useRef<HTMLDivElement | null>(null);
+  const runtimeRootRef = useRef<HTMLDivElement>(null);
+  const lastBackgroundFocusRef = useRef<HTMLElement | null>(null);
   const { 
     isConnected,
     connectionState,
@@ -631,6 +761,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [resultExitPending, setResultExitPending] = useState(false);
   const [resultExitError, setResultExitError] = useState<string | null>(null);
   const [multiplayerStartPending, setMultiplayerStartPending] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const multiplayerStartPendingRef = useRef(false);
   const resultExitCoordinatorRef = useRef<ReturnType<
     typeof createCanonicalResultExitCoordinator
@@ -652,6 +783,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     multiplayer.hasNonTerminalMatch,
     isMultiplayerJoinPending,
   );
+  useEffect(() => {
+    if (localControlsLocked) setIsInfoModalOpen(false);
+  }, [localControlsLocked]);
   const lastPublishedSnapshotRef = useRef<{
     score: number;
     hearts: number;
@@ -1969,7 +2103,50 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       setSoundsEnabled(newState);
    };
 
+   const copyMultiplayerInvite = useCallback(async () => {
+      const invitationUrl = multiplayer.inviteUrl;
+      if (!invitationUrl) return;
+
+      let copied = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(invitationUrl);
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+
+      if (!copied) {
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = invitationUrl;
+          textarea.setAttribute('readonly', '');
+          textarea.style.position = 'absolute';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          copied = document.execCommand('copy');
+          document.body.removeChild(textarea);
+        } catch {
+          copied = false;
+        }
+      }
+
+      if (!copied) {
+        window.prompt('Copia este enlace de invitación:', invitationUrl);
+        return;
+      }
+
+      playSound('button_click');
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 1800);
+   }, [multiplayer.inviteUrl, playSound]);
+
    const handleInfoToggle = () => {
+      // En 1v1 el servidor mantiene la ronda viva: no mostramos un modal que
+      // parezca pausar localmente una partida que en realidad continúa.
+      if (localControlsLocked) return;
       // Prevenir doble ejecución
       if (infoButtonClickedRef.current) {
         console.log('[INFO] handleInfoToggle already executing, skipping');
@@ -2003,6 +2180,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
    };
 
    const handleOpenInfo = () => {
+      if (localControlsLocked) return;
       playSound('button_click');
       // Si el juego está en playing, pausar automáticamente
       if (!localControlsLocked && gameState.status === 'playing') {
@@ -2495,9 +2673,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [scale, setScale] = useState(1);
 
   const calculateScale = useCallback(() => {
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const newScale = Math.min(
-      window.innerWidth / BASE_GAME_WIDTH,
-      window.innerHeight / BASE_GAME_HEIGHT,
+      viewportWidth / BASE_GAME_WIDTH,
+      viewportHeight / BASE_GAME_HEIGHT,
       1 // no ampliamos por encima del 100%
     );
     setScale(newScale);
@@ -2574,7 +2754,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleResize);
+    };
   }, [calculateScale, calculateCanvasHorizontalOffset]);
 
   // Recalcular offset cuando cambia el tamaño del canvas - usar useLayoutEffect para medir después del render
@@ -2589,29 +2773,586 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Loading screen optimizado con fases
   if (!criticalAssetsLoaded) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-background z-50">
-        <div className="w-full flex flex-col items-center justify-center py-10">
-          <div className="w-3/4 mb-4">
-            <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-4 bg-pink-500 rounded-full transition-all duration-300"
-                style={{ width: `${Math.round(loadingProgress * 100)}%` }}
-              ></div>
+      <TreasureStage scale={scale} label="Cargando Treasure Hunt">
+        <StageBackdrop variant="menu" />
+        <div className="th-overlay th-overlay--soft">
+          <TreasurePanel className="th-dialog th-dialog--small">
+            <p className="th-screen-kicker">Preparando la expedición</p>
+            <h1 className="th-overlay-title">Treasure Hunt</h1>
+            <div className="th-loading-track" aria-hidden="true">
+              <span style={{ width: `${Math.round(loadingProgress * 100)}%` }} />
             </div>
-          </div>
-          <p className="text-pink-200 text-lg font-pixellari mt-2">
-            {loadingPhase === 'preload' 
-              ? `Cargando elementos esenciales: ${Math.round(loadingProgress * 100)}%`
-              : `Optimizando experiencia: ${Math.round(loadingProgress * 100)}%`
-            }
-          </p>
-          <p className="text-pink-200/70 text-sm font-pixellari mt-1">
-            {loadingPhase === 'preload' 
-              ? 'Preparando juego...'
-              : 'Cargando efectos especiales...'
-            }
-          </p>
+            <p className="th-dialog-copy" aria-live="polite">
+              {loadingPhase === 'preload'
+                ? `Cargando elementos esenciales · ${Math.round(loadingProgress * 100)}%`
+                : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`}
+            </p>
+          </TreasurePanel>
         </div>
+      </TreasureStage>
+    );
+  }
+
+  const collectedRunes = gameState.runeState.slots.filter(slot => slot.collected).length;
+  const totalCollected = gameState.levelStats.reduce(
+    (total, entry) => total + Object.values(entry.counts).reduce((sum, count) => sum + count, 0),
+    0,
+  );
+  const totalRunTimeMs = gameState.levelStats.reduce(
+    (total, entry) => total + (entry.durationMs || 0),
+    0,
+  );
+  const gameOverCopy = (() => {
+    switch (gameState.gameOverReason) {
+      case 'time':
+        return 'El tiempo de la expedición se agotó.';
+      case 'hearts':
+        return 'Te quedaste sin vidas frente a las trampas del mercado.';
+      case 'redZone':
+        return 'Una zona de riesgo terminó la expedición.';
+      case 'bug':
+        return 'Un fee atrapó a tu explorador.';
+      default:
+        return 'La expedición ha terminado.';
+    }
+  })();
+  const multiplayerMenuEnabled =
+    multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
+  const multiplayerMenuLabel =
+    multiplayerEntryState === 'hub'
+      ? 'Abrir 1v1 en Hub'
+      : multiplayerEntryState === 'connecting'
+        ? 'Conecta wallet para 1v1'
+        : multiplayerEntryState === 'disabled'
+          ? '1v1 no disponible'
+          : 'Jugar 1v1';
+  const activeEffectLabel = gameState.scoreMultiplier > 1
+    ? `Multiplicador x${gameState.scoreMultiplier}`
+    : gameState.activeVaulEffect === 'double_collectibles'
+      ? 'Doble botín activo'
+      : gameState.activeVaulEffect === 'energy_to_uki'
+        ? 'Gemas a monedas'
+        : gameState.activeVaulEffect === 'eliminate_enemies'
+          ? 'Limpieza de enemigos'
+          : 'Sin efecto temporal';
+  const showGameShell = gameState.status !== 'idle' || isMultiplayerMode;
+  const hasBlockingOverlay = Boolean(
+    modeSelectOpen ||
+    isInfoModalOpen ||
+    multiplayerJoinFailure ||
+    matchResult ||
+    showWaitingOverlay ||
+    showCountdownOverlay ||
+    showReconnectOverlay ||
+    (isMobile && isPortrait) ||
+    gameState.status === 'countdown' ||
+    gameState.status === 'paused' ||
+    gameState.status === 'gameOver'
+  );
+  const backgroundSurfaceProps: React.HTMLAttributes<HTMLDivElement> =
+    hasBlockingOverlay
+      ? { 'aria-hidden': true, inert: true }
+      : {};
+
+  const handleRuntimeFocusCapture = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!hasBlockingOverlay) {
+      lastBackgroundFocusRef.current = event.target as HTMLElement;
+    }
+  };
+  const renderTreasureUxV2 = BASE_GAME_WIDTH === 1100 && BASE_GAME_HEIGHT === 800;
+
+  if (renderTreasureUxV2) {
+    return (
+      <div
+        ref={runtimeRootRef}
+        className="th-runtime-root"
+        onFocusCapture={handleRuntimeFocusCapture}
+      >
+        <ModalFocusManager
+          active={hasBlockingOverlay}
+          refreshKey={[
+            gameState.status,
+            matchStatus,
+            modeSelectOpen,
+            isInfoModalOpen,
+            isLevelStatsVisible,
+            isMobile && isPortrait,
+            terminalResultKey,
+          ].join(':')}
+          rootRef={runtimeRootRef}
+          lastBackgroundFocusRef={lastBackgroundFocusRef}
+        />
+        <TreasureStage scale={scale}>
+          <StageBackdrop variant={showGameShell ? 'game' : 'menu'} />
+
+          {!showGameShell ? (
+            <div className="th-menu-surface" {...backgroundSurfaceProps}>
+              <TreasureTopBar
+                musicEnabled={musicEnabled}
+                soundsEnabled={soundsEnabled}
+                onMusicToggle={handleMusicToggle}
+                onSoundsToggle={handleSoundsToggle}
+                onInfo={handleOpenInfo}
+              />
+              <main className="th-menu-screen">
+                <section className="th-menu-copy" aria-labelledby="treasure-hunt-title">
+                  <p className="th-menu-kicker">Cukies World presenta</p>
+                  <h1 id="treasure-hunt-title" className="th-menu-title">
+                    Treasure<br />Hunt
+                  </h1>
+                  <p className="th-menu-description">
+                    Entra en la cámara del tesoro, esquiva los fees y conserva tus tres vidas
+                    mientras haces crecer el botín.
+                  </p>
+                  <div className="th-menu-meta" aria-label="Datos de la partida">
+                    <span>30 segundos</span>
+                    <span>3 vidas</span>
+                    <span>5 runas</span>
+                  </div>
+                  <div className="th-menu-actions">
+                    <TreasureButton
+                      size="large"
+                      onClick={() => void handleModeSelected('single')}
+                      icon={<span>1P</span>}
+                    >
+                      Jugar solo
+                    </TreasureButton>
+                    <TreasureButton
+                      variant="secondary"
+                      size="large"
+                      disabled={!multiplayerMenuEnabled || isMultiplayerJoinPending}
+                      onClick={() => void handleModeSelected('multiplayer')}
+                      icon={<span>VS</span>}
+                    >
+                      {multiplayerMenuLabel}
+                    </TreasureButton>
+                    <div className="th-menu-secondary-actions">
+                      <TreasureButton
+                        variant="quiet"
+                        size="small"
+                        onClick={() => setModeSelectOpen(true)}
+                      >
+                        Comparar modos
+                      </TreasureButton>
+                      <TreasureButton
+                        variant="quiet"
+                        size="small"
+                        onClick={handleOpenInfo}
+                      >
+                        Ver reglas
+                      </TreasureButton>
+                    </div>
+                  </div>
+                  <p className="th-menu-disclaimer">Partida de prueba · sin ranking ni recompensas</p>
+                </section>
+
+                <div className="th-menu-art" aria-hidden="true">
+                  <Image
+                    src="/assets/totem/totemlateral.png"
+                    alt=""
+                    width={256}
+                    height={600}
+                    className="th-menu-art__totem"
+                  />
+                  <Image
+                    src="/assets/characters/2p.png"
+                    alt=""
+                    width={360}
+                    height={420}
+                    className="th-menu-art__two"
+                  />
+                  <Image
+                    src="/assets/characters/1p.png"
+                    alt=""
+                    width={400}
+                    height={460}
+                    priority
+                    className="th-menu-art__one"
+                  />
+                  <Image src="/assets/collectibles/pruebamoneda.png" alt="" width={64} height={64} className="th-menu-art__coin th-menu-art__coin--one" />
+                  <Image src="/assets/collectibles/pruebamoneda.png" alt="" width={64} height={64} className="th-menu-art__coin th-menu-art__coin--two" />
+                  <Image src="/assets/collectibles/pruebamoneda.png" alt="" width={64} height={64} className="th-menu-art__coin th-menu-art__coin--three" />
+                </div>
+              </main>
+            </div>
+          ) : (
+            <div
+              ref={parentContainerRef}
+              className="th-game-shell"
+              {...backgroundSurfaceProps}
+            >
+              <header className={`th-game-hud${isMultiplayerMode ? ' th-game-hud--multiplayer' : ''}`}>
+                <HudMetric
+                  label={isMultiplayerMode ? 'Tu botín' : 'Botín'}
+                  value={numberFormatter.format(localScore)}
+                  tone={gameState.scoreMultiplier > 1 ? 'teal' : 'default'}
+                  icon={<span>◆</span>}
+                />
+                {isMultiplayerMode ? (
+                  <HudMetric
+                    label="Rival"
+                    value={multiplayer.opponent ? numberFormatter.format(opponentScore) : '---'}
+                    tone="warning"
+                    icon={<span>VS</span>}
+                  />
+                ) : (
+                  <HudMetric label="Nivel" value={gameState.level} icon={<span>◇</span>} />
+                )}
+                <HudMetric
+                  label="Tiempo"
+                  value={`${Math.ceil(canonicalTimer)}s`}
+                  tone={canonicalTimer <= 10 ? 'danger' : 'default'}
+                  icon={<span>◷</span>}
+                />
+                <HudMetric
+                  label="Vidas"
+                  value={<HeartMeter value={gameState.hearts} max={gameState.maxHearts} compact />}
+                  icon={<span>♥</span>}
+                />
+              </header>
+
+              <div ref={containerRef} className="th-playfield">
+                <style dangerouslySetInnerHTML={{ __html: animationStyles }} />
+                {canvasSize.width > 0 && canvasSize.height > 0 ? (
+                  <GameCanvas
+                    gameState={gameState}
+                    width={canvasSize.width}
+                    height={canvasSize.height}
+                    energyCollectedFlag={energyCollectedFlag}
+                    damageFlag={damageFlag}
+                  />
+                ) : null}
+
+                <div className="th-game-effects" aria-live="polite">
+                  {jeffGoitAnimation?.active ? (
+                    <img src="/assets/collectibles/jeff_goit.png" alt="Checkpoint recogido" data-position="left-bottom" data-phase={jeffGoitAnimation.phase} />
+                  ) : null}
+                  {whaleChadAnimation?.active ? (
+                    <img src="/assets/collectibles/whalechadmode.png" alt="Whale Chad activado" data-position="right-bottom" data-phase={whaleChadAnimation.phase} />
+                  ) : null}
+                  {meowAnimation?.active ? (
+                    <div className="th-game-effect" data-position="right-top" data-phase={meowAnimation.phase}>
+                      <img src="/assets/collectibles/meow.png" alt="Inmunidad activada" />
+                      <span>{Math.ceil(gameState.token.immunityTimer / 1000)}s</span>
+                    </div>
+                  ) : null}
+                  {gigaVaultAnimation?.active ? (
+                    <img src="/assets/collectibles/giga_vault.png" alt="Vault activado" data-position="left-top" data-phase={gigaVaultAnimation.phase} />
+                  ) : null}
+                  {hackerAnimation?.active ? (
+                    <img src="/assets/collectibles/pay_tariffs.png" alt="Fee recibido" data-position="center" data-phase={hackerAnimation.phase} />
+                  ) : null}
+                </div>
+              </div>
+
+              <aside className={`th-rail${isMultiplayerMode ? ' th-rail--multiplayer' : ''}`} aria-label="Estado de la expedición">
+                {isMultiplayerMode ? (
+                  <>
+                    <PlayerPortrait
+                      src="/assets/characters/2p.png"
+                      label="Rival"
+                      status={opponentStatusLabel}
+                      tone="opponent"
+                      dimmed={!multiplayer.opponent || multiplayer.opponent.presence === 'offline'}
+                    />
+                    <div className="th-rail-card th-rail-card--compact">
+                      <span className="th-rail-card__label">Marcador rival</span>
+                      <strong className="th-rail-card__value">
+                        {multiplayer.opponent ? numberFormatter.format(opponentScore) : '---'}
+                      </strong>
+                      <HeartMeter value={opponentHearts} max={gameState.maxHearts} compact />
+                    </div>
+                    <div className="th-advantage" aria-label="Ventaja de puntuación">
+                      <div className="th-advantage__labels">
+                        <span>Tú {scoreDifference >= 0 ? `+${scoreDifference}` : scoreDifference}</span>
+                        <span>Rival</span>
+                      </div>
+                      <div className="th-advantage__track">
+                        <span className="th-advantage__fill" style={{ background: advantageGradient }} />
+                        <span className="th-advantage__mid" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="th-rail-card">
+                      <span className="th-rail-card__label">Tótem de runas</span>
+                      <strong className="th-rail-card__value">{collectedRunes}/5</strong>
+                    </div>
+                    <div className="th-rail-card th-rail-card--compact">
+                      <span className="th-rail-card__label">Efecto actual</span>
+                      <strong className="th-rail-card__copy">{activeEffectLabel}</strong>
+                    </div>
+                  </>
+                )}
+                <RuneTotemSidebar runeState={gameState.runeState} height={350} />
+              </aside>
+
+              <footer className="th-footer">
+                {isMultiplayerMode ? (
+                  <div className="th-footer__status">
+                    <span className="th-live-dot" aria-hidden="true" />
+                    <span>{getMultiplayerStatusCopy(matchStatus)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <TreasureButton
+                      size="small"
+                      onClick={handleStartPauseClick}
+                      disabled={gameState.status === 'countdown' || gameState.status === 'gameOver'}
+                    >
+                      {gameState.status === 'paused' ? 'Continuar' : 'Pausa'}
+                    </TreasureButton>
+                    <TreasureButton
+                      variant="secondary"
+                      size="small"
+                      onClick={handleResetClick}
+                      disabled={gameState.status === 'gameOver'}
+                    >
+                      Reiniciar
+                    </TreasureButton>
+                    <div className="th-footer__status">
+                      <span>{gameState.status === 'countdown' ? 'Preparando expedición' : activeEffectLabel}</span>
+                    </div>
+                  </>
+                )}
+                <div className="th-footer__utilities" aria-label="Ajustes de partida">
+                  <button type="button" className="th-topbar-button" onClick={handleMusicToggle} aria-pressed={musicEnabled}>
+                    <span aria-hidden="true">{musicEnabled ? '♫' : '♪'}</span><span>Música</span>
+                  </button>
+                  <button type="button" className="th-topbar-button" onClick={handleSoundsToggle} aria-pressed={soundsEnabled}>
+                    <span aria-hidden="true">{soundsEnabled ? '◕' : '○'}</span><span>Efectos</span>
+                  </button>
+                  {!isMultiplayerMode ? (
+                    <button type="button" className="th-topbar-button" onClick={handleInfoToggle}>
+                      <span aria-hidden="true">ⓘ</span><span>Reglas</span>
+                    </button>
+                  ) : null}
+                </div>
+              </footer>
+
+              {showSuddenDeathBanner ? (
+                <div className="th-sudden-death" role="status">
+                  <strong>Muerte súbita</strong>
+                  <span>{getSuddenDeathObjectiveCopy(
+                    multiplayer.suddenDeath?.chasingPlayerId,
+                    multiplayer.playerId,
+                    multiplayer.suddenDeath?.targetScore ?? localScore,
+                  )}</span>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          <ModeSelectModal
+            open={modeSelectOpen && canChangeGameMode}
+            onClose={() => setModeSelectOpen(false)}
+            onSelectMode={handleModeSelected}
+            defaultMode={currentMode}
+            onRulesClick={() => {
+              setModeSelectOpen(false);
+              handleOpenInfo();
+            }}
+            multiplayerEntryState={multiplayerEntryState}
+          />
+          <InfoModal
+            isOpen={isInfoModalOpen && !localControlsLocked}
+            onClose={() => setIsInfoModalOpen(false)}
+            onPlaySound={playSound}
+          />
+
+          {isMultiplayerMode && showWaitingOverlay ? (
+            <div className="th-overlay">
+              <TreasurePanel className="th-lobby" role="dialog" aria-modal="true" aria-labelledby="multiplayer-lobby-title">
+                <header className="th-lobby__header">
+                  <p className="th-screen-kicker">Partida multijugador</p>
+                  <h2 id="multiplayer-lobby-title" className="th-overlay-title">Cámara de duelo</h2>
+                  <p className="th-lobby__state">
+                    {multiplayer.error ? 'La sala necesita atención' : 'Esperando rival'}
+                  </p>
+                  <p className="th-lobby__copy">Comparte la invitación. La ronda empezará cuando los dos jugadores estén listos.</p>
+                </header>
+                <div className="th-lobby__players">
+                  <div className="th-lobby-player">
+                    <Image src="/assets/characters/1p.png" alt="Tu personaje" width={220} height={220} />
+                    <strong>Tú</strong>
+                    <span>Conectado</span>
+                  </div>
+                  <span className="th-lobby__vs" aria-hidden="true">VS</span>
+                  <div className="th-lobby-player">
+                    <Image src="/assets/characters/2p.png" alt="Personaje rival" width={220} height={220} />
+                    <strong>Rival</strong>
+                    <span>{multiplayer.hasOpponent ? 'Listo' : 'Esperando'}</span>
+                  </div>
+                </div>
+                <div className="th-lobby__room">
+                  <span>Sala <strong>{multiplayer.roomCode ?? 'Generando…'}</strong></span>
+                  <span>{lobbySeconds !== null ? `Expira en ${lobbySeconds}s` : 'Sala protegida'}</span>
+                  <span>{multiplayer.inviteUrl ? 'Invitación lista para compartir' : 'Creando invitación…'}</span>
+                </div>
+                {multiplayer.error ? <p role="alert" className="th-error-copy">{multiplayer.error}</p> : null}
+                <div className="th-lobby__actions">
+                  <TreasureButton
+                    size="medium"
+                    onClick={() => void copyMultiplayerInvite()}
+                    disabled={!multiplayer.inviteUrl}
+                  >
+                    {inviteCopied ? 'Enlace copiado' : 'Copiar invitación'}
+                  </TreasureButton>
+                </div>
+                <p className="th-disclaimer th-lobby__footer">El segundo jugador debe abrir el enlace con otro perfil</p>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {isMultiplayerMode && showCountdownOverlay ? (
+            <div className="th-overlay th-overlay--soft">
+              <TreasurePanel className="th-dialog" role="dialog" aria-modal="true" aria-label="Cuenta atrás del duelo">
+                <p className="th-screen-kicker">Jugadores preparados</p>
+                <h2 className="th-overlay-title">
+                  {multiplayer.matchConfig?.resumeAt ? 'Reanudamos en' : 'La caza comienza en'}
+                </h2>
+                <div className="th-countdown-number" aria-live="assertive">{countdownSeconds ?? 0}</div>
+                <p className="th-dialog-copy">Mismas condiciones, mismo mapa y marcador validado por el servidor.</p>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {!isMultiplayerMode && gameState.status === 'countdown' ? (
+            <div className="th-overlay th-overlay--soft">
+              <TreasurePanel className="th-dialog th-dialog--small" role="dialog" aria-modal="true" aria-label="Cuenta atrás de la expedición">
+                <p className="th-screen-kicker">Prepárate</p>
+                <h2 className="th-overlay-title">La expedición comienza</h2>
+                <div className="th-countdown-number" aria-live="assertive">{gameState.countdown ?? 0}</div>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {showReconnectOverlay ? (
+            <div className="th-overlay th-overlay--critical">
+              <TreasurePanel className="th-dialog" tone="warning" role="dialog" aria-modal="true" aria-label="Partida en espera por reconexión">
+                <p className="th-screen-kicker">Conexión interrumpida</p>
+                <h2 className="th-overlay-title">Partida en espera</h2>
+                <OrnamentalDivider danger />
+                <p className="th-dialog-copy">Esperando que el jugador desconectado vuelva a la sala. El servidor conserva el estado oficial.</p>
+                <div className="th-countdown-number th-countdown-number--small" aria-live="polite">
+                  {reconnectSeconds ?? 0}
+                </div>
+                <p className="th-disclaimer th-dialog-disclaimer">Segundos de gracia restantes</p>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {multiplayerJoinFailure ? (
+            <div className="th-overlay th-overlay--critical">
+              <TreasurePanel className="th-dialog th-dialog--small" tone="danger" role="alertdialog" aria-modal="true" aria-label="No se pudo entrar en la sala">
+                <p className="th-screen-kicker">Acceso rechazado</p>
+                <h2 className="th-overlay-title">No se pudo entrar</h2>
+                <p className="th-dialog-copy" role="alert">{multiplayerJoinFailure.message}</p>
+                <div className="th-dialog-actions">
+                  <TreasureButton size="small" onClick={retryMultiplayerJoin}>Reintentar</TreasureButton>
+                  <TreasureButton variant="secondary" size="small" onClick={() => void exitFailedMultiplayerJoin()}>Salir</TreasureButton>
+                </div>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {!isMultiplayerMode && gameState.status === 'paused' ? (
+            <div className="th-overlay th-overlay--soft">
+              <TreasurePanel className="th-dialog th-dialog--small" role="dialog" aria-modal="true" aria-label="Partida en pausa">
+                <p className="th-screen-kicker">Expedición detenida</p>
+                <h2 className="th-overlay-title">Pausa</h2>
+                <p className="th-dialog-copy">Tu partida local está a salvo. Continúa cuando estés listo.</p>
+                <div className="th-dialog-actions">
+                  <TreasureButton size="small" onClick={handleStartPauseClick}>Continuar</TreasureButton>
+                  <TreasureButton variant="secondary" size="small" onClick={handleResetClick}>Volver al menú</TreasureButton>
+                </div>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {!isMultiplayerMode && gameState.status === 'gameOver' && !isLevelStatsVisible ? (
+            <div className="th-overlay th-overlay--critical">
+              <TreasurePanel className="th-result-layout" role="dialog" aria-modal="true" aria-labelledby="single-result-title">
+                <section className="th-result-copy">
+                  <p className="th-screen-kicker">Expedición completada</p>
+                  <h2 id="single-result-title" className="th-overlay-title">Resultado final</h2>
+                  <p className="th-dialog-copy">{gameOverCopy}</p>
+                  <strong className="th-result-score">{numberFormatter.format(localScore)}</strong>
+                  <span className="th-result-score-label">Puntos</span>
+                  <div className="th-result-metrics">
+                    <div className="th-result-metric"><span>Nivel</span><strong>{gameState.level}</strong></div>
+                    <div className="th-result-metric"><span>Recogidos</span><strong>{totalCollected}</strong></div>
+                    <div className="th-result-metric"><span>Tiempo</span><strong>{formatDuration(totalRunTimeMs)}</strong></div>
+                  </div>
+                  <div className="th-result-actions">
+                    <TreasureButton
+                      size="small"
+                      onClick={() => {
+                        playSound('button_click');
+                        stopMusic();
+                        resetGame();
+                        setModeSelectOpen(true);
+                      }}
+                    >
+                      Jugar de nuevo
+                    </TreasureButton>
+                    <TreasureButton variant="secondary" size="small" onClick={() => setIsLevelStatsVisible(true)}>
+                      Ver desglose
+                    </TreasureButton>
+                    <TreasureButton variant="quiet" size="small" onClick={handleResetClick}>Volver al menú</TreasureButton>
+                  </div>
+                </section>
+                <div className="th-result-art" aria-hidden="true">
+                  <Image src="/assets/characters/1p.png" alt="" width={430} height={500} />
+                </div>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {isMultiplayerMode && matchResult ? (
+            <div className="th-overlay th-overlay--critical">
+              <TreasurePanel className="th-result-layout" role="dialog" aria-modal="true" aria-labelledby="multiplayer-result-title">
+                <section className="th-result-copy">
+                  <p className="th-screen-kicker">Resultado oficial</p>
+                  <h2 id="multiplayer-result-title" className="th-overlay-title">{resultTitle}</h2>
+                  <p className="th-dialog-copy">
+                    Resultado confirmado por el servidor · {getMatchResultReasonCopy(matchResult.reason)}
+                  </p>
+                  <strong className="th-result-score">{numberFormatter.format(localFinalScore)}</strong>
+                  <span className="th-result-score-label">Tu puntuación</span>
+                  <div className="th-result-metrics th-result-metrics--versus">
+                    <div className="th-result-metric"><span>Tú</span><strong>{numberFormatter.format(localFinalScore)}</strong></div>
+                    <div className="th-result-metric"><span>Rival</span><strong>{numberFormatter.format(opponentFinalScore)}</strong></div>
+                  </div>
+                  {resultExitError ? <p className="th-error-copy" role="alert">{resultExitError}</p> : null}
+                  <div className="th-result-actions">
+                    <TreasureButton
+                      size="small"
+                      disabled={resultExitPending}
+                      aria-busy={resultExitPending}
+                      onClick={() => void exitCanonicalMultiplayerResult()}
+                    >
+                      {resultExitPending ? 'Liberando sesión…' : resultExitError ? 'Reintentar salida' : 'Salir a 1 jugador'}
+                    </TreasureButton>
+                  </div>
+                </section>
+                <div className="th-result-art" aria-hidden="true">
+                  <Image src={localIsWinner === false ? '/assets/characters/2p.png' : '/assets/characters/1p.png'} alt="" width={430} height={500} />
+                </div>
+              </TreasurePanel>
+            </div>
+          ) : null}
+
+          {gameState.status === 'gameOver' && isLevelStatsVisible && !isMultiplayerMode ? (
+            <LevelStatsOverlay stats={gameState.levelStats} onClose={() => setIsLevelStatsVisible(false)} />
+          ) : null}
+        </TreasureStage>
+
+        {(process.env.NODE_ENV === 'development' || isMobile) && !hasBlockingOverlay ? (
+          <TouchZones onDirectionChange={setTouchDirection} onDirectionClear={clearTouchDirection} />
+        ) : null}
+        {!localControlsLocked ? <OrientationOverlay /> : null}
       </div>
     );
   }
@@ -2623,7 +3364,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         onClose={() => setModeSelectOpen(false)}
         onSelectMode={handleModeSelected}
         defaultMode={currentMode}
-        onRulesClick={handleOpenInfo}
+        onRulesClick={() => {
+          setModeSelectOpen(false);
+          handleOpenInfo();
+        }}
         multiplayerEntryState={multiplayerEntryState}
       />
       {waitingOverlay}
