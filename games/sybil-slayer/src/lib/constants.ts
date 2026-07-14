@@ -1,4 +1,4 @@
-import type { RuneType } from '@/types/game';
+import type { RuneType } from '../types/game';
 
 // Game Timing
 export const GAME_DURATION_SECONDS = 30; // Duración inicial: 30 segundos (el jugador debe extenderla con checkpoints)

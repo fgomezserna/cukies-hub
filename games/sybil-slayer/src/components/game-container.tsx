@@ -49,6 +49,8 @@ import {
   shouldBlockLocalGameControls,
 } from '../lib/multiplayer-feature';
 import { buildTreasureHuntHubEntryUrl } from '../lib/parent-origin';
+import { shouldRenderDirectionalTouchControls } from '../lib/touch-controls';
+import { calculateContainScale, resolveGameViewportSize } from '../lib/viewport-scale';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
 
@@ -991,9 +993,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       // Permitir scroll en elementos específicos que lo necesitan (modales, contenido scrolleable)
       const isModal = target.closest('[role="dialog"], [class*="z-[60"], [class*="z-[70"]');
       const isScrollableContent = target.closest('[class*="overflow-y-auto"], [class*="overflow-y-scroll"], [class*="max-h-\\["]');
+      const isInteractiveSurface = target.closest(
+        'button, a, input, select, textarea, [role="button"], [role="tab"], .th-menu-surface',
+      );
       
-      // Solo prevenir scroll en el body principal, no en modales o contenido scrolleable
-      if (!isModal && !isScrollableContent) {
+      // No cancelar el click sintetizado cuando un tap sobre la UX deriva unos píxeles.
+      if (!isModal && !isScrollableContent && !isInteractiveSurface) {
         e.preventDefault();
       }
     };
@@ -2674,11 +2679,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [scale, setScale] = useState(1);
 
   const calculateScale = useCallback(() => {
-    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-    const newScale = Math.min(
-      viewportWidth / BASE_GAME_WIDTH,
-      viewportHeight / BASE_GAME_HEIGHT,
+    const viewport = resolveGameViewportSize({
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      rootWidth: document.documentElement.clientWidth,
+      rootHeight: document.documentElement.clientHeight,
+      visualWidth: window.visualViewport?.width,
+      visualHeight: window.visualViewport?.height,
+    });
+    const newScale = calculateContainScale(
+      viewport,
+      BASE_GAME_WIDTH,
+      BASE_GAME_HEIGHT,
     );
     setScale(newScale);
   }, []);
@@ -2755,9 +2767,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     handleResize();
     window.addEventListener('resize', handleResize);
     window.visualViewport?.addEventListener('resize', handleResize);
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(handleResize);
+    resizeObserver?.observe(document.documentElement);
     return () => {
       window.removeEventListener('resize', handleResize);
       window.visualViewport?.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
     };
   }, [calculateScale, calculateCanvasHorizontalOffset]);
 
@@ -2853,6 +2870,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     hasBlockingOverlay
       ? { 'aria-hidden': true, inert: true }
       : {};
+  const shouldRenderTouchControls = shouldRenderDirectionalTouchControls({
+    inputAvailable: process.env.NODE_ENV === 'development' || isMobile,
+    gameStatus: gameState.status,
+    hasBlockingOverlay,
+  });
 
   const handleRuntimeFocusCapture = (event: React.FocusEvent<HTMLDivElement>) => {
     if (!hasBlockingOverlay) {
@@ -3333,7 +3355,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           ) : null}
         </TreasureStage>
 
-        {(process.env.NODE_ENV === 'development' || isMobile) && !hasBlockingOverlay ? (
+        {shouldRenderTouchControls ? (
           <TouchZones onDirectionChange={setTouchDirection} onDirectionClear={clearTouchDirection} />
         ) : null}
         {!localControlsLocked ? <OrientationOverlay /> : null}
@@ -4424,7 +4446,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
       {/* Mobile touch controls */}
       {/* Always render in development to debug, or when isMobile is true */}
-      {(process.env.NODE_ENV === 'development' || isMobile) && (
+      {shouldRenderTouchControls && (
         <>
           <TouchZones
             onDirectionChange={setTouchDirection}

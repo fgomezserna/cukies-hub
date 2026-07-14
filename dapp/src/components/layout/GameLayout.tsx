@@ -18,6 +18,13 @@ interface FullscreenElement extends HTMLDivElement {
   msRequestFullscreen?: () => Promise<void>;
 }
 
+interface FullscreenDocument extends Document {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+  msFullscreenElement?: Element | null;
+  msExitFullscreen?: () => Promise<void> | void;
+}
+
 interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
@@ -72,15 +79,27 @@ export default function GameLayout({
 
   const handleFullScreen = () => {
     const element = gameContainerRef.current;
+    const fullscreenDocument = document as FullscreenDocument;
     if (element) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
+      const fullscreenElement =
+        fullscreenDocument.fullscreenElement ||
+        fullscreenDocument.webkitFullscreenElement ||
+        fullscreenDocument.msFullscreenElement;
+
+      if (fullscreenElement) {
+        if (fullscreenDocument.exitFullscreen) {
+          void fullscreenDocument.exitFullscreen();
+        } else if (fullscreenDocument.webkitExitFullscreen) {
+          void fullscreenDocument.webkitExitFullscreen();
+        } else if (fullscreenDocument.msExitFullscreen) {
+          void fullscreenDocument.msExitFullscreen();
+        }
       } else if (element.requestFullscreen) {
-        element.requestFullscreen();
+        void element.requestFullscreen();
       } else if (element.webkitRequestFullscreen) { /* Safari */
-        element.webkitRequestFullscreen();
+        void element.webkitRequestFullscreen();
       } else if (element.msRequestFullscreen) { /* IE11 */
-        element.msRequestFullscreen();
+        void element.msRequestFullscreen();
       }
     }
   };
@@ -123,15 +142,19 @@ export default function GameLayout({
   }
 
   return (
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+      <div className="grid h-full min-h-0 grid-cols-1 gap-6 lg:grid-cols-4">
         
         {/* Left Column: Game */}
-        <div className="lg:col-span-3 flex flex-col gap-6">
-          <div ref={gameContainerRef} className="bg-card flex-grow flex flex-col relative overflow-hidden rounded-lg border">
+        <div className="flex min-h-0 flex-col gap-6 lg:col-span-3">
+          <div
+            ref={gameContainerRef}
+            data-game-viewport
+            className="relative flex min-h-0 flex-grow flex-col overflow-hidden rounded-lg border bg-card"
+          >
             <iframe
               ref={iframeRef}
               src={gameConfig.gameUrl}
-              className="w-full h-full border-0 min-h-[480px] lg:min-h-0"
+              className="block h-full min-h-0 w-full flex-1 overscroll-contain border-0 touch-manipulation"
               title={gameConfig.name}
               allow="clipboard-read; clipboard-write"
               allowFullScreen

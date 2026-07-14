@@ -78,7 +78,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   ];
 
   return (
-    <div className="flex h-screen w-full bg-background relative">
+    <div className="relative flex h-screen h-dvh w-full bg-background">
       <SidebarProvider>
         <Sidebar collapsible="icon" className="border-r border-teal-400/20 bg-black/10 backdrop-blur-md shadow-xl shadow-teal-400/10" style={{
             // Override sidebar background variable for transparency

@@ -594,7 +594,7 @@ body {
     height: 100%;
     position: fixed;
     width: 100%;
-    touch-action: pan-x; /* Permitir scroll horizontal si es necesario, pero no vertical */
+    touch-action: manipulation;
   }
   
   /* Prevenir scroll en el contenedor principal */
@@ -834,6 +834,8 @@ button,
   font: 750 15px/1 var(--th-font-ui);
   border-radius: 4px;
   transition: color 180ms ease, background 180ms ease, transform 120ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .th-topbar-button[aria-pressed='true'] {
@@ -896,6 +898,8 @@ button,
   clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px);
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.3), 0 9px 24px rgba(0, 0, 0, 0.28);
   transition: filter 180ms ease, transform 150ms ease, color 180ms ease, border-color 180ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .th-button::before {
