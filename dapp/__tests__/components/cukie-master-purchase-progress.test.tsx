@@ -61,6 +61,7 @@ describe('CukieMasterPurchaseProgress', () => {
 
     const slots = screen.getAllByRole('listitem');
     expect(slots).toHaveLength(5);
+    expect(screen.getByText('1º rango')).toBeInTheDocument();
     expect(slots[0]).toHaveAttribute('data-state', 'next');
     expect(slots[0]).toHaveAttribute('aria-current', 'step');
     expect(slots.slice(1).every((slot) => slot.dataset.state === 'locked')).toBe(true);

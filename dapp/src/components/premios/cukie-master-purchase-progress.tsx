@@ -30,7 +30,7 @@ const masterCopyByLocale = {
     eyebrow: 'Progreso Cukie Master',
     title: 'Tus rangos por UKI comprados',
     summary: (achieved: number, maximum: number) => `${achieved}/${maximum} rangos`,
-    rank: (ordinal: number) => ordinal === 1 ? '1.er rango' : `${ordinal}º rango`,
+    rank: (ordinal: number) => `${ordinal}º rango`,
     target: (amount: string) => `${amount} UKI`,
     achieved: 'Alcanzado',
     achievedBody: (ordinal: number) => ordinal === 1
