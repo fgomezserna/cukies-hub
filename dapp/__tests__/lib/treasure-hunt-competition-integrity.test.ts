@@ -1,4 +1,4 @@
-import type { Db, Document } from 'mongodb';
+import type { Db } from 'mongodb';
 
 jest.mock('@/lib/indexer-db/mongodb', () => ({ getIndexerDb: jest.fn() }));
 
@@ -168,70 +168,35 @@ describe('Treasure Hunt competition persistence integrity', () => {
     expect(updateOne.mock.calls[1]?.[1].$setOnInsert.alias).toBe(expectedAlias);
   });
 
-  it('applies the per-wallet top five before the global leaderboard limit', async () => {
-    const toArray = jest.fn().mockResolvedValue([]);
-    const aggregate = jest.fn().mockReturnValue({ toArray });
+  it('uses an ordered MongoDB 4.4-compatible cursor for leaderboard attempts', async () => {
+    const close = jest.fn().mockResolvedValue(undefined);
+    const cursor = {
+      close,
+      sort: jest.fn(),
+      async *[Symbol.asyncIterator]() {
+        // An empty cursor is enough here; selection limits are covered by the ranking unit tests.
+      },
+    };
+    cursor.sort.mockReturnValue(cursor);
+    const find = jest.fn().mockReturnValue(cursor);
     const repository = new MongoCompetitionRepository(
-      async () => databaseWith({ presale_game_attempts: { aggregate } }),
+      async () => databaseWith({ presale_game_attempts: { find } }),
       aliasSecret,
     );
 
     await repository.listValidAttempts(campaign.campaignId, 500);
 
-    const pipeline = aggregate.mock.calls[0]?.[0] as Document[];
-    const walletLimitIndex = pipeline.findIndex((stage) => (
-      JSON.stringify(stage) === JSON.stringify({ $match: { __walletRank: { $lte: 5 } } })
-    ));
-    const globalLimitIndex = pipeline.findIndex((stage) => stage.$limit === 500);
-    expect(pipeline).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        $setWindowFields: expect.objectContaining({
-          partitionBy: '$__normalizedWallet',
-          output: { __walletRank: { $documentNumber: {} } },
-        }),
-      }),
-    ]));
-    expect(walletLimitIndex).toBeGreaterThan(-1);
-    expect(globalLimitIndex).toBeGreaterThan(walletLimitIndex);
-    expect(pipeline[0]).toEqual({
-      $match: {
-        campaignId: campaign.campaignId,
-        status: { $in: ['review', 'valid'] },
-      },
+    expect(find).toHaveBeenCalledWith({
+      campaignId: campaign.campaignId,
+      status: { $in: ['review', 'valid'] },
     });
-    expect(pipeline).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        $lookup: expect.objectContaining({
-          from: 'presale_game_participants',
-          let: {
-            attemptCampaignId: '$campaignId',
-            attemptWalletAddress: '$walletAddress',
-          },
-          pipeline: expect.arrayContaining([
-            expect.objectContaining({
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$campaignId', '$$attemptCampaignId'] },
-                    { $eq: ['$walletAddress', '$$attemptWalletAddress'] },
-                  ],
-                },
-              },
-            }),
-          ]),
-        }),
-      }),
-      {
-        $set: {
-          playerAlias: {
-            $ifNull: [
-              { $arrayElemAt: ['$__participant.alias', 0] },
-              '$playerAlias',
-            ],
-          },
-        },
-      },
-    ]));
+    expect(cursor.sort).toHaveBeenCalledWith({
+      score: -1,
+      gameTimeMs: 1,
+      finishedAt: 1,
+      attemptId: 1,
+    });
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it('shares one index creation promise across repository instances for the same database', async () => {

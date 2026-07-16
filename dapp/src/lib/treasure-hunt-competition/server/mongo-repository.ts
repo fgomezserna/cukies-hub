@@ -25,6 +25,7 @@ const PARTICIPANTS_COLLECTION = 'presale_game_participants';
 const ATTEMPTS_COLLECTION = 'presale_game_attempts';
 const DEFAULT_LOCAL_ALIAS_SECRET = 'cukies-treasure-hunt-local-alias-secret';
 const MAX_ALIAS_COLLISION_RETRIES = 16;
+const MAX_RANKED_ATTEMPTS_PER_WALLET = 5;
 
 const indexesByDatabase = new WeakMap<Db, Promise<void>>();
 
@@ -96,6 +97,28 @@ function withoutMongoId<T>(document: (T & { _id?: unknown }) | null): T | null {
   if (!document) return null;
   const { _id: _ignored, ...record } = document;
   return record as T;
+}
+
+export async function selectTopCompetitionAttempts(
+  rows: AsyncIterable<CompetitionAttemptRecord>,
+  limit: number,
+) {
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new RangeError('Competition attempt limit must be a positive safe integer');
+  }
+
+  const selected: CompetitionAttemptRecord[] = [];
+  const attemptsByWallet = new Map<string, number>();
+  for await (const row of rows) {
+    const walletAddress = row.walletAddress.toLowerCase();
+    const walletAttempts = attemptsByWallet.get(walletAddress) ?? 0;
+    if (walletAttempts >= MAX_RANKED_ATTEMPTS_PER_WALLET) continue;
+
+    attemptsByWallet.set(walletAddress, walletAttempts + 1);
+    selected.push(row);
+    if (selected.length >= limit) break;
+  }
+  return selected;
 }
 
 export class MongoCompetitionRepository implements CompetitionRepository {
@@ -409,55 +432,32 @@ export class MongoCompetitionRepository implements CompetitionRepository {
     if (!Number.isSafeInteger(limit) || limit < 1) {
       throw new RangeError('Competition attempt limit must be a positive safe integer');
     }
-    const rows = await (await this.attempts()).aggregate<CompetitionAttemptRecord>([
-      { $match: { campaignId, status: { $in: ['review', 'valid'] } } },
-      { $set: { __normalizedWallet: { $toLower: '$walletAddress' } } },
-      {
-        $setWindowFields: {
-          partitionBy: '$__normalizedWallet',
-          sortBy: { score: -1, gameTimeMs: 1, finishedAt: 1, attemptId: 1 },
-          output: { __walletRank: { $documentNumber: {} } },
-        },
-      },
-      { $match: { __walletRank: { $lte: 5 } } },
-      { $sort: { score: -1, gameTimeMs: 1, finishedAt: 1, attemptId: 1 } },
-      { $limit: limit },
-      {
-        $lookup: {
-          from: PARTICIPANTS_COLLECTION,
-          let: {
-            attemptCampaignId: '$campaignId',
-            attemptWalletAddress: '$walletAddress',
-          },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$campaignId', '$$attemptCampaignId'] },
-                    { $eq: ['$walletAddress', '$$attemptWalletAddress'] },
-                  ],
-                },
-              },
-            },
-            { $project: { _id: 0, alias: 1 } },
-            { $limit: 1 },
-          ],
-          as: '__participant',
-        },
-      },
-      {
-        $set: {
-          playerAlias: {
-            $ifNull: [
-              { $arrayElemAt: ['$__participant.alias', 0] },
-              '$playerAlias',
-            ],
-          },
-        },
-      },
-      { $unset: ['__participant', '__normalizedWallet', '__walletRank'] },
-    ], { allowDiskUse: true }).toArray();
-    return rows.map((row) => withoutMongoId(row) as CompetitionAttemptRecord);
+    const cursor = (await this.attempts()).find({
+      campaignId,
+      status: { $in: ['review', 'valid'] },
+    }).sort({ score: -1, gameTimeMs: 1, finishedAt: 1, attemptId: 1 });
+
+    let rows: CompetitionAttemptRecord[];
+    try {
+      rows = await selectTopCompetitionAttempts(cursor, limit);
+    } finally {
+      await cursor.close();
+    }
+
+    const normalizedWallets = [...new Set(rows.map((row) => row.walletAddress.toLowerCase()))];
+    const participants = normalizedWallets.length > 0
+      ? await (await this.participants()).find({
+        campaignId,
+        walletAddress: { $in: normalizedWallets },
+      }).project({ _id: 0, walletAddress: 1, alias: 1 }).toArray()
+      : [];
+    const aliasByWallet = new Map(
+      participants.map((participant) => [participant.walletAddress.toLowerCase(), participant.alias]),
+    );
+
+    return rows.map((row) => withoutMongoId({
+      ...row,
+      playerAlias: aliasByWallet.get(row.walletAddress.toLowerCase()) ?? row.playerAlias,
+    }) as CompetitionAttemptRecord);
   }
 }
