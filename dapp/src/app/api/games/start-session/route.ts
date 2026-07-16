@@ -13,6 +13,7 @@ const SUPPORTED_GAME_IDS: ReadonlySet<string> = new Set([
 ]);
 const DEFAULT_GAME_VERSION = '1.0.0';
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+const RESUMABLE_SESSION_ID_PATTERN = /^game_[0-9a-f]{64}$/;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const GAME_SESSION_SELECT = {
   sessionId: true,
@@ -137,6 +138,22 @@ export async function POST(request: NextRequest) {
     }
 
     const identity = { userId: walletSession.userId, gameId };
+    if (input.resumeSessionId !== undefined) {
+      if (
+        typeof input.resumeSessionId !== 'string' ||
+        !RESUMABLE_SESSION_ID_PATTERN.test(input.resumeSessionId) ||
+        input.idempotencyKey !== undefined
+      ) {
+        return json({ success: false, error: 'Invalid resume session' }, 400);
+      }
+      const resumable = await findGameSession(input.resumeSessionId);
+      if (!resumable || !isCompatibleSession(resumable, identity)) {
+        // Do not disclose whether an opaque id belongs to another wallet.
+        return json({ success: false, error: 'Game session could not be resumed' }, 404);
+      }
+      return successResponse(resumable);
+    }
+
     const sessionId = createSessionId(identity.userId, identity.gameId, idempotencyKey);
     const existing = await findGameSession(sessionId);
     if (existing) {

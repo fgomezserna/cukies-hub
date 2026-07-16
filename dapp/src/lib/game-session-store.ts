@@ -13,6 +13,12 @@ type SessionIdentity = {
   readonly clientInstanceId: string;
 };
 
+type CompetitionSessionIdentity = {
+  readonly userId: string;
+  readonly gameSessionId: string;
+  readonly attemptId: string;
+};
+
 export type DirectGameSessionInput = {
   readonly sessionId: string;
   readonly sessionToken: string;
@@ -74,11 +80,17 @@ function availableClientLease(clientInstanceId: string) {
   };
 }
 
-function activeOwnedSession(identity: SessionIdentity): Filter<Document> {
+function ownedSession(identity: Pick<SessionIdentity, 'userId' | 'gameSessionId'>): Filter<Document> {
   return {
     sessionId: identity.gameSessionId,
     userId: toObjectId(identity.userId),
     gameId: TREASURE_HUNT_GAME_ID,
+  };
+}
+
+function activeOwnedSession(identity: SessionIdentity): Filter<Document> {
+  return {
+    ...ownedSession(identity),
     isActive: true,
   };
 }
@@ -99,12 +111,109 @@ export async function createGameSessionDirectly(input: DirectGameSessionInput) {
     rewardEligible: true,
     multiplayerState: 'idle',
     multiplayerClientInstanceId: null,
+    competitionAttemptId: null,
     startedAt: now,
     endedAt: null,
     isActive: true,
     createdAt: now,
     updatedAt: now,
   });
+}
+
+export async function claimGameSessionForCompetition(identity: CompetitionSessionIdentity) {
+  const collection = await getGameSessionCollection();
+  const result = await collection.updateOne(
+    {
+      ...activeOwnedSession({
+        userId: identity.userId,
+        gameSessionId: identity.gameSessionId,
+        clientInstanceId: '',
+      }),
+      $or: [
+        {
+          mode: 'standard',
+          rewardEligible: true,
+          competitionAttemptId: null,
+          multiplayerState: { $in: ['idle', null] },
+        },
+        {
+          mode: 'standard',
+          rewardEligible: true,
+          competitionAttemptId: null,
+          multiplayerState: { $exists: false },
+        },
+        {
+          mode: 'presale_competition',
+          rewardEligible: false,
+          competitionAttemptId: identity.attemptId,
+        },
+      ],
+    },
+    {
+      $set: {
+        mode: 'presale_competition',
+        rewardEligible: false,
+        competitionAttemptId: identity.attemptId,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  return result.matchedCount === 1;
+}
+
+export async function finishGameSessionForCompetition(identity: CompetitionSessionIdentity) {
+  const collection = await getGameSessionCollection();
+  const endedAt = new Date();
+  const result = await collection.updateOne(
+    {
+      ...ownedSession({
+        userId: identity.userId,
+        gameSessionId: identity.gameSessionId,
+      }),
+      mode: 'presale_competition',
+      rewardEligible: false,
+      competitionAttemptId: identity.attemptId,
+      $or: [
+        { isActive: true },
+        { isActive: false, endedAt: { $ne: null } },
+      ],
+    },
+    [
+      {
+        $set: {
+          isActive: false,
+          endedAt: {
+            $cond: [{ $eq: ['$isActive', true] }, endedAt, '$endedAt'],
+          },
+          updatedAt: {
+            $cond: [{ $eq: ['$isActive', true] }, endedAt, '$updatedAt'],
+          },
+        },
+      },
+    ],
+  );
+  return result.matchedCount === 1;
+}
+
+export async function releaseGameSessionForCompetition(identity: CompetitionSessionIdentity) {
+  const collection = await getGameSessionCollection();
+  const result = await collection.updateOne(
+    {
+      ...activeOwnedSession({
+        userId: identity.userId,
+        gameSessionId: identity.gameSessionId,
+        clientInstanceId: '',
+      }),
+      mode: 'presale_competition',
+      rewardEligible: false,
+      competitionAttemptId: identity.attemptId,
+    },
+    {
+      $set: { mode: 'standard', rewardEligible: true, updatedAt: new Date() },
+      $unset: { competitionAttemptId: '' },
+    },
+  );
+  return result.matchedCount === 1;
 }
 
 export async function claimGameSessionForMultiplayer(identity: SessionIdentity) {
@@ -114,16 +223,34 @@ export async function claimGameSessionForMultiplayer(identity: SessionIdentity) 
     {
       ...activeOwnedSession(identity),
       $or: [
-        { multiplayerState: 'idle', ...clientLease },
-        { multiplayerState: null, ...clientLease },
-        { multiplayerState: { $exists: false }, ...clientLease },
         {
-          multiplayerState: 'joining',
-          multiplayerClientInstanceId: identity.clientInstanceId,
+          mode: 'standard',
+          rewardEligible: true,
+          $and: [
+            {
+              $or: [
+                { competitionAttemptId: null },
+                { competitionAttemptId: { $exists: false } },
+              ],
+            },
+            {
+              $or: [
+                { multiplayerState: 'idle', ...clientLease },
+                { multiplayerState: null, ...clientLease },
+                { multiplayerState: { $exists: false }, ...clientLease },
+              ],
+            },
+          ],
         },
         {
-          multiplayerState: 'joined',
+          mode: 'staging_unranked',
+          rewardEligible: false,
+          multiplayerState: { $in: ['joining', 'joined'] },
           multiplayerClientInstanceId: identity.clientInstanceId,
+          $or: [
+            { competitionAttemptId: null },
+            { competitionAttemptId: { $exists: false } },
+          ],
         },
       ],
     },

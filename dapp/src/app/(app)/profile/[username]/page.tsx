@@ -139,7 +139,7 @@ export default function ProfilePage() {
 
   const formatGameId = (gameId: string) => {
     const gameNames: Record<string, string> = {
-      'sybil-slayer': 'Sybil Slayer',
+      'sybil-slayer': 'Treasure Hunt',
       'hyppie-road': 'Hyppie Road',
       'tower-builder': 'Hyppie Tower'
     };

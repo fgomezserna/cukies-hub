@@ -20,12 +20,13 @@ interface ModeSelectModalProps {
   defaultMode?: GameMode;
   onRulesClick?: () => void;
   multiplayerEntryState: TreasureHuntMultiplayerEntryState;
+  competitionNotice?: string | null;
 }
 
 const modeCopy: Record<GameMode, { title: string; description: string }> = {
   single: {
-    title: '1 Jugador',
-    description: 'Enfréntate solo al mercado. Mantén el score, supera niveles y evita los fees.',
+    title: 'Competición 1P',
+    description: 'En Cukies Hub, conecta y firma tu wallet para jugar 1P y entrar en el ranking. Fuera del Hub, solo práctica.',
   },
   multiplayer: {
     title: 'Multijugador',
@@ -57,6 +58,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   defaultMode = 'single',
   onRulesClick,
   multiplayerEntryState,
+  competitionNotice,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
   const multiplayerInteractive =
@@ -125,13 +127,14 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               Selecciona modo de juego
             </h2>
             <p
+              role={competitionNotice ? 'alert' : undefined}
               style={{
                 margin: '5px 0 0',
-                color: 'var(--th-cream-muted)',
+                color: competitionNotice ? '#fecdd3' : 'var(--th-cream-muted)',
                 font: "600 15px/21px var(--th-font-ui)",
               }}
             >
-              Misma caza. Dos formas de conquistar el tesoro.
+              {competitionNotice ?? 'Misma caza. Dos formas de conquistar el tesoro.'}
             </p>
           </div>
           <button
@@ -197,7 +200,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     textTransform: 'uppercase',
                   }}
                 >
-                  Modo clásico
+                  Preventa UKI
                 </span>
                 <h3
                   id="single-mode-title"
@@ -283,7 +286,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               fullWidth
               onClick={() => onSelectMode('single')}
             >
-              Jugar solo
+              Jugar 1P
             </TreasureButton>
           </section>
 

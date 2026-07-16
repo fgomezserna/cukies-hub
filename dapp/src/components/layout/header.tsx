@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 const ranks = [
   { xp: 50000, name: 'Hyppie Master' },
   { xp: 20000, name: 'Hyperliquid Veteran' },
-  { xp: 10000, name: 'Sybil Slayer' },
+  { xp: 10000, name: 'Treasure Hunter' },
   { xp: 5000, name: 'Experimented Hyppie' },
   { xp: 2500, name: 'Explorer' },
 ];

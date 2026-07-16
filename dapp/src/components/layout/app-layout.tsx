@@ -54,7 +54,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isMobileGameShell = useMobileGameShell();
   const isMobileTreasureHunt =
-    isMobileGameShell && pathname === '/games/sybil-slayer';
+    isMobileGameShell && pathname === '/games/treasure-hunt';
   const isCukiesSection =
     pathname.startsWith('/cukies') ||
     pathname.startsWith('/marketplace') ||

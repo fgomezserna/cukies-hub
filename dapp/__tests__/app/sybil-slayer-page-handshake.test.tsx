@@ -26,13 +26,23 @@ jest.mock('@/components/layout/GameLayout', () => ({
   default: ({
     iframeRef,
     gameConfig,
+    children,
   }: {
     iframeRef: React.RefObject<HTMLIFrameElement>;
     gameConfig: { gameUrl: string };
-  }) => <iframe ref={iframeRef} src={gameConfig.gameUrl} title="mock-game-frame" />,
+    children?: React.ReactNode;
+  }) => <>
+    <iframe ref={iframeRef} src={gameConfig.gameUrl} title="mock-game-frame" />
+    {children}
+  </>,
 }));
 
-import SybilSlayerPage from '@/app/(app)/games/sybil-slayer/page';
+jest.mock('@/components/games/treasure-hunt-competition-panel', () => ({
+  __esModule: true,
+  default: () => <div data-testid="competition-panel" />,
+}));
+
+import SybilSlayerPage from '@/app/(app)/games/treasure-hunt/page';
 import { useGameData } from '@/hooks/use-game-data';
 import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
 import { useTreasureHuntMultiplayerBridge } from '@/hooks/use-treasure-hunt-multiplayer-bridge';
@@ -58,7 +68,8 @@ describe('SybilSlayerPage game-session handshake', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    window.history.replaceState({}, '', '/games/sybil-slayer?room=INVITED');
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/games/treasure-hunt?room=INVITED');
 
     mockUseAuth.mockReturnValue({
       isLoading: false,
@@ -72,7 +83,7 @@ describe('SybilSlayerPage game-session handshake', () => {
       gameConfig: {
         id: 'config-1',
         gameId: 'sybil-slayer',
-        name: 'Sybil Slayer',
+        name: 'Treasure Hunt',
         description: 'Test game',
         gameUrl: `${GAME_ORIGIN}/treasure-hunt`,
         ranks: [],
@@ -135,7 +146,7 @@ describe('SybilSlayerPage game-session handshake', () => {
       </StrictMode>,
     );
     act(() => {
-      window.history.replaceState({}, '', '/games/sybil-slayer?room=ROOM-TWO');
+      window.history.replaceState({}, '', '/games/treasure-hunt?room=ROOM-TWO');
       latestBridgeOptions().onRoomJoined?.('ROOM-TWO');
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -201,7 +212,7 @@ describe('SybilSlayerPage game-session handshake', () => {
 
     postMessage.mockClear();
     act(() => {
-      window.history.replaceState({}, '', '/games/sybil-slayer?room=ROOM-THREE');
+      window.history.replaceState({}, '', '/games/treasure-hunt?room=ROOM-THREE');
       latestBridgeOptions().onRoomJoined?.('ROOM-THREE');
     });
     await waitFor(() =>
@@ -223,7 +234,7 @@ describe('SybilSlayerPage game-session handshake', () => {
     window.history.replaceState(
       { navigation: 'test' },
       '',
-      '/games/sybil-slayer?room=INVITED&campaign=summer#score',
+      '/games/treasure-hunt?room=INVITED&campaign=summer#score',
     );
     mockUseAuth.mockReturnValue({ isLoading: false, user: null });
     const sessionResponse = (sessionId: string) => new Response(
@@ -507,6 +518,216 @@ describe('SybilSlayerPage game-session handshake', () => {
     expect(localStorage.getItem('session_token_parent-session')).toBeNull();
   });
 
+  it('requires a signed wallet in the Hub instead of silently starting practice', () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, user: null });
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+          requestId: 'wallet-required-request',
+          sessionId: null,
+        },
+      }));
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'TREASURE_HUNT_COMPETITION_START_RESPONSE',
+      requestId: 'wallet-required-request',
+      sessionId: null,
+      eligible: false,
+      practice: false,
+      reason: 'SIGNED_WALLET_REQUIRED',
+    }, GAME_ORIGIN);
+  });
+
+  it('keeps the opaque resume id through real auth hydration from loading to wallet', async () => {
+    const sessionId = `game_${'1'.repeat(64)}`;
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+      JSON.stringify([{ ownerKey: 'wallet-user', sessionId }]),
+    );
+    mockUseAuth.mockReturnValue({ isLoading: true, user: null });
+    const fetchMock = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `session_${'2'.repeat(43)}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+
+    const view = render(<SybilSlayerPage />);
+    expect(fetchMock).not.toHaveBeenCalled();
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      user: { id: 'wallet-user', username: 'Player One', email: 'player@example.test' },
+    });
+    view.rerender(<SybilSlayerPage />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      resumeSessionId: sessionId,
+    });
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+  });
+
+  it('starts a ranked 1P attempt only for the trusted iframe and returns no receipt', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        sessionId: 'competition-session',
+        sessionToken: 'parent-memory-token',
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        attempt: {
+          attemptId: 'attempt-1',
+          seed: 'server-seed',
+          alias: 'Hunter-ABC123',
+          status: 'active',
+          nextSequence: 0,
+          receipt: 'parent-only-receipt',
+        },
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('competition-session'));
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: 'https://evil.example',
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+          requestId: 'evil-request-id',
+          sessionId: 'competition-session',
+        },
+      }));
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+          requestId: 'trusted-request-id',
+          sessionId: 'competition-session',
+        },
+      }));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/games/treasure-hunt/competition/attempts',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ gameSessionId: 'competition-session' }),
+      }),
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'TREASURE_HUNT_COMPETITION_START_RESPONSE',
+        requestId: 'trusted-request-id',
+        sessionId: 'competition-session',
+        eligible: true,
+        practice: false,
+        attemptId: 'attempt-1',
+        seed: 'server-seed',
+        alias: 'Hunter-ABC123',
+        status: 'active',
+      },
+      GAME_ORIGIN,
+    ));
+    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('parent-only-receipt');
+    expect(mockUsePusherGameConnection).toHaveBeenLastCalledWith(
+      'competition-session',
+      expect.any(Object),
+      expect.objectContaining({
+        competitionCoordinator: expect.objectContaining({
+          hasActiveAttempt: expect.any(Function),
+          finish: expect.any(Function),
+        }),
+      }),
+    );
+  });
+
+  it('fails an expired resumed session closed and rotates it before the next play', async () => {
+    const staleSessionId = `game_${'3'.repeat(64)}`;
+    const freshSessionId = `game_${'4'.repeat(64)}`;
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+      JSON.stringify([{ ownerKey: 'wallet-user', sessionId: staleSessionId }]),
+    );
+    const sessionResponse = (sessionId: string) => new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `token-${sessionId}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(sessionResponse(staleSessionId))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: false,
+        error: 'GAME_SESSION_NOT_ELIGIBLE',
+        message: 'Session expired',
+      }), { status: 403, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(sessionResponse(freshSessionId));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(staleSessionId));
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+          requestId: 'expired-session-request',
+          sessionId: staleSessionId,
+        },
+      }));
+    });
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'TREASURE_HUNT_COMPETITION_START_RESPONSE',
+      requestId: 'expired-session-request',
+      sessionId: staleSessionId,
+      eligible: false,
+      practice: false,
+      reason: 'GAME_SESSION_RESTART_REQUIRED',
+    }, GAME_ORIGIN));
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'GAME_SESSION_CLEAR',
+      sessionId: staleSessionId,
+    }, GAME_ORIGIN);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(freshSessionId));
+  });
+
   it('rotates to a fresh normal GameSession only after the bridge confirms release', async () => {
     const sessionResponse = (sessionId: string, sessionToken: string) => new Response(
       JSON.stringify({
@@ -539,5 +760,322 @@ describe('SybilSlayerPage game-session handshake', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('fresh-single-session'));
     expect(JSON.stringify(postMessage.mock.calls)).not.toContain('fresh-token');
+  });
+
+  it('resumes the same parent GameSession after a full page remount without storing its bearer', async () => {
+    const sessionId = `game_${'a'.repeat(64)}`;
+    const sessionToken = `session_${'b'.repeat(43)}`;
+    const sessionResponse = () => new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = jest.fn()
+      .mockImplementationOnce(async () => sessionResponse())
+      .mockImplementationOnce(async () => sessionResponse());
+    global.fetch = fetchMock as typeof fetch;
+
+    const first = render(<SybilSlayerPage />);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+    const stored = sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    );
+    expect(stored).toContain(sessionId);
+    expect(stored).not.toContain(sessionToken);
+    first.unmount();
+
+    render(<SybilSlayerPage />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      resumeSessionId: sessionId,
+    });
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+    expect(JSON.stringify(sessionStorage)).not.toContain(sessionToken);
+  });
+
+  it('remounts the competition panel after a confirmed review result and clears that exact result', async () => {
+    const sessionId = `game_${'c'.repeat(64)}`;
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `session_${'d'.repeat(43)}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const postMessage = jest.spyOn(iframe.contentWindow as Window, 'postMessage')
+      .mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+    const panelBefore = screen.getByTestId('competition-panel');
+    const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
+      onSessionEnd: (result: Record<string, unknown>) => Promise<void>;
+    };
+
+    await act(async () => {
+      await options.onSessionEnd({
+        resultId: 'result-review-123',
+        finalScore: 900,
+        isValid: false,
+        source: 'competition',
+        status: 'review',
+        clearConfirmationRequired: true,
+      });
+    });
+
+    expect(screen.getByTestId('competition-panel')).not.toBe(panelBefore);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'GAME_SESSION_CLEAR',
+      sessionId,
+      resultId: 'result-review-123',
+    }, GAME_ORIGIN);
+  });
+
+  it('uses confirmed exact CLEAR for a modern persisted result even when practice routes through legacy', async () => {
+    const sessionId = `game_${'7'.repeat(64)}`;
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `session_${'8'.repeat(43)}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const postMessage = jest.spyOn(iframe.contentWindow as Window, 'postMessage')
+      .mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+    const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
+      onSessionEnd: (result: Record<string, unknown>) => Promise<void>;
+    };
+
+    await act(async () => {
+      await options.onSessionEnd({
+        resultId: 'result-modern-practice',
+        finalScore: 55,
+        isValid: false,
+        source: 'legacy',
+        status: null,
+        clearConfirmationRequired: true,
+      });
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'GAME_SESSION_CLEAR',
+      sessionId,
+      resultId: 'result-modern-practice',
+    }, GAME_ORIGIN);
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:pending-session-clear:v1',
+    )).toContain('result-modern-practice');
+    expect(latestBridgeOptions().currentSessionId).toBe(sessionId);
+  });
+
+  it('replays a modern practice CLEAR after parent reload between backend ACK and ACK confirmation', async () => {
+    const sessionId = `game_${'9'.repeat(64)}`;
+    const sessionResponse = () => new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `session_${'a'.repeat(43)}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = jest.fn()
+      .mockImplementationOnce(async () => sessionResponse())
+      .mockImplementationOnce(async () => sessionResponse());
+    global.fetch = fetchMock as typeof fetch;
+    const first = render(<SybilSlayerPage />);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+    const firstOptions = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
+      onGameEndPersisted: (result: Record<string, unknown>) => boolean;
+    };
+
+    expect(firstOptions.onGameEndPersisted({
+      resultId: 'result-practice-before-confirm',
+      clearConfirmationRequired: true,
+    })).toBe(true);
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:pending-session-clear:v1',
+    )).toContain('result-practice-before-confirm');
+    first.unmount();
+
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toMatchObject({
+      resumeSessionId: sessionId,
+    });
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'GAME_SESSION_CLEAR',
+      sessionId,
+      resultId: 'result-practice-before-confirm',
+    }, GAME_ORIGIN);
+  });
+
+  it('recovers and ACKs a competition result after reload even when the ended session cannot reconnect Pusher', async () => {
+    const sessionId = `game_${'e'.repeat(64)}`;
+    sessionStorage.setItem('cukies:treasure-hunt:parent-session:v1:sybil-slayer', JSON.stringify({
+      ownerKey: 'wallet-user',
+      sessionId,
+    }));
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        sessionId,
+        sessionToken: `session_${'f'.repeat(43)}`,
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        attempts: [{
+          attemptId: 'attempt-reload-review',
+          seed: 'seed-reload',
+          alias: 'Hunter-RELOAD',
+          status: 'review',
+          nextSequence: 3,
+          receipt: null,
+          score: 808,
+          gameTimeMs: 30_000,
+        }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toMatchObject({
+      resumeSessionId: sessionId,
+    });
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
+          sessionId,
+          resultId: 'result-after-reload',
+          competitionAttemptId: 'attempt-reload-review',
+          finalScore: 808,
+          gameTime: 30_000,
+        },
+      }));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls[1][0]).toContain(
+      '/api/games/treasure-hunt/competition/attempts?limit=500',
+    );
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY_ACK',
+      sessionId,
+      resultId: 'result-after-reload',
+    }, GAME_ORIGIN));
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:pending-session-clear:v1',
+    )).toContain('result-after-reload');
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY_ACK_CONFIRMED',
+          sessionId,
+          resultId: 'result-after-reload',
+        },
+      }));
+    });
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'GAME_SESSION_CLEAR',
+      sessionId,
+      resultId: 'result-after-reload',
+    }, GAME_ORIGIN));
+  });
+
+  it('replays an exact pending clear after parent reload and forgets the session only after iframe confirmation', async () => {
+    const oldSessionId = `game_${'5'.repeat(64)}`;
+    const freshSessionId = `game_${'6'.repeat(64)}`;
+    const resultId = 'result-final-clear-123';
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+      JSON.stringify([{ ownerKey: 'wallet-user', sessionId: oldSessionId }]),
+    );
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:pending-session-clear:v1',
+      JSON.stringify([{ ownerUserId: 'wallet-user', sessionId: oldSessionId, resultId }]),
+    );
+    const sessionResponse = (sessionId: string) => new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `token-${sessionId}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(sessionResponse(oldSessionId))
+      .mockResolvedValueOnce(sessionResponse(freshSessionId));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(oldSessionId));
+
+    postMessage.mockClear();
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'GAME_SESSION_CLEAR',
+      sessionId: oldSessionId,
+      resultId,
+    }, GAME_ORIGIN);
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    )).toContain(oldSessionId);
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_GAME_SESSION_CLEAR_CONFIRMED',
+          sessionId: oldSessionId,
+          resultId,
+        },
+      }));
+    });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(freshSessionId));
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    )).not.toContain(oldSessionId);
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:pending-session-clear:v1',
+    )).toBeNull();
   });
 });
