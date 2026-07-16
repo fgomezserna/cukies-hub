@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { useIsMobile } from '@/hooks/use-mobile'
 
 describe('hooks/use-mobile', () => {
@@ -115,7 +115,9 @@ describe('hooks/use-mobile', () => {
     mockInnerWidth(400)
 
     // Dispatch change event to notify listeners
-    listeners.forEach(listener => listener())
+    act(() => {
+      listeners.forEach(listener => listener())
+    })
 
     // Trigger a rerender to simulate the effect
     rerender()

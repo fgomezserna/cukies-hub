@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import Script from 'next/script';
 import './globals.css';
 import PWASetup from '@/components/pwa-setup';
@@ -12,6 +13,14 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+});
+
+const alumniSans = localFont({
+  src: '../../public/assets/ui/fonts/AlumniSans-Variable.ttf',
+  variable: '--font-alumni-sans',
+  display: 'swap',
+  style: 'normal',
+  weight: '100 900',
 });
 
 export const metadata: Metadata = {
@@ -55,8 +64,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="es" className="dark">
+      <head>
+        <link
+          rel="preload"
+          as="image"
+          href="/assets/ui/game-container/treasure-vault-background.webp"
+          type="image/webp"
+        />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${alumniSans.variable} antialiased`}>
         <Script 
           src="/joy.js" 
           strategy="afterInteractive"

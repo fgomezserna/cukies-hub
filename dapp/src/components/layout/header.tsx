@@ -27,6 +27,7 @@ import { useAccount, useConnect, useDisconnect, type Connector } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
 import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
 import { HeaderWalletDialog } from '@/components/layout/header-wallet-dialog';
+import { cn } from '@/lib/utils';
 
 
 
@@ -43,7 +44,12 @@ const getRank = (xp: number): string => {
   return userRank ? userRank.name : 'Sin rango';
 };
 
-export default function Header() {
+interface HeaderProps {
+  variant?: 'default' | 'game-overlay';
+}
+
+export default function Header({ variant = 'default' }: HeaderProps) {
+  const isGameOverlay = variant === 'game-overlay';
   const { toggleSidebar, state, isMobile } = useSidebar();
   const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
   const { address: evmAddress, isConnected: isEvmConnected } = useAccount();
@@ -115,27 +121,44 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-teal-400/20 bg-black/25 backdrop-blur-md shadow-lg shadow-teal-400/10 px-4 sm:px-6">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={toggleSidebar}
-        className="hover:bg-teal-400/10 hover:text-cyan-300 transition-all duration-300"
-      >
-        <PanelLeft />
-        <span className="sr-only">Alternar barra lateral</span>
-      </Button>
+    <header
+      className={cn(
+        'z-50 flex items-center',
+        isGameOverlay
+          ? 'pointer-events-none absolute h-auto w-auto bg-transparent p-0'
+          : 'sticky top-0 h-16 shrink-0 gap-4 border-b border-teal-400/20 bg-black/25 px-4 shadow-lg shadow-teal-400/10 backdrop-blur-md sm:px-6',
+      )}
+      style={isGameOverlay ? {
+        top: 'max(0.5rem, env(safe-area-inset-top))',
+        right: 'max(0.5rem, env(safe-area-inset-right))',
+      } : undefined}
+    >
+      {!isGameOverlay && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="hover:bg-teal-400/10 hover:text-cyan-300 transition-all duration-300"
+        >
+          <PanelLeft />
+          <span className="sr-only">Alternar barra lateral</span>
+        </Button>
+      )}
 
-      {(isMobile || state === 'collapsed') && (
+      {!isGameOverlay && (isMobile || state === 'collapsed') && (
         <div className="flex items-center gap-2 group h-full">
-            <Image src="/Cukie_logo_first.png" alt="Cukies World" width={140} height={40} className="object-contain max-h-[48px] w-auto" />
+          <Image src="/Cukie_logo_first.png" alt="Cukies World" width={140} height={40} className="object-contain max-h-[48px] w-auto" />
         </div>
       )}
 
-      <div className="flex-1">
-      </div>
-      <div className="flex items-center gap-4">
-        {user && (
+      {!isGameOverlay && <div className="flex-1" />}
+      <div
+        className={cn(
+          'flex items-center gap-4',
+          isGameOverlay && 'pointer-events-auto gap-2',
+        )}
+      >
+        {user && !isGameOverlay && (
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="relative rounded-full group hover:bg-teal-400/10 transition-all duration-300">
@@ -177,8 +200,19 @@ export default function Header() {
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full group hover:bg-teal-400/10 transition-all duration-300">
-                <Avatar className="h-10 w-10 border-2 border-cyan-300/30 group-hover:border-cyan-300/60 transition-all duration-300">
+              <Button
+                variant="ghost"
+                className={cn(
+                  'relative h-10 w-10 rounded-full group hover:bg-teal-400/10 transition-all duration-300',
+                  isGameOverlay && 'h-11 w-11',
+                )}
+              >
+                <Avatar
+                  className={cn(
+                    'h-10 w-10 border-2 border-cyan-300/30 group-hover:border-cyan-300/60 transition-all duration-300',
+                    isGameOverlay && 'h-11 w-11',
+                  )}
+                >
                   <AvatarImage src={user.profilePictureUrl ?? "https://placehold.co/100x100.png"} alt={user.username ?? "user"} data-ai-hint="profile avatar" />
                   <AvatarFallback className="bg-gradient-to-br from-cyan-300 to-teal-400 text-white font-bold">
                     {user.username?.slice(0,1).toUpperCase() ?? "U"}
@@ -230,25 +264,27 @@ export default function Header() {
             <Button 
               onClick={() => !isWaitingForApproval && setIsWalletDialogOpen(true)} 
               disabled={isWaitingForApproval || isAuthLoading}
-              className={`${
-                isWaitingForApproval 
-                  ? "bg-gradient-to-r from-amber-500 to-orange-600 cursor-not-allowed" 
-                  : "bg-gradient-to-r from-teal-400 to-teal-500 hover:from-teal-500 hover:to-teal-600 hover:scale-105 hover:shadow-xl hover:shadow-teal-400/40"
-              } text-white font-bold px-6 py-2 rounded-xl shadow-lg transition-all duration-300 ${
-                isWaitingForApproval ? "shadow-amber-500/30 animate-pulse" : "shadow-teal-400/30"
-              }`}
+              className={cn(
+                isWaitingForApproval
+                  ? 'cursor-not-allowed bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/30 animate-pulse'
+                  : 'bg-gradient-to-r from-teal-400 to-teal-500 shadow-teal-400/30 hover:from-teal-500 hover:to-teal-600 hover:scale-105 hover:shadow-xl hover:shadow-teal-400/40',
+                'rounded-xl px-6 py-2 font-bold text-white shadow-lg transition-all duration-300',
+                isGameOverlay && 'h-11 w-11 rounded-full border border-cyan-200/30 bg-black/45 p-0 backdrop-blur-md hover:bg-black/65',
+              )}
+              aria-label={isWaitingForApproval ? 'Esperando aprobación de wallet' : 'Conectar wallet'}
+              title={isGameOverlay ? 'Conectar wallet' : undefined}
             >
               {isWaitingForApproval || isAuthLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent md:mr-2" />
-                  <span className="hidden md:inline">
+                  <div className={cn('animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent', !isGameOverlay && 'md:mr-2')} />
+                  <span className={cn(isGameOverlay ? 'sr-only' : 'hidden md:inline')}>
                     {isWaitingForApproval ? 'Esperando aprobación...' : 'Cargando...'}
                   </span>
                 </>
               ) : (
                 <>
-                  <Wallet className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Conectar wallet</span>
+                  <Wallet className={cn('h-4 w-4', !isGameOverlay && 'md:mr-2')} />
+                  <span className={cn(isGameOverlay ? 'sr-only' : 'hidden md:inline')}>Conectar wallet</span>
                 </>
               )}
             </Button>

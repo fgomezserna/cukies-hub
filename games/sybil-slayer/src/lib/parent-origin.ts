@@ -51,6 +51,29 @@ export function resolveConfiguredParentOrigin(
     : allowedOrigins[0];
 }
 
+export function buildTreasureHuntHubEntryUrl(
+  currentSearch: string,
+  dappOrigin?: string,
+  parentUrl?: string,
+  nodeEnv: string | undefined = 'production',
+): string | null {
+  try {
+    const origin = resolveConfiguredParentOrigin('', dappOrigin, parentUrl, nodeEnv);
+    const hubUrl = new URL('/games/sybil-slayer', origin);
+    const roomCode = new URLSearchParams(currentSearch).get('room')?.trim();
+
+    // Invitation links only need the room code. Do not forward arbitrary query
+    // parameters from the standalone game into the authenticated DApp.
+    if (roomCode && roomCode.length <= 128) {
+      hubUrl.searchParams.set('room', roomCode);
+    }
+
+    return hubUrl.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function buildFrameAncestorsPolicy(
   nodeEnv: string | undefined,
   dappOrigin?: string,

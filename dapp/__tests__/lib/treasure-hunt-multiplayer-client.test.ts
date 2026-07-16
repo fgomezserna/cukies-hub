@@ -16,6 +16,7 @@ import {
   type PublicMatch,
 } from '../../../games/sybil-slayer/src/lib/multiplayer-client';
 import {
+  buildTreasureHuntHubEntryUrl,
   buildFrameAncestorsPolicy,
   resolveConfiguredParentOrigin,
 } from '../../../games/sybil-slayer/src/lib/parent-origin';
@@ -24,6 +25,7 @@ import {
   getSuddenDeathObjectiveCopy,
   isTreasureHuntMatchNonTerminal,
   isTreasureHuntMultiplayerEnabled,
+  resolveTreasureHuntMultiplayerEntryState,
   shouldBlockLocalGameControls,
 } from '../../../games/sybil-slayer/src/lib/multiplayer-feature';
 import { InMemoryMatchRepository } from '@/lib/treasure-hunt-multiplayer';
@@ -146,6 +148,43 @@ describe('Treasure Hunt multiplayer parent transport', () => {
       .toBe("'self' https://hub.example");
     expect(buildFrameAncestorsPolicy('development', PARENT_ORIGIN)).toContain('http://localhost:*');
     expect(buildFrameAncestorsPolicy('development', PARENT_ORIGIN)).toContain(PARENT_ORIGIN);
+  });
+
+  it('routes standalone multiplayer into the Hub without forwarding unrelated query data', () => {
+    expect(buildTreasureHuntHubEntryUrl(
+      '?room=ROOM-1&session_token=must-not-leak',
+      PARENT_ORIGIN,
+      undefined,
+      'production',
+    )).toBe('https://hub.example/games/sybil-slayer?room=ROOM-1');
+    expect(buildTreasureHuntHubEntryUrl('', undefined, undefined, 'production')).toBeNull();
+  });
+
+  it('only enables in-frame multiplayer after the parent authority is ready', () => {
+    expect(resolveTreasureHuntMultiplayerEntryState({
+      enabled: false,
+      authorityReady: true,
+      standaloneRuntime: false,
+      hubUrlAvailable: true,
+    })).toBe('disabled');
+    expect(resolveTreasureHuntMultiplayerEntryState({
+      enabled: true,
+      authorityReady: false,
+      standaloneRuntime: false,
+      hubUrlAvailable: true,
+    })).toBe('connecting');
+    expect(resolveTreasureHuntMultiplayerEntryState({
+      enabled: true,
+      authorityReady: false,
+      standaloneRuntime: true,
+      hubUrlAvailable: true,
+    })).toBe('hub');
+    expect(resolveTreasureHuntMultiplayerEntryState({
+      enabled: true,
+      authorityReady: true,
+      standaloneRuntime: false,
+      hubUrlAvailable: false,
+    })).toBe('ready');
   });
 
   it('correlates responses and ignores a wrong source, origin or request id', async () => {

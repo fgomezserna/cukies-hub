@@ -1,9 +1,15 @@
 "use client";
 
-import React from 'react';
 import Image from 'next/image';
-import { useIsMobile } from '../hooks/use-mobile';
-import { isTreasureHuntMultiplayerEnabled } from '../lib/multiplayer-feature';
+import React from 'react';
+
+import type { TreasureHuntMultiplayerEntryState } from '../lib/multiplayer-feature';
+import {
+  OrnamentalDivider,
+  TreasureButton,
+  TreasurePanel,
+  joinClasses,
+} from './treasure-hunt-ui';
 
 type GameMode = 'single' | 'multiplayer';
 
@@ -13,6 +19,7 @@ interface ModeSelectModalProps {
   onSelectMode: (mode: GameMode) => void;
   defaultMode?: GameMode;
   onRulesClick?: () => void;
+  multiplayerEntryState: TreasureHuntMultiplayerEntryState;
 }
 
 const modeCopy: Record<GameMode, { title: string; description: string }> = {
@@ -26,16 +33,49 @@ const modeCopy: Record<GameMode, { title: string; description: string }> = {
   },
 };
 
+const cardStyle: React.CSSProperties = {
+  position: 'relative',
+  display: 'flex',
+  minWidth: 0,
+  minHeight: 430,
+  flexDirection: 'column',
+  overflow: 'hidden',
+  padding: '22px 24px 20px',
+  color: 'var(--th-cream)',
+  border: '1px solid rgba(215, 163, 67, 0.55)',
+  background:
+    'linear-gradient(165deg, rgba(12, 52, 47, 0.96), rgba(3, 20, 18, 0.98) 66%)',
+  clipPath:
+    'polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px)',
+  transition: 'border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease',
+};
+
 const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   open,
   onClose,
   onSelectMode,
   defaultMode = 'single',
   onRulesClick,
+  multiplayerEntryState,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
-  const isMobile = useIsMobile();
-  const multiplayerEnabled = isTreasureHuntMultiplayerEnabled();
+  const multiplayerInteractive =
+    multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
+  const multiplayerActionCopy =
+    multiplayerEntryState === 'ready'
+      ? 'JUGAR 2P'
+      : multiplayerEntryState === 'hub'
+        ? 'ABRIR HUB'
+        : multiplayerEntryState === 'connecting'
+          ? 'CONECTA WALLET'
+          : 'PRÓXIMAMENTE';
+  const multiplayerDescription =
+    multiplayerEntryState === 'hub'
+      ? 'Abre Cukies Hub y conecta la wallet para jugar.'
+      : multiplayerEntryState === 'connecting'
+        ? 'Conecta la wallet en Cukies Hub para activar el modo 2P.'
+        : 'Partida de prueba sin ranking ni recompensas.';
+  const highlightedMode = hoveredMode ?? defaultMode;
 
   React.useEffect(() => {
     if (!open) {
@@ -45,295 +85,376 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
 
   if (!open) return null;
 
-  // Estructura diferente para móvil: pantalla completa
-  if (isMobile) {
-    return (
-      <div
-        className="fixed inset-0 z-[70] flex flex-col bg-black/95 backdrop-blur-sm"
-        onClick={onClose}
+  return (
+    <div
+      className="th-modal-layer"
+      onClick={onClose}
+      role="presentation"
+    >
+      <TreasurePanel
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="treasure-mode-title"
+        onClick={event => event.stopPropagation()}
+        style={{
+          display: 'flex',
+          width: 1004,
+          height: 696,
+          flexDirection: 'column',
+          padding: '26px 30px 28px',
+        }}
       >
-        {/* Header fijo */}
-        <div className="relative flex-shrink-0 bg-slate-900/95 border-b border-pink-400/60 px-4 py-3">
+        <header
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'start',
+            gap: 24,
+          }}
+        >
+          <div aria-hidden="true" />
+          <div style={{ textAlign: 'center' }}>
+            <p className="th-screen-kicker" style={{ marginBottom: 2 }}>
+              Elige tu desafío
+            </p>
+            <h2
+              id="treasure-mode-title"
+              className="th-screen-title"
+              style={{ fontSize: 38, lineHeight: '44px' }}
+            >
+              Selecciona modo de juego
+            </h2>
+            <p
+              style={{
+                margin: '5px 0 0',
+                color: 'var(--th-cream-muted)',
+                font: "600 15px/21px var(--th-font-ui)",
+              }}
+            >
+              Misma caza. Dos formas de conquistar el tesoro.
+            </p>
+          </div>
           <button
+            type="button"
+            className="th-close-button"
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50 focus:outline-none z-10"
             aria-label="Cerrar selector de modo"
+            style={{ justifySelf: 'end' }}
           >
             ×
           </button>
-          <div className="text-center pr-10">
-            <h2 className="text-xl font-pixellari text-pink-200 tracking-wide leading-tight">
-              Selecciona modo de juego
-            </h2>
-          </div>
+        </header>
+
+        <div style={{ margin: '18px 6px 20px' }}>
+          <OrnamentalDivider />
         </div>
 
-        {/* Contenido scrolleable */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
-          <div className="flex flex-wrap justify-center gap-4">
-          {/* Single Player Mode */}
-          <button
-            onClick={() => onSelectMode('single')}
-            onMouseEnter={() => setHoveredMode('single')}
-            onMouseLeave={() => setHoveredMode(null)}
-            className="group relative flex flex-col p-4 rounded-lg border border-pink-400/40 bg-slate-800/60 shadow-lg shadow-pink-500/10 hover:border-pink-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-full max-w-[280px]"
-          >
-            <div className="flex flex-col gap-4 items-center w-full">
-              <div className="flex items-center justify-center gap-3 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-400/20">
-                  <span className="font-pixellari text-lg font-bold text-pink-200">1P</span>
-                </div>
-                <div>
-                  <h3 className="font-pixellari text-2xl text-pink-200">
-                    {modeCopy.single.title}
-                  </h3>
-                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-pink-300/80">
-                    MODO CLÁSICO
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-center w-full">
-                <Image
-                  src="/assets/characters/1p.png"
-                  alt="1P"
-                  width={300}
-                  height={300}
-                  quality={100}
-                  className="object-contain w-[100px] h-[100px]"
-                />
-              </div>
-              {/* Botón de Reglas - debajo de la imagen */}
-              {onRulesClick && (
-                <div className="flex justify-center w-full">
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRulesClick();
-                    }}
-                    className="focus:outline-none game-button relative mt-2 cursor-pointer"
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Reglas"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onRulesClick();
-                      }
-                    }}
-                  >
-                    <Image 
-                      src="/assets/ui/buttons/caja-texto2.png"
-                      alt="Reglas"
-                      width={120}
-                      height={50}
-                      className="game-img"
-                    />
-                    <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                      REGLAS
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </button>
-
-          {/* Multiplayer Mode */}
-          <button
-            type="button"
-            data-testid="treasure-hunt-multiplayer-mode"
-            disabled={!multiplayerEnabled}
-            onClick={() => multiplayerEnabled && onSelectMode('multiplayer')}
-            className={`group relative flex flex-col p-4 rounded-lg border w-full max-w-[280px] transition-all duration-200 ${
-              multiplayerEnabled
-                ? 'border-cyan-400/60 bg-slate-800/70 hover:border-cyan-300 hover:bg-slate-800/90 focus:outline-none'
-                : 'border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 cursor-not-allowed select-none'
-            }`}
-          >
-            <div className="flex flex-col gap-4 items-center">
-              <div className="flex items-center justify-center gap-3 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/30 bg-pink-400/10 opacity-60">
-                  <span className="font-pixellari text-lg font-bold text-pink-200/60">2P</span>
-                </div>
-                <div>
-                  <h3 className="font-pixellari text-2xl text-pink-200/60">
-                    {modeCopy.multiplayer.title}
-                  </h3>
-                  <p className="text-xs uppercase tracking-[0.2em] font-pixellari text-pink-300/70">
-                    STAGING · SIN RANKING
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex flex-row items-center justify-center">
-                  <Image
-                    src="/assets/characters/vs.png"
-                    alt="VS"
-                    width={600}
-                    height={300}
-                    quality={100}
-                    className={`object-contain w-[240px] h-[120px] ${multiplayerEnabled ? '' : 'opacity-60'}`}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
-                <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
-                  {multiplayerEnabled ? 'JUGAR 2P' : 'PRÓXIMAMENTE'}
-                </span>
-              </div>
-              <p className="text-center text-xs font-pixellari text-cyan-100/70">
-                Prueba sin ranking ni recompensas.
-              </p>
-            </div>
-          </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Estructura original para escritorio
-  return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6 overflow-y-auto"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-5xl rounded-xl border border-pink-400/60 bg-slate-900/90 p-6 shadow-2xl shadow-pink-500/10"
-        onClick={event => event.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-red-600/80 hover:bg-red-500 text-white font-bold text-xl transition-colors duration-200 shadow-lg hover:shadow-red-500/50 focus:outline-none"
-          aria-label="Cerrar selector de modo"
+        <div
+          style={{
+            display: 'grid',
+            minHeight: 0,
+            flex: 1,
+            gridTemplateColumns: '1fr 1fr',
+            gap: 18,
+          }}
         >
-          ×
-        </button>
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-pixellari text-pink-200 tracking-wide">
-            Selecciona modo de juego
-          </h2>
-          <p className="mt-2 text-sm font-pixellari text-pink-200/80">
-            Elige cómo quieres jugar.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-6">
-          {/* Single Player Mode */}
-          <button
-            onClick={() => onSelectMode('single')}
+          <section
+            className="th-mode-card"
+            aria-labelledby="single-mode-title"
             onMouseEnter={() => setHoveredMode('single')}
             onMouseLeave={() => setHoveredMode(null)}
-            className="group relative flex flex-col p-6 rounded-lg border border-pink-400/40 bg-slate-800/60 shadow-lg shadow-pink-500/10 hover:border-pink-400/80 hover:bg-slate-800/80 transition-all duration-200 focus:outline-none w-[280px]"
+            onFocus={() => setHoveredMode('single')}
+            onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setHoveredMode(null);
+              }
+            }}
+            style={{
+              ...cardStyle,
+              borderColor:
+                highlightedMode === 'single' ? 'var(--th-teal)' : 'rgba(215, 163, 67, 0.55)',
+              boxShadow:
+                highlightedMode === 'single'
+                  ? 'inset 0 0 40px rgba(33, 221, 212, 0.08), 0 0 24px rgba(33, 221, 212, 0.13)'
+                  : 'inset 0 0 28px rgba(33, 221, 212, 0.025)',
+              transform: highlightedMode === 'single' ? 'translateY(-2px)' : 'none',
+            }}
           >
-            <div className="flex flex-col gap-4 items-center">
-              <div className="flex items-center justify-center gap-3 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/60 bg-pink-400/20">
-                  <span className="font-pixellari text-lg font-bold text-pink-200">1P</span>
-                </div>
-                <div>
-                  <h3 className="font-pixellari text-2xl text-pink-200">
-                    {modeCopy.single.title}
-                  </h3>
-                  <p className="text-xs uppercase tracking-[0.25em] font-pixellari text-pink-300/80">
-                    MODO CLÁSICO
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-center">
-                <Image
-                  src="/assets/characters/1p.png"
-                  alt="1P"
-                  width={300}
-                  height={300}
-                  quality={100}
-                  className="object-contain w-[100px] h-[100px]"
-                />
-              </div>
-              {/* Botón de Reglas - debajo de la imagen */}
-              {onRulesClick && (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRulesClick();
-                  }}
-                  className="focus:outline-none game-button relative mt-2 cursor-pointer"
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Reglas"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onRulesClick();
-                    }
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 18,
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    color: 'var(--th-teal)',
+                    font: "800 15px/20px var(--th-font-ui)",
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
                   }}
                 >
-                  <Image 
-                    src="/assets/ui/buttons/caja-texto2.png"
-                    alt="Reglas"
-                    width={120}
-                    height={50}
-                    className="game-img"
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                    REGLAS
-                  </span>
-                </div>
-              )}
+                  Modo clásico
+                </span>
+                <h3
+                  id="single-mode-title"
+                  style={{
+                    margin: '2px 0 0',
+                    color: 'var(--th-cream)',
+                    font: "800 34px/40px Georgia, 'Times New Roman', serif",
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {modeCopy.single.title}
+                </h3>
+              </div>
+              <span
+                aria-hidden="true"
+                style={{
+                  display: 'grid',
+                  width: 54,
+                  height: 54,
+                  placeItems: 'center',
+                  flex: '0 0 auto',
+                  color: 'var(--th-cream)',
+                  font: "800 22px/1 var(--th-font-ui)",
+                  border: '2px solid var(--th-teal)',
+                  background: 'rgba(33, 221, 212, 0.12)',
+                  transform: 'rotate(45deg)',
+                }}
+              >
+                <span style={{ transform: 'rotate(-45deg)' }}>1P</span>
+              </span>
             </div>
-          </button>
 
-          {/* Multiplayer Mode */}
+            <div
+              style={{
+                position: 'relative',
+                display: 'grid',
+                height: 174,
+                placeItems: 'center',
+                margin: '6px 0 2px',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  width: 230,
+                  height: 130,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(33, 221, 212, 0.18), transparent 68%)',
+                }}
+              />
+              <Image
+                src="/assets/characters/1p.png"
+                alt="Personaje del modo para un jugador"
+                width={300}
+                height={300}
+                quality={100}
+                style={{
+                  position: 'relative',
+                  width: 190,
+                  height: 180,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 16px 14px rgba(0, 0, 0, 0.62))',
+                }}
+              />
+            </div>
+
+            <p
+              style={{
+                minHeight: 44,
+                margin: '0 4px 14px',
+                color: 'var(--th-cream-muted)',
+                font: "600 15px/22px var(--th-font-ui)",
+                textAlign: 'center',
+              }}
+            >
+              {modeCopy.single.description}
+            </p>
+
+            <TreasureButton
+              variant="primary"
+              size="medium"
+              fullWidth
+              onClick={() => onSelectMode('single')}
+            >
+              Jugar solo
+            </TreasureButton>
+          </section>
+
+          <section
+            className="th-mode-card"
+            aria-labelledby="multiplayer-mode-title"
+            onMouseEnter={() => setHoveredMode('multiplayer')}
+            onMouseLeave={() => setHoveredMode(null)}
+            onFocus={() => setHoveredMode('multiplayer')}
+            onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setHoveredMode(null);
+              }
+            }}
+            style={{
+              ...cardStyle,
+              borderColor:
+                highlightedMode === 'multiplayer'
+                  ? 'var(--th-teal)'
+                  : 'rgba(215, 163, 67, 0.55)',
+              boxShadow:
+                highlightedMode === 'multiplayer'
+                  ? 'inset 0 0 40px rgba(33, 221, 212, 0.08), 0 0 24px rgba(33, 221, 212, 0.13)'
+                  : 'inset 0 0 28px rgba(33, 221, 212, 0.025)',
+              transform: highlightedMode === 'multiplayer' ? 'translateY(-2px)' : 'none',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 18,
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    color: multiplayerInteractive ? 'var(--th-teal)' : 'var(--th-gold-light)',
+                    font: "800 15px/20px var(--th-font-ui)",
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  1 contra 1 · staging
+                </span>
+                <h3
+                  id="multiplayer-mode-title"
+                  style={{
+                    margin: '2px 0 0',
+                    color: 'var(--th-cream)',
+                    font: "800 34px/40px Georgia, 'Times New Roman', serif",
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {modeCopy.multiplayer.title}
+                </h3>
+              </div>
+              <span
+                aria-hidden="true"
+                style={{
+                  display: 'grid',
+                  width: 54,
+                  height: 54,
+                  placeItems: 'center',
+                  flex: '0 0 auto',
+                  color: 'var(--th-cream)',
+                  font: "800 22px/1 var(--th-font-ui)",
+                  border: `2px solid ${multiplayerInteractive ? 'var(--th-teal)' : 'var(--th-gold)'}`,
+                  background: multiplayerInteractive
+                    ? 'rgba(33, 221, 212, 0.12)'
+                    : 'rgba(215, 163, 67, 0.1)',
+                  transform: 'rotate(45deg)',
+                }}
+              >
+                <span style={{ transform: 'rotate(-45deg)' }}>2P</span>
+              </span>
+            </div>
+
+            <div
+              style={{
+                position: 'relative',
+                display: 'grid',
+                height: 174,
+                placeItems: 'center',
+                margin: '6px 0 2px',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  width: 270,
+                  height: 130,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(215, 163, 67, 0.14), transparent 70%)',
+                }}
+              />
+              <Image
+                src="/assets/characters/vs.png"
+                alt="Dos personajes preparados para un duelo"
+                width={600}
+                height={300}
+                quality={100}
+                className={joinClasses(!multiplayerInteractive && 'opacity-60')}
+                style={{
+                  position: 'relative',
+                  width: 310,
+                  height: 168,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 16px 14px rgba(0, 0, 0, 0.62))',
+                }}
+              />
+            </div>
+
+            <div style={{ minHeight: 58, margin: '0 4px 0', textAlign: 'center' }}>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--th-cream-muted)',
+                  font: "700 15px/20px var(--th-font-ui)",
+                }}
+              >
+                {multiplayerDescription}
+              </p>
+              <span
+                style={{
+                  color: 'var(--th-gold-light)',
+                  font: "650 12px/18px var(--th-font-ui)",
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {modeCopy.multiplayer.description}
+              </span>
+            </div>
+
+            <TreasureButton
+              data-testid="treasure-hunt-multiplayer-mode"
+              data-multiplayer-entry={multiplayerEntryState}
+              variant={multiplayerInteractive ? 'secondary' : 'quiet'}
+              size="medium"
+              fullWidth
+              disabled={!multiplayerInteractive}
+              onClick={() => multiplayerInteractive && onSelectMode('multiplayer')}
+            >
+              {multiplayerActionCopy}
+            </TreasureButton>
+          </section>
+        </div>
+
+        {onRulesClick ? (
           <button
             type="button"
-            data-testid="treasure-hunt-multiplayer-mode"
-            disabled={!multiplayerEnabled}
-            onClick={() => multiplayerEnabled && onSelectMode('multiplayer')}
-            className={`group relative flex flex-col p-6 rounded-lg border w-[280px] transition-all duration-200 ${
-              multiplayerEnabled
-                ? 'border-cyan-400/60 bg-slate-800/70 hover:border-cyan-300 hover:bg-slate-800/90 focus:outline-none'
-                : 'border-pink-400/20 bg-slate-800/30 opacity-60 grayscale brightness-75 contrast-90 cursor-not-allowed select-none'
-            }`}
+            onClick={onRulesClick}
+            style={{
+              alignSelf: 'center',
+              marginTop: 16,
+              color: 'var(--th-gold-light)',
+              font: "650 14px/20px var(--th-font-ui)",
+              letterSpacing: '0.08em',
+              textDecoration: 'underline',
+              textDecorationColor: 'rgba(215, 163, 67, 0.48)',
+              textUnderlineOffset: 5,
+              textTransform: 'uppercase',
+            }}
           >
-            <div className="flex flex-col gap-4 items-center">
-              <div className="flex items-center justify-center gap-3 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-pink-400/30 bg-pink-400/10 opacity-60">
-                  <span className="font-pixellari text-lg font-bold text-pink-200/60">2P</span>
-                </div>
-                <div>
-                  <h3 className="font-pixellari text-2xl text-pink-200/60">
-                    {modeCopy.multiplayer.title}
-                  </h3>
-                  <p className="text-xs uppercase tracking-[0.2em] font-pixellari text-pink-300/70">
-                    STAGING · SIN RANKING
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex flex-row items-center justify-center">
-                  <Image
-                    src="/assets/characters/vs.png"
-                    alt="VS"
-                    width={600}
-                    height={300}
-                    quality={100}
-                    className={`object-contain w-[240px] h-[120px] ${multiplayerEnabled ? '' : 'opacity-60'}`}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-2 rounded-full border border-pink-400/40 bg-slate-900/90 px-4 py-1 shadow-lg shadow-pink-500/20">
-                <span className="font-pixellari text-sm tracking-[0.35em] text-pink-200">
-                  {multiplayerEnabled ? 'JUGAR 2P' : 'PRÓXIMAMENTE'}
-                </span>
-              </div>
-              <p className="text-center text-xs font-pixellari text-cyan-100/70">
-                Prueba sin ranking ni recompensas.
-              </p>
-            </div>
+            Consultar reglas y controles
           </button>
-        </div>
-      </div>
+        ) : null}
+      </TreasurePanel>
     </div>
   );
 };

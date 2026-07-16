@@ -422,6 +422,7 @@ export default function SybilSlayerPage() {
       loading={loading}
       iframeRef={iframeRef}
       onGameConnection={handleGameConnection}
+      mobileFocus
     />
   );
 }

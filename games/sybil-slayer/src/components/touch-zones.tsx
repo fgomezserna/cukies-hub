@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { Vector2D } from '@/types/game';
 import JoystickWrapper from './joystick-wrapper';
 
@@ -17,7 +17,12 @@ const TouchZones: React.FC<TouchZonesProps> = ({
   const [dpadPosition, setDpadPosition] = useState({ x: 0, y: 0 });
   const [activeTouchId, setActiveTouchId] = useState<number | null>(null);
   const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
+  const clearDirectionRef = useRef(onDirectionClear);
   const dpadSize = 200; // Base size, will be adjusted for mobile
+
+  useEffect(() => {
+    clearDirectionRef.current = onDirectionClear;
+  }, [onDirectionClear]);
 
   // Debug: Log when component mounts
   useEffect(() => {
@@ -25,6 +30,7 @@ const TouchZones: React.FC<TouchZonesProps> = ({
       console.log('[D-PAD] TouchZones component MOUNTED');
     }
     return () => {
+      clearDirectionRef.current();
       if (process.env.NODE_ENV === 'development') {
         console.log('[D-PAD] TouchZones component UNMOUNTED');
       }
@@ -135,8 +141,11 @@ const TouchZones: React.FC<TouchZonesProps> = ({
     // Check if it's inside a link
     if (element.closest('a')) return true;
     
-    // Check if it's inside a modal or overlay (z-index >= 60)
-    const modal = element.closest('[class*="z-[6"], [class*="z-[7"], [class*="z-[8"], [class*="z-[9"]');
+    // Los overlays del stage nuevo usan clases semánticas en lugar de z-index
+    // utilitario. No activar el D-pad sobre diálogos ni capas bloqueantes.
+    const modal = element.closest(
+      '.th-modal-layer, .th-overlay, [role="dialog"], [role="alertdialog"], [aria-modal="true"], [class*="z-[6"], [class*="z-[7"], [class*="z-[8"], [class*="z-[9"]',
+    );
     if (modal) return true;
     
     // Check if it's an input, textarea, or select element
@@ -317,4 +326,3 @@ const TouchZones: React.FC<TouchZonesProps> = ({
 };
 
 export default TouchZones;
-

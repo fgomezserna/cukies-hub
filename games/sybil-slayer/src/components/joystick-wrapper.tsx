@@ -277,6 +277,8 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
     <div
       ref={containerRef}
       id={containerIdRef.current}
+      className="virtual-dpad"
+      data-testid="virtual-dpad"
       style={{
         position: 'fixed',
         left: `${x}px`,
@@ -293,4 +295,3 @@ const JoystickWrapper: React.FC<JoystickWrapperProps> = ({
 };
 
 export default JoystickWrapper;
-
