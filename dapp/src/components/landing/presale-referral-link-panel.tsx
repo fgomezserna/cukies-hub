@@ -6,7 +6,6 @@ import { Copy, Loader2, ShieldAlert, Ticket, Trophy, Users, Wallet } from 'lucid
 import { useAccount } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import type { PublicLocale } from '@/lib/public-locale';
-import { useAuth } from '@/providers/auth-provider';
 import { usePublicLocale } from '@/providers/public-locale-provider';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
@@ -142,8 +141,7 @@ const referralPanelCopyByLocale = {
 export function PresaleReferralLinkPanel() {
   const { locale } = usePublicLocale();
   const copy = referralPanelCopyByLocale[locale];
-  const { address, chainId, connector: activeConnector, isConnected } = useAccount();
-  const { fetchUser } = useAuth();
+  const { address, chainId, isConnected } = useAccount();
   const { toast } = useToast();
   const [status, setStatus] = useState<PresaleReferralStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,13 +157,6 @@ export function PresaleReferralLinkPanel() {
     setIsLoading(true);
     setStatusError(null);
     try {
-      await fetchUser(address, {
-        evmConnector: activeConnector,
-        promptForSignature: true,
-        requireSignedWallet: true,
-        walletType: 'evm',
-      });
-
       const params = new URLSearchParams({
         walletAddress: address,
         origin: window.location.origin,
@@ -190,7 +181,7 @@ export function PresaleReferralLinkPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeConnector, address, copy.loadError, fetchUser]);
+  }, [address, copy.loadError]);
 
   useEffect(() => {
     void fetchStatus();

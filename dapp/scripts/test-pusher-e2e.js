@@ -7,13 +7,13 @@ console.log('🧪 Pusher End-to-End Testing Guide\n');
 
 console.log('📋 Pre-requisites:');
 console.log('✅ Dapp running on: http://localhost:3001');
-console.log('✅ Sybil Slayer running on: http://localhost:9012');
+console.log('✅ Treasure Hunt running on: http://localhost:9012');
 console.log('✅ Pusher credentials configured\n');
 
 console.log('🔍 Manual Testing Steps:\n');
 
 console.log('1. 🌐 Open Dapp:');
-console.log('   → Navigate to: http://localhost:3001/games/sybil-slayer\n');
+console.log('   → Navigate to: http://localhost:3001/games/treasure-hunt\n');
 
 console.log('2. 🔐 Authenticate:');
 console.log('   → Login with Discord/Twitter if not already logged in\n');
@@ -55,10 +55,10 @@ console.log('✅ Instant game end communication');
 console.log('✅ No "emergency save" fallbacks needed');
 console.log('✅ Clean reconnection if connection drops\n');
 
-console.log('🚀 Ready to test! Open http://localhost:3001/games/sybil-slayer');
+console.log('🚀 Ready to test! Open http://localhost:3001/games/treasure-hunt');
 
 // Optional: Open browser automatically if on macOS
 if (process.platform === 'darwin') {
   console.log('\n🌐 Opening browser...');
-  require('child_process').exec('open http://localhost:3001/games/sybil-slayer');
+  require('child_process').exec('open http://localhost:3001/games/treasure-hunt');
 }

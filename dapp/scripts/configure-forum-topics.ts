@@ -14,7 +14,7 @@ async function configureForumTopics() {
       {
         gameId: 'sybil-slayer',
         topicId: 1532, // Use the topic ID from recent messages
-        description: 'Sybil Slayer game chat topic'
+        description: 'Treasure Hunt game chat topic'
       },
       {
         gameId: 'hyppie-road', 
@@ -95,4 +95,3 @@ async function configureForumTopics() {
 }
 
 configureForumTopics();
-

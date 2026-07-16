@@ -42,7 +42,7 @@ jest.mock('@/components/games/treasure-hunt-competition-panel', () => ({
   default: () => <div data-testid="competition-panel" />,
 }));
 
-import SybilSlayerPage from '@/app/(app)/games/sybil-slayer/page';
+import SybilSlayerPage from '@/app/(app)/games/treasure-hunt/page';
 import { useGameData } from '@/hooks/use-game-data';
 import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
 import { useTreasureHuntMultiplayerBridge } from '@/hooks/use-treasure-hunt-multiplayer-bridge';
@@ -69,7 +69,7 @@ describe('SybilSlayerPage game-session handshake', () => {
     jest.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
-    window.history.replaceState({}, '', '/games/sybil-slayer?room=INVITED');
+    window.history.replaceState({}, '', '/games/treasure-hunt?room=INVITED');
 
     mockUseAuth.mockReturnValue({
       isLoading: false,
@@ -83,7 +83,7 @@ describe('SybilSlayerPage game-session handshake', () => {
       gameConfig: {
         id: 'config-1',
         gameId: 'sybil-slayer',
-        name: 'Sybil Slayer',
+        name: 'Treasure Hunt',
         description: 'Test game',
         gameUrl: `${GAME_ORIGIN}/treasure-hunt`,
         ranks: [],
@@ -146,7 +146,7 @@ describe('SybilSlayerPage game-session handshake', () => {
       </StrictMode>,
     );
     act(() => {
-      window.history.replaceState({}, '', '/games/sybil-slayer?room=ROOM-TWO');
+      window.history.replaceState({}, '', '/games/treasure-hunt?room=ROOM-TWO');
       latestBridgeOptions().onRoomJoined?.('ROOM-TWO');
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -212,7 +212,7 @@ describe('SybilSlayerPage game-session handshake', () => {
 
     postMessage.mockClear();
     act(() => {
-      window.history.replaceState({}, '', '/games/sybil-slayer?room=ROOM-THREE');
+      window.history.replaceState({}, '', '/games/treasure-hunt?room=ROOM-THREE');
       latestBridgeOptions().onRoomJoined?.('ROOM-THREE');
     });
     await waitFor(() =>
@@ -234,7 +234,7 @@ describe('SybilSlayerPage game-session handshake', () => {
     window.history.replaceState(
       { navigation: 'test' },
       '',
-      '/games/sybil-slayer?room=INVITED&campaign=summer#score',
+      '/games/treasure-hunt?room=INVITED&campaign=summer#score',
     );
     mockUseAuth.mockReturnValue({ isLoading: false, user: null });
     const sessionResponse = (sessionId: string) => new Response(

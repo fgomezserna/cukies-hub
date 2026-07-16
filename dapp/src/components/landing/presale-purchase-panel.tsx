@@ -6,7 +6,6 @@ import { formatUnits, parseUnits, type Address } from 'viem';
 import { useAccount, useConnect, useDisconnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract, type Connector } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { useHasMounted } from '@/hooks/use-has-mounted';
-import { useAuth } from '@/providers/auth-provider';
 import {
   Sheet,
   SheetContent,
@@ -94,12 +93,11 @@ function formatRate(quote?: bigint, cost?: bigint) {
 }
 
 export function PresalePurchasePanel() {
-  const { address, chainId, connector: activeConnector, isConnected } = useAccount();
+  const { address, chainId, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { toast } = useToast();
-  const { fetchUser } = useAuth();
   const { isLocked: isPublicPresaleLocked, startShortLabel } = usePresaleLock();
   const hasMounted = useHasMounted();
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
@@ -344,44 +342,28 @@ export function PresalePurchasePanel() {
   async function ensureReferralAttribution() {
     if (!address) return true;
 
-    // Referral attribution is a wallet-owned mutation. Make sure the backend
-    // has the signed EVM session before applying the browser referral cookie;
-    // restored wagmi connections may otherwise have no authenticated session.
-    await fetchUser(address, {
-      evmConnector: activeConnector,
-      promptForSignature: true,
-      requireSignedWallet: true,
-      walletType: 'evm',
+    const params = new URLSearchParams({
+      walletAddress: address,
+      origin: window.location.origin,
+      applyReferral: '1',
     });
-
-    const response = await fetch('/api/presale/referral/attribution', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress: address }),
+    const response = await fetch(`/api/presale/referral/status?${params.toString()}`, {
       cache: 'no-store',
     });
 
     if (!response.ok) return false;
 
     const data = await response.json().catch(() => null) as {
-      applied: boolean;
-      reason?:
-        | 'no_referral_code'
-        | 'invalid_or_locked_code'
-        | 'self_referral'
-        | 'sponsor_already_locked'
-        | 'purchase_status_unavailable';
+      referralAttribution?: {
+        applied: boolean;
+        reason?: 'invalid_or_locked_code' | 'self_referral' | 'sponsor_already_locked';
+      } | null;
     } | null;
-    const attribution = data;
+    const attribution = data?.referralAttribution;
 
-    if (!attribution) return false;
-    if (attribution.applied) return true;
+    if (!attribution || attribution.applied) return true;
 
-    return (
-      attribution.reason === 'no_referral_code' ||
-      attribution.reason === 'self_referral' ||
-      attribution.reason === 'sponsor_already_locked'
-    );
+    return attribution.reason === 'self_referral' || attribution.reason === 'sponsor_already_locked';
   }
 
   async function connectEvmForPurchase(connector: Connector) {

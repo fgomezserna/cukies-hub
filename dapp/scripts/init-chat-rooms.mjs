@@ -9,8 +9,8 @@ async function initializeChatRooms() {
     const rooms = [
       {
         gameId: 'sybil-slayer',
-        name: 'Sybil Slayer Chat',
-        description: 'Chat room for Sybil Slayer game players',
+        name: 'Treasure Hunt Chat',
+        description: 'Chat room for Treasure Hunt players',
       },
       {
         gameId: 'hyppie-road',

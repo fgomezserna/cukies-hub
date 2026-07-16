@@ -14,7 +14,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
     ranks: [
       { xp: 50000, name: 'Hyppie Master', icon: 'Crown', color: 'text-yellow-400' },
       { xp: 20000, name: 'Hyperliquid Veteran', icon: 'Medal', color: 'text-purple-400' },
-      { xp: 10000, name: 'Sybil Slayer', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 10000, name: 'Treasure Hunter', icon: 'Trophy', color: 'text-orange-400' },
       { xp: 5000, name: 'Experimented Hyppie', icon: 'Star', color: 'text-blue-400' },
       { xp: 2500, name: 'Explorer', icon: 'Star', color: 'text-pink-500' },
     ],

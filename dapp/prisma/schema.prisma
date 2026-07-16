@@ -331,7 +331,7 @@ model EmailVerification {
 model Game {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   gameId        String   @unique  // e.g., 'sybil-slayer', 'hyppie-road'
-  name          String   // Display name: 'Sybil Slayer', 'Hyppie Road'
+  name          String   // Display name: 'Treasure Hunt', 'Hyppie Road'
   description   String   // Game description
   emoji         String?  // Game emoji/icon
   gameUrl       String   // URL to the game iframe

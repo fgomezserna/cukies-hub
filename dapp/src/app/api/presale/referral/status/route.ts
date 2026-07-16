@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
-import { getPresaleReferralStatus } from '@/lib/presale-referrals';
-import { competitionRateLimitResponse } from '@/lib/treasure-hunt-competition/server/api';
-import {
-  evmWalletSessionMatchesSignedAddress,
-  isValidEvmWalletAddress,
-  readWalletSession,
-} from '@/lib/wallet-auth';
+import { applyPresaleReferralCode, getPresaleReferralStatus } from '@/lib/presale-referrals';
 
 function validBrowserOrigin(value: string | null) {
   if (!value) return null;
@@ -46,35 +41,32 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const origin = getPublicOrigin(request, searchParams.get('origin'));
   const walletAddress = searchParams.get('walletAddress');
+  const shouldApplyReferral = searchParams.get('applyReferral') === '1';
 
   if (!walletAddress) {
     return NextResponse.json({ error: 'walletAddress is required' }, { status: 400 });
   }
 
-  if (!isValidEvmWalletAddress(walletAddress)) {
-    return NextResponse.json({ error: 'walletAddress must be a valid EVM address' }, { status: 400 });
-  }
-
   try {
-    const walletSession = await readWalletSession();
-    if (!walletSession || !evmWalletSessionMatchesSignedAddress(walletSession, walletAddress)) {
-      return NextResponse.json(
-        { error: 'Authenticated EVM wallet does not match' },
-        { status: 401 },
-      );
+    const cookieStore = await cookies();
+    const cookieReferralCode = cookieStore.get('ukiReferralCode')?.value;
+    let referralAttribution: Awaited<ReturnType<typeof applyPresaleReferralCode>> | null = null;
+
+    if (shouldApplyReferral && cookieReferralCode) {
+      referralAttribution = await applyPresaleReferralCode(walletAddress, cookieReferralCode);
+
+      if (referralAttribution.applied) {
+        cookieStore.set('ukiReferralCode', '', { expires: new Date(0), path: '/' });
+      }
     }
 
-    const rateLimit = competitionRateLimitResponse({
-      request,
-      operation: 'referral',
-      identityKey: walletAddress.toLowerCase(),
-    });
-    if (rateLimit) return rateLimit;
-
     const status = await getPresaleReferralStatus(walletAddress, origin);
-    return NextResponse.json(status);
+    return NextResponse.json({
+      ...status,
+      referralAttribution,
+    });
   } catch (error) {
-    console.error('Failed to read presale referral status:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

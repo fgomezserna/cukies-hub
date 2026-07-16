@@ -27,7 +27,7 @@ interface RuntimeFactories {
 }
 
 // Runtime import is intentional: dapp's tsconfig owns a different `@/` alias,
-// while Jest executes these factories in the Sybil Slayer module graph.
+// while Jest executes these factories in the Treasure Hunt module graph.
 const {
   createEnergyCollectible,
   createObstacle,
