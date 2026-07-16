@@ -11,6 +11,11 @@ body {
   min-height: min(480px, max(0px, calc(100dvh - 6rem)));
 }
 
+[data-game-layout='mobile-focus'] [data-game-viewport] {
+  height: 100%;
+  min-height: 0;
+}
+
 @media (min-width: 1024px) {
   [data-game-viewport] {
     min-height: 0;

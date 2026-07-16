@@ -33,6 +33,8 @@ import XIcon from '../icons/x-icon';
 import Image from 'next/image';
 import CukieLogoFirst from '@/assets/Cukie_logo_first.png';
 import { usePathname } from 'next/navigation';
+import { useMobileGameShell } from '@/hooks/use-mobile-game-shell';
+import { cn } from '@/lib/utils';
 
 const SidebarLogo = () => {
   return (
@@ -50,6 +52,9 @@ const SidebarLogo = () => {
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
+  const isMobileGameShell = useMobileGameShell();
+  const isMobileTreasureHunt =
+    isMobileGameShell && pathname === '/games/sybil-slayer';
   const isCukiesSection =
     pathname.startsWith('/cukies') ||
     pathname.startsWith('/marketplace') ||
@@ -78,8 +83,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   ];
 
   return (
-    <div className="relative flex h-screen h-dvh w-full bg-background">
-      <SidebarProvider>
+    <div className="relative flex h-screen h-dvh min-h-0 w-full overflow-hidden bg-background">
+      <SidebarProvider
+        className={cn(isMobileTreasureHunt && 'h-full min-h-0 overflow-hidden')}
+      >
+        {!isMobileTreasureHunt && (
         <Sidebar collapsible="icon" className="border-r border-teal-400/20 bg-black/10 backdrop-blur-md shadow-xl shadow-teal-400/10" style={{
             // Override sidebar background variable for transparency
             // 25% opaque black provides dark overlay while showing content background
@@ -295,7 +303,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden relative z-10">
+        )}
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* Main background with gradients and textures */}
           <div className="absolute inset-0 bg-gradient-to-br from-background via-cyan-950/20 to-cyan-950/30"></div>
           
@@ -347,8 +356,16 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </>
           )}
           
-          <Header />
-          <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
+          <Header variant={isMobileTreasureHunt ? 'game-overlay' : 'default'} />
+          <main
+            data-app-main
+            className={cn(
+              'relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8',
+              isMobileTreasureHunt && 'h-full overflow-hidden p-0 sm:p-0 lg:p-0',
+            )}
+          >
+            {children}
+          </main>
         </div>
       </SidebarProvider>
     </div>

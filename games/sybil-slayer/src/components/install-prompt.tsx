@@ -15,6 +15,8 @@ interface InstallDebugInfo {
   readonly manifest?: { readonly exists?: boolean; [key: string]: unknown };
 }
 
+type InstallRuntime = 'detecting' | 'embedded' | 'standalone';
+
 /**
  * Verifica si la app está instalada usando múltiples métodos de detección
  * @returns Promise<boolean> - true si la app está instalada
@@ -72,9 +74,20 @@ export default function InstallPrompt() {
   const [showManualInstall, setShowManualInstall] = useState(false);
   const [stageRoot, setStageRoot] = useState<HTMLElement | null>(null);
   const [gameShellActive, setGameShellActive] = useState(false);
+  const [runtime, setRuntime] = useState<InstallRuntime>('detecting');
   const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    try {
+      setRuntime(window.self === window.top ? 'standalone' : 'embedded');
+    } catch {
+      setRuntime('embedded');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (runtime !== 'standalone') return;
+
     const syncStageRoot = () => {
       const stage = document.querySelector<HTMLElement>('.th-stage');
       setStageRoot(stage);
@@ -84,9 +97,11 @@ export default function InstallPrompt() {
     const observer = new MutationObserver(syncStageRoot);
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, []);
+  }, [runtime]);
 
   useEffect(() => {
+    if (runtime !== 'standalone') return;
+
     // Listener para cambios en display-mode (debe estar siempre activo)
     const standaloneQuery = window.matchMedia('(display-mode: standalone)');
     const fullscreenQuery = window.matchMedia('(display-mode: fullscreen)');
@@ -351,7 +366,7 @@ export default function InstallPrompt() {
         (minimalUIQuery as any).removeListener(handleDisplayModeChange);
       }
     };
-  }, [isMobile, deferredPrompt, isInstalled]);
+  }, [runtime, isMobile, deferredPrompt, isInstalled]);
 
   // Efecto para cancelar el timeout si isInstalled cambia a true
   useEffect(() => {
@@ -408,8 +423,9 @@ export default function InstallPrompt() {
     }
   };
 
-  // No mostrar si ya está instalada
-  if (isInstalled) {
+  // La instalación pertenece a la app independiente, nunca al juego embebido
+  // dentro del Hub, donde el aviso roba espacio útil y no instala el contenedor.
+  if (runtime !== 'standalone' || isInstalled) {
     return null;
   }
 

@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect, ReactNode } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Maximize, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { ArrowLeft, Maximize, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
+import { cn } from '@/lib/utils';
+import { useMobileGameShell } from '@/hooks/use-mobile-game-shell';
 import { GameConfig, GameStats, GameLayoutProps } from '@/types/game';
 import { LeaderboardPlayer } from '@/types';
 
@@ -29,6 +32,7 @@ interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
   children?: ReactNode; // For any additional game-specific content
+  mobileFocus?: boolean;
 }
 
 // Helper function to get user rank based on XP and game-specific ranks
@@ -62,12 +66,15 @@ export default function GameLayout({
   loading,
   onGameConnection,
   iframeRef: externalIframeRef,
-  children 
+  children,
+  mobileFocus = false,
 }: GameLayoutComponentProps) {
   const gameContainerRef = useRef<FullscreenElement>(null);
   const internalIframeRef = useRef<HTMLIFrameElement>(null);
   const iframeRef = externalIframeRef || internalIframeRef;
   const { user } = useAuth();
+  const isMobileGameShell = useMobileGameShell();
+  const isMobileFocus = mobileFocus && isMobileGameShell;
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Call the game connection callback when iframe ref is ready (optional)
@@ -142,14 +149,28 @@ export default function GameLayout({
   }
 
   return (
-      <div className="grid h-full min-h-0 grid-cols-1 gap-6 lg:grid-cols-4">
+      <div
+        data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
+        className={cn(
+          'grid h-full min-h-0 grid-cols-1',
+          isMobileFocus ? 'gap-0' : 'gap-6 lg:grid-cols-4',
+        )}
+      >
         
         {/* Left Column: Game */}
-        <div className="flex min-h-0 flex-col gap-6 lg:col-span-3">
+        <div
+          className={cn(
+            'flex min-h-0 flex-col',
+            isMobileFocus ? 'h-full gap-0' : 'gap-6 lg:col-span-3',
+          )}
+        >
           <div
             ref={gameContainerRef}
             data-game-viewport
-            className="relative flex min-h-0 flex-grow flex-col overflow-hidden rounded-lg border bg-card"
+            className={cn(
+              'relative flex min-h-0 flex-grow flex-col overflow-hidden bg-card',
+              isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
+            )}
           >
             <iframe
               ref={iframeRef}
@@ -160,36 +181,63 @@ export default function GameLayout({
               allowFullScreen
               onLoad={handleIframeLoad}
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute bottom-2 left-2 text-white/50 bg-black/10 hover:text-white hover:bg-black/30 backdrop-blur-sm"
-              onClick={handleFullScreen}
-              title="Toggle Fullscreen"
+            <div
+              className="absolute z-30 flex items-center gap-2"
+              style={{
+                bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+                left: 'max(0.5rem, env(safe-area-inset-left))',
+              }}
             >
-              <Maximize className="h-5 w-5" />
-            </Button>
+              {isMobileFocus && (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 bg-black/35 text-white/80 backdrop-blur-sm hover:bg-black/55 hover:text-white"
+                >
+                  <Link href="/games" aria-label="Volver a juegos" title="Volver a juegos">
+                    <ArrowLeft className="h-5 w-5" />
+                  </Link>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white',
+                  isMobileFocus && 'h-11 w-11',
+                )}
+                onClick={handleFullScreen}
+                aria-label="Alternar pantalla completa"
+                title="Alternar pantalla completa"
+              >
+                <Maximize className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
           
           {/* Game Instructions */}
-          <Card>
-            <CardContent className="p-4 flex flex-wrap justify-around items-center text-center gap-4">
-              {playInstructions.map((instruction, index) => (
-                <React.Fragment key={instruction.text}>
-                  <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
-                    {renderIcon(instruction.icon, "h-5 w-5 text-primary")}
-                    <span>{instruction.text}</span>
-                  </div>
-                  {index < playInstructions.length - 1 && (
-                    <Separator orientation="vertical" className="h-6 hidden sm:block"/>
-                  )}
-                </React.Fragment>
-              ))}
-            </CardContent>
-          </Card>
+          {!isMobileFocus && (
+            <Card>
+              <CardContent className="p-4 flex flex-wrap justify-around items-center text-center gap-4">
+                {playInstructions.map((instruction, index) => (
+                  <React.Fragment key={instruction.text}>
+                    <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
+                      {renderIcon(instruction.icon, "h-5 w-5 text-primary")}
+                      <span>{instruction.text}</span>
+                    </div>
+                    {index < playInstructions.length - 1 && (
+                      <Separator orientation="vertical" className="h-6 hidden sm:block"/>
+                    )}
+                  </React.Fragment>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Game Info & Stats */}
+        {!isMobileFocus && (
         <div className="lg:col-span-1 flex flex-col gap-3">
           
           {/* 1. Game Title and Description */}
@@ -319,6 +367,7 @@ export default function GameLayout({
           {/* Additional game-specific content */}
           {children}
         </div>
+        )}
       </div>
   );
 }
