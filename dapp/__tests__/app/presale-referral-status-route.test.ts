@@ -1,10 +1,7 @@
-const mockCookies = jest.fn();
-const mockApplyPresaleReferralCode = jest.fn();
 const mockGetPresaleReferralStatus = jest.fn();
-
-jest.mock('next/headers', () => ({
-  cookies: (...args: unknown[]) => mockCookies(...args),
-}));
+const mockReadWalletSession = jest.fn();
+const mockEvmWalletSessionMatchesSignedAddress = jest.fn();
+const mockIsValidEvmWalletAddress = jest.fn();
 
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -13,86 +10,104 @@ jest.mock('next/server', () => ({
 }));
 
 jest.mock('@/lib/presale-referrals', () => ({
-  applyPresaleReferralCode: (...args: unknown[]) => mockApplyPresaleReferralCode(...args),
   getPresaleReferralStatus: (...args: unknown[]) => mockGetPresaleReferralStatus(...args),
+}));
+
+jest.mock('@/lib/wallet-auth', () => ({
+  readWalletSession: (...args: unknown[]) => mockReadWalletSession(...args),
+  evmWalletSessionMatchesSignedAddress: (...args: unknown[]) => (
+    mockEvmWalletSessionMatchesSignedAddress(...args)
+  ),
+  isValidEvmWalletAddress: (...args: unknown[]) => mockIsValidEvmWalletAddress(...args),
 }));
 
 import { GET } from '@/app/api/presale/referral/status/route';
 
-function createCookieStore(referralCode?: string) {
-  return {
-    get: jest.fn((name: string) => (
-      name === 'ukiReferralCode' && referralCode
-        ? { value: referralCode }
-        : undefined
-    )),
-    set: jest.fn(),
-  };
-}
-
 const baseStatus = {
-  walletAddress: '0xbuyer',
-  normalizedWalletAddress: '0xbuyer',
+  walletAddress: '0x1111111111111111111111111111111111111111',
+  normalizedWalletAddress: '0x1111111111111111111111111111111111111111',
   totalUkiPurchased: 0,
   referralLink: null,
 };
+
+const buyerAddress = '0x1111111111111111111111111111111111111111';
 
 describe('/api/presale/referral/status', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetPresaleReferralStatus.mockResolvedValue(baseStatus);
+    mockReadWalletSession.mockResolvedValue({
+      userId: 'buyer-user',
+      walletAddress: buyerAddress,
+      signedWalletAddress: buyerAddress,
+      walletType: 'evm',
+    });
+    mockIsValidEvmWalletAddress.mockReturnValue(true);
+    mockEvmWalletSessionMatchesSignedAddress.mockReturnValue(true);
   });
 
-  it('no consume la cookie de referido en una consulta pasiva de estado', async () => {
-    const cookieStore = createCookieStore('uki-sponsor');
-    mockCookies.mockResolvedValue(cookieStore);
-
+  it('consulta estado solo para la wallet EVM firmada', async () => {
     const response = await GET(new Request(
-      'https://cukies.world/api/presale/referral/status?walletAddress=0xbuyer',
+      `https://cukies.world/api/presale/referral/status?walletAddress=${buyerAddress}`,
     ) as never);
     const body = await response.json();
 
-    expect(mockApplyPresaleReferralCode).not.toHaveBeenCalled();
-    expect(cookieStore.set).not.toHaveBeenCalled();
-    expect(body.referralAttribution).toBeNull();
+    expect(response.status).toBe(200);
+    expect(mockEvmWalletSessionMatchesSignedAddress).toHaveBeenCalledWith(
+      expect.objectContaining({ signedWalletAddress: buyerAddress, walletType: 'evm' }),
+      buyerAddress,
+    );
+    expect(mockGetPresaleReferralStatus).toHaveBeenCalledWith(
+      buyerAddress,
+      'https://cukies.world',
+    );
+    expect(body).toEqual(baseStatus);
+    expect(body).not.toHaveProperty('referralAttribution');
   });
 
-  it('aplica y borra la cookie cuando el caller pide atribucion explicita', async () => {
-    const cookieStore = createCookieStore('uki-sponsor');
-    mockCookies.mockResolvedValue(cookieStore);
-    mockApplyPresaleReferralCode.mockResolvedValue({ applied: true, pendingSponsorCode: 'uki-sponsor' });
-
+  it('ignora applyReferral y nunca convierte GET en una mutacion', async () => {
     const response = await GET(new Request(
-      'https://cukies.world/api/presale/referral/status?walletAddress=0xbuyer&applyReferral=1',
+      `https://cukies.world/api/presale/referral/status?walletAddress=${buyerAddress}&applyReferral=1`,
     ) as never);
     const body = await response.json();
 
-    expect(mockApplyPresaleReferralCode).toHaveBeenCalledWith('0xbuyer', 'uki-sponsor');
-    expect(cookieStore.set).toHaveBeenCalledWith('ukiReferralCode', '', {
-      expires: expect.any(Date),
-      path: '/',
-    });
-    expect(body.referralAttribution).toEqual({ applied: true, pendingSponsorCode: 'uki-sponsor' });
+    expect(response.status).toBe(200);
+    expect(mockGetPresaleReferralStatus).toHaveBeenCalledTimes(1);
+    expect(body).toEqual(baseStatus);
   });
 
-  it('conserva la cookie si la atribucion explicita no se pudo aplicar', async () => {
-    const cookieStore = createCookieStore('uki-sponsor');
-    mockCookies.mockResolvedValue(cookieStore);
-    mockApplyPresaleReferralCode.mockResolvedValue({
-      applied: false,
-      reason: 'invalid_or_locked_code',
-    });
+  it('rechaza una direccion que no sea EVM valida antes de leer la sesion', async () => {
+    mockIsValidEvmWalletAddress.mockReturnValue(false);
 
     const response = await GET(new Request(
-      'https://cukies.world/api/presale/referral/status?walletAddress=0xbuyer&applyReferral=1',
+      'https://cukies.world/api/presale/referral/status?walletAddress=TInvalidForEvm',
     ) as never);
-    const body = await response.json();
 
-    expect(mockApplyPresaleReferralCode).toHaveBeenCalledWith('0xbuyer', 'uki-sponsor');
-    expect(cookieStore.set).not.toHaveBeenCalled();
-    expect(body.referralAttribution).toEqual({
-      applied: false,
-      reason: 'invalid_or_locked_code',
+    expect(response.status).toBe(400);
+    expect(mockReadWalletSession).not.toHaveBeenCalled();
+    expect(mockGetPresaleReferralStatus).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['sesion TRON', { walletType: 'tron', signedWalletAddress: 'TSessionAddress' }],
+    ['wallet primaria sin firma', {
+      walletType: 'evm',
+      walletAddress: buyerAddress,
+      signedWalletAddress: '0x2222222222222222222222222222222222222222',
+    }],
+  ])('rechaza %s aunque walletAddress coincida en otro campo', async (_label, sessionPatch) => {
+    mockReadWalletSession.mockResolvedValue({
+      userId: 'buyer-user',
+      walletAddress: buyerAddress,
+      ...sessionPatch,
     });
+    mockEvmWalletSessionMatchesSignedAddress.mockReturnValue(false);
+
+    const response = await GET(new Request(
+      `https://cukies.world/api/presale/referral/status?walletAddress=${buyerAddress}`,
+    ) as never);
+
+    expect(response.status).toBe(401);
+    expect(mockGetPresaleReferralStatus).not.toHaveBeenCalled();
   });
 });

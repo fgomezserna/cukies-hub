@@ -106,6 +106,7 @@ model GameSession {
   // Durable multiplayer authority; optional so legacy Mongo rows remain readable.
   multiplayerState String? @default("idle")
   multiplayerClientInstanceId String?
+  competitionAttemptId String?
   startedAt     DateTime @default(now())
   endedAt       DateTime?
   isActive      Boolean  @default(true)

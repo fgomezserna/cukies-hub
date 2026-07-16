@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { Channel } from 'pusher-js';
+import {
+  routeGameCheckpoint,
+  routeGameEnd,
+  type CompetitionAttemptCoordinator,
+} from '@/lib/treasure-hunt-competition/client';
 
 interface GameCheckpoint {
   score: number;
@@ -11,17 +16,41 @@ interface GameCheckpoint {
 }
 
 interface GameEndData {
+  resultId?: unknown;
   finalScore: number;
   gameTime: number;
   metadata?: any;
+  competitionAttemptId?: unknown;
+}
+
+interface CompletedGameEnd {
+  resultId: string;
+  finalScore: number;
+  isValid: boolean;
+  source: 'competition' | 'legacy';
+  status: string | null;
+  clearConfirmationRequired: boolean;
+  sessionNotified: boolean;
 }
 
 interface PusherGameConnectionOptions {
   gameId: string;
   gameVersion?: string;
+  competitionCoordinator?: CompetitionAttemptCoordinator;
   onSessionStart?: (sessionData: { sessionToken: string; sessionId: string }) => void;
   onCheckpoint?: (checkpoint: GameCheckpoint) => void;
-  onSessionEnd?: (result: { finalScore: number; isValid: boolean }) => void;
+  onSessionEnd?: (result: {
+    resultId: string;
+    finalScore: number;
+    isValid: boolean;
+    source: 'competition' | 'legacy';
+    status: string | null;
+    clearConfirmationRequired: boolean;
+  }) => void;
+  onGameEndPersisted?: (result: {
+    resultId: string;
+    clearConfirmationRequired: boolean;
+  }) => boolean;
   onHoneypotDetected?: (event: string) => void;
 }
 
@@ -44,7 +73,9 @@ export function usePusherGameConnection(
   const {
     gameId,
     gameVersion,
+    competitionCoordinator,
     onCheckpoint,
+    onGameEndPersisted,
     onHoneypotDetected,
     onSessionEnd,
     onSessionStart,
@@ -56,6 +87,8 @@ export function usePusherGameConnection(
   const customClientRef = useRef<any>(null);
   const isConnectingRef = useRef(false);
   const connectionPromiseRef = useRef<Promise<void> | null>(null);
+  const processingGameEndIdsRef = useRef(new Set<string>());
+  const completedGameEndsRef = useRef(new Map<string, CompletedGameEnd>());
 
   // Connect to Pusher channel when sessionId is available and session token exists
   useEffect(() => {
@@ -224,33 +257,27 @@ export function usePusherGameConnection(
         
         // Process checkpoint (validate and save to DB)
         try {
-          const response = await fetch('/api/games/checkpoint', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionToken: sessionToken,
-              checkpoint: data,
-              events: data.events || []
-            })
+          const routed = await routeGameCheckpoint({
+            gameSessionId: sessionId,
+            sessionToken,
+            competitionCoordinator,
+            checkpoint: data,
           });
-
-          const result = await response.json();
-          
-          if (result.success) {
+          if (routed.success) {
             setGameStats(prev => ({
               ...prev,
               checkpointsReceived: prev.checkpointsReceived + 1,
-              honeypotEvents: prev.honeypotEvents + (result.honeypotDetected ? 1 : 0),
-              sessionValid: result.sessionValid
+              honeypotEvents: prev.honeypotEvents + (routed.honeypotDetected ? 1 : 0),
+              sessionValid: routed.sessionValid,
             }));
 
-            if (result.honeypotDetected) {
+            if (routed.honeypotDetected) {
               onHoneypotDetected?.(data.events?.find(e => e.type === 'honeypot')?.event || 'unknown');
             }
 
             onCheckpoint?.(data);
           } else {
-            console.error('❌ [PUSHER] Checkpoint processing failed:', result);
+            console.error('❌ [PUSHER] Checkpoint processing failed:', routed.result);
           }
         } catch (error) {
           console.error('❌ [PUSHER] Error processing checkpoint:', error);
@@ -259,7 +286,71 @@ export function usePusherGameConnection(
 
       // IMPORTANT: Bind game-end event BEFORE subscription succeeds to ensure we catch it
       console.log('🔗 [PUSHER] Binding client-game-end event listener to channel:', channelName);
+      const notifySessionEnd = (completed: CompletedGameEnd) => {
+        if (completed.sessionNotified) return;
+        completed.sessionNotified = true;
+        onSessionEnd?.({
+          resultId: completed.resultId,
+          finalScore: completed.finalScore,
+          isValid: completed.isValid,
+          source: completed.source,
+          status: completed.status,
+          clearConfirmationRequired: completed.clearConfirmationRequired,
+        });
+      };
+      const ensureReloadSafeClearMarker = (completed: CompletedGameEnd) => {
+        if (!completed.clearConfirmationRequired || !onGameEndPersisted) return true;
+        try {
+          return onGameEndPersisted({
+            resultId: completed.resultId,
+            clearConfirmationRequired: true,
+          }) === true;
+        } catch (error) {
+          console.error('❌ [PUSHER] Failed to persist reload-safe result marker:', error);
+          return false;
+        }
+      };
       const gameEndHandler = async (data: GameEndData) => {
+        const isPayload = Boolean(data) && typeof data === 'object' && !Array.isArray(data);
+        const declaresCompetitionAttempt = isPayload &&
+          Object.prototype.hasOwnProperty.call(data, 'competitionAttemptId');
+        const declaresResultId = isPayload &&
+          Object.prototype.hasOwnProperty.call(data, 'resultId');
+        const hasValidResultId = typeof data?.resultId === 'string' &&
+          data.resultId.length >= 8 && data.resultId.length <= 128;
+        // Temporary DApp-first rollout bridge: the previous iframe emitted one
+        // legacy result per GameSession without a result id and never confirmed
+        // ACKs. A declared competition attempt is never allowed through this
+        // compatibility path, even when malformed.
+        const isLegacyIframePayload = isPayload &&
+          !declaresCompetitionAttempt && !declaresResultId;
+        if (!hasValidResultId && !isLegacyIframePayload) {
+          console.error('❌ [PUSHER] Ignoring game end without a valid result id');
+          return;
+        }
+        const resultId = hasValidResultId
+          ? data.resultId as string
+          : `legacy-${sessionId}`.slice(0, 128);
+        const resultKey = `${sessionId}:${resultId}`;
+        const emitAcknowledgement = () => {
+          try {
+            return newChannel.trigger('client-game-end-ack', {
+              resultId,
+            }) === true;
+          } catch (error) {
+            console.error('❌ [PUSHER] Failed to acknowledge persisted game end:', error);
+            return false;
+          }
+        };
+        const alreadyCompleted = completedGameEndsRef.current.get(resultKey);
+        if (alreadyCompleted) {
+          if (isLegacyIframePayload) notifySessionEnd(alreadyCompleted);
+          else if (ensureReloadSafeClearMarker(alreadyCompleted)) emitAcknowledgement();
+          return;
+        }
+        if (processingGameEndIdsRef.current.has(resultKey)) return;
+        processingGameEndIdsRef.current.add(resultKey);
+
         console.log('🏁 [PUSHER] Game end received:', data);
         console.log('🏁 [PUSHER] Game end details:', {
           finalScore: data.finalScore,
@@ -271,49 +362,72 @@ export function usePusherGameConnection(
         
         // Process game end
         try {
-          const response = await fetch('/api/games/end-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionToken: sessionToken,
-              finalScore: data.finalScore,
-              metadata: data.metadata,
-              timestamp: new Date().toISOString()
-            })
+          const routed = await routeGameEnd({
+            gameSessionId: sessionId,
+            sessionToken,
+            competitionCoordinator,
+            gameEnd: data,
           });
-
-          const result = await response.json();
-          
-          if (result.success) {
+          if (routed.success) {
             console.log('✅ [PUSHER] Game session ended successfully:', {
-              finalScore: result.finalScore,
-              xpEarned: result.xpEarned,
-              isValid: result.isValid
+              finalScore: routed.finalScore,
+              isValid: routed.isValid,
+              source: routed.source,
             });
 
-            onSessionEnd?.({
-              finalScore: result.finalScore,
-              isValid: result.isValid
-            });
+            const completed: CompletedGameEnd = {
+              resultId,
+              finalScore: routed.finalScore,
+              isValid: routed.isValid,
+              source: routed.source,
+              status: routed.source === 'competition' &&
+                routed.result && typeof routed.result === 'object' &&
+                'status' in routed.result && typeof routed.result.status === 'string'
+                ? routed.result.status
+                : null,
+              clearConfirmationRequired: !isLegacyIframePayload,
+              sessionNotified: false,
+            };
+            completedGameEndsRef.current.set(resultKey, completed);
+            while (completedGameEndsRef.current.size > 32) {
+              const oldestKey = completedGameEndsRef.current.keys().next().value;
+              if (typeof oldestKey !== 'string') break;
+              completedGameEndsRef.current.delete(oldestKey);
+            }
+            if (isLegacyIframePayload) notifySessionEnd(completed);
+            else if (ensureReloadSafeClearMarker(completed)) emitAcknowledgement();
+            else console.error('❌ [PUSHER] Result is durable but its reload-safe clear marker is not');
           } else {
-            console.error('❌ [PUSHER] Game end processing failed:', result);
-            onSessionEnd?.({
-              finalScore: data.finalScore,
-              isValid: false
-            });
+            console.error('❌ [PUSHER] Game end processing failed:', routed.result);
           }
         } catch (error) {
           console.error('❌ [PUSHER] Error processing game end:', error);
-          onSessionEnd?.({
-            finalScore: data.finalScore,
-            isValid: false
-          });
+        } finally {
+          processingGameEndIdsRef.current.delete(resultKey);
         }
       };
       
       // Bind the handler to the channel
       newChannel.bind('client-game-end', gameEndHandler);
       console.log('✅ [PUSHER] client-game-end handler bound to channel:', channelName);
+
+      // Do not rotate/clear the GameSession merely because the ACK was queued.
+      // The iframe confirms it received the backend-success ACK and removed its
+      // durable pending result before the parent advances to a fresh session.
+      newChannel.bind('client-game-end-ack-confirmed', (data: unknown) => {
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          Array.isArray(data) ||
+          typeof (data as { resultId?: unknown }).resultId !== 'string'
+        ) {
+          return;
+        }
+        const resultId = (data as { resultId: string }).resultId;
+        if (resultId.length < 8 || resultId.length > 128) return;
+        const completed = completedGameEndsRef.current.get(`${sessionId}:${resultId}`);
+        if (completed) notifySessionEnd(completed);
+      });
 
       newChannel.bind('client-honeypot-trigger', (data: { event: string }) => {
         console.log('🍯 [PUSHER] Honeypot triggered:', data);
@@ -387,9 +501,11 @@ export function usePusherGameConnection(
     authData.sessionToken,
     authData.user,
     authData.user?.id,
+    competitionCoordinator,
     gameId,
     gameVersion,
     onCheckpoint,
+    onGameEndPersisted,
     onHoneypotDetected,
     onSessionEnd,
     onSessionStart,

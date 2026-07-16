@@ -17,6 +17,7 @@
     "import:legacy": "tsx src/cli.ts import-legacy",
     "import:legacy-metadata": "tsx src/cli.ts import-legacy-metadata",
     "project:once": "tsx src/cli.ts project-once",
+    "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -37,7 +37,13 @@ export class IndexerStore {
 
   async ensureIndexes() {
     await Promise.all([
-      this.events().createIndex({ chain: 1, contractAlias: 1, eventName: 1, blockNumber: 1 }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        contractAddress: 1,
+        eventName: 1,
+        blockNumber: 1,
+      }),
       this.events().createIndex({ status: 1, timestampMs: 1, blockNumber: 1, logIndex: 1 }),
       this.events().createIndex({ txHash: 1 }),
       this.events().createIndex({ eventName: 1, 'normalized.tokenId': 1, timestampMs: -1 }),
@@ -52,6 +58,7 @@ export class IndexerStore {
       this.db.collection('presale_purchases').createIndex({ eventId: 1 }, { unique: true }),
       this.db.collection('presale_purchases').createIndex({ txHash: 1, logIndex: 1 }, { unique: true }),
       this.db.collection('presale_purchases').createIndex({ buyerNormalized: 1, confirmedAt: -1 }),
+      this.db.collection('presale_purchases').createIndex({ contractAddress: 1, confirmedAt: 1 }),
       this.db.collection('presale_participants').createIndex({ normalizedWalletAddress: 1 }, { unique: true }),
       this.db.collection('presale_participants').createIndex({ referralCode: 1 }, { unique: true, sparse: true }),
       this.db.collection('presale_referral_contributions').createIndex({ eventId: 1, level: 1 }, { unique: true }),
@@ -74,7 +81,21 @@ export class IndexerStore {
   }
 
   async getCursor(config: ContractEventConfig) {
-    return this.cursors().findOne({ _id: this.cursorId(config) });
+    const cursors = this.cursors();
+    const cursor = await cursors.findOne({ _id: this.cursorId(config) });
+    if (!cursor) return null;
+
+    const storedAddress = cursor.contractAddress?.trim();
+    const configuredAddress = config.contractAddress.trim();
+    const matches = config.chain === 'BSC'
+      ? storedAddress?.toLowerCase() === configuredAddress.toLowerCase()
+      : storedAddress === configuredAddress;
+    if (matches) return cursor;
+
+    await cursors.deleteOne(cursor.contractAddress
+      ? { _id: this.cursorId(config), contractAddress: cursor.contractAddress }
+      : { _id: this.cursorId(config), contractAddress: { $exists: false } });
+    return null;
   }
 
   async updateCursor(config: ContractEventConfig, update: Partial<ChainCursor>) {

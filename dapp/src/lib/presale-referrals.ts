@@ -273,7 +273,7 @@ export async function getPresaleReferralStatus(walletAddress: string, origin?: s
 
 export async function applyPresaleReferralCode(walletAddress: string, referralCode: string) {
   const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
-  const cleanCode = referralCode.trim();
+  const cleanCode = referralCode.trim().toLowerCase();
   const now = new Date();
   const db = await getPresaleDb();
   const participants = db.collection('presale_participants');
@@ -304,12 +304,33 @@ export async function applyPresaleReferralCode(walletAddress: string, referralCo
   }
 
   const buyerOnChainTotals = await readOnChainPresalePurchaseTotalsSafely(walletAddress);
-  if ((buyerOnChainTotals?.totalUkiPurchased ?? 0) > 0) {
+  if (!buyerOnChainTotals) {
+    return { applied: false, reason: 'purchase_status_unavailable' as const };
+  }
+
+  if (buyerOnChainTotals.totalUkiPurchased > 0) {
     return { applied: false, reason: 'sponsor_already_locked' as const };
   }
 
-  await participants.updateOne(
-    { normalizedWalletAddress },
+  const updateResult = await participants.updateOne(
+    {
+      normalizedWalletAddress,
+      $and: [
+        {
+          $or: [
+            { firstPurchaseAt: { $exists: false } },
+            { firstPurchaseAt: null },
+          ],
+        },
+        {
+          $or: [
+            { lockedSponsorWalletAddress: { $exists: false } },
+            { lockedSponsorWalletAddress: null },
+            { lockedSponsorWalletAddress: '' },
+          ],
+        },
+      ],
+    },
     {
       $set: {
         pendingSponsorWalletAddress: sponsor.walletAddress,
@@ -320,6 +341,10 @@ export async function applyPresaleReferralCode(walletAddress: string, referralCo
       },
     },
   );
+
+  if (updateResult.matchedCount !== 1) {
+    return { applied: false, reason: 'sponsor_already_locked' as const };
+  }
 
   return {
     applied: true,

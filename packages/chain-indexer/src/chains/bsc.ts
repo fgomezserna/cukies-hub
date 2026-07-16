@@ -9,11 +9,15 @@ import { now, toJsonRecord } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
 
 type BscClient = ReturnType<typeof createPublicClient>;
-type BscRpcClient = {
+export type BscRpcClient = {
   url: string;
   host: string;
   client: BscClient;
 };
+
+export interface BscIngestDependencies {
+  readonly rpcClients?: BscRpcClient[];
+}
 
 function rpcHost(url: string) {
   try {
@@ -65,6 +69,35 @@ async function withBscRpcFallback<T>(
   throw new Error(`Todos los RPC BSC fallaron: ${failures.join(' | ')}`);
 }
 
+function rpcClientsWithPreferredFirst(
+  preferred: BscRpcClient,
+  rpcClients: BscRpcClient[],
+) {
+  return [preferred, ...rpcClients.filter((rpc) => rpc !== preferred)];
+}
+
+async function getBlockTimestampMs(input: {
+  blockNumber: number;
+  preferredRpc: BscRpcClient;
+  rpcClients: BscRpcClient[];
+  timestampCache: Map<number, number>;
+}) {
+  const cached = input.timestampCache.get(input.blockNumber);
+  if (cached !== undefined) return cached;
+
+  const { value: block } = await withBscRpcFallback(
+    rpcClientsWithPreferredFirst(input.preferredRpc, input.rpcClients),
+    (rpc) => rpc.client.getBlock({ blockNumber: BigInt(input.blockNumber) }),
+  );
+  const timestampMsBigInt = block.timestamp * BigInt(1_000);
+  if (timestampMsBigInt < BigInt(0) || timestampMsBigInt > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`Timestamp BSC fuera de rango seguro para el bloque ${input.blockNumber}`);
+  }
+  const timestampMs = Number(timestampMsBigInt);
+  input.timestampCache.set(input.blockNumber, timestampMs);
+  return timestampMs;
+}
+
 async function getLogsWithFallback(
   client: BscClient,
   params: {
@@ -93,10 +126,16 @@ async function getLogsWithFallback(
   }
 }
 
-export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) {
+export async function ingestBscOnce(
+  store: IndexerStore,
+  config: IndexerConfig,
+  dependencies: BscIngestDependencies = {},
+) {
   if (!config.chains.includes('BSC')) return { inserted: 0, ranges: 0 };
 
-  const rpcClients = createBscRpcClients(config.bscRpcUrls.length > 0 ? config.bscRpcUrls : [config.bscRpcUrl]);
+  const rpcClients = dependencies.rpcClients ?? createBscRpcClients(
+    config.bscRpcUrls.length > 0 ? config.bscRpcUrls : [config.bscRpcUrl],
+  );
 
   const { value: latestBlockValue, rpc: latestBlockRpc } = await withBscRpcFallback(
     rpcClients,
@@ -114,15 +153,48 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
 
   for (const contractEvent of contractEvents) {
     const cursor = await store.getCursor(contractEvent);
+    const cursorHasCoverageOrigin =
+      Number.isSafeInteger(cursor?.processedFromBlock) &&
+      Number(cursor?.processedFromBlock) >= 0 &&
+      Number.isSafeInteger(cursor?.processedFromTimestampMs) &&
+      Number(cursor?.processedFromTimestampMs) >= 0;
     const fromBlock =
       cursor?.nextBlock ?? (config.bscStartBlock > 0 ? config.bscStartBlock : safeBlock);
 
     if (fromBlock > safeBlock) {
-      await store.updateCursor(contractEvent, { nextBlock: fromBlock, safeBlock });
+      const processedThroughTimestampMs = await getBlockTimestampMs({
+        blockNumber: safeBlock,
+        preferredRpc: latestBlockRpc,
+        rpcClients,
+        timestampCache,
+      });
+      await store.updateCursor(contractEvent, {
+        nextBlock: fromBlock,
+        safeBlock,
+        processedThroughBlock: safeBlock,
+        processedThroughTimestampMs,
+        ...(cursorHasCoverageOrigin
+          ? {
+              processedFromBlock: cursor?.processedFromBlock,
+              processedFromTimestampMs: cursor?.processedFromTimestampMs,
+            }
+          : {}),
+      });
       continue;
     }
 
     const toBlock = Math.min(fromBlock + config.maxBlockRange - 1, safeBlock);
+    const processedFromBlock = cursorHasCoverageOrigin
+      ? Number(cursor?.processedFromBlock)
+      : fromBlock;
+    const processedFromTimestampMs = cursorHasCoverageOrigin
+      ? Number(cursor?.processedFromTimestampMs)
+      : await getBlockTimestampMs({
+          blockNumber: processedFromBlock,
+          preferredRpc: latestBlockRpc,
+          rpcClients,
+          timestampCache,
+        });
     const { value: logs, rpc: logsRpc } = await withBscRpcFallback(
       rpcClients,
       (rpc) => getLogsWithFallback(
@@ -142,16 +214,12 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
       const logArgs =
         log.args && !Array.isArray(log.args) ? (log.args as Record<string, unknown>) : {};
       const blockNumber = Number(log.blockNumber);
-      let timestampMs = timestampCache.get(blockNumber);
-
-      if (!timestampMs) {
-        const { value: block } = await withBscRpcFallback(
-          [logsRpc, ...rpcClients.filter((rpc) => rpc.host !== logsRpc.host)],
-          (rpc) => rpc.client.getBlock({ blockNumber: BigInt(blockNumber) }),
-        );
-        timestampMs = Number(block.timestamp) * 1000;
-        timestampCache.set(blockNumber, timestampMs);
-      }
+      const timestampMs = await getBlockTimestampMs({
+        blockNumber,
+        preferredRpc: logsRpc,
+        rpcClients,
+        timestampCache,
+      });
 
       const args = toJsonRecord(logArgs);
       const normalized = normalizeDomainEvent(
@@ -189,9 +257,19 @@ export async function ingestBscOnce(store: IndexerStore, config: IndexerConfig) 
     inserted += result.inserted;
     ranges += 1;
 
+    const processedThroughTimestampMs = await getBlockTimestampMs({
+      blockNumber: toBlock,
+      preferredRpc: logsRpc,
+      rpcClients,
+      timestampCache,
+    });
     await store.updateCursor(contractEvent, {
       nextBlock: toBlock + 1,
       safeBlock,
+      processedFromBlock,
+      processedFromTimestampMs,
+      processedThroughBlock: toBlock,
+      processedThroughTimestampMs,
     });
   }
 
