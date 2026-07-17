@@ -1,5 +1,9 @@
 import React, { StrictMode } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+jest.mock('lucide-react', () => ({
+  X: () => null,
+}));
 
 jest.mock('@/providers/auth-provider', () => ({
   useAuth: jest.fn(),
@@ -28,18 +32,15 @@ jest.mock('@/components/layout/GameLayout', () => ({
     gameConfig,
     children,
     desktopBanner,
-    desktopFooter,
   }: {
     iframeRef: React.RefObject<HTMLIFrameElement>;
     gameConfig: { gameUrl: string };
     children?: React.ReactNode;
     desktopBanner?: React.ReactNode;
-    desktopFooter?: React.ReactNode;
   }) => <>
     <iframe ref={iframeRef} src={gameConfig.gameUrl} title="mock-game-frame" />
     {children}
     <div data-testid="desktop-banner-slot">{desktopBanner}</div>
-    <div data-testid="desktop-footer-slot">{desktopFooter}</div>
   </>,
 }));
 
@@ -817,11 +818,13 @@ describe('SybilSlayerPage game-session handshake', () => {
     const postMessage = jest.spyOn(iframe.contentWindow as Window, 'postMessage')
       .mockImplementation(() => undefined);
     await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
-    const panelBefore = screen.getByTestId('competition-panel');
     expect(screen.getByTestId('desktop-banner-slot')).toHaveTextContent(
       'Competición oficial · Preventa UKI',
     );
-    expect(screen.getByTestId('desktop-footer-slot')).toContainElement(panelBefore);
+    expect(screen.queryByTestId('competition-panel')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver reglas, alias y ranking' }));
+    const panelBefore = screen.getByTestId('competition-panel');
+    expect(screen.getByRole('dialog')).toContainElement(panelBefore);
     const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
       onSessionEnd: (result: Record<string, unknown>) => Promise<void>;
     };

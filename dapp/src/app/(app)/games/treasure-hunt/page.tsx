@@ -832,8 +832,11 @@ export default function TreasureHuntPage() {
       loading={loading}
       iframeRef={iframeRef}
       onGameConnection={handleGameConnection}
-      desktopBanner={<TreasureHuntCompetitionBanner />}
-      desktopFooter={<TreasureHuntCompetitionPanel key={competitionPanelRefreshKey} />}
+      desktopBanner={(
+        <TreasureHuntCompetitionBanner>
+          <TreasureHuntCompetitionPanel key={competitionPanelRefreshKey} />
+        </TreasureHuntCompetitionBanner>
+      )}
       mobileFocus
     />
   );

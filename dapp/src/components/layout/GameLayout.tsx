@@ -33,7 +33,6 @@ interface GameLayoutComponentProps extends GameLayoutProps {
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
   children?: ReactNode; // For any additional game-specific content
   desktopBanner?: ReactNode; // Important desktop context rendered above the game shell
-  desktopFooter?: ReactNode; // Wide desktop content rendered below the game shell
   mobileFocus?: boolean;
 }
 
@@ -70,7 +69,6 @@ export default function GameLayout({
   iframeRef: externalIframeRef,
   children,
   desktopBanner,
-  desktopFooter,
   mobileFocus = false,
 }: GameLayoutComponentProps) {
   const gameContainerRef = useRef<FullscreenElement>(null);
@@ -152,15 +150,15 @@ export default function GameLayout({
     );
   }
 
-  const hasDesktopSupplement = Boolean(desktopBanner || desktopFooter);
+  const hasDesktopBanner = Boolean(desktopBanner);
   const gameShell = (
     <div
       data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
       className={cn(
         'grid min-h-0 grid-cols-1',
         isMobileFocus ? 'gap-0' : 'gap-6 lg:grid-cols-4',
-        !isMobileFocus && !hasDesktopSupplement && 'h-full',
-        !isMobileFocus && hasDesktopSupplement && 'items-start',
+        !isMobileFocus && !hasDesktopBanner && 'h-full',
+        !isMobileFocus && hasDesktopBanner && 'items-start',
       )}
     >
         
@@ -177,7 +175,7 @@ export default function GameLayout({
             className={cn(
               'relative flex min-h-0 flex-col overflow-hidden bg-card',
               isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
-              !isMobileFocus && hasDesktopSupplement
+              !isMobileFocus && hasDesktopBanner
                 ? 'aspect-[11/8] w-full flex-none'
                 : 'flex-grow',
             )}
@@ -381,13 +379,12 @@ export default function GameLayout({
     </div>
   );
 
-  if (isMobileFocus || !hasDesktopSupplement) return gameShell;
+  if (isMobileFocus || !hasDesktopBanner) return gameShell;
 
   return (
     <div className="space-y-5">
       {desktopBanner ? <div data-game-desktop-banner>{desktopBanner}</div> : null}
       {gameShell}
-      {desktopFooter ? <div data-game-desktop-footer>{desktopFooter}</div> : null}
     </div>
   );
 }
