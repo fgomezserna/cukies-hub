@@ -27,13 +27,19 @@ jest.mock('@/components/layout/GameLayout', () => ({
     iframeRef,
     gameConfig,
     children,
+    desktopBanner,
+    desktopFooter,
   }: {
     iframeRef: React.RefObject<HTMLIFrameElement>;
     gameConfig: { gameUrl: string };
     children?: React.ReactNode;
+    desktopBanner?: React.ReactNode;
+    desktopFooter?: React.ReactNode;
   }) => <>
     <iframe ref={iframeRef} src={gameConfig.gameUrl} title="mock-game-frame" />
     {children}
+    <div data-testid="desktop-banner-slot">{desktopBanner}</div>
+    <div data-testid="desktop-footer-slot">{desktopFooter}</div>
   </>,
 }));
 
@@ -812,6 +818,10 @@ describe('SybilSlayerPage game-session handshake', () => {
       .mockImplementation(() => undefined);
     await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
     const panelBefore = screen.getByTestId('competition-panel');
+    expect(screen.getByTestId('desktop-banner-slot')).toHaveTextContent(
+      'Competición oficial · Preventa UKI',
+    );
+    expect(screen.getByTestId('desktop-footer-slot')).toContainElement(panelBefore);
     const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
       onSessionEnd: (result: Record<string, unknown>) => Promise<void>;
     };

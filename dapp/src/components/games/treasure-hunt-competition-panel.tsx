@@ -474,13 +474,13 @@ export default function TreasureHuntCompetitionPanel() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="font-mono text-[0.68rem] font-bold uppercase tracking-[0.18em] text-primary">
-              Preventa UKI · Treasure Hunt
+              Detalle de la competición
             </p>
             <h2
               id="treasure-hunt-competition-title"
               className="mt-2 font-headline text-2xl font-black tracking-tight text-foreground"
             >
-              Competición oficial
+              Reglas, identidad y ranking
             </h2>
             <p className="mt-2 max-w-[64ch] text-sm leading-relaxed text-muted-foreground">
               Juega en modo 1P, entra en el ranking con tus mejores partidas y desbloquea

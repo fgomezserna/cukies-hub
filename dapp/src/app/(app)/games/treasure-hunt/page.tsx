@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import GameLayout from '@/components/layout/GameLayout';
+import TreasureHuntCompetitionBanner from '@/components/games/treasure-hunt-competition-banner';
 import TreasureHuntCompetitionPanel from '@/components/games/treasure-hunt-competition-panel';
 import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 import { useGameData } from '@/hooks/use-game-data';
@@ -831,9 +832,9 @@ export default function TreasureHuntPage() {
       loading={loading}
       iframeRef={iframeRef}
       onGameConnection={handleGameConnection}
+      desktopBanner={<TreasureHuntCompetitionBanner />}
+      desktopFooter={<TreasureHuntCompetitionPanel key={competitionPanelRefreshKey} />}
       mobileFocus
-    >
-      <TreasureHuntCompetitionPanel key={competitionPanelRefreshKey} />
-    </GameLayout>
+    />
   );
 }
