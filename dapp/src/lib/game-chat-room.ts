@@ -30,13 +30,26 @@ export async function getOrCreateWebGameChatRoom(gameId: string) {
     description: `Chat web para jugadores de ${gameId.replace(/-/g, ' ')}.`,
   };
 
-  return prisma.chatRoom.upsert({
-    where: { gameId },
-    create: {
-      gameId,
-      name: details.name,
-      description: details.description,
-    },
-    update: {},
-  });
+  const existingRoom = await prisma.chatRoom.findUnique({ where: { gameId } });
+  if (existingRoom) return existingRoom;
+
+  try {
+    return await prisma.chatRoom.create({
+      data: {
+        gameId,
+        name: details.name,
+        description: details.description,
+      },
+    });
+  } catch (error: unknown) {
+    // The unique gameId index handles concurrent first opens without relying on
+    // Prisma's transactional upsert, which MongoDB standalone does not support.
+    if ((error as { code?: string })?.code === 'P2002') {
+      const roomCreatedConcurrently = await prisma.chatRoom.findUnique({
+        where: { gameId },
+      });
+      if (roomCreatedConcurrently) return roomCreatedConcurrently;
+    }
+    throw error;
+  }
 }
