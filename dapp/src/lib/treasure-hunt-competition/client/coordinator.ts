@@ -326,16 +326,9 @@ export function createCompetitionAttemptCoordinator(options: CoordinatorOptions 
     evidence: CompetitionClientEvidence,
   ) {
     validateEvidence(evidence);
-    let attempt = attempts.get(gameSessionId);
+    const attempt = attempts.get(gameSessionId);
     if (!attempt) {
       throw new CompetitionClientError('ATTEMPT_NOT_ACTIVE', 409, 'No active competition attempt');
-    }
-    if (attempt.nextSequence === 0) {
-      await checkpointUnlocked(gameSessionId, evidence);
-      attempt = attempts.get(gameSessionId);
-      if (!attempt) {
-        throw new CompetitionClientError('ATTEMPT_NOT_ACTIVE', 409, 'Competition attempt closed before finish');
-      }
     }
     const body = await post(`${basePath}/${encodeURIComponent(attempt.attemptId)}/finish`, {
       receipt: attempt.receipt,

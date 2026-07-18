@@ -61,7 +61,7 @@ describe('Treasure Hunt competition client coordinator', () => {
     expect(checkpoint).toMatchObject({ nextSequence: 1, receipt: 'receipt-1' });
   });
 
-  it('adds an initial checkpoint before finishing a game with no periodic checkpoint', async () => {
+  it('finishes a game with no periodic checkpoint in one recoverable request', async () => {
     const fetchImpl = jest.fn()
       .mockResolvedValueOnce(jsonResponse({
         success: true,
@@ -70,10 +70,6 @@ describe('Treasure Hunt competition client coordinator', () => {
           status: 'active', nextSequence: 0, receipt: 'receipt-0',
         },
       }, 201))
-      .mockResolvedValueOnce(jsonResponse({
-        success: true,
-        result: { accepted: true, status: 'active', nextSequence: 1, receipt: 'receipt-1' },
-      }))
       .mockResolvedValueOnce(jsonResponse({
         success: true,
         result: { accepted: true, status: 'review', nextSequence: 2, receipt: null, score: 200 },
@@ -87,9 +83,15 @@ describe('Treasure Hunt competition client coordinator', () => {
       clientTimestampMs: 2000,
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-    expect(String(fetchImpl.mock.calls[1][0])).toContain('/checkpoint');
-    expect(String(fetchImpl.mock.calls[2][0])).toContain('/finish');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(String(fetchImpl.mock.calls[1][0])).toContain('/finish');
+    expect(fetchImpl.mock.calls[1][1]?.body).toBe(JSON.stringify({
+      receipt: 'receipt-0',
+      sequence: 0,
+      score: 200,
+      gameTimeMs: 30_000,
+      clientTimestampMs: 2000,
+    }));
     expect(result.status).toBe('review');
     expect(coordinator.hasActiveAttempt('game-session-2')).toBe(false);
   });

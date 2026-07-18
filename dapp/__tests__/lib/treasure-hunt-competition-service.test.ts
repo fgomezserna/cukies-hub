@@ -545,6 +545,48 @@ describe('Treasure Hunt competition service', () => {
     });
   });
 
+  it('bootstraps and replays a finish with no prior checkpoint in one request', async () => {
+    const harness = createHarness();
+    const started = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1',
+    });
+    harness.setNow('2026-07-12T12:00:10.000Z');
+    const finishRequest = {
+      walletAddress: wallet,
+      attemptId: started.attemptId,
+      receipt: started.receipt,
+      sequence: 0,
+      score: 200,
+      gameTimeMs: 10_000,
+      clientTimestampMs: 2_000,
+    };
+
+    await expect(harness.service.finishAttempt(finishRequest)).resolves.toMatchObject({
+      accepted: true,
+      replayed: false,
+      status: 'review',
+      nextSequence: 2,
+      receipt: null,
+    });
+    await expect(harness.service.finishAttempt(finishRequest)).resolves.toMatchObject({
+      accepted: true,
+      replayed: true,
+      status: 'review',
+      nextSequence: 2,
+      receipt: null,
+    });
+    expect(harness.finishGameSession).toHaveBeenCalledTimes(1);
+    expect(harness.repository.attempts.get(started.attemptId)).toMatchObject({
+      status: 'review',
+      score: 200,
+      nextSequence: 2,
+      evidence: [
+        expect.objectContaining({ kind: 'checkpoint', sequence: 0 }),
+        expect.objectContaining({ kind: 'finish', sequence: 1 }),
+      ],
+    });
+  });
+
   it('never exposes a ranking-valid attempt before GameSession finish authority succeeds', async () => {
     const finishGameSession = jest.fn()
       .mockResolvedValueOnce(false)

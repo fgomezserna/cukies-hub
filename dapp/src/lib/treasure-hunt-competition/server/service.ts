@@ -869,6 +869,74 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     };
   }
 
+  async function finishAttempt(request: AttemptEvidenceRequest) {
+    if (request.sequence !== 0) return appendEvidence(request, 'finish');
+
+    let checkpoint;
+    try {
+      checkpoint = await appendEvidence(request, 'checkpoint');
+    } catch (error) {
+      if (!(error instanceof CompetitionServiceError) || error.code !== 'ATTEMPT_NOT_ACTIVE') {
+        throw error;
+      }
+
+      // The same initial finish may be retried after both points were committed but
+      // before the response reached the browser. Rebuild the intermediate receipt
+      // only when the durable checkpoint and finish exactly match this request.
+      const attempt = await dependencies.repository.findAttempt(request.attemptId);
+      const signedReceipt = verifyCheckpointReceiptSignature(request.receipt, proofSecret());
+      const storedCheckpoint = attempt?.evidence.find((point) => point.sequence === 0);
+      const storedFinish = attempt ? durableFinishPoint(attempt) : null;
+      const matchesInitialFinish = Boolean(
+        attempt &&
+        signedReceipt &&
+        signedReceipt.campaignId === attempt.campaignId &&
+        signedReceipt.attemptId === attempt.attemptId &&
+        signedReceipt.walletAddress === attempt.walletAddress &&
+        signedReceipt.gameSessionId === attempt.gameSessionId &&
+        signedReceipt.nextSequence === 0 &&
+        signedReceipt.previousDigest === storedCheckpoint?.previousDigest &&
+        storedCheckpoint?.kind === 'checkpoint' &&
+        storedCheckpoint.score === request.score &&
+        storedCheckpoint.gameTimeMs === request.gameTimeMs &&
+        (storedCheckpoint.clientTimestampMs ?? null) === (request.clientTimestampMs ?? null) &&
+        storedFinish?.sequence === 1 &&
+        storedFinish.previousDigest === storedCheckpoint.digest &&
+        storedFinish.score === request.score &&
+        storedFinish.gameTimeMs === request.gameTimeMs &&
+        (storedFinish.clientTimestampMs ?? null) === (request.clientTimestampMs ?? null)
+      );
+      if (!matchesInitialFinish || !attempt || !storedCheckpoint) throw error;
+
+      checkpoint = {
+        nextSequence: 1,
+        receipt: createCheckpointReceipt({
+          version: 1,
+          campaignId: attempt.campaignId,
+          attemptId: attempt.attemptId,
+          walletAddress: attempt.walletAddress,
+          gameSessionId: attempt.gameSessionId,
+          nextSequence: 1,
+          previousDigest: storedCheckpoint.digest,
+          expiresAt: attempt.expiresAt,
+        }, proofSecret()),
+      };
+    }
+
+    if (!checkpoint.receipt) {
+      throw new CompetitionServiceError(
+        'ATTEMPT_NOT_ACTIVE',
+        'Checkpoint unexpectedly closed the attempt',
+        409,
+      );
+    }
+    return appendEvidence({
+      ...request,
+      receipt: checkpoint.receipt,
+      sequence: checkpoint.nextSequence,
+    }, 'finish');
+  }
+
   async function recoverPendingFinishes(limit = 500): Promise<CompetitionPendingFinishRecoveryResult> {
     const { campaign, current } = await prepareCampaign(false);
     const safeLimit = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 500, 1), 500);
@@ -1065,7 +1133,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       }
       return { ...result, receipt: result.receipt, status: 'active' as const };
     },
-    finishAttempt: (request: AttemptEvidenceRequest) => appendEvidence(request, 'finish'),
+    finishAttempt,
     recoverPendingFinishes,
     listReviewAttempts,
     getAttemptForReview,
