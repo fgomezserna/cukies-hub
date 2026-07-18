@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyWalletAuth } from '@/lib/auth-utils';
+import { getOrCreateWebGameChatRoom, isValidGameChatId } from '@/lib/game-chat-room';
 
 type RouteContext = { params: Promise<{ gameId: string }> };
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
+    if (!isValidGameChatId(params.gameId)) {
+      return NextResponse.json({ error: 'Invalid game chat id' }, { status: 400 });
+    }
     const { walletAddress } = await request.json();
     
     if (!walletAddress) {
@@ -19,13 +23,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Find the chat room
-    const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
-    });
-
-    if (!room) {
-      return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
-    }
+    const room = await getOrCreateWebGameChatRoom(params.gameId);
 
     if (!room.isActive) {
       return NextResponse.json({ error: 'Chat room is not active' }, { status: 403 });
@@ -81,6 +79,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
+    if (!isValidGameChatId(params.gameId)) {
+      return NextResponse.json({ error: 'Invalid game chat id' }, { status: 400 });
+    }
     const { walletAddress } = await request.json();
     
     if (!walletAddress) {
@@ -93,13 +94,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     }
 
     // Find the chat room
-    const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
-    });
-
-    if (!room) {
-      return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
-    }
+    const room = await getOrCreateWebGameChatRoom(params.gameId);
 
     // Update membership to inactive
     await prisma.chatRoomMember.updateMany({

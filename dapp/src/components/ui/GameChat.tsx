@@ -20,11 +20,6 @@ interface ChatMessage {
     walletAddress: string;
     profilePictureUrl?: string;
   };
-  telegramUserId?: number;
-  telegramUsername?: string;
-  telegramFirstName?: string;
-  telegramLastName?: string;
-  isFromTelegram: boolean;
   isFromWeb: boolean;
   replyTo?: {
     id: string;
@@ -54,6 +49,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   const [isSending, setIsSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [memberCount, setMemberCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const checkingForMessages = useRef(false);
@@ -68,6 +64,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     if (!user?.walletAddress) return;
 
     setIsLoading(true);
+    setError(null);
     try {
       console.log('🔄 Fetching messages for gameId:', gameId);
       const response = await fetch(`/api/chat/rooms/${gameId}/messages?limit=50&walletAddress=${encodeURIComponent(user.walletAddress)}`);
@@ -77,7 +74,8 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
         setMessages(data);
         setTimeout(scrollToBottom, 100);
       } else {
-        console.error('❌ API response error:', response.status);
+        const data = await response.json().catch(() => null);
+        setError(data?.error || 'No se ha podido cargar el chat.');
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -111,6 +109,9 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
         setNewMessage('');
         setReplyTo(null);
         setTimeout(scrollToBottom, 100);
+      } else {
+        const data = await response.json().catch(() => null);
+        setError(data?.error || 'No se ha podido enviar el mensaje.');
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -123,13 +124,19 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
   useEffect(() => {
     if (isOpen && user?.walletAddress) {
       // Auto-join room
-      fetch(`/api/chat/rooms/${gameId}/join`, { 
+      fetch(`/api/chat/rooms/${gameId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: user.walletAddress })
       })
-        .then(() => fetchMessages())
-        .catch(console.error);
+        .then(async (response) => {
+          if (!response.ok) {
+            const data = await response.json().catch(() => null);
+            throw new Error(data?.error || 'No se ha podido acceder al chat.');
+          }
+          return fetchMessages();
+        })
+        .catch((joinError) => setError(joinError.message));
     }
   }, [isOpen, user?.walletAddress, gameId, fetchMessages]);
 
@@ -175,7 +182,7 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
     }
   }, [user?.walletAddress, gameId, messages, fetchMessages]);
 
-  // Poll for new messages and sync from Telegram
+  // Poll for new web messages
   useEffect(() => {
     if (!isOpen || !user?.walletAddress) return;
 
@@ -190,20 +197,6 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
       return 'System';
     }
     
-    // For Telegram messages, prioritize Telegram user info
-    if (message.isFromTelegram) {
-      if (message.telegramUsername) {
-        return `@${message.telegramUsername}`;
-      }
-      
-      if (message.telegramFirstName || message.telegramLastName) {
-        return `${message.telegramFirstName || ''} ${message.telegramLastName || ''}`.trim();
-      }
-      
-      return 'Telegram User';
-    }
-    
-    // For web messages, use web user info
     if (message.user) {
       return message.user.username || 
              `${message.user.walletAddress.slice(0, 6)}...${message.user.walletAddress.slice(-4)}`;
@@ -256,6 +249,21 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
           </div>
         ) : (
           <div className="space-y-4">
+            {!user?.walletAddress && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Conecta tu wallet para entrar al chat.
+              </p>
+            )}
+            {error && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            {user?.walletAddress && messages.length === 0 && !error && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Aún no hay mensajes. Sé el primero en escribir.
+              </p>
+            )}
             {messages.map((message) => {
               const messageClasses = `flex flex-col gap-1 transition-all duration-300 ${
                 message.messageType === 'SYSTEM' ? 'items-center' : 'items-start'
@@ -291,11 +299,6 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
                           <span className="font-medium text-sm">
                             {getDisplayName(message)}
                           </span>
-                          {message.isFromTelegram && (
-                            <span className="text-xs bg-blue-500/20 text-blue-400 px-1 rounded">
-                              TG
-                            </span>
-                          )}
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(message.createdAt), {
                               addSuffix: true,
@@ -355,12 +358,12 @@ export default function GameChat({ gameId, isOpen, onClose }: GameChatProps) {
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
+            placeholder={user?.walletAddress ? 'Escribe un mensaje…' : 'Conecta tu wallet para chatear'}
             className="flex-1"
-            disabled={isSending}
+            disabled={!user?.walletAddress || isSending}
             maxLength={2000}
           />
-          <Button type="submit" disabled={!newMessage.trim() || isSending}>
+          <Button type="submit" disabled={!user?.walletAddress || !newMessage.trim() || isSending}>
             <Send className="h-4 w-4" />
           </Button>
         </form>
