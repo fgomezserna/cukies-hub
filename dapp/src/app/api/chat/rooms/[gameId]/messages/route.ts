@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyWalletAuth } from '@/lib/auth-utils';
+import { getOrCreateWebGameChatRoom, isValidGameChatId } from '@/lib/game-chat-room';
 
 type RouteContext = { params: Promise<{ gameId: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
+    if (!isValidGameChatId(params.gameId)) {
+      return NextResponse.json({ error: 'Invalid game chat id' }, { status: 400 });
+    }
     // For GET requests, we'll check if a wallet address is provided in query params
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get('walletAddress');
@@ -26,18 +30,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const after = searchParams.get('after'); // For new messages
 
     // Find the chat room
-    const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
-    });
+    const room = await getOrCreateWebGameChatRoom(params.gameId);
 
-    if (!room) {
-      return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
+    if (!room.isActive) {
+      return NextResponse.json({ error: 'Chat room is not active' }, { status: 403 });
     }
 
     // Build query conditions
     const whereConditions: any = {
       roomId: room.id,
       isDeleted: false,
+      isFromTelegram: false,
     };
 
     if (before) {
@@ -95,6 +98,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
+    if (!isValidGameChatId(params.gameId)) {
+      return NextResponse.json({ error: 'Invalid game chat id' }, { status: 400 });
+    }
     let requestData;
     try {
       requestData = await request.json();
@@ -123,12 +129,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Find the chat room
-    const room = await prisma.chatRoom.findUnique({
-      where: { gameId: params.gameId },
-    });
+    const room = await getOrCreateWebGameChatRoom(params.gameId);
 
-    if (!room) {
-      return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
+    if (!room.isActive) {
+      return NextResponse.json({ error: 'Chat room is not active' }, { status: 403 });
     }
 
     // Check if user is a member of the room
@@ -184,42 +188,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
         },
       },
     });
-
-    console.log('💬 Message created successfully');
-    
-    // Send to Telegram in background
-    if (room.telegramGroupId && room.telegramTopicId && process.env.TELEGRAM_BOT_TOKEN) {
-      setTimeout(async () => {
-        try {
-          const displayName = user.username || `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`;
-          const telegramContent = `<b>${displayName}</b>: ${content.trim()}`;
-          
-          const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: room.telegramGroupId,
-              text: telegramContent,
-              parse_mode: 'HTML',
-              message_thread_id: room.telegramTopicId
-            })
-          });
-          
-          const data = await response.json();
-          console.log('📱 Telegram API response:', data.ok ? `✅ Sent (${data.result.message_id})` : `❌ ${data.description}`);
-          
-          if (data.ok && data.result) {
-            // Update the message with the Telegram message ID for future reference
-            await prisma.chatMessage.update({
-              where: { id: message.id },
-              data: { telegramMessageId: data.result.message_id }
-            });
-          }
-        } catch (telegramError: any) {
-          console.error('❌ Telegram error:', telegramError.message);
-        }
-      }, 100);
-    }
 
     return NextResponse.json(message, { status: 201 });
   } catch (error) {
