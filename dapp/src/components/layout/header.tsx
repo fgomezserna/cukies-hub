@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 const ranks = [
   { xp: 50000, name: 'Hyppie Master' },
   { xp: 20000, name: 'Hyperliquid Veteran' },
-  { xp: 10000, name: 'Sybil Slayer' },
+  { xp: 10000, name: 'Treasure Hunter' },
   { xp: 5000, name: 'Experimented Hyppie' },
   { xp: 2500, name: 'Explorer' },
 ];
@@ -204,8 +204,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                 variant="ghost"
                 className={cn(
                   'relative h-10 w-10 rounded-full group hover:bg-teal-400/10 transition-all duration-300',
-                  isGameOverlay && 'h-11 w-11',
+                  isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-emerald-300/30 bg-black/55 px-2 pr-3 text-white backdrop-blur-md hover:bg-black/70',
                 )}
+                aria-label={isGameOverlay ? 'Wallet conectada' : undefined}
               >
                 <Avatar
                   className={cn(
@@ -218,6 +219,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                     {user.username?.slice(0,1).toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
+                {isGameOverlay ? (
+                  <span className="text-xs font-bold">Wallet conectada</span>
+                ) : null}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10">
@@ -269,7 +273,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                   ? 'cursor-not-allowed bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/30 animate-pulse'
                   : 'bg-gradient-to-r from-teal-400 to-teal-500 shadow-teal-400/30 hover:from-teal-500 hover:to-teal-600 hover:scale-105 hover:shadow-xl hover:shadow-teal-400/40',
                 'rounded-xl px-6 py-2 font-bold text-white shadow-lg transition-all duration-300',
-                isGameOverlay && 'h-11 w-11 rounded-full border border-cyan-200/30 bg-black/45 p-0 backdrop-blur-md hover:bg-black/65',
+                isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-cyan-200/30 bg-black/55 px-4 backdrop-blur-md hover:bg-black/70',
               )}
               aria-label={isWaitingForApproval ? 'Esperando aprobación de wallet' : 'Conectar wallet'}
               title={isGameOverlay ? 'Conectar wallet' : undefined}
@@ -277,14 +281,14 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               {isWaitingForApproval || isAuthLoading ? (
                 <>
                   <div className={cn('animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent', !isGameOverlay && 'md:mr-2')} />
-                  <span className={cn(isGameOverlay ? 'sr-only' : 'hidden md:inline')}>
+                  <span className={cn(isGameOverlay ? 'inline' : 'hidden md:inline')}>
                     {isWaitingForApproval ? 'Esperando aprobación...' : 'Cargando...'}
                   </span>
                 </>
               ) : (
                 <>
                   <Wallet className={cn('h-4 w-4', !isGameOverlay && 'md:mr-2')} />
-                  <span className={cn(isGameOverlay ? 'sr-only' : 'hidden md:inline')}>Conectar wallet</span>
+                  <span className={cn(isGameOverlay ? 'inline' : 'hidden md:inline')}>Conectar wallet</span>
                 </>
               )}
             </Button>

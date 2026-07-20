@@ -59,7 +59,7 @@ export function buildTreasureHuntHubEntryUrl(
 ): string | null {
   try {
     const origin = resolveConfiguredParentOrigin('', dappOrigin, parentUrl, nodeEnv);
-    const hubUrl = new URL('/games/sybil-slayer', origin);
+    const hubUrl = new URL('/games/treasure-hunt', origin);
     const roomCode = new URLSearchParams(currentSearch).get('room')?.trim();
 
     // Invitation links only need the room code. Do not forward arbitrary query

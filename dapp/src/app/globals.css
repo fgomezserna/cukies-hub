@@ -6,6 +6,14 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Treasure Hunt keeps its information architecture in portrait, but the
+   landscape game viewport must remain immersive on short touch screens. */
+@media (max-width: 1023px) and (max-height: 500px) and (orientation: landscape) {
+  [data-treasure-hunt-view='play'] > header {
+    display: none;
+  }
+}
+
 [data-game-viewport] {
   min-height: min(480px, max(0px, calc(100vh - 6rem)));
   min-height: min(480px, max(0px, calc(100dvh - 6rem)));

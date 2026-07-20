@@ -142,7 +142,7 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
     window.history.replaceState(
       { preserved: true },
       '',
-      '/games/sybil-slayer?lang=es&campaign=launch&session_token=secret#fragment',
+      '/games/treasure-hunt?lang=es&campaign=launch&session_token=secret#fragment',
     );
   });
 
@@ -766,12 +766,12 @@ describe('Treasure Hunt multiplayer parent bridge', () => {
           slot: 0,
           match: { matchId: 'match-1', roomCode: 'ROOM 42' },
           inviteUrl:
-            'http://localhost/games/sybil-slayer?room=ROOM+42',
+            'http://localhost/games/treasure-hunt?room=ROOM+42',
         }),
       },
       GAME_ORIGIN,
     );
-    expect(window.location.pathname).toBe('/games/sybil-slayer');
+    expect(window.location.pathname).toBe('/games/treasure-hunt');
     expect(window.location.search).toBe('?room=ROOM+42');
     expect(window.location.hash).toBe('');
     expect(onRoomJoined).toHaveBeenCalledWith('ROOM 42');

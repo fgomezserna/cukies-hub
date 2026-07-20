@@ -7,22 +7,22 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
     id: 'mock-id-1',
     gameId: 'sybil-slayer',
     name: 'Treasure Hunt',
-    description: "Collect as fast as you can and don't get caught!",
+    description: 'Encuentra tesoros, completa el tótem y escapa antes de que se agote el tiempo.',
     emoji: '🎮',
     gameUrl: process.env.GAME_SYBILSLASH || 'http://localhost:9002/',
     port: 9002,
     ranks: [
       { xp: 50000, name: 'Hyppie Master', icon: 'Crown', color: 'text-yellow-400' },
       { xp: 20000, name: 'Hyperliquid Veteran', icon: 'Medal', color: 'text-purple-400' },
-      { xp: 10000, name: 'Sybil Slayer', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 10000, name: 'Treasure Hunter', icon: 'Trophy', color: 'text-orange-400' },
       { xp: 5000, name: 'Experimented Hyppie', icon: 'Star', color: 'text-blue-400' },
       { xp: 2500, name: 'Explorer', icon: 'Star', color: 'text-pink-500' },
     ],
-    leaderboardTitle: 'Top Slayers',
+    leaderboardTitle: 'Ranking general',
     playInstructions: [
-      { icon: 'Gamepad2', text: 'PLAY' },
-      { icon: 'Heart', text: 'HAVE FUN' },
-      { icon: 'Trophy', text: 'EARN XP' }
+      { icon: 'Gamepad2', text: 'JUEGA' },
+      { icon: 'Heart', text: 'SUPERA EL RETO' },
+      { icon: 'Trophy', text: 'MEJORA TU SCORE' }
     ],
     isActive: true,
     isInMaintenance: false,

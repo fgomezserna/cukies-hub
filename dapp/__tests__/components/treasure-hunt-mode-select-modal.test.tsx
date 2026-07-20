@@ -1,8 +1,24 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import ModeSelectModal from '../../../games/sybil-slayer/src/components/mode-select-modal';
+import ModeSelectModal, {
+  resolveTreasureHuntSinglePlayerEntry,
+} from '../../../games/sybil-slayer/src/components/mode-select-modal';
 
 describe('Treasure Hunt mode selector', () => {
+  it('uses the same signed-wallet gate for every 1P entry point', () => {
+    expect(resolveTreasureHuntSinglePlayerEntry('connecting')).toEqual(expect.objectContaining({
+      interactive: false,
+      actionCopy: 'CONECTA WALLET',
+    }));
+    expect(resolveTreasureHuntSinglePlayerEntry('ready')).toEqual(expect.objectContaining({
+      interactive: true,
+      actionCopy: 'JUGAR 1P',
+    }));
+    expect(resolveTreasureHuntSinglePlayerEntry('practice')).toEqual(expect.objectContaining({
+      interactive: true,
+      actionCopy: 'PRACTICAR 1P',
+    }));
+  });
   it('turns standalone multiplayer into an explicit Hub entry action', () => {
     const onSelectMode = jest.fn();
     render(
@@ -10,6 +26,7 @@ describe('Treasure Hunt mode selector', () => {
         open
         onClose={jest.fn()}
         onSelectMode={onSelectMode}
+        singlePlayerEntryState="practice"
         multiplayerEntryState="hub"
       />,
     );
@@ -31,6 +48,7 @@ describe('Treasure Hunt mode selector', () => {
         open
         onClose={jest.fn()}
         onSelectMode={onSelectMode}
+        singlePlayerEntryState="ready"
         multiplayerEntryState="connecting"
       />,
     );
@@ -46,6 +64,7 @@ describe('Treasure Hunt mode selector', () => {
         open
         onClose={jest.fn()}
         onSelectMode={onSelectMode}
+        singlePlayerEntryState="ready"
         multiplayerEntryState="ready"
       />,
     );
@@ -55,5 +74,40 @@ describe('Treasure Hunt mode selector', () => {
     expect(screen.getByText('JUGAR 2P')).toBeInTheDocument();
     fireEvent.click(readyButton);
     expect(onSelectMode).toHaveBeenCalledWith('multiplayer');
+  });
+
+  it('requires the signed Hub wallet for 1P as well as multiplayer', () => {
+    const onSelectMode = jest.fn();
+    const { rerender } = render(
+      <ModeSelectModal
+        open
+        onClose={jest.fn()}
+        onSelectMode={onSelectMode}
+        singlePlayerEntryState="connecting"
+        multiplayerEntryState="connecting"
+      />,
+    );
+
+    const blockedButton = screen.getByTestId('treasure-hunt-single-player-mode');
+    expect(blockedButton).toBeDisabled();
+    expect(blockedButton).toHaveAttribute('data-single-player-entry', 'connecting');
+    expect(screen.getAllByText('CONECTA WALLET')).toHaveLength(2);
+    fireEvent.click(blockedButton);
+    expect(onSelectMode).not.toHaveBeenCalled();
+
+    rerender(
+      <ModeSelectModal
+        open
+        onClose={jest.fn()}
+        onSelectMode={onSelectMode}
+        singlePlayerEntryState="ready"
+        multiplayerEntryState="ready"
+      />,
+    );
+    const readyButton = screen.getByTestId('treasure-hunt-single-player-mode');
+    expect(readyButton).toBeEnabled();
+    expect(screen.getByText('Wallet firmada. Tu próxima partida podrá entrar en el ranking oficial.')).toBeInTheDocument();
+    fireEvent.click(readyButton);
+    expect(onSelectMode).toHaveBeenCalledWith('single');
   });
 });

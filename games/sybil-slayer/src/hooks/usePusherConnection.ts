@@ -18,9 +18,152 @@ interface GameCheckpoint {
 }
 
 interface GameEndData {
+  resultId: string;
   finalScore: number;
   gameTime: number;
   metadata?: any;
+  competitionAttemptId?: string;
+}
+
+interface PendingGameEndResult extends GameEndData {
+  sessionId: string;
+  timestamp: number;
+}
+
+const PENDING_GAME_RESULT_STORAGE_KEY = 'pending-game-result';
+const GAME_END_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000] as const;
+const PENDING_GAME_RESULT_TTL_MS = 400 * 24 * 60 * 60 * 1_000;
+const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60 * 1_000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sanitizeStoredGameEndMetadata(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const metadata: Record<string, unknown> = {};
+  if (typeof value.gameOverReason === 'string') {
+    metadata.gameOverReason = value.gameOverReason.slice(0, 80);
+  }
+  if (Number.isSafeInteger(value.level) && Number(value.level) >= 0) {
+    metadata.level = Number(value.level);
+  }
+  if (Number.isSafeInteger(value.hearts) && Number(value.hearts) >= 0) {
+    metadata.hearts = Number(value.hearts);
+  }
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+function storedPendingGameEndResult(value: unknown): PendingGameEndResult | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.resultId !== 'string' ||
+    value.resultId.length < 8 ||
+    value.resultId.length > 128 ||
+    typeof value.sessionId !== 'string' ||
+    value.sessionId.length === 0 ||
+    value.sessionId.length > 128 ||
+    !Number.isSafeInteger(value.finalScore) ||
+    Number(value.finalScore) < 0 ||
+    !Number.isSafeInteger(value.gameTime) ||
+    Number(value.gameTime) < 0 ||
+    !Number.isSafeInteger(value.timestamp) ||
+    Number(value.timestamp) < 0 ||
+    Number(value.timestamp) > Date.now() + MAX_FUTURE_TIMESTAMP_SKEW_MS ||
+    Date.now() - Number(value.timestamp) > PENDING_GAME_RESULT_TTL_MS ||
+    ('competitionAttemptId' in value && (
+      typeof value.competitionAttemptId !== 'string' ||
+      value.competitionAttemptId.length === 0 ||
+      value.competitionAttemptId.length > 128
+    ))
+  ) {
+    return null;
+  }
+
+  const metadata = sanitizeStoredGameEndMetadata(value.metadata);
+  return {
+    resultId: value.resultId,
+    sessionId: value.sessionId,
+    finalScore: Number(value.finalScore),
+    gameTime: Number(value.gameTime),
+    timestamp: Number(value.timestamp),
+    ...(metadata ? { metadata } : {}),
+    ...(typeof value.competitionAttemptId === 'string'
+      ? { competitionAttemptId: value.competitionAttemptId }
+      : {}),
+  };
+}
+
+function readPendingGameEndResults(): PendingGameEndResult[] {
+  try {
+    const serialized = localStorage.getItem(PENDING_GAME_RESULT_STORAGE_KEY);
+    if (!serialized) return [];
+    const parsed: unknown = JSON.parse(serialized);
+    const candidates = Array.isArray(parsed) ? parsed : [parsed];
+    const valid = candidates
+      .map(storedPendingGameEndResult)
+      .filter((candidate): candidate is PendingGameEndResult => Boolean(candidate));
+    const unique = new Map<string, PendingGameEndResult>();
+    for (const candidate of valid) {
+      unique.set(`${candidate.sessionId}:${candidate.resultId}`, candidate);
+    }
+    return [...unique.values()]
+      .sort((left, right) => left.timestamp - right.timestamp);
+  } catch {
+    return [];
+  }
+}
+
+function writePendingGameEndResults(results: readonly PendingGameEndResult[]) {
+  try {
+    if (results.length === 0) {
+      localStorage.removeItem(PENDING_GAME_RESULT_STORAGE_KEY);
+    } else {
+      // Reconstructing the records keeps legacy bearer fields out of storage.
+      localStorage.setItem(PENDING_GAME_RESULT_STORAGE_KEY, JSON.stringify(results.map((result) => ({
+        resultId: result.resultId,
+        sessionId: result.sessionId,
+        finalScore: result.finalScore,
+        gameTime: result.gameTime,
+        timestamp: result.timestamp,
+        ...(sanitizeStoredGameEndMetadata(result.metadata)
+          ? { metadata: sanitizeStoredGameEndMetadata(result.metadata) }
+          : {}),
+        ...(result.competitionAttemptId
+          ? { competitionAttemptId: result.competitionAttemptId }
+          : {}),
+      }))));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function persistPendingGameEndResult(result: PendingGameEndResult) {
+  const pending = readPendingGameEndResults();
+  // Never evict a still-live result from another wallet/session. Each session
+  // contributes at most one record through sendGameEnd; the browser quota is
+  // handled as a visible fail-closed state with an explicit retry.
+  const withoutCurrent = pending.filter((candidate) => (
+    candidate.sessionId !== result.sessionId || candidate.resultId !== result.resultId
+  ));
+  return writePendingGameEndResults([...withoutCurrent, result]);
+}
+
+function removePendingGameEndResult(sessionId: string, resultId: string) {
+  const pending = readPendingGameEndResults();
+  const remaining = pending.filter((candidate) => (
+    candidate.sessionId !== sessionId || candidate.resultId !== resultId
+  ));
+  if (remaining.length === pending.length) return false;
+  return writePendingGameEndResults(remaining);
+}
+
+function createGameEndResultId() {
+  if (typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  return Array.from(window.crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, '0')).join('');
 }
 
 export interface SessionData {
@@ -29,6 +172,23 @@ export interface SessionData {
   gameVersion?: string;
   roomId?: string;
   userId?: string;
+}
+
+export interface TreasureHuntCompetitionAccess {
+  readonly eligible: boolean;
+  readonly practice: boolean;
+  readonly sessionId: string | null;
+  readonly attemptId?: string;
+  readonly seed?: string;
+  readonly alias?: string;
+  readonly status?: 'active';
+  readonly reason?: string;
+}
+
+interface PendingCompetitionAccessRequest {
+  readonly sessionId: string | null;
+  readonly promise: Promise<TreasureHuntCompetitionAccess>;
+  cancel(reason: string): void;
 }
 
 /**
@@ -40,6 +200,8 @@ export function usePusherConnection() {
   const [channel, setChannel] = useState<Channel | null>(null);
   const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [hasParentHandshake, setHasParentHandshake] = useState(false);
+  const [hasPendingGameEnd, setHasPendingGameEnd] = useState(false);
+  const [gameEndPersistenceError, setGameEndPersistenceError] = useState<string | null>(null);
 
   // Ref to track cleanup timeout
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -55,19 +217,156 @@ export function usePusherConnection() {
   const isConnectingRef = useRef(false);
   const sessionGenerationRef = useRef(0);
   const gameEndRetryTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const acknowledgedGameEndIdsRef = useRef(new Set<string>());
+  const competitionAccessRequestRef = useRef<PendingCompetitionAccessRequest | null>(null);
+  const unpersistedGameEndRef = useRef<PendingGameEndResult | null>(null);
 
   const clearGameEndRetries = useCallback(() => {
     for (const timeout of gameEndRetryTimeoutsRef.current) clearTimeout(timeout);
     gameEndRetryTimeoutsRef.current.clear();
   }, []);
 
-  const clearSessionData = useCallback((expectedSessionId?: string) => {
+  const startPendingGameEndDelivery = useCallback((pending: PendingGameEndResult) => {
+    clearGameEndRetries();
+    setHasPendingGameEnd(true);
+    setGameEndPersistenceError(null);
+    const generationSnapshot = sessionGenerationRef.current;
+
+    const deliver = (attempt: number) => {
+      const currentSessionId = sessionDataRef.current?.sessionId;
+      if (
+        sessionGenerationRef.current !== generationSnapshot ||
+        currentSessionId !== pending.sessionId
+      ) {
+        return;
+      }
+
+      const isStillPending = readPendingGameEndResults().some((candidate) => (
+        candidate.sessionId === pending.sessionId && candidate.resultId === pending.resultId
+      ));
+      if (!isStillPending) return;
+
+      if (channelRef.current) {
+        try {
+          channelRef.current.trigger('client-game-end', {
+            resultId: pending.resultId,
+            finalScore: pending.finalScore,
+            gameTime: pending.gameTime,
+            ...('metadata' in pending ? { metadata: pending.metadata } : {}),
+            ...(pending.competitionAttemptId
+              ? { competitionAttemptId: pending.competitionAttemptId }
+              : {}),
+          });
+          console.log('📤 [GAME-PUSHER] Game end dispatched; awaiting dapp ACK', {
+            resultId: pending.resultId,
+            attempt: attempt + 1,
+          });
+        } catch (error) {
+          console.error('❌ [GAME-PUSHER] Game end dispatch failed; it remains pending', error);
+        }
+      }
+
+      if (pending.competitionAttemptId) {
+        const parentOrigin = getParentOrigin();
+        if (parentOrigin) {
+          window.parent?.postMessage({
+            type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
+            sessionId: pending.sessionId,
+            resultId: pending.resultId,
+            competitionAttemptId: pending.competitionAttemptId,
+            finalScore: pending.finalScore,
+            gameTime: pending.gameTime,
+          }, parentOrigin);
+        }
+      }
+
+      const retryDelay = GAME_END_RETRY_DELAYS_MS[
+        Math.min(attempt, GAME_END_RETRY_DELAYS_MS.length - 1)
+      ];
+      const timeout = setTimeout(() => {
+        gameEndRetryTimeoutsRef.current.delete(timeout);
+        deliver(attempt + 1);
+      }, retryDelay);
+      gameEndRetryTimeoutsRef.current.add(timeout);
+    };
+
+    deliver(0);
+  }, [clearGameEndRetries]);
+
+  const startGameEndAckConfirmation = useCallback((sessionId: string, resultId: string) => {
+    clearGameEndRetries();
+    const generationSnapshot = sessionGenerationRef.current;
+
+    const confirm = (attempt: number) => {
+      if (
+        sessionGenerationRef.current !== generationSnapshot ||
+        sessionDataRef.current?.sessionId !== sessionId ||
+        !acknowledgedGameEndIdsRef.current.has(`${sessionId}:${resultId}`)
+      ) {
+        return;
+      }
+
+      if (channelRef.current) {
+        try {
+          channelRef.current.trigger('client-game-end-ack-confirmed', { resultId });
+        } catch (error) {
+          console.error('❌ [GAME-PUSHER] ACK confirmation failed; retrying', error);
+        }
+      }
+
+
+      const pending = readPendingGameEndResults().find((candidate) => (
+        candidate.sessionId === sessionId &&
+        candidate.resultId === resultId &&
+        Boolean(candidate.competitionAttemptId)
+      ));
+      const parentOrigin = getParentOrigin();
+      if (pending && parentOrigin) {
+        // Re-send the complete evidence before confirmation. If the parent was
+        // reloaded after its ACK, it must rebuild its in-memory completion map.
+        window.parent?.postMessage({
+          type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
+          sessionId,
+          resultId,
+          competitionAttemptId: pending.competitionAttemptId,
+          finalScore: pending.finalScore,
+          gameTime: pending.gameTime,
+        }, parentOrigin);
+        window.parent?.postMessage({
+          type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY_ACK_CONFIRMED',
+          sessionId,
+          resultId,
+        }, parentOrigin);
+      }
+
+      const retryDelay = GAME_END_RETRY_DELAYS_MS[
+        Math.min(attempt, GAME_END_RETRY_DELAYS_MS.length - 1)
+      ];
+      const timeout = setTimeout(() => {
+        gameEndRetryTimeoutsRef.current.delete(timeout);
+        confirm(attempt + 1);
+      }, retryDelay);
+      gameEndRetryTimeoutsRef.current.add(timeout);
+    };
+
+    confirm(0);
+  }, [clearGameEndRetries]);
+
+  const clearSessionData = useCallback((expectedSessionId?: string, completedResultId?: string) => {
     const current = sessionDataRef.current;
     if (expectedSessionId && current?.sessionId !== expectedSessionId) return;
 
+    if (current && completedResultId) {
+      removePendingGameEndResult(current.sessionId, completedResultId);
+    }
+
     sessionGenerationRef.current += 1;
+    acknowledgedGameEndIdsRef.current.clear();
+    unpersistedGameEndRef.current = null;
+    setHasPendingGameEnd(false);
+    setGameEndPersistenceError(null);
+    competitionAccessRequestRef.current?.cancel('SESSION_CHANGED');
     clearGameEndRetries();
-    localStorage.removeItem('pending-game-result');
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
       cleanupTimeoutRef.current = null;
@@ -108,8 +407,12 @@ export function usePusherConnection() {
     const current = sessionDataRef.current;
     if (current?.sessionId !== normalized.sessionId) {
       sessionGenerationRef.current += 1;
+      acknowledgedGameEndIdsRef.current.clear();
+      unpersistedGameEndRef.current = null;
+      setHasPendingGameEnd(false);
+      setGameEndPersistenceError(null);
+      competitionAccessRequestRef.current?.cancel('SESSION_CHANGED');
       clearGameEndRetries();
-      localStorage.removeItem('pending-game-result');
       if (channelRef.current && current) {
         pusherRef.current?.unsubscribe(`private-game-session-${current.sessionId}`);
       }
@@ -128,24 +431,26 @@ export function usePusherConnection() {
 
     sessionDataRef.current = next;
     setSessionData(next);
-  }, [clearGameEndRetries]);
+    const pendingResult = readPendingGameEndResults()
+      .filter((candidate) => candidate.sessionId === next.sessionId)
+      .sort((left, right) => left.timestamp - right.timestamp)[0];
+    if (pendingResult) {
+      // The previous session may already be inactive, so Pusher authorization
+      // can legitimately fail after reload. Start the trusted parent recovery
+      // path immediately instead of waiting for a channel subscription.
+      startPendingGameEndDelivery(pendingResult);
+    }
+  }, [clearGameEndRetries, startPendingGameEndDelivery]);
 
   useEffect(() => {
     localStorage.removeItem('pusher-game-session');
-    const pendingResult = localStorage.getItem('pending-game-result');
-    if (!pendingResult) return;
-    try {
-      const parsed = JSON.parse(pendingResult) as Record<string, unknown>;
-      if ('sessionToken' in parsed) {
-        const { sessionToken: _discardedBearer, ...tokenlessResult } = parsed;
-        localStorage.setItem('pending-game-result', JSON.stringify(tokenlessResult));
-      }
-    } catch {
-      localStorage.removeItem('pending-game-result');
-    }
+    writePendingGameEndResults(readPendingGameEndResults());
   }, []);
 
-  useEffect(() => () => clearGameEndRetries(), [clearGameEndRetries]);
+  useEffect(() => () => {
+    competitionAccessRequestRef.current?.cancel('COMPONENT_UNMOUNTED');
+    clearGameEndRetries();
+  }, [clearGameEndRetries]);
 
   // Listen for session data from parent (dapp) via postMessage
   // This is the initial handshake - after this, everything uses Pusher
@@ -173,7 +478,58 @@ export function usePusherConnection() {
         const sessionId = typeof event.data.sessionId === 'string'
           ? event.data.sessionId
           : undefined;
-        clearSessionData(sessionId);
+        const resultId = typeof event.data.resultId === 'string' &&
+          event.data.resultId.length >= 8 && event.data.resultId.length <= 128
+          ? event.data.resultId
+          : undefined;
+        const currentSessionId = sessionDataRef.current?.sessionId;
+        if (sessionId && currentSessionId !== sessionId) {
+          // The first CLEAR may have succeeded while its confirmation was lost.
+          // Once this exact result is absent locally, re-confirming the trusted
+          // parent's retry is idempotent and lets it finally forget the session.
+          if (
+            !currentSessionId &&
+            resultId &&
+            !readPendingGameEndResults().some((candidate) => (
+              candidate.sessionId === sessionId && candidate.resultId === resultId
+            ))
+          ) {
+            window.parent?.postMessage({
+              type: 'TREASURE_HUNT_GAME_SESSION_CLEAR_CONFIRMED',
+              sessionId,
+              resultId,
+            }, parentOrigin);
+          }
+          return;
+        }
+        clearSessionData(sessionId, resultId);
+        if (sessionId && resultId) {
+          window.parent?.postMessage({
+            type: 'TREASURE_HUNT_GAME_SESSION_CLEAR_CONFIRMED',
+            sessionId,
+            resultId,
+          }, parentOrigin);
+        }
+      } else if (event.data?.type === 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY_ACK') {
+        const sessionId = sessionDataRef.current?.sessionId;
+        const resultId = event.data.resultId;
+        if (
+          !sessionId ||
+          event.data.sessionId !== sessionId ||
+          typeof resultId !== 'string' ||
+          resultId.length < 8 ||
+          resultId.length > 128 ||
+          !readPendingGameEndResults().some((candidate) => (
+            candidate.sessionId === sessionId &&
+            candidate.resultId === resultId &&
+            Boolean(candidate.competitionAttemptId)
+          ))
+        ) {
+          return;
+        }
+        acknowledgedGameEndIdsRef.current.add(`${sessionId}:${resultId}`);
+        setHasPendingGameEnd(true);
+        startGameEndAckConfirmation(sessionId, resultId);
       }
     };
 
@@ -203,7 +559,7 @@ export function usePusherConnection() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [acceptSessionData, clearSessionData]);
+  }, [acceptSessionData, clearSessionData, startGameEndAckConfirmation]);
 
   // Connect to Pusher when we have session data
   const connectionSessionId = sessionData?.sessionId ?? null;
@@ -252,6 +608,9 @@ export function usePusherConnection() {
       pusherSessionIdRef.current = null;
       channelRef.current = null;
     }
+
+    let ownedPusher: Pusher | null = null;
+    let ownedChannel: Channel | null = null;
 
     // Add a small delay to prevent rapid reconnections
     const connectTimeout = setTimeout(() => {
@@ -334,6 +693,7 @@ export function usePusherConnection() {
             })
           }
         );
+        ownedPusher = pusherInstance;
 
         // Connection event handlers
         pusherInstance.connection.bind('connected', () => {
@@ -353,6 +713,7 @@ export function usePusherConnection() {
         // Subscribe to game session channel
         const channelName = `private-game-session-${sessionData.sessionId}`;
         const gameChannel = pusherInstance.subscribe(channelName);
+        ownedChannel = gameChannel;
 
         // Assign channel ref immediately so it's available even if subscription is pending
         channelRef.current = gameChannel;
@@ -378,26 +739,39 @@ export function usePusherConnection() {
             timestamp: Date.now()
           });
 
-          // Check for pending game results and send them
-          const pendingResult = localStorage.getItem('pending-game-result');
+          const pendingResult = readPendingGameEndResults()
+            .filter((candidate) => candidate.sessionId === sessionData.sessionId)
+            .sort((left, right) => left.timestamp - right.timestamp)[0];
           if (pendingResult) {
-            try {
-              const parsed = JSON.parse(pendingResult) as Record<string, unknown>;
-              const { sessionToken: _discardedBearer, sessionId, ...gameResult } = parsed;
-              if (sessionId !== sessionData.sessionId) {
-                console.warn('⚠️ [GAME-PUSHER] Discarding pending result for another session');
-                localStorage.removeItem('pending-game-result');
-                return;
-              }
-              console.log('🔄 [GAME-PUSHER] Found pending game result, sending');
-
-              gameChannel.trigger('client-game-end', gameResult);
-              localStorage.removeItem('pending-game-result');
-              console.log('✅ [GAME-PUSHER] Pending game result sent successfully');
-            } catch (error) {
-              console.error('❌ [GAME-PUSHER] Failed to send pending game result:', error);
-            }
+            console.log('🔄 [GAME-PUSHER] Resuming pending game result delivery', {
+              resultId: pendingResult.resultId,
+            });
+            startPendingGameEndDelivery(pendingResult);
           }
+        });
+
+        gameChannel.bind('client-game-end-ack', (data: unknown) => {
+          if (
+            !isRecord(data) ||
+            typeof data.resultId !== 'string' ||
+            data.resultId.length < 8 ||
+            data.resultId.length > 128
+          ) {
+            return;
+          }
+          const remainsDurable = readPendingGameEndResults().some((candidate) => (
+            candidate.sessionId === sessionData.sessionId && candidate.resultId === data.resultId
+          ));
+          if (!remainsDurable) return;
+
+          // Keep the exact result until the parent clears it after receiving this
+          // confirmation. Reloading either document cannot strand the old session.
+          setHasPendingGameEnd(true);
+          acknowledgedGameEndIdsRef.current.add(`${sessionData.sessionId}:${data.resultId}`);
+          startGameEndAckConfirmation(sessionData.sessionId, data.resultId);
+          console.log('✅ [GAME-PUSHER] Dapp acknowledged persisted game result', {
+            resultId: data.resultId,
+          });
         });
 
         // NEW: Listen for session updates from dapp via Pusher
@@ -452,8 +826,7 @@ export function usePusherConnection() {
           sessionDataRef.current = sessionData;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const state = (gameChannel as any).state;
+        const state = (gameChannel as Channel & { state?: string }).state;
         console.log('🔗 [GAME-PUSHER] Channel assigned to ref:', {
           hasChannel: !!channelRef.current,
           channelName: gameChannel.name,
@@ -487,29 +860,38 @@ export function usePusherConnection() {
       cleanupTimeoutRef.current = setTimeout(() => {
         console.log('🧹 [GAME-PUSHER] Delayed cleanup starting...');
 
-        if (channelRef.current && sessionDataRef.current) {
-          const channelName = `private-game-session-${sessionData.sessionId}`;
-          pusherRef.current?.unsubscribe(channelName);
+        if (ownedChannel) {
+          ownedPusher?.unsubscribe(ownedChannel.name);
         }
+        ownedPusher?.disconnect();
 
-        if (pusherRef.current) {
-          pusherRef.current.disconnect();
+        // Socket cleanup must never erase a newer signed parent authority.
+        // The GameSession ref belongs to acceptSessionData/clearSessionData;
+        // keeping it alive also lets the postMessage recovery path persist a
+        // result when Pusher drops during a run.
+        if (
+          pusherRef.current === ownedPusher &&
+          pusherSessionIdRef.current === sessionData.sessionId
+        ) {
+          console.log('🧹 [GAME-PUSHER] Clearing refs owned by the old connection');
+          pusherRef.current = null;
+          pusherSessionIdRef.current = null;
+          if (channelRef.current === ownedChannel) channelRef.current = null;
+          setPusher(null);
+          setChannel(null);
+          setConnectionState('disconnected');
         }
-
-        console.log('🧹 [GAME-PUSHER] Clearing all refs');
-        pusherRef.current = null;
-        pusherSessionIdRef.current = null;
-        channelRef.current = null;
-        sessionDataRef.current = null;
-
-        setPusher(null);
-        setChannel(null);
-        setConnectionState('disconnected');
         cleanupTimeoutRef.current = null;
       }, 2000); // 2 second delay to allow game end to complete
     };
 
-  }, [acceptSessionData, connectionSessionId]);
+  }, [
+    acceptSessionData,
+    clearGameEndRetries,
+    connectionSessionId,
+    startPendingGameEndDelivery,
+    startGameEndAckConfirmation,
+  ]);
 
   // Send checkpoint to dapp
   const sendCheckpoint = useCallback((checkpointData: Omit<GameCheckpoint, 'timestamp'>) => {
@@ -540,127 +922,194 @@ export function usePusherConnection() {
     }
   }, [connectionState]);
 
-  // Send game end to dapp with retry logic
-  const sendGameEnd = useCallback((endData: Omit<GameEndData, 'timestamp'>) => {
+  const requestCompetitionAccess = useCallback((): Promise<TreasureHuntCompetitionAccess> => {
+    const isStandaloneRuntime = window.parent === window;
+    const parentOrigin = getParentOrigin();
+    const sessionIdSnapshot = sessionDataRef.current?.sessionId ?? null;
+    const existing = competitionAccessRequestRef.current;
+    if (existing && existing.sessionId === sessionIdSnapshot) return existing.promise;
+    if (isStandaloneRuntime) {
+      return Promise.resolve({
+        eligible: false,
+        practice: true,
+        sessionId: sessionIdSnapshot,
+        reason: 'STANDALONE_PRACTICE',
+      });
+    }
+    if (!parentOrigin || !hasParentHandshake || !sessionIdSnapshot) {
+      return Promise.resolve({
+        eligible: false,
+        practice: false,
+        sessionId: sessionIdSnapshot,
+        reason: !parentOrigin
+          ? 'SECURE_PARENT_UNAVAILABLE'
+          : 'PARENT_HANDSHAKE_REQUIRED',
+      });
+    }
+
+    const generationSnapshot = sessionGenerationRef.current;
+    const requestId = typeof window.crypto.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : Array.from(window.crypto.getRandomValues(new Uint8Array(16)), byte =>
+        byte.toString(16).padStart(2, '0')).join('');
+    let cancelRequest: (reason: string) => void = () => undefined;
+
+    const promise = new Promise<TreasureHuntCompetitionAccess>((resolve) => {
+      let settled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      const settle = (result: TreasureHuntCompetitionAccess) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        window.removeEventListener('message', handleResponse);
+        resolve(result);
+      };
+      cancelRequest = (reason: string) => settle({
+        eligible: false,
+        practice: false,
+        sessionId: sessionIdSnapshot,
+        reason,
+      });
+      const handleResponse = (event: MessageEvent) => {
+        if (
+          event.source !== window.parent ||
+          event.origin !== parentOrigin ||
+          event.data?.type !== 'TREASURE_HUNT_COMPETITION_START_RESPONSE' ||
+          event.data?.requestId !== requestId ||
+          sessionGenerationRef.current !== generationSnapshot
+        ) {
+          return;
+        }
+        const responseSessionId = typeof event.data.sessionId === 'string'
+          ? event.data.sessionId
+          : null;
+        if (
+          (sessionIdSnapshot && responseSessionId !== sessionIdSnapshot) ||
+          (sessionDataRef.current?.sessionId && responseSessionId !== sessionDataRef.current.sessionId)
+        ) {
+          return;
+        }
+        if (
+          event.data.eligible === true &&
+          typeof event.data.attemptId === 'string' && event.data.attemptId.length > 0 &&
+          typeof event.data.seed === 'string' && event.data.seed.length > 0 &&
+          typeof event.data.alias === 'string' && event.data.alias.length > 0 &&
+          event.data.status === 'active' &&
+          responseSessionId
+        ) {
+          settle({
+            eligible: true,
+            practice: false,
+            sessionId: responseSessionId,
+            attemptId: event.data.attemptId,
+            seed: event.data.seed,
+            alias: event.data.alias,
+            status: 'active',
+          });
+          return;
+        }
+        if (
+          event.data.eligible === false &&
+          typeof event.data.practice === 'boolean'
+        ) {
+          settle({
+            eligible: false,
+            practice: event.data.practice,
+            sessionId: responseSessionId,
+            reason: typeof event.data.reason === 'string'
+              ? event.data.reason.slice(0, 80)
+              : 'COMPETITION_UNAVAILABLE',
+          });
+        }
+      };
+
+      window.addEventListener('message', handleResponse);
+      window.parent.postMessage({
+        type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+        requestId,
+        sessionId: sessionIdSnapshot,
+      }, parentOrigin);
+      timeoutId = setTimeout(() => cancelRequest('COMPETITION_REQUEST_TIMEOUT'), 12_000);
+    });
+    const pending: PendingCompetitionAccessRequest = {
+      sessionId: sessionIdSnapshot,
+      promise,
+      cancel: (reason) => cancelRequest(reason),
+    };
+    competitionAccessRequestRef.current = pending;
+    promise.finally(() => {
+      if (competitionAccessRequestRef.current === pending) {
+        competitionAccessRequestRef.current = null;
+      }
+    });
+    return promise;
+  }, [hasParentHandshake]);
+
+  // Persist first, then retry with the same result id until the dapp confirms
+  // that backend processing completed.
+  const sendGameEnd = useCallback((endData: Omit<GameEndData, 'resultId'>) => {
     const sessionIdSnapshot = sessionDataRef.current?.sessionId;
     if (!sessionIdSnapshot) {
       console.warn('⚠️ [GAME-PUSHER] Cannot send game end - missing session data');
       return false;
     }
-    const generationSnapshot = sessionGenerationRef.current;
-
-    const gameEndData: GameEndData = {
-      ...endData,
-      gameTime: endData.gameTime
-    };
-
-    const persistPendingResult = () => {
-      if (
-        sessionGenerationRef.current !== generationSnapshot ||
-        sessionDataRef.current?.sessionId !== sessionIdSnapshot
-      ) return;
-      localStorage.setItem('pending-game-result', JSON.stringify({
-        ...gameEndData,
-        sessionId: sessionIdSnapshot,
-        timestamp: Date.now(),
-      }));
-    };
-
-    const isCurrentSession = () => (
-      sessionGenerationRef.current === generationSnapshot &&
-      sessionDataRef.current?.sessionId === sessionIdSnapshot
-    );
-
-    const scheduleRetry = (callback: () => void, delayMs: number) => {
-      const timeout = setTimeout(() => {
-        gameEndRetryTimeoutsRef.current.delete(timeout);
-        if (isCurrentSession()) callback();
-      }, delayMs);
-      gameEndRetryTimeoutsRef.current.add(timeout);
-    };
-
-    const handleGameEndFailure = () => {
-      if (!isCurrentSession()) return false;
-      console.error('❌ [GAME-PUSHER] All parent-proxied attempts failed; persisting tokenless result');
-      persistPendingResult();
+    if (
+      !Number.isSafeInteger(endData.finalScore) ||
+      endData.finalScore < 0 ||
+      !Number.isSafeInteger(endData.gameTime) ||
+      endData.gameTime < 0
+    ) {
+      console.error('❌ [GAME-PUSHER] Cannot queue an invalid game result');
       return false;
+    }
+
+    const existing = readPendingGameEndResults()
+      .find((candidate) => candidate.sessionId === sessionIdSnapshot);
+    const pending: PendingGameEndResult = existing ?? {
+      resultId: createGameEndResultId(),
+      sessionId: sessionIdSnapshot,
+      finalScore: endData.finalScore,
+      gameTime: endData.gameTime,
+      timestamp: Date.now(),
+      ...('metadata' in endData ? { metadata: endData.metadata } : {}),
+      ...(endData.competitionAttemptId
+        ? { competitionAttemptId: endData.competitionAttemptId }
+        : {}),
     };
 
-    const attemptSend = (attempt = 1, maxAttempts = 5) => {
-      if (!isCurrentSession()) return false;
-      console.log(`🔍 [GAME-PUSHER] Game end attempt ${attempt} - channel status:`, {
-        hasChannel: !!channelRef.current,
-        hasPusher: !!pusherRef.current,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        channelState: channelRef.current ? (channelRef.current as any).state : 'none',
-        connectionState,
-        hasSessionData: !!sessionDataRef.current
-      });
+    if (!persistPendingGameEndResult(pending)) {
+      console.error('❌ [GAME-PUSHER] Game result could not be persisted before delivery');
+      unpersistedGameEndRef.current = pending;
+      setHasPendingGameEnd(true);
+      setGameEndPersistenceError(
+        'No se pudo guardar el resultado en este dispositivo. No cierres la página y pulsa “Reintentar guardado”.',
+      );
+      return false;
+    }
 
-      // Try to reconnect channel if we have pusher but no channel
-      if (!channelRef.current && pusherRef.current) {
-        console.log('🔄 [GAME-PUSHER] Attempting to reconnect channel for game end');
-        try {
-          const channelName = `private-game-session-${sessionIdSnapshot}`;
-          const newChannel = pusherRef.current.subscribe(channelName);
+    unpersistedGameEndRef.current = null;
+    setGameEndPersistenceError(null);
+    setHasPendingGameEnd(true);
+    startPendingGameEndDelivery(pending);
+    return true;
+  }, [startPendingGameEndDelivery]);
 
-          // Wait a bit for subscription to be ready
-          scheduleRetry(() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((newChannel as any).state === 'subscribed' || (newChannel as any).subscribed) {
-              channelRef.current = newChannel;
-              console.log('✅ [GAME-PUSHER] Channel reconnected, retrying game end');
-              attemptSend(attempt, maxAttempts);
-            } else {
-              console.warn('⚠️ [GAME-PUSHER] Channel reconnection failed, continuing with retry logic');
-              if (attempt < maxAttempts) {
-                scheduleRetry(() => attemptSend(attempt + 1, maxAttempts), 1000);
-              } else {
-                handleGameEndFailure();
-              }
-            }
-          }, 500);
-          return;
-        } catch (error) {
-          console.error('❌ [GAME-PUSHER] Failed to reconnect channel:', error);
-        }
-      }
-
-      if (!channelRef.current) {
-        console.warn(`⚠️ [GAME-PUSHER] Cannot send game end (attempt ${attempt}) - no channel connection`);
-
-        if (attempt < maxAttempts) {
-          console.log(`🔄 [GAME-PUSHER] Retrying game end in 1s (attempt ${attempt + 1}/${maxAttempts})`);
-          scheduleRetry(() => attemptSend(attempt + 1, maxAttempts), 1000);
-          return;
-        } else {
-          handleGameEndFailure();
-          return false;
-        }
-      }
-
-      try {
-        channelRef.current.trigger('client-game-end', gameEndData);
-        console.log(`📤 [GAME-PUSHER] Game end sent successfully (attempt ${attempt})`);
-
-        // Clear any pending result from localStorage
-        localStorage.removeItem('pending-game-result');
-        return true;
-      } catch (error) {
-        console.error(`❌ [GAME-PUSHER] Failed to send game end (attempt ${attempt}):`, error);
-
-        if (attempt < maxAttempts) {
-          console.log(`🔄 [GAME-PUSHER] Retrying game end in 1s (attempt ${attempt + 1}/${maxAttempts})`);
-          scheduleRetry(() => attemptSend(attempt + 1, maxAttempts), 1000);
-        } else {
-          handleGameEndFailure();
-        }
-        return false;
-      }
-    };
-
-    return attemptSend();
-  }, [connectionState]);
+  const retryGameEndPersistence = useCallback(() => {
+    const pending = unpersistedGameEndRef.current;
+    if (!pending || sessionDataRef.current?.sessionId !== pending.sessionId) return false;
+    if (!persistPendingGameEndResult(pending)) {
+      setHasPendingGameEnd(true);
+      setGameEndPersistenceError(
+        'El resultado sigue sin poder guardarse. Libera espacio del navegador y vuelve a intentarlo sin cerrar la página.',
+      );
+      return false;
+    }
+    unpersistedGameEndRef.current = null;
+    setGameEndPersistenceError(null);
+    setHasPendingGameEnd(true);
+    startPendingGameEndDelivery(pending);
+    return true;
+  }, [startPendingGameEndDelivery]);
 
   // Send honeypot trigger to dapp
   const sendHoneypotTrigger = useCallback((event: string) => {
@@ -704,10 +1153,14 @@ export function usePusherConnection() {
     connectionState,
     sessionData,
     hasParentHandshake,
+    hasPendingGameEnd,
+    gameEndPersistenceError,
 
     // Communication methods
     sendCheckpoint,
     sendGameEnd,
+    retryGameEndPersistence,
+    requestCompetitionAccess,
     sendHoneypotTrigger,
     startCheckpointInterval,
 
