@@ -53,8 +53,9 @@ const SidebarLogo = () => {
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isMobileGameShell = useMobileGameShell();
+  const isTreasureHunt = pathname.startsWith('/games/treasure-hunt');
   const isMobileTreasureHunt =
-    isMobileGameShell && pathname === '/games/treasure-hunt';
+    isMobileGameShell && isTreasureHunt;
   const isCukiesSection =
     pathname.startsWith('/cukies') ||
     pathname.startsWith('/marketplace') ||
@@ -356,12 +357,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </>
           )}
           
-          <Header variant={isMobileTreasureHunt ? 'game-overlay' : 'default'} />
+          {!isTreasureHunt ? <Header variant="default" /> : null}
           <main
             data-app-main
             className={cn(
               'relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8',
-              isMobileTreasureHunt && 'h-full overflow-hidden p-0 sm:p-0 lg:p-0',
+              isTreasureHunt && 'h-full overflow-hidden p-0 sm:p-0 lg:p-0',
             )}
           >
             {children}

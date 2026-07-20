@@ -13,6 +13,25 @@ jest.mock('@/hooks/use-game-data', () => ({
   useGameData: jest.fn(),
 }));
 
+jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
+  formatTreasureHuntPercentage: (bps: number) => `${bps / 100}%`,
+  TREASURE_HUNT_FALLBACK_RULES: {
+    poolBps: 2_500,
+    playerRewardBps: 1_000,
+    sponsorRewardBps: 2_500,
+    maxWinningAttemptsPerWallet: 5,
+    cliffMonths: 9,
+    vestingMonths: 6,
+  },
+  useTreasureHuntCompetitionOverview: () => ({
+    status: null,
+    leaderboard: [],
+    isLoading: false,
+    error: null,
+    reload: jest.fn(),
+  }),
+}));
+
 jest.mock('@/hooks/use-pusher-game-connection', () => ({
   usePusherGameConnection: jest.fn(),
 }));
@@ -819,10 +838,10 @@ describe('SybilSlayerPage game-session handshake', () => {
       .mockImplementation(() => undefined);
     await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
     expect(screen.getByTestId('desktop-banner-slot')).toHaveTextContent(
-      'Competición oficial · Preventa UKI',
+      'Competición activa · Torneo de Preventa UKI',
     );
     expect(screen.queryByTestId('competition-panel')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Ver reglas, nombre y ranking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mi participación' }));
     const panelBefore = screen.getByTestId('competition-panel');
     expect(screen.getByRole('dialog')).toContainElement(panelBefore);
     const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {

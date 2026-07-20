@@ -826,7 +826,6 @@ export function usePusherConnection() {
           sessionDataRef.current = sessionData;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const state = (gameChannel as any).state;
         console.log('🔗 [GAME-PUSHER] Channel assigned to ref:', {
           hasChannel: !!channelRef.current,

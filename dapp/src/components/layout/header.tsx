@@ -220,7 +220,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                   </AvatarFallback>
                 </Avatar>
                 {isGameOverlay ? (
-                  <span className="text-xs font-bold">Wallet conectada</span>
+                  <span className="hidden text-xs font-bold sm:inline">Wallet conectada</span>
                 ) : null}
               </Button>
             </DropdownMenuTrigger>
@@ -281,14 +281,14 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               {isWaitingForApproval || isAuthLoading ? (
                 <>
                   <div className={cn('animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent', !isGameOverlay && 'md:mr-2')} />
-                  <span className={cn(isGameOverlay ? 'inline' : 'hidden md:inline')}>
+                  <span className={cn(isGameOverlay ? 'hidden sm:inline' : 'hidden md:inline')}>
                     {isWaitingForApproval ? 'Esperando aprobación...' : 'Cargando...'}
                   </span>
                 </>
               ) : (
                 <>
                   <Wallet className={cn('h-4 w-4', !isGameOverlay && 'md:mr-2')} />
-                  <span className={cn(isGameOverlay ? 'inline' : 'hidden md:inline')}>Conectar wallet</span>
+                  <span className={cn(isGameOverlay ? 'hidden sm:inline' : 'hidden md:inline')}>Conectar wallet</span>
                 </>
               )}
             </Button>

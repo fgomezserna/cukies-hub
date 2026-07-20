@@ -2202,6 +2202,30 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     startMultiplayerGame,
   ]);
 
+  useEffect(() => {
+    if (window.parent === window) return undefined;
+    let parentOrigin: string;
+    try {
+      parentOrigin = new URL(document.referrer).origin;
+    } catch {
+      return undefined;
+    }
+
+    const handleParentModeRequest = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== parentOrigin) return;
+      if (
+        event.data?.type !== 'TREASURE_HUNT_START_MODE' ||
+        event.data?.mode !== 'single'
+      ) {
+        return;
+      }
+      void handleModeSelected('single');
+    };
+
+    window.addEventListener('message', handleParentModeRequest);
+    return () => window.removeEventListener('message', handleParentModeRequest);
+  }, [handleModeSelected]);
+
   // La invitación llega únicamente por el handshake autenticado del padre.
   useEffect(() => {
     if (!hasParentHandshake) return;

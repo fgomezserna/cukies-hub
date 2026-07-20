@@ -38,6 +38,8 @@ interface GameLayoutComponentProps extends GameLayoutProps {
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
   children?: ReactNode; // For any additional game-specific content
   desktopBanner?: ReactNode; // Important desktop context rendered above the game shell
+  desktopSidebar?: ReactNode; // Optional game-specific preparation/status panel
+  desktopFooter?: ReactNode;
   mobileFocus?: boolean;
 }
 
@@ -74,6 +76,8 @@ export default function GameLayout({
   iframeRef: externalIframeRef,
   children,
   desktopBanner,
+  desktopSidebar,
+  desktopFooter,
   mobileFocus = false,
 }: GameLayoutComponentProps) {
   const gameContainerRef = useRef<FullscreenElement>(null);
@@ -243,7 +247,11 @@ export default function GameLayout({
       data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
       className={cn(
         'grid min-h-0 grid-cols-1',
-        isMobileFocus ? 'gap-0' : 'gap-6 lg:grid-cols-4',
+        isMobileFocus
+          ? 'gap-0'
+          : desktopSidebar
+            ? 'gap-3 lg:grid-cols-[minmax(0,1fr)_24rem]'
+            : 'gap-6 lg:grid-cols-4',
         !isMobileFocus && !hasDesktopBanner && 'h-full',
         !isMobileFocus && hasDesktopBanner && 'items-start',
       )}
@@ -253,7 +261,11 @@ export default function GameLayout({
         <div
           className={cn(
             'flex min-h-0 flex-col',
-            isMobileFocus ? 'h-full gap-0' : 'gap-6 lg:col-span-3',
+            isMobileFocus
+              ? 'h-full gap-0'
+              : desktopSidebar
+                ? 'gap-3'
+                : 'gap-6 lg:col-span-3',
           )}
         >
           <div
@@ -264,7 +276,9 @@ export default function GameLayout({
               'relative flex min-h-0 flex-col overflow-hidden bg-card',
               isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
               !isMobileFocus && hasDesktopBanner
-                ? 'h-[clamp(26rem,calc(100dvh-18rem),41.25rem)] w-full flex-none'
+                ? desktopSidebar
+                  ? 'h-[clamp(30rem,calc(100dvh-23rem),35rem)] w-full flex-none rounded-[8px] border-[#b7832d]/65'
+                  : 'h-[clamp(26rem,calc(100dvh-18rem),41.25rem)] w-full flex-none'
                 : 'flex-grow',
               isFallbackFullscreen && 'fixed inset-0 z-[100] h-[100dvh] w-screen rounded-none border-0',
             )}
@@ -328,7 +342,7 @@ export default function GameLayout({
           </div>
           
           {/* Game Instructions */}
-          {!isMobileFocus && (
+          {!isMobileFocus && !desktopSidebar && (
             <Card>
               <CardContent className="p-4 flex flex-wrap justify-around items-center text-center gap-4">
                 {playInstructions.map((instruction, index) => (
@@ -348,7 +362,7 @@ export default function GameLayout({
         </div>
 
         {/* Right Column: Game Info & Stats */}
-        {!isMobileFocus && (
+        {!isMobileFocus && !desktopSidebar && (
         <div className="lg:col-span-1 flex flex-col gap-3">
           
           {/* 1. Game Title and Description */}
@@ -479,15 +493,19 @@ export default function GameLayout({
           {children}
         </div>
         )}
+        {!isMobileFocus && desktopSidebar ? (
+          <div className="min-h-0 lg:col-span-1">{desktopSidebar}</div>
+        ) : null}
     </div>
   );
 
   if (isMobileFocus || !hasDesktopBanner) return gameShell;
 
   return (
-    <div className="space-y-5">
+    <div className={cn(desktopSidebar ? 'space-y-3' : 'space-y-5')}>
       {desktopBanner ? <div data-game-desktop-banner>{desktopBanner}</div> : null}
       {gameShell}
+      {desktopFooter ? <div data-game-desktop-footer>{desktopFooter}</div> : null}
     </div>
   );
 }
