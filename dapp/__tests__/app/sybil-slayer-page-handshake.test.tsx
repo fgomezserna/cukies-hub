@@ -888,6 +888,63 @@ describe('SybilSlayerPage game-session handshake', () => {
     expect(latestBridgeOptions().currentSessionId).toBe(sessionId);
   });
 
+  it('accepts a duplicate persisted callback after another transport already cleared the result', async () => {
+    const endedSessionId = `game_${'7'.repeat(64)}`;
+    const freshSessionId = `game_${'8'.repeat(64)}`;
+    const sessionResponse = (sessionId: string) => new Response(JSON.stringify({
+      success: true,
+      sessionId,
+      sessionToken: `token-${sessionId}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(sessionResponse(endedSessionId))
+      .mockResolvedValueOnce(sessionResponse(freshSessionId));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(endedSessionId));
+    const endedSessionOptions = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
+      onSessionEnd: (result: Record<string, unknown>) => Promise<void>;
+      onGameEndPersisted: (result: Record<string, unknown>) => boolean;
+    };
+    const resultId = 'result-cleared-by-recovery';
+
+    await act(async () => {
+      await endedSessionOptions.onSessionEnd({
+        resultId,
+        finalScore: 55,
+        isValid: false,
+        source: 'competition',
+        status: 'review',
+        clearConfirmationRequired: true,
+      });
+    });
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_GAME_SESSION_CLEAR_CONFIRMED',
+          sessionId: endedSessionId,
+          resultId,
+        },
+      }));
+    });
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(freshSessionId));
+
+    expect(endedSessionOptions.onGameEndPersisted({
+      resultId,
+      clearConfirmationRequired: true,
+    })).toBe(true);
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:pending-session-clear:v1',
+    )).toBeNull();
+  });
+
   it('replays a modern practice CLEAR after parent reload between backend ACK and ACK confirmation', async () => {
     const sessionId = `game_${'9'.repeat(64)}`;
     const sessionResponse = () => new Response(JSON.stringify({

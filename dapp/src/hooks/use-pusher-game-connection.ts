@@ -6,6 +6,15 @@ import {
   type CompetitionAttemptCoordinator,
 } from '@/lib/treasure-hunt-competition/client';
 
+function isTerminalCheckpointRace(error: unknown) {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'ATTEMPT_NOT_ACTIVE',
+  );
+}
+
 interface GameCheckpoint {
   score: number;
   gameTime: number;
@@ -280,6 +289,11 @@ export function usePusherGameConnection(
             console.error('❌ [PUSHER] Checkpoint processing failed:', routed.result);
           }
         } catch (error) {
+          // The iframe emits its last checkpoint immediately before game-end.
+          // The postMessage recovery transport can finish that attempt before
+          // this slower Pusher checkpoint arrives, so the terminal 409 is an
+          // expected ordering outcome rather than a failed save.
+          if (isTerminalCheckpointRace(error)) return;
           console.error('❌ [PUSHER] Error processing checkpoint:', error);
         }
       });

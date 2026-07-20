@@ -326,6 +326,16 @@ export default function TreasureHuntPage() {
     const endingSession = activeParentGameSession;
     if (!result.clearConfirmationRequired) return true;
     if (
+      endingSession &&
+      notifiedGameEndIdsRef.current.has(`${endingSession.sessionId}:${result.resultId}`)
+    ) {
+      // The recovery transport may already have received ACK_CONFIRMED and
+      // rotated the session while the same Pusher finish was still resolving.
+      // The exact result is already durable and cleared, so a duplicate ACK is
+      // safe and does not need a new marker for the now-finished session.
+      return true;
+    }
+    if (
       !endingSession ||
       latestWalletUserIdRef.current !== endingSession.ownerUserId ||
       latestParentGameSessionRef.current?.sessionId !== endingSession.sessionId

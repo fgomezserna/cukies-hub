@@ -1,7 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 
 import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
-import { routeGameEnd } from '@/lib/treasure-hunt-competition/client';
+import {
+  routeGameCheckpoint,
+  routeGameEnd,
+} from '@/lib/treasure-hunt-competition/client';
 
 const mockChannelBindings = new Map<string, (data: any) => unknown>();
 const mockChannelTrigger = jest.fn((_eventName: string, _payload?: any) => true);
@@ -30,6 +33,9 @@ jest.mock('@/lib/treasure-hunt-competition/client', () => ({
 }));
 
 const mockRouteGameEnd = routeGameEnd as jest.MockedFunction<typeof routeGameEnd>;
+const mockRouteGameCheckpoint = routeGameCheckpoint as jest.MockedFunction<
+  typeof routeGameCheckpoint
+>;
 
 describe('usePusherGameConnection game-end ACK', () => {
   const authData = {
@@ -307,6 +313,31 @@ describe('usePusherGameConnection game-end ACK', () => {
     expect(onSessionEnd).not.toHaveBeenCalled();
     expect(mockChannelTrigger).not.toHaveBeenCalledWith(
       'client-game-end-ack',
+      expect.anything(),
+    );
+    unmount();
+  });
+
+  it('treats a terminal checkpoint arriving after game-end as an expected transport race', async () => {
+    mockRouteGameCheckpoint.mockRejectedValue({
+      name: 'CompetitionClientError',
+      code: 'ATTEMPT_NOT_ACTIVE',
+      status: 409,
+    });
+    const { unmount } = renderHook(() => usePusherGameConnection(
+      'session-1',
+      authData,
+      options,
+    ));
+    const handler = mockChannelBindings.get('client-checkpoint');
+
+    await act(async () => {
+      await handler?.({ score: 0, gameTime: 30_000, timestamp: Date.now() });
+    });
+
+    expect(mockRouteGameCheckpoint).toHaveBeenCalledTimes(1);
+    expect(console.error).not.toHaveBeenCalledWith(
+      '❌ [PUSHER] Error processing checkpoint:',
       expect.anything(),
     );
     unmount();
