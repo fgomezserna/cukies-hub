@@ -376,6 +376,7 @@ describe('Treasure Hunt competition service', () => {
 
     expect(first).toMatchObject({
       attemptId: 'attempt-1',
+      gameSessionId: 'game-session-1',
       seed: 'server-seed-1',
       nextSequence: 0,
       alias: expect.stringMatching(/^Hunter-/),

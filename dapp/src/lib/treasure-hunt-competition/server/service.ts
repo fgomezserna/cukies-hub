@@ -266,6 +266,7 @@ function publicParticipant(participant: CompetitionParticipantRecord) {
 function publicAttempt(attempt: CompetitionAttemptRecord, secret: string) {
   return {
     attemptId: attempt.attemptId,
+    gameSessionId: attempt.gameSessionId,
     campaignId: attempt.campaignId,
     gameId: attempt.gameId,
     mode: attempt.mode,

@@ -35,6 +35,7 @@ interface MutableAttemptState {
 
 interface RecoverableAttemptState {
   readonly attemptId: string;
+  readonly gameSessionId: string;
   readonly seed: string;
   readonly alias: string;
   readonly status: CompetitionClientEvidenceResult['status'];
@@ -131,6 +132,7 @@ function parseRecoverableAttempt(payload: unknown): RecoverableAttemptState | nu
   const status = String(payload.status);
   if (
     typeof payload.attemptId !== 'string' || !payload.attemptId ||
+    typeof payload.gameSessionId !== 'string' || !payload.gameSessionId ||
     typeof payload.seed !== 'string' || !payload.seed ||
     typeof payload.alias !== 'string' || !payload.alias ||
     !['active', 'review', 'valid', 'invalid', 'abandoned'].includes(status) ||
@@ -141,6 +143,7 @@ function parseRecoverableAttempt(payload: unknown): RecoverableAttemptState | nu
   try {
     return {
       attemptId: payload.attemptId,
+      gameSessionId: payload.gameSessionId,
       seed: payload.seed,
       alias: payload.alias,
       status: status as RecoverableAttemptState['status'],
@@ -406,6 +409,20 @@ export function createCompetitionAttemptCoordinator(options: CoordinatorOptions 
             receipt: recovered.receipt,
           });
         } else if (['review', 'valid', 'invalid'].includes(recovered.status)) {
+          // A previous client could re-submit a terminal screen after the parent
+          // had already rotated to a fresh GameSession. The canonical attempt is
+          // already durable, so acknowledge its server result and let the new,
+          // unused session clear instead of trapping the wallet forever.
+          if (recovered.gameSessionId !== gameSessionId) {
+            return {
+              accepted: true,
+              status: recovered.status,
+              nextSequence: recovered.nextSequence,
+              receipt: null,
+              score: recovered.score,
+              gameTimeMs: recovered.gameTimeMs,
+            } satisfies CompetitionClientEvidenceResult;
+          }
           if (
             recovered.score !== evidence.score ||
             recovered.gameTimeMs !== evidence.gameTimeMs

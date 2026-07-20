@@ -165,6 +165,7 @@ describe('Treasure Hunt competition client coordinator', () => {
         success: true,
         attempts: [{
           attemptId: 'attempt-reloaded',
+          gameSessionId: 'game-session-reloaded',
           seed: 'seed-reloaded',
           alias: 'Hunter-RELOAD',
           status: 'active',
@@ -218,6 +219,7 @@ describe('Treasure Hunt competition client coordinator', () => {
       success: true,
       attempts: [{
         attemptId: 'attempt-already-review',
+        gameSessionId: 'game-session-review',
         seed: 'seed-review',
         alias: 'Hunter-REVIEW',
         status: 'review',
@@ -248,7 +250,8 @@ describe('Treasure Hunt competition client coordinator', () => {
       fetchImpl: jest.fn().mockResolvedValue(jsonResponse({
         success: true,
         attempts: [{
-          attemptId: 'attempt-mismatch', seed: 'seed', alias: 'Hunter-MISMATCH',
+          attemptId: 'attempt-mismatch', gameSessionId: 'game-session-mismatch',
+          seed: 'seed', alias: 'Hunter-MISMATCH',
           status: 'review', nextSequence: 2, receipt: null, score: 10, gameTimeMs: 100,
         }],
       })),
@@ -258,6 +261,37 @@ describe('Treasure Hunt competition client coordinator', () => {
       score: 11,
       gameTimeMs: 100,
     })).rejects.toMatchObject({ code: 'COMPETITION_RESULT_MISMATCH' });
+  });
+
+  it('clears a stale replay after its canonical attempt finished in a prior GameSession', async () => {
+    const coordinator = createCompetitionAttemptCoordinator({
+      fetchImpl: jest.fn().mockResolvedValue(jsonResponse({
+        success: true,
+        attempts: [{
+          attemptId: 'attempt-prior-session',
+          gameSessionId: 'game-session-original',
+          seed: 'seed',
+          alias: 'Hunter-REPLAY',
+          status: 'review',
+          nextSequence: 2,
+          receipt: null,
+          score: 10,
+          gameTimeMs: 30_063,
+        }],
+      })),
+    });
+
+    await expect(coordinator.finishDeclared('game-session-rotated', 'attempt-prior-session', {
+      score: 10,
+      gameTimeMs: 30_681,
+    })).resolves.toEqual({
+      accepted: true,
+      status: 'review',
+      nextSequence: 2,
+      receipt: null,
+      score: 10,
+      gameTimeMs: 30_063,
+    });
   });
 });
 

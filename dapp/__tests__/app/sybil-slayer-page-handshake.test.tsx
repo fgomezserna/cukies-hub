@@ -822,7 +822,7 @@ describe('SybilSlayerPage game-session handshake', () => {
       'Competición oficial · Preventa UKI',
     );
     expect(screen.queryByTestId('competition-panel')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Ver reglas, alias y ranking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver reglas, nombre y ranking' }));
     const panelBefore = screen.getByTestId('competition-panel');
     expect(screen.getByRole('dialog')).toContainElement(panelBefore);
     const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
@@ -959,6 +959,7 @@ describe('SybilSlayerPage game-session handshake', () => {
         success: true,
         attempts: [{
           attemptId: 'attempt-reload-review',
+          gameSessionId: sessionId,
           seed: 'seed-reload',
           alias: 'Hunter-RELOAD',
           status: 'review',
