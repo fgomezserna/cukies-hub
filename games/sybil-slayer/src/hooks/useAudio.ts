@@ -55,7 +55,7 @@ const SOUND_CONFIG: Record<SoundType, {
   life: { path: '/assets/sounds/Sonidos/Corazon/Corazon 1.wav', volume: 0.8, category: 'effect' },
   collision_damage: { path: '/assets/sounds/Sonidos/Golpe Recibido/547344__legnalegna55__ouch.mp3', volume: 0.5, category: 'effect' },
   auch: { path: '/assets/sounds/effects/auch.mp3', volume: 0.7, category: 'effect' },
-  bug_collision: { path: '/assets/sounds/effects/bug_collision.mp3', volume: 0.8, category: 'effect' },
+  bug_collision: { path: '/assets/sounds/Sonidos/Golpe Recibido/Golpe 1.wav', volume: 0.8, category: 'effect' },
   hacker_collision: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.7, category: 'voice' },
   hacker_escape: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' }, // NUEVO: Mismo sonido pero diferente evento
   level_up: { path: '/assets/sounds/Sonidos/Level Up/Level up 1.wav', volume: 1.0, category: 'effect' },
@@ -68,18 +68,18 @@ const SOUND_CONFIG: Record<SoundType, {
   
   // UI
   button_click: { path: '/assets/sounds/ui/button-click-01.mp3', volume: 0.5, category: 'ui' },
-  game_start: { path: '/assets/sounds/ui/game_start.mp3', volume: 0.6, category: 'ui' },
+  game_start: { path: '/assets/sounds/ui/button-click-01.mp3', volume: 0.6, category: 'ui' },
   pause: { path: '/assets/sounds/Sonidos/Boton Pause/Pause 1.wav', volume: 0.5, category: 'ui' },
-  resume: { path: '/assets/sounds/ui/resume.mp3', volume: 0.5, category: 'ui' },
+  resume: { path: '/assets/sounds/Sonidos/Boton Pause/Pause 1.wav', volume: 0.5, category: 'ui' },
   
   // Voice
-  jeff_goit: { path: '/assets/sounds/voice/jeff_goit.mp3', volume: 0.8, category: 'voice' },
-  whale_chad: { path: '/assets/sounds/voice/whale_chad.mp3', volume: 0.8, category: 'voice' },
+  jeff_goit: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' },
+  whale_chad: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' },
   
   // Music
   background_music: { path: '/assets/sounds/Sonidos/Musica/musica1.mp3', volume: 0.2, loop: true, category: 'music' },
   background_music_alt: { path: '/assets/sounds/Sonidos/Musica/musica1.mp3', volume: 0.2, loop: true, category: 'music' },
-  frenzy_mode: { path: '/assets/sounds/music/frenzy_mode.mp3', volume: 0.4, loop: true, category: 'music' },
+  frenzy_mode: { path: '/assets/sounds/Sonidos/Musica/musica1.mp3', volume: 0.4, loop: true, category: 'music' },
   game_over: { path: '/assets/sounds/Sonidos/Muerte/Muerte 1.wav', volume: 0.6, category: 'music' },
 };
 
@@ -556,4 +556,4 @@ export const useAudio = () => {
     toggleSounds,
     isSoundsEnabled,
   };
-}; 
+};
