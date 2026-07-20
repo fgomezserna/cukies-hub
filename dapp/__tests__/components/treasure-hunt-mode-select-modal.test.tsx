@@ -1,8 +1,24 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import ModeSelectModal from '../../../games/sybil-slayer/src/components/mode-select-modal';
+import ModeSelectModal, {
+  resolveTreasureHuntSinglePlayerEntry,
+} from '../../../games/sybil-slayer/src/components/mode-select-modal';
 
 describe('Treasure Hunt mode selector', () => {
+  it('uses the same signed-wallet gate for every 1P entry point', () => {
+    expect(resolveTreasureHuntSinglePlayerEntry('connecting')).toEqual(expect.objectContaining({
+      interactive: false,
+      actionCopy: 'CONECTA WALLET',
+    }));
+    expect(resolveTreasureHuntSinglePlayerEntry('ready')).toEqual(expect.objectContaining({
+      interactive: true,
+      actionCopy: 'JUGAR 1P',
+    }));
+    expect(resolveTreasureHuntSinglePlayerEntry('practice')).toEqual(expect.objectContaining({
+      interactive: true,
+      actionCopy: 'PRACTICAR 1P',
+    }));
+  });
   it('turns standalone multiplayer into an explicit Hub entry action', () => {
     const onSelectMode = jest.fn();
     render(

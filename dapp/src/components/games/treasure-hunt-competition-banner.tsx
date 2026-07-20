@@ -75,7 +75,7 @@ export default function TreasureHuntCompetitionBanner({
                   type="button"
                   className="inline-flex min-h-9 items-center rounded-[8px] border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px"
                 >
-                  Ver reglas, alias y ranking
+                  Ver reglas, nombre y ranking
                 </button>
               </SheetTrigger>
               <p className="text-xs font-medium text-muted-foreground">
@@ -93,7 +93,7 @@ export default function TreasureHuntCompetitionBanner({
         <SheetHeader className="sr-only">
           <SheetTitle>Competición oficial de preventa UKI</SheetTitle>
           <SheetDescription>
-            Reglas, identidad de juego y ranking de Treasure Hunt.
+            Reglas, nombre público y ranking de Treasure Hunt.
           </SheetDescription>
         </SheetHeader>
         {children}

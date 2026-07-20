@@ -480,7 +480,7 @@ export default function TreasureHuntCompetitionPanel() {
               id="treasure-hunt-competition-title"
               className="mt-2 font-headline text-2xl font-black tracking-tight text-foreground"
             >
-              Reglas, identidad y ranking
+              Reglas, nombre y ranking
             </h2>
             <p className="mt-2 max-w-[64ch] text-sm leading-relaxed text-muted-foreground">
               Juega en modo 1P, entra en el ranking con tus mejores partidas y desbloquea

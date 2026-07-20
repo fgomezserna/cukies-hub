@@ -14,6 +14,36 @@ import {
 type GameMode = 'single' | 'multiplayer';
 type SinglePlayerEntryState = 'ready' | 'practice' | 'connecting';
 
+interface SinglePlayerEntryPresentation {
+  readonly interactive: boolean;
+  readonly actionCopy: 'JUGAR 1P' | 'PRACTICAR 1P' | 'CONECTA WALLET';
+  readonly description: string;
+}
+
+export function resolveTreasureHuntSinglePlayerEntry(
+  state: SinglePlayerEntryState,
+): SinglePlayerEntryPresentation {
+  if (state === 'ready') {
+    return {
+      interactive: true,
+      actionCopy: 'JUGAR 1P',
+      description: 'Wallet firmada. Tu próxima partida podrá entrar en el ranking oficial.',
+    };
+  }
+  if (state === 'practice') {
+    return {
+      interactive: true,
+      actionCopy: 'PRACTICAR 1P',
+      description: 'Práctica local sin ranking ni recompensas.',
+    };
+  }
+  return {
+    interactive: false,
+    actionCopy: 'CONECTA WALLET',
+    description: 'Conecta y firma tu wallet EVM en Cukies Hub para activar el modo 1P.',
+  };
+}
+
 interface ModeSelectModalProps {
   open: boolean;
   onClose: () => void;
@@ -64,18 +94,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   competitionNotice,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
-  const singlePlayerInteractive =
-    singlePlayerEntryState === 'ready' || singlePlayerEntryState === 'practice';
-  const singlePlayerActionCopy = singlePlayerEntryState === 'ready'
-    ? 'JUGAR 1P'
-    : singlePlayerEntryState === 'practice'
-      ? 'PRACTICAR 1P'
-      : 'CONECTA WALLET';
-  const singlePlayerDescription = singlePlayerEntryState === 'ready'
-    ? 'Wallet firmada. Tu próxima partida podrá entrar en el ranking oficial.'
-    : singlePlayerEntryState === 'practice'
-      ? 'Práctica local sin ranking ni recompensas.'
-      : 'Conecta y firma tu wallet EVM en Cukies Hub para activar el modo 1P.';
+  const singlePlayerEntry = resolveTreasureHuntSinglePlayerEntry(singlePlayerEntryState);
   const multiplayerInteractive =
     multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
   const multiplayerActionCopy =
@@ -292,7 +311,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 textAlign: 'center',
               }}
             >
-              {singlePlayerDescription}
+              {singlePlayerEntry.description}
             </p>
 
             <TreasureButton
@@ -301,10 +320,10 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               variant="primary"
               size="medium"
               fullWidth
-              disabled={!singlePlayerInteractive}
-              onClick={() => singlePlayerInteractive && onSelectMode('single')}
+              disabled={!singlePlayerEntry.interactive}
+              onClick={() => singlePlayerEntry.interactive && onSelectMode('single')}
             >
-              {singlePlayerActionCopy}
+              {singlePlayerEntry.actionCopy}
             </TreasureButton>
           </section>
 
