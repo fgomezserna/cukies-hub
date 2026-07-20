@@ -64,6 +64,7 @@ import { shouldRenderDirectionalTouchControls } from '../lib/touch-controls';
 import { calculateContainScale, resolveGameViewportSize } from '../lib/viewport-scale';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
+const CRITICAL_ASSET_GATE_TIMEOUT_MS = 5_000;
 
 const getLevelScoreMultiplier = (level: number): number => {
   // Multiplicador basado en el nivel: nivel 2 = x2, nivel 3 = x3, nivel 4 = x4, nivel 5 = x5
@@ -872,17 +873,34 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         // El canvas gestiona sus propios sprites. Bloquear el arranque con un
         // segundo precargador duplicaba más de cien peticiones y ahogaba los
         // assets que sí son necesarios para mostrar el juego.
-        await assetLoader.preloadCritical((progress) => {
+        const criticalAssetsPromise = assetLoader.preloadCritical((progress) => {
           setLoadingProgress(progress * 0.9);
         });
 
-        performanceMonitor.endTimer('criticalAssets');
-        setLoadingProgress(1);
-        console.log('✅ Assets críticos cargados - juego puede iniciar');
+        let gateTimer: ReturnType<typeof setTimeout> | undefined;
+        const loadedBeforeGateTimeout = await Promise.race([
+          criticalAssetsPromise.then(() => true),
+          new Promise<boolean>((resolve) => {
+            gateTimer = setTimeout(
+              () => resolve(false),
+              CRITICAL_ASSET_GATE_TIMEOUT_MS,
+            );
+          }),
+        ]);
+        if (gateTimer) clearTimeout(gateTimer);
+
+        if (!loadedBeforeGateTimeout) {
+          console.warn('⚠️ Assets críticos continúan cargando en segundo plano');
+        }
         setCriticalAssetsLoaded(true);
-        
+
         // Fase 2: Cargar assets restantes en background
         setTimeout(async () => {
+          await criticalAssetsPromise;
+          performanceMonitor.endTimer('criticalAssets');
+          setLoadingProgress(1);
+          console.log('✅ Assets críticos cargados');
+
           console.log('⏳ Cargando assets decorativos en background...');
           setLoadingPhase('full');
           
