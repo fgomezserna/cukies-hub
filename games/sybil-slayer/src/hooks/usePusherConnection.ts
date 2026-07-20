@@ -609,6 +609,9 @@ export function usePusherConnection() {
       channelRef.current = null;
     }
 
+    let ownedPusher: Pusher | null = null;
+    let ownedChannel: Channel | null = null;
+
     // Add a small delay to prevent rapid reconnections
     const connectTimeout = setTimeout(() => {
       console.log('🔗 [GAME-PUSHER] Connecting to Pusher with session:', sessionData.sessionId);
@@ -690,6 +693,7 @@ export function usePusherConnection() {
             })
           }
         );
+        ownedPusher = pusherInstance;
 
         // Connection event handlers
         pusherInstance.connection.bind('connected', () => {
@@ -709,6 +713,7 @@ export function usePusherConnection() {
         // Subscribe to game session channel
         const channelName = `private-game-session-${sessionData.sessionId}`;
         const gameChannel = pusherInstance.subscribe(channelName);
+        ownedChannel = gameChannel;
 
         // Assign channel ref immediately so it's available even if subscription is pending
         channelRef.current = gameChannel;
@@ -856,24 +861,27 @@ export function usePusherConnection() {
       cleanupTimeoutRef.current = setTimeout(() => {
         console.log('🧹 [GAME-PUSHER] Delayed cleanup starting...');
 
-        if (channelRef.current && sessionDataRef.current) {
-          const channelName = `private-game-session-${sessionData.sessionId}`;
-          pusherRef.current?.unsubscribe(channelName);
+        if (ownedChannel) {
+          ownedPusher?.unsubscribe(ownedChannel.name);
         }
+        ownedPusher?.disconnect();
 
-        if (pusherRef.current) {
-          pusherRef.current.disconnect();
+        // Socket cleanup must never erase a newer signed parent authority.
+        // The GameSession ref belongs to acceptSessionData/clearSessionData;
+        // keeping it alive also lets the postMessage recovery path persist a
+        // result when Pusher drops during a run.
+        if (
+          pusherRef.current === ownedPusher &&
+          pusherSessionIdRef.current === sessionData.sessionId
+        ) {
+          console.log('🧹 [GAME-PUSHER] Clearing refs owned by the old connection');
+          pusherRef.current = null;
+          pusherSessionIdRef.current = null;
+          if (channelRef.current === ownedChannel) channelRef.current = null;
+          setPusher(null);
+          setChannel(null);
+          setConnectionState('disconnected');
         }
-
-        console.log('🧹 [GAME-PUSHER] Clearing all refs');
-        pusherRef.current = null;
-        pusherSessionIdRef.current = null;
-        channelRef.current = null;
-        sessionDataRef.current = null;
-
-        setPusher(null);
-        setChannel(null);
-        setConnectionState('disconnected');
         cleanupTimeoutRef.current = null;
       }, 2000); // 2 second delay to allow game end to complete
     };

@@ -399,11 +399,11 @@ export default function SettingsPage() {
                       <div className="space-y-2">
                         <Label htmlFor="username" className="flex items-center gap-2">
                           <User className="h-4 w-4" />
-                          Username
+                          Nombre de perfil
                           {profile.isUsernameSet && (
                             <div className="flex items-center gap-1 ml-auto">
                               <Info className="h-4 w-4 text-yellow-500" />
-                              <span className="text-xs text-yellow-500">Cannot be modified</span>
+                              <span className="text-xs text-yellow-500">No se puede modificar</span>
                             </div>
                           )}
                         </Label>
@@ -411,7 +411,7 @@ export default function SettingsPage() {
                           id="username" 
                           value={profile.username || ''} 
                           onChange={handleInputChange('username')}
-                          placeholder="Enter your username"
+                          placeholder="Elige tu nombre de perfil"
                           disabled={profile.isUsernameSet}
                           className={`border-pink-600/20 focus:border-pink-500 bg-card/50 backdrop-blur-sm ${
                             profile.isUsernameSet ? 'opacity-60 cursor-not-allowed' : ''
@@ -420,7 +420,8 @@ export default function SettingsPage() {
                         {!profile.isUsernameSet && (
                           <p className="text-xs text-yellow-500 flex items-center gap-1">
                             <Info className="h-3 w-3" />
-                            Username can only be set once and cannot be modified in the future
+                            Solo puede elegirse una vez: identifica tu perfil y tus enlaces de referido.
+                            El nombre del ranking de Treasure Hunt se configura aparte en las reglas de la competición.
                           </p>
                         )}
                         {usernameValidation.message && (

@@ -593,6 +593,67 @@ describe('usePusherConnection session refresh', () => {
     unmount();
   });
 
+  it('keeps three consecutive result rotations recoverable for the same wallet', async () => {
+    const { result, unmount } = renderHook(() => usePusherConnection());
+    const handshake = async (sessionId: string) => {
+      act(() => {
+        window.dispatchEvent(new MessageEvent('message', {
+          source: window.parent,
+          origin: 'https://hub.example',
+          data: {
+            type: 'GAME_SESSION_START',
+            payload: { gameId: 'sybil-slayer', sessionId, userId: 'wallet-user' },
+          },
+        }));
+      });
+      await act(async () => jest.advanceTimersByTimeAsync(150));
+      expect(result.current.sessionData?.sessionId).toBe(sessionId);
+    };
+    const queueAndClear = (sessionId: string, attemptId: string, score: number) => {
+      act(() => {
+        expect(result.current.sendGameEnd({
+          finalScore: score,
+          gameTime: 30_000,
+          competitionAttemptId: attemptId,
+        })).toBe(true);
+      });
+      const pending = JSON.parse(localStorage.getItem('pending-game-result') ?? '[]') as Array<{
+        resultId: string;
+        sessionId: string;
+      }>;
+      const resultId = pending.find((candidate) => candidate.sessionId === sessionId)?.resultId;
+      expect(resultId).toEqual(expect.any(String));
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
+        sessionId,
+        resultId,
+        competitionAttemptId: attemptId,
+      }), 'https://hub.example');
+
+      act(() => {
+        window.dispatchEvent(new MessageEvent('message', {
+          source: window.parent,
+          origin: 'https://hub.example',
+          data: { type: 'GAME_SESSION_CLEAR', sessionId, resultId },
+        }));
+      });
+      expect(result.current.sessionData).toBeNull();
+    };
+
+    await handshake('session-1');
+    queueAndClear('session-1', 'attempt-1', 101);
+    await handshake('session-2');
+    // Let any delayed cleanup owned by session 1 fire. It must not erase the
+    // signed session 2 authority used by the recovery path.
+    await act(async () => jest.advanceTimersByTimeAsync(2_500));
+    queueAndClear('session-2', 'attempt-2', 202);
+    await handshake('session-3');
+    await act(async () => jest.advanceTimersByTimeAsync(2_500));
+    queueAndClear('session-3', 'attempt-3', 303);
+
+    unmount();
+  });
+
   it('never replays a persisted game result into a different session', async () => {
     localStorage.setItem('pending-game-result', JSON.stringify([{
       resultId: 'result-old-wallet',

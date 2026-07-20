@@ -646,6 +646,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isStandaloneRuntime]);
   const multiplayerAuthorityReady =
     hasParentHandshake && Boolean(multiplayerAuthoritySessionId);
+  const singlePlayerEntryState = isStandaloneRuntime
+    ? 'practice' as const
+    : multiplayerAuthorityReady
+      ? 'ready' as const
+      : 'connecting' as const;
   const multiplayerEntryState = resolveTreasureHuntMultiplayerEntryState({
     enabled: multiplayerEnabled,
     authorityReady: multiplayerAuthorityReady,
@@ -1059,15 +1064,32 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const previousMultiplayerAuthoritySessionRef = useRef<string | null>(
     multiplayerAuthoritySessionId,
   );
+  const previousAuthorityOwnerUserIdRef = useRef<string | null>(
+    sessionData?.userId ?? null,
+  );
   useEffect(() => {
     const previousSessionId = previousMultiplayerAuthoritySessionRef.current;
-    if (previousSessionId === multiplayerAuthoritySessionId) return;
+    const previousOwnerUserId = previousAuthorityOwnerUserIdRef.current;
+    const nextOwnerUserId = sessionData?.userId ?? null;
+    const ownerChanged = Boolean(
+      previousOwnerUserId &&
+      nextOwnerUserId &&
+      previousOwnerUserId !== nextOwnerUserId,
+    );
+    if (previousSessionId === multiplayerAuthoritySessionId && !ownerChanged) return;
 
     previousMultiplayerAuthoritySessionRef.current = multiplayerAuthoritySessionId;
-    if (!shouldResetLocalGameForAuthorityChange(
+    // Retain the last known owner across the brief null state between two
+    // GameSessions, so a genuine wallet switch is still detected afterwards.
+    if (nextOwnerUserId) previousAuthorityOwnerUserIdRef.current = nextOwnerUserId;
+    if (!shouldResetLocalGameForAuthorityChange({
       previousSessionId,
-      multiplayerAuthoritySessionId,
-    )) return;
+      nextSessionId: multiplayerAuthoritySessionId,
+      previousOwnerUserId,
+      nextOwnerUserId,
+      preserveTerminalSinglePlayerResult:
+        currentMode === 'single' && gameState.status === 'gameOver',
+    })) return;
 
     // The old controller belongs to a different wallet/GameSession. Never try
     // to release it through the new cookie authority; the server sweeper owns
@@ -1076,7 +1098,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setModeSelectOpen(false);
     setCurrentMode('single');
     resetGame();
-  }, [multiplayerAuthoritySessionId, resetGame]);
+  }, [
+    currentMode,
+    gameState.status,
+    multiplayerAuthoritySessionId,
+    resetGame,
+    sessionData?.userId,
+  ]);
 
   // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
   useEffect(() => {
@@ -3238,6 +3266,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               handleOpenInfo();
             }}
             multiplayerEntryState={multiplayerEntryState}
+            singlePlayerEntryState={singlePlayerEntryState}
             competitionNotice={competitionStartError}
           />
           <InfoModal
@@ -3473,6 +3502,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           handleOpenInfo();
         }}
         multiplayerEntryState={multiplayerEntryState}
+        singlePlayerEntryState={singlePlayerEntryState}
         competitionNotice={competitionStartError}
       />
       {waitingOverlay}

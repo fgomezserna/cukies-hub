@@ -423,19 +423,19 @@ export default function TreasureHuntCompetitionPanel() {
 
         if (response.status === 401) {
           setRequiresWalletSignature(true);
-          setAliasFeedback('Tu sesión ha caducado. Conecta y firma la wallet para editar el alias.');
+          setAliasFeedback('Tu sesión ha caducado. Conecta y firma la wallet para editar el nombre del ranking.');
           return;
         }
         if (!response.ok || !isParticipantResponse(body)) {
           const code = errorCode(body);
           setAliasError(
             code === 'ALIAS_TAKEN'
-              ? 'Ese alias ya está en uso.'
+              ? 'Ese nombre ya está en uso.'
               : code === 'INVALID_ALIAS'
-                ? 'El alias no cumple las reglas.'
+                ? 'El nombre no cumple las reglas.'
                 : code === 'ALIAS_LOCKED'
-                  ? 'El alias quedó bloqueado al cerrar la competición.'
-                : 'No se pudo guardar el alias. Inténtalo de nuevo.',
+                  ? 'El nombre quedó bloqueado al cerrar la competición.'
+                : 'No se pudo guardar el nombre. Inténtalo de nuevo.',
           );
           return;
         }
@@ -445,9 +445,9 @@ export default function TreasureHuntCompetitionPanel() {
           entry.isMe ? { ...entry, alias: body.participant.alias } : entry
         )));
         setAliasDraft(body.participant.alias);
-        setAliasFeedback('Alias actualizado. Se usará en el ranking público.');
+        setAliasFeedback('Nombre actualizado. Se usará en el ranking público.');
       } catch {
-        setAliasError('No se pudo guardar el alias. Revisa la conexión e inténtalo de nuevo.');
+        setAliasError('No se pudo guardar el nombre. Revisa la conexión e inténtalo de nuevo.');
       } finally {
         setIsSavingAlias(false);
       }
@@ -519,10 +519,10 @@ export default function TreasureHuntCompetitionPanel() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-headline text-lg font-black tracking-tight text-foreground">
-                Identidad de juego
+                Nombre en el ranking
               </h3>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                El ranking muestra tu alias, nunca la dirección de tu wallet.
+                Treasure Hunt usa este nombre público y nunca muestra la dirección de tu wallet.
               </p>
             </div>
             {participant && !requiresWalletSignature ? (
@@ -539,7 +539,7 @@ export default function TreasureHuntCompetitionPanel() {
             </div>
           ) : canEditAlias ? (
             <form className="mt-5 space-y-2" onSubmit={handleAliasSubmit}>
-              <Label htmlFor="treasure-hunt-alias">Alias público</Label>
+              <Label htmlFor="treasure-hunt-alias">Nombre en el ranking</Label>
               <div className="flex flex-wrap gap-2">
                 <Input
                   id="treasure-hunt-alias"
@@ -563,11 +563,12 @@ export default function TreasureHuntCompetitionPanel() {
                   disabled={isSavingAlias || aliasDraft.trim() === participant?.alias}
                   className="active:scale-[0.98]"
                 >
-                  {isSavingAlias ? 'Guardando' : 'Guardar alias'}
+                  {isSavingAlias ? 'Guardando' : 'Guardar nombre'}
                 </Button>
               </div>
               <p id="treasure-hunt-alias-help" className="text-xs text-muted-foreground">
-                De 3 a 20 caracteres: letras, números, guion o guion bajo.
+                De 3 a 20 caracteres. Es independiente del nombre de perfil general,
+                que también se usa en enlaces de referido.
               </p>
               <p
                 id="treasure-hunt-alias-feedback"
@@ -580,10 +581,10 @@ export default function TreasureHuntCompetitionPanel() {
           ) : isAliasLocked ? (
             <div className="mt-5 rounded-[8px] border border-border bg-muted/35 p-4">
               <p className="text-sm font-bold text-foreground">
-                Alias definitivo: <span className="font-mono text-primary">{participant?.alias}</span>
+                Nombre definitivo: <span className="font-mono text-primary">{participant?.alias}</span>
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Los alias quedaron bloqueados al cerrar la competición para preservar el ranking
+                Los nombres quedaron bloqueados al cerrar la competición para preservar el ranking
                 y la liquidación auditables.
               </p>
             </div>
@@ -593,7 +594,7 @@ export default function TreasureHuntCompetitionPanel() {
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {address
                   ? `Debes firmar con ${address.slice(0, 6)}…${address.slice(-4)}. No se reutilizará la sesión de otra wallet ni una sesión TRON.`
-                  : 'Conecta una wallet EVM y fírmala para guardar partidas y editar tu alias.'}
+                  : 'Conecta una wallet EVM y fírmala para guardar partidas y editar tu nombre del ranking.'}
                 {' '}Sin firma puedes consultar las reglas y el ranking público.
               </p>
               {aliasFeedback ? (
@@ -651,7 +652,7 @@ export default function TreasureHuntCompetitionPanel() {
                   <thead className="bg-muted/55 text-xs uppercase tracking-[0.08em] text-muted-foreground">
                     <tr>
                       <th scope="col" className="px-3 py-2.5 font-bold">Puesto</th>
-                      <th scope="col" className="px-3 py-2.5 font-bold">Alias</th>
+                      <th scope="col" className="px-3 py-2.5 font-bold">Nombre</th>
                       <th scope="col" className="px-3 py-2.5 text-right font-bold">Puntos</th>
                       <th scope="col" className="px-3 py-2.5 text-right font-bold">Tiempo</th>
                     </tr>

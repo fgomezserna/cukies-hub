@@ -94,7 +94,7 @@ describe('TreasureHuntCompetitionPanel', () => {
     expect(screen.getByText('Premio por partida')).toBeInTheDocument();
     expect(screen.getByText('Recompensa del sponsor')).toBeInTheDocument();
     expect(screen.getByText('9 meses de cliff y 6 meses de vesting lineal')).toBeInTheDocument();
-    expect(screen.getByLabelText('Alias público')).toHaveValue('Hunter-A1B2C3');
+    expect(screen.getByLabelText('Nombre en el ranking')).toHaveValue('Hunter-A1B2C3');
     expect(screen.getByText('Wallet firmada')).toBeInTheDocument();
     expect(screen.getByText('CipherFox')).toBeInTheDocument();
     expect(screen.getByText('12.345')).toBeInTheDocument();
@@ -139,11 +139,11 @@ describe('TreasureHuntCompetitionPanel', () => {
     });
 
     render(<TreasureHuntCompetitionPanel />);
-    const input = await screen.findByLabelText('Alias público');
+    const input = await screen.findByLabelText('Nombre en el ranking');
     fireEvent.change(input, { target: { value: 'VaultRunner' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar alias' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar nombre' }));
 
-    expect(await screen.findByText('Alias actualizado. Se usará en el ranking público.')).toBeInTheDocument();
+    expect(await screen.findByText('Nombre actualizado. Se usará en el ranking público.')).toBeInTheDocument();
     expect(input).toHaveValue('VaultRunner');
     expect(screen.getByText('VaultRunner')).toBeInTheDocument();
     expect(screen.queryByText(participant.alias)).not.toBeInTheDocument();
@@ -178,10 +178,10 @@ describe('TreasureHuntCompetitionPanel', () => {
     });
 
     render(<TreasureHuntCompetitionPanel />);
-    fireEvent.change(await screen.findByLabelText('Alias público'), {
+    fireEvent.change(await screen.findByLabelText('Nombre en el ranking'), {
       target: { value: 'VaultRunner' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar alias' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar nombre' }));
 
     expect(await screen.findByText('Firma la wallet EVM conectada')).toBeInTheDocument();
     expect(screen.getByText(/No se reutilizará la sesión de otra wallet ni una sesión TRON/i)).toBeInTheDocument();
@@ -240,8 +240,8 @@ describe('TreasureHuntCompetitionPanel', () => {
     render(<TreasureHuntCompetitionPanel />);
 
     expect(await screen.findByText('Cerrada')).toBeInTheDocument();
-    expect(screen.getByText(/Alias definitivo:/)).toHaveTextContent(participant.alias);
-    expect(screen.queryByLabelText('Alias público')).not.toBeInTheDocument();
+    expect(screen.getByText(/Nombre definitivo:/)).toHaveTextContent(participant.alias);
+    expect(screen.queryByLabelText('Nombre en el ranking')).not.toBeInTheDocument();
     expect(screen.queryByText('Firma la wallet EVM conectada')).not.toBeInTheDocument();
   });
 });
