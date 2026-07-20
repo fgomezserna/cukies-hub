@@ -24,10 +24,7 @@ const mockReadWalletSession = readWalletSession as unknown as jest.Mock;
 const mockFindGameSession = prisma.gameSession.findUnique as unknown as jest.Mock;
 const mockAuthorizeChannel = pusherServer.authorizeChannel as unknown as jest.Mock;
 
-function request(
-  overrides: Record<string, string> = {},
-  headers: Record<string, string> = {},
-) {
+function request(overrides: Record<string, string> = {}) {
   const params = new URLSearchParams({
     socket_id: '123.456',
     channel_name: 'private-game-session-game_session_1',
@@ -36,7 +33,7 @@ function request(
   });
   return new NextRequest('http://localhost/api/pusher/auth', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
   });
 }
@@ -65,30 +62,6 @@ describe('POST /api/pusher/auth security', () => {
     const crossOriginRequest = request();
     crossOriginRequest.headers.set('Origin', 'https://attacker.example');
     const response = await authorizePusher(crossOriginRequest);
-    expect(response.status).toBe(403);
-    expect(mockReadWalletSession).not.toHaveBeenCalled();
-    expect(mockFindGameSession).not.toHaveBeenCalled();
-  });
-
-  it('accepts the public origin forwarded by the trusted reverse proxy', async () => {
-    const response = await authorizePusher(request({}, {
-      Origin: 'https://cukieshub.eurekand.com',
-      'X-Forwarded-Host': 'cukieshub.eurekand.com',
-      'X-Forwarded-Proto': 'https',
-    }));
-
-    expect(response.status).toBe(200);
-    expect(mockReadWalletSession).toHaveBeenCalledTimes(1);
-    expect(mockAuthorizeChannel).toHaveBeenCalledTimes(1);
-  });
-
-  it('still rejects a foreign origin behind the reverse proxy', async () => {
-    const response = await authorizePusher(request({}, {
-      Origin: 'https://attacker.example',
-      'X-Forwarded-Host': 'cukieshub.eurekand.com',
-      'X-Forwarded-Proto': 'https',
-    }));
-
     expect(response.status).toBe(403);
     expect(mockReadWalletSession).not.toHaveBeenCalled();
     expect(mockFindGameSession).not.toHaveBeenCalled();

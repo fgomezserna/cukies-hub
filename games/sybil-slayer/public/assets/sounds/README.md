@@ -14,19 +14,19 @@ Este directorio contiene todos los archivos de audio organizados por categorías
 - `life.wav` - Sonido alternativo de vida (legacy)
 - `collision_damage.mp3` - Sonido al recibir daño por colisión
 - `auch.mp3` - Sonido específico cuando el token recibe impacto de un enemigo
-- `Sonidos/Golpe Recibido/Golpe 2.wav` - Sonido cuando los enemigos chocan entre sí
+- `bug_collision.mp3` - Sonido cuando los enemigos chocan entre sí
 - `voice_trump.mp3` - Voz de Trump cuando el hacker toca al token
 - `level_up.mp3` - Sonido al subir de nivel
 
 ### `/ui` - Sonidos de Interfaz
 - `button-click-01.mp3` - Sonido de clic en botones
-- `Sonidos/ZZZ RETRO EVENT/Retro Event UI 01.wav` - Sonido al iniciar el juego
+- `game_start.mp3` - Sonido al iniciar el juego
 - `pause.mp3` - Sonido al pausar
-- `button-click-01.mp3` - Sonido al reanudar
+- `resume.mp3` - Sonido al reanudar
 
 ### `/voice` - Efectos de Voz
-- `Sonidos/Goat/Goat 0.mp3` - Voz/efecto cuando aparece Jeff Goit
-- `Sonidos/Haku/Haku 1.wav` - Voz/efecto cuando aparece Whale Chad
+- `jeff_goit.mp3` - Voz/efecto cuando aparece Jeff Goit
+- `whale_chad.mp3` - Voz/efecto cuando aparece Whale Chad
 
 ### `/effects` - Efectos Especiales de Voz
 - `voice_trump.mp3` - Voz de Trump cuando el hacker roba monedas del jugador
@@ -35,7 +35,7 @@ Este directorio contiene todos los archivos de audio organizados por categorías
 ### `/music` - Música de Fondo
 - `HoliznaCC0 - Game BOI 4.mp3` - Música principal del juego (se alterna automáticamente)
 - `HoliznaCC0 - Track 1.mp3` - Música alternativa del juego (se alterna automáticamente)
-- `Sonidos/Musica/retro-wave-style-track-59892.mp3` - Música para modo frenzy (loop)
+- `frenzy_mode.mp3` - Música para modo frenzy (loop)
 - `game_over.wav` - Música de game over (se reproduce cuando el juego termina)
 
 ## Configuración de Audio
@@ -78,4 +78,4 @@ Los sonidos se activan automáticamente en:
 - ✅ **Transición musical**: Al llegar a game over, la música del juego se detiene automáticamente
 - ✅ **Música especial**: Se reproduce `game_over.wav` exclusivamente durante el estado de game over
 - ✅ **Reactivación**: Al hacer clic en RESET o PLAY desde game over, se detiene la música de game over y se reanuda la música normal del juego
-- ✅ **Respeto al control**: Si la música está desactivada, no se reproduce ninguna música (ni de juego ni de game over)
+- ✅ **Respeto al control**: Si la música está desactivada, no se reproduce ninguna música (ni de juego ni de game over) 

@@ -6,8 +6,6 @@ import { createUserDirectly } from '@/lib/mongodb-hub';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 import {
   clearWalletChallengeCookie,
-  evmWalletSessionMatchesSignedAddress,
-  isValidEvmWalletAddress,
   readWalletChallenge,
   readWalletSession,
   resolveWalletType,
@@ -28,13 +26,7 @@ const userIncludes = {
 
 export async function POST(request: Request) {
   try {
-    const {
-      walletAddress,
-      walletType,
-      message,
-      signature,
-      requireSignedWallet: requestedSignedWalletMode,
-    } = await request.json();
+    const { walletAddress, walletType, message, signature } = await request.json();
 
     if (!walletAddress || typeof walletAddress !== 'string') {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 });
@@ -42,26 +34,10 @@ export async function POST(request: Request) {
 
     const normalizedAddress = normalizeWalletAddress(walletAddress);
     const resolvedWalletType = resolveWalletType(normalizedAddress, walletType);
-    const requireSignedWallet = requestedSignedWalletMode === true;
-
-    if (
-      requireSignedWallet &&
-      (resolvedWalletType !== 'evm' || !isValidEvmWalletAddress(normalizedAddress))
-    ) {
-      return NextResponse.json(
-        { error: 'A signed EVM wallet is required', requiresSignature: true },
-        { status: 400 },
-      );
-    }
 
     const existingSession = await readWalletSession();
-    const canReuseExistingSession = Boolean(existingSession && (
-      requireSignedWallet
-        ? evmWalletSessionMatchesSignedAddress(existingSession, normalizedAddress)
-        : walletSessionMatchesAddress(existingSession, normalizedAddress)
-    ));
 
-    if (existingSession && canReuseExistingSession) {
+    if (existingSession && walletSessionMatchesAddress(existingSession, normalizedAddress)) {
       const sessionUser = await prisma.user.findUnique({
         where: { id: existingSession.userId },
         include: userIncludes,

@@ -14,56 +14,6 @@ function json(payload: unknown, status: number) {
   return NextResponse.json(payload, { status, headers: NO_STORE_HEADERS });
 }
 
-function firstForwardedValue(value: string | null) {
-  return value?.split(',', 1)[0]?.trim() || null;
-}
-
-function publicRequestOrigin(request: NextRequest) {
-  const host = firstForwardedValue(request.headers.get('x-forwarded-host')) ??
-    firstForwardedValue(request.headers.get('host'));
-  const protocol = firstForwardedValue(request.headers.get('x-forwarded-proto')) ??
-    request.nextUrl.protocol.replace(/:$/, '');
-
-  if (!host || (protocol !== 'http' && protocol !== 'https')) return null;
-
-  try {
-    const url = new URL(`${protocol}://${host}`);
-    if (
-      url.username ||
-      url.password ||
-      url.pathname !== '/' ||
-      url.search ||
-      url.hash
-    ) return null;
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
-function isAllowedBrowserOrigin(request: NextRequest, origin: string) {
-  let normalizedOrigin: string;
-  try {
-    const parsed = new URL(origin);
-    if (
-      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
-      parsed.username ||
-      parsed.password ||
-      parsed.pathname !== '/' ||
-      parsed.search ||
-      parsed.hash
-    ) return false;
-    normalizedOrigin = parsed.origin;
-  } catch {
-    return false;
-  }
-
-  const allowedOrigins = new Set([request.nextUrl.origin]);
-  const forwardedOrigin = publicRequestOrigin(request);
-  if (forwardedOrigin) allowedOrigins.add(forwardedOrigin);
-  return allowedOrigins.has(normalizedOrigin);
-}
-
 export async function OPTIONS() {
   return new Response(null, {
     status: 405,
@@ -74,7 +24,7 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const requestOrigin = request.headers.get('origin');
-    if (requestOrigin && !isAllowedBrowserOrigin(request, requestOrigin)) {
+    if (requestOrigin && requestOrigin !== request.nextUrl.origin) {
       return json({ error: 'Forbidden' }, 403);
     }
 

@@ -6,7 +6,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { ArrowLeft, Maximize, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
@@ -28,16 +28,10 @@ interface FullscreenDocument extends Document {
   msExitFullscreen?: () => Promise<void> | void;
 }
 
-interface LockableScreenOrientation {
-  lock?: (orientation: 'landscape') => Promise<void>;
-  unlock?: () => void;
-}
-
 interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
   children?: ReactNode; // For any additional game-specific content
-  desktopBanner?: ReactNode; // Important desktop context rendered above the game shell
   mobileFocus?: boolean;
 }
 
@@ -73,7 +67,6 @@ export default function GameLayout({
   onGameConnection,
   iframeRef: externalIframeRef,
   children,
-  desktopBanner,
   mobileFocus = false,
 }: GameLayoutComponentProps) {
   const gameContainerRef = useRef<FullscreenElement>(null);
@@ -83,9 +76,6 @@ export default function GameLayout({
   const isMobileGameShell = useMobileGameShell();
   const isMobileFocus = mobileFocus && isMobileGameShell;
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
-  const [isFallbackFullscreen, setIsFallbackFullscreen] = useState(false);
-  const isFullscreen = isNativeFullscreen || isFallbackFullscreen;
 
   // Call the game connection callback when iframe ref is ready (optional)
   useEffect(() => {
@@ -94,110 +84,31 @@ export default function GameLayout({
     }
   }, [onGameConnection, iframeRef]);
 
-  const unlockOrientation = useCallback(() => {
-    const orientation = window.screen.orientation as LockableScreenOrientation | undefined;
-    try {
-      orientation?.unlock?.();
-    } catch {
-      // Some wallet browsers expose the API but reject orientation changes.
-    }
-  }, []);
-
-  const requestLandscape = useCallback(async () => {
-    const orientation = window.screen.orientation as LockableScreenOrientation | undefined;
-    if (!orientation?.lock) return;
-    try {
-      await orientation.lock('landscape');
-    } catch {
-      // The in-game portrait overlay still gives the player an explicit cue.
-    }
-  }, []);
-
-  useEffect(() => {
-    const fullscreenDocument = document as FullscreenDocument;
-    const syncFullscreenState = () => {
-      const active = Boolean(
-        fullscreenDocument.fullscreenElement ||
-        fullscreenDocument.webkitFullscreenElement ||
-        fullscreenDocument.msFullscreenElement,
-      );
-      setIsNativeFullscreen(active);
-      if (active) setIsFallbackFullscreen(false);
-    };
-    document.addEventListener('fullscreenchange', syncFullscreenState);
-    document.addEventListener('webkitfullscreenchange', syncFullscreenState);
-    return () => {
-      document.removeEventListener('fullscreenchange', syncFullscreenState);
-      document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isFallbackFullscreen) return undefined;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    const previousBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      document.body.style.overflow = previousBodyOverflow;
-    };
-  }, [isFallbackFullscreen]);
-
-  useEffect(() => () => unlockOrientation(), [unlockOrientation]);
-
-  const handleFullScreen = async () => {
+  const handleFullScreen = () => {
     const element = gameContainerRef.current;
     const fullscreenDocument = document as FullscreenDocument;
-    if (!element) return;
+    if (element) {
+      const fullscreenElement =
+        fullscreenDocument.fullscreenElement ||
+        fullscreenDocument.webkitFullscreenElement ||
+        fullscreenDocument.msFullscreenElement;
 
-    const fullscreenElement =
-      fullscreenDocument.fullscreenElement ||
-      fullscreenDocument.webkitFullscreenElement ||
-      fullscreenDocument.msFullscreenElement;
-    if (fullscreenElement || isFallbackFullscreen) {
-      try {
-        if (fullscreenElement && fullscreenDocument.exitFullscreen) {
-          await fullscreenDocument.exitFullscreen();
-        } else if (fullscreenElement && fullscreenDocument.webkitExitFullscreen) {
-          await fullscreenDocument.webkitExitFullscreen();
-        } else if (fullscreenElement && fullscreenDocument.msExitFullscreen) {
-          await fullscreenDocument.msExitFullscreen();
+      if (fullscreenElement) {
+        if (fullscreenDocument.exitFullscreen) {
+          void fullscreenDocument.exitFullscreen();
+        } else if (fullscreenDocument.webkitExitFullscreen) {
+          void fullscreenDocument.webkitExitFullscreen();
+        } else if (fullscreenDocument.msExitFullscreen) {
+          void fullscreenDocument.msExitFullscreen();
         }
-      } catch {
-        // The CSS fullscreen fallback can still be closed independently.
-      } finally {
-        setIsFallbackFullscreen(false);
-        setIsNativeFullscreen(false);
-        unlockOrientation();
+      } else if (element.requestFullscreen) {
+        void element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) { /* Safari */
+        void element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) { /* IE11 */
+        void element.msRequestFullscreen();
       }
-      return;
     }
-
-    let enteredNativeFullscreen = false;
-    try {
-      if (element.requestFullscreen) {
-        await element.requestFullscreen();
-        enteredNativeFullscreen = Boolean(fullscreenDocument.fullscreenElement);
-      } else if (element.webkitRequestFullscreen) {
-        await element.webkitRequestFullscreen();
-        enteredNativeFullscreen = Boolean(fullscreenDocument.webkitFullscreenElement);
-      } else if (element.msRequestFullscreen) {
-        await element.msRequestFullscreen();
-        enteredNativeFullscreen = Boolean(fullscreenDocument.msFullscreenElement);
-      }
-    } catch {
-      enteredNativeFullscreen = false;
-    }
-
-    if (enteredNativeFullscreen) {
-      setIsNativeFullscreen(true);
-    } else {
-      // MetaMask Mobile and several in-app browsers ignore or reject the
-      // Fullscreen API. Keep the control functional with an app-level viewport.
-      setIsFallbackFullscreen(true);
-    }
-    await requestLandscape();
   };
 
   const handleIframeLoad = useCallback(
@@ -237,17 +148,14 @@ export default function GameLayout({
     );
   }
 
-  const hasDesktopBanner = Boolean(desktopBanner);
-  const gameShell = (
-    <div
-      data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
-      className={cn(
-        'grid min-h-0 grid-cols-1',
-        isMobileFocus ? 'h-full gap-0' : 'gap-6 lg:grid-cols-4',
-        !isMobileFocus && !hasDesktopBanner && 'h-full',
-        !isMobileFocus && hasDesktopBanner && 'items-start',
-      )}
-    >
+  return (
+      <div
+        data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
+        className={cn(
+          'grid h-full min-h-0 grid-cols-1',
+          isMobileFocus ? 'gap-0' : 'gap-6 lg:grid-cols-4',
+        )}
+      >
         
         {/* Left Column: Game */}
         <div
@@ -259,14 +167,9 @@ export default function GameLayout({
           <div
             ref={gameContainerRef}
             data-game-viewport
-            data-game-fullscreen={isFullscreen ? (isNativeFullscreen ? 'native' : 'fallback') : 'off'}
             className={cn(
-              'relative flex min-h-0 flex-col overflow-hidden bg-card',
+              'relative flex min-h-0 flex-grow flex-col overflow-hidden bg-card',
               isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
-              !isMobileFocus && hasDesktopBanner
-                ? 'h-[clamp(26rem,calc(100dvh-18rem),41.25rem)] w-full flex-none'
-                : 'flex-grow',
-              isFallbackFullscreen && 'fixed inset-0 z-[100] h-[100dvh] w-screen rounded-none border-0',
             )}
           >
             <iframe
@@ -274,19 +177,14 @@ export default function GameLayout({
               src={gameConfig.gameUrl}
               className="block h-full min-h-0 w-full flex-1 overscroll-contain border-0 touch-manipulation"
               title={gameConfig.name}
-              allow="clipboard-read; clipboard-write; fullscreen"
+              allow="clipboard-read; clipboard-write"
               allowFullScreen
               onLoad={handleIframeLoad}
             />
             <div
-              className={cn(
-                'absolute z-30 flex items-center gap-2',
-                isMobileFocus ? 'top-0' : 'bottom-0',
-              )}
+              className="absolute z-30 flex items-center gap-2"
               style={{
-                ...(isMobileFocus
-                  ? { top: 'max(0.5rem, env(safe-area-inset-top))' }
-                  : { bottom: 'max(0.5rem, env(safe-area-inset-bottom))' }),
+                bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
                 left: 'max(0.5rem, env(safe-area-inset-left))',
               }}
             >
@@ -304,27 +202,18 @@ export default function GameLayout({
               )}
               <Button
                 variant="ghost"
-                size={isMobileFocus ? 'sm' : 'icon'}
+                size="icon"
                 className={cn(
                   'bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white',
-                  isMobileFocus && 'h-11 gap-2 border border-white/15 bg-black/55 px-3 text-xs font-bold text-white',
+                  isMobileFocus && 'h-11 w-11',
                 )}
-                onClick={() => void handleFullScreen()}
-                aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
-                title={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
+                onClick={handleFullScreen}
+                aria-label="Alternar pantalla completa"
+                title="Alternar pantalla completa"
               >
-                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-                {isMobileFocus ? <span>{isFullscreen ? 'Salir' : 'Pantalla completa'}</span> : null}
+                <Maximize className="h-5 w-5" />
               </Button>
             </div>
-            {isMobileFocus && isFullscreen ? (
-              <p
-                role="status"
-                className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-30 hidden -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-200/30 bg-black/70 px-4 py-2 text-xs font-bold text-amber-100 backdrop-blur-md portrait:block"
-              >
-                Gira el móvil para jugar en horizontal
-              </p>
-            ) : null}
           </div>
           
           {/* Game Instructions */}
@@ -368,7 +257,7 @@ export default function GameLayout({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Trophy className="h-4 w-4 text-yellow-400" />
-                Tu mejor score
+                Your High Score
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3">
@@ -382,7 +271,7 @@ export default function GameLayout({
               </div>
               {!user && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  Conecta tu wallet para guardar tus scores
+                  Connect wallet to track your scores
                 </p>
               )}
             </CardContent>
@@ -393,7 +282,7 @@ export default function GameLayout({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 {renderIcon(userRank.icon)}
-                Rango de cuenta
+                Your Rank
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3">
@@ -406,7 +295,7 @@ export default function GameLayout({
                     {userRank.name}
                   </span>
                   <span className="text-xs text-muted-foreground ml-2">
-                    ({user ? `${userXP.toLocaleString()} XP` : 'Conecta tu wallet'})
+                    ({user ? `${userXP.toLocaleString()} XP` : 'Connect wallet'})
                   </span>
                 </div>
               </div>
@@ -418,19 +307,19 @@ export default function GameLayout({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Crown className="h-4 w-4 text-yellow-400" />
-                Ranking histórico del juego
+                {gameConfig.leaderboardTitle}
               </CardTitle>
-              <CardDescription>Score general; es independiente de cada torneo</CardDescription>
+              <CardDescription>Best players this season</CardDescription>
             </CardHeader>
             <CardContent className="p-3">
               <div className="space-y-0">
                 {loading ? (
                   <div className="flex items-center justify-center py-4">
-                    <div className="text-sm text-muted-foreground">Cargando...</div>
+                    <div className="text-sm text-muted-foreground">Loading...</div>
                   </div>
                 ) : leaderboardData.leaderboard.length === 0 ? (
                   <div className="flex items-center justify-center py-4">
-                    <div className="text-sm text-muted-foreground">Todavía no hay jugadores</div>
+                    <div className="text-sm text-muted-foreground">No players yet</div>
                   </div>
                 ) : (
                   leaderboardData.leaderboard.slice(0, 5).map((player, index) => (
@@ -456,11 +345,6 @@ export default function GameLayout({
                   ))
                 )}
               </div>
-              <Button asChild variant="ghost" size="sm" className="mt-2 w-full justify-center text-primary">
-                <Link href={gameConfig.gameId === 'sybil-slayer' ? '/games/treasure-hunt/rankings' : '/leaderboard'}>
-                  {gameConfig.gameId === 'sybil-slayer' ? 'Ver todos los rankings' : 'Ver ranking completo'}
-                </Link>
-              </Button>
             </CardContent>
           </Card>
 
@@ -471,7 +355,7 @@ export default function GameLayout({
             onClick={() => setIsChatOpen(true)}
           >
             <MessageCircle className="h-5 w-5" />
-            <span>Chat del juego</span>
+            <span>Chat</span>
           </Button>
           
           <GameChat 
@@ -484,15 +368,6 @@ export default function GameLayout({
           {children}
         </div>
         )}
-    </div>
-  );
-
-  if (isMobileFocus || !hasDesktopBanner) return gameShell;
-
-  return (
-    <div className="space-y-5">
-      {desktopBanner ? <div data-game-desktop-banner>{desktopBanner}</div> : null}
-      {gameShell}
-    </div>
+      </div>
   );
 }

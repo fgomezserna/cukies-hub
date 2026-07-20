@@ -3240,7 +3240,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ctx.font = MESSAGE_FONT;
           ctx.fillText('FATAL ERROR!', width / 2, height / 2 - 100);
           ctx.font = TIMER_FONT;
-          ctx.fillText('CHEAT DETECTED - BANNED!', width / 2, height / 2 - 40);
+          ctx.fillText('SYBIL DETECTED - BANNED!', width / 2, height / 2 - 40);
           
           // Color dorado para el resto de textos
           ctx.fillStyle = '#FFB700';

@@ -189,34 +189,10 @@ describe('useMultiplayerMatch GameSession authority lifecycle', () => {
   });
 
   it('rejects late state/seed from the old authority and defines the local UI reset contract', () => {
-    const transition = (
-      previousSessionId: string | null,
-      nextSessionId: string | null,
-      overrides: Partial<Parameters<typeof shouldResetLocalGameForAuthorityChange>[0]> = {},
-    ) => shouldResetLocalGameForAuthorityChange({
-      previousSessionId,
-      nextSessionId,
-      previousOwnerUserId: 'wallet-a',
-      nextOwnerUserId: 'wallet-a',
-      preserveTerminalSinglePlayerResult: false,
-      ...overrides,
-    });
-
-    expect(transition(null, 'game-session-a')).toBe(false);
-    expect(transition('game-session-a', 'game-session-a')).toBe(false);
-    expect(transition('game-session-a', null)).toBe(true);
-    expect(transition('game-session-a', 'game-session-b')).toBe(true);
-    expect(transition('game-session-a', null, {
-      nextOwnerUserId: null,
-      preserveTerminalSinglePlayerResult: true,
-    })).toBe(false);
-    expect(transition(null, 'game-session-b', {
-      preserveTerminalSinglePlayerResult: true,
-    })).toBe(false);
-    expect(transition(null, 'game-session-other-wallet', {
-      nextOwnerUserId: 'wallet-b',
-      preserveTerminalSinglePlayerResult: true,
-    })).toBe(true);
+    expect(shouldResetLocalGameForAuthorityChange(null, 'game-session-a')).toBe(false);
+    expect(shouldResetLocalGameForAuthorityChange('game-session-a', 'game-session-a')).toBe(false);
+    expect(shouldResetLocalGameForAuthorityChange('game-session-a', null)).toBe(true);
+    expect(shouldResetLocalGameForAuthorityChange('game-session-a', 'game-session-b')).toBe(true);
 
     const { result, rerender, unmount } = renderHook(
       ({ authoritySessionId }: { authoritySessionId: string | null }) =>

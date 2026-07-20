@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
-import { isAddress, verifyMessage, zeroAddress } from 'viem';
+import { verifyMessage } from 'viem';
 import { TronWeb } from 'tronweb';
 
 import { normalizeWalletAddress } from './wallet-address';
@@ -235,35 +235,6 @@ export function walletSessionMatchesAddress(
     normalizeWalletAddress(session.walletAddress) === normalizedAddress ||
     normalizeWalletAddress(session.signedWalletAddress) === normalizedAddress
   );
-}
-
-export function isValidEvmWalletAddress(walletAddress: string) {
-  const normalized = walletAddress.trim().toLowerCase();
-  return isAddress(normalized, { strict: false }) && normalized !== zeroAddress;
-}
-
-/**
- * Sensitive EVM mutations and reads must be owned by the wallet that actually
- * signed the session. `walletAddress` can be the user's primary/profile wallet
- * and therefore is deliberately not considered here.
- */
-export function evmWalletSessionMatchesSignedAddress(
-  session: WalletSessionPayload,
-  walletAddress: string,
-) {
-  const requestedAddress = walletAddress.trim();
-  const signedAddress = session.signedWalletAddress?.trim();
-
-  if (
-    session.walletType !== 'evm' ||
-    !signedAddress ||
-    !isValidEvmWalletAddress(requestedAddress) ||
-    !isValidEvmWalletAddress(signedAddress)
-  ) {
-    return false;
-  }
-
-  return normalizeWalletAddress(signedAddress) === normalizeWalletAddress(requestedAddress);
 }
 
 export async function setWalletSessionCookie(params: {

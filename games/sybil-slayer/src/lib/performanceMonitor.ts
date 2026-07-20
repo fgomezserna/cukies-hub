@@ -80,7 +80,7 @@ export class PerformanceMonitor {
   public printReport(): void {
     const metrics = this.getMetrics();
     
-    console.group('📊 Reporte de Rendimiento - Treasure Hunt');
+    console.group('📊 Reporte de Rendimiento - Sybil Slayer');
     console.log(`⏱️  Tiempo de carga de assets críticos: ${metrics.criticalAssetsLoadTime.toFixed(2)}ms`);
     console.log(`🎨 Tiempo de carga de sprites: ${metrics.spriteLoadTime.toFixed(2)}ms`);
     console.log(`📦 Tiempo total de carga: ${metrics.assetLoadTime.toFixed(2)}ms`);

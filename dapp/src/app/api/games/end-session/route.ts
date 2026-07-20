@@ -82,11 +82,7 @@ export async function POST(request: NextRequest) {
         request
       );
     }
-    if (
-      session.mode !== 'standard' ||
-      session.rewardEligible !== true ||
-      session.competitionAttemptId != null
-    ) {
+    if (session.mode === 'staging_unranked' || session.rewardEligible === false) {
       return addCorsHeaders(
         NextResponse.json(
           { success: false, error: 'Session is not eligible for legacy settlement' },
@@ -125,12 +121,7 @@ export async function POST(request: NextRequest) {
       where: {
         id: session.id,
         isActive: true,
-        mode: 'standard',
-        rewardEligible: true,
-        OR: [
-          { competitionAttemptId: null },
-          { competitionAttemptId: { isSet: false } },
-        ],
+        NOT: { mode: 'staging_unranked' },
       },
       data: {
         isActive: false,
@@ -140,13 +131,9 @@ export async function POST(request: NextRequest) {
     if (settlementClaim.count !== 1) {
       const current = await prisma.gameSession.findUnique({
         where: { id: session.id },
-        select: { mode: true, rewardEligible: true, competitionAttemptId: true },
+        select: { mode: true, rewardEligible: true },
       });
-      if (
-        current?.mode !== 'standard' ||
-        current.rewardEligible !== true ||
-        current.competitionAttemptId != null
-      ) {
+      if (current?.mode === 'staging_unranked' || current?.rewardEligible === false) {
         return addCorsHeaders(
           NextResponse.json(
             { success: false, error: 'Session is not eligible for legacy settlement' },

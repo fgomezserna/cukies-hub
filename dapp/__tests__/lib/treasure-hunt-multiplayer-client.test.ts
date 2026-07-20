@@ -109,7 +109,7 @@ class FakeTransport implements MultiplayerTransport {
   join = jest.fn(async () => ({
     playerId: 'player-1',
     slot: 0 as const,
-    inviteUrl: 'https://hub.example/games/treasure-hunt?room=ROOM-1',
+    inviteUrl: 'https://hub.example/games/sybil-slayer?room=ROOM-1',
     match: match(1),
   }));
   get = jest.fn(async () => ({ match: match(1) }));
@@ -156,7 +156,7 @@ describe('Treasure Hunt multiplayer parent transport', () => {
       PARENT_ORIGIN,
       undefined,
       'production',
-    )).toBe('https://hub.example/games/treasure-hunt?room=ROOM-1');
+    )).toBe('https://hub.example/games/sybil-slayer?room=ROOM-1');
     expect(buildTreasureHuntHubEntryUrl('', undefined, undefined, 'production')).toBeNull();
   });
 

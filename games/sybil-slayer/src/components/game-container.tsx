@@ -2,16 +2,10 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
-import {
-  usePusherConnection,
-  type TreasureHuntCompetitionAccess,
-} from '../hooks/usePusherConnection';
+import { usePusherConnection } from '../hooks/usePusherConnection';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
-import ModeSelectModal, {
-  GameMode,
-  resolveTreasureHuntSinglePlayerEntry,
-} from './mode-select-modal';
+import ModeSelectModal, { GameMode } from './mode-select-modal';
 import { useGameState } from '../hooks/useGameState';
 import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
@@ -55,12 +49,6 @@ import {
   shouldBlockLocalGameControls,
 } from '../lib/multiplayer-feature';
 import { buildTreasureHuntHubEntryUrl } from '../lib/parent-origin';
-import { randomManager } from '../lib/random';
-import {
-  createSinglePlayerResultAuthority,
-  resolveSinglePlayerResultDispatch,
-  type SinglePlayerResultAuthority,
-} from '../lib/single-player-result-authority';
 import { shouldRenderDirectionalTouchControls } from '../lib/touch-controls';
 import { calculateContainScale, resolveGameViewportSize } from '../lib/viewport-scale';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
@@ -628,11 +616,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     connectionState,
     sessionData,
     hasParentHandshake,
-    hasPendingGameEnd,
-    gameEndPersistenceError,
     sendGameEnd, 
-    retryGameEndPersistence,
-    requestCompetitionAccess,
     startCheckpointInterval,
     channel,
   } = usePusherConnection();
@@ -654,12 +638,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isStandaloneRuntime]);
   const multiplayerAuthorityReady =
     hasParentHandshake && Boolean(multiplayerAuthoritySessionId);
-  const singlePlayerEntryState = isStandaloneRuntime
-    ? 'practice' as const
-    : multiplayerAuthorityReady
-      ? 'ready' as const
-      : 'connecting' as const;
-  const singlePlayerEntry = resolveTreasureHuntSinglePlayerEntry(singlePlayerEntryState);
   const multiplayerEntryState = resolveTreasureHuntMultiplayerEntryState({
     enabled: multiplayerEnabled,
     authorityReady: multiplayerAuthorityReady,
@@ -786,15 +764,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [resultExitPending, setResultExitPending] = useState(false);
   const [resultExitError, setResultExitError] = useState<string | null>(null);
   const [multiplayerStartPending, setMultiplayerStartPending] = useState(false);
-  const [competitionStartPending, setCompetitionStartPending] = useState(false);
-  const [competitionAccess, setCompetitionAccess] = useState<TreasureHuntCompetitionAccess | null>(null);
-  const [competitionStartError, setCompetitionStartError] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
   const multiplayerStartPendingRef = useRef(false);
-  const competitionStartPendingRef = useRef(false);
-  const singlePlayerRunSequenceRef = useRef(0);
-  const activeSinglePlayerResultAuthorityRef = useRef<SinglePlayerResultAuthority | null>(null);
-  const dispatchedSinglePlayerRunIdRef = useRef<number | null>(null);
   const resultExitCoordinatorRef = useRef<ReturnType<
     typeof createCanonicalResultExitCoordinator
   > | null>(null);
@@ -810,7 +781,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     multiplayer.hasNonTerminalMatch,
     isMultiplayerJoinPending,
   );
-  const canChangeGameMode = !hasPendingGameEnd && canChangeTreasureHuntGameMode(
+  const canChangeGameMode = canChangeTreasureHuntGameMode(
     Boolean(multiplayer.matchResult),
     multiplayer.hasNonTerminalMatch,
     isMultiplayerJoinPending,
@@ -1076,32 +1047,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const previousMultiplayerAuthoritySessionRef = useRef<string | null>(
     multiplayerAuthoritySessionId,
   );
-  const previousAuthorityOwnerUserIdRef = useRef<string | null>(
-    sessionData?.userId ?? null,
-  );
   useEffect(() => {
     const previousSessionId = previousMultiplayerAuthoritySessionRef.current;
-    const previousOwnerUserId = previousAuthorityOwnerUserIdRef.current;
-    const nextOwnerUserId = sessionData?.userId ?? null;
-    const ownerChanged = Boolean(
-      previousOwnerUserId &&
-      nextOwnerUserId &&
-      previousOwnerUserId !== nextOwnerUserId,
-    );
-    if (previousSessionId === multiplayerAuthoritySessionId && !ownerChanged) return;
+    if (previousSessionId === multiplayerAuthoritySessionId) return;
 
     previousMultiplayerAuthoritySessionRef.current = multiplayerAuthoritySessionId;
-    // Retain the last known owner across the brief null state between two
-    // GameSessions, so a genuine wallet switch is still detected afterwards.
-    if (nextOwnerUserId) previousAuthorityOwnerUserIdRef.current = nextOwnerUserId;
-    if (!shouldResetLocalGameForAuthorityChange({
+    if (!shouldResetLocalGameForAuthorityChange(
       previousSessionId,
-      nextSessionId: multiplayerAuthoritySessionId,
-      previousOwnerUserId,
-      nextOwnerUserId,
-      preserveTerminalSinglePlayerResult:
-        currentMode === 'single' && gameState.status === 'gameOver',
-    })) return;
+      multiplayerAuthoritySessionId,
+    )) return;
 
     // The old controller belongs to a different wallet/GameSession. Never try
     // to release it through the new cookie authority; the server sweeper owns
@@ -1110,13 +1064,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setModeSelectOpen(false);
     setCurrentMode('single');
     resetGame();
-  }, [
-    currentMode,
-    gameState.status,
-    multiplayerAuthoritySessionId,
-    resetGame,
-    sessionData?.userId,
-  ]);
+  }, [multiplayerAuthoritySessionId, resetGame]);
 
   // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
   useEffect(() => {
@@ -1610,99 +1558,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       </div>
     </div>
   ) : null;
-
-  const startSinglePlayer = useCallback(async () => {
-    if (
-      hasPendingGameEnd ||
-      competitionStartPendingRef.current ||
-      multiplayerStartPendingRef.current
-    ) return;
-    if (!singlePlayerEntry.interactive) {
-      setCompetitionStartError(
-        'Conecta y firma una wallet EVM en el Hub para jugar y registrar tu puntuación.',
-      );
-      setModeSelectOpen(true);
-      return;
-    }
-    competitionStartPendingRef.current = true;
-    setCompetitionStartPending(true);
-    setCompetitionStartError(null);
-    setModeSelectOpen(false);
-    try {
-      await multiplayer.reset();
-      let access: TreasureHuntCompetitionAccess;
-      try {
-        access = await requestCompetitionAccess();
-      } catch {
-        access = {
-          eligible: false,
-          practice: false,
-          sessionId: sessionData?.sessionId ?? null,
-          reason: 'COMPETITION_ACCESS_UNCERTAIN',
-        };
-      }
-      setCompetitionAccess(access);
-      if (!access.eligible && !access.practice) {
-        randomManager.clear();
-        const accessErrorCopy: Record<string, string> = {
-          SIGNED_WALLET_REQUIRED:
-            'Conecta y firma una wallet EVM en el Hub para jugar y registrar tu puntuación.',
-          INVALID_WALLET:
-            'La wallet firmada no es válida. Vuelve al Hub, conecta una wallet EVM válida y firma de nuevo.',
-          PARENT_HANDSHAKE_REQUIRED:
-            'El Hub todavía está preparando tu sesión segura. Espera unos segundos y vuelve a intentarlo.',
-          SECURE_PARENT_UNAVAILABLE:
-            'No se pudo verificar el Hub de origen. Abre Treasure Hunt desde el Hub oficial y vuelve a intentarlo.',
-          GAME_SESSION_RESTART_REQUIRED:
-            'La sesión anterior caducó y se está renovando. Espera unos segundos y vuelve a intentarlo.',
-          SESSION_CHANGED:
-            'La sesión cambió mientras confirmábamos el acceso. La partida no se inició; vuelve a intentarlo.',
-        };
-        setCompetitionStartError(accessErrorCopy[access.reason ?? ''] ??
-          'No pudimos confirmar si el intento quedó creado. La partida no se inició; vuelve a intentarlo.');
-        setModeSelectOpen(true);
-        return;
-      }
-      if (access.eligible && access.seed) {
-        randomManager.setSeed(access.seed);
-      } else {
-        randomManager.clear();
-      }
-      const resultAuthority = createSinglePlayerResultAuthority(
-        singlePlayerRunSequenceRef.current + 1,
-        access,
-        sessionData?.sessionId ?? null,
-      );
-      if (!resultAuthority) {
-        setCompetitionStartError(
-          'La sesión cambió mientras preparábamos la partida. Espera unos segundos y vuelve a intentarlo.',
-        );
-        setModeSelectOpen(true);
-        return;
-      }
-      singlePlayerRunSequenceRef.current = resultAuthority.runId;
-      activeSinglePlayerResultAuthorityRef.current = resultAuthority;
-      setCurrentMode('single');
-      if (gameState.status === 'gameOver') {
-        stopMusic();
-      }
-      playSound('game_start');
-      startGame();
-    } finally {
-      competitionStartPendingRef.current = false;
-      setCompetitionStartPending(false);
-    }
-  }, [
-    gameState.status,
-    hasPendingGameEnd,
-    multiplayer,
-    playSound,
-    requestCompetitionAccess,
-    sessionData?.sessionId,
-    singlePlayerEntry.interactive,
-    startGame,
-    stopMusic,
-  ]);
   
   // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
   // useEffect(() => {
@@ -1726,11 +1581,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
     if (multiplayer.hasNonTerminalMatch) return;
-    void startSinglePlayer();
+    playSound('game_start');
+    startGame();
   }, [
     startToggled,
     gameState.status,
-    startSinglePlayer,
+    startGame,
+    playSound,
     modeSelectOpen,
     currentMode,
     multiplayer.isJoinPending,
@@ -1785,15 +1642,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isMultiplayerMode, isConnected, sessionData, gameState.status, startCheckpointInterval]);
 
   // Handle game session end with Pusher
+  const gameEndSentRef = useRef<string | null>(null); // Track which session already sent game end
+  
   useEffect(() => {
     if (!isMultiplayerMode && sessionData && gameState.status === 'gameOver') {
-      const resultAuthority = resolveSinglePlayerResultDispatch(
-        activeSinglePlayerResultAuthorityRef.current,
-        sessionData.sessionId,
-        dispatchedSinglePlayerRunIdRef.current,
-      );
-      if (!resultAuthority) {
-        console.log('🔄 [GAME-PUSHER] Terminal run has no matching unsent authority, skipping');
+      // Prevent duplicate sends for the same session
+      const sessionKey = `${sessionData.sessionId}_${gameState.score}`;
+      if (gameEndSentRef.current === sessionKey) {
+        console.log('🔄 [GAME-PUSHER] Game end already sent for this session, skipping');
         return;
       }
       
@@ -1804,19 +1660,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         : 0;
       
       console.log('📤 [GAME-PUSHER] Attempting to send game end immediately');
-      const queued = sendGameEnd({
+      sendGameEnd({
         finalScore: gameState.score,
         gameTime,
-        ...(resultAuthority.competitionAttemptId
-          ? { competitionAttemptId: resultAuthority.competitionAttemptId }
-          : {}),
         metadata: {
           gameOverReason: gameState.gameOverReason,
           level: gameState.level,
           hearts: gameState.hearts
         }
       });
-      if (queued) dispatchedSinglePlayerRunIdRef.current = resultAuthority.runId;
+      
+      // Mark this session as having sent game end
+      gameEndSentRef.current = sessionKey;
     }
   }, [isMultiplayerMode, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
 
@@ -2171,12 +2026,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
     if (multiplayerStartPendingRef.current || !canChangeGameMode) return;
-    setCompetitionStartError(null);
     setModeSelectOpen(false);
 
     if (mode === 'single') {
       console.log('🎮 [MODE] Starting single player mode');
-      await startSinglePlayer();
+      try {
+        await multiplayer.reset();
+      } catch {
+        return;
+      }
+      setCurrentMode('single');
+      if (gameState.status === 'gameOver') {
+        console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
+        stopMusic();
+      }
+      playSound('game_start');
+      startGame();
       return;
     }
 
@@ -2190,16 +2055,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
 
     console.log('🎮 [MODE] Starting multiplayer mode');
-    setCompetitionAccess(null);
     playSound('button_click');
     await startMultiplayerGame();
   }, [
     canChangeGameMode,
+    gameState.status,
+    multiplayer,
     multiplayerEntryState,
     multiplayerHubEntryUrl,
     playSound,
-    startSinglePlayer,
+    startGame,
     startMultiplayerGame,
+    stopMusic,
   ]);
 
   // La invitación llega únicamente por el handshake autenticado del padre.
@@ -3069,14 +2936,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     <TreasureButton
                       size="large"
                       className="th-menu-cta"
-                      disabled={competitionStartPending || !singlePlayerEntry.interactive}
-                      aria-busy={competitionStartPending}
                       onClick={() => void handleModeSelected('single')}
                       icon={<PlayIcon strokeWidth={2.5} />}
                     >
-                      {competitionStartPending
-                        ? 'Comprobando acceso…'
-                        : singlePlayerEntry.actionCopy}
+                      Jugar solo
                     </TreasureButton>
                     <TreasureButton
                       variant="secondary"
@@ -3094,15 +2957,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     </TreasureButton>
                     <p className="th-menu-disclaimer">
                       <ShieldIcon aria-hidden="true" />
-                      {competitionAccess?.eligible
-                        ? `Partida clasificatoria · ${competitionAccess.alias}`
-                        : competitionAccess?.practice
-                          ? 'Modo práctica · esta partida no entra en el ranking'
-                          : !singlePlayerEntry.interactive
-                            ? 'Conecta y firma tu wallet en el Hub para jugar 1P'
-                          : competitionStartError
-                            ? 'Acceso sin confirmar · la partida no se inició'
-                          : '1P: competición de preventa · 1v1: sin ranking ni recompensas'}
+                      Sin ranking ni recompensas
                     </p>
                     <TreasureButton
                       variant="secondary"
@@ -3305,8 +3160,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               handleOpenInfo();
             }}
             multiplayerEntryState={multiplayerEntryState}
-            singlePlayerEntryState={singlePlayerEntryState}
-            competitionNotice={competitionStartError}
           />
           <InfoModal
             isOpen={isInfoModalOpen && !localControlsLocked}
@@ -3431,9 +3284,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <p className="th-screen-kicker">Expedición completada</p>
                   <h2 id="single-result-title" className="th-overlay-title">Resultado final</h2>
                   <p className="th-dialog-copy">{gameOverCopy}</p>
-                  {gameEndPersistenceError ? (
-                    <p className="th-dialog-copy" role="alert">{gameEndPersistenceError}</p>
-                  ) : null}
                   <strong className="th-result-score">{numberFormatter.format(localScore)}</strong>
                   <span className="th-result-score-label">Puntos</span>
                   <div className="th-result-metrics">
@@ -3444,35 +3294,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <div className="th-result-actions">
                     <TreasureButton
                       size="small"
-                      disabled={hasPendingGameEnd && !gameEndPersistenceError}
                       onClick={() => {
-                        if (gameEndPersistenceError) {
-                          retryGameEndPersistence();
-                          return;
-                        }
                         playSound('button_click');
                         stopMusic();
                         resetGame();
                         setModeSelectOpen(true);
                       }}
                     >
-                      {gameEndPersistenceError
-                        ? 'Reintentar guardado'
-                        : hasPendingGameEnd
-                          ? 'Guardando resultado…'
-                          : 'Jugar de nuevo'}
+                      Jugar de nuevo
                     </TreasureButton>
                     <TreasureButton variant="secondary" size="small" onClick={() => setIsLevelStatsVisible(true)}>
                       Ver desglose
                     </TreasureButton>
-                    <TreasureButton
-                      variant="quiet"
-                      size="small"
-                      disabled={hasPendingGameEnd}
-                      onClick={handleResetClick}
-                    >
-                      Volver al menú
-                    </TreasureButton>
+                    <TreasureButton variant="quiet" size="small" onClick={handleResetClick}>Volver al menú</TreasureButton>
                   </div>
                 </section>
                 <div className="th-result-art" aria-hidden="true">
@@ -3541,8 +3375,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           handleOpenInfo();
         }}
         multiplayerEntryState={multiplayerEntryState}
-        singlePlayerEntryState={singlePlayerEntryState}
-        competitionNotice={competitionStartError}
       />
       {waitingOverlay}
       {countdownOverlay}

@@ -1,6 +1,6 @@
 {
-  "name": "Treasure Hunt",
-  "short_name": "Treasure Hunt",
+  "name": "Sybil Slayer - Treasure Hunt",
+  "short_name": "Sybil Slayer",
   "description": "¡Esquiva duendes y recolecta puntos!",
   "start_url": "/",
   "display": "fullscreen",
@@ -31,3 +31,4 @@
     }
   ]
 }
+

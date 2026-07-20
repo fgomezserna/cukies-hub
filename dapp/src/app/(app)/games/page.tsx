@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const games = [
-  { name: "Treasure Hunt", description: "Primer juego conectado a UKI: usa créditos, valida score y compite por periodo.", imageUrl: "/brand/generated/uki-treasure-hunt-scene-v2.png", hint: "treasure hunt", live: false, playable: true, href: "/games/treasure-hunt" },
+  { name: "Treasure Hunt", description: "Primer juego conectado a UKI: usa créditos, valida score y compite por periodo.", imageUrl: "/brand/generated/uki-treasure-hunt-scene-v2.png", hint: "treasure hunt", live: false, playable: true, href: "/games/sybil-slayer" },
   { name: "Cukies Brain Buzz", description: "Trivia competitiva para ampliar el universo de juegos Cukies.", imageUrl: "/portada_brain_buzz.jpg", hint: "trivia", live: false, playable: true, href: "https://brain-buzz.cukies.world/" },
   { name: "Cukies Rush n' Run", description: "Runner de acción dentro del ecosistema Cukies.", imageUrl: "/portada_jump_Hop.jpg", hint: "platformer", live: false, playable: true, href: "https://cukies.world/cukies-jump-n-hop/" },
   { name: "Cukies Island", description: "Aventura de mundo para futuras experiencias de la economía Cukies.", imageUrl: "/portada_cukies_island.jpg", hint: "island adventure", live: false, playable: true, href: "https://cukies-island.cukies.world/" }

@@ -106,36 +106,11 @@ function toStatus(state: MultiplayerControllerState, setupError: string | null):
   return state.match.status;
 }
 
-interface LocalGameAuthorityTransition {
-  readonly previousSessionId: string | null;
-  readonly nextSessionId: string | null;
-  readonly previousOwnerUserId: string | null;
-  readonly nextOwnerUserId: string | null;
-  readonly preserveTerminalSinglePlayerResult: boolean;
-}
-
-export function shouldResetLocalGameForAuthorityChange({
-  previousSessionId,
-  nextSessionId,
-  previousOwnerUserId,
-  nextOwnerUserId,
-  preserveTerminalSinglePlayerResult,
-}: LocalGameAuthorityTransition): boolean {
-  const ownerChanged = Boolean(
-    previousOwnerUserId &&
-    nextOwnerUserId &&
-    previousOwnerUserId !== nextOwnerUserId,
-  );
-  if (ownerChanged) return true;
-
-  const establishedAuthorityChanged =
-    previousSessionId !== null && previousSessionId !== nextSessionId;
-  if (!establishedAuthorityChanged) return false;
-
-  // A completed 1P result rotates to a fresh GameSession after the backend ACK.
-  // That transport-only rotation must not erase the result dialog the player is
-  // currently reading. Active/idle games and real wallet changes still reset.
-  return !preserveTerminalSinglePlayerResult;
+export function shouldResetLocalGameForAuthorityChange(
+  previousSessionId: string | null,
+  nextSessionId: string | null,
+): boolean {
+  return previousSessionId !== null && previousSessionId !== nextSessionId;
 }
 
 export interface CanonicalResultExitCoordinator {

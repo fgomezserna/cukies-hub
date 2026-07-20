@@ -18,33 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid or inactive session' }, { status: 400 });
     }
 
-    if (
-      session.mode !== 'standard' ||
-      session.rewardEligible !== true ||
-      session.competitionAttemptId != null
-    ) {
-      return NextResponse.json(
-        { success: false, error: 'Session is not eligible for legacy checkpoints' },
-        { status: 403 },
-      );
-    }
-
-    // Re-check the exact authority tuple immediately before the legacy write. The
-    // competition and 1v1 claims use mutually exclusive CAS predicates.
-    const checkpointClaim = await prisma.gameSession.updateMany({
-      where: {
-        id: session.id,
-        isActive: true,
-        mode: 'standard',
-        rewardEligible: true,
-        OR: [
-          { competitionAttemptId: null },
-          { competitionAttemptId: { isSet: false } },
-        ],
-      },
-      data: { updatedAt: new Date() },
-    });
-    if (checkpointClaim.count !== 1) {
+    if (session.mode === 'staging_unranked' || session.rewardEligible === false) {
       return NextResponse.json(
         { success: false, error: 'Session is not eligible for legacy checkpoints' },
         { status: 403 },

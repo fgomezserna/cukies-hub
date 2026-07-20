@@ -21,7 +21,6 @@ type FetchUserOptions = {
   promptForSignature?: boolean;
   walletType?: LoginWalletType;
   evmConnector?: Connector;
-  requireSignedWallet?: boolean;
 };
 
 function isUserRejectedRequest(error: unknown) {
@@ -84,7 +83,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const addressToUse = walletAddress || currentAddress;
     const loginWalletType: LoginWalletType = options.walletType || (isEvmConnected ? 'evm' : 'tron');
     const shouldPromptForSignature = Boolean(options.promptForSignature);
-    const requireSignedWallet = options.requireSignedWallet === true;
     const canUseWalletAddress = isConnected || Boolean(walletAddress && shouldPromptForSignature);
 
     if (!canUseWalletAddress || !addressToUse) {
@@ -102,12 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       let response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: addressToUse,
-          ...(requireSignedWallet
-            ? { walletType: loginWalletType, requireSignedWallet: true }
-            : {}),
-        }),
+        body: JSON.stringify({ walletAddress: addressToUse }),
       });
 
       if (response.status === 401) {
@@ -150,7 +143,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             walletType: loginWalletType,
             message: challenge.message,
             signature,
-            ...(requireSignedWallet ? { requireSignedWallet: true } : {}),
           }),
         });
       }

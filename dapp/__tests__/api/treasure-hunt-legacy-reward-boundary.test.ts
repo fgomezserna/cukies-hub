@@ -39,7 +39,6 @@ function gameSession(overrides: Record<string, unknown> = {}) {
     isActive: true,
     mode: 'staging_unranked',
     rewardEligible: false,
-    competitionAttemptId: null,
     checkpoints: [],
     result: null,
     ...overrides,
@@ -52,7 +51,6 @@ describe('Treasure Hunt legacy reward boundary', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    updateGameSessions.mockResolvedValue({ count: 1 });
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -65,11 +63,6 @@ describe('Treasure Hunt legacy reward boundary', () => {
   it.each([
     ['multiplayer mode', { mode: 'staging_unranked', rewardEligible: true }],
     ['ineligible reward flag', { mode: 'standard', rewardEligible: false }],
-    ['competition attempt authority', {
-      mode: 'standard',
-      rewardEligible: true,
-      competitionAttemptId: 'attempt-1',
-    }],
   ])('rejects end-session for %s with zero database writes', async (_label, overrides) => {
     findGameSession.mockResolvedValue(gameSession(overrides));
 
@@ -92,11 +85,6 @@ describe('Treasure Hunt legacy reward boundary', () => {
   it.each([
     ['multiplayer mode', { mode: 'staging_unranked', rewardEligible: true }],
     ['ineligible reward flag', { mode: 'standard', rewardEligible: false }],
-    ['competition attempt authority', {
-      mode: 'standard',
-      rewardEligible: true,
-      competitionAttemptId: 'attempt-1',
-    }],
   ])('rejects checkpoints for %s with zero database writes', async (_label, overrides) => {
     findGameSession.mockResolvedValue(gameSession(overrides));
 
@@ -134,46 +122,12 @@ describe('Treasure Hunt legacy reward boundary', () => {
       where: {
         id: '507f1f77bcf86cd799439011',
         isActive: true,
-        mode: 'standard',
-        rewardEligible: true,
-        OR: [
-          { competitionAttemptId: null },
-          { competitionAttemptId: { isSet: false } },
-        ],
+        NOT: { mode: 'staging_unranked' },
       },
       data: { isActive: false, endedAt: expect.any(Date) },
     });
     expect(createGameResult).not.toHaveBeenCalled();
     expect(updateUser).not.toHaveBeenCalled();
     expect(createPointTransaction).not.toHaveBeenCalled();
-  });
-
-  it('fails a legacy checkpoint when the exact standard-session CAS loses a race', async () => {
-    findGameSession.mockResolvedValue(gameSession({ mode: 'standard', rewardEligible: true }));
-    updateGameSessions.mockResolvedValue({ count: 0 });
-
-    const response = await checkpoint(
-      request('/api/games/checkpoint', {
-        sessionToken: 'secret-session-token',
-        checkpoint: { score: 100, gameTime: 1_000, nonce: 'n', hash: 'h' },
-        events: [],
-      }),
-    );
-
-    expect(response.status).toBe(403);
-    expect(updateGameSessions).toHaveBeenCalledWith({
-      where: {
-        id: '507f1f77bcf86cd799439011',
-        isActive: true,
-        mode: 'standard',
-        rewardEligible: true,
-        OR: [
-          { competitionAttemptId: null },
-          { competitionAttemptId: { isSet: false } },
-        ],
-      },
-      data: { updatedAt: expect.any(Date) },
-    });
-    expect(createCheckpoint).not.toHaveBeenCalled();
   });
 });

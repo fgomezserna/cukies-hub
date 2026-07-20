@@ -12,37 +12,6 @@ import {
 } from './treasure-hunt-ui';
 
 type GameMode = 'single' | 'multiplayer';
-type SinglePlayerEntryState = 'ready' | 'practice' | 'connecting';
-
-interface SinglePlayerEntryPresentation {
-  readonly interactive: boolean;
-  readonly actionCopy: 'JUGAR 1P' | 'PRACTICAR 1P' | 'CONECTA WALLET';
-  readonly description: string;
-}
-
-export function resolveTreasureHuntSinglePlayerEntry(
-  state: SinglePlayerEntryState,
-): SinglePlayerEntryPresentation {
-  if (state === 'ready') {
-    return {
-      interactive: true,
-      actionCopy: 'JUGAR 1P',
-      description: 'Wallet firmada. Tu próxima partida podrá entrar en el ranking oficial.',
-    };
-  }
-  if (state === 'practice') {
-    return {
-      interactive: true,
-      actionCopy: 'PRACTICAR 1P',
-      description: 'Práctica local sin ranking ni recompensas.',
-    };
-  }
-  return {
-    interactive: false,
-    actionCopy: 'CONECTA WALLET',
-    description: 'Conecta y firma tu wallet EVM en Cukies Hub para activar el modo 1P.',
-  };
-}
 
 interface ModeSelectModalProps {
   open: boolean;
@@ -50,15 +19,13 @@ interface ModeSelectModalProps {
   onSelectMode: (mode: GameMode) => void;
   defaultMode?: GameMode;
   onRulesClick?: () => void;
-  singlePlayerEntryState: SinglePlayerEntryState;
   multiplayerEntryState: TreasureHuntMultiplayerEntryState;
-  competitionNotice?: string | null;
 }
 
 const modeCopy: Record<GameMode, { title: string; description: string }> = {
   single: {
-    title: 'Competición 1P',
-    description: 'En Cukies Hub, conecta y firma tu wallet para jugar 1P y entrar en el ranking. Fuera del Hub, solo práctica.',
+    title: '1 Jugador',
+    description: 'Enfréntate solo al mercado. Mantén el score, supera niveles y evita los fees.',
   },
   multiplayer: {
     title: 'Multijugador',
@@ -89,12 +56,9 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   onSelectMode,
   defaultMode = 'single',
   onRulesClick,
-  singlePlayerEntryState,
   multiplayerEntryState,
-  competitionNotice,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
-  const singlePlayerEntry = resolveTreasureHuntSinglePlayerEntry(singlePlayerEntryState);
   const multiplayerInteractive =
     multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
   const multiplayerActionCopy =
@@ -161,14 +125,13 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               Selecciona modo de juego
             </h2>
             <p
-              role={competitionNotice ? 'alert' : undefined}
               style={{
                 margin: '5px 0 0',
-                color: competitionNotice ? '#fecdd3' : 'var(--th-cream-muted)',
+                color: 'var(--th-cream-muted)',
                 font: "600 15px/21px var(--th-font-ui)",
               }}
             >
-              {competitionNotice ?? 'Misma caza. Dos formas de conquistar el tesoro.'}
+              Misma caza. Dos formas de conquistar el tesoro.
             </p>
           </div>
           <button
@@ -234,7 +197,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                     textTransform: 'uppercase',
                   }}
                 >
-                  Preventa UKI
+                  Modo clásico
                 </span>
                 <h3
                   id="single-mode-title"
@@ -311,19 +274,16 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                 textAlign: 'center',
               }}
             >
-              {singlePlayerEntry.description}
+              {modeCopy.single.description}
             </p>
 
             <TreasureButton
-              data-testid="treasure-hunt-single-player-mode"
-              data-single-player-entry={singlePlayerEntryState}
               variant="primary"
               size="medium"
               fullWidth
-              disabled={!singlePlayerEntry.interactive}
-              onClick={() => singlePlayerEntry.interactive && onSelectMode('single')}
+              onClick={() => onSelectMode('single')}
             >
-              {singlePlayerEntry.actionCopy}
+              Jugar solo
             </TreasureButton>
           </section>
 
@@ -499,5 +459,5 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   );
 };
 
-export type { GameMode, SinglePlayerEntryState };
+export type { GameMode };
 export default ModeSelectModal;

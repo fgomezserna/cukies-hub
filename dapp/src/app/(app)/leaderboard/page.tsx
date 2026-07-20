@@ -112,7 +112,7 @@ function LeaderboardView() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Games</SelectItem>
-                                    <SelectItem value="sybil-slayer">Treasure Hunt</SelectItem>
+                                    <SelectItem value="sybil-slayer">Sybil Slayer</SelectItem>
                                     <SelectItem value="hyppie-road">Hyppie Road</SelectItem>
                                     <SelectItem value="tower-builder">Tower Builder</SelectItem>
                                 </SelectContent>

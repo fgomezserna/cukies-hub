@@ -54,7 +54,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isMobileGameShell = useMobileGameShell();
   const isMobileTreasureHunt =
-    isMobileGameShell && pathname.startsWith('/games/treasure-hunt');
+    isMobileGameShell && pathname === '/games/sybil-slayer';
   const isCukiesSection =
     pathname.startsWith('/cukies') ||
     pathname.startsWith('/marketplace') ||
@@ -141,7 +141,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
                         <Trophy className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
                       </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Arena</span>
+                      <span className="group-data-[collapsible=icon]:hidden font-medium">Ranking</span>
                     </div>
                   </SidebarMenuButton>
                 </Link>

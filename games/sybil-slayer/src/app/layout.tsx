@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from 'next';
+import type {Metadata} from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
 import Script from 'next/script';
@@ -28,10 +28,18 @@ export const metadata: Metadata = {
   description: '¡Esquiva duendes y recolecta puntos!',
   metadataBase: new URL('https://treasure-hunt.cukies.world'),
   manifest: '/manifest.json',
+  themeColor: '#0f172a',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Treasure Hunt',
+    title: 'Sybil Slayer',
   },
   other: {
     'mobile-web-app-capable': 'yes',
@@ -48,15 +56,6 @@ export const metadata: Metadata = {
     title: 'Treasure Hunt',
     description: '¡Esquiva duendes y recolecta puntos!',
   },
-};
-
-export const viewport: Viewport = {
-  themeColor: '#0f172a',
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: 'cover',
 };
 
 export default function RootLayout({

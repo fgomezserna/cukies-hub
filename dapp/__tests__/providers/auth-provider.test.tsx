@@ -24,23 +24,12 @@ const TestComponent = () => {
       <button onClick={() => void fetchUser()} data-testid="fetch-user">
         Fetch User
       </button>
-      <button
-        onClick={() => void fetchUser(undefined, {
-          promptForSignature: true,
-          requireSignedWallet: true,
-          walletType: 'evm',
-        })}
-        data-testid="fetch-signed-evm-user"
-      >
-        Fetch Signed EVM User
-      </button>
     </div>
   )
 }
 
 describe('providers/AuthProvider', () => {
   const mockDisconnect = jest.fn()
-  const mockSignMessageAsync = jest.fn()
   const mockUser = {
     id: '1',
     walletAddress: '0x123456789',
@@ -72,7 +61,7 @@ describe('providers/AuthProvider', () => {
     } as any)
     mockUseSignMessage.mockReturnValue({
       signMessage: jest.fn(),
-      signMessageAsync: mockSignMessageAsync.mockResolvedValue('0xsigned-login-message'),
+      signMessageAsync: jest.fn().mockResolvedValue('0xsigned-login-message'),
     } as any)
 
     // Mock successful fetch response
@@ -251,79 +240,6 @@ describe('providers/AuthProvider', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
-  })
-
-  it('forces a new EVM signature when requireSignedWallet is enabled', async () => {
-    const walletAddress = '0x1111111111111111111111111111111111111111'
-    mockUseAccount.mockReturnValue({
-      address: walletAddress,
-      connector: { id: 'injected' },
-      isConnected: true,
-    } as any)
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('user')).toHaveTextContent('testuser')
-    })
-
-    mockFetch.mockReset()
-    mockSignMessageAsync.mockClear()
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ message: 'Sign this challenge' }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockUser,
-      } as Response)
-
-    screen.getByTestId('fetch-signed-evm-user').click()
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(3)
-    })
-
-    expect(mockFetch).toHaveBeenNthCalledWith(1, '/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        walletAddress,
-        walletType: 'evm',
-        requireSignedWallet: true,
-      }),
-    })
-    expect(mockFetch).toHaveBeenNthCalledWith(2, '/api/auth/challenge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress, walletType: 'evm' }),
-    })
-    expect(mockFetch).toHaveBeenNthCalledWith(3, '/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        walletAddress,
-        walletType: 'evm',
-        message: 'Sign this challenge',
-        signature: '0xsigned-login-message',
-        requireSignedWallet: true,
-      }),
-    })
-    expect(mockSignMessageAsync).toHaveBeenCalledWith(expect.objectContaining({
-      account: walletAddress,
-      message: 'Sign this challenge',
-    }))
   })
 
   it('should update user when wallet address changes', async () => {

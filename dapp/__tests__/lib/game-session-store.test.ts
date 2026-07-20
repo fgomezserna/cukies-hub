@@ -24,12 +24,9 @@ jest.mock('mongodb', () => ({
 
 import {
   claimGameSessionForMultiplayer,
-  claimGameSessionForCompetition,
   confirmGameSessionForMultiplayerDirectly,
   createGameSessionDirectly,
   releaseGameSessionForMultiplayerDirectly,
-  finishGameSessionForCompetition,
-  releaseGameSessionForCompetition,
 } from '@/lib/game-session-store';
 import { getHubCollection } from '@/lib/mongodb-hub';
 
@@ -42,11 +39,6 @@ const identity = {
   userId,
   gameSessionId: 'game-session-1',
   clientInstanceId: 'client-instance-1',
-};
-const competitionIdentity = {
-  userId,
-  gameSessionId: 'game-session-1',
-  attemptId: 'attempt-1',
 };
 
 describe('game session Mongo store', () => {
@@ -114,28 +106,14 @@ describe('game session Mongo store', () => {
         gameId: 'sybil-slayer',
         isActive: true,
         $or: expect.arrayContaining([
-          expect.objectContaining({
-            mode: 'standard',
-            rewardEligible: true,
-            $and: expect.arrayContaining([
-              { $or: [{ competitionAttemptId: null }, { competitionAttemptId: { $exists: false } }] },
-              expect.objectContaining({
-                $or: expect.arrayContaining([
-                  {
-                    multiplayerState: 'idle',
-                    $or: expect.any(Array),
-                  },
-                ]),
-              }),
-            ]),
-          }),
-          expect.objectContaining({
-            mode: 'staging_unranked',
-            rewardEligible: false,
-            multiplayerState: { $in: ['joining', 'joined'] },
+          {
+            multiplayerState: 'joining',
             multiplayerClientInstanceId: 'client-instance-1',
-            $or: [{ competitionAttemptId: null }, { competitionAttemptId: { $exists: false } }],
-          }),
+          },
+          {
+            multiplayerState: 'joined',
+            multiplayerClientInstanceId: 'client-instance-1',
+          },
         ]),
       }),
       {
@@ -194,88 +172,12 @@ describe('game session Mongo store', () => {
     );
   });
 
-  it('atomically claims, finishes and can roll back an exact competition attempt', async () => {
-    await expect(claimGameSessionForCompetition(competitionIdentity)).resolves.toBe(true);
-    await expect(finishGameSessionForCompetition(competitionIdentity)).resolves.toBe(true);
-    await expect(releaseGameSessionForCompetition(competitionIdentity)).resolves.toBe(true);
-
-    expect(updateOne).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        sessionId: 'game-session-1',
-        userId: expect.anything(),
-        gameId: 'sybil-slayer',
-        isActive: true,
-        $or: expect.arrayContaining([
-          expect.objectContaining({ mode: 'standard', rewardEligible: true }),
-          expect.objectContaining({
-            mode: 'presale_competition',
-            competitionAttemptId: 'attempt-1',
-          }),
-        ]),
-      }),
-      {
-        $set: expect.objectContaining({
-          mode: 'presale_competition',
-          rewardEligible: false,
-          competitionAttemptId: 'attempt-1',
-        }),
-      },
-    );
-    const standardClaims = updateOne.mock.calls[0][0].$or.filter(
-      (candidate: Record<string, unknown>) => candidate.mode === 'standard',
-    );
-    expect(standardClaims).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        competitionAttemptId: null,
-        mode: 'standard',
-        rewardEligible: true,
-      }),
-    ]));
-    expect(updateOne).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        mode: 'presale_competition',
-        rewardEligible: false,
-        competitionAttemptId: 'attempt-1',
-        $or: [
-          { isActive: true },
-          { isActive: false, endedAt: { $ne: null } },
-        ],
-      }),
-      [
-        {
-          $set: {
-            isActive: false,
-            endedAt: {
-              $cond: [{ $eq: ['$isActive', true] }, expect.any(Date), '$endedAt'],
-            },
-            updatedAt: {
-              $cond: [{ $eq: ['$isActive', true] }, expect.any(Date), '$updatedAt'],
-            },
-          },
-        },
-      ],
-    );
-    expect(updateOne).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({ competitionAttemptId: 'attempt-1' }),
-      {
-        $set: expect.objectContaining({ mode: 'standard', rewardEligible: true }),
-        $unset: { competitionAttemptId: '' },
-      },
-    );
-  });
-
   it('fails closed when the conditional update matches no session', async () => {
     updateOne.mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
 
     await expect(claimGameSessionForMultiplayer(identity)).resolves.toBe(false);
     await expect(confirmGameSessionForMultiplayerDirectly(identity)).resolves.toBe(false);
     await expect(releaseGameSessionForMultiplayerDirectly(identity)).resolves.toBe(false);
-    await expect(claimGameSessionForCompetition(competitionIdentity)).resolves.toBe(false);
-    await expect(finishGameSessionForCompetition(competitionIdentity)).resolves.toBe(false);
-    await expect(releaseGameSessionForCompetition(competitionIdentity)).resolves.toBe(false);
   });
 
   it('rejects non-ObjectId user identities before issuing an update', async () => {
