@@ -38,7 +38,6 @@ import {
 } from './treasure-hunt-ui';
 import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
-import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
 import {
   canResumeLocalPlayerInSuddenDeath,
@@ -866,24 +865,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         // Inicializar monitoreo de rendimiento
         performanceMonitor.startTimer('totalAssets');
         performanceMonitor.startTimer('criticalAssets');
-        performanceMonitor.startTimer('sprites');
-        
+
         console.log('🚀 Iniciando carga optimizada de assets...');
         setLoadingPhase('preload');
-        
-        // Cargar assets críticos en paralelo
-        const [, ] = await Promise.all([
-          assetLoader.preloadCritical((progress) => {
-            setLoadingProgress(progress * 0.6); // 60% para assets críticos
-          }),
-          spriteManager.loadGameSprites().then(() => {
-            performanceMonitor.endTimer('sprites');
-            setLoadingProgress(prev => prev + 0.3); // 30% para sprites
-          })
-        ]);
-        
+
+        // El canvas gestiona sus propios sprites. Bloquear el arranque con un
+        // segundo precargador duplicaba más de cien peticiones y ahogaba los
+        // assets que sí son necesarios para mostrar el juego.
+        await assetLoader.preloadCritical((progress) => {
+          setLoadingProgress(progress * 0.9);
+        });
+
         performanceMonitor.endTimer('criticalAssets');
-        console.log('✅ Assets críticos y sprites cargados - juego puede iniciar');
+        setLoadingProgress(1);
+        console.log('✅ Assets críticos cargados - juego puede iniciar');
         setCriticalAssetsLoaded(true);
         
         // Fase 2: Cargar assets restantes en background
