@@ -320,6 +320,7 @@ describe('Treasure Hunt competition service', () => {
     const service = createCompetitionService({
       repository,
       environment: { ...campaignEnv, NODE_ENV: 'production' },
+      now: () => new Date('2026-07-12T12:00:00.000Z'),
       findGameSession,
     });
 
@@ -585,6 +586,50 @@ describe('Treasure Hunt competition service', () => {
         expect.objectContaining({ kind: 'checkpoint', sequence: 0 }),
         expect.objectContaining({ kind: 'finish', sequence: 1 }),
       ],
+    });
+  });
+
+  it('persists a short eliminated run and allows the wallet to start the next session', async () => {
+    const createId = jest.fn()
+      .mockReturnValueOnce('attempt-short')
+      .mockReturnValueOnce('attempt-next');
+    const harness = createHarness({ createId });
+    const started = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-short',
+    });
+    harness.setNow('2026-07-12T12:00:04.500Z');
+
+    await expect(harness.service.finishAttempt({
+      walletAddress: wallet,
+      attemptId: started.attemptId,
+      receipt: started.receipt,
+      sequence: 0,
+      score: 5,
+      gameTimeMs: 4_500,
+    })).resolves.toMatchObject({
+      accepted: true,
+      status: 'review',
+      score: 5,
+      nextSequence: 2,
+      receipt: null,
+    });
+    expect(harness.repository.attempts.get('attempt-short')).toMatchObject({
+      status: 'review',
+      finishPendingAuthority: false,
+      score: 5,
+      gameTimeMs: 4_500,
+      evidence: [
+        expect.objectContaining({ kind: 'checkpoint', sequence: 0 }),
+        expect.objectContaining({ kind: 'finish', sequence: 1 }),
+      ],
+    });
+
+    await expect(harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-next',
+    })).resolves.toMatchObject({
+      attemptId: 'attempt-next',
+      status: 'active',
+      nextSequence: 0,
     });
   });
 

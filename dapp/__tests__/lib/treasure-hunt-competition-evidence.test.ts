@@ -77,7 +77,7 @@ describe('Treasure Hunt competition evidence validation', () => {
     })).toEqual({ valid: false, reason: 'attempt_expired' });
   });
 
-  it('requires prior checkpoint evidence and ten seconds of game time to finish', () => {
+  it('requires prior checkpoint evidence and accepts a legitimate short finish', () => {
     expect(validateCompetitionEvidence({
       state: { ...state, nextSequence: 0, lastScore: 0, lastGameTimeMs: 0 },
       evidence: { sequence: 0, kind: 'finish', score: 0, gameTimeMs: 10_000 },
@@ -87,9 +87,24 @@ describe('Treasure Hunt competition evidence validation', () => {
 
     expect(validateCompetitionEvidence({
       state,
+      evidence: { sequence: 1, kind: 'finish', score: 125, gameTimeMs: 5_007 },
+      receivedAt: new Date('2026-07-10T00:00:05.007Z'),
+      secret: 'competition-proof-secret',
+    })).toMatchObject({ valid: true });
+
+    expect(validateCompetitionEvidence({
+      state,
       evidence: { sequence: 1, kind: 'finish', score: 250, gameTimeMs: 9_999 },
       receivedAt: new Date('2026-07-10T00:00:10.000Z'),
       secret: 'competition-proof-secret',
+      rules: {
+        maxScorePerSecond: 500,
+        scoreBurstAllowance: 250,
+        serverTimeToleranceMs: 5_000,
+        minimumFinishedGameTimeMs: 10_000,
+        minimumCheckpointIntervalMs: 4_000,
+        maxEvidencePoints: 720,
+      },
     })).toEqual({ valid: false, reason: 'game_too_short' });
   });
 
@@ -116,12 +131,20 @@ describe('Treasure Hunt competition evidence validation', () => {
     })).toEqual({ valid: false, reason: 'score_rate_exceeded' });
   });
 
-  it('requires real server time before accepting a finish', () => {
+  it('can enforce a configured minimum of real server time before accepting a finish', () => {
     expect(validateCompetitionEvidence({
       state,
       evidence: { sequence: 1, kind: 'finish', score: 250, gameTimeMs: 10_000 },
       receivedAt: new Date('2026-07-10T00:00:01.000Z'),
       secret: 'competition-proof-secret',
+      rules: {
+        maxScorePerSecond: 500,
+        scoreBurstAllowance: 250,
+        serverTimeToleranceMs: 5_000,
+        minimumFinishedGameTimeMs: 10_000,
+        minimumCheckpointIntervalMs: 4_000,
+        maxEvidencePoints: 720,
+      },
     })).toEqual({ valid: false, reason: 'server_game_too_short' });
   });
 

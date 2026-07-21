@@ -65,7 +65,12 @@ export const DEFAULT_COMPETITION_EVIDENCE_RULES: CompetitionEvidenceRules = {
   maxScorePerSecond: 500,
   scoreBurstAllowance: 250,
   serverTimeToleranceMs: 5_000,
-  minimumFinishedGameTimeMs: 10_000,
+  // Treasure Hunt can end as soon as the player loses all three lives. A
+  // minimum duration would reject legitimate short runs after their initial
+  // checkpoint had already been persisted, leaving the attempt active and the
+  // wallet unable to start another run. Duration is still bounded against
+  // server time and score growth below.
+  minimumFinishedGameTimeMs: 0,
   minimumCheckpointIntervalMs: 4_000,
   maxEvidencePoints: MAX_COMPETITION_EVIDENCE_POINTS,
 };
