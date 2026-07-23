@@ -1,6 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import TreasureHuntCompetitionsView from '@/components/games/treasure-hunt-competitions-view';
 import TreasureHuntPlaySidebar from '@/components/games/treasure-hunt-play-sidebar';
 import TreasureHuntRankingsView from '@/components/games/treasure-hunt-rankings-view';
 import TreasureHuntRulesView from '@/components/games/treasure-hunt-rules-view';
@@ -22,6 +21,15 @@ jest.mock('lucide-react', () => ({
   Timer: () => null,
   Trophy: () => null,
   UserRound: () => null,
+}));
+
+jest.mock('@/hooks/use-treasure-hunt-prize-pool', () => ({
+  useTreasureHuntPrizePool: () => ({
+    value: 71_484,
+    isLoading: false,
+    error: null,
+    reload: jest.fn(),
+  }),
 }));
 
 jest.mock('@/components/games/treasure-hunt-competition-panel', () => ({
@@ -60,32 +68,25 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 }));
 
 describe('vistas UX de Treasure Hunt', () => {
-  it('separa el torneo activo de tres competiciones inactivas', () => {
-    render(<TreasureHuntCompetitionsView />);
-
-    expect(screen.getAllByText('Torneo de Preventa UKI').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Liga semanal UKI').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Speedrun semanal').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Torneo 1v1').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('No disponible')).toHaveLength(3);
-  });
-
-  it('muestra el ranking propio y mantiene los demás rankings bloqueados', () => {
+  it('muestra una única clasificación con las métricas del torneo', () => {
     render(<TreasureHuntRankingsView />);
 
     expect(screen.getByText('Rankings de Treasure Hunt')).toBeInTheDocument();
-    expect(screen.getByText('TÚ · Sin clasificar')).toBeInTheDocument();
-    expect(screen.getByText('Rankings disponibles')).toBeInTheDocument();
+    expect(screen.getByText('Mis partidas')).toBeInTheDocument();
+    expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
+    expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
   });
 
-  it('presenta las cuatro secciones y el resumen del reglamento aprobado', () => {
+  it('presenta las siete secciones del reglamento aprobado', () => {
     render(<TreasureHuntRulesView />);
 
     expect(screen.getByText('Cómo participar')).toBeInTheDocument();
     expect(screen.getByText('Clasificación')).toBeInTheDocument();
-    expect(screen.getByText('Distribución')).toBeInTheDocument();
-    expect(screen.getByText('Entrega de premios')).toBeInTheDocument();
-    expect(screen.getByText('Resumen del torneo')).toBeInTheDocument();
+    expect(screen.getByText('Pool de Premios')).toBeInTheDocument();
+    expect(screen.getByText('¿Cuánto puedes ganar?')).toBeInTheDocument();
+    expect(screen.getByText('¿Cómo se eligen los ganadores?')).toBeInTheDocument();
+    expect(screen.getByText('Reparto del Pool')).toBeInTheDocument();
+    expect(screen.getByText('Entrega de los Premios')).toBeInTheDocument();
   });
 
   it('hace operativo el CTA principal de la preparación 1P', () => {
@@ -95,5 +96,8 @@ describe('vistas UX de Treasure Hunt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar partida 1P' }));
 
     expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver reglas/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Si clasificas/)).not.toBeInTheDocument();
   });
 });

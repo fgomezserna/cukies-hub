@@ -16,7 +16,7 @@ const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 
 describe('TreasureHuntExperienceShell', () => {
   beforeEach(() => {
-    mockUsePathname.mockReturnValue('/games/treasure-hunt/competitions');
+    mockUsePathname.mockReturnValue('/games/treasure-hunt/rankings');
   });
 
   it('mantiene el hero y las pestañas fuera de un único viewport vertical desplazable', () => {
@@ -31,10 +31,12 @@ describe('TreasureHuntExperienceShell', () => {
 
     expect(shell).toHaveClass('h-full', 'min-h-0', 'overflow-hidden');
     expect(viewport).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
-    expect(screen.getByRole('link', { name: 'Competiciones' })).toHaveAttribute(
+    expect(screen.queryByRole('link', { name: 'Competiciones' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Rankings' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+    expect(screen.getByText('Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.')).toBeInTheDocument();
     expect(screen.getByText('Contenido largo')).toBeInTheDocument();
     expect(screen.getByTestId('treasure-wallet-controls')).toBeInTheDocument();
   });

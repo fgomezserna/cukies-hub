@@ -1,12 +1,5 @@
-import type { Metadata } from 'next';
-
-import TreasureHuntCompetitionsView from '@/components/games/treasure-hunt-competitions-view';
-
-export const metadata: Metadata = {
-  title: 'Competiciones de Treasure Hunt | Cukies World',
-  description: 'Torneos activos e inactivos de Treasure Hunt, con sus reglas y rankings separados.',
-};
+import { redirect } from 'next/navigation';
 
 export default function TreasureHuntCompetitionsPage() {
-  return <TreasureHuntCompetitionsView />;
+  redirect('/games/treasure-hunt/rankings');
 }

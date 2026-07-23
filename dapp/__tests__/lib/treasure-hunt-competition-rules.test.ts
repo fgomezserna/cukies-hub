@@ -2,6 +2,7 @@ import {
   buildCompetitionRanking,
   createCompetitionConfig,
   createCompetitionVestingSchedule,
+  displayCompetitionAlias,
   generateCompetitionAlias,
   normalizeCompetitionAlias,
   parseUkiRaw,
@@ -158,10 +159,20 @@ describe('Treasure Hunt presale competition rules', () => {
     const wallet = '0x1234567890abcdef1234567890abcdef12345678';
     const alias = generateCompetitionAlias(wallet);
 
-    expect(alias).toMatch(/^Hunter-[A-F0-9]{6}$/);
+    expect(alias).toMatch(/^[A-Za-z]+-[A-Z2-7]{8}$/);
+    expect(alias).not.toMatch(/^Hunter-/);
     expect(generateCompetitionAlias(wallet.toUpperCase())).toBe(alias);
     expect(alias.toLowerCase()).not.toContain(wallet.slice(2, 8).toLowerCase());
     expect(alias.toLowerCase()).not.toContain(wallet.slice(-6).toLowerCase());
+  });
+
+  it('upgrades legacy Hunter aliases at the public display boundary', () => {
+    const displayed = displayCompetitionAlias('Hunter-ABC123');
+
+    expect(displayed).toMatch(/^[A-Za-z]+-[A-Z2-7]{8}$/);
+    expect(displayed).not.toMatch(/^Hunter-/);
+    expect(displayCompetitionAlias('TreasureKing')).toBe('TreasureKing');
+    expect(displayCompetitionAlias('Hunter-ABC123')).toBe(displayed);
   });
 
   it('validates aliases with a case-insensitive canonical key', () => {

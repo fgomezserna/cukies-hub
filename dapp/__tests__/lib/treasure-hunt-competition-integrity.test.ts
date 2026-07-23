@@ -88,7 +88,8 @@ describe('Treasure Hunt competition persistence integrity', () => {
       ...input,
       secret: 'different-private-alias-secret-123456789',
     }));
-    expect(first).toMatch(/^Hunter-[A-Z2-7]{13}$/);
+    expect(first).toMatch(/^[A-Za-z]+-[A-Z2-7]{8}$/);
+    expect(first).not.toMatch(/^Hunter-/);
     expect(validateCompetitionAlias(first)).toMatchObject({ valid: true });
     expect(first.toLowerCase()).not.toContain(input.walletAddress.slice(2, 8));
   });

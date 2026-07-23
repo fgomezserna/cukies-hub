@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import GameLayout from '@/components/layout/GameLayout';
 import TreasureHuntCompetitionBanner from '@/components/games/treasure-hunt-competition-banner';
-import TreasureHuntCompetitionPanel from '@/components/games/treasure-hunt-competition-panel';
 import TreasureHuntPlaySidebar from '@/components/games/treasure-hunt-play-sidebar';
 import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 import { useGameData } from '@/hooks/use-game-data';
@@ -436,6 +435,10 @@ export default function TreasureHuntPage() {
         return;
       }
 
+      if (event.data?.type === 'TREASURE_HUNT_CONNECT_WALLET_REQUEST') {
+        window.dispatchEvent(new CustomEvent('cukies:open-wallet-dialog'));
+        return;
+      }
       if (event.data?.type === 'GAME_READY') {
         sendSessionHandshake();
         return;
@@ -853,19 +856,9 @@ export default function TreasureHuntPage() {
       loading={loading}
       iframeRef={iframeRef}
       onGameConnection={handleGameConnection}
-      desktopBanner={(
-        <TreasureHuntCompetitionBanner>
-          <TreasureHuntCompetitionPanel key={competitionPanelRefreshKey} />
-        </TreasureHuntCompetitionBanner>
-      )}
+      desktopBanner={<TreasureHuntCompetitionBanner key={competitionPanelRefreshKey} />}
       desktopSidebar={(
         <TreasureHuntPlaySidebar onStartSinglePlayer={startSinglePlayerFromHub} />
-      )}
-      desktopFooter={(
-        <div className="flex flex-col gap-3 border-t border-white/15 py-4 text-[11px] text-[#9b9e99] sm:flex-row sm:items-center sm:justify-between">
-          <p>ⓘ Las competiciones están sujetas a reglas específicas. Revisa los detalles antes de participar.</p>
-          <p>◷ Las horas se muestran en tu zona horaria local.</p>
-        </div>
       )}
       mobileFocus
     />

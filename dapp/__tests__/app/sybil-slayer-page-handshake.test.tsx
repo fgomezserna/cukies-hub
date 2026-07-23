@@ -68,6 +68,13 @@ jest.mock('@/components/games/treasure-hunt-competition-panel', () => ({
   default: () => <div data-testid="competition-panel" />,
 }));
 
+jest.mock('@/components/games/treasure-hunt-competition-banner', () => ({
+  __esModule: true,
+  default: () => (
+    <div data-testid="competition-banner">Competición oficial · Preventa UKI</div>
+  ),
+}));
+
 import SybilSlayerPage from '@/app/(app)/games/treasure-hunt/page';
 import { useGameData } from '@/hooks/use-game-data';
 import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
@@ -576,6 +583,31 @@ describe('SybilSlayerPage game-session handshake', () => {
     }, GAME_ORIGIN);
   });
 
+  it('opens the shared wallet dialog only when the trusted game iframe requests it', () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, user: null });
+    const openWalletDialog = jest.fn();
+    window.addEventListener('cukies:open-wallet-dialog', openWalletDialog);
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: 'https://evil.example',
+        data: { type: 'TREASURE_HUNT_CONNECT_WALLET_REQUEST' },
+      }));
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'TREASURE_HUNT_CONNECT_WALLET_REQUEST' },
+      }));
+    });
+
+    expect(openWalletDialog).toHaveBeenCalledTimes(1);
+    window.removeEventListener('cukies:open-wallet-dialog', openWalletDialog);
+  });
+
   it('keeps the opaque resume id through real auth hydration from loading to wallet', async () => {
     const sessionId = `game_${'1'.repeat(64)}`;
     sessionStorage.setItem(
@@ -823,7 +855,7 @@ describe('SybilSlayerPage game-session handshake', () => {
     expect(JSON.stringify(sessionStorage)).not.toContain(sessionToken);
   });
 
-  it('remounts the competition panel after a confirmed review result and clears that exact result', async () => {
+  it('keeps the compact tournament banner and clears an exact confirmed review result', async () => {
     const sessionId = `game_${'c'.repeat(64)}`;
     global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({
       success: true,
@@ -838,12 +870,8 @@ describe('SybilSlayerPage game-session handshake', () => {
       .mockImplementation(() => undefined);
     await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(sessionId));
     expect(screen.getByTestId('desktop-banner-slot')).toHaveTextContent(
-      'Competición activa · Torneo de Preventa UKI',
+      'Competición oficial · Preventa UKI',
     );
-    expect(screen.queryByTestId('competition-panel')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Mi participación' }));
-    const panelBefore = screen.getByTestId('competition-panel');
-    expect(screen.getByRole('dialog')).toContainElement(panelBefore);
     const options = mockUsePusherGameConnection.mock.calls.at(-1)?.[2] as {
       onSessionEnd: (result: Record<string, unknown>) => Promise<void>;
     };
@@ -859,7 +887,7 @@ describe('SybilSlayerPage game-session handshake', () => {
       });
     });
 
-    expect(screen.getByTestId('competition-panel')).not.toBe(panelBefore);
+    expect(screen.getByTestId('competition-banner')).toBeInTheDocument();
     expect(postMessage).toHaveBeenCalledWith({
       type: 'GAME_SESSION_CLEAR',
       sessionId,

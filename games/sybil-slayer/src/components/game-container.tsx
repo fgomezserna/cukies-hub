@@ -24,7 +24,7 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
 import OrientationOverlay from './orientation-overlay';
-import { BookOpenIcon, HeartIcon, PlayIcon, ShieldIcon, SwordsIcon, TimerIcon } from './treasure-icons';
+import { BookOpenIcon, HeartIcon, PlayIcon, SwordsIcon, TimerIcon } from './treasure-icons';
 import {
   HeartMeter,
   HudMetric,
@@ -53,7 +53,10 @@ import {
   resolveTreasureHuntMultiplayerEntryState,
   shouldBlockLocalGameControls,
 } from '../lib/multiplayer-feature';
-import { buildTreasureHuntHubEntryUrl } from '../lib/parent-origin';
+import {
+  buildTreasureHuntHubEntryUrl,
+  resolveConfiguredParentOrigin,
+} from '../lib/parent-origin';
 import { randomManager } from '../lib/random';
 import {
   createSinglePlayerResultAuthority,
@@ -789,6 +792,33 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [competitionStartPending, setCompetitionStartPending] = useState(false);
   const [competitionAccess, setCompetitionAccess] = useState<TreasureHuntCompetitionAccess | null>(null);
   const [competitionStartError, setCompetitionStartError] = useState<string | null>(null);
+  const requestHubWalletConnection = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    if (window.parent === window) {
+      if (multiplayerHubEntryUrl) {
+        window.location.assign(multiplayerHubEntryUrl);
+      } else {
+        setCompetitionStartError('Abre Treasure Hunt desde el Hub para conectar tu wallet.');
+      }
+      return;
+    }
+
+    try {
+      const parentOrigin = resolveConfiguredParentOrigin(
+        document.referrer,
+        process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+        process.env.NEXT_PUBLIC_PARENT_URL,
+        process.env.NODE_ENV,
+      );
+      window.parent.postMessage(
+        { type: 'TREASURE_HUNT_CONNECT_WALLET_REQUEST' },
+        parentOrigin,
+      );
+    } catch {
+      setCompetitionStartError('No se pudo abrir la conexión de wallet del Hub.');
+    }
+  }, [multiplayerHubEntryUrl]);
   const [inviteCopied, setInviteCopied] = useState(false);
   const multiplayerStartPendingRef = useRef(false);
   const competitionStartPendingRef = useRef(false);
@@ -1631,10 +1661,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       multiplayerStartPendingRef.current
     ) return;
     if (!singlePlayerEntry.interactive) {
-      setCompetitionStartError(
-        'Conecta y firma una wallet EVM en el Hub para jugar y registrar tu puntuación.',
-      );
-      setModeSelectOpen(true);
+      requestHubWalletConnection();
       return;
     }
     competitionStartPendingRef.current = true;
@@ -1710,6 +1737,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     hasPendingGameEnd,
     multiplayer,
     playSound,
+    requestHubWalletConnection,
     requestCompetitionAccess,
     sessionData?.sessionId,
     singlePlayerEntry.interactive,
@@ -3003,16 +3031,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         return 'La expedición ha terminado.';
     }
   })();
-  const multiplayerMenuEnabled =
-    multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
-  const multiplayerMenuLabel =
-    multiplayerEntryState === 'hub'
-      ? 'Abrir 1v1 en Hub'
-      : multiplayerEntryState === 'connecting'
-        ? 'Conecta wallet para 1v1'
-        : multiplayerEntryState === 'disabled'
-          ? '1v1 no disponible'
-          : 'Jugar 1v1';
+  const multiplayerMenuEnabled = false;
+  const multiplayerMenuLabel = '1v1 no disponible';
   const activeEffectLabel = gameState.scoreMultiplier > 1
     ? `Multiplicador x${gameState.scoreMultiplier}`
     : gameState.activeVaulEffect === 'double_collectibles'
@@ -3094,8 +3114,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </h1>
                   <span className="th-menu-title-rule" aria-hidden="true" />
                   <p className="th-menu-description">
-                    Encuentra tesoros. Completa el tótem.<br />
-                    Escapa antes de que se agote el tiempo.
+                    Consigue la mayor puntuación antes de agotar<br />
+                    el tiempo o perder las 3 vidas.
                   </p>
                   <div className="th-menu-meta" aria-label="Datos de la partida">
                     <span><TimerIcon aria-hidden="true" /> Partidas rápidas</span>
@@ -3106,7 +3126,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     <TreasureButton
                       size="large"
                       className="th-menu-cta"
-                      disabled={competitionStartPending || !singlePlayerEntry.interactive}
+                      disabled={competitionStartPending}
                       aria-busy={competitionStartPending}
                       onClick={() => void handleModeSelected('single')}
                       icon={<PlayIcon strokeWidth={2.5} />}
@@ -3129,18 +3149,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     >
                       {multiplayerMenuLabel}
                     </TreasureButton>
-                    <p className="th-menu-disclaimer">
-                      <ShieldIcon aria-hidden="true" />
-                      {competitionAccess?.eligible
-                        ? `Partida clasificatoria · ${competitionAccess.alias}`
-                        : competitionAccess?.practice
-                          ? 'Modo práctica · esta partida no entra en el ranking'
-                          : !singlePlayerEntry.interactive
-                            ? 'Conecta y firma tu wallet en el Hub para jugar 1P'
-                          : competitionStartError
-                            ? 'Acceso sin confirmar · la partida no se inició'
-                          : '1P: competición de preventa · 1v1: sin ranking ni recompensas'}
-                    </p>
+                    {competitionStartError ? (
+                      <p className="th-menu-disclaimer" role="alert">
+                        {competitionStartError}
+                      </p>
+                    ) : null}
                     <TreasureButton
                       variant="secondary"
                       size="small"
@@ -3148,15 +3161,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onClick={handleOpenInfo}
                       icon={<BookOpenIcon strokeWidth={2.1} />}
                     >
-                      Cómo se juega
-                    </TreasureButton>
-                    <TreasureButton
-                      variant="quiet"
-                      size="small"
-                      className="th-menu-compare-button"
-                      onClick={() => setModeSelectOpen(true)}
-                    >
-                      Comparar modos
+                      Ver reglas
                     </TreasureButton>
                   </div>
                 </section>
@@ -3341,7 +3346,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               setModeSelectOpen(false);
               handleOpenInfo();
             }}
-            multiplayerEntryState={multiplayerEntryState}
+            multiplayerEntryState="disabled"
             singlePlayerEntryState={singlePlayerEntryState}
             competitionNotice={competitionStartError}
           />
@@ -3577,7 +3582,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           setModeSelectOpen(false);
           handleOpenInfo();
         }}
-        multiplayerEntryState={multiplayerEntryState}
+        multiplayerEntryState="disabled"
         singlePlayerEntryState={singlePlayerEntryState}
         competitionNotice={competitionStartError}
       />

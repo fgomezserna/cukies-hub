@@ -277,8 +277,8 @@ export default function GameLayout({
               isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
               !isMobileFocus && hasDesktopBanner
                 ? desktopSidebar
-                  ? 'h-[clamp(30rem,calc(100dvh-23rem),35rem)] w-full flex-none rounded-[8px] border-[#b7832d]/65'
-                  : 'h-[clamp(26rem,calc(100dvh-18rem),41.25rem)] w-full flex-none'
+                  ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65'
+                  : 'aspect-[11/8] w-full flex-none'
                 : 'flex-grow',
               isFallbackFullscreen && 'fixed inset-0 z-[100] h-[100dvh] w-screen rounded-none border-0',
             )}

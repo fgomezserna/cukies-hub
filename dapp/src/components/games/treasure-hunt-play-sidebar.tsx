@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CheckCircle2,
   Gamepad2,
-  Info,
   Medal,
   ShoppingCart,
   Trophy,
@@ -27,7 +26,7 @@ export default function TreasureHuntPlaySidebar({
 
   return (
     <aside className="flex h-full min-h-[30rem] flex-col rounded-[8px] border border-white/20 bg-[#071312]/94 p-5">
-      <h2 className="font-headline text-xl font-black text-[#f2eee7]">Preparar partida</h2>
+      <h2 className="font-headline text-xl font-black text-[#f2eee7]">Torneo Preventa UKI</h2>
 
       <dl className="mt-4 overflow-hidden rounded-[8px] border border-white/20 bg-[#091513]">
         {[
@@ -55,13 +54,8 @@ export default function TreasureHuntPlaySidebar({
       </button>
 
       <Link href="/games/treasure-hunt/rules" className="mt-2 inline-flex min-h-11 items-center justify-center gap-3 text-sm font-semibold text-[#35eee2] hover:text-white">
-        Cómo se juega <ArrowRight className="h-4 w-4" />
+        Ver reglas <ArrowRight className="h-4 w-4" />
       </Link>
-
-      <div className="mt-auto flex gap-3 rounded-[8px] border border-white/15 bg-[#091513] p-4 text-xs leading-5 text-[#b0b1ac]">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#d9ddd8]" />
-        <p>Si clasificas, la partida se asociará al ranking de preventa.</p>
-      </div>
     </aside>
   );
 }

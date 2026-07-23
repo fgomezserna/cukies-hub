@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Bell, Wallet, Settings, LogOut, PanelLeft } from 'lucide-react';
+import { Bell, Wallet, UserRound, LogOut, PanelLeft } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -70,6 +70,12 @@ export default function Header({ variant = 'default' }: HeaderProps) {
     () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
     [connectors, hasMounted],
   );
+
+  useEffect(() => {
+    const openWalletDialog = () => setIsWalletDialogOpen(true);
+    window.addEventListener('cukies:open-wallet-dialog', openWalletDialog);
+    return () => window.removeEventListener('cukies:open-wallet-dialog', openWalletDialog);
+  }, []);
   
   // This would come from user data in a real app
   const userXP = user?.xp ?? 0;
@@ -248,9 +254,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                 <span>Mi wallet</span>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-teal-400/10 transition-colors">
-                <Link href="/settings">
-                  <Settings className="mr-3 h-4 w-4 text-cyan-300" />
-                  <span>Ajustes</span>
+                <Link href="/profile">
+                  <UserRound className="mr-3 h-4 w-4 text-cyan-300" />
+                  <span>Mi perfil</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-teal-400/20" />

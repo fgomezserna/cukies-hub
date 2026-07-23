@@ -12,7 +12,6 @@ const GAME_ROOT = '/games/treasure-hunt';
 
 const tabs = [
   { href: GAME_ROOT, label: 'Jugar' },
-  { href: `${GAME_ROOT}/competitions`, label: 'Competiciones' },
   { href: `${GAME_ROOT}/rankings`, label: 'Rankings' },
   { href: `${GAME_ROOT}/rules`, label: 'Reglas' },
 ] as const;
@@ -82,7 +81,7 @@ export default function TreasureHuntExperienceShell({
                 </span>
               </div>
               <p className="mt-1.5 max-w-[44rem] truncate text-xs text-[#aaa8a2] sm:text-sm">
-                Encuentra tesoros, completa el tótem y compite en distintos desafíos.
+                Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.
               </p>
             </div>
           </div>

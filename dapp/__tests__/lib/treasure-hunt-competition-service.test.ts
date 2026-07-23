@@ -380,7 +380,7 @@ describe('Treasure Hunt competition service', () => {
       gameSessionId: 'game-session-1',
       seed: 'server-seed-1',
       nextSequence: 0,
-      alias: expect.stringMatching(/^Hunter-/),
+      alias: expect.stringMatching(/^[A-Za-z]+[A-Za-z]+-[A-Z2-7]{8}$/),
     });
     expect(replay.attemptId).toBe(first.attemptId);
     expect(harness.repository.attempts.size).toBe(1);

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import TreasureHuntCompetitionBanner from '@/components/games/treasure-hunt-competition-banner';
 
 jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
+  BookOpenText: () => null,
   CalendarDays: () => null,
   Medal: () => null,
   Trophy: () => null,
@@ -29,27 +30,30 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   }),
 }));
 
-describe('TreasureHuntCompetitionBanner', () => {
-  it('mantiene visible el estado esencial y abre la gestión de participación', () => {
-    render(
-      <TreasureHuntCompetitionBanner>
-        <div>Detalle completo de la competición</div>
-      </TreasureHuntCompetitionBanner>,
-    );
+jest.mock('@/hooks/use-treasure-hunt-prize-pool', () => ({
+  useTreasureHuntPrizePool: () => ({
+    value: 71_484,
+    isLoading: false,
+    error: null,
+    reload: jest.fn(),
+  }),
+}));
 
-    expect(screen.getByText('Competición activa · Torneo de Preventa UKI')).toBeInTheDocument();
+describe('TreasureHuntCompetitionBanner', () => {
+  it('mantiene visibles las tres métricas y enlaza a reglas y rankings', () => {
+    render(<TreasureHuntCompetitionBanner />);
+
+    expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
     expect(screen.getByText('1P')).toBeInTheDocument();
     expect(screen.getByText('0/5')).toBeInTheDocument();
-    expect(screen.getByText('25%')).toBeInTheDocument();
+    expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toHaveAttribute(
       'href',
       '/games/treasure-hunt/rules',
     );
-    expect(screen.queryByText('Detalle completo de la competición')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Mi participación' }));
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Detalle completo de la competición')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Rankings/ })).toHaveAttribute(
+      'href',
+      '/games/treasure-hunt/rankings',
+    );
   });
 });

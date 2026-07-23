@@ -99,10 +99,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     );
 
     const viewport = document.querySelector('[data-game-viewport]');
-    expect(viewport).toHaveClass(
-      'h-[clamp(26rem,calc(100dvh-18rem),41.25rem)]',
-      'w-full',
-    );
+    expect(viewport).toHaveClass('aspect-[11/8]', 'w-full', 'flex-none');
     expect(screen.getByText('Banner compacto')).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 import {
   buildCompetitionRanking,
+  displayCompetitionAlias,
   generateCompetitionAlias,
   isCompetitionWalletAddress,
   normalizeCompetitionWallet,
@@ -255,9 +256,10 @@ function receiptFor(attempt: CompetitionAttemptRecord, secret: string) {
 }
 
 function publicParticipant(participant: CompetitionParticipantRecord) {
+  const alias = displayCompetitionAlias(participant.alias);
   return {
-    alias: participant.alias,
-    canonicalAlias: participant.canonicalAlias,
+    alias,
+    canonicalAlias: normalizeCompetitionAlias(alias),
     aliasChangedAt: participant.aliasChangedAt ?? null,
     createdAt: participant.createdAt,
   };
@@ -271,7 +273,7 @@ function publicAttempt(attempt: CompetitionAttemptRecord, secret: string) {
     gameId: attempt.gameId,
     mode: attempt.mode,
     rulesVersion: attempt.rulesVersion,
-    alias: attempt.playerAlias,
+    alias: displayCompetitionAlias(attempt.playerAlias),
     seed: attempt.seed,
     status: attempt.status,
     score: attempt.score,
@@ -1106,7 +1108,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
         rank: attempt.rank,
         walletRank: attempt.walletRank,
         attemptId: attempt.attemptId,
-        alias: attempt.playerAlias,
+        alias: displayCompetitionAlias(attempt.playerAlias),
         score: attempt.score,
         gameTimeMs: attempt.gameTimeMs,
         finishedAt: attempt.finishedAt,

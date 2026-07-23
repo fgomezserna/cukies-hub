@@ -7,7 +7,7 @@ const MOCK_GAME_CONFIGS: Record<string, GameConfig> = {
     id: 'mock-id-1',
     gameId: 'sybil-slayer',
     name: 'Treasure Hunt',
-    description: "Collect as fast as you can and don't get caught!",
+    description: 'Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.',
     emoji: '🎮',
     gameUrl: process.env.GAME_SYBILSLASH || 'http://localhost:9002/',
     port: 9002,
