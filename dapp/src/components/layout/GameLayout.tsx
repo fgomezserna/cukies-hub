@@ -32,6 +32,12 @@ interface LockableScreenOrientation {
   unlock?: () => void;
 }
 
+interface MetaMaskBrowserWindow extends Window {
+  ethereum?: {
+    isMetaMask?: boolean;
+  };
+}
+
 interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
@@ -66,6 +72,15 @@ const renderIcon = (iconName: string, className: string = "h-4 w-4") => {
   return iconMap[iconName] || <Star className={className} />;
 };
 
+function needsCssLandscapeFallback() {
+  const browserWindow = window as MetaMaskBrowserWindow;
+  const isAndroid = /Android/i.test(window.navigator.userAgent);
+  const isMetaMaskBrowser = Boolean(browserWindow.ethereum?.isMetaMask);
+  const isPortraitViewport = window.innerHeight > window.innerWidth;
+
+  return isAndroid && isMetaMaskBrowser && isPortraitViewport;
+}
+
 export default function GameLayout({ 
   gameConfig, 
   gameStats, 
@@ -88,6 +103,7 @@ export default function GameLayout({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
   const [isFallbackFullscreen, setIsFallbackFullscreen] = useState(false);
+  const [isCssRotatedLandscape, setIsCssRotatedLandscape] = useState(false);
   const isFullscreen = isNativeFullscreen || isFallbackFullscreen;
 
   // Call the game connection callback when iframe ref is ready (optional)
@@ -147,6 +163,35 @@ export default function GameLayout({
     };
   }, [isFallbackFullscreen]);
 
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsCssRotatedLandscape(false);
+      return undefined;
+    }
+
+    let syncTimeout: number | undefined;
+    const scheduleOrientationFallbackSync = () => {
+      if (syncTimeout !== undefined) {
+        window.clearTimeout(syncTimeout);
+      }
+      syncTimeout = window.setTimeout(() => {
+        setIsCssRotatedLandscape(needsCssLandscapeFallback());
+      }, 200);
+    };
+
+    scheduleOrientationFallbackSync();
+    window.addEventListener('resize', scheduleOrientationFallbackSync);
+    window.addEventListener('orientationchange', scheduleOrientationFallbackSync);
+
+    return () => {
+      if (syncTimeout !== undefined) {
+        window.clearTimeout(syncTimeout);
+      }
+      window.removeEventListener('resize', scheduleOrientationFallbackSync);
+      window.removeEventListener('orientationchange', scheduleOrientationFallbackSync);
+    };
+  }, [isFullscreen]);
+
   useEffect(() => () => unlockOrientation(), [unlockOrientation]);
 
   const handleFullScreen = useCallback(async () => {
@@ -172,6 +217,7 @@ export default function GameLayout({
       } finally {
         setIsFallbackFullscreen(false);
         setIsNativeFullscreen(false);
+        setIsCssRotatedLandscape(false);
         unlockOrientation();
       }
       return;
@@ -307,6 +353,7 @@ export default function GameLayout({
             ref={gameContainerRef}
             data-game-viewport
             data-game-fullscreen={isFullscreen ? (isNativeFullscreen ? 'native' : 'fallback') : 'off'}
+            data-game-orientation-fallback={isCssRotatedLandscape ? 'css-rotated' : 'off'}
             className={cn(
               'relative flex min-h-0 flex-col overflow-hidden bg-card',
               isMobileFocus
@@ -319,8 +366,17 @@ export default function GameLayout({
                     : 'aspect-[11/8] w-full flex-none'
                   : 'flex-grow'
               ),
-              isFallbackFullscreen && 'fixed inset-0 z-[100] !h-[100dvh] !w-screen !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
+              isFallbackFullscreen && !isCssRotatedLandscape && 'fixed inset-0 z-[100] !h-[100dvh] !w-screen !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
+              isCssRotatedLandscape && 'fixed z-[100] !h-[100vw] !w-[100dvh] !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
             )}
+            style={isCssRotatedLandscape ? {
+              bottom: 'auto',
+              left: '50%',
+              right: 'auto',
+              top: '50%',
+              transform: 'translate(-50%, -50%) rotate(90deg)',
+              transformOrigin: 'center',
+            } : undefined}
           >
             <iframe
               ref={iframeRef}
@@ -331,7 +387,7 @@ export default function GameLayout({
               allowFullScreen
               onLoad={handleIframeLoad}
             />
-            {isMobileFocus ? (
+            {isMobileFocus && !isCssRotatedLandscape ? (
               <div className="absolute inset-0 z-40 hidden flex-col items-center justify-center bg-[#030c0c]/95 px-6 text-center backdrop-blur-sm portrait:flex">
                 <span className="text-4xl text-[#35eee2]" aria-hidden="true">↻</span>
                 <strong className="mt-3 font-headline text-xl text-[#f2eee7]">

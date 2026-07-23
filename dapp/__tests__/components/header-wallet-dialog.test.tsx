@@ -18,6 +18,13 @@ const browserWallet = {
   type: 'injected',
 } as Connector;
 
+const braveWallet = {
+  id: 'com.brave.wallet',
+  name: 'Brave Wallet',
+  type: 'injected',
+  rdns: 'com.brave.wallet',
+} as Connector;
+
 describe('components/layout/HeaderWalletDialog', () => {
   it('keeps long wallet descriptions inside a viewport-sized scroll area', () => {
     render(
@@ -114,5 +121,30 @@ describe('components/layout/HeaderWalletDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /TokenPocket/ }));
     expect(onSelectMobileWallet).toHaveBeenCalledWith('tokenPocket');
+  });
+
+  it('mantiene visibles en móvil Brave y el resto de conectores compatibles', () => {
+    render(
+      <HeaderWalletDialog
+        open
+        onOpenChange={jest.fn()}
+        connectors={[braveWallet, browserWallet]}
+        onSelectMobileWallet={jest.fn()}
+        onSelectConnector={jest.fn()}
+        tronLink={{
+          error: null,
+          isInstalled: false,
+          isLoading: false,
+          onSelect: jest.fn(),
+        }}
+      />,
+    );
+
+    const otherOptions = screen.getByTestId('other-wallet-options');
+
+    expect(otherOptions).toHaveClass('grid');
+    expect(otherOptions).not.toHaveClass('hidden');
+    expect(screen.getByRole('button', { name: /Brave Wallet/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Browser wallet/i })).toBeInTheDocument();
   });
 });

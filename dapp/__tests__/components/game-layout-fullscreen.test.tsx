@@ -68,8 +68,34 @@ const props = {
 };
 
 describe('GameLayout fullscreen and desktop viewport', () => {
+  const originalUserAgent = window.navigator.userAgent;
+  const originalInnerWidth = window.innerWidth;
+  const originalInnerHeight = window.innerHeight;
+  const originalEthereum = (window as Window & {
+    ethereum?: { isMetaMask?: boolean };
+  }).ethereum;
+
   beforeEach(() => {
     mockUseMobileGameShell.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: originalUserAgent,
+    });
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: originalInnerWidth,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: originalInnerHeight,
+    });
+    Object.defineProperty(window, 'ethereum', {
+      configurable: true,
+      value: originalEthereum,
+    });
   });
 
   it('uses a functional app-level fullscreen fallback in mobile wallet browsers', async () => {
@@ -109,6 +135,46 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     expect(
       banner?.compareDocumentPosition(viewport as Node) ?? 0,
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('rota el viewport en MetaMask Android cuando la app nativa permanece en portrait', async () => {
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 MetaMaskMobile',
+    });
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 390,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 844,
+    });
+    Object.defineProperty(window, 'ethereum', {
+      configurable: true,
+      value: { isMetaMask: true },
+    });
+
+    render(<GameLayout {...props} mobileFocus />);
+
+    const viewport = document.querySelector('[data-game-viewport]');
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir pantalla completa' }));
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute('data-game-orientation-fallback', 'css-rotated');
+    });
+    expect(viewport).toHaveClass('!h-[100vw]', '!w-[100dvh]');
+    expect(viewport).toHaveStyle({
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%) rotate(90deg)',
+    });
+    expect(screen.queryByText('Gira el móvil para jugar')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute('data-game-orientation-fallback', 'off');
+    });
   });
 
   it('constrains the desktop game above the fold when the competition banner is present', () => {

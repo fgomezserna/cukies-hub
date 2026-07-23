@@ -162,7 +162,7 @@ export function HeaderWalletDialog({
             ))}
           </div>
 
-          <div className="hidden gap-3 sm:grid">
+          <div data-testid="other-wallet-options" className="grid gap-3">
             <p className="pt-1 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
               Otras opciones
             </p>
