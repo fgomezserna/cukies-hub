@@ -28,9 +28,6 @@ export type SoundType =
   | 'game_start'
   | 'pause'
   | 'resume'
-  // Voice
-  | 'jeff_goit'
-  | 'whale_chad'
   // Music
   | 'background_music'
   | 'background_music_alt'
@@ -71,10 +68,6 @@ const SOUND_CONFIG: Record<SoundType, {
   game_start: { path: '/assets/sounds/ui/button-click-01.mp3', volume: 0.6, category: 'ui' },
   pause: { path: '/assets/sounds/Sonidos/Boton Pause/Pause 1.wav', volume: 0.5, category: 'ui' },
   resume: { path: '/assets/sounds/Sonidos/Boton Pause/Pause 1.wav', volume: 0.5, category: 'ui' },
-  
-  // Voice
-  jeff_goit: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' },
-  whale_chad: { path: '/assets/sounds/effects/voice_trump.mp3', volume: 0.8, category: 'voice' },
   
   // Music
   background_music: { path: '/assets/sounds/Sonidos/Musica/musica1.mp3', volume: 0.2, loop: true, category: 'music' },

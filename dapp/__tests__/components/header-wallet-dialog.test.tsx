@@ -25,6 +25,7 @@ describe('components/layout/HeaderWalletDialog', () => {
         open
         onOpenChange={jest.fn()}
         connectors={[browserWallet]}
+        onSelectMobileWallet={jest.fn()}
         onSelectConnector={jest.fn()}
         tronLink={{
           error: null,
@@ -62,6 +63,7 @@ describe('components/layout/HeaderWalletDialog', () => {
         open
         onOpenChange={jest.fn()}
         connectors={[browserWallet]}
+        onSelectMobileWallet={jest.fn()}
         onSelectConnector={onSelectConnector}
         tronLink={{
           error: null,
@@ -79,5 +81,38 @@ describe('components/layout/HeaderWalletDialog', () => {
     expect(
       screen.getByRole('button', { name: /^TronLink Instala la extensión TronLink$/i }),
     ).toBeDisabled();
+  });
+
+  it('prioriza las cuatro wallets móviles solicitadas y comunica la selección', () => {
+    const onSelectMobileWallet = jest.fn();
+
+    render(
+      <HeaderWalletDialog
+        open
+        onOpenChange={jest.fn()}
+        connectors={[browserWallet]}
+        onSelectMobileWallet={onSelectMobileWallet}
+        onSelectConnector={jest.fn()}
+        tronLink={{
+          error: null,
+          isInstalled: false,
+          isLoading: false,
+          onSelect: jest.fn(),
+        }}
+      />,
+    );
+
+    const mobileOptions = screen.getByTestId('mobile-wallet-options');
+    const buttons = Array.from(mobileOptions.querySelectorAll('button'));
+
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      expect.stringContaining('SafePal'),
+      expect.stringContaining('Trust Wallet'),
+      expect.stringContaining('MetaMask'),
+      expect.stringContaining('TokenPocket'),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: /TokenPocket/ }));
+    expect(onSelectMobileWallet).toHaveBeenCalledWith('tokenPocket');
   });
 });

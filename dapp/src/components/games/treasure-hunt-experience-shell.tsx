@@ -14,6 +14,7 @@ const tabs = [
   { href: GAME_ROOT, label: 'Jugar' },
   { href: `${GAME_ROOT}/rankings`, label: 'Rankings' },
   { href: `${GAME_ROOT}/rules`, label: 'Reglas' },
+  { href: '/profile', label: 'Perfil' },
 ] as const;
 
 function isCurrentTab(pathname: string, href: string) {
@@ -53,15 +54,15 @@ export default function TreasureHuntExperienceShell({
           />
         </div>
 
-        <div className="relative mx-auto w-full max-w-[1340px] px-4 pb-4 pt-4 sm:px-7 lg:px-8 lg:pb-5">
+        <div className="relative w-full px-3 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-4 lg:px-8 lg:pb-5">
           <p className="text-xs font-medium text-[#aaa8a2] sm:text-sm">
             <Link href="/games" className="transition hover:text-[#37eee2]">Juegos</Link>
             <span className="mx-3 text-[#6f7470]">/</span>
             <span className="text-[#37eee2]">Treasure Hunt</span>
           </p>
 
-          <div className="mt-3 flex min-w-0 items-center gap-4 sm:gap-5">
-            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[14px] border border-[#bd8f32]/25 bg-[#10201c] shadow-[inset_0_0_24px_rgba(210,159,55,0.12)] sm:h-[74px] sm:w-[74px]">
+          <div className="mt-2 flex min-w-0 items-center gap-3 pr-12 sm:mt-3 sm:gap-5 sm:pr-0">
+            <div className="relative hidden h-[74px] w-[74px] shrink-0 overflow-hidden rounded-[14px] border border-[#bd8f32]/25 bg-[#10201c] shadow-[inset_0_0_24px_rgba(210,159,55,0.12)] lg:block">
               <Image
                 src="/brand/official/uki-token-cukies-world-coin.png"
                 alt=""
@@ -75,12 +76,12 @@ export default function TreasureHuntExperienceShell({
                 <h1 className="font-headline text-2xl font-black tracking-[-0.03em] text-[#f3efe7] sm:text-3xl lg:text-[2.2rem]">
                   Treasure Hunt
                 </h1>
-                <span className="inline-flex items-center gap-2 rounded-[5px] border border-[#29c894]/30 bg-[#0b1c17] px-2.5 py-1 text-xs font-semibold text-[#61e598]">
+                <span className="hidden items-center gap-2 rounded-[5px] border border-[#29c894]/30 bg-[#0b1c17] px-2.5 py-1 text-xs font-semibold text-[#61e598] lg:inline-flex">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#61e598]" />
                   Disponible
                 </span>
               </div>
-              <p className="mt-1.5 max-w-[44rem] truncate text-xs text-[#aaa8a2] sm:text-sm">
+              <p className="mt-1.5 max-w-[44rem] text-xs leading-5 text-[#aaa8a2] sm:text-sm">
                 Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.
               </p>
             </div>
@@ -95,7 +96,7 @@ export default function TreasureHuntExperienceShell({
           aria-label="Secciones de Treasure Hunt"
           className="border-t border-[#2ce8dc]/16 bg-[#071312]/88"
         >
-          <div className="mx-auto flex min-w-max max-w-[1340px] overflow-x-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-max overflow-x-auto px-1 sm:px-6 lg:px-8">
             {tabs.map(({ href, label }) => {
               const active = isCurrentTab(pathname, href);
               return (
@@ -104,7 +105,7 @@ export default function TreasureHuntExperienceShell({
                   href={href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'relative inline-flex min-h-[46px] min-w-[5.75rem] items-center justify-center border-r border-[#d9e4df]/10 px-3 text-xs font-semibold transition-colors first:border-l sm:min-w-[10rem] sm:px-5 sm:text-sm',
+                    'relative inline-flex min-h-[46px] min-w-[5.25rem] flex-1 items-center justify-center border-r border-[#d9e4df]/10 px-3 text-xs font-semibold transition-colors first:border-l sm:min-w-[10rem] sm:px-5 sm:text-sm',
                     active
                       ? 'text-[#35eee2]'
                       : 'text-[#aaa8a2] hover:text-[#f3efe7]',
@@ -126,7 +127,7 @@ export default function TreasureHuntExperienceShell({
         data-treasure-hunt-content
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
       >
-        <div className="mx-auto min-h-full w-full max-w-[1340px] px-4 py-5 sm:px-7 sm:py-6 lg:px-8">
+        <div className="min-h-full w-full px-2 py-2 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
           {children}
         </div>
       </div>

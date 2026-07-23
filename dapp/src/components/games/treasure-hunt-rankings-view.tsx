@@ -144,7 +144,6 @@ export default function TreasureHuntRankingsView() {
                     <span className="font-mono font-black text-[#ffc240]">#{entry.rank}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-bold text-[#f2eee7]">{entry.alias}</p>
-                      <p className="text-xs text-[#969994]">Partida {entry.walletRank}/{maxAttempts}</p>
                     </div>
                     <p className="font-mono text-lg font-black text-[#35eee2]">{entry.score.toLocaleString('es-ES')}</p>
                   </div>
@@ -157,14 +156,13 @@ export default function TreasureHuntRankingsView() {
             </div>
 
             <div className="hidden overflow-x-auto sm:block">
-              <table className="w-full min-w-[42rem] text-left text-sm">
+              <table className="w-full min-w-[34rem] text-left text-sm">
                 <thead className="bg-black/15 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]">
                   <tr>
                     <th className="px-5 py-3">Pos.</th>
                     <th className="px-5 py-3">Jugador</th>
-                    <th className="px-5 py-3">Partida</th>
+                    <th className="px-5 py-3 text-right">Puntuación</th>
                     <th className="px-5 py-3 text-right">Tiempo</th>
-                    <th className="px-5 py-3 text-right">Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
@@ -174,9 +172,8 @@ export default function TreasureHuntRankingsView() {
                       <td className="px-5 py-4 font-bold text-[#f2eee7]">
                         {entry.alias}{entry.isMe ? <span className="ml-2 text-xs text-[#35eee2]">Tú</span> : null}
                       </td>
-                      <td className="px-5 py-4 font-mono text-[#aaa8a2]">{entry.walletRank}/{maxAttempts}</td>
-                      <td className="px-5 py-4 text-right font-mono text-[#aaa8a2]">{formatTreasureHuntDuration(entry.gameTimeMs)}</td>
                       <td className="px-5 py-4 text-right font-mono font-black text-[#35eee2]">{entry.score.toLocaleString('es-ES')}</td>
+                      <td className="px-5 py-4 text-right font-mono text-[#aaa8a2]">{formatTreasureHuntDuration(entry.gameTimeMs)}</td>
                     </tr>
                   ))}
                 </tbody>

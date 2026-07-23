@@ -8,7 +8,6 @@ jest.mock('@/providers/auth-provider', () => ({
 }));
 
 jest.mock('lucide-react', () => ({
-  ArrowLeft: () => null,
   Maximize: () => null,
   Minimize2: () => null,
   MessageCircle: () => null,
@@ -18,6 +17,7 @@ jest.mock('lucide-react', () => ({
   Star: () => null,
   Medal: () => null,
   Crown: () => null,
+  Wallet: () => null,
 }));
 
 jest.mock('@/hooks/use-mobile-game-shell', () => ({
@@ -76,20 +76,39 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     render(<GameLayout {...props} mobileFocus />);
 
     const viewport = document.querySelector('[data-game-viewport]');
+    const fullscreenButton = screen.getByRole('button', { name: 'Abrir pantalla completa' });
     expect(viewport).toHaveAttribute('data-game-fullscreen', 'off');
-    expect(screen.getByRole('button', { name: 'Abrir pantalla completa' })).toHaveTextContent(
-      'Pantalla completa',
+    expect(fullscreenButton).toHaveTextContent('Pantalla completa');
+    expect(viewport).not.toContainElement(fullscreenButton);
+    expect(fullscreenButton.compareDocumentPosition(viewport as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
     );
+    expect(screen.queryByRole('link', { name: /Volver a juegos/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir pantalla completa' }));
+    fireEvent.click(fullscreenButton);
     await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'fallback'));
-    expect(viewport).toHaveClass('fixed', 'inset-0', 'h-[100dvh]');
+    expect(viewport).toHaveClass('fixed', 'inset-0', '!h-[100dvh]');
     expect(document.body.style.overflow).toBe('hidden');
-    expect(screen.getByText('Gira el móvil para jugar en horizontal')).toBeInTheDocument();
+    expect(screen.getByText('Gira el móvil para jugar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conectar wallet' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
     await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'off'));
     expect(document.body.style.overflow).toBe('');
+  });
+
+  it('mantiene el resumen del torneo sobre el juego en el shell móvil', () => {
+    render(
+      <GameLayout {...props} mobileFocus desktopBanner={<div>Resumen móvil del torneo</div>} />,
+    );
+
+    const banner = document.querySelector('[data-game-mobile-banner]');
+    const viewport = document.querySelector('[data-game-viewport]');
+
+    expect(banner).toHaveTextContent('Resumen móvil del torneo');
+    expect(
+      banner?.compareDocumentPosition(viewport as Node) ?? 0,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('constrains the desktop game above the fold when the competition banner is present', () => {

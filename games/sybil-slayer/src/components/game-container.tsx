@@ -2401,9 +2401,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (lastGlowTimerRef.current === 0 || gameState.token.glowTimer > lastGlowTimerRef.current) {
         console.log("¡Checkpoint recogido!");
         
-        // Reproducir sonidos al recoger checkpoint
+        // El checkpoint conserva únicamente su sonido propio. Las voces de
+        // Sybil Slayer no forman parte de la identidad sonora de Treasure Hunt.
         playSound('checkpoint_collect'); // Sonido "Checkpoint 1"
-        playSound('jeff_goit');
         
         // DESACTIVADO: Animación de jeff_goit
         // setJeffGoitAnimation({
@@ -2429,9 +2429,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (lastBoostTimerRef.current === 0 || gameState.token.boostTimer > lastBoostTimerRef.current) {
         console.log("¡Haku recogido!");
         
-        // Reproducir sonidos
+        // Haku conserva únicamente su efecto propio.
         playSound('mega_node_collect');
-        playSound('whale_chad');
         
         // DESACTIVADO: Animación de whalechadmode
         // setWhaleChadAnimation({
@@ -3032,7 +3031,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
   })();
   const multiplayerMenuEnabled = false;
-  const multiplayerMenuLabel = '1v1 no disponible';
+  const multiplayerMenuLabel = 'JUGAR 1 VS 1';
   const activeEffectLabel = gameState.scoreMultiplier > 1
     ? `Multiplicador x${gameState.scoreMultiplier}`
     : gameState.activeVaulEffect === 'double_collectibles'
@@ -3139,7 +3138,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       variant="secondary"
                       size="large"
                       className={`th-menu-cta${
-                        multiplayerMenuLabel.length > 18 || multiplayerMenuLabel === '1v1 no disponible'
+                        multiplayerMenuLabel.length > 18
                           ? ' th-menu-cta--long'
                           : ''
                       }`}
@@ -3493,9 +3492,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                           return;
                         }
                         playSound('button_click');
-                        stopMusic();
-                        resetGame();
-                        setModeSelectOpen(true);
+                        void startSinglePlayer();
                       }}
                     >
                       {gameEndPersistenceError
@@ -4392,10 +4389,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                             playSound('button_click');
                             if (gameState.status === 'gameOver') {
                               console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
-                              stopMusic();
                             }
-                            resetGame();
-                            setModeSelectOpen(true);
+                            void startSinglePlayer();
                           }}
                           className="focus:outline-none game-button relative"
                           aria-label="Play Again"

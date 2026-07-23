@@ -25,7 +25,12 @@ import { useAuth } from '@/providers/auth-provider';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useAccount, useConnect, useDisconnect, type Connector } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
-import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import {
+  getMobileWalletConnector,
+  getMobileWalletLaunchUrl,
+  getVisibleWalletConnectors,
+  type MobileWalletId,
+} from '@/lib/wallet-connectors';
 import { HeaderWalletDialog } from '@/components/layout/header-wallet-dialog';
 import { cn } from '@/lib/utils';
 
@@ -124,6 +129,27 @@ export default function Header({ variant = 'default' }: HeaderProps) {
     } catch (error) {
       console.error('Failed to connect TronLink:', error);
     }
+  };
+
+  const handleMobileWallet = async (walletId: MobileWalletId) => {
+    const connector = getMobileWalletConnector(evmConnectors, walletId);
+    if (connector) {
+      await handleConnectEVM(connector);
+      return;
+    }
+
+    const launchUrl = getMobileWalletLaunchUrl(walletId, window.location.href);
+    setIsWalletDialogOpen(false);
+
+    if (walletId === 'safepal' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+      } catch {
+        // SafePal still opens its official install page when clipboard access is unavailable.
+      }
+    }
+
+    window.location.assign(launchUrl);
   };
 
   return (
@@ -303,6 +329,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               open={isWalletDialogOpen}
               onOpenChange={setIsWalletDialogOpen}
               connectors={evmConnectors}
+              onSelectMobileWallet={(walletId) => void handleMobileWallet(walletId)}
               onSelectConnector={(connector) => void handleConnectEVM(connector)}
               tronLink={{
                 error: tronError,

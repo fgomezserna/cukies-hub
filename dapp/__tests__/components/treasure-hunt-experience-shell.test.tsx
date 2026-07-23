@@ -36,7 +36,11 @@ describe('TreasureHuntExperienceShell', () => {
       'aria-current',
       'page',
     );
-    expect(screen.getByText('Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/profile');
+    expect(
+      screen.getByText('Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.'),
+    ).not.toHaveClass('truncate');
+    expect(screen.getByText('Disponible')).toHaveClass('hidden');
     expect(screen.getByText('Contenido largo')).toBeInTheDocument();
     expect(screen.getByTestId('treasure-wallet-controls')).toBeInTheDocument();
   });

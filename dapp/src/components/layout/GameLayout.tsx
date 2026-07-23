@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect, ReactNode } from 'react';
-import Link from 'next/link';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown, Wallet } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
@@ -150,7 +149,7 @@ export default function GameLayout({
 
   useEffect(() => () => unlockOrientation(), [unlockOrientation]);
 
-  const handleFullScreen = async () => {
+  const handleFullScreen = useCallback(async () => {
     const element = gameContainerRef.current;
     const fullscreenDocument = document as FullscreenDocument;
     if (!element) return;
@@ -202,7 +201,22 @@ export default function GameLayout({
       setIsFallbackFullscreen(true);
     }
     await requestLandscape();
-  };
+  }, [isFallbackFullscreen, requestLandscape, unlockOrientation]);
+
+  useEffect(() => {
+    const revealWalletDialog = () => {
+      if (isFullscreen) {
+        void handleFullScreen();
+      }
+    };
+
+    window.addEventListener('cukies:open-wallet-dialog', revealWalletDialog);
+    return () => window.removeEventListener('cukies:open-wallet-dialog', revealWalletDialog);
+  }, [handleFullScreen, isFullscreen]);
+
+  const openWalletDialog = useCallback(() => {
+    window.dispatchEvent(new Event('cukies:open-wallet-dialog'));
+  }, []);
 
   const handleIframeLoad = useCallback(
     (event: React.SyntheticEvent<HTMLIFrameElement>) => {
@@ -246,41 +260,66 @@ export default function GameLayout({
     <div
       data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
       className={cn(
-        'grid min-h-0 grid-cols-1',
+        'min-h-0',
         isMobileFocus
-          ? 'gap-0'
+          ? 'flex h-full flex-col gap-2'
           : desktopSidebar
-            ? 'gap-3 lg:grid-cols-[minmax(0,1fr)_24rem]'
-            : 'gap-6 lg:grid-cols-4',
+            ? 'grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_24rem]'
+            : 'grid grid-cols-1 gap-6 lg:grid-cols-4',
         !isMobileFocus && !hasDesktopBanner && 'h-full',
         !isMobileFocus && hasDesktopBanner && 'items-start',
       )}
     >
+        {isMobileFocus && desktopBanner ? (
+          <div data-game-mobile-banner className="shrink-0">
+            {desktopBanner}
+          </div>
+        ) : null}
         
         {/* Left Column: Game */}
         <div
           className={cn(
             'flex min-h-0 flex-col',
             isMobileFocus
-              ? 'h-full gap-0'
+              ? 'flex-1 gap-2'
               : desktopSidebar
                 ? 'gap-3'
                 : 'gap-6 lg:col-span-3',
           )}
         >
+          {isMobileFocus && !isFullscreen ? (
+            <div className="flex shrink-0 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 gap-2 border-[#35eee2]/35 bg-[#071312] px-3 text-xs font-black text-[#f2eee7] hover:bg-[#0b211e]"
+                onClick={() => void handleFullScreen()}
+                aria-label="Abrir pantalla completa"
+              >
+                <Maximize className="h-4 w-4" aria-hidden="true" />
+                Pantalla completa
+              </Button>
+            </div>
+          ) : null}
+
           <div
             ref={gameContainerRef}
             data-game-viewport
             data-game-fullscreen={isFullscreen ? (isNativeFullscreen ? 'native' : 'fallback') : 'off'}
             className={cn(
               'relative flex min-h-0 flex-col overflow-hidden bg-card',
-              isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
-              !isMobileFocus && hasDesktopBanner
-                ? desktopSidebar
-                  ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65'
-                  : 'aspect-[11/8] w-full flex-none'
-                : 'flex-grow',
-              isFallbackFullscreen && 'fixed inset-0 z-[100] h-[100dvh] w-screen rounded-none border-0',
+              isMobileFocus
+                ? 'aspect-[11/8] w-full flex-none rounded-[8px] border border-[#b7832d]/65'
+                : 'rounded-lg border',
+              !isMobileFocus && (
+                hasDesktopBanner
+                  ? desktopSidebar
+                    ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65'
+                    : 'aspect-[11/8] w-full flex-none'
+                  : 'flex-grow'
+              ),
+              isFallbackFullscreen && 'fixed inset-0 z-[100] !h-[100dvh] !w-screen !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
             )}
           >
             <iframe
@@ -292,52 +331,68 @@ export default function GameLayout({
               allowFullScreen
               onLoad={handleIframeLoad}
             />
-            <div
-              className={cn(
-                'absolute z-30 flex items-center gap-2',
-                isMobileFocus ? 'top-0' : 'bottom-0',
-              )}
-              style={{
-                ...(isMobileFocus
-                  ? { top: 'max(0.5rem, env(safe-area-inset-top))' }
-                  : { bottom: 'max(0.5rem, env(safe-area-inset-bottom))' }),
-                left: 'max(0.5rem, env(safe-area-inset-left))',
-              }}
-            >
-              {isMobileFocus && (
+            {isMobileFocus ? (
+              <div className="absolute inset-0 z-40 hidden flex-col items-center justify-center bg-[#030c0c]/95 px-6 text-center backdrop-blur-sm portrait:flex">
+                <span className="text-4xl text-[#35eee2]" aria-hidden="true">↻</span>
+                <strong className="mt-3 font-headline text-xl text-[#f2eee7]">
+                  Gira el móvil para jugar
+                </strong>
+                <span className="mt-2 max-w-xs text-sm leading-5 text-[#aaa8a2]">
+                  Treasure Hunt está optimizado para modo horizontal.
+                </span>
+              </div>
+            ) : null}
+            {!isMobileFocus ? (
+              <div
+                className="absolute bottom-0 left-0 z-30 flex items-center gap-2"
+                style={{
+                  bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+                  left: 'max(0.5rem, env(safe-area-inset-left))',
+                }}
+              >
                 <Button
-                  asChild
                   variant="ghost"
                   size="icon"
-                  className="h-11 w-11 bg-black/35 text-white/80 backdrop-blur-sm hover:bg-black/55 hover:text-white"
+                  className="bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white"
+                  onClick={() => void handleFullScreen()}
+                  aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
+                  title={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
                 >
-                  <Link href="/games" aria-label="Volver a juegos" title="Volver a juegos">
-                    <ArrowLeft className="h-5 w-5" />
-                  </Link>
+                  {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size={isMobileFocus ? 'sm' : 'icon'}
-                className={cn(
-                  'bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white',
-                  isMobileFocus && 'h-11 gap-2 border border-white/15 bg-black/55 px-3 text-xs font-bold text-white',
-                )}
-                onClick={() => void handleFullScreen()}
-                aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
-                title={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
-              >
-                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-                {isMobileFocus ? <span>{isFullscreen ? 'Salir' : 'Pantalla completa'}</span> : null}
-              </Button>
-            </div>
+              </div>
+            ) : null}
             {isMobileFocus && isFullscreen ? (
-              <p
-                role="status"
-                className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-30 hidden -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-200/30 bg-black/70 px-4 py-2 text-xs font-bold text-amber-100 backdrop-blur-md portrait:block"
+              <div
+                className="absolute right-0 top-0 z-50 flex items-center gap-2"
+                style={{
+                  top: 'max(0.5rem, env(safe-area-inset-top))',
+                  right: 'max(0.5rem, env(safe-area-inset-right))',
+                }}
               >
-                Gira el móvil para jugar en horizontal
-              </p>
+                {!user ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={openWalletDialog}
+                    className="h-11 gap-2 border border-[#35eee2]/40 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                  >
+                    <Wallet className="h-4 w-4" aria-hidden="true" />
+                    Conectar wallet
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void handleFullScreen()}
+                  className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                  aria-label="Salir de pantalla completa"
+                >
+                  <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                  Salir
+                </Button>
+              </div>
             ) : null}
           </div>
           

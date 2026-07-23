@@ -5,7 +5,16 @@ import { mainnet, sepolia } from 'wagmi/chains';
 import { defineChain } from 'viem';
 import { coinbaseWallet, injected, metaMask, walletConnect } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { findTronLinkEvmProvider, TRONLINK_EVM_CONNECTOR_ID } from '@/lib/wallet-connectors';
+import {
+  findSafePalEvmProvider,
+  findTokenPocketEvmProvider,
+  findTronLinkEvmProvider,
+  findTrustWalletEvmProvider,
+  SAFEPAL_EVM_CONNECTOR_ID,
+  TOKENPOCKET_EVM_CONNECTOR_ID,
+  TRONLINK_EVM_CONNECTOR_ID,
+  TRUST_WALLET_EVM_CONNECTOR_ID,
+} from '@/lib/wallet-connectors';
 
 const queryClient = new QueryClient();
 const BSC_RPC_URL = 'https://bsc-dataseed1.binance.org';
@@ -53,12 +62,36 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cukies.world';
 const appIconUrl = `${siteUrl.replace(/\/$/, '')}/Cukie_logo_first.png`;
 
 const connectors = [
+  injected({
+    target: {
+      id: SAFEPAL_EVM_CONNECTOR_ID,
+      name: 'SafePal',
+      provider: findSafePalEvmProvider,
+    },
+    unstable_shimAsyncInject: 1_000,
+  }),
+  injected({
+    target: {
+      id: TRUST_WALLET_EVM_CONNECTOR_ID,
+      name: 'Trust Wallet',
+      provider: findTrustWalletEvmProvider,
+    },
+    unstable_shimAsyncInject: 1_000,
+  }),
   metaMask({
     dappMetadata: {
       name: 'Cukies World',
       url: siteUrl,
       iconUrl: appIconUrl,
     },
+  }),
+  injected({
+    target: {
+      id: TOKENPOCKET_EVM_CONNECTOR_ID,
+      name: 'TokenPocket',
+      provider: findTokenPocketEvmProvider,
+    },
+    unstable_shimAsyncInject: 1_000,
   }),
   injected({ unstable_shimAsyncInject: 1_000 }),
   injected({

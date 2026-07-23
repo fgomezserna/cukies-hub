@@ -55,5 +55,16 @@ describe('TreasureHuntCompetitionBanner', () => {
       'href',
       '/games/treasure-hunt/rankings',
     );
+
+    const title = document.querySelector('[data-competition-title]');
+    const metrics = document.querySelector('[data-competition-metrics]');
+    const actions = document.querySelector('[data-competition-actions]');
+    expect(title?.compareDocumentPosition(metrics as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(metrics?.compareDocumentPosition(actions as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(actions).toHaveClass('hidden', 'sm:flex');
   });
 });

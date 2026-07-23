@@ -39,6 +39,7 @@ jest.mock('@/components/games/treasure-hunt-competition-panel', () => ({
 
 jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   formatTreasureHuntCampaignWindow: () => '17 jul 2026 — 24 jul 2026',
+  formatTreasureHuntDuration: (gameTimeMs: number) => `${gameTimeMs / 1_000} s`,
   formatTreasureHuntPercentage: (bps: number) => `${bps / 100}%`,
   TREASURE_HUNT_FALLBACK_RULES: {
     poolBps: 2_500,
@@ -60,7 +61,19 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         vestingMonths: 6,
       },
     },
-    leaderboard: [],
+    leaderboard: [
+      {
+        rank: 1,
+        walletRank: 1,
+        attemptId: 'attempt-1',
+        alias: 'CukiePlayer',
+        score: 12_500,
+        gameTimeMs: 42_000,
+        finishedAt: '2026-07-23T18:00:00.000Z',
+        reviewStatus: 'approved',
+        isMe: true,
+      },
+    ],
     isLoading: false,
     error: null,
     reload: jest.fn(),
@@ -75,6 +88,11 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('Mis partidas')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo']);
+    expect(headers).not.toContain('Partida');
+    expect(headers).not.toContain('Score');
   });
 
   it('presenta las siete secciones del reglamento aprobado', () => {

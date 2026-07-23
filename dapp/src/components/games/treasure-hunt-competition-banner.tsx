@@ -31,8 +31,11 @@ export default function TreasureHuntCompetitionBanner() {
       aria-labelledby="treasure-hunt-competition-banner-title"
       className="overflow-hidden rounded-[8px] border border-white/20 bg-[#071312]/94"
     >
-      <div className="grid gap-4 px-4 py-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(34rem,1.2fr)] lg:items-center lg:px-5">
-        <div className="min-w-0 border-l-2 border-[#35eee2] pl-4">
+      <div className="px-3 py-3 sm:px-4 lg:px-5">
+        <div
+          data-competition-title
+          className="min-w-0 border-l-2 border-[#35eee2] pl-3 sm:pl-4"
+        >
           <p className="font-mono text-[0.66rem] font-black uppercase tracking-[0.2em] text-[#35eee2]">
             Competición oficial · Preventa UKI
           </p>
@@ -44,15 +47,18 @@ export default function TreasureHuntCompetitionBanner() {
           </h2>
         </div>
 
-        <div className="min-w-0">
-          <dl className="grid grid-cols-3 divide-x divide-white/15 rounded-[8px] border border-white/20 bg-[#091513]">
+        <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
+          <dl
+            data-competition-metrics
+            className="grid min-w-0 grid-cols-3 divide-x divide-white/15 rounded-[8px] border border-white/20 bg-[#091513]"
+          >
             {metrics.map(({ label, value }) => (
               <div key={label} className="min-w-0 px-2 py-2 text-center sm:px-3">
-                <dt className="text-[0.58rem] font-bold uppercase tracking-[0.08em] text-[#969994] sm:text-[0.62rem]">
+                <dt className="text-[0.52rem] font-bold uppercase tracking-[0.05em] text-[#969994] sm:text-[0.62rem] sm:tracking-[0.08em]">
                   {label}
                 </dt>
                 <dd
-                  className="mt-0.5 truncate font-mono text-sm font-black text-[#35eee2] sm:text-base"
+                  className="mt-0.5 truncate font-mono text-[0.7rem] font-black text-[#35eee2] min-[390px]:text-xs sm:text-base"
                   title={value}
                 >
                   {value}
@@ -61,7 +67,10 @@ export default function TreasureHuntCompetitionBanner() {
             ))}
           </dl>
 
-          <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+          <div
+            data-competition-actions
+            className="hidden items-stretch justify-end gap-2 sm:flex"
+          >
             <Link
               href="/games/treasure-hunt/rules"
               className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-white/20 px-3 py-2 text-xs font-black text-[#f2eee7] transition hover:border-[#35eee2]/55"

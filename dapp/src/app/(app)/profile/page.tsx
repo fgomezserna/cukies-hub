@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import ProfileBackButton from '@/components/profile/profile-back-button';
 import TreasureHuntProfile from '@/components/profile/treasure-hunt-profile';
 
 export const metadata: Metadata = {
@@ -11,7 +12,8 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 pb-10">
       <div className="max-w-3xl">
-        <p className="font-mono text-[0.68rem] font-black uppercase tracking-[0.2em] text-emerald-300">
+        <ProfileBackButton />
+        <p className="mt-4 font-mono text-[0.68rem] font-black uppercase tracking-[0.2em] text-emerald-300">
           Cuenta
         </p>
         <h1 className="mt-2 font-headline text-3xl font-black tracking-tight text-white sm:text-4xl">
