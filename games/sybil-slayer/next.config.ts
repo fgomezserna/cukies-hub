@@ -4,6 +4,12 @@ import { buildFrameAncestorsPolicy } from './src/lib/parent-origin';
 const nextConfig: NextConfig = {
 
   /* config options here */
+  env: {
+    NEXT_PUBLIC_GAME_CACHE_VERSION:
+      process.env.NEXT_PUBLIC_GAME_CACHE_VERSION ??
+      process.env.SOURCE_COMMIT ??
+      'dev',
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -8,18 +8,32 @@ import InstallPrompt from './install-prompt';
  */
 export default function PWASetup() {
   useEffect(() => {
+    let removePendingRegistration: (() => void) | undefined;
+
     // Registrar Service Worker
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('/sw.js')
+      const cacheVersion = encodeURIComponent(
+        process.env.NEXT_PUBLIC_GAME_CACHE_VERSION ?? 'dev',
+      );
+      const registerServiceWorker = () => {
+        void navigator.serviceWorker
+          .register(`/sw.js?v=${cacheVersion}`)
           .then((registration) => {
             console.log('Service Worker registrado:', registration.scope);
           })
           .catch((error) => {
             console.log('Error al registrar Service Worker:', error);
           });
-      });
+      };
+
+      if (document.readyState === 'complete') {
+        registerServiceWorker();
+      } else {
+        window.addEventListener('load', registerServiceWorker, { once: true });
+        removePendingRegistration = () => {
+          window.removeEventListener('load', registerServiceWorker);
+        };
+      }
     }
 
     // Intentar forzar orientación landscape si está disponible
@@ -42,8 +56,9 @@ export default function PWASetup() {
         lockOrientation();
       }
     }
+
+    return removePendingRegistration;
   }, []);
 
   return <InstallPrompt />;
 }
-

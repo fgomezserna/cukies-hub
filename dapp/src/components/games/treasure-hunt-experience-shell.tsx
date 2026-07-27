@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -9,6 +10,11 @@ import Header from '@/components/layout/header';
 import { cn } from '@/lib/utils';
 
 const GAME_ROOT = '/games/treasure-hunt';
+
+const PersistentTreasureHuntGame = dynamic(
+  () => import('@/components/games/treasure-hunt-game-view'),
+  { ssr: false },
+);
 
 const tabs = [
   { href: GAME_ROOT, label: 'Jugar' },
@@ -26,6 +32,9 @@ export default function TreasureHuntExperienceShell({
 }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const contentViewportRef = useRef<HTMLDivElement>(null);
+  const persistentGameRef = useRef<HTMLDivElement>(null);
+  const isGameViewActive = pathname === GAME_ROOT;
+  const [hasMountedGame, setHasMountedGame] = useState(isGameViewActive);
 
   useEffect(() => {
     const viewport = contentViewportRef.current;
@@ -36,6 +45,36 @@ export default function TreasureHuntExperienceShell({
       viewport.scrollLeft = 0;
     }
   }, [pathname]);
+
+  useEffect(() => {
+    if (isGameViewActive) setHasMountedGame(true);
+  }, [isGameViewActive]);
+
+  useEffect(() => {
+    if (!hasMountedGame) return undefined;
+
+    const frame = persistentGameRef.current?.querySelector('iframe');
+    if (!frame) return undefined;
+
+    const notifyVisibility = () => {
+      try {
+        const targetOrigin = new URL(frame.src, window.location.href).origin;
+        frame.contentWindow?.postMessage(
+          {
+            type: 'TREASURE_HUNT_VIEW_VISIBILITY',
+            visible: isGameViewActive,
+          },
+          targetOrigin,
+        );
+      } catch {
+        // The iframe load event retries once the configured game URL is available.
+      }
+    };
+
+    notifyVisibility();
+    frame.addEventListener('load', notifyVisibility);
+    return () => frame.removeEventListener('load', notifyVisibility);
+  }, [hasMountedGame, isGameViewActive]);
 
   return (
     <section
@@ -128,7 +167,18 @@ export default function TreasureHuntExperienceShell({
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
       >
         <div className="h-full min-h-full w-full px-2 py-2 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
-          {children}
+          {hasMountedGame ? (
+            <div
+              ref={persistentGameRef}
+              data-treasure-hunt-persistent-game
+              hidden={!isGameViewActive}
+              aria-hidden={!isGameViewActive}
+              className="h-full min-h-full w-full"
+            >
+              <PersistentTreasureHuntGame />
+            </div>
+          ) : null}
+          {!isGameViewActive ? children : null}
         </div>
       </div>
     </section>

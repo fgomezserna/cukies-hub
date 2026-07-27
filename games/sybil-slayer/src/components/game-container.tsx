@@ -807,6 +807,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
+  const [isHubViewVisible, setIsHubViewVisible] = useState(true);
   const [multiplayerJoinFailure, setMultiplayerJoinFailure] = useState<{
     roomCode: string;
     message: string;
@@ -2121,6 +2122,24 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     };
   }, [localControlsLocked, gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
 
+  useEffect(() => {
+    if (isHubViewVisible || localControlsLocked || gameState.status !== 'playing') {
+      return;
+    }
+
+    console.log('🧭 Vista del juego oculta en el Hub - Pausando partida');
+    playSound('pause');
+    stopMusic();
+    togglePause();
+  }, [
+    gameState.status,
+    isHubViewVisible,
+    localControlsLocked,
+    playSound,
+    stopMusic,
+    togglePause,
+  ]);
+
 
  // Game loop integration using the custom hook
   useGameLoop((deltaTime, isPaused) => {
@@ -2262,8 +2281,23 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       return undefined;
     }
 
-    const handleParentModeRequest = (event: MessageEvent) => {
+    const handleParentRequest = (event: MessageEvent) => {
       if (event.source !== window.parent || event.origin !== parentOrigin) return;
+
+      if (
+        event.data?.type === 'TREASURE_HUNT_VIEW_VISIBILITY' &&
+        typeof event.data?.visible === 'boolean'
+      ) {
+        const visible = event.data.visible;
+        setIsHubViewVisible(visible);
+        if (!visible) {
+          stopMusic();
+        } else if (gameState.status === 'idle') {
+          playMusic('background_music');
+        }
+        return;
+      }
+
       if (
         event.data?.type !== 'TREASURE_HUNT_START_MODE' ||
         event.data?.mode !== 'single'
@@ -2273,9 +2307,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       void handleModeSelected('single');
     };
 
-    window.addEventListener('message', handleParentModeRequest);
-    return () => window.removeEventListener('message', handleParentModeRequest);
-  }, [handleModeSelected]);
+    window.addEventListener('message', handleParentRequest);
+    return () => window.removeEventListener('message', handleParentRequest);
+  }, [gameState.status, handleModeSelected, playMusic, stopMusic]);
 
   // La invitación llega únicamente por el handshake autenticado del padre.
   useEffect(() => {
@@ -2608,6 +2642,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Manejar música de fondo según el estado del juego
   useEffect(() => {
+    if (!isHubViewVisible) {
+      stopMusic();
+      return;
+    }
+
     if (gameState.status === 'gameOver' && (!isMultiplayerMode || Boolean(matchResult))) {
       // Reproducir sonido de game over independientemente del control de música
       console.log('💀 Game Over - Reproduciendo sonido de game over');
@@ -2618,7 +2657,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       playMusic('background_music');
     }
     // En estado 'idle' o 'paused' no cambiar la música
-  }, [gameState.status, isMultiplayerMode, matchResult, playGameOverSound]); // CORREGIDO: Removido playMusic, stopMusic, y gameState.score
+  }, [
+    gameState.status,
+    isHubViewVisible,
+    isMultiplayerMode,
+    matchResult,
+    playGameOverSound,
+    playMusic,
+    stopMusic,
+  ]);
 
   // Iniciar música de fondo automáticamente al cargar el componente
   useEffect(() => {

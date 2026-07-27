@@ -10,7 +10,15 @@ const audioSource = readFileSync(
   'utf8',
 );
 const treasureHuntPageSource = readFileSync(
-  resolve(process.cwd(), 'src/app/(app)/games/treasure-hunt/page.tsx'),
+  resolve(process.cwd(), 'src/components/games/treasure-hunt-game-view.tsx'),
+  'utf8',
+);
+const serviceWorkerSource = readFileSync(
+  resolve(process.cwd(), '../games/sybil-slayer/public/sw.js'),
+  'utf8',
+);
+const pwaSetupSource = readFileSync(
+  resolve(process.cwd(), '../games/sybil-slayer/src/components/pwa-setup.tsx'),
   'utf8',
 );
 const treasureHuntProfilePageSource = readFileSync(
@@ -68,6 +76,32 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     expect(treasureHuntPageSource).toContain(
       "window.location.assign('/games/treasure-hunt')",
     );
+  });
+
+  it('pausa el juego cuando su vista persistente queda oculta', () => {
+    expect(gameContainerSource).toContain(
+      "event.data?.type === 'TREASURE_HUNT_VIEW_VISIBILITY'",
+    );
+    expect(gameContainerSource).toContain(
+      "Vista del juego oculta en el Hub - Pausando partida",
+    );
+    expect(gameContainerSource).toMatch(
+      /isHubViewVisible \|\| localControlsLocked \|\| gameState\.status !== 'playing'[\s\S]{0,500}togglePause\(\)/,
+    );
+  });
+
+  it('usa caché estática versionada y stale-while-revalidate', () => {
+    expect(pwaSetupSource).toContain('NEXT_PUBLIC_GAME_CACHE_VERSION');
+    expect(pwaSetupSource).toContain('`/sw.js?v=${cacheVersion}`');
+    expect(serviceWorkerSource).toContain(
+      "new URL(self.location.href).searchParams.get('v')",
+    );
+    expect(serviceWorkerSource).toContain('staleWhileRevalidate');
+    expect(serviceWorkerSource).toContain("requestUrl.pathname.startsWith('/assets/')");
+    expect(serviceWorkerSource).toContain(
+      "requestUrl.pathname.startsWith('/_next/static/')",
+    );
+    expect(serviceWorkerSource).not.toContain('cache.put(event.request, responseToCache)');
   });
 
   it('redirige Mi perfil al perfil propio de Treasure Hunt y simplifica su cabecera', () => {

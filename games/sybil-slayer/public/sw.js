@@ -1,18 +1,17 @@
-// Service Worker básico para PWA
-const CACHE_NAME = 'sybil-slayer-v1';
-const urlsToCache = [
+const CACHE_PREFIX = 'treasure-hunt-static';
+const CACHE_VERSION =
+  new URL(self.location.href).searchParams.get('v') || 'dev';
+const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
+const URLS_TO_CACHE = [
   '/',
   '/icon.png',
   '/manifest.json'
 ];
 
-// Instalación del Service Worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
+      .then((cache) => cache.addAll(URLS_TO_CACHE))
       .catch((error) => {
         console.log('Service Worker install error:', error);
       })
@@ -20,40 +19,81 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activación del Service Worker
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
+          return Promise.resolve(false);
         })
       );
     })
   );
-  return self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
-// Estrategia: Network First, fallback a Cache
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Si la respuesta es válida, clonarla y guardarla en cache
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Si falla la red, intentar obtener del cache
-        return caches.match(event.request);
-      })
+function isStaticAsset(requestUrl) {
+  return (
+    requestUrl.origin === self.location.origin &&
+    (
+      requestUrl.pathname.startsWith('/assets/') ||
+      requestUrl.pathname.startsWith('/_next/static/')
+    )
   );
-});
+}
 
+async function staleWhileRevalidate(event) {
+  const cache = await caches.open(CACHE_NAME);
+  const cachedResponse = await cache.match(event.request);
+  const networkResponse = fetch(
+    event.request,
+    cachedResponse ? undefined : { cache: 'reload' },
+  )
+    .then(async (response) => {
+      if (response.ok && response.type === 'basic') {
+        await cache.put(event.request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => undefined);
+
+  if (cachedResponse) {
+    event.waitUntil(networkResponse);
+    return cachedResponse;
+  }
+
+  return (await networkResponse) || Response.error();
+}
+
+async function networkFirstNavigation(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put('/', response.clone());
+    }
+    return response;
+  } catch {
+    return (await caches.match('/')) || Response.error();
+  }
+}
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  const requestUrl = new URL(event.request.url);
+  if (isStaticAsset(requestUrl)) {
+    event.respondWith(staleWhileRevalidate(event));
+    return;
+  }
+
+  if (
+    requestUrl.origin === self.location.origin &&
+    event.request.mode === 'navigate'
+  ) {
+    event.respondWith(networkFirstNavigation(event.request));
+  }
+});

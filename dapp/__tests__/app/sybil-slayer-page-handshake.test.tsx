@@ -75,7 +75,7 @@ jest.mock('@/components/games/treasure-hunt-competition-banner', () => ({
   ),
 }));
 
-import SybilSlayerPage from '@/app/(app)/games/treasure-hunt/page';
+import SybilSlayerPage from '@/components/games/treasure-hunt-game-view';
 import { useGameData } from '@/hooks/use-game-data';
 import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
 import { useTreasureHuntMultiplayerBridge } from '@/hooks/use-treasure-hunt-multiplayer-bridge';
