@@ -82,7 +82,7 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 
 describe('vistas UX de Treasure Hunt', () => {
   it('muestra una única clasificación con las métricas del torneo', () => {
-    render(<TreasureHuntRankingsView />);
+    const { container } = render(<TreasureHuntRankingsView />);
 
     expect(screen.getByText('Rankings de Treasure Hunt')).toBeInTheDocument();
     expect(screen.getByText('Mis partidas')).toBeInTheDocument();
@@ -93,10 +93,11 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo']);
     expect(headers).not.toContain('Partida');
     expect(headers).not.toContain('Score');
+    expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
   });
 
   it('presenta las siete secciones del reglamento aprobado', () => {
-    render(<TreasureHuntRulesView />);
+    const { container } = render(<TreasureHuntRulesView />);
 
     expect(screen.getByText('Cómo participar')).toBeInTheDocument();
     expect(screen.getByText('Clasificación')).toBeInTheDocument();
@@ -105,6 +106,7 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('¿Cómo se eligen los ganadores?')).toBeInTheDocument();
     expect(screen.getByText('Reparto del Pool')).toBeInTheDocument();
     expect(screen.getByText('Entrega de los Premios')).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
   });
 
   it('hace operativo el CTA principal de la preparación 1P', () => {

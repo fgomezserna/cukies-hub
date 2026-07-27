@@ -22,6 +22,9 @@ export default function TreasureHuntRankingsView() {
   const maxAttempts = campaign?.maxWinningAttemptsPerWallet ?? 5;
   const myAttempts = leaderboard.filter((entry) => entry.isMe).length;
   const prizePool = useTreasureHuntPrizePool(campaign?.poolBps ?? 2_500);
+  const prizePoolValue = prizePool.value === null
+    ? 'Actualizando…'
+    : formatTreasureHuntPrizePoolUki(prizePool.value);
   const visibleEntries = useMemo(
     () => (filter === 'mine' ? leaderboard.filter((entry) => entry.isMe) : leaderboard),
     [filter, leaderboard],
@@ -36,12 +39,12 @@ export default function TreasureHuntRankingsView() {
     ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
     [
       'Premio acumulado',
-      prizePool.isLoading ? '···' : formatTreasureHuntPrizePoolUki(prizePool.value),
+      prizePool.isLoading && prizePool.value === null ? '···' : prizePoolValue,
     ],
   ] as const;
 
   return (
-    <div className="min-h-full pb-8">
+    <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
       <div className="mb-4">
         <h2 className="font-headline text-2xl font-black tracking-[-0.025em] text-[#f2eee7]">
           Rankings de Treasure Hunt

@@ -14,7 +14,7 @@ const tabs = [
   { href: GAME_ROOT, label: 'Jugar' },
   { href: `${GAME_ROOT}/rankings`, label: 'Rankings' },
   { href: `${GAME_ROOT}/rules`, label: 'Reglas' },
-  { href: '/profile', label: 'Perfil' },
+  { href: `${GAME_ROOT}/profile`, label: 'Perfil' },
 ] as const;
 
 function isCurrentTab(pathname: string, href: string) {
@@ -127,7 +127,7 @@ export default function TreasureHuntExperienceShell({
         data-treasure-hunt-content
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
       >
-        <div className="min-h-full w-full px-2 py-2 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+        <div className="h-full min-h-full w-full px-2 py-2 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
           {children}
         </div>
       </div>

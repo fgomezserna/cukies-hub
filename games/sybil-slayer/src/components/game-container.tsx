@@ -21,9 +21,7 @@ import useMultiplayerMatch, {
   shouldResetLocalGameForAuthorityChange,
 } from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
-import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
-import OrientationOverlay from './orientation-overlay';
 import { BookOpenIcon, HeartIcon, PlayIcon, SwordsIcon, TimerIcon } from './treasure-icons';
 import {
   HeartMeter,
@@ -36,7 +34,7 @@ import {
   TreasureStage,
   TreasureTopBar,
 } from './treasure-hunt-ui';
-import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
+import { FPS, MOBILE_FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
 import { performanceMonitor } from '../lib/performanceMonitor';
 import {
@@ -822,6 +820,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [inviteCopied, setInviteCopied] = useState(false);
   const multiplayerStartPendingRef = useRef(false);
   const competitionStartPendingRef = useRef(false);
+  const competitionSessionRecoveryRef = useRef<string | null>(null);
   const singlePlayerRunSequenceRef = useRef(0);
   const activeSinglePlayerResultAuthorityRef = useRef<SinglePlayerResultAuthority | null>(null);
   const dispatchedSinglePlayerRunIdRef = useRef<number | null>(null);
@@ -1019,10 +1018,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     subscribeToDirection,
   } = useGameInput();
   const isMobile = useIsMobile();
-  const isPortrait = useOrientation();
-  
-  // Ref para rastrear si pausamos automáticamente por orientación
-  const pausedByOrientationRef = useRef<boolean>(false);
   
   // Debug: Log mobile detection
   useEffect(() => {
@@ -1161,35 +1156,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     sessionData?.userId,
   ]);
 
-  // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
-  useEffect(() => {
-    if (localControlsLocked) return;
-    // Solo aplicar en móviles
-    if (!isMobile) return;
-
-    // Si está en portrait y el juego está jugando, pausar automáticamente
-    if (isPortrait && gameState.status === 'playing') {
-      console.log('[GameContainer] Dispositivo en vertical, pausando juego automáticamente');
-      pausedByOrientationRef.current = true;
-      togglePause();
-    }
-    
-    // Cuando vuelve a landscape, NO reanudar automáticamente
-    // El usuario debe presionar Play manualmente
-    if (!isPortrait && pausedByOrientationRef.current && gameState.status === 'paused') {
-      // Resetear el flag cuando vuelve a landscape
-      // El juego permanecerá pausado hasta que el usuario presione Play
-      pausedByOrientationRef.current = false;
-    }
-  }, [localControlsLocked, isPortrait, gameState.status, isMobile, togglePause]);
-
-  // Resetear el flag cuando el usuario presiona Play manualmente
-  useEffect(() => {
-    if (gameState.status === 'playing' && pausedByOrientationRef.current) {
-      // El usuario presionó Play, resetear el flag
-      pausedByOrientationRef.current = false;
-    }
-  }, [gameState.status]);
   const localScore = Math.floor(
     isMultiplayerMode ? (multiplayer.localPlayer?.score ?? gameState.score) : gameState.score,
   );
@@ -1684,6 +1650,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       setCompetitionAccess(access);
       if (!access.eligible && !access.practice) {
         randomManager.clear();
+        if (access.reason === 'GAME_SESSION_RESTART_REQUIRED') {
+          competitionSessionRecoveryRef.current =
+            access.sessionId ?? sessionData?.sessionId ?? 'pending-session';
+          setModeSelectOpen(false);
+          return;
+        }
+        competitionSessionRecoveryRef.current = null;
         const accessErrorCopy: Record<string, string> = {
           SIGNED_WALLET_REQUIRED:
             'Conecta y firma una wallet EVM en el Hub para jugar y registrar tu puntuación.',
@@ -1693,8 +1666,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             'El Hub todavía está preparando tu sesión segura. Espera unos segundos y vuelve a intentarlo.',
           SECURE_PARENT_UNAVAILABLE:
             'No se pudo verificar el Hub de origen. Abre Treasure Hunt desde el Hub oficial y vuelve a intentarlo.',
-          GAME_SESSION_RESTART_REQUIRED:
-            'La sesión anterior caducó y se está renovando. Espera unos segundos y vuelve a intentarlo.',
           SESSION_CHANGED:
             'La sesión cambió mientras confirmábamos el acceso. La partida no se inició; vuelve a intentarlo.',
         };
@@ -1703,6 +1674,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         setModeSelectOpen(true);
         return;
       }
+      competitionSessionRecoveryRef.current = null;
       if (access.eligible && access.seed) {
         randomManager.setSeed(access.seed);
       } else {
@@ -1744,6 +1716,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     startGame,
     stopMusic,
   ]);
+
+  useEffect(() => {
+    const staleSessionId = competitionSessionRecoveryRef.current;
+    const refreshedSessionId = sessionData?.sessionId;
+    if (
+      !staleSessionId ||
+      !refreshedSessionId ||
+      refreshedSessionId === staleSessionId
+    ) {
+      return undefined;
+    }
+
+    competitionSessionRecoveryRef.current = null;
+    const retry = window.setTimeout(() => void startSinglePlayer(), 0);
+    return () => window.clearTimeout(retry);
+  }, [sessionData?.sessionId, startSinglePlayer]);
   
   // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
   // useEffect(() => {
@@ -2112,7 +2100,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     // Pass deltaTime to the updateGame function provided by useGameState
     // El deltaTime será 0 si está pausado, pausando efectivamente todas las actualizaciones
     updateGame(deltaTime);
-  }, FPS, gameState.status === 'paused'); // Target FPS, pasar estado de pausa
+  }, isMobile ? MOBILE_FPS : FPS, gameState.status === 'paused');
 
 
   // UI Button Handlers
@@ -2125,11 +2113,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
 
     if (gameState.status === 'paused') {
-      // No permitir reanudar si el dispositivo está en portrait
-      if (isMobile && isPortrait) {
-        console.log('[GameContainer] No se puede reanudar el juego en modo vertical');
-        return;
-      }
       playSound('resume');
       togglePause();
       return;
@@ -3050,7 +3033,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     showWaitingOverlay ||
     showCountdownOverlay ||
     showReconnectOverlay ||
-    (isMobile && isPortrait) ||
     gameState.status === 'countdown' ||
     gameState.status === 'paused' ||
     gameState.status === 'gameOver'
@@ -3087,7 +3069,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             modeSelectOpen,
             isInfoModalOpen,
             isLevelStatsVisible,
-            isMobile && isPortrait,
             terminalResultKey,
           ].join(':')}
           rootRef={runtimeRootRef}
@@ -3160,7 +3141,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onClick={handleOpenInfo}
                       icon={<BookOpenIcon strokeWidth={2.1} />}
                     >
-                      Ver reglas
+                      CÓMO JUGAR
                     </TreasureButton>
                   </div>
                 </section>
@@ -3563,7 +3544,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {shouldRenderTouchControls ? (
           <TouchZones onDirectionChange={setTouchDirection} onDirectionClear={clearTouchDirection} />
         ) : null}
-        {!localControlsLocked ? <OrientationOverlay /> : null}
       </div>
     );
   }
@@ -4660,8 +4640,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         </>
       )}
 
-      {/* Orientation overlay - muestra mensaje cuando el dispositivo está en vertical */}
-      <OrientationOverlay />
     </div>
   );
 };

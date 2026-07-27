@@ -45,6 +45,7 @@ describe('TreasureHuntCompetitionBanner', () => {
 
     expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
     expect(screen.getByText('1P')).toBeInTheDocument();
+    expect(screen.getByText('Modo activo').parentElement).toHaveClass('hidden', 'sm:block');
     expect(screen.getByText('0/5')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toHaveAttribute(
@@ -66,5 +67,6 @@ describe('TreasureHuntCompetitionBanner', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(actions).toHaveClass('hidden', 'sm:flex');
+    expect(metrics).toHaveClass('grid-cols-2', 'sm:grid-cols-3');
   });
 });

@@ -36,7 +36,10 @@ describe('TreasureHuntExperienceShell', () => {
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/profile');
+    expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute(
+      'href',
+      '/games/treasure-hunt/profile',
+    );
     expect(
       screen.getByText('Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.'),
     ).not.toHaveClass('truncate');

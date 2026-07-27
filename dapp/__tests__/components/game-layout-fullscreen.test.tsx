@@ -115,8 +115,9 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'fallback'));
     expect(viewport).toHaveClass('fixed', 'inset-0', '!h-[100dvh]');
     expect(document.body.style.overflow).toBe('hidden');
-    expect(screen.getByText('Gira el móvil para jugar')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Conectar wallet' })).toBeInTheDocument();
+    expect(screen.queryByText('Gira el móvil para jugar')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Conectar wallet' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salir de pantalla completa' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
     await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'off'));
@@ -177,14 +178,37 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     });
   });
 
+  it('reduce el horizontal sin fullscreen a una única puerta de entrada', () => {
+    render(<GameLayout {...props} mobileFocus />);
+
+    const gate = document.querySelector('[data-game-landscape-gate]');
+    expect(gate).toHaveClass('hidden', 'landscape:flex');
+    expect(
+      screen.getByRole('button', { name: 'Activar pantalla completa en horizontal' }),
+    ).toBeInTheDocument();
+  });
+
   it('constrains the desktop game above the fold when the competition banner is present', () => {
     mockUseMobileGameShell.mockReturnValue(false);
     render(
-      <GameLayout {...props} mobileFocus desktopBanner={<div>Banner compacto</div>} />,
+      <GameLayout
+        {...props}
+        mobileFocus
+        desktopBanner={<div>Banner compacto</div>}
+        desktopSidebar={<div>Preparación 1P</div>}
+      />,
     );
 
     const viewport = document.querySelector('[data-game-viewport]');
-    expect(viewport).toHaveClass('aspect-[11/8]', 'w-full', 'flex-none');
+    expect(viewport).toHaveClass(
+      'aspect-[11/8]',
+      'w-full',
+      'flex-none',
+      'lg:h-full',
+      'lg:w-auto',
+      'lg:max-w-full',
+      'lg:self-start',
+    );
     expect(screen.getByText('Banner compacto')).toBeInTheDocument();
   });
 });

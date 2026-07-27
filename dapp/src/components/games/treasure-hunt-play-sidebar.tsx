@@ -25,7 +25,7 @@ export default function TreasureHuntPlaySidebar({
   const attempts = leaderboard.filter((entry) => entry.isMe).length;
 
   return (
-    <aside className="flex h-full min-h-[30rem] flex-col rounded-[8px] border border-white/20 bg-[#071312]/94 p-5">
+    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-white/20 bg-[#071312]/94 p-5">
       <h2 className="font-headline text-xl font-black text-[#f2eee7]">Torneo Preventa UKI</h2>
 
       <dl className="mt-4 overflow-hidden rounded-[8px] border border-white/20 bg-[#091513]">

@@ -14,15 +14,20 @@ export default function TreasureHuntCompetitionBanner() {
   const myAttempts = leaderboard.filter((entry) => entry.isMe).length;
   const prizePool = useTreasureHuntPrizePool(campaign?.poolBps ?? 2_500);
 
+  const prizePoolValue = prizePool.value === null
+    ? 'Actualizando…'
+    : formatTreasureHuntPrizePoolUki(prizePool.value);
   const metrics = [
-    { label: 'Modo activo', value: '1P' },
+    { label: 'Modo activo', value: '1P', mobileHidden: true },
     {
       label: 'Partidas computables',
       value: isLoading ? '···' : `${myAttempts}/${maxAttempts}`,
+      mobileHidden: false,
     },
     {
       label: 'Premio acumulado',
-      value: prizePool.isLoading ? '···' : formatTreasureHuntPrizePoolUki(prizePool.value),
+      value: prizePool.isLoading && prizePool.value === null ? '···' : prizePoolValue,
+      mobileHidden: false,
     },
   ];
 
@@ -50,10 +55,15 @@ export default function TreasureHuntCompetitionBanner() {
         <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
           <dl
             data-competition-metrics
-            className="grid min-w-0 grid-cols-3 divide-x divide-white/15 rounded-[8px] border border-white/20 bg-[#091513]"
+            className="grid min-w-0 grid-cols-2 divide-x divide-white/15 rounded-[8px] border border-white/20 bg-[#091513] sm:grid-cols-3"
           >
-            {metrics.map(({ label, value }) => (
-              <div key={label} className="min-w-0 px-2 py-2 text-center sm:px-3">
+            {metrics.map(({ label, value, mobileHidden }) => (
+              <div
+                key={label}
+                className={mobileHidden
+                  ? 'hidden min-w-0 px-2 py-2 text-center sm:block sm:px-3'
+                  : 'min-w-0 px-2 py-2 text-center sm:px-3'}
+              >
                 <dt className="text-[0.52rem] font-bold uppercase tracking-[0.05em] text-[#969994] sm:text-[0.62rem] sm:tracking-[0.08em]">
                   {label}
                 </dt>

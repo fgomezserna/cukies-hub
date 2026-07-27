@@ -5,7 +5,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown, Wallet } from 'lucide-react';
+import { Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
@@ -128,7 +128,7 @@ export default function GameLayout({
     try {
       await orientation.lock('landscape');
     } catch {
-      // The in-game portrait overlay still gives the player an explicit cue.
+      // The app-level fullscreen and CSS rotation fallbacks remain available.
     }
   }, []);
 
@@ -260,10 +260,6 @@ export default function GameLayout({
     return () => window.removeEventListener('cukies:open-wallet-dialog', revealWalletDialog);
   }, [handleFullScreen, isFullscreen]);
 
-  const openWalletDialog = useCallback(() => {
-    window.dispatchEvent(new Event('cukies:open-wallet-dialog'));
-  }, []);
-
   const handleIframeLoad = useCallback(
     (event: React.SyntheticEvent<HTMLIFrameElement>) => {
       markParentIframeNavigation(event.currentTarget);
@@ -310,10 +306,10 @@ export default function GameLayout({
         isMobileFocus
           ? 'flex h-full flex-col gap-2'
           : desktopSidebar
-            ? 'grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_24rem]'
+            ? 'grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]'
             : 'grid grid-cols-1 gap-6 lg:grid-cols-4',
         !isMobileFocus && !hasDesktopBanner && 'h-full',
-        !isMobileFocus && hasDesktopBanner && 'items-start',
+        !isMobileFocus && hasDesktopBanner && 'items-start lg:items-stretch',
       )}
     >
         {isMobileFocus && desktopBanner ? (
@@ -329,10 +325,35 @@ export default function GameLayout({
             isMobileFocus
               ? 'flex-1 gap-2'
               : desktopSidebar
-                ? 'gap-3'
+                ? 'gap-3 lg:h-full'
                 : 'gap-6 lg:col-span-3',
           )}
         >
+          {isMobileFocus && !isFullscreen ? (
+            <div
+              data-game-landscape-gate
+              className="fixed inset-0 z-[90] hidden flex-col items-center justify-center gap-4 bg-[#030c0c] px-6 text-center landscape:flex"
+            >
+              <div>
+                <h2 className="font-headline text-xl font-black text-[#f2eee7]">
+                  Vista horizontal
+                </h2>
+                <p className="mt-2 text-sm text-[#aaa8a2]">
+                  Activa la pantalla completa para jugar con el mapa bien encajado.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => void handleFullScreen()}
+                className="min-h-11 gap-2 border border-[#35eee2]/45 bg-[#0d5d57] px-5 font-black text-white hover:bg-[#137069]"
+                aria-label="Activar pantalla completa en horizontal"
+              >
+                <Maximize className="h-4 w-4" aria-hidden="true" />
+                Pantalla completa
+              </Button>
+            </div>
+          ) : null}
+
           {isMobileFocus && !isFullscreen ? (
             <div className="flex shrink-0 justify-end">
               <Button
@@ -362,7 +383,7 @@ export default function GameLayout({
               !isMobileFocus && (
                 hasDesktopBanner
                   ? desktopSidebar
-                    ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65'
+                    ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65 lg:h-full lg:w-auto lg:max-w-full lg:self-start'
                     : 'aspect-[11/8] w-full flex-none'
                   : 'flex-grow'
               ),
@@ -387,17 +408,6 @@ export default function GameLayout({
               allowFullScreen
               onLoad={handleIframeLoad}
             />
-            {isMobileFocus && !isCssRotatedLandscape ? (
-              <div className="absolute inset-0 z-40 hidden flex-col items-center justify-center bg-[#030c0c]/95 px-6 text-center backdrop-blur-sm portrait:flex">
-                <span className="text-4xl text-[#35eee2]" aria-hidden="true">↻</span>
-                <strong className="mt-3 font-headline text-xl text-[#f2eee7]">
-                  Gira el móvil para jugar
-                </strong>
-                <span className="mt-2 max-w-xs text-sm leading-5 text-[#aaa8a2]">
-                  Treasure Hunt está optimizado para modo horizontal.
-                </span>
-              </div>
-            ) : null}
             {!isMobileFocus ? (
               <div
                 className="absolute bottom-0 left-0 z-30 flex items-center gap-2"
@@ -426,17 +436,6 @@ export default function GameLayout({
                   right: 'max(0.5rem, env(safe-area-inset-right))',
                 }}
               >
-                {!user ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={openWalletDialog}
-                    className="h-11 gap-2 border border-[#35eee2]/40 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
-                  >
-                    <Wallet className="h-4 w-4" aria-hidden="true" />
-                    Conectar wallet
-                  </Button>
-                ) : null}
                 <Button
                   type="button"
                   size="sm"
@@ -613,9 +612,19 @@ export default function GameLayout({
   if (isMobileFocus || !hasDesktopBanner) return gameShell;
 
   return (
-    <div className={cn(desktopSidebar ? 'space-y-3' : 'space-y-5')}>
-      {desktopBanner ? <div data-game-desktop-banner>{desktopBanner}</div> : null}
-      {gameShell}
+    <div
+      className={cn(
+        desktopSidebar
+          ? 'space-y-3 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0'
+          : 'space-y-5',
+      )}
+    >
+      {desktopBanner ? (
+        <div data-game-desktop-banner className="shrink-0">{desktopBanner}</div>
+      ) : null}
+      <div className={cn(desktopSidebar && 'lg:min-h-0 lg:flex-1')}>
+        {gameShell}
+      </div>
       {desktopFooter ? <div data-game-desktop-footer>{desktopFooter}</div> : null}
     </div>
   );

@@ -16,6 +16,25 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     expect(gameContainerSource).not.toContain('1V1 NO DISPONIBLE');
   });
 
+  it('renombra solo la ayuda situada bajo JUGAR 1 VS 1', () => {
+    expect(gameContainerSource).toContain('CÓMO JUGAR');
+    expect(gameContainerSource).not.toContain('La sesión anterior caducó y se está renovando');
+  });
+
+  it('recupera silenciosamente una GameSession caducada', () => {
+    expect(gameContainerSource).toContain(
+      "access.reason === 'GAME_SESSION_RESTART_REQUIRED'",
+    );
+    expect(gameContainerSource).toContain(
+      'const retry = window.setTimeout(() => void startSinglePlayer(), 0)',
+    );
+  });
+
+  it('permite el runtime en portrait y reduce el coste de render móvil', () => {
+    expect(gameContainerSource).not.toContain('<OrientationOverlay');
+    expect(gameContainerSource).toContain('isMobile ? MOBILE_FPS : FPS');
+  });
+
   it('no reproduce la voz de Trump al recoger checkpoint ni Haku', () => {
     expect(gameContainerSource).not.toContain("playSound('jeff_goit')");
     expect(gameContainerSource).not.toContain("playSound('whale_chad')");

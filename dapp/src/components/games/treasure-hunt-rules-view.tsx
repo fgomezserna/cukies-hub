@@ -38,7 +38,7 @@ export default function TreasureHuntRulesView() {
   const rules = status?.campaign ?? TREASURE_HUNT_FALLBACK_RULES;
 
   return (
-    <div className="min-h-full pb-8">
+    <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
       <div className="mb-4">
         <h2 className="font-headline text-2xl font-black tracking-[-0.025em] text-[#f2eee7]">
           Reglas del Torneo Preventa UKI

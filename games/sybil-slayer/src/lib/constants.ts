@@ -7,6 +7,7 @@ export const MAX_LEVEL_WITH_TOTEM = 4;
 export const MAX_LEVEL = 5;
 
 export const FPS = 60;
+export const MOBILE_FPS = 30;
 export const FRAME_TIME_MS = 1000 / FPS;
 export const MEGA_NODE_BOOST_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos para coincidir con purr
 export const PURR_IMMUNITY_DURATION_MS = 7000; // 7 seconds - aumentado de 5 a 7 segundos
