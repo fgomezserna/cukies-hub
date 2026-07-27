@@ -280,7 +280,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                 <span>Mi wallet</span>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-teal-400/10 transition-colors">
-                <Link href="/profile">
+                <Link href={isGameOverlay ? '/games/treasure-hunt/profile' : '/profile'}>
                   <UserRound className="mr-3 h-4 w-4 text-cyan-300" />
                   <span>Mi perfil</span>
                 </Link>

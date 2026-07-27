@@ -207,7 +207,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
       'lg:h-full',
       'lg:w-auto',
       'lg:max-w-full',
-      'lg:self-start',
+      'lg:self-center',
     );
     expect(screen.getByText('Banner compacto')).toBeInTheDocument();
   });

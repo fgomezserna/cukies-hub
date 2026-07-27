@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { CheckCircle2, Loader2, LockKeyhole, Save, UserRound, Wallet } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  TREASURE_HUNT_PHASE_COPY,
-  useTreasureHuntCompetitionOverview,
-} from '@/hooks/use-treasure-hunt-competition-overview';
+import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
 import { useAuth } from '@/providers/auth-provider';
 
 const ALIAS_PATTERN = /^[A-Za-z0-9_-]{3,20}$/;
@@ -44,7 +41,7 @@ function ReadonlyField({ label, value }: { readonly label: string; readonly valu
 
 export default function TreasureHuntProfile() {
   const { user, isLoading: authLoading } = useAuth();
-  const { status, leaderboard, isLoading, error, reload } =
+  const { status, isLoading, error, reload } =
     useTreasureHuntCompetitionOverview();
   const [alias, setAlias] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -55,10 +52,6 @@ export default function TreasureHuntProfile() {
     setAlias(status?.participant?.alias ?? '');
   }, [status?.participant?.alias]);
 
-  const myAttempts = useMemo(
-    () => leaderboard.filter((entry) => entry.isMe).length,
-    [leaderboard],
-  );
   const validationMessage = aliasValidationMessage(alias);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -143,23 +136,14 @@ export default function TreasureHuntProfile() {
             className="border-white/10 bg-black/20 font-mono text-white focus-visible:ring-emerald-300"
           />
           <p id="competition-alias-help" className={`text-xs ${validationMessage ? 'text-amber-200' : 'text-slate-500'}`}>
-            {validationMessage ?? 'Es el único dato editable y será visible en el ranking.'}
+            {validationMessage ?? 'El nombre con el que aparecerás en el ranking.'}
           </p>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="max-w-md">
           <ReadonlyField
             label="Wallet"
             value={user?.walletAddress ? compactWallet(user.walletAddress) : 'Consultando…'}
-          />
-          <ReadonlyField label="Torneo" value="Torneo Preventa UKI" />
-          <ReadonlyField
-            label="Estado"
-            value={TREASURE_HUNT_PHASE_COPY[status?.phase ?? 'unconfigured'].label}
-          />
-          <ReadonlyField
-            label="Partidas computables"
-            value={`${myAttempts}/${status?.campaign?.maxWinningAttemptsPerWallet ?? 5}`}
           />
         </div>
 

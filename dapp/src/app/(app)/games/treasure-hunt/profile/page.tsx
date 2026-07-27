@@ -17,10 +17,6 @@ export default function TreasureHuntProfilePage() {
         <h2 className="mt-2 font-headline text-2xl font-black tracking-tight text-white sm:text-3xl">
           Mi perfil
         </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          Gestiona el alias con el que apareces en la clasificación. El resto de datos se
-          muestra como información de solo lectura.
-        </p>
       </div>
 
       <TreasureHuntProfile />

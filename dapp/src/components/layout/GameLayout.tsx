@@ -383,7 +383,7 @@ export default function GameLayout({
               !isMobileFocus && (
                 hasDesktopBanner
                   ? desktopSidebar
-                    ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65 lg:h-full lg:w-auto lg:max-w-full lg:self-start'
+                    ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65 lg:h-full lg:w-auto lg:max-w-full lg:self-center'
                     : 'aspect-[11/8] w-full flex-none'
                   : 'flex-grow'
               ),

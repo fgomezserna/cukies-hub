@@ -9,6 +9,18 @@ const audioSource = readFileSync(
   resolve(process.cwd(), '../games/sybil-slayer/src/hooks/useAudio.ts'),
   'utf8',
 );
+const treasureHuntPageSource = readFileSync(
+  resolve(process.cwd(), 'src/app/(app)/games/treasure-hunt/page.tsx'),
+  'utf8',
+);
+const treasureHuntProfilePageSource = readFileSync(
+  resolve(process.cwd(), 'src/app/(app)/games/treasure-hunt/profile/page.tsx'),
+  'utf8',
+);
+const headerSource = readFileSync(
+  resolve(process.cwd(), 'src/components/layout/header.tsx'),
+  'utf8',
+);
 
 describe('contrato UX del runtime de Treasure Hunt', () => {
   it('usa la etiqueta solicitada para el modo 1 vs 1 aún deshabilitado', () => {
@@ -42,12 +54,28 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     expect(audioSource).not.toContain('whale_chad:');
   });
 
-  it('reinicia una partida 1P directamente desde ambos resultados', () => {
-    expect(gameContainerSource).toMatch(
-      /void startSinglePlayer\(\)[\s\S]{0,900}Jugar de nuevo/,
+  it('mantiene el guardado durable en segundo plano sin bloquear el resultado', () => {
+    expect(gameContainerSource).not.toContain('Guardando resultado…');
+    expect(gameContainerSource).toContain(
+      "{ type: 'TREASURE_HUNT_RETURN_TO_MENU' }",
     );
     expect(gameContainerSource).toMatch(
-      /Play Again[\s\S]{0,900}void startSinglePlayer\(\)/,
+      /onClick=\{returnToTreasureHuntMenu\}[\s\S]{0,500}Volver al menú/,
+    );
+    expect(treasureHuntPageSource).toContain(
+      "event.data?.type === 'TREASURE_HUNT_RETURN_TO_MENU'",
+    );
+    expect(treasureHuntPageSource).toContain(
+      "window.location.assign('/games/treasure-hunt')",
+    );
+  });
+
+  it('redirige Mi perfil al perfil propio de Treasure Hunt y simplifica su cabecera', () => {
+    expect(headerSource).toContain(
+      "isGameOverlay ? '/games/treasure-hunt/profile' : '/profile'",
+    );
+    expect(treasureHuntProfilePageSource).not.toContain(
+      'Gestiona el alias con el que apareces en la clasificación.',
     );
   });
 });

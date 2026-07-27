@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import TreasureHuntPlaySidebar from '@/components/games/treasure-hunt-play-sidebar';
 import TreasureHuntRankingsView from '@/components/games/treasure-hunt-rankings-view';
 import TreasureHuntRulesView from '@/components/games/treasure-hunt-rules-view';
+import TreasureHuntProfile from '@/components/profile/treasure-hunt-profile';
 
 jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
@@ -15,12 +16,25 @@ jest.mock('lucide-react', () => ({
   Gamepad2: () => null,
   Info: () => null,
   LockKeyhole: () => null,
+  Loader2: () => null,
   Medal: () => null,
+  Save: () => null,
   ShoppingCart: () => null,
   Swords: () => null,
   Timer: () => null,
   Trophy: () => null,
   UserRound: () => null,
+  Wallet: () => null,
+}));
+
+jest.mock('@/providers/auth-provider', () => ({
+  useAuth: () => ({
+    user: {
+      id: 'user-1',
+      walletAddress: '0x26789b9743d187174c3e3a87729730824a4d0c13',
+    },
+    isLoading: false,
+  }),
 }));
 
 jest.mock('@/hooks/use-treasure-hunt-prize-pool', () => ({
@@ -52,6 +66,9 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   useTreasureHuntCompetitionOverview: () => ({
     status: {
       phase: 'active',
+      participant: {
+        alias: 'CukiePlayer',
+      },
       campaign: {
         poolBps: 2_500,
         playerRewardBps: 1_000,
@@ -94,6 +111,14 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(headers).not.toContain('Partida');
     expect(headers).not.toContain('Score');
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
+
+    const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
+    expect(playLink).toHaveClass('hidden', 'sm:inline-flex');
+    expect(screen.getByText('Modo activo').parentElement).toHaveClass('hidden', 'sm:block');
+    expect(screen.getByText('Partidas computables').closest('dl')).toHaveClass(
+      'grid-cols-2',
+      'sm:grid-cols-3',
+    );
   });
 
   it('presenta las siete secciones del reglamento aprobado', () => {
@@ -119,5 +144,15 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toBeInTheDocument();
     expect(screen.queryByText(/Si clasificas/)).not.toBeInTheDocument();
+  });
+
+  it('reduce el perfil al alias público y la wallet', () => {
+    render(<TreasureHuntProfile />);
+
+    expect(screen.getByText('El nombre con el que aparecerás en el ranking.')).toBeInTheDocument();
+    expect(screen.getByText('Wallet')).toBeInTheDocument();
+    expect(screen.queryByText(/^Torneo$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Estado$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Partidas computables$/)).not.toBeInTheDocument();
   });
 });

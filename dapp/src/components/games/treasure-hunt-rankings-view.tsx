@@ -35,11 +35,12 @@ export default function TreasureHuntRankingsView() {
   }, []);
 
   const metrics = [
-    ['Modo activo', '1P'],
-    ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
+    ['Modo activo', '1P', true],
+    ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`, false],
     [
       'Premio acumulado',
       prizePool.isLoading && prizePool.value === null ? '···' : prizePoolValue,
+      false,
     ],
   ] as const;
 
@@ -75,19 +76,25 @@ export default function TreasureHuntRankingsView() {
           </div>
           <Link
             href="/games/treasure-hunt"
-            className="inline-flex min-h-11 items-center gap-2 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d5d57] px-5 text-sm font-bold text-white hover:bg-[#137069]"
+            className="hidden min-h-11 items-center gap-2 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d5d57] px-5 text-sm font-bold text-white hover:bg-[#137069] sm:inline-flex"
           >
             Jugar 1P <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </header>
 
-        <dl className="grid gap-px border-b border-white/15 bg-white/15 sm:grid-cols-3">
-          {metrics.map(([label, value]) => (
-            <div key={label} className="min-w-0 bg-[#071312] px-5 py-4">
+        <dl className="grid grid-cols-2 gap-px border-b border-white/15 bg-white/15 sm:grid-cols-3">
+          {metrics.map(([label, value, mobileHidden]) => (
+            <div
+              key={label}
+              className={cn(
+                'min-w-0 bg-[#071312] px-3 py-3 sm:px-5 sm:py-4',
+                mobileHidden && 'hidden sm:block',
+              )}
+            >
               <dt className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#969994]">
                 {label}
               </dt>
-              <dd className="mt-1 truncate font-mono text-xl font-black text-[#35eee2]" title={value}>
+              <dd className="mt-1 truncate font-mono text-base font-black text-[#35eee2] sm:text-xl" title={value}>
                 {value}
               </dd>
             </div>

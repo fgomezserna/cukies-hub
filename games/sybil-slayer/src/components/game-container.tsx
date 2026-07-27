@@ -774,6 +774,33 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Initialize audio system
   const { playSound, playMusic, stopMusic, setVolume, toggleMusic, isMusicEnabled, playGameOverSound, toggleSounds, isSoundsEnabled } = useAudio();
+
+  const returnToTreasureHuntMenu = useCallback(() => {
+    playSound('button_click');
+    stopMusic();
+
+    if (window.parent === window) {
+      window.location.assign(multiplayerHubEntryUrl ?? '/games/treasure-hunt');
+      return;
+    }
+
+    try {
+      const parentOrigin = resolveConfiguredParentOrigin(
+        document.referrer,
+        process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+        process.env.NEXT_PUBLIC_PARENT_URL,
+        process.env.NODE_ENV,
+      );
+      window.parent.postMessage(
+        { type: 'TREASURE_HUNT_RETURN_TO_MENU' },
+        parentOrigin,
+      );
+    } catch {
+      setCompetitionStartError(
+        'No se pudo volver al Hub. Recarga la página para continuar.',
+      );
+    }
+  }, [multiplayerHubEntryUrl, playSound, stopMusic]);
   
   // Estado para controlar el botón de música
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -3464,32 +3491,18 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     <div className="th-result-metric"><span>Tiempo</span><strong>{formatDuration(totalRunTimeMs)}</strong></div>
                   </div>
                   <div className="th-result-actions">
-                    <TreasureButton
-                      size="small"
-                      disabled={hasPendingGameEnd && !gameEndPersistenceError}
-                      onClick={() => {
-                        if (gameEndPersistenceError) {
-                          retryGameEndPersistence();
-                          return;
-                        }
-                        playSound('button_click');
-                        void startSinglePlayer();
-                      }}
-                    >
-                      {gameEndPersistenceError
-                        ? 'Reintentar guardado'
-                        : hasPendingGameEnd
-                          ? 'Guardando resultado…'
-                          : 'Jugar de nuevo'}
-                    </TreasureButton>
+                    {gameEndPersistenceError ? (
+                      <TreasureButton size="small" onClick={retryGameEndPersistence}>
+                        Reintentar guardado
+                      </TreasureButton>
+                    ) : null}
                     <TreasureButton variant="secondary" size="small" onClick={() => setIsLevelStatsVisible(true)}>
                       Ver desglose
                     </TreasureButton>
                     <TreasureButton
                       variant="quiet"
                       size="small"
-                      disabled={hasPendingGameEnd}
-                      onClick={handleResetClick}
+                      onClick={returnToTreasureHuntMenu}
                     >
                       Volver al menú
                     </TreasureButton>
@@ -4364,26 +4377,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         
                         {/* Botón Play Again */}
                         <button
-                          onClick={() => {
-                            if (multiplayerStartPendingRef.current) return;
-                            playSound('button_click');
-                            if (gameState.status === 'gameOver') {
-                              console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
-                            }
-                            void startSinglePlayer();
-                          }}
+                          onClick={returnToTreasureHuntMenu}
                           className="focus:outline-none game-button relative"
-                          aria-label="Play Again"
+                          aria-label="Volver al menú"
                         >
                           <Image 
                             src="/assets/ui/buttons/caja-texto2.png" 
-                            alt="Play Again" 
+                            alt="Volver al menú"
                             width={180} 
                             height={50}
                             className="game-img"
                           />
                           <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                            PLAY AGAIN
+                            VOLVER AL MENÚ
                           </span>
                         </button>
                       </div>
