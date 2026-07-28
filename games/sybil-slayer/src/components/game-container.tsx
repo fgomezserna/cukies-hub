@@ -1105,7 +1105,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setMultiplayerCanonicalDeadline,
     pauseMultiplayerRuntime,
     resumeMultiplayerRuntime,
-    togglePause,
+    pauseGame,
+    resumeGame,
+    getPausableGameTime,
     resetGame,
     forceGameOver,
   } = useGameState(
@@ -1674,6 +1676,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             'No se pudo verificar el Hub de origen. Abre Treasure Hunt desde el Hub oficial y vuelve a intentarlo.',
           SESSION_CHANGED:
             'La sesión cambió mientras confirmábamos el acceso. La partida no se inició; vuelve a intentarlo.',
+          ATTEMPT_ALREADY_ACTIVE:
+            'Esta wallet ya tiene una partida activa en otra pestaña. Vuelve a esa partida o espera un momento para iniciar una nueva.',
         };
         setCompetitionStartError(accessErrorCopy[access.reason ?? ''] ??
           'No pudimos confirmar si el intento quedó creado. La partida no se inició; vuelve a intentarlo.');
@@ -1790,6 +1794,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
+  const getActiveGameTimeMs = useCallback(() => {
+    const startedAt = gameStateRef.current.gameStartTime;
+    if (!startedAt) return 0;
+    return Math.max(0, Math.floor(getPausableGameTime() - startedAt));
+  }, [getPausableGameTime]);
 
   // Log para verificar el estado de conexión con Pusher
   useEffect(() => {
@@ -1809,16 +1818,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       
       const stopInterval = startCheckpointInterval(
         () => gameStateRef.current.score,
-        () => {
-          const now = Date.now();
-          const startTime = gameStateRef.current.gameStartTime || now;
-          return now - startTime;
-        }
+        getActiveGameTimeMs,
       );
       
       return stopInterval;
     }
-  }, [isMultiplayerMode, isConnected, sessionData, gameState.status, startCheckpointInterval]);
+  }, [
+    gameState.status,
+    getActiveGameTimeMs,
+    isConnected,
+    isMultiplayerMode,
+    sessionData,
+    startCheckpointInterval,
+  ]);
 
   // Handle game session end with Pusher
   useEffect(() => {
@@ -1835,9 +1847,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       
       console.log('🏁 [GAME-PUSHER] Ending session with score:', gameState.score);
       
-      const gameTime = gameState.gameStartTime 
-        ? Date.now() - gameState.gameStartTime 
-        : 0;
+      const gameTime = getActiveGameTimeMs();
       
       console.log('📤 [GAME-PUSHER] Attempting to send game end immediately');
       const queued = sendGameEnd({
@@ -1854,7 +1864,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       });
       if (queued) dispatchedSinglePlayerRunIdRef.current = resultAuthority.runId;
     }
-  }, [isMultiplayerMode, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
+  }, [
+    gameState.gameOverReason,
+    gameState.hearts,
+    gameState.level,
+    gameState.score,
+    gameState.status,
+    getActiveGameTimeMs,
+    isMultiplayerMode,
+    sendGameEnd,
+    sessionData,
+  ]);
 
   useEffect(() => {
     if (isMultiplayerMode || gameState.status !== 'gameOver') return;
@@ -2086,35 +2106,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // NUEVO: Pausa automática cuando se cambia de pestaña
   useEffect(() => {
     if (localControlsLocked) return undefined;
-    let wasPlayingBeforeHidden = false;
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // La pestaña se ocultó (cambió a otra pestaña o minimizó)
-        if (gameState.status === 'playing') {
-          wasPlayingBeforeHidden = true;
-          console.log('📱 Pestaña oculta - Pausando juego automáticamente');
-          playSound('pause');
-          togglePause();
-        }
-      } else {
-        // La pestaña volvió a estar visible
-        if (wasPlayingBeforeHidden && gameState.status === 'paused') {
-          console.log('📱 Pestaña visible de nuevo - El juego queda pausado (presiona P para reanudar)');
-          // Nota: No reanudamos automáticamente, el usuario debe presionar P
-          wasPlayingBeforeHidden = false;
-        }
-      }
+      if (!document.hidden || gameStateRef.current.status !== 'playing') return;
+
+      console.log('📱 Pestaña oculta - Pausando juego automáticamente');
+      playSound('pause');
+      pauseGame();
     };
 
-    // Añadir listener para detectar cambios de visibilidad
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [localControlsLocked, gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
+  }, [localControlsLocked, pauseGame, playSound]);
 
   useEffect(() => {
     if (isHubViewVisible || localControlsLocked || gameState.status !== 'playing') {
@@ -2124,14 +2129,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     console.log('🧭 Vista del juego oculta en el Hub - Pausando partida');
     playSound('pause');
     stopMusic();
-    togglePause();
+    pauseGame();
   }, [
     gameState.status,
     isHubViewVisible,
     localControlsLocked,
+    pauseGame,
     playSound,
     stopMusic,
-    togglePause,
   ]);
 
 
@@ -2148,13 +2153,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (multiplayerStartPendingRef.current || localControlsLocked) return;
     if (gameState.status === 'playing') {
       playSound('pause');
-      togglePause();
+      pauseGame();
       return;
     }
 
     if (gameState.status === 'paused') {
       playSound('resume');
-      togglePause();
+      resumeGame();
       return;
     }
 
@@ -2322,6 +2327,17 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         !singlePlayerResultSaved
       ) return;
       playSound('button_click');
+
+      // A board that has already emitted competition evidence cannot be reset
+      // locally: doing so would reuse a non-zero server receipt from score zero
+      // and strand the wallet. Finalize the current result first.
+      if (
+        !isMultiplayerMode &&
+        (gameState.status === 'playing' || gameState.status === 'paused')
+      ) {
+        forceGameOver('manual');
+        return;
+      }
       
       // Si estamos en game over, detener el sonido de game over
       if (gameState.status === 'gameOver') {
@@ -2413,7 +2429,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         // Si está en playing o paused, pausar si es necesario y abrir el modal
         if (!localControlsLocked && currentStatus === 'playing') {
           console.log('[INFO] Pausing game before opening modal');
-          togglePause();
+          pauseGame();
         }
         // Siempre abrir el modal cuando no está en idle
         console.log('[INFO] Opening info modal');
@@ -2431,7 +2447,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       playSound('button_click');
       // Si el juego está en playing, pausar automáticamente
       if (!localControlsLocked && gameState.status === 'playing') {
-        togglePause();
+        pauseGame();
       }
       setIsInfoModalOpen(true);
    };
@@ -3080,6 +3096,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         return 'Te quedaste sin vidas frente a las trampas del mercado.';
       case 'redZone':
         return 'Una zona de riesgo terminó la expedición.';
+      case 'manual':
+        return 'Finalizaste la expedición antes de agotar el tiempo.';
       case 'bug':
         return 'Un fee atrapó a tu explorador.';
       default:
@@ -3355,7 +3373,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onClick={handleResetClick}
                       disabled={gameState.status === 'gameOver'}
                     >
-                      Reiniciar
+                      Finalizar
                     </TreasureButton>
                     <div className="th-footer__status">
                       <span>{gameState.status === 'countdown' ? 'Preparando expedición' : activeEffectLabel}</span>
@@ -3505,7 +3523,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             </div>
           ) : null}
 
-          {!isMultiplayerMode && gameState.status === 'paused' ? (
+          {!isMultiplayerMode && gameState.status === 'paused' && !isInfoModalOpen ? (
             <div className="th-overlay th-overlay--soft">
               <TreasurePanel className="th-dialog th-dialog--small" role="dialog" aria-modal="true" aria-label="Partida en pausa">
                 <p className="th-screen-kicker">Expedición detenida</p>
@@ -3513,7 +3531,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <p className="th-dialog-copy">Tu partida local está a salvo. Continúa cuando estés listo.</p>
                 <div className="th-dialog-actions">
                   <TreasureButton size="small" onClick={handleStartPauseClick}>Continuar</TreasureButton>
-                  <TreasureButton variant="secondary" size="small" onClick={handleResetClick}>Volver al menú</TreasureButton>
+                  <TreasureButton variant="secondary" size="small" onClick={handleResetClick}>Finalizar partida</TreasureButton>
                 </div>
               </TreasurePanel>
             </div>

@@ -254,6 +254,7 @@ function createHarness(options: {
   finishGameSession?: jest.Mock;
   releaseGameSession?: jest.Mock;
   createId?: () => string;
+  activeAttemptStaleMs?: number;
 } = {}) {
   const repository = options.repository ?? new MemoryCompetitionRepository();
   let now = new Date('2026-07-12T12:00:00.000Z');
@@ -281,6 +282,7 @@ function createHarness(options: {
     claimGameSession,
     finishGameSession,
     releaseGameSession,
+    activeAttemptStaleMs: options.activeAttemptStaleMs,
   });
 
   return {
@@ -434,7 +436,7 @@ describe('Treasure Hunt competition service', () => {
     expect(harness.repository.attempts.size).toBe(1);
   });
 
-  it('does not abandon an unexpired attempt when another GameSession tries to start', async () => {
+  it('does not abandon a recently active attempt when another GameSession tries to start', async () => {
     const harness = createHarness();
     await harness.service.startAttempt({
       userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1',
@@ -443,12 +445,68 @@ describe('Treasure Hunt competition service', () => {
     await expect(harness.service.startAttempt({
       userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-2',
     })).rejects.toMatchObject({
-      code: 'GAME_SESSION_NOT_ELIGIBLE',
+      code: 'ATTEMPT_ALREADY_ACTIVE',
       status: 409,
     });
 
     expect(harness.finishGameSession).not.toHaveBeenCalled();
     expect(harness.repository.attempts.get('attempt-1')?.status).toBe('active');
+  });
+
+  it('abandons an interrupted board before rotating its reused GameSession', async () => {
+    const harness = createHarness();
+    const started = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1',
+    });
+    harness.setNow('2026-07-12T12:00:05.000Z');
+    await harness.service.recordCheckpoint({
+      walletAddress: wallet,
+      attemptId: started.attemptId,
+      receipt: started.receipt,
+      sequence: 0,
+      score: 1,
+      gameTimeMs: 5_000,
+    });
+
+    await expect(harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1',
+    })).rejects.toMatchObject({
+      code: 'GAME_SESSION_NOT_ELIGIBLE',
+      status: 409,
+    });
+
+    expect(harness.finishGameSession).toHaveBeenCalledWith({
+      userId: 'user-1',
+      gameSessionId: 'game-session-1',
+      attemptId: 'attempt-1',
+    });
+    expect(harness.repository.attempts.get('attempt-1')?.status).toBe('abandoned');
+  });
+
+  it('replaces a silent attempt on another GameSession before its lease expires', async () => {
+    const createId = jest.fn()
+      .mockReturnValueOnce('attempt-old')
+      .mockReturnValueOnce('attempt-new');
+    const harness = createHarness({
+      createId,
+      activeAttemptStaleMs: 60_000,
+    });
+    await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-old',
+    });
+    harness.setNow('2026-07-12T12:01:00.001Z');
+
+    await expect(harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-new',
+    })).resolves.toMatchObject({ attemptId: 'attempt-new', status: 'active' });
+
+    expect(harness.finishGameSession).toHaveBeenCalledWith({
+      userId: 'user-1',
+      gameSessionId: 'game-session-old',
+      attemptId: 'attempt-old',
+    });
+    expect(harness.repository.attempts.get('attempt-old')?.status).toBe('abandoned');
+    expect(harness.repository.attempts.get('attempt-new')?.status).toBe('active');
   });
 
   it('closes expired authority before replacing an attempt on a new GameSession', async () => {

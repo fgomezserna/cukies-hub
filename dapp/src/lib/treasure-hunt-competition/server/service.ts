@@ -35,6 +35,7 @@ export type CompetitionServiceErrorCode =
   | 'COMPETITION_NOT_ACTIVE'
   | 'INVALID_WALLET'
   | 'GAME_SESSION_NOT_ELIGIBLE'
+  | 'ATTEMPT_ALREADY_ACTIVE'
   | 'ATTEMPT_NOT_FOUND'
   | 'ATTEMPT_NOT_ACTIVE'
   | 'INVALID_RECEIPT'
@@ -87,6 +88,7 @@ interface CompetitionServiceDependencies {
     attemptId: string;
   }) => Promise<boolean>;
   readonly attemptLeaseMs?: number;
+  readonly activeAttemptStaleMs?: number;
 }
 
 interface AttemptStartInput {
@@ -311,6 +313,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
   const createId = dependencies.createId ?? randomUUID;
   const createSeed = dependencies.createSeed ?? (() => randomBytes(32).toString('base64url'));
   const attemptLeaseMs = dependencies.attemptLeaseMs ?? 2 * 60 * 60 * 1_000;
+  const activeAttemptStaleMs = dependencies.activeAttemptStaleMs ?? 2 * 60 * 1_000;
 
   async function prepareCampaign(requireActive: boolean) {
     const current = now();
@@ -494,6 +497,34 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       sessionOwned,
     );
     if (existing && existingMatchesSession) {
+      // A start replay is idempotent only until the first evidence point. Once a
+      // board has progressed, recreating it from zero would reuse a non-zero
+      // receipt and make every later checkpoint/finish regress. Close that
+      // orphaned authority and make the parent rotate to a fresh GameSession.
+      if (existing.nextSequence > 0) {
+        const orphanedAuthorityClosed = await (dependencies.finishGameSession?.({
+          userId: existing.userId,
+          gameSessionId: existing.gameSessionId,
+          attemptId: existing.attemptId,
+        }) ?? Promise.resolve(false));
+        if (!orphanedAuthorityClosed) {
+          throw new CompetitionServiceError(
+            'GAME_SESSION_NOT_ELIGIBLE',
+            'The interrupted competition attempt could not release its authority',
+            409,
+          );
+        }
+        await dependencies.repository.abandonActiveAttempts(
+          campaign.campaignId,
+          walletAddress,
+          current.toISOString(),
+        );
+        throw new CompetitionServiceError(
+          'GAME_SESSION_NOT_ELIGIBLE',
+          'The interrupted competition attempt requires a fresh game session',
+          409,
+        );
+      }
       if (
         gameSession?.mode === 'presale_competition' &&
         gameSession.rewardEligible === false &&
@@ -531,18 +562,24 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
 
     if (existing) {
       const expiresAtMs = Date.parse(existing.expiresAt);
-      if (!Number.isFinite(expiresAtMs) || current.getTime() <= expiresAtMs) {
+      const lastActivityAtMs = Date.parse(existing.lastEvidenceAt ?? existing.startedAt);
+      const isExpired = Number.isFinite(expiresAtMs) && current.getTime() > expiresAtMs;
+      const isStaleOnAnotherSession =
+        existing.gameSessionId !== input.gameSessionId &&
+        Number.isFinite(lastActivityAtMs) &&
+        current.getTime() - lastActivityAtMs > activeAttemptStaleMs;
+      if (!isExpired && !isStaleOnAnotherSession) {
         throw new CompetitionServiceError(
-          'GAME_SESSION_NOT_ELIGIBLE',
-          'Another competition attempt is still active for this wallet',
+          'ATTEMPT_ALREADY_ACTIVE',
+          'Another recently active competition attempt is still using this wallet',
           409,
         );
       }
 
-      // Expired attempts can be superseded, but their authority must be closed
-      // before the database row is abandoned. Otherwise a failed claim for the
-      // new session would strand an abandoned attempt behind a still-open
-      // competition GameSession.
+      // Expired attempts and attempts silent on another session can be
+      // superseded, but their authority must be closed before the database row
+      // is abandoned. This prevents a stale tab from retaining the wallet while
+      // also protecting a second tab that is still publishing checkpoints.
       const expiredAuthorityClosed = await (dependencies.finishGameSession?.({
         userId: existing.userId,
         gameSessionId: existing.gameSessionId,

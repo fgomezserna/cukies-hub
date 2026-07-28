@@ -85,9 +85,12 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     );
   });
 
-  it('no muestra el tablero ni el Hyppie legacy mientras carga los sprites actuales', () => {
-    expect(gameCanvasSource).not.toContain(
+  it('mantiene el tablero azul de Treasure Hunt y evita el Hyppie legacy', () => {
+    expect(gameCanvasSource).toContain(
       "gridImg.src = '/assets/ui/game-container/pantallajuego3.png'",
+    );
+    expect(gameCanvasSource).not.toContain(
+      "gridImg.src = '/assets/ui/game-container/grid-background.png'",
     );
     expect(gameCanvasSource).not.toContain(
       "tokenImg.src = '/assets/characters/token.png'",
@@ -100,6 +103,12 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     );
     expect(assetLoaderSource).toContain(
       "token: { path: '/assets/characters/cukiesprites/south/cukie_walk_s_01.png'",
+    );
+    expect(assetLoaderSource).toContain(
+      "grid_background: { path: '/assets/ui/game-container/pantallajuego3.png'",
+    );
+    expect(assetLoaderSource).not.toContain(
+      "grid_background: { path: '/assets/ui/game-container/grid-background.png'",
     );
     expect(assetLoaderSource).not.toContain(
       "path: '/assets/characters/token.png'",
@@ -114,8 +123,33 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
       "Vista del juego oculta en el Hub - Pausando partida",
     );
     expect(gameContainerSource).toMatch(
-      /isHubViewVisible \|\| localControlsLocked \|\| gameState\.status !== 'playing'[\s\S]{0,500}togglePause\(\)/,
+      /isHubViewVisible \|\| localControlsLocked \|\| gameState\.status !== 'playing'[\s\S]{0,500}pauseGame\(\)/,
     );
+  });
+
+  it('muestra las reglas por encima y conserva el menú de pausa al cerrarlas', () => {
+    expect(gameContainerSource).toContain(
+      "currentStatus === 'playing'",
+    );
+    expect(gameContainerSource).toMatch(
+      /currentStatus === 'playing'[\s\S]{0,180}pauseGame\(\)/,
+    );
+    expect(gameContainerSource).toContain(
+      "gameState.status === 'paused' && !isInfoModalOpen",
+    );
+  });
+
+  it('no cuenta el tiempo en pausa dentro de la evidencia de competición', () => {
+    expect(gameContainerSource).toContain('getPausableGameTime() - startedAt');
+    expect(gameContainerSource).toContain('const gameTime = getActiveGameTimeMs()');
+    expect(gameContainerSource).not.toContain('Date.now() - gameState.gameStartTime');
+  });
+
+  it('finaliza una partida iniciada antes de permitir volver al menú', () => {
+    expect(gameContainerSource).toMatch(
+      /gameState\.status === 'playing' \|\| gameState\.status === 'paused'[\s\S]{0,120}forceGameOver\('manual'\)/,
+    );
+    expect(gameContainerSource).toContain('Finalizar partida');
   });
 
   it('usa caché estática versionada y stale-while-revalidate', () => {
