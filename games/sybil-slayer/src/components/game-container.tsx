@@ -67,8 +67,6 @@ import { shouldRenderDirectionalTouchControls } from '../lib/touch-controls';
 import { calculateContainScale, resolveGameViewportSize } from '../lib/viewport-scale';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
 
-const CRITICAL_ASSET_GATE_TIMEOUT_MS = 5_000;
-
 const getLevelScoreMultiplier = (level: number): number => {
   // Multiplicador basado en el nivel: nivel 2 = x2, nivel 3 = x3, nivel 4 = x4, nivel 5 = x5
   if (level >= 2) return level;
@@ -823,6 +821,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [inviteCopied, setInviteCopied] = useState(false);
   const multiplayerStartPendingRef = useRef(false);
   const competitionStartPendingRef = useRef(false);
+  const singlePlayerStartAfterAssetsRef = useRef(false);
   const competitionSessionRecoveryRef = useRef<string | null>(null);
   const singlePlayerRunSequenceRef = useRef(0);
   const activeSinglePlayerResultAuthorityRef = useRef<SinglePlayerResultAuthority | null>(null);
@@ -893,11 +892,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState<'preload' | 'full'>('preload');
+  const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
+  const [assetLoadAttempt, setAssetLoadAttempt] = useState(0);
 
   // Carga progresiva y optimizada de assets con monitoreo de rendimiento
   useEffect(() => {
+    let cancelled = false;
+    let backgroundLoadTimer: ReturnType<typeof setTimeout> | undefined;
+
     const loadAssets = async () => {
       try {
+        setCriticalAssetsLoaded(false);
+        setAssetLoadError(null);
+        setLoadingProgress(0);
+
         // Inicializar monitoreo de rendimiento
         performanceMonitor.startTimer('totalAssets');
         performanceMonitor.startTimer('criticalAssets');
@@ -908,44 +916,36 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         // El canvas gestiona sus propios sprites. Bloquear el arranque con un
         // segundo precargador duplicaba más de cien peticiones y ahogaba los
         // assets que sí son necesarios para mostrar el juego.
-        const criticalAssetsPromise = assetLoader.preloadCritical((progress) => {
+        await assetLoader.preloadCritical((progress) => {
+          if (cancelled) return;
           setLoadingProgress(progress * 0.9);
         });
 
-        let gateTimer: ReturnType<typeof setTimeout> | undefined;
-        const loadedBeforeGateTimeout = await Promise.race([
-          criticalAssetsPromise.then(() => true),
-          new Promise<boolean>((resolve) => {
-            gateTimer = setTimeout(
-              () => resolve(false),
-              CRITICAL_ASSET_GATE_TIMEOUT_MS,
-            );
-          }),
-        ]);
-        if (gateTimer) clearTimeout(gateTimer);
-
-        if (!loadedBeforeGateTimeout) {
-          console.warn('⚠️ Assets críticos continúan cargando en segundo plano');
+        if (cancelled) return;
+        if (!assetLoader.areCriticalAssetsLoaded()) {
+          throw new Error('Critical asset verification failed');
         }
+
+        performanceMonitor.endTimer('criticalAssets');
+        setLoadingProgress(0.9);
         setCriticalAssetsLoaded(true);
 
         // Fase 2: Cargar assets restantes en background
-        setTimeout(async () => {
-          await criticalAssetsPromise;
-          performanceMonitor.endTimer('criticalAssets');
-          setLoadingProgress(1);
-          console.log('✅ Assets críticos cargados');
-
+        backgroundLoadTimer = setTimeout(async () => {
+          if (cancelled) return;
           console.log('⏳ Cargando assets decorativos en background...');
           setLoadingPhase('full');
           
           await assetLoader.loadRemaining((progress, phase) => {
+            if (cancelled) return;
             setLoadingProgress(0.9 + (progress * 0.1)); // 10% restante
             setLoadingPhase(phase);
           });
-          
+
+          if (cancelled) return;
           performanceMonitor.endTimer('totalAssets');
           console.log('🎉 Todos los assets cargados');
+          setLoadingProgress(1);
           setAllAssetsLoaded(true);
           
           // Mostrar reporte de rendimiento en desarrollo
@@ -957,14 +957,26 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         }, 300); // Delay reducido para mejor UX
         
       } catch (error) {
+        if (cancelled) return;
         console.error('❌ Error cargando assets:', error);
         performanceMonitor.recordAssetFailed();
-        // Aún así permitir que el juego inicie con assets básicos
-        setCriticalAssetsLoaded(true);
+        setAssetLoadError(
+          'No se pudieron preparar todos los elementos del juego. Comprueba la conexión y vuelve a intentarlo.',
+        );
       }
     };
     
-    loadAssets();
+    void loadAssets();
+    return () => {
+      cancelled = true;
+      if (backgroundLoadTimer) clearTimeout(backgroundLoadTimer);
+    };
+  }, [assetLoadAttempt]);
+
+  const retryCriticalAssetLoad = useCallback(() => {
+    setLoadingPhase('preload');
+    setLoadingProgress(0);
+    setAssetLoadAttempt(attempt => attempt + 1);
   }, []);
   
   // Estilos CSS para las animaciones
@@ -1629,6 +1641,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   ) : null;
 
   const startSinglePlayer = useCallback(async () => {
+    if (!criticalAssetsLoaded) {
+      // The persistent Hub iframe can receive its play command while startup
+      // assets are still loading. Queue it so neither the countdown nor the
+      // competition attempt starts behind the loading screen.
+      singlePlayerStartAfterAssetsRef.current = true;
+      return;
+    }
+    singlePlayerStartAfterAssetsRef.current = false;
+
     if (
       hasPendingGameEnd ||
       competitionStartPendingRef.current ||
@@ -1716,6 +1737,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       setCompetitionStartPending(false);
     }
   }, [
+    criticalAssetsLoaded,
     gameState.status,
     hasPendingGameEnd,
     multiplayer,
@@ -1727,6 +1749,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     startGame,
     stopMusic,
   ]);
+
+  useEffect(() => {
+    if (!criticalAssetsLoaded || !singlePlayerStartAfterAssetsRef.current) return;
+    singlePlayerStartAfterAssetsRef.current = false;
+    void startSinglePlayer();
+  }, [criticalAssetsLoaded, startSinglePlayer]);
 
   useEffect(() => {
     const staleSessionId = competitionSessionRecoveryRef.current;
@@ -3069,10 +3097,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               <span style={{ width: `${Math.round(loadingProgress * 100)}%` }} />
             </div>
             <p className="th-dialog-copy" aria-live="polite">
-              {loadingPhase === 'preload'
+              {assetLoadError ?? (loadingPhase === 'preload'
                 ? `Cargando elementos esenciales · ${Math.round(loadingProgress * 100)}%`
-                : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`}
+                : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`)}
             </p>
+            {assetLoadError ? (
+              <TreasureButton size="small" onClick={retryCriticalAssetLoad}>
+                Reintentar carga
+              </TreasureButton>
+            ) : null}
           </TreasurePanel>
         </div>
       </TreasureStage>

@@ -115,6 +115,40 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     );
   });
 
+  it('no inicia la partida hasta que los assets críticos estén realmente listos', () => {
+    expect(gameContainerSource).toContain('await assetLoader.preloadCritical');
+    expect(gameContainerSource).toContain('assetLoader.areCriticalAssetsLoaded()');
+    expect(gameContainerSource).toContain('setAssetLoadError(');
+    expect(gameContainerSource).toContain('Reintentar carga');
+    expect(gameContainerSource).not.toContain('CRITICAL_ASSET_GATE_TIMEOUT_MS');
+    expect(gameContainerSource).not.toContain('Promise.race([');
+    expect(assetLoaderSource).toContain('Missing critical assets:');
+    expect(assetLoaderSource).toContain('image.naturalWidth > 0');
+    expect(gameContainerSource).toContain('singlePlayerStartAfterAssetsRef.current = true');
+    expect(gameContainerSource).toMatch(
+      /if \(!criticalAssetsLoaded\)[\s\S]{0,260}singlePlayerStartAfterAssetsRef\.current = true/,
+    );
+    expect(gameContainerSource).toMatch(
+      /if \(!criticalAssetsLoaded \|\| !singlePlayerStartAfterAssetsRef\.current\) return;[\s\S]{0,160}startSinglePlayer\(\)/,
+    );
+  });
+
+  it('precarga fallbacks visuales reales para todos los elementos iniciales', () => {
+    expect(assetLoaderSource).toContain(
+      "energy_point: { path: '/assets/collectibles/gemas.png'",
+    );
+    expect(assetLoaderSource).toContain(
+      "quicksand: { path: '/assets/obstacles/arenasmovedizas2.png'",
+    );
+    expect(gameCanvasSource).toContain("feeImgRef.current = assetLoader.getAsset('fee')");
+    expect(gameCanvasSource).toContain(
+      "quicksandImgRef.current = assetLoader.getAsset('quicksand')",
+    );
+    expect(gameCanvasSource).toContain(
+      "const loadedEnergyImg = assetLoader.getAsset('energy_point')",
+    );
+  });
+
   it('pausa el juego cuando su vista persistente queda oculta', () => {
     expect(gameContainerSource).toContain(
       "event.data?.type === 'TREASURE_HUNT_VIEW_VISIBILITY'",

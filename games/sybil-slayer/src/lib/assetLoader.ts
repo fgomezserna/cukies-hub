@@ -23,6 +23,7 @@ export type AssetKey =
   | 'checkpoint'
   | 'heart'
   | 'energy_point'
+  | 'quicksand'
   | 'purr'
   | 'vaul'
   | 'uki'
@@ -94,7 +95,8 @@ const assetConfigs: Record<AssetKey, AssetConfig> = {
   megaNode: { path: '/assets/collectibles/haku.png', priority: AssetPriority.HIGH, preload: true },
   checkpoint: { path: '/assets/collectibles/checkpointcukies.png', priority: AssetPriority.HIGH, preload: true },
   heart: { path: '/assets/collectibles/heart.png', priority: AssetPriority.HIGH, preload: true },
-  energy_point: { path: '/assets/collectibles/resource_rare_metals.png', priority: AssetPriority.HIGH, preload: true },
+  energy_point: { path: '/assets/collectibles/gemas.png', priority: AssetPriority.HIGH, preload: true },
+  quicksand: { path: '/assets/obstacles/arenasmovedizas2.png', priority: AssetPriority.HIGH, preload: true },
   uki: { path: '/assets/collectibles/uki.png', priority: AssetPriority.HIGH, preload: true },
   treasure: { path: '/assets/collectibles/tesoro.png', priority: AssetPriority.HIGH, preload: true },
   treasure2: { path: '/assets/collectibles/tesoro2.png', priority: AssetPriority.HIGH, preload: true },
@@ -188,10 +190,21 @@ export class AssetLoader {
     
     console.log(`🚀 Precargando ${criticalAssets.length} assets críticos...`);
     
-    this.preloadPromise = this.loadAssetBatch(criticalAssets, 'preload');
-    await this.preloadPromise;
-    
-    console.log('✅ Assets críticos cargados');
+    this.preloadPromise = this.loadAssetBatch(criticalAssets, 'preload')
+      .then(() => {
+        const missingAssets = criticalAssets.filter(key => !this.isAssetLoaded(key));
+        if (missingAssets.length > 0) {
+          throw new Error(`Missing critical assets: ${missingAssets.join(', ')}`);
+        }
+        console.log('✅ Assets críticos cargados');
+      })
+      .catch((error) => {
+        // A failed startup load must be retryable. Keeping a resolved batch
+        // promise here would let the game start with canvas placeholders.
+        this.preloadPromise = null;
+        throw error;
+      });
+
     return this.preloadPromise;
   }
 
@@ -281,9 +294,12 @@ export class AssetLoader {
       // Verificar cache primero
       if (this.cache.has(path)) {
         const cachedImage = this.cache.get(path)!;
-        this.loadedAssets.set(key, cachedImage);
-        resolve(cachedImage);
-        return;
+        if (this.isImageReady(cachedImage)) {
+          this.loadedAssets.set(key, cachedImage);
+          resolve(cachedImage);
+          return;
+        }
+        this.cache.delete(path);
       }
       
       const tryLoad = (attempt: number) => {
@@ -323,7 +339,8 @@ export class AssetLoader {
 
   // Obtener un asset
   public getAsset(key: AssetKey): HTMLImageElement | null {
-    return this.loadedAssets.get(key) || null;
+    const asset = this.loadedAssets.get(key);
+    return asset && this.isImageReady(asset) ? asset : null;
   }
 
   // Comprobar si los assets críticos están cargados
@@ -332,18 +349,23 @@ export class AssetLoader {
       .filter(([, config]) => config.preload === true)
       .map(([key]) => key as AssetKey);
     
-    return criticalAssets.every(key => this.loadedAssets.has(key));
+    return criticalAssets.every(key => this.isAssetLoaded(key));
   }
 
   // Comprobar si todos los assets están cargados
   public areAllAssetsLoaded(): boolean {
     const allKeys = Object.keys(assetConfigs) as AssetKey[];
-    return allKeys.every(key => this.loadedAssets.has(key));
+    return allKeys.every(key => this.isAssetLoaded(key));
   }
 
   // Comprobar si un asset específico está cargado
   public isAssetLoaded(key: AssetKey): boolean {
-    return this.loadedAssets.has(key);
+    const asset = this.loadedAssets.get(key);
+    return Boolean(asset && this.isImageReady(asset));
+  }
+
+  private isImageReady(image: HTMLImageElement): boolean {
+    return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
   }
 
   // Obtener estadísticas de carga
@@ -357,7 +379,7 @@ export class AssetLoader {
       loaded: this.loadedAssets.size,
       total: allKeys.length,
       critical: criticalKeys.length,
-      criticalLoaded: criticalKeys.filter(key => this.loadedAssets.has(key)).length
+      criticalLoaded: criticalKeys.filter(key => this.isAssetLoaded(key)).length
     };
   }
 

@@ -258,20 +258,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
         tokenImgRef.current = tokenImg;
       };
     }
-    
-    // Cargar imagen de fee (obstáculo)
-    const feeImg = new Image();
-    feeImg.src = '/assets/obstacles/fee.png';
-    feeImg.onload = () => {
-      feeImgRef.current = feeImg;
-    };
-    
-    // Cargar imagen de bug (obstáculo)
-    const bugImg = new Image();
-    bugImg.src = '/assets/obstacles/bug.png';
-    bugImg.onload = () => {
-      bugImgRef.current = bugImg;
-    };
+
+    feeImgRef.current = assetLoader.getAsset('fee');
+    bugImgRef.current = assetLoader.getAsset('bug');
+    hackerImgRef.current = assetLoader.getAsset('hacker');
+    megaNodeImgRef.current = assetLoader.getAsset('megaNode');
+    quicksandImgRef.current = assetLoader.getAsset('quicksand');
+    const loadedEnergyImg = assetLoader.getAsset('energy_point');
+    if (loadedEnergyImg) {
+      energySpritesRef.current = Array.from({ length: 6 }, () => loadedEnergyImg);
+    }
     
     // Cargar imagen de wallet para mostrar sobre el bug
     const walletImg = new Image();
@@ -284,26 +280,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando wallet_2.png:', e);
     };
     
-    // Cargar imagen de hacker (obstáculo - Trump)
-    const hackerImg = new Image();
-    hackerImg.src = '/assets/obstacles/trump.png';
-    hackerImg.onload = () => {
-      console.log('✅ Imagen trump.png cargada EXITOSAMENTE');
-      hackerImgRef.current = hackerImg;
-    };
-    hackerImg.onerror = (e) => {
-      console.error('❌ Error cargando trump.png:', e);
-    };
-    
     // ELIMINADO: Ya no necesitamos cargar la imagen estática de energía
     // porque ahora usamos sprites animados de energía
-    
-    // Cargar imagen de Haku (antes mega node) - respaldo por si fallan los sprites
-    const megaNodeImg = new Image();
-    megaNodeImg.src = '/assets/collectibles/haku.png';
-    megaNodeImg.onload = () => {
-      megaNodeImgRef.current = megaNodeImg;
-    };
     
     // Cargar sprites animados del mega nodo
     const megaNodeSprite1 = new Image();
@@ -590,17 +568,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     damageImg.src = '/assets/effects/damagecukie.png';
     damageImg.onload = () => {
       damageImgRef.current = damageImg;
-    };
-    
-    // Cargar imagen de arenas movedizas
-    const quicksandImg = new Image();
-    quicksandImg.src = '/assets/obstacles/arenasmovedizas2.png';
-    quicksandImg.onload = () => {
-      quicksandImgRef.current = quicksandImg;
-      console.log('✅ Imagen de arenas movedizas cargada correctamente');
-    };
-    quicksandImg.onerror = (e) => {
-      console.error('❌ Error cargando imagen de arenas movedizas:', e);
     };
     
     // Cargar sprites animados de purr (gato)
@@ -2102,8 +2069,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
      if ('type' in obj) {
        switch(obj.type) {
          case 'fee':
-           // Los fees no deben usar imagen estática, siempre sprites animados
-           return; // Saltar renderizado fallback para fees
+           // La imagen estática evita placeholders mientras terminan los
+           // sprites direccionales.
+           img = feeImgRef.current;
+           break;
          case 'bug':
            img = bugImgRef.current;
            break;
@@ -2614,10 +2583,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            ctx.globalAlpha = alpha;
          }
          
-         // Los fees siempre usan sprites animados, no imagen estática
+         // Los sprites animados son preferentes; la imagen estática cargada
+         // antes del inicio es el fallback visual real.
          if ('type' in obj && obj.type === 'fee') {
-           // Saltar renderizado de fee aquí - se maneja arriba con sprites
-           return;
+           const standardImgSize = imgSize * 0.9;
+           ctx.drawImage(img, obj.x - standardImgSize/2, obj.y - standardImgSize/2, standardImgSize, standardImgSize);
          } else {
            // Asegurar renderizado suave para collectibles (especialmente uki, checkpoint y otros)
            if ('type' in obj && (obj.type === 'uki' || obj.type === 'heart' || obj.type === 'vaul' || obj.type === 'checkpoint' || obj.type === 'treasure' || obj.type === 'treasure2' || obj.type === 'treasure3')) {
@@ -2648,8 +2618,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        } 
        // Para obstáculos, usar las imágenes estáticas correspondientes (excepto fee que usa sprites)
        else if (obj.type === 'fee') {
-         // Los fees no deben usar imagen estática, siempre sprites animados
-         return; // Saltar renderizado fallback para fees
+         fallbackImg = feeImgRef.current;
        } else if (obj.type === 'bug') {
          fallbackImg = bugImgRef.current;
        } else if (obj.type === 'hacker') {
@@ -2690,9 +2659,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Token
            const tokenImgSize = imgSize * 1.46;
            ctx.drawImage(fallbackImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
-         } else if (obj.type === 'fee') {
-           // Los fees no deben usar imagen estática, siempre sprites animados
-           return; // Saltar renderizado fallback para fees
          } else {
            // Otros elementos con tamaño estándar
            const standardImgSize = imgSize * 0.9;
