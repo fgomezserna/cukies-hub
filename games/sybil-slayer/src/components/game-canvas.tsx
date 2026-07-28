@@ -234,19 +234,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   
   // Cargar imágenes una vez al montar el componente
   useEffect(() => {
-    // Cargar imagen de fondo (pantallajuego)
-    const gridImg = new Image();
-    gridImg.src = '/assets/ui/game-container/pantallajuego3.png';
-    gridImg.onload = () => {
-      gridImgRef.current = gridImg;
-    };
+    // GameContainer mounts the canvas only after critical assets are ready.
+    // Reuse those exact current assets so an old board/player can never flash
+    // while the directional Cukie sprites finish loading.
+    const loadedGridImg = assetLoader.getAsset('grid_background');
+    if (loadedGridImg) {
+      gridImgRef.current = loadedGridImg;
+    } else {
+      const gridImg = new Image();
+      gridImg.src = '/assets/ui/game-container/grid-background.png';
+      gridImg.onload = () => {
+        gridImgRef.current = gridImg;
+      };
+    }
     
-    // Cargar imagen del token (jugador)
-    const tokenImg = new Image();
-    tokenImg.src = '/assets/characters/token.png';
-    tokenImg.onload = () => {
-      tokenImgRef.current = tokenImg;
-    };
+    const loadedTokenImg = assetLoader.getAsset('token');
+    if (loadedTokenImg) {
+      tokenImgRef.current = loadedTokenImg;
+    } else {
+      const tokenImg = new Image();
+      tokenImg.src = '/assets/characters/cukiesprites/south/cukie_walk_s_01.png';
+      tokenImg.onload = () => {
+        tokenImgRef.current = tokenImg;
+      };
+    }
     
     // Cargar imagen de fee (obstáculo)
     const feeImg = new Image();

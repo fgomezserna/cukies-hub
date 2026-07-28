@@ -1,5 +1,7 @@
 import {
+  advanceSinglePlayerResultSaveState,
   createSinglePlayerResultAuthority,
+  emptySinglePlayerResultSaveState,
   resolveSinglePlayerResultDispatch,
 } from '../../../games/sybil-slayer/src/lib/single-player-result-authority';
 
@@ -58,5 +60,23 @@ describe('Treasure Hunt single-player result authority', () => {
       sessionId: 'game-session-old',
       attemptId: 'competition-attempt-old',
     }, 'game-session-new')).toBeNull();
+  });
+
+  it('solo permite salir del resultado después de observar guardado y confirmación', () => {
+    const initial = emptySinglePlayerResultSaveState();
+
+    expect(advanceSinglePlayerResultSaveState(initial, 1, false)).toBe(initial);
+
+    const pending = advanceSinglePlayerResultSaveState(initial, 1, true);
+    expect(pending).toEqual({
+      pendingRunId: 1,
+      savedRunId: null,
+    });
+
+    expect(advanceSinglePlayerResultSaveState(pending, 2, false)).toBe(pending);
+    expect(advanceSinglePlayerResultSaveState(pending, 1, false)).toEqual({
+      pendingRunId: null,
+      savedRunId: 1,
+    });
   });
 });

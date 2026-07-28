@@ -5,6 +5,14 @@ const gameContainerSource = readFileSync(
   resolve(process.cwd(), '../games/sybil-slayer/src/components/game-container.tsx'),
   'utf8',
 );
+const gameCanvasSource = readFileSync(
+  resolve(process.cwd(), '../games/sybil-slayer/src/components/game-canvas.tsx'),
+  'utf8',
+);
+const assetLoaderSource = readFileSync(
+  resolve(process.cwd(), '../games/sybil-slayer/src/lib/assetLoader.ts'),
+  'utf8',
+);
 const audioSource = readFileSync(
   resolve(process.cwd(), '../games/sybil-slayer/src/hooks/useAudio.ts'),
   'utf8',
@@ -62,19 +70,39 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     expect(audioSource).not.toContain('whale_chad:');
   });
 
-  it('mantiene el guardado durable en segundo plano sin bloquear el resultado', () => {
-    expect(gameContainerSource).not.toContain('Guardando resultado…');
+  it('bloquea la salida del resultado hasta recibir confirmación durable', () => {
     expect(gameContainerSource).toContain(
+      'Guardando resultado… No cierres la partida.',
+    );
+    expect(gameContainerSource).not.toContain(
       "{ type: 'TREASURE_HUNT_RETURN_TO_MENU' }",
     );
     expect(gameContainerSource).toMatch(
-      /onClick=\{returnToTreasureHuntMenu\}[\s\S]{0,500}Volver al menú/,
+      /onClick=\{handleResetClick\}[\s\S]{0,200}disabled=\{!singlePlayerResultSaved\}/,
     );
-    expect(treasureHuntPageSource).toContain(
-      "event.data?.type === 'TREASURE_HUNT_RETURN_TO_MENU'",
+    expect(gameContainerSource).toContain(
+      'advanceSinglePlayerResultSaveState(current, runId, hasPendingGameEnd)',
     );
-    expect(treasureHuntPageSource).toContain(
-      "window.location.assign('/games/treasure-hunt')",
+  });
+
+  it('no muestra el tablero ni el Hyppie legacy mientras carga los sprites actuales', () => {
+    expect(gameCanvasSource).not.toContain(
+      "gridImg.src = '/assets/ui/game-container/pantallajuego3.png'",
+    );
+    expect(gameCanvasSource).not.toContain(
+      "tokenImg.src = '/assets/characters/token.png'",
+    );
+    expect(gameCanvasSource).toContain(
+      "assetLoader.getAsset('grid_background')",
+    );
+    expect(gameCanvasSource).toContain(
+      "assetLoader.getAsset('token')",
+    );
+    expect(assetLoaderSource).toContain(
+      "token: { path: '/assets/characters/cukiesprites/south/cukie_walk_s_01.png'",
+    );
+    expect(assetLoaderSource).not.toContain(
+      "path: '/assets/characters/token.png'",
     );
   });
 

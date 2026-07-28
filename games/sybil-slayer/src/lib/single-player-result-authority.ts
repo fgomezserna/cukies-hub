@@ -11,6 +11,40 @@ export interface SinglePlayerResultAuthority {
   readonly competitionAttemptId?: string;
 }
 
+export interface SinglePlayerResultSaveState {
+  readonly pendingRunId: number | null;
+  readonly savedRunId: number | null;
+}
+
+export function emptySinglePlayerResultSaveState(): SinglePlayerResultSaveState {
+  return {
+    pendingRunId: null,
+    savedRunId: null,
+  };
+}
+
+export function advanceSinglePlayerResultSaveState(
+  state: SinglePlayerResultSaveState,
+  runId: number | null,
+  hasPendingGameEnd: boolean,
+): SinglePlayerResultSaveState {
+  if (!Number.isSafeInteger(runId) || Number(runId) < 1) return state;
+
+  if (hasPendingGameEnd) {
+    if (state.pendingRunId === runId && state.savedRunId === null) return state;
+    return {
+      pendingRunId: runId,
+      savedRunId: null,
+    };
+  }
+
+  if (state.pendingRunId !== runId) return state;
+  return {
+    pendingRunId: null,
+    savedRunId: runId,
+  };
+}
+
 export function createSinglePlayerResultAuthority(
   runId: number,
   access: CompetitionAccessAuthority,

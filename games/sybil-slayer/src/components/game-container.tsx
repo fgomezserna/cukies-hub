@@ -57,7 +57,9 @@ import {
 } from '../lib/parent-origin';
 import { randomManager } from '../lib/random';
 import {
+  advanceSinglePlayerResultSaveState,
   createSinglePlayerResultAuthority,
+  emptySinglePlayerResultSaveState,
   resolveSinglePlayerResultDispatch,
   type SinglePlayerResultAuthority,
 } from '../lib/single-player-result-authority';
@@ -775,33 +777,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // Initialize audio system
   const { playSound, playMusic, stopMusic, setVolume, toggleMusic, isMusicEnabled, playGameOverSound, toggleSounds, isSoundsEnabled } = useAudio();
 
-  const returnToTreasureHuntMenu = useCallback(() => {
-    playSound('button_click');
-    stopMusic();
-
-    if (window.parent === window) {
-      window.location.assign(multiplayerHubEntryUrl ?? '/games/treasure-hunt');
-      return;
-    }
-
-    try {
-      const parentOrigin = resolveConfiguredParentOrigin(
-        document.referrer,
-        process.env.NEXT_PUBLIC_DAPP_ORIGIN,
-        process.env.NEXT_PUBLIC_PARENT_URL,
-        process.env.NODE_ENV,
-      );
-      window.parent.postMessage(
-        { type: 'TREASURE_HUNT_RETURN_TO_MENU' },
-        parentOrigin,
-      );
-    } catch {
-      setCompetitionStartError(
-        'No se pudo volver al Hub. Recarga la página para continuar.',
-      );
-    }
-  }, [multiplayerHubEntryUrl, playSound, stopMusic]);
-  
   // Estado para controlar el botón de música
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
@@ -852,6 +827,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const singlePlayerRunSequenceRef = useRef(0);
   const activeSinglePlayerResultAuthorityRef = useRef<SinglePlayerResultAuthority | null>(null);
   const dispatchedSinglePlayerRunIdRef = useRef<number | null>(null);
+  const [singlePlayerResultSaveState, setSinglePlayerResultSaveState] = useState(
+    emptySinglePlayerResultSaveState,
+  );
   const resultExitCoordinatorRef = useRef<ReturnType<
     typeof createCanonicalResultExitCoordinator
   > | null>(null);
@@ -1722,6 +1700,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       }
       singlePlayerRunSequenceRef.current = resultAuthority.runId;
       activeSinglePlayerResultAuthorityRef.current = resultAuthority;
+      setSinglePlayerResultSaveState(emptySinglePlayerResultSaveState());
       setCurrentMode('single');
       if (gameState.status === 'gameOver') {
         stopMusic();
@@ -1876,6 +1855,21 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (queued) dispatchedSinglePlayerRunIdRef.current = resultAuthority.runId;
     }
   }, [isMultiplayerMode, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
+
+  useEffect(() => {
+    if (isMultiplayerMode || gameState.status !== 'gameOver') return;
+    const runId = activeSinglePlayerResultAuthorityRef.current?.runId ?? null;
+    setSinglePlayerResultSaveState((current) => (
+      advanceSinglePlayerResultSaveState(current, runId, hasPendingGameEnd)
+    ));
+  }, [gameState.status, hasPendingGameEnd, isMultiplayerMode]);
+
+  const activeSinglePlayerRunId =
+    activeSinglePlayerResultAuthorityRef.current?.runId ?? null;
+  const singlePlayerResultSaved =
+    gameState.status === 'gameOver' &&
+    activeSinglePlayerRunId !== null &&
+    singlePlayerResultSaveState.savedRunId === activeSinglePlayerRunId;
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
@@ -2322,6 +2316,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
    const handleResetClick = () => {
       if (multiplayerStartPendingRef.current || localControlsLocked) return;
+      if (
+        gameState.status === 'gameOver' &&
+        !isMultiplayerMode &&
+        !singlePlayerResultSaved
+      ) return;
       playSound('button_click');
       
       // Si estamos en game over, detener el sonido de game over
@@ -3529,6 +3528,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <p className="th-dialog-copy">{gameOverCopy}</p>
                   {gameEndPersistenceError ? (
                     <p className="th-dialog-copy" role="alert">{gameEndPersistenceError}</p>
+                  ) : !singlePlayerResultSaved ? (
+                    <p className="th-dialog-copy" role="status">
+                      Guardando resultado… No cierres la partida.
+                    </p>
                   ) : null}
                   <strong className="th-result-score">{numberFormatter.format(localScore)}</strong>
                   <span className="th-result-score-label">Puntos</span>
@@ -3549,9 +3552,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     <TreasureButton
                       variant="quiet"
                       size="small"
-                      onClick={returnToTreasureHuntMenu}
+                      onClick={handleResetClick}
+                      disabled={!singlePlayerResultSaved}
+                      aria-busy={!singlePlayerResultSaved}
                     >
-                      Volver al menú
+                      {singlePlayerResultSaved ? 'Volver al menú' : 'Guardando…'}
                     </TreasureButton>
                   </div>
                 </section>
@@ -4424,7 +4429,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         
                         {/* Botón Play Again */}
                         <button
-                          onClick={returnToTreasureHuntMenu}
+                          onClick={handleResetClick}
+                          disabled={!singlePlayerResultSaved}
+                          aria-busy={!singlePlayerResultSaved}
                           className="focus:outline-none game-button relative"
                           aria-label="Volver al menú"
                         >
