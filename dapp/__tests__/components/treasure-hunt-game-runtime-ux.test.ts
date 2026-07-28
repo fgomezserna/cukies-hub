@@ -13,6 +13,10 @@ const assetLoaderSource = readFileSync(
   resolve(process.cwd(), '../games/sybil-slayer/src/lib/assetLoader.ts'),
   'utf8',
 );
+const spriteManagerSource = readFileSync(
+  resolve(process.cwd(), '../games/sybil-slayer/src/lib/spriteManager.ts'),
+  'utf8',
+);
 const audioSource = readFileSync(
   resolve(process.cwd(), '../games/sybil-slayer/src/hooks/useAudio.ts'),
   'utf8',
@@ -118,6 +122,8 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
   it('no inicia la partida hasta que los assets críticos estén realmente listos', () => {
     expect(gameContainerSource).toContain('await assetLoader.preloadCritical');
     expect(gameContainerSource).toContain('assetLoader.areCriticalAssetsLoaded()');
+    expect(gameContainerSource).toContain('await spriteManager.loadGameSprites');
+    expect(gameContainerSource).toContain('spriteManager.areGameSpritesLoaded()');
     expect(gameContainerSource).toContain('setAssetLoadError(');
     expect(gameContainerSource).toContain('Reintentar carga');
     expect(gameContainerSource).not.toContain('CRITICAL_ASSET_GATE_TIMEOUT_MS');
@@ -130,6 +136,22 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     );
     expect(gameContainerSource).toMatch(
       /if \(!criticalAssetsLoaded \|\| !singlePlayerStartAfterAssetsRef\.current\) return;[\s\S]{0,160}startSinglePlayer\(\)/,
+    );
+  });
+
+  it('precarga y reutiliza los sprites con concurrencia limitada y reintentos', () => {
+    expect(spriteManagerSource).toContain('MAX_CONCURRENT_SPRITE_REQUESTS = 6');
+    expect(spriteManagerSource).toContain('MAX_SPRITE_LOAD_ATTEMPTS = 3');
+    expect(spriteManagerSource).toContain('this.acquireRequestSlot()');
+    expect(spriteManagerSource).toContain('this.gameSpritesPromise = null');
+    expect(gameCanvasSource).toContain(
+      "spriteManager.getSpriteSheet(`token_${direction}`)",
+    );
+    expect(gameCanvasSource).toContain(
+      "spriteManager.getSpriteSheet(`fee_${direction}`)",
+    );
+    expect(gameCanvasSource).toContain(
+      "spriteManager.getSpriteSheet(`hacker_${direction}`)",
     );
   });
 
@@ -186,16 +208,34 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     expect(gameContainerSource).toContain('Finalizar partida');
   });
 
-  it('usa caché estática versionada y stale-while-revalidate', () => {
+  it('conserva los assets entre despliegues y versiona solo el shell', () => {
     expect(pwaSetupSource).toContain('NEXT_PUBLIC_GAME_CACHE_VERSION');
     expect(pwaSetupSource).toContain('`/sw.js?v=${cacheVersion}`');
     expect(serviceWorkerSource).toContain(
       "new URL(self.location.href).searchParams.get('v')",
     );
+    expect(serviceWorkerSource).toContain(
+      "const ASSET_CACHE_NAME = 'treasure-hunt-assets-v1'",
+    );
+    expect(serviceWorkerSource).toContain(
+      "const SHELL_CACHE_NAME = `${SHELL_CACHE_PREFIX}-${CACHE_VERSION}`",
+    );
+    expect(serviceWorkerSource).toContain(
+      "cacheName.startsWith(LEGACY_CACHE_PREFIX)",
+    );
+    expect(serviceWorkerSource).toContain(
+      'await assetCache.put(request, response)',
+    );
     expect(serviceWorkerSource).toContain('staleWhileRevalidate');
     expect(serviceWorkerSource).toContain("requestUrl.pathname.startsWith('/assets/')");
     expect(serviceWorkerSource).toContain(
       "requestUrl.pathname.startsWith('/_next/static/')",
+    );
+    expect(serviceWorkerSource).toContain(
+      'staleWhileRevalidate(event, ASSET_CACHE_NAME)',
+    );
+    expect(serviceWorkerSource).toContain(
+      'staleWhileRevalidate(event, SHELL_CACHE_NAME)',
     );
     expect(serviceWorkerSource).not.toContain('cache.put(event.request, responseToCache)');
   });

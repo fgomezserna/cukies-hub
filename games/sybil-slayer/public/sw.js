@@ -1,7 +1,9 @@
-const CACHE_PREFIX = 'treasure-hunt-static';
+const SHELL_CACHE_PREFIX = 'treasure-hunt-shell';
+const LEGACY_CACHE_PREFIX = 'treasure-hunt-static';
+const ASSET_CACHE_NAME = 'treasure-hunt-assets-v1';
 const CACHE_VERSION =
   new URL(self.location.href).searchParams.get('v') || 'dev';
-const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
+const SHELL_CACHE_NAME = `${SHELL_CACHE_PREFIX}-${CACHE_VERSION}`;
 const URLS_TO_CACHE = [
   '/',
   '/icon.png',
@@ -10,7 +12,7 @@ const URLS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches.open(SHELL_CACHE_NAME)
       .then((cache) => cache.addAll(URLS_TO_CACHE))
       .catch((error) => {
         console.log('Service Worker install error:', error);
@@ -21,16 +23,51 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
+    (async () => {
+      const cacheNames = await caches.keys();
+      const assetCache = await caches.open(ASSET_CACHE_NAME);
+
+      // La versión anterior guardaba shell y assets en la misma caché ligada al
+      // commit. Migrar los /assets ya descargados evita volver a pedir todos los
+      // sprites justo después del despliegue que introduce esta separación.
+      for (const cacheName of cacheNames) {
+        if (!cacheName.startsWith(LEGACY_CACHE_PREFIX)) continue;
+        const legacyCache = await caches.open(cacheName);
+        const requests = await legacyCache.keys();
+
+        for (const request of requests) {
+          const requestUrl = new URL(request.url);
+          if (
+            requestUrl.origin !== self.location.origin ||
+            !requestUrl.pathname.startsWith('/assets/')
+          ) {
+            continue;
           }
-          return Promise.resolve(false);
-        })
+
+          if (await assetCache.match(request)) continue;
+          const response = await legacyCache.match(request);
+          if (response) {
+            try {
+              await assetCache.put(request, response);
+            } catch {
+              // Una cuota de caché limitada no debe impedir activar el worker.
+            }
+          }
+        }
+      }
+
+      await Promise.all(
+        cacheNames.map((cacheName) => {
+          const isOldShell =
+            cacheName.startsWith(SHELL_CACHE_PREFIX) &&
+            cacheName !== SHELL_CACHE_NAME;
+          const isLegacyCache = cacheName.startsWith(LEGACY_CACHE_PREFIX);
+          return isOldShell || isLegacyCache
+            ? caches.delete(cacheName)
+            : Promise.resolve(false);
+        }),
       );
-    })
+    })(),
   );
   event.waitUntil(self.clients.claim());
 });
@@ -38,15 +75,19 @@ self.addEventListener('activate', (event) => {
 function isStaticAsset(requestUrl) {
   return (
     requestUrl.origin === self.location.origin &&
-    (
-      requestUrl.pathname.startsWith('/assets/') ||
-      requestUrl.pathname.startsWith('/_next/static/')
-    )
+    requestUrl.pathname.startsWith('/assets/')
   );
 }
 
-async function staleWhileRevalidate(event) {
-  const cache = await caches.open(CACHE_NAME);
+function isVersionedAppAsset(requestUrl) {
+  return (
+    requestUrl.origin === self.location.origin &&
+    requestUrl.pathname.startsWith('/_next/static/')
+  );
+}
+
+async function staleWhileRevalidate(event, cacheName) {
+  const cache = await caches.open(cacheName);
   const cachedResponse = await cache.match(event.request);
   const networkResponse = fetch(
     event.request,
@@ -54,7 +95,11 @@ async function staleWhileRevalidate(event) {
   )
     .then(async (response) => {
       if (response.ok && response.type === 'basic') {
-        await cache.put(event.request, response.clone());
+        try {
+          await cache.put(event.request, response.clone());
+        } catch {
+          // Servir la respuesta de red aunque el navegador no pueda persistirla.
+        }
       }
       return response;
     })
@@ -72,8 +117,12 @@ async function networkFirstNavigation(request) {
   try {
     const response = await fetch(request);
     if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      await cache.put('/', response.clone());
+      const cache = await caches.open(SHELL_CACHE_NAME);
+      try {
+        await cache.put('/', response.clone());
+      } catch {
+        // La navegación de red sigue siendo válida aunque la caché esté llena.
+      }
     }
     return response;
   } catch {
@@ -86,7 +135,12 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url);
   if (isStaticAsset(requestUrl)) {
-    event.respondWith(staleWhileRevalidate(event));
+    event.respondWith(staleWhileRevalidate(event, ASSET_CACHE_NAME));
+    return;
+  }
+
+  if (isVersionedAppAsset(requestUrl)) {
+    event.respondWith(staleWhileRevalidate(event, SHELL_CACHE_NAME));
     return;
   }
 

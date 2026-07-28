@@ -37,6 +37,7 @@ import {
 import { FPS, MOBILE_FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
 import { performanceMonitor } from '../lib/performanceMonitor';
+import { spriteManager } from '../lib/spriteManager';
 import {
   canResumeLocalPlayerInSuddenDeath,
   createMultiplayerRoomCode,
@@ -891,7 +892,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [criticalAssetsLoaded, setCriticalAssetsLoaded] = useState(false);
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingPhase, setLoadingPhase] = useState<'preload' | 'full'>('preload');
+  const [loadingPhase, setLoadingPhase] = useState<'preload' | 'sprites' | 'full'>('preload');
   const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
   const [assetLoadAttempt, setAssetLoadAttempt] = useState(0);
 
@@ -913,12 +914,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         console.log('🚀 Iniciando carga optimizada de assets...');
         setLoadingPhase('preload');
 
-        // El canvas gestiona sus propios sprites. Bloquear el arranque con un
-        // segundo precargador duplicaba más de cien peticiones y ahogaba los
-        // assets que sí son necesarios para mostrar el juego.
         await assetLoader.preloadCritical((progress) => {
           if (cancelled) return;
-          setLoadingProgress(progress * 0.9);
+          setLoadingProgress(progress * 0.25);
         });
 
         if (cancelled) return;
@@ -926,8 +924,22 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           throw new Error('Critical asset verification failed');
         }
 
+        // Los frames animados se cargan una sola vez, con concurrencia limitada
+        // y reintentos. El canvas reutiliza estas mismas imágenes y no genera
+        // una ráfaga nueva de cientos de peticiones al comenzar la partida.
+        setLoadingPhase('sprites');
+        await spriteManager.loadGameSprites((progress) => {
+          if (cancelled) return;
+          setLoadingProgress(0.25 + progress * 0.75);
+        });
+
+        if (cancelled) return;
+        if (!spriteManager.areGameSpritesLoaded()) {
+          throw new Error('Gameplay sprite verification failed');
+        }
+
         performanceMonitor.endTimer('criticalAssets');
-        setLoadingProgress(0.9);
+        setLoadingProgress(1);
         setCriticalAssetsLoaded(true);
 
         // Fase 2: Cargar assets restantes en background
@@ -938,7 +950,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           
           await assetLoader.loadRemaining((progress, phase) => {
             if (cancelled) return;
-            setLoadingProgress(0.9 + (progress * 0.1)); // 10% restante
             setLoadingPhase(phase);
           });
 
@@ -3097,9 +3108,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               <span style={{ width: `${Math.round(loadingProgress * 100)}%` }} />
             </div>
             <p className="th-dialog-copy" aria-live="polite">
-              {assetLoadError ?? (loadingPhase === 'preload'
-                ? `Cargando elementos esenciales · ${Math.round(loadingProgress * 100)}%`
-                : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`)}
+              {assetLoadError ?? (
+                loadingPhase === 'preload'
+                  ? `Cargando elementos esenciales · ${Math.round(loadingProgress * 100)}%`
+                  : loadingPhase === 'sprites'
+                    ? `Preparando personajes y animaciones · ${Math.round(loadingProgress * 100)}%`
+                    : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`
+              )}
             </p>
             {assetLoadError ? (
               <TreasureButton size="small" onClick={retryCriticalAssetLoad}>

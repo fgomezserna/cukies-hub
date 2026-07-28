@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { assetLoader } from '@/lib/assetLoader';
+import { spriteManager } from '@/lib/spriteManager';
 import type { GameState, Token, Obstacle, Collectible, DirectionType, RayHazard, RedZone } from '@/types/game';
 import {
     TOKEN_COLOR, FEE_COLOR, BUG_COLOR, HACKER_COLOR,
@@ -268,6 +269,56 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     if (loadedEnergyImg) {
       energySpritesRef.current = Array.from({ length: 6 }, () => loadedEnergyImg);
     }
+
+    const spriteDirections: DirectionType[] = [
+      'up',
+      'down',
+      'left',
+      'right',
+      'north_west',
+      'north_east',
+      'south_west',
+      'south_east',
+    ];
+
+    spriteDirections.forEach(direction => {
+      const tokenFrames = spriteManager.getSpriteSheet(`token_${direction}`)?.frames ?? [];
+      tokenSpritesRef.current[direction] = tokenFrames;
+      tokenRunSpritesRef.current[direction] = tokenFrames;
+      feeSpritesRef.current[direction] =
+        spriteManager.getSpriteSheet(`fee_${direction}`)?.frames ?? [];
+    });
+
+    (['up', 'left', 'right'] as const).forEach(direction => {
+      hackerSpritesRef.current[direction] =
+        spriteManager.getSpriteSheet(`hacker_${direction}`)?.frames ?? [];
+    });
+
+    const megaNodeFrames = spriteManager.getSpriteSheet('mega_node')?.frames ?? [];
+    megaNodeSprite1Ref.current = megaNodeFrames[0] ?? null;
+    megaNodeSprite2Ref.current = megaNodeFrames[1] ?? null;
+    megaNodeSprite3Ref.current = megaNodeFrames[2] ?? null;
+
+    const purrFrames = spriteManager.getSpriteSheet('purr')?.frames ?? [];
+    purrSprite1Ref.current = purrFrames[0] ?? null;
+    purrSprite2Ref.current = purrFrames[1] ?? null;
+    purrSprite3Ref.current = purrFrames[2] ?? null;
+
+    const bugFrames = spriteManager.getSpriteSheet('bug')?.frames ?? [];
+    bugSprite1Ref.current = bugFrames[0] ?? null;
+    bugSprite2Ref.current = bugFrames[1] ?? null;
+    bugSprite3Ref.current = bugFrames[2] ?? null;
+
+    energySpritesRef.current =
+      spriteManager.getSpriteSheet('energy')?.frames ?? energySpritesRef.current;
+    explosionSpritesRef.current =
+      spriteManager.getSpriteSheet('explosion')?.frames ?? [];
+    enExplosionSpritesRef.current =
+      spriteManager.getSpriteSheet('energy_explosion')?.frames ?? [];
+    greenExplosionSpritesRef.current =
+      spriteManager.getSpriteSheet('green_explosion')?.frames ?? [];
+    damageImgRef.current =
+      spriteManager.getSpriteSheet('damage')?.frames[0] ?? null;
     
     // Cargar imagen de wallet para mostrar sobre el bug
     const walletImg = new Image();
@@ -283,6 +334,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
     // ELIMINADO: Ya no necesitamos cargar la imagen estática de energía
     // porque ahora usamos sprites animados de energía
     
+    // Respaldo legacy: GameContainer no monta el canvas hasta que SpriteManager
+    // verifica todos los grupos. Se mantiene solo para usos aislados del canvas.
+    if (!spriteManager.areGameSpritesLoaded()) {
     // Cargar sprites animados del mega nodo
     const megaNodeSprite1 = new Image();
     megaNodeSprite1.src = '/assets/collectibles/mega_node/mega_node_1.png';
@@ -642,6 +696,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando bug sprite 3:', e);
     };
     bugSprite3.src = '/assets/characters/bug/bug_3.png';
+    }
     
     // ELIMINADO: Carga de imagen de overlay de pausa (ya no se usa)
     // El overlay de pausa se maneja en game-container.tsx
@@ -3451,6 +3506,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   }, []);
 
   useEffect(() => {
+    if (spriteManager.areGameSpritesLoaded()) return;
     preloadSprites();
   }, [preloadSprites]);
 
@@ -3488,6 +3544,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
   // Ejecutar precarga prioritaria antes que el resto
   useEffect(() => {
+    if (spriteManager.areGameSpritesLoaded()) return;
     preloadPrioritySprites()
       .then(() => console.log('✨ Precarga de sprites prioritarios completada'))
       .catch(() => console.warn('⚠️ Algunos sprites prioritarios no se pudieron cargar'));
