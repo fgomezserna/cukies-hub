@@ -50,6 +50,10 @@ export type ChainCursor = {
   contractAddress: string;
   eventName: EventName;
   nextBlock?: number;
+  processedFromBlock?: number;
+  processedFromTimestampMs?: number;
+  processedThroughBlock?: number;
+  processedThroughTimestampMs?: number;
   nextTimestampMs?: number;
   fingerprint?: string | null;
   safeBlock?: number;

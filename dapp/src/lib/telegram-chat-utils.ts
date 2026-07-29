@@ -175,8 +175,8 @@ export async function createGameChatRooms(): Promise<void> {
     const games = [
       {
         gameId: 'sybil-slayer',
-        name: 'Sybil Slayer Chat',
-        description: 'Chat for Sybil Slayer game players',
+        name: 'Treasure Hunt Chat',
+        description: 'Chat for Treasure Hunt players',
       },
       {
         gameId: 'hyppie-road',

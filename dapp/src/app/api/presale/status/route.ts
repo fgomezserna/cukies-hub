@@ -175,6 +175,7 @@ export async function GET() {
     totals: {
       totalUkiForSale: totalUkiForSale?.toString() ?? null,
       totalAsmRaised: totalAsmRaised?.toString() ?? null,
+      totalAsmRaisedFormatted: totalAsmRaised ? formatUnits(totalAsmRaised, 18) : null,
       totalUkiSold: totalUkiSold?.toString() ?? null,
     },
   });

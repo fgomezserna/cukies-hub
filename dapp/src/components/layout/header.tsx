@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Bell, Wallet, Settings, LogOut, PanelLeft } from 'lucide-react';
+import { Bell, Wallet, UserRound, LogOut, PanelLeft } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -25,7 +25,12 @@ import { useAuth } from '@/providers/auth-provider';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useAccount, useConnect, useDisconnect, type Connector } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
-import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import {
+  getMobileWalletConnector,
+  getMobileWalletLaunchUrl,
+  getVisibleWalletConnectors,
+  type MobileWalletId,
+} from '@/lib/wallet-connectors';
 import { HeaderWalletDialog } from '@/components/layout/header-wallet-dialog';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +39,7 @@ import { cn } from '@/lib/utils';
 const ranks = [
   { xp: 50000, name: 'Hyppie Master' },
   { xp: 20000, name: 'Hyperliquid Veteran' },
-  { xp: 10000, name: 'Sybil Slayer' },
+  { xp: 10000, name: 'Treasure Hunter' },
   { xp: 5000, name: 'Experimented Hyppie' },
   { xp: 2500, name: 'Explorer' },
 ];
@@ -70,6 +75,12 @@ export default function Header({ variant = 'default' }: HeaderProps) {
     () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
     [connectors, hasMounted],
   );
+
+  useEffect(() => {
+    const openWalletDialog = () => setIsWalletDialogOpen(true);
+    window.addEventListener('cukies:open-wallet-dialog', openWalletDialog);
+    return () => window.removeEventListener('cukies:open-wallet-dialog', openWalletDialog);
+  }, []);
   
   // This would come from user data in a real app
   const userXP = user?.xp ?? 0;
@@ -118,6 +129,27 @@ export default function Header({ variant = 'default' }: HeaderProps) {
     } catch (error) {
       console.error('Failed to connect TronLink:', error);
     }
+  };
+
+  const handleMobileWallet = async (walletId: MobileWalletId) => {
+    const connector = getMobileWalletConnector(evmConnectors, walletId);
+    if (connector) {
+      await handleConnectEVM(connector);
+      return;
+    }
+
+    const launchUrl = getMobileWalletLaunchUrl(walletId, window.location.href);
+    setIsWalletDialogOpen(false);
+
+    if (walletId === 'safepal' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+      } catch {
+        // SafePal still opens its official install page when clipboard access is unavailable.
+      }
+    }
+
+    window.location.assign(launchUrl);
   };
 
   return (
@@ -204,8 +236,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                 variant="ghost"
                 className={cn(
                   'relative h-10 w-10 rounded-full group hover:bg-teal-400/10 transition-all duration-300',
-                  isGameOverlay && 'h-11 w-11',
+                  isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-emerald-300/30 bg-black/55 px-2 pr-3 text-white backdrop-blur-md hover:bg-black/70',
                 )}
+                aria-label={isGameOverlay ? 'Wallet conectada' : undefined}
               >
                 <Avatar
                   className={cn(
@@ -218,6 +251,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                     {user.username?.slice(0,1).toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
+                {isGameOverlay ? (
+                  <span className="hidden text-xs font-bold sm:inline">Wallet conectada</span>
+                ) : null}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10">
@@ -244,9 +280,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                 <span>Mi wallet</span>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-teal-400/10 transition-colors">
-                <Link href="/settings">
-                  <Settings className="mr-3 h-4 w-4 text-cyan-300" />
-                  <span>Ajustes</span>
+                <Link href={isGameOverlay ? '/games/treasure-hunt/profile' : '/profile'}>
+                  <UserRound className="mr-3 h-4 w-4 text-cyan-300" />
+                  <span>Mi perfil</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-teal-400/20" />
@@ -269,7 +305,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                   ? 'cursor-not-allowed bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/30 animate-pulse'
                   : 'bg-gradient-to-r from-teal-400 to-teal-500 shadow-teal-400/30 hover:from-teal-500 hover:to-teal-600 hover:scale-105 hover:shadow-xl hover:shadow-teal-400/40',
                 'rounded-xl px-6 py-2 font-bold text-white shadow-lg transition-all duration-300',
-                isGameOverlay && 'h-11 w-11 rounded-full border border-cyan-200/30 bg-black/45 p-0 backdrop-blur-md hover:bg-black/65',
+                isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-cyan-200/30 bg-black/55 px-4 backdrop-blur-md hover:bg-black/70',
               )}
               aria-label={isWaitingForApproval ? 'Esperando aprobación de wallet' : 'Conectar wallet'}
               title={isGameOverlay ? 'Conectar wallet' : undefined}
@@ -277,14 +313,14 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               {isWaitingForApproval || isAuthLoading ? (
                 <>
                   <div className={cn('animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent', !isGameOverlay && 'md:mr-2')} />
-                  <span className={cn(isGameOverlay ? 'sr-only' : 'hidden md:inline')}>
+                  <span className={cn(isGameOverlay ? 'hidden sm:inline' : 'hidden md:inline')}>
                     {isWaitingForApproval ? 'Esperando aprobación...' : 'Cargando...'}
                   </span>
                 </>
               ) : (
                 <>
                   <Wallet className={cn('h-4 w-4', !isGameOverlay && 'md:mr-2')} />
-                  <span className={cn(isGameOverlay ? 'sr-only' : 'hidden md:inline')}>Conectar wallet</span>
+                  <span className={cn(isGameOverlay ? 'hidden sm:inline' : 'hidden md:inline')}>Conectar wallet</span>
                 </>
               )}
             </Button>
@@ -293,6 +329,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               open={isWalletDialogOpen}
               onOpenChange={setIsWalletDialogOpen}
               connectors={evmConnectors}
+              onSelectMobileWallet={(walletId) => void handleMobileWallet(walletId)}
               onSelectConnector={(connector) => void handleConnectEVM(connector)}
               tronLink={{
                 error: tronError,

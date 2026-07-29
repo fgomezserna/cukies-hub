@@ -37,14 +37,14 @@ const questsData = [
     ],
   },
   {
-    title: 'Sybil Slayer Rookie',
+    title: 'Treasure Hunt Rookie',
     description: 'Get your hands dirty in our first game.',
     xp: 100,
-    tasks: [{ title: 'Play 3 games of Sybil Slayer', validationApiEndpoint: '/api/tasks/validate/play-sybil-slayer-games' }],
+    tasks: [{ title: 'Play 3 games of Treasure Hunt', validationApiEndpoint: '/api/tasks/validate/play-sybil-slayer-games' }],
   },
   {
-    title: 'Sybil Slayer Pro',
-    description: 'Show your skill and achieve a high score in SYBIL SLAYER.',
+    title: 'Treasure Hunt Pro',
+    description: 'Show your skill and achieve a high score in Treasure Hunt.',
     xp: 250,
     tasks: [{ title: 'Score over 2000 points in one match', validationApiEndpoint: '/api/tasks/validate/sybil-slayer-highscore' }],
   },
@@ -62,7 +62,7 @@ const gamesData = [
     ranks: [
       { xp: 50000, name: 'Hyppie Master', icon: 'Crown', color: 'text-yellow-400' },
       { xp: 20000, name: 'Hyperliquid Veteran', icon: 'Medal', color: 'text-purple-400' },
-      { xp: 10000, name: 'Sybil Slayer', icon: 'Trophy', color: 'text-orange-400' },
+      { xp: 10000, name: 'Treasure Hunter', icon: 'Trophy', color: 'text-orange-400' },
       { xp: 5000, name: 'Experimented Hyppie', icon: 'Star', color: 'text-blue-400' },
       { xp: 2500, name: 'Explorer', icon: 'Star', color: 'text-green-400' },
     ],
@@ -192,4 +192,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  }); 
+  });

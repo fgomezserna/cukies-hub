@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import React, { useEffect, useMemo, useState } from 'react';
-import { SoundType } from '@/hooks/useAudio';
+import { SoundType } from '../hooks/useAudio';
 import { TreasureButton, TreasurePanel } from './treasure-hunt-ui';
 
 interface InfoModalProps {

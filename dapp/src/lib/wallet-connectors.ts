@@ -2,24 +2,44 @@ import type { Connector } from 'wagmi';
 import type { EIP1193Provider } from 'viem';
 
 export const TRONLINK_EVM_CONNECTOR_ID = 'tronLinkEvm';
+export const SAFEPAL_EVM_CONNECTOR_ID = 'safePalEvm';
+export const TRUST_WALLET_EVM_CONNECTOR_ID = 'trustWalletEvm';
+export const TOKENPOCKET_EVM_CONNECTOR_ID = 'tokenPocketEvm';
+
+export type MobileWalletId = 'safepal' | 'trustWallet' | 'metaMask' | 'tokenPocket';
 
 type ConnectorLike = Pick<Connector, 'icon' | 'id' | 'name' | 'type' | 'rdns'>;
 
+type TaggedEvmProvider = EIP1193Provider & {
+  isMetaMask?: true;
+  isSafePal?: true;
+  isTokenPocket?: true;
+  isTrust?: true;
+  isTrustWallet?: true;
+  rdns?: string;
+};
+
 type BrowserWindowWithTronLink = {
-  ethereum?: EIP1193Provider & {
-    providers?: EIP1193Provider[];
+  ethereum?: TaggedEvmProvider & {
+    providers?: TaggedEvmProvider[];
     isPhantom?: boolean;
     isTronLink?: boolean;
     isTronlink?: boolean;
     rdns?: string;
   };
   phantom?: { ethereum?: EIP1193Provider };
+  safepalProvider?: TaggedEvmProvider;
+  tokenpocket?: { ethereum?: TaggedEvmProvider };
+  trustwallet?: { ethereum?: TaggedEvmProvider };
   tron?: { ethereum?: EIP1193Provider };
   tronLink?: { ethereum?: EIP1193Provider; provider?: EIP1193Provider };
 };
 
 const CONNECTOR_ORDER = [
+  SAFEPAL_EVM_CONNECTOR_ID,
+  TRUST_WALLET_EVM_CONNECTOR_ID,
   'metaMask',
+  TOKENPOCKET_EVM_CONNECTOR_ID,
   TRONLINK_EVM_CONNECTOR_ID,
   'injected',
   'walletConnect',
@@ -52,9 +72,69 @@ export function isMetaMaskConnector(connector: ConnectorLike) {
   return connector.id === 'metaMask' || text.toLowerCase().includes('metamask');
 }
 
+export function isSafePalConnector(connector: ConnectorLike) {
+  const text = `${connector.id} ${connector.name} ${connector.type} ${normalizeConnectorText(connector.rdns)}`;
+  return connector.id === SAFEPAL_EVM_CONNECTOR_ID || text.toLowerCase().includes('safepal');
+}
+
+export function isTrustWalletConnector(connector: ConnectorLike) {
+  const text = `${connector.id} ${connector.name} ${connector.type} ${normalizeConnectorText(connector.rdns)}`;
+  const normalized = text.toLowerCase();
+  return connector.id === TRUST_WALLET_EVM_CONNECTOR_ID ||
+    normalized.includes('trust wallet') ||
+    normalized.includes('trustwallet');
+}
+
+export function isTokenPocketConnector(connector: ConnectorLike) {
+  const text = `${connector.id} ${connector.name} ${connector.type} ${normalizeConnectorText(connector.rdns)}`;
+  const normalized = text.toLowerCase();
+  return connector.id === TOKENPOCKET_EVM_CONNECTOR_ID ||
+    normalized.includes('tokenpocket') ||
+    normalized.includes('token pocket');
+}
+
 export function isTronLinkEvmConnector(connector: ConnectorLike) {
   const text = `${connector.id} ${connector.name} ${connector.type} ${normalizeConnectorText(connector.rdns)}`;
   return connector.id === TRONLINK_EVM_CONNECTOR_ID || text.toLowerCase().includes('tronlink');
+}
+
+function findProvider(
+  windowObject: unknown,
+  predicate: (provider: TaggedEvmProvider) => boolean,
+) {
+  const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  const providers = browserWindow?.ethereum?.providers ?? [];
+  return providers.find(predicate);
+}
+
+export function findSafePalEvmProvider(windowObject?: unknown) {
+  const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  return browserWindow?.safepalProvider ?? findProvider(windowObject, (provider) => (
+    Boolean(provider.isSafePal || provider.rdns?.toLowerCase().includes('safepal'))
+  ));
+}
+
+export function findTrustWalletEvmProvider(windowObject?: unknown) {
+  const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  if (browserWindow?.trustwallet?.ethereum) return browserWindow.trustwallet.ethereum;
+  if (browserWindow?.ethereum?.isTrust || browserWindow?.ethereum?.isTrustWallet) {
+    return browserWindow.ethereum;
+  }
+  return findProvider(windowObject, (provider) => Boolean(
+    provider.isTrust ||
+    provider.isTrustWallet ||
+    provider.rdns?.toLowerCase().includes('trustwallet'),
+  ));
+}
+
+export function findTokenPocketEvmProvider(windowObject?: unknown) {
+  const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  if (browserWindow?.tokenpocket?.ethereum) return browserWindow.tokenpocket.ethereum;
+  if (browserWindow?.ethereum?.isTokenPocket) return browserWindow.ethereum;
+  return findProvider(windowObject, (provider) => Boolean(
+    provider.isTokenPocket ||
+    provider.rdns?.toLowerCase().includes('tokenpocket'),
+  ));
 }
 
 export function findTronLinkEvmProvider(windowObject?: unknown) {
@@ -99,7 +179,10 @@ function isDefaultInjectedPhantomProvider(windowObject?: unknown) {
 
 export function getConnectorDisplayName(connector: ConnectorLike) {
   if (isPhantomConnector(connector)) return 'Phantom';
+  if (isSafePalConnector(connector)) return 'SafePal';
+  if (isTrustWalletConnector(connector)) return 'Trust Wallet';
   if (isMetaMaskConnector(connector)) return 'MetaMask';
+  if (isTokenPocketConnector(connector)) return 'TokenPocket';
   if (isTronLinkEvmConnector(connector)) return 'TronLink EVM';
   if (isWalletConnectConnector(connector)) return 'WalletConnect';
   if (isCoinbaseWalletConnector(connector)) return 'Coinbase Wallet';
@@ -113,8 +196,20 @@ export function getConnectorDescription(connector: ConnectorLike) {
     return 'No disponible para la preventa en BNB Smart Chain.';
   }
 
+  if (isSafePalConnector(connector)) {
+    return 'SafePal móvil o extensión en BNB Smart Chain.';
+  }
+
+  if (isTrustWalletConnector(connector)) {
+    return 'Trust Wallet móvil o extensión en BNB Smart Chain.';
+  }
+
   if (isMetaMaskConnector(connector)) {
     return 'Extension, navegador movil o deep link oficial.';
+  }
+
+  if (isTokenPocketConnector(connector)) {
+    return 'TokenPocket móvil mediante su navegador DApp.';
   }
 
   if (isTronLinkEvmConnector(connector)) {
@@ -148,13 +243,19 @@ export function getConnectorLogoSrc(connector: ConnectorLike) {
 
 function getConnectorPriority(connector: ConnectorLike) {
   if (isPhantomConnector(connector)) return Number.POSITIVE_INFINITY;
+  if (connector.id === SAFEPAL_EVM_CONNECTOR_ID) return CONNECTOR_ORDER.indexOf(SAFEPAL_EVM_CONNECTOR_ID);
+  if (connector.id === TRUST_WALLET_EVM_CONNECTOR_ID) return CONNECTOR_ORDER.indexOf(TRUST_WALLET_EVM_CONNECTOR_ID);
+  if (connector.id === TOKENPOCKET_EVM_CONNECTOR_ID) return CONNECTOR_ORDER.indexOf(TOKENPOCKET_EVM_CONNECTOR_ID);
   if (connector.id === TRONLINK_EVM_CONNECTOR_ID) return CONNECTOR_ORDER.indexOf(TRONLINK_EVM_CONNECTOR_ID);
   if (connector.id === 'metaMask') return CONNECTOR_ORDER.indexOf('metaMask');
 
   const exactIndex = CONNECTOR_ORDER.indexOf(connector.id);
   if (exactIndex >= 0) return exactIndex;
 
+  if (isSafePalConnector(connector)) return CONNECTOR_ORDER.indexOf(SAFEPAL_EVM_CONNECTOR_ID) + 0.1;
+  if (isTrustWalletConnector(connector)) return CONNECTOR_ORDER.indexOf(TRUST_WALLET_EVM_CONNECTOR_ID) + 0.1;
   if (isMetaMaskConnector(connector)) return CONNECTOR_ORDER.indexOf('metaMask') + 0.1;
+  if (isTokenPocketConnector(connector)) return CONNECTOR_ORDER.indexOf(TOKENPOCKET_EVM_CONNECTOR_ID) + 0.1;
   if (isTronLinkEvmConnector(connector)) return CONNECTOR_ORDER.indexOf(TRONLINK_EVM_CONNECTOR_ID) + 0.1;
   if (isWalletConnectConnector(connector)) return CONNECTOR_ORDER.indexOf('walletConnect');
   if (isCoinbaseWalletConnector(connector)) return CONNECTOR_ORDER.indexOf('coinbaseWalletSDK');
@@ -180,7 +281,10 @@ export function getSortedWalletConnectors<TConnector extends ConnectorLike>(conn
 
 function getConnectorFamilyKey(connector: ConnectorLike) {
   if (isPhantomConnector(connector)) return 'phantom';
+  if (isSafePalConnector(connector)) return 'safepal';
+  if (isTrustWalletConnector(connector)) return 'trustwallet';
   if (isMetaMaskConnector(connector)) return 'metamask';
+  if (isTokenPocketConnector(connector)) return 'tokenpocket';
   if (isTronLinkEvmConnector(connector)) return 'tronlink-evm';
   if (isWalletConnectConnector(connector)) return 'walletconnect';
   if (isCoinbaseWalletConnector(connector)) return 'coinbase';
@@ -207,6 +311,21 @@ export function getVisibleWalletConnectors<TConnector extends ConnectorLike>(
     if (connector.id === TRONLINK_EVM_CONNECTOR_ID) {
       if (!hasDedicatedTronLinkProvider) continue;
     }
+    if (connector.id === SAFEPAL_EVM_CONNECTOR_ID && !findSafePalEvmProvider(browserWindow)) {
+      continue;
+    }
+    if (
+      connector.id === TRUST_WALLET_EVM_CONNECTOR_ID &&
+      !findTrustWalletEvmProvider(browserWindow)
+    ) {
+      continue;
+    }
+    if (
+      connector.id === TOKENPOCKET_EVM_CONNECTOR_ID &&
+      !findTokenPocketEvmProvider(browserWindow)
+    ) {
+      continue;
+    }
 
     if (connector.id === 'injected' && connector.name === 'Injected' && defaultInjectedProviderIsPhantom) {
       continue;
@@ -224,4 +343,45 @@ export function getVisibleWalletConnectors<TConnector extends ConnectorLike>(
 
 export function getPreferredWalletConnector<TConnector extends ConnectorLike>(connectors: readonly TConnector[]) {
   return getVisibleWalletConnectors(connectors)[0];
+}
+
+export function getMobileWalletConnector<TConnector extends ConnectorLike>(
+  connectors: readonly TConnector[],
+  walletId: MobileWalletId,
+) {
+  return connectors.find((connector) => {
+    switch (walletId) {
+      case 'safepal':
+        return isSafePalConnector(connector);
+      case 'trustWallet':
+        return isTrustWalletConnector(connector);
+      case 'metaMask':
+        return isMetaMaskConnector(connector);
+      case 'tokenPocket':
+        return isTokenPocketConnector(connector);
+    }
+  });
+}
+
+export function getMobileWalletLaunchUrl(walletId: MobileWalletId, dappUrl: string) {
+  const parsed = new URL(dappUrl);
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Unsupported dapp URL');
+  }
+  const normalizedUrl = parsed.toString();
+
+  switch (walletId) {
+    case 'safepal':
+      return 'https://www.safepal.com/download?product=1';
+    case 'trustWallet':
+      return `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(normalizedUrl)}`;
+    case 'metaMask':
+      return `https://metamask.app.link/dapp/${normalizedUrl.replace(/^https?:\/\//, '')}`;
+    case 'tokenPocket':
+      return `tpdapp://open?params=${encodeURIComponent(JSON.stringify({
+        url: normalizedUrl,
+        chain: 'BSC',
+        source: 'Cukies World',
+      }))}`;
+  }
 }

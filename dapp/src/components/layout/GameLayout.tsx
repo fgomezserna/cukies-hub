@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect, ReactNode } from 'react';
-import Link from 'next/link';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Maximize, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
@@ -28,10 +27,24 @@ interface FullscreenDocument extends Document {
   msExitFullscreen?: () => Promise<void> | void;
 }
 
+interface LockableScreenOrientation {
+  lock?: (orientation: 'landscape') => Promise<void>;
+  unlock?: () => void;
+}
+
+interface MetaMaskBrowserWindow extends Window {
+  ethereum?: {
+    isMetaMask?: boolean;
+  };
+}
+
 interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
   children?: ReactNode; // For any additional game-specific content
+  desktopBanner?: ReactNode; // Important desktop context rendered above the game shell
+  desktopSidebar?: ReactNode; // Optional game-specific preparation/status panel
+  desktopFooter?: ReactNode;
   mobileFocus?: boolean;
 }
 
@@ -59,6 +72,15 @@ const renderIcon = (iconName: string, className: string = "h-4 w-4") => {
   return iconMap[iconName] || <Star className={className} />;
 };
 
+function needsCssLandscapeFallback() {
+  const browserWindow = window as MetaMaskBrowserWindow;
+  const isAndroid = /Android/i.test(window.navigator.userAgent);
+  const isMetaMaskBrowser = Boolean(browserWindow.ethereum?.isMetaMask);
+  const isPortraitViewport = window.innerHeight > window.innerWidth;
+
+  return isAndroid && isMetaMaskBrowser && isPortraitViewport;
+}
+
 export default function GameLayout({ 
   gameConfig, 
   gameStats, 
@@ -67,6 +89,9 @@ export default function GameLayout({
   onGameConnection,
   iframeRef: externalIframeRef,
   children,
+  desktopBanner,
+  desktopSidebar,
+  desktopFooter,
   mobileFocus = false,
 }: GameLayoutComponentProps) {
   const gameContainerRef = useRef<FullscreenElement>(null);
@@ -76,6 +101,10 @@ export default function GameLayout({
   const isMobileGameShell = useMobileGameShell();
   const isMobileFocus = mobileFocus && isMobileGameShell;
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+  const [isFallbackFullscreen, setIsFallbackFullscreen] = useState(false);
+  const [isCssRotatedLandscape, setIsCssRotatedLandscape] = useState(false);
+  const isFullscreen = isNativeFullscreen || isFallbackFullscreen;
 
   // Call the game connection callback when iframe ref is ready (optional)
   useEffect(() => {
@@ -84,32 +113,152 @@ export default function GameLayout({
     }
   }, [onGameConnection, iframeRef]);
 
-  const handleFullScreen = () => {
-    const element = gameContainerRef.current;
+  const unlockOrientation = useCallback(() => {
+    const orientation = window.screen.orientation as LockableScreenOrientation | undefined;
+    try {
+      orientation?.unlock?.();
+    } catch {
+      // Some wallet browsers expose the API but reject orientation changes.
+    }
+  }, []);
+
+  const requestLandscape = useCallback(async () => {
+    const orientation = window.screen.orientation as LockableScreenOrientation | undefined;
+    if (!orientation?.lock) return;
+    try {
+      await orientation.lock('landscape');
+    } catch {
+      // The app-level fullscreen and CSS rotation fallbacks remain available.
+    }
+  }, []);
+
+  useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
-    if (element) {
-      const fullscreenElement =
+    const syncFullscreenState = () => {
+      const active = Boolean(
         fullscreenDocument.fullscreenElement ||
         fullscreenDocument.webkitFullscreenElement ||
-        fullscreenDocument.msFullscreenElement;
+        fullscreenDocument.msFullscreenElement,
+      );
+      setIsNativeFullscreen(active);
+      if (active) setIsFallbackFullscreen(false);
+    };
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState);
+      document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
+    };
+  }, []);
 
-      if (fullscreenElement) {
-        if (fullscreenDocument.exitFullscreen) {
-          void fullscreenDocument.exitFullscreen();
-        } else if (fullscreenDocument.webkitExitFullscreen) {
-          void fullscreenDocument.webkitExitFullscreen();
-        } else if (fullscreenDocument.msExitFullscreen) {
-          void fullscreenDocument.msExitFullscreen();
-        }
-      } else if (element.requestFullscreen) {
-        void element.requestFullscreen();
-      } else if (element.webkitRequestFullscreen) { /* Safari */
-        void element.webkitRequestFullscreen();
-      } else if (element.msRequestFullscreen) { /* IE11 */
-        void element.msRequestFullscreen();
-      }
+  useEffect(() => {
+    if (!isFallbackFullscreen) return undefined;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [isFallbackFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsCssRotatedLandscape(false);
+      return undefined;
     }
-  };
+
+    let syncTimeout: number | undefined;
+    const scheduleOrientationFallbackSync = () => {
+      if (syncTimeout !== undefined) {
+        window.clearTimeout(syncTimeout);
+      }
+      syncTimeout = window.setTimeout(() => {
+        setIsCssRotatedLandscape(needsCssLandscapeFallback());
+      }, 200);
+    };
+
+    scheduleOrientationFallbackSync();
+    window.addEventListener('resize', scheduleOrientationFallbackSync);
+    window.addEventListener('orientationchange', scheduleOrientationFallbackSync);
+
+    return () => {
+      if (syncTimeout !== undefined) {
+        window.clearTimeout(syncTimeout);
+      }
+      window.removeEventListener('resize', scheduleOrientationFallbackSync);
+      window.removeEventListener('orientationchange', scheduleOrientationFallbackSync);
+    };
+  }, [isFullscreen]);
+
+  useEffect(() => () => unlockOrientation(), [unlockOrientation]);
+
+  const handleFullScreen = useCallback(async () => {
+    const element = gameContainerRef.current;
+    const fullscreenDocument = document as FullscreenDocument;
+    if (!element) return;
+
+    const fullscreenElement =
+      fullscreenDocument.fullscreenElement ||
+      fullscreenDocument.webkitFullscreenElement ||
+      fullscreenDocument.msFullscreenElement;
+    if (fullscreenElement || isFallbackFullscreen) {
+      try {
+        if (fullscreenElement && fullscreenDocument.exitFullscreen) {
+          await fullscreenDocument.exitFullscreen();
+        } else if (fullscreenElement && fullscreenDocument.webkitExitFullscreen) {
+          await fullscreenDocument.webkitExitFullscreen();
+        } else if (fullscreenElement && fullscreenDocument.msExitFullscreen) {
+          await fullscreenDocument.msExitFullscreen();
+        }
+      } catch {
+        // The CSS fullscreen fallback can still be closed independently.
+      } finally {
+        setIsFallbackFullscreen(false);
+        setIsNativeFullscreen(false);
+        setIsCssRotatedLandscape(false);
+        unlockOrientation();
+      }
+      return;
+    }
+
+    let enteredNativeFullscreen = false;
+    try {
+      if (element.requestFullscreen) {
+        await element.requestFullscreen();
+        enteredNativeFullscreen = Boolean(fullscreenDocument.fullscreenElement);
+      } else if (element.webkitRequestFullscreen) {
+        await element.webkitRequestFullscreen();
+        enteredNativeFullscreen = Boolean(fullscreenDocument.webkitFullscreenElement);
+      } else if (element.msRequestFullscreen) {
+        await element.msRequestFullscreen();
+        enteredNativeFullscreen = Boolean(fullscreenDocument.msFullscreenElement);
+      }
+    } catch {
+      enteredNativeFullscreen = false;
+    }
+
+    if (enteredNativeFullscreen) {
+      setIsNativeFullscreen(true);
+    } else {
+      // MetaMask Mobile and several in-app browsers ignore or reject the
+      // Fullscreen API. Keep the control functional with an app-level viewport.
+      setIsFallbackFullscreen(true);
+    }
+    await requestLandscape();
+  }, [isFallbackFullscreen, requestLandscape, unlockOrientation]);
+
+  useEffect(() => {
+    const revealWalletDialog = () => {
+      if (isFullscreen) {
+        void handleFullScreen();
+      }
+    };
+
+    window.addEventListener('cukies:open-wallet-dialog', revealWalletDialog);
+    return () => window.removeEventListener('cukies:open-wallet-dialog', revealWalletDialog);
+  }, [handleFullScreen, isFullscreen]);
 
   const handleIframeLoad = useCallback(
     (event: React.SyntheticEvent<HTMLIFrameElement>) => {
@@ -148,76 +297,162 @@ export default function GameLayout({
     );
   }
 
-  return (
-      <div
-        data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
-        className={cn(
-          'grid h-full min-h-0 grid-cols-1',
-          isMobileFocus ? 'gap-0' : 'gap-6 lg:grid-cols-4',
-        )}
-      >
+  const hasDesktopBanner = Boolean(desktopBanner);
+  const gameShell = (
+    <div
+      data-game-layout={isMobileFocus ? 'mobile-focus' : 'standard'}
+      className={cn(
+        'min-h-0',
+        isMobileFocus
+          ? 'flex h-full flex-col gap-2'
+          : desktopSidebar
+            ? 'grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]'
+            : 'grid grid-cols-1 gap-6 lg:grid-cols-4',
+        !isMobileFocus && !hasDesktopBanner && 'h-full',
+        !isMobileFocus && hasDesktopBanner && 'items-start lg:items-stretch',
+      )}
+    >
+        {isMobileFocus && desktopBanner ? (
+          <div data-game-mobile-banner className="shrink-0">
+            {desktopBanner}
+          </div>
+        ) : null}
         
         {/* Left Column: Game */}
         <div
           className={cn(
             'flex min-h-0 flex-col',
-            isMobileFocus ? 'h-full gap-0' : 'gap-6 lg:col-span-3',
+            isMobileFocus
+              ? 'flex-1 gap-2'
+              : desktopSidebar
+                ? 'gap-3 lg:h-full'
+                : 'gap-6 lg:col-span-3',
           )}
         >
+          {isMobileFocus && !isFullscreen ? (
+            <div
+              data-game-landscape-gate
+              className="fixed inset-0 z-[90] hidden flex-col items-center justify-center gap-4 bg-[#030c0c] px-6 text-center landscape:flex"
+            >
+              <div>
+                <h2 className="font-headline text-xl font-black text-[#f2eee7]">
+                  Vista horizontal
+                </h2>
+                <p className="mt-2 text-sm text-[#aaa8a2]">
+                  Activa la pantalla completa para jugar con el mapa bien encajado.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => void handleFullScreen()}
+                className="min-h-11 gap-2 border border-[#35eee2]/45 bg-[#0d5d57] px-5 font-black text-white hover:bg-[#137069]"
+                aria-label="Activar pantalla completa en horizontal"
+              >
+                <Maximize className="h-4 w-4" aria-hidden="true" />
+                Pantalla completa
+              </Button>
+            </div>
+          ) : null}
+
+          {isMobileFocus && !isFullscreen ? (
+            <div className="flex shrink-0 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 gap-2 border-[#35eee2]/35 bg-[#071312] px-3 text-xs font-black text-[#f2eee7] hover:bg-[#0b211e]"
+                onClick={() => void handleFullScreen()}
+                aria-label="Abrir pantalla completa"
+              >
+                <Maximize className="h-4 w-4" aria-hidden="true" />
+                Pantalla completa
+              </Button>
+            </div>
+          ) : null}
+
           <div
             ref={gameContainerRef}
             data-game-viewport
+            data-game-fullscreen={isFullscreen ? (isNativeFullscreen ? 'native' : 'fallback') : 'off'}
+            data-game-orientation-fallback={isCssRotatedLandscape ? 'css-rotated' : 'off'}
             className={cn(
-              'relative flex min-h-0 flex-grow flex-col overflow-hidden bg-card',
-              isMobileFocus ? 'h-full rounded-none border-0' : 'rounded-lg border',
+              'relative flex min-h-0 flex-col overflow-hidden bg-card',
+              isMobileFocus
+                ? 'aspect-[11/8] w-full flex-none rounded-[8px] border border-[#b7832d]/65'
+                : 'rounded-lg border',
+              !isMobileFocus && (
+                hasDesktopBanner
+                  ? desktopSidebar
+                    ? 'aspect-[11/8] w-full flex-none rounded-[8px] border-[#b7832d]/65 lg:h-full lg:w-auto lg:max-w-full lg:self-center'
+                    : 'aspect-[11/8] w-full flex-none'
+                  : 'flex-grow'
+              ),
+              isFallbackFullscreen && !isCssRotatedLandscape && 'fixed inset-0 z-[100] !h-[100dvh] !w-screen !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
+              isCssRotatedLandscape && 'fixed z-[100] !h-[100vw] !w-[100dvh] !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
             )}
+            style={isCssRotatedLandscape ? {
+              bottom: 'auto',
+              left: '50%',
+              right: 'auto',
+              top: '50%',
+              transform: 'translate(-50%, -50%) rotate(90deg)',
+              transformOrigin: 'center',
+            } : undefined}
           >
             <iframe
               ref={iframeRef}
               src={gameConfig.gameUrl}
               className="block h-full min-h-0 w-full flex-1 overscroll-contain border-0 touch-manipulation"
               title={gameConfig.name}
-              allow="clipboard-read; clipboard-write"
+              allow="clipboard-read; clipboard-write; fullscreen"
               allowFullScreen
               onLoad={handleIframeLoad}
             />
-            <div
-              className="absolute z-30 flex items-center gap-2"
-              style={{
-                bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
-                left: 'max(0.5rem, env(safe-area-inset-left))',
-              }}
-            >
-              {isMobileFocus && (
+            {!isMobileFocus ? (
+              <div
+                className="absolute bottom-0 left-0 z-30 flex items-center gap-2"
+                style={{
+                  bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+                  left: 'max(0.5rem, env(safe-area-inset-left))',
+                }}
+              >
                 <Button
-                  asChild
                   variant="ghost"
                   size="icon"
-                  className="h-11 w-11 bg-black/35 text-white/80 backdrop-blur-sm hover:bg-black/55 hover:text-white"
+                  className="bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white"
+                  onClick={() => void handleFullScreen()}
+                  aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
+                  title={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
                 >
-                  <Link href="/games" aria-label="Volver a juegos" title="Volver a juegos">
-                    <ArrowLeft className="h-5 w-5" />
-                  </Link>
+                  {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  'bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white',
-                  isMobileFocus && 'h-11 w-11',
-                )}
-                onClick={handleFullScreen}
-                aria-label="Alternar pantalla completa"
-                title="Alternar pantalla completa"
+              </div>
+            ) : null}
+            {isMobileFocus && isFullscreen ? (
+              <div
+                className="absolute right-0 top-0 z-50 flex items-center gap-2"
+                style={{
+                  top: 'max(0.5rem, env(safe-area-inset-top))',
+                  right: 'max(0.5rem, env(safe-area-inset-right))',
+                }}
               >
-                <Maximize className="h-5 w-5" />
-              </Button>
-            </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void handleFullScreen()}
+                  className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                  aria-label="Salir de pantalla completa"
+                >
+                  <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                  Salir
+                </Button>
+              </div>
+            ) : null}
           </div>
           
           {/* Game Instructions */}
-          {!isMobileFocus && (
+          {!isMobileFocus && !desktopSidebar && (
             <Card>
               <CardContent className="p-4 flex flex-wrap justify-around items-center text-center gap-4">
                 {playInstructions.map((instruction, index) => (
@@ -237,7 +472,7 @@ export default function GameLayout({
         </div>
 
         {/* Right Column: Game Info & Stats */}
-        {!isMobileFocus && (
+        {!isMobileFocus && !desktopSidebar && (
         <div className="lg:col-span-1 flex flex-col gap-3">
           
           {/* 1. Game Title and Description */}
@@ -368,6 +603,29 @@ export default function GameLayout({
           {children}
         </div>
         )}
+        {!isMobileFocus && desktopSidebar ? (
+          <div className="min-h-0 lg:col-span-1">{desktopSidebar}</div>
+        ) : null}
+    </div>
+  );
+
+  if (isMobileFocus || !hasDesktopBanner) return gameShell;
+
+  return (
+    <div
+      className={cn(
+        desktopSidebar
+          ? 'space-y-3 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0'
+          : 'space-y-5',
+      )}
+    >
+      {desktopBanner ? (
+        <div data-game-desktop-banner className="shrink-0">{desktopBanner}</div>
+      ) : null}
+      <div className={cn(desktopSidebar && 'lg:min-h-0 lg:flex-1')}>
+        {gameShell}
       </div>
+      {desktopFooter ? <div data-game-desktop-footer>{desktopFooter}</div> : null}
+    </div>
   );
 }

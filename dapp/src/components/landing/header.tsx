@@ -11,6 +11,7 @@ import { usePublicLocale } from '@/providers/public-locale-provider';
 
 const navItems = [
   { label: { es: 'Inicio', en: 'Home' }, href: '/' },
+  { label: { es: 'Jugar', en: 'Play' }, href: '/games/treasure-hunt' },
   { label: { es: 'Premios', en: 'Rewards' }, href: '/premios' },
   { label: { es: 'Vesting', en: 'Vesting' }, href: '/vesting' },
 ];

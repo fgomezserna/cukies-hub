@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { assetLoader } from '@/lib/assetLoader';
+import { spriteManager } from '@/lib/spriteManager';
 import type { GameState, Token, Obstacle, Collectible, DirectionType, RayHazard, RedZone } from '@/types/game';
 import {
     TOKEN_COLOR, FEE_COLOR, BUG_COLOR, HACKER_COLOR,
@@ -234,33 +235,90 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   
   // Cargar imágenes una vez al montar el componente
   useEffect(() => {
-    // Cargar imagen de fondo (pantallajuego)
-    const gridImg = new Image();
-    gridImg.src = '/assets/ui/game-container/pantallajuego3.png';
-    gridImg.onload = () => {
-      gridImgRef.current = gridImg;
-    };
+    // GameContainer mounts the canvas only after critical assets are ready.
+    // Reuse those exact current assets so an old board/player can never flash
+    // while the directional Cukie sprites finish loading.
+    const loadedGridImg = assetLoader.getAsset('grid_background');
+    if (loadedGridImg) {
+      gridImgRef.current = loadedGridImg;
+    } else {
+      const gridImg = new Image();
+      gridImg.src = '/assets/ui/game-container/pantallajuego3.png';
+      gridImg.onload = () => {
+        gridImgRef.current = gridImg;
+      };
+    }
     
-    // Cargar imagen del token (jugador)
-    const tokenImg = new Image();
-    tokenImg.src = '/assets/characters/token.png';
-    tokenImg.onload = () => {
-      tokenImgRef.current = tokenImg;
-    };
-    
-    // Cargar imagen de fee (obstáculo)
-    const feeImg = new Image();
-    feeImg.src = '/assets/obstacles/fee.png';
-    feeImg.onload = () => {
-      feeImgRef.current = feeImg;
-    };
-    
-    // Cargar imagen de bug (obstáculo)
-    const bugImg = new Image();
-    bugImg.src = '/assets/obstacles/bug.png';
-    bugImg.onload = () => {
-      bugImgRef.current = bugImg;
-    };
+    const loadedTokenImg = assetLoader.getAsset('token');
+    if (loadedTokenImg) {
+      tokenImgRef.current = loadedTokenImg;
+    } else {
+      const tokenImg = new Image();
+      tokenImg.src = '/assets/characters/cukiesprites/south/cukie_walk_s_01.png';
+      tokenImg.onload = () => {
+        tokenImgRef.current = tokenImg;
+      };
+    }
+
+    feeImgRef.current = assetLoader.getAsset('fee');
+    bugImgRef.current = assetLoader.getAsset('bug');
+    hackerImgRef.current = assetLoader.getAsset('hacker');
+    megaNodeImgRef.current = assetLoader.getAsset('megaNode');
+    quicksandImgRef.current = assetLoader.getAsset('quicksand');
+    const loadedEnergyImg = assetLoader.getAsset('energy_point');
+    if (loadedEnergyImg) {
+      energySpritesRef.current = Array.from({ length: 6 }, () => loadedEnergyImg);
+    }
+
+    const spriteDirections: DirectionType[] = [
+      'up',
+      'down',
+      'left',
+      'right',
+      'north_west',
+      'north_east',
+      'south_west',
+      'south_east',
+    ];
+
+    spriteDirections.forEach(direction => {
+      const tokenFrames = spriteManager.getSpriteSheet(`token_${direction}`)?.frames ?? [];
+      tokenSpritesRef.current[direction] = tokenFrames;
+      tokenRunSpritesRef.current[direction] = tokenFrames;
+      feeSpritesRef.current[direction] =
+        spriteManager.getSpriteSheet(`fee_${direction}`)?.frames ?? [];
+    });
+
+    (['up', 'left', 'right'] as const).forEach(direction => {
+      hackerSpritesRef.current[direction] =
+        spriteManager.getSpriteSheet(`hacker_${direction}`)?.frames ?? [];
+    });
+
+    const megaNodeFrames = spriteManager.getSpriteSheet('mega_node')?.frames ?? [];
+    megaNodeSprite1Ref.current = megaNodeFrames[0] ?? null;
+    megaNodeSprite2Ref.current = megaNodeFrames[1] ?? null;
+    megaNodeSprite3Ref.current = megaNodeFrames[2] ?? null;
+
+    const purrFrames = spriteManager.getSpriteSheet('purr')?.frames ?? [];
+    purrSprite1Ref.current = purrFrames[0] ?? null;
+    purrSprite2Ref.current = purrFrames[1] ?? null;
+    purrSprite3Ref.current = purrFrames[2] ?? null;
+
+    const bugFrames = spriteManager.getSpriteSheet('bug')?.frames ?? [];
+    bugSprite1Ref.current = bugFrames[0] ?? null;
+    bugSprite2Ref.current = bugFrames[1] ?? null;
+    bugSprite3Ref.current = bugFrames[2] ?? null;
+
+    energySpritesRef.current =
+      spriteManager.getSpriteSheet('energy')?.frames ?? energySpritesRef.current;
+    explosionSpritesRef.current =
+      spriteManager.getSpriteSheet('explosion')?.frames ?? [];
+    enExplosionSpritesRef.current =
+      spriteManager.getSpriteSheet('energy_explosion')?.frames ?? [];
+    greenExplosionSpritesRef.current =
+      spriteManager.getSpriteSheet('green_explosion')?.frames ?? [];
+    damageImgRef.current =
+      spriteManager.getSpriteSheet('damage')?.frames[0] ?? null;
     
     // Cargar imagen de wallet para mostrar sobre el bug
     const walletImg = new Image();
@@ -273,27 +331,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando wallet_2.png:', e);
     };
     
-    // Cargar imagen de hacker (obstáculo - Trump)
-    const hackerImg = new Image();
-    hackerImg.src = '/assets/obstacles/trump.png';
-    hackerImg.onload = () => {
-      console.log('✅ Imagen trump.png cargada EXITOSAMENTE');
-      hackerImgRef.current = hackerImg;
-    };
-    hackerImg.onerror = (e) => {
-      console.error('❌ Error cargando trump.png:', e);
-    };
-    
     // ELIMINADO: Ya no necesitamos cargar la imagen estática de energía
     // porque ahora usamos sprites animados de energía
     
-    // Cargar imagen de Haku (antes mega node) - respaldo por si fallan los sprites
-    const megaNodeImg = new Image();
-    megaNodeImg.src = '/assets/collectibles/haku.png';
-    megaNodeImg.onload = () => {
-      megaNodeImgRef.current = megaNodeImg;
-    };
-    
+    // Respaldo legacy: GameContainer no monta el canvas hasta que SpriteManager
+    // verifica todos los grupos. Se mantiene solo para usos aislados del canvas.
+    if (!spriteManager.areGameSpritesLoaded()) {
     // Cargar sprites animados del mega nodo
     const megaNodeSprite1 = new Image();
     megaNodeSprite1.src = '/assets/collectibles/mega_node/mega_node_1.png';
@@ -581,17 +624,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       damageImgRef.current = damageImg;
     };
     
-    // Cargar imagen de arenas movedizas
-    const quicksandImg = new Image();
-    quicksandImg.src = '/assets/obstacles/arenasmovedizas2.png';
-    quicksandImg.onload = () => {
-      quicksandImgRef.current = quicksandImg;
-      console.log('✅ Imagen de arenas movedizas cargada correctamente');
-    };
-    quicksandImg.onerror = (e) => {
-      console.error('❌ Error cargando imagen de arenas movedizas:', e);
-    };
-    
     // Cargar sprites animados de purr (gato)
     const purrSprite1 = new Image();
     purrSprite1.onload = () => {
@@ -664,6 +696,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
       console.error('❌ Error cargando bug sprite 3:', e);
     };
     bugSprite3.src = '/assets/characters/bug/bug_3.png';
+    }
     
     // ELIMINADO: Carga de imagen de overlay de pausa (ya no se usa)
     // El overlay de pausa se maneja en game-container.tsx
@@ -2091,8 +2124,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
      if ('type' in obj) {
        switch(obj.type) {
          case 'fee':
-           // Los fees no deben usar imagen estática, siempre sprites animados
-           return; // Saltar renderizado fallback para fees
+           // La imagen estática evita placeholders mientras terminan los
+           // sprites direccionales.
+           img = feeImgRef.current;
+           break;
          case 'bug':
            img = bugImgRef.current;
            break;
@@ -2603,10 +2638,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            ctx.globalAlpha = alpha;
          }
          
-         // Los fees siempre usan sprites animados, no imagen estática
+         // Los sprites animados son preferentes; la imagen estática cargada
+         // antes del inicio es el fallback visual real.
          if ('type' in obj && obj.type === 'fee') {
-           // Saltar renderizado de fee aquí - se maneja arriba con sprites
-           return;
+           const standardImgSize = imgSize * 0.9;
+           ctx.drawImage(img, obj.x - standardImgSize/2, obj.y - standardImgSize/2, standardImgSize, standardImgSize);
          } else {
            // Asegurar renderizado suave para collectibles (especialmente uki, checkpoint y otros)
            if ('type' in obj && (obj.type === 'uki' || obj.type === 'heart' || obj.type === 'vaul' || obj.type === 'checkpoint' || obj.type === 'treasure' || obj.type === 'treasure2' || obj.type === 'treasure3')) {
@@ -2637,8 +2673,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
        } 
        // Para obstáculos, usar las imágenes estáticas correspondientes (excepto fee que usa sprites)
        else if (obj.type === 'fee') {
-         // Los fees no deben usar imagen estática, siempre sprites animados
-         return; // Saltar renderizado fallback para fees
+         fallbackImg = feeImgRef.current;
        } else if (obj.type === 'bug') {
          fallbackImg = bugImgRef.current;
        } else if (obj.type === 'hacker') {
@@ -2679,9 +2714,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
            // Token
            const tokenImgSize = imgSize * 1.46;
            ctx.drawImage(fallbackImg, obj.x - tokenImgSize/2, obj.y - tokenImgSize/2, tokenImgSize, tokenImgSize);
-         } else if (obj.type === 'fee') {
-           // Los fees no deben usar imagen estática, siempre sprites animados
-           return; // Saltar renderizado fallback para fees
          } else {
            // Otros elementos con tamaño estándar
            const standardImgSize = imgSize * 0.9;
@@ -3240,7 +3272,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
           ctx.font = MESSAGE_FONT;
           ctx.fillText('FATAL ERROR!', width / 2, height / 2 - 100);
           ctx.font = TIMER_FONT;
-          ctx.fillText('SYBIL DETECTED - BANNED!', width / 2, height / 2 - 40);
+          ctx.fillText('CHEAT DETECTED - BANNED!', width / 2, height / 2 - 40);
           
           // Color dorado para el resto de textos
           ctx.fillStyle = '#FFB700';
@@ -3474,6 +3506,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
   }, []);
 
   useEffect(() => {
+    if (spriteManager.areGameSpritesLoaded()) return;
     preloadSprites();
   }, [preloadSprites]);
 
@@ -3511,6 +3544,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, width, height, energ
 
   // Ejecutar precarga prioritaria antes que el resto
   useEffect(() => {
+    if (spriteManager.areGameSpritesLoaded()) return;
     preloadPrioritySprites()
       .then(() => console.log('✨ Precarga de sprites prioritarios completada'))
       .catch(() => console.warn('⚠️ Algunos sprites prioritarios no se pudieron cargar'));

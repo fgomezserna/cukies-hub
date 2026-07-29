@@ -2,10 +2,16 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
-import { usePusherConnection } from '../hooks/usePusherConnection';
+import {
+  usePusherConnection,
+  type TreasureHuntCompetitionAccess,
+} from '../hooks/usePusherConnection';
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
-import ModeSelectModal, { GameMode } from './mode-select-modal';
+import ModeSelectModal, {
+  GameMode,
+  resolveTreasureHuntSinglePlayerEntry,
+} from './mode-select-modal';
 import { useGameState } from '../hooks/useGameState';
 import { useGameInput } from '../hooks/useGameInput';
 import { useGameLoop } from '../hooks/useGameLoop';
@@ -15,10 +21,8 @@ import useMultiplayerMatch, {
   shouldResetLocalGameForAuthorityChange,
 } from '../hooks/useMultiplayerMatch';
 import { useIsMobile } from '../hooks/use-mobile';
-import { useOrientation } from '../hooks/use-orientation';
 import TouchZones from './touch-zones';
-import OrientationOverlay from './orientation-overlay';
-import { BookOpenIcon, HeartIcon, PlayIcon, ShieldIcon, SwordsIcon, TimerIcon } from './treasure-icons';
+import { BookOpenIcon, HeartIcon, PlayIcon, SwordsIcon, TimerIcon } from './treasure-icons';
 import {
   HeartMeter,
   HudMetric,
@@ -30,10 +34,10 @@ import {
   TreasureStage,
   TreasureTopBar,
 } from './treasure-hunt-ui';
-import { FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
+import { FPS, MOBILE_FPS, BASE_GAME_WIDTH, BASE_GAME_HEIGHT, RUNE_CONFIG } from '../lib/constants';
 import { assetLoader } from '../lib/assetLoader';
-import { spriteManager } from '../lib/spriteManager';
 import { performanceMonitor } from '../lib/performanceMonitor';
+import { spriteManager } from '../lib/spriteManager';
 import {
   canResumeLocalPlayerInSuddenDeath,
   createMultiplayerRoomCode,
@@ -48,11 +52,21 @@ import {
   resolveTreasureHuntMultiplayerEntryState,
   shouldBlockLocalGameControls,
 } from '../lib/multiplayer-feature';
-import { buildTreasureHuntHubEntryUrl } from '../lib/parent-origin';
+import {
+  buildTreasureHuntHubEntryUrl,
+  resolveConfiguredParentOrigin,
+} from '../lib/parent-origin';
+import { randomManager } from '../lib/random';
+import {
+  advanceSinglePlayerResultSaveState,
+  createSinglePlayerResultAuthority,
+  emptySinglePlayerResultSaveState,
+  resolveSinglePlayerResultDispatch,
+  type SinglePlayerResultAuthority,
+} from '../lib/single-player-result-authority';
 import { shouldRenderDirectionalTouchControls } from '../lib/touch-controls';
 import { calculateContainScale, resolveGameViewportSize } from '../lib/viewport-scale';
 import type { Collectible, RuneState, LevelStatsEntry, GameState, RuneType } from '@/types/game';
-
 
 const getLevelScoreMultiplier = (level: number): number => {
   // Multiplicador basado en el nivel: nivel 2 = x2, nivel 3 = x3, nivel 4 = x4, nivel 5 = x5
@@ -616,7 +630,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     connectionState,
     sessionData,
     hasParentHandshake,
+    hasPendingGameEnd,
+    gameEndPersistenceError,
     sendGameEnd, 
+    retryGameEndPersistence,
+    requestCompetitionAccess,
     startCheckpointInterval,
     channel,
   } = usePusherConnection();
@@ -638,6 +656,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isStandaloneRuntime]);
   const multiplayerAuthorityReady =
     hasParentHandshake && Boolean(multiplayerAuthoritySessionId);
+  const singlePlayerEntryState = isStandaloneRuntime
+    ? 'practice' as const
+    : multiplayerAuthorityReady
+      ? 'ready' as const
+      : 'connecting' as const;
+  const singlePlayerEntry = resolveTreasureHuntSinglePlayerEntry(singlePlayerEntryState);
   const multiplayerEntryState = resolveTreasureHuntMultiplayerEntryState({
     enabled: multiplayerEnabled,
     authorityReady: multiplayerAuthorityReady,
@@ -751,12 +775,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   
   // Initialize audio system
   const { playSound, playMusic, stopMusic, setVolume, toggleMusic, isMusicEnabled, playGameOverSound, toggleSounds, isSoundsEnabled } = useAudio();
-  
+
   // Estado para controlar el botón de música
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [soundsEnabled, setSoundsEnabled] = useState(true); // NUEVO: Estado para sonidos de efectos
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
+  const [isHubViewVisible, setIsHubViewVisible] = useState(true);
   const [multiplayerJoinFailure, setMultiplayerJoinFailure] = useState<{
     roomCode: string;
     message: string;
@@ -764,8 +789,47 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [resultExitPending, setResultExitPending] = useState(false);
   const [resultExitError, setResultExitError] = useState<string | null>(null);
   const [multiplayerStartPending, setMultiplayerStartPending] = useState(false);
+  const [competitionStartPending, setCompetitionStartPending] = useState(false);
+  const [competitionAccess, setCompetitionAccess] = useState<TreasureHuntCompetitionAccess | null>(null);
+  const [competitionStartError, setCompetitionStartError] = useState<string | null>(null);
+  const requestHubWalletConnection = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    if (window.parent === window) {
+      if (multiplayerHubEntryUrl) {
+        window.location.assign(multiplayerHubEntryUrl);
+      } else {
+        setCompetitionStartError('Abre Treasure Hunt desde el Hub para conectar tu wallet.');
+      }
+      return;
+    }
+
+    try {
+      const parentOrigin = resolveConfiguredParentOrigin(
+        document.referrer,
+        process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+        process.env.NEXT_PUBLIC_PARENT_URL,
+        process.env.NODE_ENV,
+      );
+      window.parent.postMessage(
+        { type: 'TREASURE_HUNT_CONNECT_WALLET_REQUEST' },
+        parentOrigin,
+      );
+    } catch {
+      setCompetitionStartError('No se pudo abrir la conexión de wallet del Hub.');
+    }
+  }, [multiplayerHubEntryUrl]);
   const [inviteCopied, setInviteCopied] = useState(false);
   const multiplayerStartPendingRef = useRef(false);
+  const competitionStartPendingRef = useRef(false);
+  const singlePlayerStartAfterAssetsRef = useRef(false);
+  const competitionSessionRecoveryRef = useRef<string | null>(null);
+  const singlePlayerRunSequenceRef = useRef(0);
+  const activeSinglePlayerResultAuthorityRef = useRef<SinglePlayerResultAuthority | null>(null);
+  const dispatchedSinglePlayerRunIdRef = useRef<number | null>(null);
+  const [singlePlayerResultSaveState, setSinglePlayerResultSaveState] = useState(
+    emptySinglePlayerResultSaveState,
+  );
   const resultExitCoordinatorRef = useRef<ReturnType<
     typeof createCanonicalResultExitCoordinator
   > | null>(null);
@@ -781,7 +845,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     multiplayer.hasNonTerminalMatch,
     isMultiplayerJoinPending,
   );
-  const canChangeGameMode = canChangeTreasureHuntGameMode(
+  const canChangeGameMode = !hasPendingGameEnd && canChangeTreasureHuntGameMode(
     Boolean(multiplayer.matchResult),
     multiplayer.hasNonTerminalMatch,
     isMultiplayerJoinPending,
@@ -828,47 +892,71 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [criticalAssetsLoaded, setCriticalAssetsLoaded] = useState(false);
   const [allAssetsLoaded, setAllAssetsLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingPhase, setLoadingPhase] = useState<'preload' | 'full'>('preload');
+  const [loadingPhase, setLoadingPhase] = useState<'preload' | 'sprites' | 'full'>('preload');
+  const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
+  const [assetLoadAttempt, setAssetLoadAttempt] = useState(0);
 
   // Carga progresiva y optimizada de assets con monitoreo de rendimiento
   useEffect(() => {
+    let cancelled = false;
+    let backgroundLoadTimer: ReturnType<typeof setTimeout> | undefined;
+
     const loadAssets = async () => {
       try {
+        setCriticalAssetsLoaded(false);
+        setAssetLoadError(null);
+        setLoadingProgress(0);
+
         // Inicializar monitoreo de rendimiento
         performanceMonitor.startTimer('totalAssets');
         performanceMonitor.startTimer('criticalAssets');
-        performanceMonitor.startTimer('sprites');
-        
+
         console.log('🚀 Iniciando carga optimizada de assets...');
         setLoadingPhase('preload');
-        
-        // Cargar assets críticos en paralelo
-        const [, ] = await Promise.all([
-          assetLoader.preloadCritical((progress) => {
-            setLoadingProgress(progress * 0.6); // 60% para assets críticos
-          }),
-          spriteManager.loadGameSprites().then(() => {
-            performanceMonitor.endTimer('sprites');
-            setLoadingProgress(prev => prev + 0.3); // 30% para sprites
-          })
-        ]);
-        
+
+        await assetLoader.preloadCritical((progress) => {
+          if (cancelled) return;
+          setLoadingProgress(progress * 0.25);
+        });
+
+        if (cancelled) return;
+        if (!assetLoader.areCriticalAssetsLoaded()) {
+          throw new Error('Critical asset verification failed');
+        }
+
+        // Los frames animados se cargan una sola vez, con concurrencia limitada
+        // y reintentos. El canvas reutiliza estas mismas imágenes y no genera
+        // una ráfaga nueva de cientos de peticiones al comenzar la partida.
+        setLoadingPhase('sprites');
+        await spriteManager.loadGameSprites((progress) => {
+          if (cancelled) return;
+          setLoadingProgress(0.25 + progress * 0.75);
+        });
+
+        if (cancelled) return;
+        if (!spriteManager.areGameSpritesLoaded()) {
+          throw new Error('Gameplay sprite verification failed');
+        }
+
         performanceMonitor.endTimer('criticalAssets');
-        console.log('✅ Assets críticos y sprites cargados - juego puede iniciar');
+        setLoadingProgress(1);
         setCriticalAssetsLoaded(true);
-        
+
         // Fase 2: Cargar assets restantes en background
-        setTimeout(async () => {
+        backgroundLoadTimer = setTimeout(async () => {
+          if (cancelled) return;
           console.log('⏳ Cargando assets decorativos en background...');
           setLoadingPhase('full');
           
           await assetLoader.loadRemaining((progress, phase) => {
-            setLoadingProgress(0.9 + (progress * 0.1)); // 10% restante
+            if (cancelled) return;
             setLoadingPhase(phase);
           });
-          
+
+          if (cancelled) return;
           performanceMonitor.endTimer('totalAssets');
           console.log('🎉 Todos los assets cargados');
+          setLoadingProgress(1);
           setAllAssetsLoaded(true);
           
           // Mostrar reporte de rendimiento en desarrollo
@@ -880,14 +968,26 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         }, 300); // Delay reducido para mejor UX
         
       } catch (error) {
+        if (cancelled) return;
         console.error('❌ Error cargando assets:', error);
         performanceMonitor.recordAssetFailed();
-        // Aún así permitir que el juego inicie con assets básicos
-        setCriticalAssetsLoaded(true);
+        setAssetLoadError(
+          'No se pudieron preparar todos los elementos del juego. Comprueba la conexión y vuelve a intentarlo.',
+        );
       }
     };
     
-    loadAssets();
+    void loadAssets();
+    return () => {
+      cancelled = true;
+      if (backgroundLoadTimer) clearTimeout(backgroundLoadTimer);
+    };
+  }, [assetLoadAttempt]);
+
+  const retryCriticalAssetLoad = useCallback(() => {
+    setLoadingPhase('preload');
+    setLoadingProgress(0);
+    setAssetLoadAttempt(attempt => attempt + 1);
   }, []);
   
   // Estilos CSS para las animaciones
@@ -947,10 +1047,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     subscribeToDirection,
   } = useGameInput();
   const isMobile = useIsMobile();
-  const isPortrait = useOrientation();
-  
-  // Ref para rastrear si pausamos automáticamente por orientación
-  const pausedByOrientationRef = useRef<boolean>(false);
   
   // Debug: Log mobile detection
   useEffect(() => {
@@ -1032,7 +1128,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setMultiplayerCanonicalDeadline,
     pauseMultiplayerRuntime,
     resumeMultiplayerRuntime,
-    togglePause,
+    pauseGame,
+    resumeGame,
+    getPausableGameTime,
     resetGame,
     forceGameOver,
   } = useGameState(
@@ -1047,15 +1145,32 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const previousMultiplayerAuthoritySessionRef = useRef<string | null>(
     multiplayerAuthoritySessionId,
   );
+  const previousAuthorityOwnerUserIdRef = useRef<string | null>(
+    sessionData?.userId ?? null,
+  );
   useEffect(() => {
     const previousSessionId = previousMultiplayerAuthoritySessionRef.current;
-    if (previousSessionId === multiplayerAuthoritySessionId) return;
+    const previousOwnerUserId = previousAuthorityOwnerUserIdRef.current;
+    const nextOwnerUserId = sessionData?.userId ?? null;
+    const ownerChanged = Boolean(
+      previousOwnerUserId &&
+      nextOwnerUserId &&
+      previousOwnerUserId !== nextOwnerUserId,
+    );
+    if (previousSessionId === multiplayerAuthoritySessionId && !ownerChanged) return;
 
     previousMultiplayerAuthoritySessionRef.current = multiplayerAuthoritySessionId;
-    if (!shouldResetLocalGameForAuthorityChange(
+    // Retain the last known owner across the brief null state between two
+    // GameSessions, so a genuine wallet switch is still detected afterwards.
+    if (nextOwnerUserId) previousAuthorityOwnerUserIdRef.current = nextOwnerUserId;
+    if (!shouldResetLocalGameForAuthorityChange({
       previousSessionId,
-      multiplayerAuthoritySessionId,
-    )) return;
+      nextSessionId: multiplayerAuthoritySessionId,
+      previousOwnerUserId,
+      nextOwnerUserId,
+      preserveTerminalSinglePlayerResult:
+        currentMode === 'single' && gameState.status === 'gameOver',
+    })) return;
 
     // The old controller belongs to a different wallet/GameSession. Never try
     // to release it through the new cookie authority; the server sweeper owns
@@ -1064,37 +1179,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     setModeSelectOpen(false);
     setCurrentMode('single');
     resetGame();
-  }, [multiplayerAuthoritySessionId, resetGame]);
+  }, [
+    currentMode,
+    gameState.status,
+    multiplayerAuthoritySessionId,
+    resetGame,
+    sessionData?.userId,
+  ]);
 
-  // Pausar automáticamente cuando el dispositivo se gira a vertical (portrait)
-  useEffect(() => {
-    if (localControlsLocked) return;
-    // Solo aplicar en móviles
-    if (!isMobile) return;
-
-    // Si está en portrait y el juego está jugando, pausar automáticamente
-    if (isPortrait && gameState.status === 'playing') {
-      console.log('[GameContainer] Dispositivo en vertical, pausando juego automáticamente');
-      pausedByOrientationRef.current = true;
-      togglePause();
-    }
-    
-    // Cuando vuelve a landscape, NO reanudar automáticamente
-    // El usuario debe presionar Play manualmente
-    if (!isPortrait && pausedByOrientationRef.current && gameState.status === 'paused') {
-      // Resetear el flag cuando vuelve a landscape
-      // El juego permanecerá pausado hasta que el usuario presione Play
-      pausedByOrientationRef.current = false;
-    }
-  }, [localControlsLocked, isPortrait, gameState.status, isMobile, togglePause]);
-
-  // Resetear el flag cuando el usuario presiona Play manualmente
-  useEffect(() => {
-    if (gameState.status === 'playing' && pausedByOrientationRef.current) {
-      // El usuario presionó Play, resetear el flag
-      pausedByOrientationRef.current = false;
-    }
-  }, [gameState.status]);
   const localScore = Math.floor(
     isMultiplayerMode ? (multiplayer.localPlayer?.score ?? gameState.score) : gameState.score,
   );
@@ -1558,6 +1650,138 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       </div>
     </div>
   ) : null;
+
+  const startSinglePlayer = useCallback(async () => {
+    if (!criticalAssetsLoaded) {
+      // The persistent Hub iframe can receive its play command while startup
+      // assets are still loading. Queue it so neither the countdown nor the
+      // competition attempt starts behind the loading screen.
+      singlePlayerStartAfterAssetsRef.current = true;
+      return;
+    }
+    singlePlayerStartAfterAssetsRef.current = false;
+
+    if (
+      hasPendingGameEnd ||
+      competitionStartPendingRef.current ||
+      multiplayerStartPendingRef.current
+    ) return;
+    if (!singlePlayerEntry.interactive) {
+      requestHubWalletConnection();
+      return;
+    }
+    competitionStartPendingRef.current = true;
+    setCompetitionStartPending(true);
+    setCompetitionStartError(null);
+    setModeSelectOpen(false);
+    try {
+      await multiplayer.reset();
+      let access: TreasureHuntCompetitionAccess;
+      try {
+        access = await requestCompetitionAccess();
+      } catch {
+        access = {
+          eligible: false,
+          practice: false,
+          sessionId: sessionData?.sessionId ?? null,
+          reason: 'COMPETITION_ACCESS_UNCERTAIN',
+        };
+      }
+      setCompetitionAccess(access);
+      if (!access.eligible && !access.practice) {
+        randomManager.clear();
+        if (access.reason === 'GAME_SESSION_RESTART_REQUIRED') {
+          competitionSessionRecoveryRef.current =
+            access.sessionId ?? sessionData?.sessionId ?? 'pending-session';
+          setModeSelectOpen(false);
+          return;
+        }
+        competitionSessionRecoveryRef.current = null;
+        const accessErrorCopy: Record<string, string> = {
+          SIGNED_WALLET_REQUIRED:
+            'Conecta y firma una wallet EVM en el Hub para jugar y registrar tu puntuación.',
+          INVALID_WALLET:
+            'La wallet firmada no es válida. Vuelve al Hub, conecta una wallet EVM válida y firma de nuevo.',
+          PARENT_HANDSHAKE_REQUIRED:
+            'El Hub todavía está preparando tu sesión segura. Espera unos segundos y vuelve a intentarlo.',
+          SECURE_PARENT_UNAVAILABLE:
+            'No se pudo verificar el Hub de origen. Abre Treasure Hunt desde el Hub oficial y vuelve a intentarlo.',
+          SESSION_CHANGED:
+            'La sesión cambió mientras confirmábamos el acceso. La partida no se inició; vuelve a intentarlo.',
+          ATTEMPT_ALREADY_ACTIVE:
+            'Esta wallet ya tiene una partida activa en otra pestaña. Vuelve a esa partida o espera un momento para iniciar una nueva.',
+        };
+        setCompetitionStartError(accessErrorCopy[access.reason ?? ''] ??
+          'No pudimos confirmar si el intento quedó creado. La partida no se inició; vuelve a intentarlo.');
+        setModeSelectOpen(true);
+        return;
+      }
+      competitionSessionRecoveryRef.current = null;
+      if (access.eligible && access.seed) {
+        randomManager.setSeed(access.seed);
+      } else {
+        randomManager.clear();
+      }
+      const resultAuthority = createSinglePlayerResultAuthority(
+        singlePlayerRunSequenceRef.current + 1,
+        access,
+        sessionData?.sessionId ?? null,
+      );
+      if (!resultAuthority) {
+        setCompetitionStartError(
+          'La sesión cambió mientras preparábamos la partida. Espera unos segundos y vuelve a intentarlo.',
+        );
+        setModeSelectOpen(true);
+        return;
+      }
+      singlePlayerRunSequenceRef.current = resultAuthority.runId;
+      activeSinglePlayerResultAuthorityRef.current = resultAuthority;
+      setSinglePlayerResultSaveState(emptySinglePlayerResultSaveState());
+      setCurrentMode('single');
+      if (gameState.status === 'gameOver') {
+        stopMusic();
+      }
+      playSound('game_start');
+      startGame();
+    } finally {
+      competitionStartPendingRef.current = false;
+      setCompetitionStartPending(false);
+    }
+  }, [
+    criticalAssetsLoaded,
+    gameState.status,
+    hasPendingGameEnd,
+    multiplayer,
+    playSound,
+    requestHubWalletConnection,
+    requestCompetitionAccess,
+    sessionData?.sessionId,
+    singlePlayerEntry.interactive,
+    startGame,
+    stopMusic,
+  ]);
+
+  useEffect(() => {
+    if (!criticalAssetsLoaded || !singlePlayerStartAfterAssetsRef.current) return;
+    singlePlayerStartAfterAssetsRef.current = false;
+    void startSinglePlayer();
+  }, [criticalAssetsLoaded, startSinglePlayer]);
+
+  useEffect(() => {
+    const staleSessionId = competitionSessionRecoveryRef.current;
+    const refreshedSessionId = sessionData?.sessionId;
+    if (
+      !staleSessionId ||
+      !refreshedSessionId ||
+      refreshedSessionId === staleSessionId
+    ) {
+      return undefined;
+    }
+
+    competitionSessionRecoveryRef.current = null;
+    const retry = window.setTimeout(() => void startSinglePlayer(), 0);
+    return () => window.clearTimeout(retry);
+  }, [sessionData?.sessionId, startSinglePlayer]);
   
   // Handle pause toggle from keyboard (P key) - TEMPORALMENTE DESHABILITADO
   // useEffect(() => {
@@ -1581,13 +1805,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (modeSelectOpen) return;
     if (currentMode !== 'single') return;
     if (multiplayer.hasNonTerminalMatch) return;
-    playSound('game_start');
-    startGame();
+    void startSinglePlayer();
   }, [
     startToggled,
     gameState.status,
-    startGame,
-    playSound,
+    startSinglePlayer,
     modeSelectOpen,
     currentMode,
     multiplayer.isJoinPending,
@@ -1611,6 +1833,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
+  const getActiveGameTimeMs = useCallback(() => {
+    const startedAt = gameStateRef.current.gameStartTime;
+    if (!startedAt) return 0;
+    return Math.max(0, Math.floor(getPausableGameTime() - startedAt));
+  }, [getPausableGameTime]);
 
   // Log para verificar el estado de conexión con Pusher
   useEffect(() => {
@@ -1630,50 +1857,78 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       
       const stopInterval = startCheckpointInterval(
         () => gameStateRef.current.score,
-        () => {
-          const now = Date.now();
-          const startTime = gameStateRef.current.gameStartTime || now;
-          return now - startTime;
-        }
+        getActiveGameTimeMs,
       );
       
       return stopInterval;
     }
-  }, [isMultiplayerMode, isConnected, sessionData, gameState.status, startCheckpointInterval]);
+  }, [
+    gameState.status,
+    getActiveGameTimeMs,
+    isConnected,
+    isMultiplayerMode,
+    sessionData,
+    startCheckpointInterval,
+  ]);
 
   // Handle game session end with Pusher
-  const gameEndSentRef = useRef<string | null>(null); // Track which session already sent game end
-  
   useEffect(() => {
     if (!isMultiplayerMode && sessionData && gameState.status === 'gameOver') {
-      // Prevent duplicate sends for the same session
-      const sessionKey = `${sessionData.sessionId}_${gameState.score}`;
-      if (gameEndSentRef.current === sessionKey) {
-        console.log('🔄 [GAME-PUSHER] Game end already sent for this session, skipping');
+      const resultAuthority = resolveSinglePlayerResultDispatch(
+        activeSinglePlayerResultAuthorityRef.current,
+        sessionData.sessionId,
+        dispatchedSinglePlayerRunIdRef.current,
+      );
+      if (!resultAuthority) {
+        console.log('🔄 [GAME-PUSHER] Terminal run has no matching unsent authority, skipping');
         return;
       }
       
       console.log('🏁 [GAME-PUSHER] Ending session with score:', gameState.score);
       
-      const gameTime = gameState.gameStartTime 
-        ? Date.now() - gameState.gameStartTime 
-        : 0;
+      const gameTime = getActiveGameTimeMs();
       
       console.log('📤 [GAME-PUSHER] Attempting to send game end immediately');
-      sendGameEnd({
+      const queued = sendGameEnd({
         finalScore: gameState.score,
         gameTime,
+        ...(resultAuthority.competitionAttemptId
+          ? { competitionAttemptId: resultAuthority.competitionAttemptId }
+          : {}),
         metadata: {
           gameOverReason: gameState.gameOverReason,
           level: gameState.level,
           hearts: gameState.hearts
         }
       });
-      
-      // Mark this session as having sent game end
-      gameEndSentRef.current = sessionKey;
+      if (queued) dispatchedSinglePlayerRunIdRef.current = resultAuthority.runId;
     }
-  }, [isMultiplayerMode, sessionData, gameState.status, gameState.score, gameState.gameOverReason, gameState.level, gameState.hearts, gameState.gameStartTime, sendGameEnd]);
+  }, [
+    gameState.gameOverReason,
+    gameState.hearts,
+    gameState.level,
+    gameState.score,
+    gameState.status,
+    getActiveGameTimeMs,
+    isMultiplayerMode,
+    sendGameEnd,
+    sessionData,
+  ]);
+
+  useEffect(() => {
+    if (isMultiplayerMode || gameState.status !== 'gameOver') return;
+    const runId = activeSinglePlayerResultAuthorityRef.current?.runId ?? null;
+    setSinglePlayerResultSaveState((current) => (
+      advanceSinglePlayerResultSaveState(current, runId, hasPendingGameEnd)
+    ));
+  }, [gameState.status, hasPendingGameEnd, isMultiplayerMode]);
+
+  const activeSinglePlayerRunId =
+    activeSinglePlayerResultAuthorityRef.current?.runId ?? null;
+  const singlePlayerResultSaved =
+    gameState.status === 'gameOver' &&
+    activeSinglePlayerRunId !== null &&
+    singlePlayerResultSaveState.savedRunId === activeSinglePlayerRunId;
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
@@ -1890,35 +2145,38 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   // NUEVO: Pausa automática cuando se cambia de pestaña
   useEffect(() => {
     if (localControlsLocked) return undefined;
-    let wasPlayingBeforeHidden = false;
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // La pestaña se ocultó (cambió a otra pestaña o minimizó)
-        if (gameState.status === 'playing') {
-          wasPlayingBeforeHidden = true;
-          console.log('📱 Pestaña oculta - Pausando juego automáticamente');
-          playSound('pause');
-          togglePause();
-        }
-      } else {
-        // La pestaña volvió a estar visible
-        if (wasPlayingBeforeHidden && gameState.status === 'paused') {
-          console.log('📱 Pestaña visible de nuevo - El juego queda pausado (presiona P para reanudar)');
-          // Nota: No reanudamos automáticamente, el usuario debe presionar P
-          wasPlayingBeforeHidden = false;
-        }
-      }
+      if (!document.hidden || gameStateRef.current.status !== 'playing') return;
+
+      console.log('📱 Pestaña oculta - Pausando juego automáticamente');
+      playSound('pause');
+      pauseGame();
     };
 
-    // Añadir listener para detectar cambios de visibilidad
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [localControlsLocked, gameState.status, togglePause, playSound]); // Dependencias para que react re-evalúe cuando cambien
+  }, [localControlsLocked, pauseGame, playSound]);
+
+  useEffect(() => {
+    if (isHubViewVisible || localControlsLocked || gameState.status !== 'playing') {
+      return;
+    }
+
+    console.log('🧭 Vista del juego oculta en el Hub - Pausando partida');
+    playSound('pause');
+    stopMusic();
+    pauseGame();
+  }, [
+    gameState.status,
+    isHubViewVisible,
+    localControlsLocked,
+    pauseGame,
+    playSound,
+    stopMusic,
+  ]);
 
 
  // Game loop integration using the custom hook
@@ -1926,7 +2184,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     // Pass deltaTime to the updateGame function provided by useGameState
     // El deltaTime será 0 si está pausado, pausando efectivamente todas las actualizaciones
     updateGame(deltaTime);
-  }, FPS, gameState.status === 'paused'); // Target FPS, pasar estado de pausa
+  }, isMobile ? MOBILE_FPS : FPS, gameState.status === 'paused');
 
 
   // UI Button Handlers
@@ -1934,18 +2192,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     if (multiplayerStartPendingRef.current || localControlsLocked) return;
     if (gameState.status === 'playing') {
       playSound('pause');
-      togglePause();
+      pauseGame();
       return;
     }
 
     if (gameState.status === 'paused') {
-      // No permitir reanudar si el dispositivo está en portrait
-      if (isMobile && isPortrait) {
-        console.log('[GameContainer] No se puede reanudar el juego en modo vertical');
-        return;
-      }
       playSound('resume');
-      togglePause();
+      resumeGame();
       return;
     }
 
@@ -2026,22 +2279,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const handleModeSelected = useCallback(async (mode: GameMode) => {
     console.log('🎮 [MODE] Mode selected:', mode);
     if (multiplayerStartPendingRef.current || !canChangeGameMode) return;
+    setCompetitionStartError(null);
     setModeSelectOpen(false);
 
     if (mode === 'single') {
       console.log('🎮 [MODE] Starting single player mode');
-      try {
-        await multiplayer.reset();
-      } catch {
-        return;
-      }
-      setCurrentMode('single');
-      if (gameState.status === 'gameOver') {
-        console.log('🎮 Start desde Game Over - Deteniendo sonido de game over');
-        stopMusic();
-      }
-      playSound('game_start');
-      startGame();
+      await startSinglePlayer();
       return;
     }
 
@@ -2055,19 +2298,56 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     }
 
     console.log('🎮 [MODE] Starting multiplayer mode');
+    setCompetitionAccess(null);
     playSound('button_click');
     await startMultiplayerGame();
   }, [
     canChangeGameMode,
-    gameState.status,
-    multiplayer,
     multiplayerEntryState,
     multiplayerHubEntryUrl,
     playSound,
-    startGame,
+    startSinglePlayer,
     startMultiplayerGame,
-    stopMusic,
   ]);
+
+  useEffect(() => {
+    if (window.parent === window) return undefined;
+    let parentOrigin: string;
+    try {
+      parentOrigin = new URL(document.referrer).origin;
+    } catch {
+      return undefined;
+    }
+
+    const handleParentRequest = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== parentOrigin) return;
+
+      if (
+        event.data?.type === 'TREASURE_HUNT_VIEW_VISIBILITY' &&
+        typeof event.data?.visible === 'boolean'
+      ) {
+        const visible = event.data.visible;
+        setIsHubViewVisible(visible);
+        if (!visible) {
+          stopMusic();
+        } else if (gameState.status === 'idle') {
+          playMusic('background_music');
+        }
+        return;
+      }
+
+      if (
+        event.data?.type !== 'TREASURE_HUNT_START_MODE' ||
+        event.data?.mode !== 'single'
+      ) {
+        return;
+      }
+      void handleModeSelected('single');
+    };
+
+    window.addEventListener('message', handleParentRequest);
+    return () => window.removeEventListener('message', handleParentRequest);
+  }, [gameState.status, handleModeSelected, playMusic, stopMusic]);
 
   // La invitación llega únicamente por el handshake autenticado del padre.
   useEffect(() => {
@@ -2080,7 +2360,23 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
    const handleResetClick = () => {
       if (multiplayerStartPendingRef.current || localControlsLocked) return;
+      if (
+        gameState.status === 'gameOver' &&
+        !isMultiplayerMode &&
+        !singlePlayerResultSaved
+      ) return;
       playSound('button_click');
+
+      // A board that has already emitted competition evidence cannot be reset
+      // locally: doing so would reuse a non-zero server receipt from score zero
+      // and strand the wallet. Finalize the current result first.
+      if (
+        !isMultiplayerMode &&
+        (gameState.status === 'playing' || gameState.status === 'paused')
+      ) {
+        forceGameOver('manual');
+        return;
+      }
       
       // Si estamos en game over, detener el sonido de game over
       if (gameState.status === 'gameOver') {
@@ -2172,7 +2468,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         // Si está en playing o paused, pausar si es necesario y abrir el modal
         if (!localControlsLocked && currentStatus === 'playing') {
           console.log('[INFO] Pausing game before opening modal');
-          togglePause();
+          pauseGame();
         }
         // Siempre abrir el modal cuando no está en idle
         console.log('[INFO] Opening info modal');
@@ -2190,7 +2486,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       playSound('button_click');
       // Si el juego está en playing, pausar automáticamente
       if (!localControlsLocked && gameState.status === 'playing') {
-        togglePause();
+        pauseGame();
       }
       setIsInfoModalOpen(true);
    };
@@ -2203,9 +2499,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (lastGlowTimerRef.current === 0 || gameState.token.glowTimer > lastGlowTimerRef.current) {
         console.log("¡Checkpoint recogido!");
         
-        // Reproducir sonidos al recoger checkpoint
+        // El checkpoint conserva únicamente su sonido propio. Las voces de
+        // Sybil Slayer no forman parte de la identidad sonora de Treasure Hunt.
         playSound('checkpoint_collect'); // Sonido "Checkpoint 1"
-        playSound('jeff_goit');
         
         // DESACTIVADO: Animación de jeff_goit
         // setJeffGoitAnimation({
@@ -2231,9 +2527,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (lastBoostTimerRef.current === 0 || gameState.token.boostTimer > lastBoostTimerRef.current) {
         console.log("¡Haku recogido!");
         
-        // Reproducir sonidos
+        // Haku conserva únicamente su efecto propio.
         playSound('mega_node_collect');
-        playSound('whale_chad');
         
         // DESACTIVADO: Animación de whalechadmode
         // setWhaleChadAnimation({
@@ -2401,6 +2696,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   // Manejar música de fondo según el estado del juego
   useEffect(() => {
+    if (!isHubViewVisible) {
+      stopMusic();
+      return;
+    }
+
     if (gameState.status === 'gameOver' && (!isMultiplayerMode || Boolean(matchResult))) {
       // Reproducir sonido de game over independientemente del control de música
       console.log('💀 Game Over - Reproduciendo sonido de game over');
@@ -2411,7 +2711,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       playMusic('background_music');
     }
     // En estado 'idle' o 'paused' no cambiar la música
-  }, [gameState.status, isMultiplayerMode, matchResult, playGameOverSound]); // CORREGIDO: Removido playMusic, stopMusic, y gameState.score
+  }, [
+    gameState.status,
+    isHubViewVisible,
+    isMultiplayerMode,
+    matchResult,
+    playGameOverSound,
+    playMusic,
+    stopMusic,
+  ]);
 
   // Iniciar música de fondo automáticamente al cargar el componente
   useEffect(() => {
@@ -2800,10 +3108,19 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               <span style={{ width: `${Math.round(loadingProgress * 100)}%` }} />
             </div>
             <p className="th-dialog-copy" aria-live="polite">
-              {loadingPhase === 'preload'
-                ? `Cargando elementos esenciales · ${Math.round(loadingProgress * 100)}%`
-                : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`}
+              {assetLoadError ?? (
+                loadingPhase === 'preload'
+                  ? `Cargando elementos esenciales · ${Math.round(loadingProgress * 100)}%`
+                  : loadingPhase === 'sprites'
+                    ? `Preparando personajes y animaciones · ${Math.round(loadingProgress * 100)}%`
+                    : `Optimizando efectos · ${Math.round(loadingProgress * 100)}%`
+              )}
             </p>
+            {assetLoadError ? (
+              <TreasureButton size="small" onClick={retryCriticalAssetLoad}>
+                Reintentar carga
+              </TreasureButton>
+            ) : null}
           </TreasurePanel>
         </div>
       </TreasureStage>
@@ -2827,22 +3144,16 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         return 'Te quedaste sin vidas frente a las trampas del mercado.';
       case 'redZone':
         return 'Una zona de riesgo terminó la expedición.';
+      case 'manual':
+        return 'Finalizaste la expedición antes de agotar el tiempo.';
       case 'bug':
         return 'Un fee atrapó a tu explorador.';
       default:
         return 'La expedición ha terminado.';
     }
   })();
-  const multiplayerMenuEnabled =
-    multiplayerEntryState === 'ready' || multiplayerEntryState === 'hub';
-  const multiplayerMenuLabel =
-    multiplayerEntryState === 'hub'
-      ? 'Abrir 1v1 en Hub'
-      : multiplayerEntryState === 'connecting'
-        ? 'Conecta wallet para 1v1'
-        : multiplayerEntryState === 'disabled'
-          ? '1v1 no disponible'
-          : 'Jugar 1v1';
+  const multiplayerMenuEnabled = false;
+  const multiplayerMenuLabel = 'JUGAR 1 VS 1';
   const activeEffectLabel = gameState.scoreMultiplier > 1
     ? `Multiplicador x${gameState.scoreMultiplier}`
     : gameState.activeVaulEffect === 'double_collectibles'
@@ -2861,7 +3172,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     showWaitingOverlay ||
     showCountdownOverlay ||
     showReconnectOverlay ||
-    (isMobile && isPortrait) ||
     gameState.status === 'countdown' ||
     gameState.status === 'paused' ||
     gameState.status === 'gameOver'
@@ -2898,7 +3208,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             modeSelectOpen,
             isInfoModalOpen,
             isLevelStatsVisible,
-            isMobile && isPortrait,
             terminalResultKey,
           ].join(':')}
           rootRef={runtimeRootRef}
@@ -2924,8 +3233,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </h1>
                   <span className="th-menu-title-rule" aria-hidden="true" />
                   <p className="th-menu-description">
-                    Encuentra tesoros. Completa el tótem.<br />
-                    Escapa antes de que se agote el tiempo.
+                    Consigue la mayor puntuación antes de agotar<br />
+                    el tiempo o perder las 3 vidas.
                   </p>
                   <div className="th-menu-meta" aria-label="Datos de la partida">
                     <span><TimerIcon aria-hidden="true" /> Partidas rápidas</span>
@@ -2936,16 +3245,20 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     <TreasureButton
                       size="large"
                       className="th-menu-cta"
+                      disabled={competitionStartPending}
+                      aria-busy={competitionStartPending}
                       onClick={() => void handleModeSelected('single')}
                       icon={<PlayIcon strokeWidth={2.5} />}
                     >
-                      Jugar solo
+                      {competitionStartPending
+                        ? 'Comprobando acceso…'
+                        : singlePlayerEntry.actionCopy}
                     </TreasureButton>
                     <TreasureButton
                       variant="secondary"
                       size="large"
                       className={`th-menu-cta${
-                        multiplayerMenuLabel.length > 18 || multiplayerMenuLabel === '1v1 no disponible'
+                        multiplayerMenuLabel.length > 18
                           ? ' th-menu-cta--long'
                           : ''
                       }`}
@@ -2955,10 +3268,11 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     >
                       {multiplayerMenuLabel}
                     </TreasureButton>
-                    <p className="th-menu-disclaimer">
-                      <ShieldIcon aria-hidden="true" />
-                      Sin ranking ni recompensas
-                    </p>
+                    {competitionStartError ? (
+                      <p className="th-menu-disclaimer" role="alert">
+                        {competitionStartError}
+                      </p>
+                    ) : null}
                     <TreasureButton
                       variant="secondary"
                       size="small"
@@ -2966,15 +3280,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onClick={handleOpenInfo}
                       icon={<BookOpenIcon strokeWidth={2.1} />}
                     >
-                      Cómo se juega
-                    </TreasureButton>
-                    <TreasureButton
-                      variant="quiet"
-                      size="small"
-                      className="th-menu-compare-button"
-                      onClick={() => setModeSelectOpen(true)}
-                    >
-                      Comparar modos
+                      CÓMO JUGAR
                     </TreasureButton>
                   </div>
                 </section>
@@ -3115,7 +3421,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       onClick={handleResetClick}
                       disabled={gameState.status === 'gameOver'}
                     >
-                      Reiniciar
+                      Finalizar
                     </TreasureButton>
                     <div className="th-footer__status">
                       <span>{gameState.status === 'countdown' ? 'Preparando expedición' : activeEffectLabel}</span>
@@ -3159,7 +3465,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               setModeSelectOpen(false);
               handleOpenInfo();
             }}
-            multiplayerEntryState={multiplayerEntryState}
+            multiplayerEntryState="disabled"
+            singlePlayerEntryState={singlePlayerEntryState}
+            competitionNotice={competitionStartError}
           />
           <InfoModal
             isOpen={isInfoModalOpen && !localControlsLocked}
@@ -3263,7 +3571,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             </div>
           ) : null}
 
-          {!isMultiplayerMode && gameState.status === 'paused' ? (
+          {!isMultiplayerMode && gameState.status === 'paused' && !isInfoModalOpen ? (
             <div className="th-overlay th-overlay--soft">
               <TreasurePanel className="th-dialog th-dialog--small" role="dialog" aria-modal="true" aria-label="Partida en pausa">
                 <p className="th-screen-kicker">Expedición detenida</p>
@@ -3271,7 +3579,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <p className="th-dialog-copy">Tu partida local está a salvo. Continúa cuando estés listo.</p>
                 <div className="th-dialog-actions">
                   <TreasureButton size="small" onClick={handleStartPauseClick}>Continuar</TreasureButton>
-                  <TreasureButton variant="secondary" size="small" onClick={handleResetClick}>Volver al menú</TreasureButton>
+                  <TreasureButton variant="secondary" size="small" onClick={handleResetClick}>Finalizar partida</TreasureButton>
                 </div>
               </TreasurePanel>
             </div>
@@ -3284,6 +3592,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <p className="th-screen-kicker">Expedición completada</p>
                   <h2 id="single-result-title" className="th-overlay-title">Resultado final</h2>
                   <p className="th-dialog-copy">{gameOverCopy}</p>
+                  {gameEndPersistenceError ? (
+                    <p className="th-dialog-copy" role="alert">{gameEndPersistenceError}</p>
+                  ) : !singlePlayerResultSaved ? (
+                    <p className="th-dialog-copy" role="status">
+                      Guardando resultado… No cierres la partida.
+                    </p>
+                  ) : null}
                   <strong className="th-result-score">{numberFormatter.format(localScore)}</strong>
                   <span className="th-result-score-label">Puntos</span>
                   <div className="th-result-metrics">
@@ -3292,21 +3607,23 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     <div className="th-result-metric"><span>Tiempo</span><strong>{formatDuration(totalRunTimeMs)}</strong></div>
                   </div>
                   <div className="th-result-actions">
-                    <TreasureButton
-                      size="small"
-                      onClick={() => {
-                        playSound('button_click');
-                        stopMusic();
-                        resetGame();
-                        setModeSelectOpen(true);
-                      }}
-                    >
-                      Jugar de nuevo
-                    </TreasureButton>
+                    {gameEndPersistenceError ? (
+                      <TreasureButton size="small" onClick={retryGameEndPersistence}>
+                        Reintentar guardado
+                      </TreasureButton>
+                    ) : null}
                     <TreasureButton variant="secondary" size="small" onClick={() => setIsLevelStatsVisible(true)}>
                       Ver desglose
                     </TreasureButton>
-                    <TreasureButton variant="quiet" size="small" onClick={handleResetClick}>Volver al menú</TreasureButton>
+                    <TreasureButton
+                      variant="quiet"
+                      size="small"
+                      onClick={handleResetClick}
+                      disabled={!singlePlayerResultSaved}
+                      aria-busy={!singlePlayerResultSaved}
+                    >
+                      {singlePlayerResultSaved ? 'Volver al menú' : 'Guardando…'}
+                    </TreasureButton>
                   </div>
                 </section>
                 <div className="th-result-art" aria-hidden="true">
@@ -3358,7 +3675,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         {shouldRenderTouchControls ? (
           <TouchZones onDirectionChange={setTouchDirection} onDirectionClear={clearTouchDirection} />
         ) : null}
-        {!localControlsLocked ? <OrientationOverlay /> : null}
       </div>
     );
   }
@@ -3374,7 +3690,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           setModeSelectOpen(false);
           handleOpenInfo();
         }}
-        multiplayerEntryState={multiplayerEntryState}
+        multiplayerEntryState="disabled"
+        singlePlayerEntryState={singlePlayerEntryState}
+        competitionNotice={competitionStartError}
       />
       {waitingOverlay}
       {countdownOverlay}
@@ -4177,28 +4495,21 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                         
                         {/* Botón Play Again */}
                         <button
-                          onClick={() => {
-                            if (multiplayerStartPendingRef.current) return;
-                            playSound('button_click');
-                            if (gameState.status === 'gameOver') {
-                              console.log('🔄 Play Again desde Game Over - Deteniendo sonido de game over');
-                              stopMusic();
-                            }
-                            resetGame();
-                            setModeSelectOpen(true);
-                          }}
+                          onClick={handleResetClick}
+                          disabled={!singlePlayerResultSaved}
+                          aria-busy={!singlePlayerResultSaved}
                           className="focus:outline-none game-button relative"
-                          aria-label="Play Again"
+                          aria-label="Volver al menú"
                         >
                           <Image 
                             src="/assets/ui/buttons/caja-texto2.png" 
-                            alt="Play Again" 
+                            alt="Volver al menú"
                             width={180} 
                             height={50}
                             className="game-img"
                           />
                           <span className="absolute inset-0 flex items-center justify-center text-white font-pixellari text-lg whitespace-nowrap" style={{ WebkitTextStroke: '1px #000000', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }}>
-                            PLAY AGAIN
+                            VOLVER AL MENÚ
                           </span>
                         </button>
                       </div>
@@ -4455,8 +4766,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         </>
       )}
 
-      {/* Orientation overlay - muestra mensaje cuando el dispositivo está en vertical */}
-      <OrientationOverlay />
     </div>
   );
 };

@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Sybil Slayer',
+    title: 'Treasure Hunt',
   },
   other: {
     'mobile-web-app-capable': 'yes',

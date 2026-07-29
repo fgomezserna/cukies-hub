@@ -1,8 +1,16 @@
 import {
+  SAFEPAL_EVM_CONNECTOR_ID,
+  TOKENPOCKET_EVM_CONNECTOR_ID,
   TRONLINK_EVM_CONNECTOR_ID,
+  TRUST_WALLET_EVM_CONNECTOR_ID,
+  findSafePalEvmProvider,
+  findTokenPocketEvmProvider,
+  findTrustWalletEvmProvider,
   getConnectorDescription,
   getConnectorDisplayName,
   getConnectorLogoSrc,
+  getMobileWalletConnector,
+  getMobileWalletLaunchUrl,
   getPreferredWalletConnector,
   getSortedWalletConnectors,
   getVisibleWalletConnectors,
@@ -32,21 +40,30 @@ describe('lib/wallet-connectors', () => {
   it('sorts and deduplicates EVM connectors by stable wallet priority', () => {
     const walletConnect = connector({ id: 'walletConnect', name: 'WalletConnect', type: 'walletConnect' });
     const browserWallet = connector({ id: 'injected', name: 'Injected', type: 'injected' });
+    const safePal = connector({ id: SAFEPAL_EVM_CONNECTOR_ID, name: 'SafePal', type: 'injected' });
+    const trustWallet = connector({ id: TRUST_WALLET_EVM_CONNECTOR_ID, name: 'Trust Wallet', type: 'injected' });
     const tronLink = connector({ id: TRONLINK_EVM_CONNECTOR_ID, name: 'TronLink EVM', type: 'injected' });
     const coinbase = connector({ id: 'coinbaseWalletSDK', name: 'Coinbase Wallet', type: 'coinbaseWallet' });
     const metaMask = connector({ id: 'io.metamask', name: 'MetaMask', type: 'metaMask' });
+    const tokenPocket = connector({ id: TOKENPOCKET_EVM_CONNECTOR_ID, name: 'TokenPocket', type: 'injected' });
 
     const sorted = getSortedWalletConnectors([
       walletConnect,
       coinbase,
       browserWallet,
       tronLink,
+      tokenPocket,
+      safePal,
       walletConnect,
       metaMask,
+      trustWallet,
     ]);
 
     expect(sorted.map((item) => item.id)).toEqual([
+      SAFEPAL_EVM_CONNECTOR_ID,
+      TRUST_WALLET_EVM_CONNECTOR_ID,
       'io.metamask',
+      TOKENPOCKET_EVM_CONNECTOR_ID,
       TRONLINK_EVM_CONNECTOR_ID,
       'injected',
       'walletConnect',
@@ -124,5 +141,41 @@ describe('lib/wallet-connectors', () => {
     });
 
     expect(visible.map((item) => item.id)).toEqual([TRONLINK_EVM_CONNECTOR_ID, 'injected']);
+  });
+
+  it('detecta los proveedores móviles dedicados sin confundirlos con el inyectado genérico', () => {
+    const safePalProvider = { request: jest.fn(), isSafePal: true };
+    const trustProvider = { request: jest.fn(), isTrust: true };
+    const tokenPocketProvider = { request: jest.fn(), isTokenPocket: true };
+
+    expect(findSafePalEvmProvider({ safepalProvider: safePalProvider })).toBe(safePalProvider);
+    expect(findTrustWalletEvmProvider({ trustwallet: { ethereum: trustProvider } })).toBe(trustProvider);
+    expect(findTokenPocketEvmProvider({ tokenpocket: { ethereum: tokenPocketProvider } })).toBe(tokenPocketProvider);
+  });
+
+  it('selecciona la familia móvil y construye deep links oficiales con la URL actual', () => {
+    const safePal = connector({ id: SAFEPAL_EVM_CONNECTOR_ID, name: 'SafePal', type: 'injected' });
+    const trustWallet = connector({ id: TRUST_WALLET_EVM_CONNECTOR_ID, name: 'Trust Wallet', type: 'injected' });
+    const metaMask = connector({ id: 'metaMask', name: 'MetaMask', type: 'metaMask' });
+    const tokenPocket = connector({ id: TOKENPOCKET_EVM_CONNECTOR_ID, name: 'TokenPocket', type: 'injected' });
+    const connectors = [tokenPocket, metaMask, trustWallet, safePal];
+    const dappUrl = 'https://cukieshub.eurekand.com/games/treasure-hunt?from=wallet';
+
+    expect(getMobileWalletConnector(connectors, 'safepal')).toBe(safePal);
+    expect(getMobileWalletConnector(connectors, 'trustWallet')).toBe(trustWallet);
+    expect(getMobileWalletConnector(connectors, 'metaMask')).toBe(metaMask);
+    expect(getMobileWalletConnector(connectors, 'tokenPocket')).toBe(tokenPocket);
+    expect(getMobileWalletLaunchUrl('safepal', dappUrl)).toBe(
+      'https://www.safepal.com/download?product=1',
+    );
+    expect(getMobileWalletLaunchUrl('trustWallet', dappUrl)).toContain(
+      'https://link.trustwallet.com/open_url?coin_id=20000714&url=',
+    );
+    expect(getMobileWalletLaunchUrl('metaMask', dappUrl)).toBe(
+      'https://metamask.app.link/dapp/cukieshub.eurekand.com/games/treasure-hunt?from=wallet',
+    );
+    expect(decodeURIComponent(getMobileWalletLaunchUrl('tokenPocket', dappUrl))).toContain(
+      '"chain":"BSC"',
+    );
   });
 });

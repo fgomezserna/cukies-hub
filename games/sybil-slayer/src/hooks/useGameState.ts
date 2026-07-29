@@ -1599,6 +1599,45 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
      });
  }, [pauseGameTime, resumeGameTime]);
 
+ const pauseGame = useCallback(() => {
+   setGameState(prev => {
+     if (prev.status !== 'playing') return prev;
+
+     pauseGameTime();
+     const pauseStartedAt = Date.now();
+     return {
+       ...prev,
+       status: 'paused',
+       redZones: prev.redZones.map(zone => ({
+         ...zone,
+         visualPauseStart: zone.visualPauseStart ?? pauseStartedAt,
+       })),
+     };
+   });
+ }, [pauseGameTime]);
+
+ const resumeGame = useCallback(() => {
+   setGameState(prev => {
+     if (prev.status !== 'paused') return prev;
+
+     resumeGameTime();
+     const resumeAt = Date.now();
+     return {
+       ...prev,
+       status: 'playing',
+       redZones: prev.redZones.map(zone => {
+         if (!zone.visualPauseStart) return zone;
+         const pausedDuration = resumeAt - zone.visualPauseStart;
+         return {
+           ...zone,
+           visualStartTime: (zone.visualStartTime ?? resumeAt) + pausedDuration,
+           visualPauseStart: undefined,
+         };
+       }),
+     };
+   });
+ }, [resumeGameTime]);
+
 
    // Function to be called by the input hook to update the internal ref
   const updateInputRef = useCallback((newInputState: { direction: Vector2D; pauseToggled: boolean; startToggled: boolean }) => {
@@ -4639,6 +4678,9 @@ export function useGameState(canvasWidth: number, canvasHeight: number, onEnergy
     pauseMultiplayerRuntime,
     resumeMultiplayerRuntime,
     togglePause,
+    pauseGame,
+    resumeGame,
+    getPausableGameTime: getGameTime,
     resetGame,
     forceGameOver,
   };

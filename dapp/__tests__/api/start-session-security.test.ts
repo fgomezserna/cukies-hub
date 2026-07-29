@@ -163,6 +163,68 @@ describe('POST /api/games/start-session security', () => {
     expect(mockCreateGameSessionDirectly).toHaveBeenCalledTimes(2);
   });
 
+  it('resumes an opaque session only for the authenticated wallet and never needs a persisted bearer', async () => {
+    const sessionId = `game_${'a'.repeat(64)}`;
+    mockFindGameSession.mockResolvedValue({
+      sessionId,
+      sessionToken: `session_${'b'.repeat(43)}`,
+      userId: 'cookie-user',
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    });
+
+    const response = await POST(request({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      resumeSessionId: sessionId,
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      success: true,
+      sessionId,
+      sessionToken: `session_${'b'.repeat(43)}`,
+    });
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
+  });
+
+  it('does not disclose or resume a session owned by another wallet', async () => {
+    const sessionId = `game_${'c'.repeat(64)}`;
+    mockFindGameSession.mockResolvedValue({
+      sessionId,
+      sessionToken: `session_${'d'.repeat(43)}`,
+      userId: 'another-user',
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    });
+
+    const response = await POST(request({
+      gameId: 'sybil-slayer',
+      resumeSessionId: sessionId,
+    }));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Game session could not be resumed',
+    });
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['malformed id', { gameId: 'sybil-slayer', resumeSessionId: 'session-1' }],
+    ['ambiguous resume and create', {
+      gameId: 'sybil-slayer',
+      resumeSessionId: `game_${'e'.repeat(64)}`,
+      idempotencyKey: 'resume-must-not-also-create-0001',
+    }],
+  ])('rejects %s', async (_label, body) => {
+    const response = await POST(request(body));
+    expect(response.status).toBe(400);
+    expect(mockCreateGameSessionDirectly).not.toHaveBeenCalled();
+  });
+
   it('recovers a concurrent Mongo duplicate-key race by returning the winning session', async () => {
     let stored:
       | {
