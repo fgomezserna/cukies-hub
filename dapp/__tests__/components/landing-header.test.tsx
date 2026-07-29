@@ -31,11 +31,17 @@ describe('components/landing/LandingHeader', () => {
     );
 
     expect(screen.getAllByRole('link', { name: 'Inicio' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Jugar' })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ href: expect.stringContaining('/games/treasure-hunt') }),
+      ]),
+    );
 
     fireEvent.click(screen.getAllByRole('button', { name: 'View website in English' })[0]);
 
     await waitFor(() => {
       expect(screen.getAllByRole('link', { name: 'Home' }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('link', { name: 'Play' }).length).toBeGreaterThan(0);
       expect(window.localStorage.getItem(PUBLIC_LOCALE_STORAGE_KEY)).toBe('en');
     });
   });
