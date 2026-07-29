@@ -10,26 +10,14 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter,
 } from '@/components/ui/sidebar';
 import {
   Home,
   Gamepad2,
   Trophy,
-  Star,
-  Coins,
-  Dna,
-  ArrowRightLeft,
-  ChevronDown,
-  Cookie,
-  Send,
   LockKeyhole,
-  Store,
-  Database,
 } from 'lucide-react';
 import Header from './header';
-import DiscordIcon from '../icons/discord';
-import XIcon from '../icons/x-icon';
 import Image from 'next/image';
 import CukieLogoFirst from '@/assets/Cukie_logo_first.png';
 import { usePathname } from 'next/navigation';
@@ -56,30 +44,27 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isTreasureHunt = pathname.startsWith('/games/treasure-hunt');
   const isMobileTreasureHunt =
     isMobileGameShell && isTreasureHunt;
-  const isCukiesSection =
-    pathname.startsWith('/cukies') ||
-    pathname.startsWith('/marketplace') ||
-    pathname.startsWith('/cukiepoints') ||
-    pathname.startsWith('/users/points') ||
-    pathname.startsWith('/breeding') ||
-    pathname.startsWith('/bridge') ||
-    pathname.startsWith('/bridges');
   const isMarketplaceSection = pathname.startsWith('/marketplace');
 
-  const cukiesTools = [
-    { href: '/marketplace', label: 'Marketplace', Icon: Store, active: pathname.startsWith('/marketplace') },
+  const navigationItems = [
+    { href: '/', label: 'Preventa UKI', Icon: Home, active: pathname === '/' },
     {
-      href: '/cukiepoints',
-      label: 'CukiePoints',
-      Icon: Coins,
-      active: pathname.startsWith('/cukiepoints') || pathname.startsWith('/users/points'),
+      href: '/games/treasure-hunt',
+      label: 'Jugar',
+      Icon: Gamepad2,
+      active: isTreasureHunt,
     },
-    { href: '/breeding', label: 'Breeding', Icon: Dna, active: pathname.startsWith('/breeding') },
     {
-      href: '/bridge',
-      label: 'Bridge',
-      Icon: ArrowRightLeft,
-      active: pathname.startsWith('/bridge') || pathname.startsWith('/bridges'),
+      href: '/vesting',
+      label: 'Vesting',
+      Icon: LockKeyhole,
+      active: pathname.startsWith('/vesting'),
+    },
+    {
+      href: '/premios',
+      label: 'Premios',
+      Icon: Trophy,
+      active: pathname.startsWith('/premios'),
     },
   ];
 
@@ -100,209 +85,25 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           </SidebarHeader>
           <SidebarContent className="py-4 bg-black/10 backdrop-blur-sm">
             <SidebarMenu className="px-3 space-y-1">
-              <SidebarMenuItem>
-                <Link href="/" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname === '/'}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <Home className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Inicio</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <Link href="/games" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/games')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-300/20 to-teal-400/20 group-hover:from-cyan-300/30 group-hover:to-teal-400/30 transition-all">
-                        <Gamepad2 className="h-4 w-4 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Juegos</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <Link href="/leaderboard" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/leaderboard')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <Trophy className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Ranking</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <Link href="/quests" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/quests')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <Star className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Misiones</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <Link href="/points" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/points')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <Coins className="h-4 w-4 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Puntos</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <div className="group/cukies">
-                  <Link href="/cukies" passHref>
+              {navigationItems.map(({ href, label, Icon, active }) => (
+                <SidebarMenuItem key={href}>
+                  <Link href={href} passHref>
                     <SidebarMenuButton
-                      isActive={isCukiesSection}
+                      isActive={active}
                       className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
                     >
-                      <div className="flex w-full items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 group-hover:from-emerald-400/30 group-hover:to-cyan-400/30 transition-all">
-                            <Cookie className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                          </div>
-                          <span className="group-data-[collapsible=icon]:hidden font-medium">Cukies</span>
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
+                          <Icon className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
                         </div>
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 text-cyan-200 transition group-data-[collapsible=icon]:hidden ${
-                            isCukiesSection ? 'rotate-180' : ''
-                          }`}
-                        />
+                        <span className="group-data-[collapsible=icon]:hidden font-medium">{label}</span>
                       </div>
                     </SidebarMenuButton>
                   </Link>
-
-                  {isCukiesSection && (
-                    <div className="mt-1 space-y-1 pl-5 group-data-[collapsible=icon]:hidden">
-                    {cukiesTools.map(({ href, label, Icon, active }) => (
-                      <Link key={href} href={href} className="block">
-                        <div
-                          className={`flex items-center gap-2 rounded-[8px] px-3 py-2 text-sm transition ${
-                            active
-                              ? 'bg-cyan-300/15 text-cyan-100'
-                              : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                          }`}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                          <span>{label}</span>
-                        </div>
-                      </Link>
-                    ))}
-                    </div>
-                  )}
-                </div>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <Link href="/vesting" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/vesting')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-500/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                        <LockKeyhole className="h-4 w-4 text-cyan-200 group-hover:text-cyan-300 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Vesting</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <Link href="/indexer" passHref>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/indexer')}
-                    className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-400/20 to-emerald-400/20 group-hover:from-cyan-400/30 group-hover:to-emerald-400/30 transition-all">
-                        <Database className="h-4 w-4 text-cyan-200 group-hover:text-cyan-300 transition-colors" />
-                      </div>
-                      <span className="group-data-[collapsible=icon]:hidden font-medium">Indexer</span>
-                    </div>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
-            
-
           </SidebarContent>
-          <SidebarFooter className="border-t border-teal-400/20 bg-black/15 backdrop-blur-sm">
-            <div className="p-3 flex flex-col gap-3 group-data-[collapsible=icon]:items-center">
-
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center space-y-1">
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-cyan-400/10 hover:shadow-md hover:shadow-teal-400/20">
-                        <a href="https://x.com/cukiesworld" target="_blank" rel="noopener noreferrer">
-                          <div className="flex items-center gap-3">
-                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                              <XIcon className="h-3 w-3 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                            </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">Twitter</span>
-                          </div>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-cyan-400/10 hover:shadow-md hover:shadow-teal-400/20">
-                        <a href="https://t.me/Cukies World" target="_blank" rel="noopener noreferrer">
-                          <div className="flex items-center gap-3">
-                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                              <Send className="h-3 w-3 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
-                            </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">Telegram</span>
-                          </div>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className="group rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-cyan-400/10 hover:shadow-md hover:shadow-teal-400/20">
-                        <a href="https://discord.gg/BxFxZZeAAj" target="_blank" rel="noopener noreferrer">
-                          <div className="flex items-center gap-3">
-                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                              <DiscordIcon className="h-3 w-3 text-cyan-300 group-hover:text-cyan-300 transition-colors" />
-                            </div>
-                            <span className="group-data-[collapsible=icon]:hidden font-medium text-sm">Discord</span>
-                          </div>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </div>
-          </SidebarFooter>
         </Sidebar>
         )}
         <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

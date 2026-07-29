@@ -131,6 +131,66 @@ describe('Treasure Hunt competition persistence integrity', () => {
     expect(updateOne.mock.calls[1]?.[1]).not.toHaveProperty('$set');
   });
 
+  it('extends an open campaign without changing its id or losing ranked attempts', async () => {
+    const extendedCampaign = createCompetitionConfig({
+      campaignId: campaign.campaignId,
+      rulesVersion: campaign.rulesVersion,
+      presaleContractAddress: campaign.presaleContractAddress,
+      startsAt: campaign.startsAt,
+      endsAt: '2026-08-10T23:00:00.000Z',
+    });
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
+    const findOne = jest.fn()
+      .mockResolvedValueOnce({ ...campaign })
+      .mockResolvedValueOnce({ ...extendedCampaign });
+    const repository = new MongoCompetitionRepository(
+      async () => databaseWith({ presale_game_campaigns: { updateOne, findOne } }),
+      aliasSecret,
+    );
+
+    await expect(repository.syncCampaign(
+      extendedCampaign,
+      '2026-07-19T00:00:00.000Z',
+    )).resolves.toBeUndefined();
+
+    expect(updateOne).toHaveBeenNthCalledWith(
+      2,
+      { campaignId: campaign.campaignId, endsAt: campaign.endsAt },
+      {
+        $set: {
+          endsAt: extendedCampaign.endsAt,
+          updatedAt: '2026-07-19T00:00:00.000Z',
+        },
+      },
+    );
+  });
+
+  it.each([
+    ['shortening', '2026-07-19T00:00:00.000Z', '2026-07-18T00:00:00.000Z'],
+    ['reopening', '2026-07-21T00:00:00.000Z', '2026-08-10T23:00:00.000Z'],
+  ])('rejects %s a competition window', async (_case, now, endsAt) => {
+    const changedCampaign = createCompetitionConfig({
+      campaignId: campaign.campaignId,
+      rulesVersion: campaign.rulesVersion,
+      presaleContractAddress: campaign.presaleContractAddress,
+      startsAt: campaign.startsAt,
+      endsAt,
+    });
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const findOne = jest.fn().mockResolvedValue({ ...campaign });
+    const repository = new MongoCompetitionRepository(
+      async () => databaseWith({ presale_game_campaigns: { updateOne, findOne } }),
+      aliasSecret,
+    );
+
+    await expect(repository.syncCampaign(changedCampaign, now))
+      .rejects.toEqual(expect.objectContaining<Partial<CompetitionCampaignDriftError>>({
+        name: 'CompetitionCampaignDriftError',
+        fields: ['endsAt'],
+      }));
+    expect(updateOne).toHaveBeenCalledTimes(1);
+  });
+
   it('uses a private alias and retries an E11000 collision with a new nonce', async () => {
     const walletAddress = '0x1111111111111111111111111111111111111111';
     const expectedAlias = generatePrivateCompetitionAlias({

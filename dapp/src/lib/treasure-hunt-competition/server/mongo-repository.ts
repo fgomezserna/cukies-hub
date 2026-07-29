@@ -83,8 +83,15 @@ export function assertCompetitionCampaignMatches(
   expected: CompetitionConfig,
 ) {
   if (!stored) throw new Error('Competition campaign could not be persisted');
-  const differentFields = CAMPAIGN_CONFIG_KEYS.filter((key) => stored[key] !== expected[key]);
+  const differentFields = competitionCampaignDifferences(stored, expected);
   if (differentFields.length > 0) throw new CompetitionCampaignDriftError(differentFields);
+}
+
+function competitionCampaignDifferences(
+  stored: Document,
+  expected: CompetitionConfig,
+) {
+  return CAMPAIGN_CONFIG_KEYS.filter((key) => stored[key] !== expected[key]);
 }
 
 function isDuplicateKeyError(error: unknown) {
@@ -183,10 +190,35 @@ export class MongoCompetitionRepository implements CompetitionRepository {
       },
       { upsert: true },
     );
-    assertCompetitionCampaignMatches(
-      await collection.findOne({ campaignId: campaign.campaignId }),
-      campaign,
+    let stored = await collection.findOne({ campaignId: campaign.campaignId });
+    if (!stored) throw new Error('Competition campaign could not be persisted');
+
+    const differentFields = competitionCampaignDifferences(stored, campaign);
+    const immutableDifferentFields = differentFields.filter((key) => key !== 'endsAt');
+    if (immutableDifferentFields.length > 0) {
+      throw new CompetitionCampaignDriftError(differentFields);
+    }
+    if (!differentFields.includes('endsAt')) return;
+
+    const storedEndsAtMs = Date.parse(String(stored.endsAt));
+    const requestedEndsAtMs = Date.parse(campaign.endsAt);
+    const nowMs = Date.parse(now);
+    const isSafeExtension =
+      Number.isFinite(storedEndsAtMs) &&
+      Number.isFinite(requestedEndsAtMs) &&
+      Number.isFinite(nowMs) &&
+      requestedEndsAtMs > storedEndsAtMs &&
+      nowMs <= storedEndsAtMs;
+    if (!isSafeExtension) {
+      throw new CompetitionCampaignDriftError(['endsAt']);
+    }
+
+    await collection.updateOne(
+      { campaignId: campaign.campaignId, endsAt: stored.endsAt },
+      { $set: { endsAt: campaign.endsAt, updatedAt: now } },
     );
+    stored = await collection.findOne({ campaignId: campaign.campaignId });
+    assertCompetitionCampaignMatches(stored, campaign);
   }
 
   async getOrCreateParticipant(input: {
