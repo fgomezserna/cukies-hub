@@ -237,7 +237,7 @@ function RulesSummary({ campaign }: { readonly campaign: CompetitionCampaign | n
     {
       value: formatPercentage(rules.poolBps),
       label: 'Pool de recompensas',
-      detail: 'de todos los UKI comprados; 80% jugadores y hasta 20% sponsors',
+      detail: 'de los UKI computables tras alcanzar 3.500 ASM; 80% jugadores y hasta 20% sponsors',
     },
     {
       value: formatPercentage(rules.playerRewardBps),

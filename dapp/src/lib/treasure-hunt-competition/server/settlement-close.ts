@@ -13,10 +13,11 @@ import {
   type CompetitionSettlement,
   type CompetitionVestingSchedule,
 } from '..';
+import { calculateTreasureHuntPrizePoolRaw } from '@/lib/treasure-hunt-prize-pool';
 import type { CompetitionRuntime } from './runtime';
 
-const SETTLEMENT_SCHEMA_VERSION = 2 as const;
-const SETTLEMENT_ALGORITHM_VERSION = 'treasure-hunt-presale-v1' as const;
+const SETTLEMENT_SCHEMA_VERSION = 3 as const;
+const SETTLEMENT_ALGORITHM_VERSION = 'treasure-hunt-presale-v2' as const;
 
 export interface SettlementAttemptRecord extends CompetitionAttempt {
   readonly rulesVersion: string;
@@ -25,6 +26,8 @@ export interface SettlementAttemptRecord extends CompetitionAttempt {
 export interface SettlementPurchaseRecord {
   readonly eventId: string;
   readonly walletAddress: string;
+  /** Required by the production source; optional only for legacy test/import adapters. */
+  readonly asmPurchasedRaw?: string;
   readonly ukiPurchasedRaw: string;
   readonly confirmedAt: string;
 }
@@ -277,7 +280,6 @@ function canonicalPurchases(
   purchases: readonly SettlementPurchaseRecord[],
   campaign: CompetitionConfig,
 ) {
-  const startsAtMs = Date.parse(campaign.startsAt);
   const endsAtMs = Date.parse(campaign.endsAt);
   const relevant: SettlementPurchaseRecord[] = [];
   const eventIds = new Set<string>();
@@ -289,7 +291,7 @@ function canonicalPurchases(
     } catch (error) {
       invalidInput(error instanceof Error ? error.message : 'Invalid purchase confirmation date');
     }
-    if (confirmedAt.getTime() < startsAtMs || confirmedAt.getTime() > endsAtMs) continue;
+    if (confirmedAt.getTime() > endsAtMs) continue;
 
     if (typeof purchase.eventId !== 'string') {
       invalidInput('Purchase eventId must be a string');
@@ -314,10 +316,23 @@ function canonicalPurchases(
     } catch {
       invalidInput(`Invalid UKI raw amount for purchase event ${eventId}`);
     }
+    if (purchase.asmPurchasedRaw !== undefined) {
+      if (typeof purchase.asmPurchasedRaw !== 'string') {
+        invalidInput(`Invalid ASM raw amount for purchase event ${eventId}`);
+      }
+      try {
+        parseUkiRaw(purchase.asmPurchasedRaw);
+      } catch {
+        invalidInput(`Invalid ASM raw amount for purchase event ${eventId}`);
+      }
+    }
 
     relevant.push({
       eventId,
       walletAddress,
+      ...(purchase.asmPurchasedRaw === undefined
+        ? {}
+        : { asmPurchasedRaw: purchase.asmPurchasedRaw }),
       ukiPurchasedRaw: purchase.ukiPurchasedRaw,
       confirmedAt: confirmedAt.toISOString(),
     });
@@ -589,6 +604,22 @@ export async function closeTreasureHuntCompetition(input: {
   }
 
   const ranking = buildCompetitionRanking(attempts, campaign);
+  const hasExactPoolInputs = purchases.every(
+    (purchase) => purchase.asmPurchasedRaw !== undefined,
+  );
+  const exactPoolUkiRaw = hasExactPoolInputs
+    ? calculateTreasureHuntPrizePoolRaw({
+      totalAsmRaisedRaw: purchases.reduce(
+        (total, purchase) => total + parseUkiRaw(purchase.asmPurchasedRaw as string),
+        BigInt(0),
+      ),
+      totalUkiSoldRaw: purchases.reduce(
+        (total, purchase) => total + parseUkiRaw(purchase.ukiPurchasedRaw),
+        BigInt(0),
+      ),
+      poolBps: campaign.poolBps,
+    }).toString()
+    : undefined;
   const settlement = settleCompetition({
     campaign,
     ranking,
@@ -597,6 +628,7 @@ export async function closeTreasureHuntCompetition(input: {
       ukiPurchasedRaw: purchase.ukiPurchasedRaw,
       sponsorWalletAddress: participantInput.sponsorByWallet.get(purchase.walletAddress) ?? null,
     })),
+    poolUkiRaw: exactPoolUkiRaw,
   });
   const allocations = aggregateAllocations(settlement);
   const schedule = createCompetitionVestingSchedule(campaign.endsAt, campaign);

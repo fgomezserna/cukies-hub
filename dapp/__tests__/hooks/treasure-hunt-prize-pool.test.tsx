@@ -6,8 +6,7 @@ const CACHE_KEY = 'cukies:treasure-hunt:prize-pool:v1';
 
 function statusResponse() {
   return new Response(JSON.stringify({
-    price: { ukiPerAsmFormatted: '888' },
-    totals: { totalAsmRaisedFormatted: '3822' },
+    poolUkiRaw: '71484000000000000000000',
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -37,6 +36,10 @@ describe('useTreasureHuntPrizePool', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/games/treasure-hunt/competition/leaderboard?page=1&pageSize=1',
+      expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
+    );
     expect(result.current.value).toBe(71_484);
     expect(result.current.error).toBe('RPC temporalmente no disponible');
   });

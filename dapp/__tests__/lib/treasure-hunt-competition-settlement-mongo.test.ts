@@ -41,8 +41,8 @@ function snapshot(inputHash = 'sha256:original') {
     rulesVersion: 'rules-1',
     createdAt: '2026-04-01T00:00:00.000Z',
     manifest: {
-      schemaVersion: 2,
-      algorithmVersion: 'treasure-hunt-presale-v1',
+      schemaVersion: 3,
+      algorithmVersion: 'treasure-hunt-presale-v2',
       campaignId: 'uki-presale-2026',
       rulesVersion: 'rules-1',
       presaleContractAddress: PRESALE,
@@ -173,7 +173,6 @@ describe('Treasure Hunt competition Mongo settlement wiring', () => {
       expect.objectContaining({
         contractAddress: { $regex: `^${PRESALE}$`, $options: 'i' },
         timestampMs: {
-          $gte: Date.parse(campaign.startsAt),
           $lte: Date.parse(campaign.endsAt),
         },
         status: { $ne: 'projected' },
@@ -328,6 +327,7 @@ describe('Treasure Hunt competition Mongo settlement wiring', () => {
     const purchasesCursor = cursor([{
       eventId: 'bsc:0xabc:1',
       buyerWalletAddress: PLAYER,
+      asmAmountRaw: '1000000000000000000',
       ukiAmountRaw: '1000000000000000000',
       confirmedAt,
       txHash: 'must-not-leak',
@@ -344,6 +344,7 @@ describe('Treasure Hunt competition Mongo settlement wiring', () => {
     })).resolves.toEqual([{
       eventId: 'bsc:0xabc:1',
       walletAddress: PLAYER,
+      asmPurchasedRaw: '1000000000000000000',
       ukiPurchasedRaw: '1000000000000000000',
       confirmedAt: confirmedAt.toISOString(),
     }]);
@@ -351,7 +352,6 @@ describe('Treasure Hunt competition Mongo settlement wiring', () => {
     expect(find).toHaveBeenCalledWith({
       contractAddress: { $regex: `^${PRESALE}$`, $options: 'i' },
       confirmedAt: {
-        $gte: new Date('2026-01-01T00:00:00.000Z'),
         $lte: new Date('2026-03-31T00:00:00.000Z'),
       },
     });
@@ -359,6 +359,7 @@ describe('Treasure Hunt competition Mongo settlement wiring', () => {
       _id: 0,
       eventId: 1,
       buyerWalletAddress: 1,
+      asmAmountRaw: 1,
       ukiAmountRaw: 1,
       confirmedAt: 1,
     });

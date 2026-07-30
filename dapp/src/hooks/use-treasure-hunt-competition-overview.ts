@@ -48,9 +48,32 @@ export interface TreasureHuntLeaderboardEntry {
   readonly finishedAt: string;
   readonly reviewStatus: 'pending' | 'approved';
   readonly isMe: boolean;
+  readonly estimatedRewardUkiRaw: string;
+  readonly rewardStatus:
+    | 'estimated'
+    | 'partial'
+    | 'no_purchase'
+    | 'pool_exhausted'
+    | 'reward_rounds_to_zero';
 }
 
-interface CompetitionLeaderboardResponse {
+export interface TreasureHuntLeaderboardMeta {
+  readonly calculatedAt: string;
+  readonly poolUkiRaw: string;
+  readonly playerPoolUkiRaw: string;
+  readonly allocatedPlayerUkiRaw: string;
+  readonly remainingPlayerPoolUkiRaw: string;
+  readonly totalRankedEntries: number;
+  readonly myAttempts: number;
+  readonly pagination: {
+    readonly page: number;
+    readonly pageSize: number;
+    readonly totalEntries: number;
+    readonly totalPages: number;
+  };
+}
+
+interface CompetitionLeaderboardResponse extends TreasureHuntLeaderboardMeta {
   readonly success: true;
   readonly campaignId: string;
   readonly entries: readonly TreasureHuntLeaderboardEntry[];
@@ -97,6 +120,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isRawTokenAmount(value: unknown): value is string {
+  return typeof value === 'string' && /^(0|[1-9]\d*)$/.test(value);
 }
 
 function isCampaign(value: unknown): value is TreasureHuntCompetitionCampaign {
@@ -148,7 +175,15 @@ function isLeaderboardEntry(value: unknown): value is TreasureHuntLeaderboardEnt
     isFiniteNumber(value.gameTimeMs) &&
     typeof value.finishedAt === 'string' &&
     (value.reviewStatus === 'pending' || value.reviewStatus === 'approved') &&
-    typeof value.isMe === 'boolean'
+    typeof value.isMe === 'boolean' &&
+    isRawTokenAmount(value.estimatedRewardUkiRaw) &&
+    [
+      'estimated',
+      'partial',
+      'no_purchase',
+      'pool_exhausted',
+      'reward_rounds_to_zero',
+    ].includes(String(value.rewardStatus))
   );
 }
 
@@ -157,6 +192,18 @@ function isLeaderboard(value: unknown): value is CompetitionLeaderboardResponse 
     isObject(value) &&
     value.success === true &&
     typeof value.campaignId === 'string' &&
+    typeof value.calculatedAt === 'string' &&
+    isRawTokenAmount(value.poolUkiRaw) &&
+    isRawTokenAmount(value.playerPoolUkiRaw) &&
+    isRawTokenAmount(value.allocatedPlayerUkiRaw) &&
+    isRawTokenAmount(value.remainingPlayerPoolUkiRaw) &&
+    isFiniteNumber(value.totalRankedEntries) &&
+    isFiniteNumber(value.myAttempts) &&
+    isObject(value.pagination) &&
+    isFiniteNumber(value.pagination.page) &&
+    isFiniteNumber(value.pagination.pageSize) &&
+    isFiniteNumber(value.pagination.totalEntries) &&
+    isFiniteNumber(value.pagination.totalPages) &&
     Array.isArray(value.entries) &&
     value.entries.every(isLeaderboardEntry)
   );
@@ -198,10 +245,17 @@ export function formatTreasureHuntCampaignWindow(
 
 export function useTreasureHuntCompetitionOverview(options?: {
   readonly includeLeaderboard?: boolean;
+  readonly leaderboardPage?: number;
+  readonly leaderboardPageSize?: number;
+  readonly leaderboardMineOnly?: boolean;
 }) {
   const includeLeaderboard = options?.includeLeaderboard ?? true;
+  const leaderboardPage = options?.leaderboardPage ?? 1;
+  const leaderboardPageSize = options?.leaderboardPageSize ?? 100;
+  const leaderboardMineOnly = options?.leaderboardMineOnly ?? false;
   const [status, setStatus] = useState<TreasureHuntCompetitionStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly TreasureHuntLeaderboardEntry[]>([]);
+  const [leaderboardMeta, setLeaderboardMeta] = useState<TreasureHuntLeaderboardMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -227,11 +281,17 @@ export function useTreasureHuntCompetitionOverview(options?: {
 
         if (!includeLeaderboard || !statusBody.configured || !statusBody.campaign) {
           setLeaderboard([]);
+          setLeaderboardMeta(null);
           return;
         }
 
+        const leaderboardParams = new URLSearchParams({
+          page: String(leaderboardPage),
+          pageSize: String(leaderboardPageSize),
+        });
+        if (leaderboardMineOnly) leaderboardParams.set('mine', '1');
         const leaderboardResponse = await fetch(
-          `${TREASURE_HUNT_COMPETITION_API}/leaderboard?limit=100`,
+          `${TREASURE_HUNT_COMPETITION_API}/leaderboard?${leaderboardParams.toString()}`,
           {
             cache: 'no-store',
             credentials: 'same-origin',
@@ -242,11 +302,24 @@ export function useTreasureHuntCompetitionOverview(options?: {
         if (!leaderboardResponse.ok || !isLeaderboard(leaderboardBody)) {
           throw new Error('El ranking no está disponible ahora mismo.');
         }
-        if (!controller.signal.aborted) setLeaderboard(leaderboardBody.entries);
+        if (!controller.signal.aborted) {
+          setLeaderboard(leaderboardBody.entries);
+          setLeaderboardMeta({
+            calculatedAt: leaderboardBody.calculatedAt,
+            poolUkiRaw: leaderboardBody.poolUkiRaw,
+            playerPoolUkiRaw: leaderboardBody.playerPoolUkiRaw,
+            allocatedPlayerUkiRaw: leaderboardBody.allocatedPlayerUkiRaw,
+            remainingPlayerPoolUkiRaw: leaderboardBody.remainingPlayerPoolUkiRaw,
+            totalRankedEntries: leaderboardBody.totalRankedEntries,
+            myAttempts: leaderboardBody.myAttempts,
+            pagination: leaderboardBody.pagination,
+          });
+        }
       } catch (cause) {
         if (controller.signal.aborted) return;
         setStatus(null);
         setLeaderboard([]);
+        setLeaderboardMeta(null);
         setError(
           cause instanceof Error
             ? cause.message
@@ -259,9 +332,15 @@ export function useTreasureHuntCompetitionOverview(options?: {
 
     void load();
     return () => controller.abort();
-  }, [includeLeaderboard, refreshToken]);
+  }, [
+    includeLeaderboard,
+    leaderboardMineOnly,
+    leaderboardPage,
+    leaderboardPageSize,
+    refreshToken,
+  ]);
 
   const reload = useCallback(() => setRefreshToken((current) => current + 1), []);
 
-  return { status, leaderboard, isLoading, error, reload } as const;
+  return { status, leaderboard, leaderboardMeta, isLoading, error, reload } as const;
 }

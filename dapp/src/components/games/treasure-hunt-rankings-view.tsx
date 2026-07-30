@@ -1,45 +1,64 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock3, Medal } from 'lucide-react';
 
 import {
   formatTreasureHuntDuration,
+  type TreasureHuntLeaderboardEntry,
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
-import { useTreasureHuntPrizePool } from '@/hooks/use-treasure-hunt-prize-pool';
-import { formatTreasureHuntPrizePoolUki } from '@/lib/treasure-hunt-prize-pool';
+import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { cn } from '@/lib/utils';
 
 type RankingFilter = 'general' | 'mine';
+const PAGE_SIZE = 20;
+
+function rewardLabel(entry: TreasureHuntLeaderboardEntry) {
+  if (entry.rewardStatus === 'no_purchase') return 'Sin compra UKI';
+  if (entry.rewardStatus === 'pool_exhausted') return 'Fuera de premios';
+  if (entry.rewardStatus === 'reward_rounds_to_zero') return 'Sin premio';
+  return formatTreasureHuntUkiRaw(entry.estimatedRewardUkiRaw);
+}
+
+function pageNumbers(currentPage: number, totalPages: number) {
+  const first = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
+  const last = Math.min(totalPages, Math.max(currentPage + 1, 3));
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
+}
 
 export default function TreasureHuntRankingsView() {
-  const { status, leaderboard, isLoading, error, reload } =
-    useTreasureHuntCompetitionOverview();
   const [filter, setFilter] = useState<RankingFilter>('general');
+  const [page, setPage] = useState(1);
+  const { status, leaderboard, leaderboardMeta, isLoading, error, reload } =
+    useTreasureHuntCompetitionOverview({
+      leaderboardPage: page,
+      leaderboardPageSize: PAGE_SIZE,
+      leaderboardMineOnly: filter === 'mine',
+    });
   const campaign = status?.campaign;
   const maxAttempts = campaign?.maxWinningAttemptsPerWallet ?? 5;
-  const myAttempts = leaderboard.filter((entry) => entry.isMe).length;
-  const prizePool = useTreasureHuntPrizePool(campaign?.poolBps ?? 2_500);
-  const prizePoolValue = prizePool.value === null
-    ? 'Actualizando…'
-    : formatTreasureHuntPrizePoolUki(prizePool.value);
-  const visibleEntries = useMemo(
-    () => (filter === 'mine' ? leaderboard.filter((entry) => entry.isMe) : leaderboard),
-    [filter, leaderboard],
-  );
+  const myAttempts = leaderboardMeta?.myAttempts ?? 0;
+  const prizePoolValue = leaderboardMeta
+    ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw)
+    : 'Actualizando…';
+  const pagination = leaderboardMeta?.pagination;
 
   useEffect(() => {
     if (window.location.hash === '#mi-participacion') setFilter('mine');
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
 
   const metrics = [
     ['Modo activo', '1P', true],
     ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`, false],
     [
       'Premio acumulado',
-      prizePool.isLoading && prizePool.value === null ? '···' : prizePoolValue,
+      isLoading && !leaderboardMeta ? '···' : prizePoolValue,
       false,
     ],
   ] as const;
@@ -126,7 +145,9 @@ export default function TreasureHuntRankingsView() {
               </button>
             ))}
           </div>
-          <p className="text-xs text-[#969994]">Hasta {maxAttempts} partidas por jugador.</p>
+          <p className="text-xs text-[#969994]">
+            Cada partida clasificada suma el 10% de tus UKI comprados, hasta {maxAttempts}.
+          </p>
         </div>
 
         {isLoading ? (
@@ -135,7 +156,7 @@ export default function TreasureHuntRankingsView() {
               <div key={index} className="h-14 animate-pulse rounded-[7px] bg-white/5" />
             ))}
           </div>
-        ) : visibleEntries.length === 0 ? (
+        ) : leaderboard.length === 0 ? (
           <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
             <Medal className="h-8 w-8 text-[#35eee2]" aria-hidden="true" />
             <h3 className="mt-4 font-headline text-lg font-black text-[#f2eee7]">
@@ -148,7 +169,7 @@ export default function TreasureHuntRankingsView() {
         ) : (
           <>
             <div className="space-y-2 p-3 sm:hidden">
-              {visibleEntries.map((entry) => (
+              {leaderboard.map((entry) => (
                 <article key={entry.attemptId} className={cn('rounded-[7px] border border-white/15 bg-black/15 p-4', entry.isMe && 'border-[#35eee2]/45 bg-[#35eee2]/5')}>
                   <div className="flex items-center gap-3">
                     <span className="font-mono font-black text-[#ffc240]">#{entry.rank}</span>
@@ -161,22 +182,35 @@ export default function TreasureHuntRankingsView() {
                     <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
                     {formatTreasureHuntDuration(entry.gameTimeMs)}
                   </p>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-[#969994]">Premio estimado</span>
+                    <strong className={cn(
+                      'font-mono text-sm',
+                      entry.rewardStatus === 'pool_exhausted'
+                        ? 'text-[#969994]'
+                        : 'text-[#ffc240]',
+                    )}>
+                      {rewardLabel(entry)}
+                      {entry.rewardStatus === 'partial' ? ' · Parcial' : ''}
+                    </strong>
+                  </div>
                 </article>
               ))}
             </div>
 
             <div className="hidden overflow-x-auto sm:block">
-              <table className="w-full min-w-[34rem] text-left text-sm">
+              <table className="w-full min-w-[46rem] text-left text-sm">
                 <thead className="bg-black/15 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]">
                   <tr>
                     <th className="px-5 py-3">Pos.</th>
                     <th className="px-5 py-3">Jugador</th>
                     <th className="px-5 py-3 text-right">Puntuación</th>
                     <th className="px-5 py-3 text-right">Tiempo</th>
+                    <th className="px-5 py-3 text-right">Premio estimado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {visibleEntries.map((entry) => (
+                  {leaderboard.map((entry) => (
                     <tr key={entry.attemptId} className={cn(entry.isMe && 'bg-[#35eee2]/5')}>
                       <td className="px-5 py-4 font-mono font-black text-[#ffc240]">#{entry.rank}</td>
                       <td className="px-5 py-4 font-bold text-[#f2eee7]">
@@ -184,11 +218,78 @@ export default function TreasureHuntRankingsView() {
                       </td>
                       <td className="px-5 py-4 text-right font-mono font-black text-[#35eee2]">{entry.score.toLocaleString('es-ES')}</td>
                       <td className="px-5 py-4 text-right font-mono text-[#aaa8a2]">{formatTreasureHuntDuration(entry.gameTimeMs)}</td>
+                      <td className="px-5 py-4 text-right">
+                        <span className={cn(
+                          'font-mono font-black',
+                          entry.rewardStatus === 'pool_exhausted'
+                            ? 'text-[#969994]'
+                            : 'text-[#ffc240]',
+                        )}>
+                          {rewardLabel(entry)}
+                        </span>
+                        {entry.rewardStatus === 'partial' ? (
+                          <span className="ml-2 rounded-full border border-[#ffc240]/35 bg-[#ffc240]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#ffc240]">
+                            Parcial
+                          </span>
+                        ) : null}
+                        {entry.reviewStatus === 'pending' ? (
+                          <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.06em] text-[#969994]">
+                            Pendiente de revisión
+                          </span>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
+            {pagination && pagination.totalPages > 1 ? (
+              <nav
+                aria-label="Paginación del ranking"
+                className="flex flex-wrap items-center justify-between gap-3 border-t border-white/15 px-4 py-4 sm:px-5"
+              >
+                <p className="text-xs text-[#969994]">
+                  {pagination.totalEntries.toLocaleString('es-ES')} partidas · Página{' '}
+                  {pagination.page} de {pagination.totalPages}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={pagination.page <= 1}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    className="min-h-10 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Anterior
+                  </button>
+                  {pageNumbers(pagination.page, pagination.totalPages).map((pageNumber) => (
+                    <button
+                      key={pageNumber}
+                      type="button"
+                      aria-current={pagination.page === pageNumber ? 'page' : undefined}
+                      aria-label={`Página ${pageNumber}`}
+                      onClick={() => setPage(pageNumber)}
+                      className={cn(
+                        'min-h-10 min-w-10 rounded-[5px] border px-2 font-mono text-xs font-black',
+                        pagination.page === pageNumber
+                          ? 'border-[#35eee2]/60 bg-[#35eee2]/15 text-[#35eee2]'
+                          : 'border-white/15 text-[#aaa8a2] hover:border-[#35eee2]/45',
+                      )}
+                    >
+                      {pageNumber}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={pagination.page >= pagination.totalPages}
+                    onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
+                    className="min-h-10 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </nav>
+            ) : null}
           </>
         )}
       </main>

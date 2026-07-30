@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 
 import { readWalletSession } from '@/lib/wallet-auth';
 import { getCompetitionService } from '@/lib/treasure-hunt-competition/server/default-service';
+import { buildCompetitionLeaderboardWithRewards } from '@/lib/treasure-hunt-competition/server/leaderboard-rewards';
 import { getCompetitionRateLimiter } from '@/lib/treasure-hunt-competition/server/rate-limit';
 import { POST as startAttempt } from '@/app/api/games/treasure-hunt/competition/attempts/route';
 import { POST as checkpointAttempt } from '@/app/api/games/treasure-hunt/competition/attempts/[attemptId]/checkpoint/route';
@@ -16,9 +17,19 @@ jest.mock('@/lib/wallet-auth', () => ({
 jest.mock('@/lib/treasure-hunt-competition/server/default-service', () => ({
   getCompetitionService: jest.fn(),
 }));
+jest.mock('@/lib/treasure-hunt-competition/server/leaderboard-rewards', () => ({
+  buildCompetitionLeaderboardWithRewards: jest.fn(),
+}));
+jest.mock('@/lib/treasure-hunt-competition/server/leaderboard-rewards-mongo', () => ({
+  MongoCompetitionRewardSource: jest.fn(() => ({ source: 'mongo' })),
+}));
 
 const mockReadWalletSession = readWalletSession as jest.MockedFunction<typeof readWalletSession>;
 const mockGetCompetitionService = getCompetitionService as jest.MockedFunction<typeof getCompetitionService>;
+const mockBuildCompetitionLeaderboardWithRewards =
+  buildCompetitionLeaderboardWithRewards as jest.MockedFunction<
+    typeof buildCompetitionLeaderboardWithRewards
+  >;
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 
 const signedWallet = '0x1111111111111111111111111111111111111111';
@@ -26,6 +37,7 @@ const service = {
   startAttempt: jest.fn(),
   recordCheckpoint: jest.fn(),
   getLeaderboard: jest.fn(),
+  getLeaderboardAllocationInput: jest.fn(),
 };
 
 function walletSession(walletType: 'evm' | 'tron' = 'evm') {
@@ -50,6 +62,14 @@ describe('Treasure Hunt competition API identity boundaries', () => {
     service.startAttempt.mockResolvedValue({ attemptId: 'attempt-1' });
     service.recordCheckpoint.mockResolvedValue({ accepted: true, nextSequence: 1 });
     service.getLeaderboard.mockResolvedValue({ campaignId: 'campaign', entries: [] });
+    service.getLeaderboardAllocationInput.mockResolvedValue({
+      campaign: { campaignId: 'campaign' },
+      entries: [],
+    });
+    mockBuildCompetitionLeaderboardWithRewards.mockResolvedValue({
+      campaignId: 'campaign',
+      entries: [],
+    } as never);
   });
 
   it('rejects attempt creation without a signed EVM wallet session', async () => {
@@ -140,12 +160,22 @@ describe('Treasure Hunt competition API identity boundaries', () => {
     expect(service.recordCheckpoint).not.toHaveBeenCalled();
   });
 
-  it('keeps the public leaderboard wallet-free when there is no session', async () => {
+  it('builds the public leaderboard preview with bounded pagination and no unsigned identity', async () => {
     mockReadWalletSession.mockResolvedValue(null);
-    const response = await getLeaderboard(new Request('https://hub.test/api?limit=25'));
+    const response = await getLeaderboard(
+      new Request('https://hub.test/api?page=2&pageSize=25&mine=1'),
+    );
 
     expect(response.status).toBe(200);
-    expect(service.getLeaderboard).toHaveBeenCalledWith(undefined, 25);
+    expect(service.getLeaderboardAllocationInput).toHaveBeenCalledWith(500);
+    expect(mockBuildCompetitionLeaderboardWithRewards).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentWalletAddress: undefined,
+        page: 2,
+        pageSize: 25,
+        mineOnly: true,
+      }),
+    );
   });
 
   it('rate-limits repeated attempt starts before invoking the service again', async () => {

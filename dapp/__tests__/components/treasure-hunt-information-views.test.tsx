@@ -89,8 +89,25 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         finishedAt: '2026-07-23T18:00:00.000Z',
         reviewStatus: 'approved',
         isMe: true,
+        estimatedRewardUkiRaw: '1250000000000000000000',
+        rewardStatus: 'estimated',
       },
     ],
+    leaderboardMeta: {
+      calculatedAt: '2026-07-30T12:00:00.000Z',
+      poolUkiRaw: '71484000000000000000000',
+      playerPoolUkiRaw: '57187200000000000000000',
+      allocatedPlayerUkiRaw: '1250000000000000000000',
+      remainingPlayerPoolUkiRaw: '55937200000000000000000',
+      totalRankedEntries: 21,
+      myAttempts: 1,
+      pagination: {
+        page: 1,
+        pageSize: 20,
+        totalEntries: 21,
+        totalPages: 2,
+      },
+    },
     isLoading: false,
     error: null,
     reload: jest.fn(),
@@ -107,7 +124,7 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
-    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo']);
+    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo', 'Premio estimado']);
     expect(headers).not.toContain('Partida');
     expect(headers).not.toContain('Score');
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
@@ -119,6 +136,8 @@ describe('vistas UX de Treasure Hunt', () => {
       'grid-cols-2',
       'sm:grid-cols-3',
     );
+    expect(screen.getByRole('navigation', { name: 'Paginación del ranking' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
   });
 
   it('presenta las siete secciones del reglamento aprobado', () => {

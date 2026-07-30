@@ -53,6 +53,7 @@ const PURCHASE_PROJECTION = {
   _id: 0,
   eventId: 1,
   buyerWalletAddress: 1,
+  asmAmountRaw: 1,
   ukiAmountRaw: 1,
   confirmedAt: 1,
 } as const;
@@ -114,6 +115,7 @@ function purchaseFromDocument(row: Document): SettlementPurchaseRecord {
   return {
     eventId: text(row.eventId),
     walletAddress: text(row.buyerWalletAddress),
+    asmPurchasedRaw: text(row.asmAmountRaw),
     ukiPurchasedRaw: text(row.ukiAmountRaw),
     confirmedAt: isoDate(row.confirmedAt),
   };
@@ -207,7 +209,6 @@ export class MongoCompetitionSettlementSource implements CompetitionSettlementCl
         contractAddress: contractAddressQuery(campaign.presaleContractAddress),
         eventName: 'Purchased',
         timestampMs: {
-          $gte: Date.parse(campaign.startsAt),
           $lte: Date.parse(campaign.endsAt),
         },
         status: { $ne: 'projected' },
@@ -424,13 +425,13 @@ export class MongoCompetitionSettlementSource implements CompetitionSettlementCl
     startsAt: string;
     endsAt: string;
   }) {
-    const startsAt = queryBoundary(input.startsAt, 'startsAt');
+    queryBoundary(input.startsAt, 'startsAt');
     const endsAt = queryBoundary(input.endsAt, 'endsAt');
     const rows = await (await this.getDb())
       .collection(PURCHASES_COLLECTION)
       .find({
         contractAddress: contractAddressQuery(input.presaleContractAddress),
-        confirmedAt: { $gte: startsAt, $lte: endsAt },
+        confirmedAt: { $lte: endsAt },
       })
       .project(PURCHASE_PROJECTION)
       .toArray();

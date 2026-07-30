@@ -72,9 +72,13 @@ export function settleCompetition(input: {
   readonly campaign: CompetitionConfig;
   readonly ranking: readonly RankedCompetitionAttempt[];
   readonly purchases: readonly CompetitionPurchase[];
+  /** Exact externally-audited pool. Omit only for legacy callers. */
+  readonly poolUkiRaw?: string;
 }): CompetitionSettlement {
   const { byWallet, totalPurchased } = aggregatePurchases(input.purchases);
-  const pool = multiplyByBps(totalPurchased, input.campaign.poolBps);
+  const pool = input.poolUkiRaw === undefined
+    ? multiplyByBps(totalPurchased, input.campaign.poolBps)
+    : parseUkiRaw(input.poolUkiRaw);
   const rewardRatioDenominator = BigInt(10_000 + input.campaign.sponsorRewardBps);
   const playerPool = (pool * BigInt(10_000)) / rewardRatioDenominator;
   const sponsorPool = pool - playerPool;

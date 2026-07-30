@@ -16,6 +16,7 @@ const PLAYER_A = `0x${'1'.repeat(40)}`;
 const PLAYER_B = `0x${'2'.repeat(40)}`;
 const SPONSOR = `0x${'3'.repeat(40)}`;
 const PRESALE = `0x${'9'.repeat(40)}`;
+const TOKEN_SCALE = BigInt(10) ** BigInt(18);
 
 const campaign = createCompetitionConfig({
   campaignId: 'uki-presale-2026',
@@ -33,6 +34,10 @@ function runtime(phase: CompetitionRuntime['phase'] = 'closed'): CompetitionRunt
     campaign,
     issues: [],
   };
+}
+
+function raw(tokens: number) {
+  return (BigInt(tokens) * TOKEN_SCALE).toString();
 }
 
 function attempt(
@@ -88,7 +93,7 @@ describe('Treasure Hunt competition settlement close', () => {
     },
   );
 
-  it('uses authoritative ranking, same-window purchases and locked participant sponsors', async () => {
+  it('uses authoritative ranking, full-presale purchases through close and locked sponsors', async () => {
     const source = new MutableSource();
     source.attempts = [attempt('attempt-a')];
     source.purchases = [
@@ -143,12 +148,12 @@ describe('Treasure Hunt competition settlement close', () => {
     });
     expect(result.created).toBe(true);
     expect(result.snapshot.settlement).toMatchObject({
-      totalPurchasedUkiRaw: '10000',
-      poolUkiRaw: '2500',
-      playerRewardsUkiRaw: '1000',
-      sponsorRewardsUkiRaw: '250',
-      spentUkiRaw: '1250',
-      remainingUkiRaw: '1250',
+      totalPurchasedUkiRaw: '1009999',
+      poolUkiRaw: '252499',
+      playerRewardsUkiRaw: '100999',
+      sponsorRewardsUkiRaw: '25249',
+      spentUkiRaw: '126248',
+      remainingUkiRaw: '126251',
     });
     expect(result.snapshot.settlement.awards).toHaveLength(1);
     expect(result.snapshot.settlement.awards[0]).toMatchObject({
@@ -159,17 +164,17 @@ describe('Treasure Hunt competition settlement close', () => {
     expect(result.snapshot.allocations).toEqual([
       expect.objectContaining({
         walletAddress: PLAYER_A,
-        playerRewardUkiRaw: '1000',
+        playerRewardUkiRaw: '100999',
         sponsorRewardUkiRaw: '0',
-        totalRewardUkiRaw: '1000',
+        totalRewardUkiRaw: '100999',
         playerAwardCount: 1,
         sponsoredAwardCount: 0,
       }),
       expect.objectContaining({
         walletAddress: SPONSOR,
         playerRewardUkiRaw: '0',
-        sponsorRewardUkiRaw: '250',
-        totalRewardUkiRaw: '250',
+        sponsorRewardUkiRaw: '25249',
+        totalRewardUkiRaw: '25249',
         playerAwardCount: 0,
         sponsoredAwardCount: 1,
       }),
@@ -177,7 +182,7 @@ describe('Treasure Hunt competition settlement close', () => {
     expect(result.snapshot.vestingPlan).toEqual([
       expect.objectContaining({
         beneficiaryWalletAddress: PLAYER_A,
-        amountUkiRaw: '1000',
+        amountUkiRaw: '100999',
         transactionStatus: 'not_submitted',
         schedule: {
           startAt: campaign.endsAt,
@@ -186,21 +191,59 @@ describe('Treasure Hunt competition settlement close', () => {
           durationSeconds: 15_638_400,
         },
       }),
-      expect.objectContaining({ beneficiaryWalletAddress: SPONSOR, amountUkiRaw: '250' }),
+      expect.objectContaining({ beneficiaryWalletAddress: SPONSOR, amountUkiRaw: '25249' }),
     ]);
     expect(result.snapshot.manifest).toMatchObject({
-      schemaVersion: 2,
-      algorithmVersion: 'treasure-hunt-presale-v1',
+      schemaVersion: 3,
+      algorithmVersion: 'treasure-hunt-presale-v2',
       campaignId: campaign.campaignId,
       rulesVersion: campaign.rulesVersion,
       presaleContractAddress: PRESALE,
       eligibleAttemptCount: 1,
-      purchaseEventCount: 1,
+      purchaseEventCount: 2,
       participantCount: 1,
       rankedAttemptCount: 1,
     });
     expect(result.snapshot.manifest.inputHash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(result.snapshot.manifest.outputHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it('freezes the same threshold-adjusted indexed pool used by the provisional ranking', async () => {
+    const source = new MutableSource();
+    source.attempts = [attempt('attempt-a')];
+    source.purchases = [
+      {
+        eventId: 'purchase-a',
+        walletAddress: PLAYER_A,
+        asmPurchasedRaw: raw(1_000),
+        ukiPurchasedRaw: raw(888_000),
+        confirmedAt: '2026-02-01T00:00:00.000Z',
+      },
+      {
+        eventId: 'purchase-b',
+        walletAddress: PLAYER_B,
+        asmPurchasedRaw: raw(4_000),
+        ukiPurchasedRaw: raw(3_552_000),
+        confirmedAt: '2026-02-02T00:00:00.000Z',
+      },
+    ];
+    source.participants = [
+      { walletAddress: PLAYER_A, lockedSponsorWalletAddress: null },
+      { walletAddress: PLAYER_B, lockedSponsorWalletAddress: null },
+    ];
+
+    const result = await closeTreasureHuntCompetition({
+      runtime: runtime(),
+      source,
+      repository: new InMemoryCompetitionSettlementRepository(),
+      now: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    expect(result.snapshot.settlement).toMatchObject({
+      poolUkiRaw: raw(333_000),
+      playerPoolUkiRaw: raw(266_400),
+      playerRewardsUkiRaw: raw(88_800),
+    });
   });
 
   it('is idempotent for the same campaign/rules input and preserves the original snapshot', async () => {

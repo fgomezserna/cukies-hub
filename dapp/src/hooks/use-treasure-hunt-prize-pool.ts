@@ -2,15 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { calculateTreasureHuntPrizePoolUki } from '@/lib/treasure-hunt-prize-pool';
-
-interface PresaleStatusResponse {
-  readonly price?: {
-    readonly ukiPerAsmFormatted?: string | null;
-  };
-  readonly totals?: {
-    readonly totalAsmRaisedFormatted?: string | null;
-  };
+interface CompetitionPrizePoolResponse {
+  readonly poolUkiRaw?: string;
 }
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -21,9 +14,9 @@ interface CachedPrizePool {
   readonly value: number;
 }
 
-function finiteNumber(value: string | null | undefined) {
-  if (!value) return null;
-  const parsed = Number(value);
+function ukiNumberFromRaw(value: string | null | undefined) {
+  if (!value || !/^(0|[1-9]\d*)$/.test(value)) return null;
+  const parsed = Number(value) / 1e18;
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -64,22 +57,19 @@ export function useTreasureHuntPrizePool(poolBps = 2_500) {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/presale/status', {
-        cache: 'no-store',
-        signal,
-      });
-      if (!response.ok) throw new Error('Presale status is unavailable');
+      const response = await fetch(
+        '/api/games/treasure-hunt/competition/leaderboard?page=1&pageSize=1',
+        {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          signal,
+        },
+      );
+      if (!response.ok) throw new Error('Competition prize pool is unavailable');
 
-      const body = await response.json() as PresaleStatusResponse;
-      const totalAsmRaised = finiteNumber(body.totals?.totalAsmRaisedFormatted);
-      const ukiPerAsm = finiteNumber(body.price?.ukiPerAsmFormatted);
-      if (totalAsmRaised === null) throw new Error('Presale totals are unavailable');
-
-      const nextValue = calculateTreasureHuntPrizePoolUki({
-        totalAsmRaised,
-        ukiPerAsm,
-        poolBps,
-      });
+      const body = await response.json() as CompetitionPrizePoolResponse;
+      const nextValue = ukiNumberFromRaw(body.poolUkiRaw);
+      if (nextValue === null) throw new Error('Competition prize pool is unavailable');
       setValue(nextValue);
       cachePrizePool(poolBps, nextValue);
       setError(null);
