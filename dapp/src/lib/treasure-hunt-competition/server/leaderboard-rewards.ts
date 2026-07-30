@@ -12,8 +12,6 @@ import {
   type RankedCompetitionAttempt,
 } from '..';
 
-const MAX_PREVIEW_RANKING_ENTRIES = 500;
-
 export type CompetitionRewardStatus =
   | 'estimated'
   | 'partial'
@@ -116,32 +114,30 @@ export async function buildCompetitionLeaderboardWithRewards(input: {
     ? normalizeCompetitionWallet(input.currentWalletAddress)
     : null;
 
-  const allEntries = input.allocation.entries
-    .slice(0, MAX_PREVIEW_RANKING_ENTRIES)
-    .map((attempt) => {
-      const award = awardByAttemptId.get(attempt.attemptId);
-      const skip = skipByAttemptId.get(attempt.attemptId);
-      const rewardStatus: CompetitionRewardStatus = award
-        ? (award.partial ? 'partial' : 'estimated')
-        : skip?.reason === 'no_purchase'
-          ? 'no_purchase'
-          : skip?.reason === 'reward_rounds_to_zero'
-            ? 'reward_rounds_to_zero'
-            : 'pool_exhausted';
-      return {
-        rank: attempt.rank,
-        walletRank: attempt.walletRank,
-        attemptId: attempt.attemptId,
-        alias: displayCompetitionAlias(attempt.playerAlias),
-        score: attempt.score,
-        gameTimeMs: attempt.gameTimeMs,
-        finishedAt: attempt.finishedAt as string,
-        reviewStatus: attempt.reviewStatus,
-        isMe: currentWallet === attempt.walletAddress,
-        estimatedRewardUkiRaw: award?.playerRewardUkiRaw ?? '0',
-        rewardStatus,
-      };
-    });
+  const allEntries = input.allocation.entries.map((attempt) => {
+    const award = awardByAttemptId.get(attempt.attemptId);
+    const skip = skipByAttemptId.get(attempt.attemptId);
+    const rewardStatus: CompetitionRewardStatus = award
+      ? (award.partial ? 'partial' : 'estimated')
+      : skip?.reason === 'no_purchase'
+        ? 'no_purchase'
+        : skip?.reason === 'reward_rounds_to_zero'
+          ? 'reward_rounds_to_zero'
+          : 'pool_exhausted';
+    return {
+      rank: attempt.rank,
+      walletRank: attempt.walletRank,
+      attemptId: attempt.attemptId,
+      alias: displayCompetitionAlias(attempt.playerAlias),
+      score: attempt.score,
+      gameTimeMs: attempt.gameTimeMs,
+      finishedAt: attempt.finishedAt as string,
+      reviewStatus: attempt.reviewStatus,
+      isMe: currentWallet === attempt.walletAddress,
+      estimatedRewardUkiRaw: award?.playerRewardUkiRaw ?? '0',
+      rewardStatus,
+    };
+  });
   const myAttempts = currentWallet
     ? allEntries.filter((entry) => entry.isMe).length
     : 0;

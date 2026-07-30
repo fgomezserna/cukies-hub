@@ -141,4 +141,43 @@ describe('Treasure Hunt provisional leaderboard rewards', () => {
     expect(JSON.stringify(result.entries)).not.toContain(PLAYER_A);
     expect(JSON.stringify(result.entries)).not.toContain(PLAYER_B);
   });
+
+  it('keeps a lower second attempt and exposes entry 101 instead of replacing rank 100', async () => {
+    const middleEntries = Array.from({ length: 99 }, (_, index) => {
+      const rank = index + 2;
+      const walletAddress = `0x${(index + 10).toString(16).padStart(40, '0')}`;
+      return entry(`middle-${rank}`, rank, walletAddress, 2_000 - rank);
+    });
+    const result = await buildCompetitionLeaderboardWithRewards({
+      allocation: {
+        campaign,
+        entries: [
+          entry('a-best', 1, PLAYER_A, 2_000),
+          ...middleEntries,
+          entry('a-lower', 101, PLAYER_A, 1),
+        ],
+      },
+      source: new Source(),
+      currentWalletAddress: PLAYER_A,
+      page: 6,
+      pageSize: 20,
+      now: new Date('2026-07-30T12:00:00.000Z'),
+    });
+
+    expect(result.totalRankedEntries).toBe(101);
+    expect(result.myAttempts).toBe(2);
+    expect(result.pagination).toEqual({
+      page: 6,
+      pageSize: 20,
+      totalEntries: 101,
+      totalPages: 6,
+    });
+    expect(result.entries).toEqual([
+      expect.objectContaining({
+        attemptId: 'a-lower',
+        rank: 101,
+        isMe: true,
+      }),
+    ]);
+  });
 });

@@ -1122,22 +1122,28 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     return attempts.map((attempt) => publicAttempt(attempt, proofSecret()));
   }
 
-  async function rankedLeaderboard(limit: number) {
+  async function rankedLeaderboard(limit?: number) {
     const { campaign } = await prepareCampaign(false);
-    const safeLimit = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 100, 1), 500);
-    const attempts = await dependencies.repository.listValidAttempts(
-      campaign.campaignId,
-      safeLimit,
+    const safeLimit = limit === undefined
+      ? undefined
+      : Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 100, 1), 500);
+    const attempts = await (
+      safeLimit === undefined
+        ? dependencies.repository.listValidAttempts(campaign.campaignId)
+        : dependencies.repository.listValidAttempts(campaign.campaignId, safeLimit)
     );
     const reviewStatusByAttemptId = new Map(
       attempts.map((attempt) => [attempt.attemptId, attempt.status] as const),
     );
-    const ranking = buildCompetitionRanking(
+    const completeRanking = buildCompetitionRanking(
       attempts.map((attempt) => attempt.status === 'review'
         ? { ...attempt, status: 'valid' as const }
         : attempt),
       campaign,
-    ).slice(0, safeLimit);
+    );
+    const ranking = safeLimit === undefined
+      ? completeRanking
+      : completeRanking.slice(0, safeLimit);
     return { campaign, ranking, reviewStatusByAttemptId };
   }
 
@@ -1162,8 +1168,8 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     };
   }
 
-  async function getLeaderboardAllocationInput(limit = 500) {
-    const { campaign, ranking, reviewStatusByAttemptId } = await rankedLeaderboard(limit);
+  async function getLeaderboardAllocationInput() {
+    const { campaign, ranking, reviewStatusByAttemptId } = await rankedLeaderboard();
     return {
       campaign,
       entries: ranking.map((attempt) => ({

@@ -108,9 +108,9 @@ function withoutMongoId<T>(document: (T & { _id?: unknown }) | null): T | null {
 
 export async function selectTopCompetitionAttempts(
   rows: AsyncIterable<CompetitionAttemptRecord>,
-  limit: number,
+  limit?: number,
 ) {
-  if (!Number.isSafeInteger(limit) || limit < 1) {
+  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) {
     throw new RangeError('Competition attempt limit must be a positive safe integer');
   }
 
@@ -123,7 +123,7 @@ export async function selectTopCompetitionAttempts(
 
     attemptsByWallet.set(walletAddress, walletAttempts + 1);
     selected.push(row);
-    if (selected.length >= limit) break;
+    if (limit !== undefined && selected.length >= limit) break;
   }
   return selected;
 }
@@ -460,8 +460,8 @@ export class MongoCompetitionRepository implements CompetitionRepository {
     return rows.map((row) => withoutMongoId(row) as CompetitionAttemptRecord);
   }
 
-  async listValidAttempts(campaignId: string, limit: number) {
-    if (!Number.isSafeInteger(limit) || limit < 1) {
+  async listValidAttempts(campaignId: string, limit?: number) {
+    if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) {
       throw new RangeError('Competition attempt limit must be a positive safe integer');
     }
     const cursor = (await this.attempts()).find({

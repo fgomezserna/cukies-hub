@@ -167,7 +167,7 @@ describe('Treasure Hunt competition API identity boundaries', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(service.getLeaderboardAllocationInput).toHaveBeenCalledWith(500);
+    expect(service.getLeaderboardAllocationInput).toHaveBeenCalledWith();
     expect(mockBuildCompetitionLeaderboardWithRewards).toHaveBeenCalledWith(
       expect.objectContaining({
         currentWalletAddress: undefined,

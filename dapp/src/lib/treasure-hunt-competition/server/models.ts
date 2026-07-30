@@ -117,7 +117,7 @@ export interface CompetitionRepository {
     walletAddress: string,
     limit: number,
   ): Promise<CompetitionAttemptRecord[]>;
-  listValidAttempts(campaignId: string, limit: number): Promise<CompetitionAttemptRecord[]>;
+  listValidAttempts(campaignId: string, limit?: number): Promise<CompetitionAttemptRecord[]>;
 }
 
 export interface CompetitionGameSessionAuthority {

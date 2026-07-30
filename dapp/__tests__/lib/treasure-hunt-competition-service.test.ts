@@ -239,12 +239,12 @@ class MemoryCompetitionRepository implements CompetitionRepository {
       .slice(0, limit);
   }
 
-  async listValidAttempts(campaignId: string, limit: number) {
-    return [...this.attempts.values()]
+  async listValidAttempts(campaignId: string, limit?: number) {
+    const attempts = [...this.attempts.values()]
       .filter((attempt) =>
         attempt.campaignId === campaignId &&
-        (attempt.status === 'review' || attempt.status === 'valid'))
-      .slice(0, limit);
+        (attempt.status === 'review' || attempt.status === 'valid'));
+    return limit === undefined ? attempts : attempts.slice(0, limit);
   }
 }
 
@@ -1008,6 +1008,11 @@ describe('Treasure Hunt competition service', () => {
       })],
     });
     expect(listSpy).toHaveBeenLastCalledWith('uki-presale-2026', 7);
+
+    await expect(harness.service.getLeaderboardAllocationInput()).resolves.toMatchObject({
+      entries: [expect.objectContaining({ attemptId: started.attemptId })],
+    });
+    expect(listSpy).toHaveBeenLastCalledWith('uki-presale-2026');
 
     await harness.service.adjudicateAttempt({
       attemptId: started.attemptId,

@@ -81,4 +81,16 @@ describe('Treasure Hunt MongoDB 4.4 ranking compatibility', () => {
       rows[1],
     ]);
   });
+
+  it('returns the complete ranked set when pagination is applied later', async () => {
+    const rows = Array.from({ length: 101 }, (_, index) => (
+      attempt(
+        `attempt-${index + 1}`,
+        `0x${(index + 1).toString(16).padStart(40, '0')}`,
+        1_000 - index,
+      )
+    ));
+
+    await expect(selectTopCompetitionAttempts(attempts(rows))).resolves.toHaveLength(101);
+  });
 });

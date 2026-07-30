@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const requestedPageSize = Number(searchParams.get('pageSize') ?? legacyLimit ?? 20);
     const requestedPage = Number(searchParams.get('page') ?? 1);
     const service = getCompetitionService();
-    const allocation = await service.getLeaderboardAllocationInput(500);
+    const allocation = await service.getLeaderboardAllocationInput();
     const leaderboard = await buildCompetitionLeaderboardWithRewards({
       allocation,
       source: new MongoCompetitionRewardSource(),
