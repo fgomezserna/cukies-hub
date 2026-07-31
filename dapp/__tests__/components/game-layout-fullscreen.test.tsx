@@ -186,6 +186,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     render(<GameLayout {...props} mobileFocus />);
 
     const viewport = document.querySelector('[data-game-viewport]');
+    const landscapeSurface = document.querySelector('[data-game-landscape-surface]');
     fireEvent.click(screen.getByRole('button', { name: 'Abrir pantalla completa' }));
 
     await waitFor(() => {
@@ -193,12 +194,17 @@ describe('GameLayout fullscreen and desktop viewport', () => {
       expect(viewport).toHaveAttribute('data-game-orientation-fallback', 'css-rotated');
     });
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
-    expect(viewport).toHaveClass('!h-[100vw]', '!w-[100dvh]');
-    expect(viewport).toHaveStyle({
-      left: '50%',
-      top: '50%',
-      transform: 'translate(-50%, -50%) rotate(90deg)',
-    });
+    expect(viewport).not.toHaveClass('rotate-90', '!h-[100vw]', '!w-[100dvh]');
+    expect(landscapeSurface).toHaveClass(
+      'absolute',
+      'left-1/2',
+      'top-1/2',
+      '!h-[100vw]',
+      '!w-[100dvh]',
+      '-translate-x-1/2',
+      '-translate-y-1/2',
+      'rotate-90',
+    );
     expect(screen.queryByText('Gira el móvil para jugar')).not.toBeInTheDocument();
 
     Object.defineProperty(window, 'innerWidth', {
@@ -214,7 +220,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     await waitFor(() => {
       expect(viewport).toHaveAttribute('data-game-orientation-fallback', 'off');
     });
-    expect(viewport).not.toHaveClass('!h-[100vw]', '!w-[100dvh]');
+    expect(landscapeSurface).not.toHaveClass('rotate-90', '!h-[100vw]', '!w-[100dvh]');
   });
 
   it('reduce el horizontal sin fullscreen a una única puerta de entrada', () => {
