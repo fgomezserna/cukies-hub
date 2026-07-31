@@ -32,12 +32,6 @@ interface LockableScreenOrientation {
   unlock?: () => void;
 }
 
-interface MetaMaskBrowserWindow extends Window {
-  ethereum?: {
-    isMetaMask?: boolean;
-  };
-}
-
 interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
@@ -73,12 +67,11 @@ const renderIcon = (iconName: string, className: string = "h-4 w-4") => {
 };
 
 function needsCssLandscapeFallback() {
-  const browserWindow = window as MetaMaskBrowserWindow;
-  const isAndroid = /Android/i.test(window.navigator.userAgent);
-  const isMetaMaskBrowser = Boolean(browserWindow.ethereum?.isMetaMask);
-  const isPortraitViewport = window.innerHeight > window.innerWidth;
+  const visualViewport = window.visualViewport;
+  const width = visualViewport?.width || window.innerWidth;
+  const height = visualViewport?.height || window.innerHeight;
 
-  return isAndroid && isMetaMaskBrowser && isPortraitViewport;
+  return height > width;
 }
 
 export default function GameLayout({ 
@@ -141,7 +134,10 @@ export default function GameLayout({
         fullscreenDocument.msFullscreenElement,
       );
       setIsNativeFullscreen(active);
-      if (active) setIsFallbackFullscreen(false);
+      if (active) {
+        setIsFallbackFullscreen(false);
+        void requestLandscape();
+      }
     };
     document.addEventListener('fullscreenchange', syncFullscreenState);
     document.addEventListener('webkitfullscreenchange', syncFullscreenState);
@@ -149,7 +145,7 @@ export default function GameLayout({
       document.removeEventListener('fullscreenchange', syncFullscreenState);
       document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
     };
-  }, []);
+  }, [requestLandscape]);
 
   useEffect(() => {
     if (!isFallbackFullscreen) return undefined;
@@ -175,13 +171,15 @@ export default function GameLayout({
         window.clearTimeout(syncTimeout);
       }
       syncTimeout = window.setTimeout(() => {
-        setIsCssRotatedLandscape(needsCssLandscapeFallback());
+        setIsCssRotatedLandscape(isMobileFocus && needsCssLandscapeFallback());
       }, 200);
     };
 
+    const visualViewport = window.visualViewport;
     scheduleOrientationFallbackSync();
     window.addEventListener('resize', scheduleOrientationFallbackSync);
     window.addEventListener('orientationchange', scheduleOrientationFallbackSync);
+    visualViewport?.addEventListener('resize', scheduleOrientationFallbackSync);
 
     return () => {
       if (syncTimeout !== undefined) {
@@ -189,8 +187,9 @@ export default function GameLayout({
       }
       window.removeEventListener('resize', scheduleOrientationFallbackSync);
       window.removeEventListener('orientationchange', scheduleOrientationFallbackSync);
+      visualViewport?.removeEventListener('resize', scheduleOrientationFallbackSync);
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, isMobileFocus]);
 
   useEffect(() => () => unlockOrientation(), [unlockOrientation]);
 
@@ -387,68 +386,67 @@ export default function GameLayout({
                     : 'aspect-[11/8] w-full flex-none'
                   : 'flex-grow'
               ),
-              isFallbackFullscreen && !isCssRotatedLandscape && 'fixed inset-0 z-[100] !h-[100dvh] !w-screen !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
-              isCssRotatedLandscape && 'fixed z-[100] !h-[100vw] !w-[100dvh] !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
+              isFallbackFullscreen && 'fixed inset-0 z-[100] !h-[100dvh] !w-screen !flex-none !rounded-none !border-0 [aspect-ratio:auto]',
             )}
-            style={isCssRotatedLandscape ? {
-              bottom: 'auto',
-              left: '50%',
-              right: 'auto',
-              top: '50%',
-              transform: 'translate(-50%, -50%) rotate(90deg)',
-              transformOrigin: 'center',
-            } : undefined}
           >
-            <iframe
-              ref={iframeRef}
-              src={gameConfig.gameUrl}
-              className="block h-full min-h-0 w-full flex-1 overscroll-contain border-0 touch-manipulation"
-              title={gameConfig.name}
-              allow="clipboard-read; clipboard-write; fullscreen"
-              allowFullScreen
-              onLoad={handleIframeLoad}
-            />
-            {!isMobileFocus ? (
-              <div
-                className="absolute bottom-0 left-0 z-30 flex items-center gap-2"
-                style={{
-                  bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
-                  left: 'max(0.5rem, env(safe-area-inset-left))',
-                }}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white"
-                  onClick={() => void handleFullScreen()}
-                  aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
-                  title={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
+            <div
+              data-game-landscape-surface
+              className={cn(
+                'relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden',
+                isCssRotatedLandscape && 'absolute left-1/2 top-1/2 !h-[100vw] !w-[100dvh] flex-none -translate-x-1/2 -translate-y-1/2 rotate-90',
+              )}
+            >
+              <iframe
+                ref={iframeRef}
+                src={gameConfig.gameUrl}
+                className="block h-full min-h-0 w-full flex-1 overscroll-contain border-0 touch-manipulation"
+                title={gameConfig.name}
+                allow="clipboard-read; clipboard-write; fullscreen"
+                allowFullScreen
+                onLoad={handleIframeLoad}
+              />
+              {!isMobileFocus ? (
+                <div
+                  className="absolute bottom-0 left-0 z-30 flex items-center gap-2"
+                  style={{
+                    bottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+                    left: 'max(0.5rem, env(safe-area-inset-left))',
+                  }}
                 >
-                  {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-                </Button>
-              </div>
-            ) : null}
-            {isMobileFocus && isFullscreen ? (
-              <div
-                className="absolute right-0 top-0 z-50 flex items-center gap-2"
-                style={{
-                  top: 'max(0.5rem, env(safe-area-inset-top))',
-                  right: 'max(0.5rem, env(safe-area-inset-right))',
-                }}
-              >
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void handleFullScreen()}
-                  className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
-                  aria-label="Salir de pantalla completa"
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="bg-black/20 text-white/60 backdrop-blur-sm hover:bg-black/45 hover:text-white"
+                    onClick={() => void handleFullScreen()}
+                    aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
+                    title={isFullscreen ? 'Salir de pantalla completa' : 'Abrir pantalla completa'}
+                  >
+                    {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                  </Button>
+                </div>
+              ) : null}
+              {isMobileFocus && isFullscreen ? (
+                <div
+                  className="absolute right-0 top-0 z-50 flex items-center gap-2"
+                  style={{
+                    top: 'max(0.5rem, env(safe-area-inset-top))',
+                    right: 'max(0.5rem, env(safe-area-inset-right))',
+                  }}
                 >
-                  <Minimize2 className="h-4 w-4" aria-hidden="true" />
-                  Salir
-                </Button>
-              </div>
-            ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void handleFullScreen()}
+                    className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                    aria-label="Salir de pantalla completa"
+                  >
+                    <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                    Salir
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </div>
           
           {/* Game Instructions */}
