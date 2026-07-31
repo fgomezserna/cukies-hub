@@ -32,12 +32,6 @@ interface LockableScreenOrientation {
   unlock?: () => void;
 }
 
-interface MetaMaskBrowserWindow extends Window {
-  ethereum?: {
-    isMetaMask?: boolean;
-  };
-}
-
 interface GameLayoutComponentProps extends GameLayoutProps {
   onGameConnection?: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   iframeRef?: React.RefObject<HTMLIFrameElement>; // Allow external ref
@@ -73,12 +67,11 @@ const renderIcon = (iconName: string, className: string = "h-4 w-4") => {
 };
 
 function needsCssLandscapeFallback() {
-  const browserWindow = window as MetaMaskBrowserWindow;
-  const isAndroid = /Android/i.test(window.navigator.userAgent);
-  const isMetaMaskBrowser = Boolean(browserWindow.ethereum?.isMetaMask);
-  const isPortraitViewport = window.innerHeight > window.innerWidth;
+  const visualViewport = window.visualViewport;
+  const width = visualViewport?.width || window.innerWidth;
+  const height = visualViewport?.height || window.innerHeight;
 
-  return isAndroid && isMetaMaskBrowser && isPortraitViewport;
+  return height > width;
 }
 
 export default function GameLayout({ 
@@ -141,7 +134,10 @@ export default function GameLayout({
         fullscreenDocument.msFullscreenElement,
       );
       setIsNativeFullscreen(active);
-      if (active) setIsFallbackFullscreen(false);
+      if (active) {
+        setIsFallbackFullscreen(false);
+        void requestLandscape();
+      }
     };
     document.addEventListener('fullscreenchange', syncFullscreenState);
     document.addEventListener('webkitfullscreenchange', syncFullscreenState);
@@ -149,7 +145,7 @@ export default function GameLayout({
       document.removeEventListener('fullscreenchange', syncFullscreenState);
       document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
     };
-  }, []);
+  }, [requestLandscape]);
 
   useEffect(() => {
     if (!isFallbackFullscreen) return undefined;
@@ -175,13 +171,15 @@ export default function GameLayout({
         window.clearTimeout(syncTimeout);
       }
       syncTimeout = window.setTimeout(() => {
-        setIsCssRotatedLandscape(needsCssLandscapeFallback());
+        setIsCssRotatedLandscape(isMobileFocus && needsCssLandscapeFallback());
       }, 200);
     };
 
+    const visualViewport = window.visualViewport;
     scheduleOrientationFallbackSync();
     window.addEventListener('resize', scheduleOrientationFallbackSync);
     window.addEventListener('orientationchange', scheduleOrientationFallbackSync);
+    visualViewport?.addEventListener('resize', scheduleOrientationFallbackSync);
 
     return () => {
       if (syncTimeout !== undefined) {
@@ -189,8 +187,9 @@ export default function GameLayout({
       }
       window.removeEventListener('resize', scheduleOrientationFallbackSync);
       window.removeEventListener('orientationchange', scheduleOrientationFallbackSync);
+      visualViewport?.removeEventListener('resize', scheduleOrientationFallbackSync);
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, isMobileFocus]);
 
   useEffect(() => () => unlockOrientation(), [unlockOrientation]);
 

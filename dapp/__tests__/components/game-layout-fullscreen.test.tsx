@@ -71,9 +71,14 @@ describe('GameLayout fullscreen and desktop viewport', () => {
   const originalUserAgent = window.navigator.userAgent;
   const originalInnerWidth = window.innerWidth;
   const originalInnerHeight = window.innerHeight;
-  const originalEthereum = (window as Window & {
-    ethereum?: { isMetaMask?: boolean };
-  }).ethereum;
+  const originalFullscreenElement = Object.getOwnPropertyDescriptor(
+    document,
+    'fullscreenElement',
+  );
+  const originalRequestFullscreen = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'requestFullscreen',
+  );
 
   beforeEach(() => {
     mockUseMobileGameShell.mockReturnValue(true);
@@ -92,10 +97,20 @@ describe('GameLayout fullscreen and desktop viewport', () => {
       configurable: true,
       value: originalInnerHeight,
     });
-    Object.defineProperty(window, 'ethereum', {
-      configurable: true,
-      value: originalEthereum,
-    });
+    if (originalFullscreenElement) {
+      Object.defineProperty(document, 'fullscreenElement', originalFullscreenElement);
+    } else {
+      Reflect.deleteProperty(document, 'fullscreenElement');
+    }
+    if (originalRequestFullscreen) {
+      Object.defineProperty(
+        HTMLElement.prototype,
+        'requestFullscreen',
+        originalRequestFullscreen,
+      );
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, 'requestFullscreen');
+    }
   });
 
   it('uses a functional app-level fullscreen fallback in mobile wallet browsers', async () => {
@@ -138,10 +153,10 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('rota el viewport en MetaMask Android cuando la app nativa permanece en portrait', async () => {
+  it('rota un fullscreen nativo que SafePal mantiene en portrait y vuelve al layout nativo al girar', async () => {
     Object.defineProperty(window.navigator, 'userAgent', {
       configurable: true,
-      value: 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 MetaMaskMobile',
+      value: 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 SafePal',
     });
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
@@ -151,9 +166,21 @@ describe('GameLayout fullscreen and desktop viewport', () => {
       configurable: true,
       value: 844,
     });
-    Object.defineProperty(window, 'ethereum', {
+
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', {
       configurable: true,
-      value: { isMetaMask: true },
+      get: () => fullscreenElement,
+    });
+    const requestFullscreen = jest.fn(async function requestFullscreen(
+      this: HTMLElement,
+    ) {
+      fullscreenElement = this;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
     });
 
     render(<GameLayout {...props} mobileFocus />);
@@ -162,8 +189,10 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir pantalla completa' }));
 
     await waitFor(() => {
+      expect(viewport).toHaveAttribute('data-game-fullscreen', 'native');
       expect(viewport).toHaveAttribute('data-game-orientation-fallback', 'css-rotated');
     });
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
     expect(viewport).toHaveClass('!h-[100vw]', '!w-[100dvh]');
     expect(viewport).toHaveStyle({
       left: '50%',
@@ -172,10 +201,20 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     });
     expect(screen.queryByText('Gira el móvil para jugar')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 844,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 390,
+    });
+    fireEvent(window, new Event('resize'));
+
     await waitFor(() => {
       expect(viewport).toHaveAttribute('data-game-orientation-fallback', 'off');
     });
+    expect(viewport).not.toHaveClass('!h-[100vw]', '!w-[100dvh]');
   });
 
   it('reduce el horizontal sin fullscreen a una única puerta de entrada', () => {
