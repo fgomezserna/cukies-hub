@@ -782,6 +782,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [modeSelectOpen, setModeSelectOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<GameMode>('single');
   const [isHubViewVisible, setIsHubViewVisible] = useState(true);
+  const [isLayoutFlipped, setIsLayoutFlipped] = useState(false);
   const [multiplayerJoinFailure, setMultiplayerJoinFailure] = useState<{
     roomCode: string;
     message: string;
@@ -2323,6 +2324,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       if (event.source !== window.parent || event.origin !== parentOrigin) return;
 
       if (
+        event.data?.type === 'TREASURE_HUNT_LAYOUT_FLIP' &&
+        typeof event.data?.flipped === 'boolean'
+      ) {
+        setIsLayoutFlipped(event.data.flipped);
+        return;
+      }
+
+      if (
         event.data?.type === 'TREASURE_HUNT_VIEW_VISIBILITY' &&
         typeof event.data?.visible === 'boolean'
       ) {
@@ -3290,7 +3299,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           ) : (
             <div
               ref={parentContainerRef}
-              className="th-game-shell"
+              className={`th-game-shell${isLayoutFlipped ? ' th-game-shell--flipped' : ''}`}
+              data-layout-flipped={isLayoutFlipped ? 'true' : 'false'}
               {...backgroundSurfaceProps}
             >
               <header className={`th-game-hud${isMultiplayerMode ? ' th-game-hud--multiplayer' : ''}`}>

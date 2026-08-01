@@ -865,6 +865,7 @@ export default function TreasureHuntGameView() {
         <TreasureHuntPlaySidebar onStartSinglePlayer={startSinglePlayerFromHub} />
       )}
       mobileFocus
+      mobileLayoutFlipEnabled
     />
   );
 }

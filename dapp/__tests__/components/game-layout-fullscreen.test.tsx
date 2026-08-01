@@ -8,6 +8,7 @@ jest.mock('@/providers/auth-provider', () => ({
 }));
 
 jest.mock('lucide-react', () => ({
+  ArrowLeftRight: () => null,
   Maximize: () => null,
   Minimize2: () => null,
   MessageCircle: () => null,
@@ -137,6 +138,38 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salir de pantalla completa' }));
     await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'off'));
     expect(document.body.style.overflow).toBe('');
+  });
+
+  it('permite voltear tablero y tótem desde el control móvil de fullscreen', async () => {
+    render(<GameLayout {...props} mobileFocus mobileLayoutFlipEnabled />);
+
+    const viewport = document.querySelector('[data-game-viewport]');
+    const iframe = screen.getByTitle('Treasure Hunt') as HTMLIFrameElement;
+    const postMessage = jest.spyOn(iframe.contentWindow as Window, 'postMessage')
+      .mockImplementation(() => undefined);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir pantalla completa' }));
+    await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'fallback'));
+
+    const flipButton = screen.getByRole('button', { name: 'Voltear tablero y tótem' });
+    expect(screen.getByRole('button', { name: 'Salir de pantalla completa' }))
+      .toBeInTheDocument();
+    expect(flipButton).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(flipButton);
+    expect(viewport).toHaveAttribute('data-game-layout-flipped', 'true');
+    expect(flipButton).toHaveAttribute('aria-pressed', 'true');
+    expect(postMessage).toHaveBeenLastCalledWith(
+      { type: 'TREASURE_HUNT_LAYOUT_FLIP', flipped: true },
+      'https://game.example',
+    );
+
+    fireEvent.click(flipButton);
+    expect(viewport).toHaveAttribute('data-game-layout-flipped', 'false');
+    expect(postMessage).toHaveBeenLastCalledWith(
+      { type: 'TREASURE_HUNT_LAYOUT_FLIP', flipped: false },
+      'https://game.example',
+    );
   });
 
   it('mantiene el resumen del torneo sobre el juego en el shell móvil', () => {

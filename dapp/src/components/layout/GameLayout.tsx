@@ -5,7 +5,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { ArrowLeftRight, Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
@@ -40,6 +40,7 @@ interface GameLayoutComponentProps extends GameLayoutProps {
   desktopSidebar?: ReactNode; // Optional game-specific preparation/status panel
   desktopFooter?: ReactNode;
   mobileFocus?: boolean;
+  mobileLayoutFlipEnabled?: boolean;
 }
 
 // Helper function to get user rank based on XP and game-specific ranks
@@ -86,6 +87,7 @@ export default function GameLayout({
   desktopSidebar,
   desktopFooter,
   mobileFocus = false,
+  mobileLayoutFlipEnabled = false,
 }: GameLayoutComponentProps) {
   const gameContainerRef = useRef<FullscreenElement>(null);
   const internalIframeRef = useRef<HTMLIFrameElement>(null);
@@ -97,6 +99,7 @@ export default function GameLayout({
   const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
   const [isFallbackFullscreen, setIsFallbackFullscreen] = useState(false);
   const [isCssRotatedLandscape, setIsCssRotatedLandscape] = useState(false);
+  const [isMobileLayoutFlipped, setIsMobileLayoutFlipped] = useState(false);
   const isFullscreen = isNativeFullscreen || isFallbackFullscreen;
 
   // Call the game connection callback when iframe ref is ready (optional)
@@ -259,11 +262,39 @@ export default function GameLayout({
     return () => window.removeEventListener('cukies:open-wallet-dialog', revealWalletDialog);
   }, [handleFullScreen, isFullscreen]);
 
+  const postMobileLayoutPreference = useCallback(
+    (flipped: boolean) => {
+      const iframe = iframeRef.current;
+      const frameWindow = iframe?.contentWindow;
+      if (!iframe || !frameWindow) return;
+
+      try {
+        const targetOrigin = new URL(iframe.src || gameConfig.gameUrl, window.location.href).origin;
+        frameWindow.postMessage(
+          { type: 'TREASURE_HUNT_LAYOUT_FLIP', flipped },
+          targetOrigin,
+        );
+      } catch {
+        // Keep the fullscreen controls functional if the configured game URL is invalid.
+      }
+    },
+    [gameConfig.gameUrl, iframeRef],
+  );
+
+  const handleMobileLayoutFlip = useCallback(() => {
+    const flipped = !isMobileLayoutFlipped;
+    setIsMobileLayoutFlipped(flipped);
+    postMobileLayoutPreference(flipped);
+  }, [isMobileLayoutFlipped, postMobileLayoutPreference]);
+
   const handleIframeLoad = useCallback(
     (event: React.SyntheticEvent<HTMLIFrameElement>) => {
       markParentIframeNavigation(event.currentTarget);
+      if (mobileLayoutFlipEnabled) {
+        postMobileLayoutPreference(isMobileLayoutFlipped);
+      }
     },
-    [],
+    [isMobileLayoutFlipped, mobileLayoutFlipEnabled, postMobileLayoutPreference],
   );
 
   // Calculate user-specific data
@@ -374,6 +405,7 @@ export default function GameLayout({
             data-game-viewport
             data-game-fullscreen={isFullscreen ? (isNativeFullscreen ? 'native' : 'fallback') : 'off'}
             data-game-orientation-fallback={isCssRotatedLandscape ? 'css-rotated' : 'off'}
+            data-game-layout-flipped={isMobileLayoutFlipped ? 'true' : 'false'}
             className={cn(
               'relative flex min-h-0 flex-col overflow-hidden bg-card',
               isMobileFocus
@@ -427,7 +459,7 @@ export default function GameLayout({
               ) : null}
               {isMobileFocus && isFullscreen ? (
                 <div
-                  className="absolute right-0 top-0 z-50 flex items-center gap-2"
+                  className="absolute right-0 top-0 z-50 flex flex-col items-stretch gap-2"
                   style={{
                     top: 'max(0.5rem, env(safe-area-inset-top))',
                     right: 'max(0.5rem, env(safe-area-inset-right))',
@@ -444,6 +476,20 @@ export default function GameLayout({
                     <Minimize2 className="h-4 w-4" aria-hidden="true" />
                     Salir
                   </Button>
+                  {mobileLayoutFlipEnabled ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleMobileLayoutFlip}
+                      className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                      aria-label="Voltear tablero y tótem"
+                      aria-pressed={isMobileLayoutFlipped}
+                    >
+                      <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
+                      Voltear
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
