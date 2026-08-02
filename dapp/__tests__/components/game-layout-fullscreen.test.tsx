@@ -8,7 +8,6 @@ jest.mock('@/providers/auth-provider', () => ({
 }));
 
 jest.mock('lucide-react', () => ({
-  ArrowLeftRight: () => null,
   Maximize: () => null,
   Minimize2: () => null,
   MessageCircle: () => null,
@@ -19,6 +18,11 @@ jest.mock('lucide-react', () => ({
   Medal: () => null,
   Crown: () => null,
   Wallet: () => null,
+}));
+
+jest.mock('@phosphor-icons/react', () => ({
+  ArrowsLeftRight: () => null,
+  SignOut: () => null,
 }));
 
 jest.mock('@/hooks/use-mobile-game-shell', () => ({
@@ -152,12 +156,17 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     await waitFor(() => expect(viewport).toHaveAttribute('data-game-fullscreen', 'fallback'));
 
     const flipButton = screen.getByRole('button', { name: 'Voltear tablero y tótem' });
+    const controls = document.querySelector('[data-game-mobile-controls]');
     expect(screen.getByRole('button', { name: 'Salir de pantalla completa' }))
       .toBeInTheDocument();
+    expect(screen.queryByText('Salir')).not.toBeInTheDocument();
+    expect(screen.queryByText('Voltear')).not.toBeInTheDocument();
+    expect(controls).toHaveAttribute('data-game-mobile-controls-side', 'right');
     expect(flipButton).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(flipButton);
     expect(viewport).toHaveAttribute('data-game-layout-flipped', 'true');
+    expect(controls).toHaveAttribute('data-game-mobile-controls-side', 'left');
     expect(flipButton).toHaveAttribute('aria-pressed', 'true');
     expect(postMessage).toHaveBeenLastCalledWith(
       { type: 'TREASURE_HUNT_LAYOUT_FLIP', flipped: true },
@@ -166,6 +175,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
 
     fireEvent.click(flipButton);
     expect(viewport).toHaveAttribute('data-game-layout-flipped', 'false');
+    expect(controls).toHaveAttribute('data-game-mobile-controls-side', 'right');
     expect(postMessage).toHaveBeenLastCalledWith(
       { type: 'TREASURE_HUNT_LAYOUT_FLIP', flipped: false },
       'https://game.example',

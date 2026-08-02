@@ -5,7 +5,8 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeftRight, Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { Maximize, Minimize2, MessageCircle, Gamepad2, Heart, Trophy, Star, Medal, Crown } from 'lucide-react';
+import { ArrowsLeftRight, SignOut } from '@phosphor-icons/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import GameChat from '@/components/ui/GameChat';
 import { markParentIframeNavigation } from '@/lib/parent-iframe-navigation';
@@ -459,35 +460,42 @@ export default function GameLayout({
               ) : null}
               {isMobileFocus && isFullscreen ? (
                 <div
-                  className="absolute right-0 top-0 z-50 flex flex-col items-stretch gap-2"
+                  data-game-mobile-controls
+                  data-game-mobile-controls-side={isMobileLayoutFlipped ? 'left' : 'right'}
+                  className={cn(
+                    'absolute top-0 z-50 flex flex-col gap-2 transition-[left,right] duration-200',
+                    isMobileLayoutFlipped ? 'left-0 items-start' : 'right-0 items-end',
+                  )}
                   style={{
                     top: 'max(0.5rem, env(safe-area-inset-top))',
-                    right: 'max(0.5rem, env(safe-area-inset-right))',
+                    ...(isMobileLayoutFlipped
+                      ? { left: 'max(0.5rem, env(safe-area-inset-left))' }
+                      : { right: 'max(0.5rem, env(safe-area-inset-right))' }),
                   }}
                 >
                   <Button
                     type="button"
-                    size="sm"
+                    size="icon"
                     variant="ghost"
                     onClick={() => void handleFullScreen()}
-                    className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                    className="h-11 w-11 rounded-xl border border-white/20 bg-[#101719]/90 text-white shadow-lg backdrop-blur-md transition-transform hover:bg-[#182224] hover:text-white active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-[#35eee2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071312]"
                     aria-label="Salir de pantalla completa"
+                    title="Salir de pantalla completa"
                   >
-                    <Minimize2 className="h-4 w-4" aria-hidden="true" />
-                    Salir
+                    <SignOut className="h-5 w-5" weight="bold" aria-hidden="true" />
                   </Button>
                   {mobileLayoutFlipEnabled ? (
                     <Button
                       type="button"
-                      size="sm"
+                      size="icon"
                       variant="ghost"
                       onClick={handleMobileLayoutFlip}
-                      className="h-11 gap-2 border border-white/20 bg-black/70 px-3 text-xs font-black text-white backdrop-blur-md hover:bg-black/85"
+                      className="h-11 w-11 rounded-xl border border-white/20 bg-[#101719]/90 text-white shadow-lg backdrop-blur-md transition-transform hover:bg-[#182224] hover:text-white active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-[#35eee2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071312]"
                       aria-label="Voltear tablero y tótem"
                       aria-pressed={isMobileLayoutFlipped}
+                      title="Voltear tablero y tótem"
                     >
-                      <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
-                      Voltear
+                      <ArrowsLeftRight className="h-5 w-5" weight="bold" aria-hidden="true" />
                     </Button>
                   ) : null}
                 </div>
