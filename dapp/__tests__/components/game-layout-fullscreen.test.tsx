@@ -144,7 +144,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
-  it('permite voltear tablero y tótem desde el control móvil de fullscreen', async () => {
+  it('permite voltear tablero y tótem manteniendo los controles a la derecha', async () => {
     render(<GameLayout {...props} mobileFocus mobileLayoutFlipEnabled />);
 
     const viewport = document.querySelector('[data-game-viewport]');
@@ -166,7 +166,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
 
     fireEvent.click(flipButton);
     expect(viewport).toHaveAttribute('data-game-layout-flipped', 'true');
-    expect(controls).toHaveAttribute('data-game-mobile-controls-side', 'left');
+    expect(controls).toHaveAttribute('data-game-mobile-controls-side', 'right');
     expect(flipButton).toHaveAttribute('aria-pressed', 'true');
     expect(postMessage).toHaveBeenLastCalledWith(
       { type: 'TREASURE_HUNT_LAYOUT_FLIP', flipped: true },

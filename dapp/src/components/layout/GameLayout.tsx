@@ -461,16 +461,11 @@ export default function GameLayout({
               {isMobileFocus && isFullscreen ? (
                 <div
                   data-game-mobile-controls
-                  data-game-mobile-controls-side={isMobileLayoutFlipped ? 'left' : 'right'}
-                  className={cn(
-                    'absolute top-0 z-50 flex flex-col gap-2 transition-[left,right] duration-200',
-                    isMobileLayoutFlipped ? 'left-0 items-start' : 'right-0 items-end',
-                  )}
+                  data-game-mobile-controls-side="right"
+                  className="absolute right-0 top-0 z-50 flex flex-col items-end gap-2"
                   style={{
                     top: 'max(0.5rem, env(safe-area-inset-top))',
-                    ...(isMobileLayoutFlipped
-                      ? { left: 'max(0.5rem, env(safe-area-inset-left))' }
-                      : { right: 'max(0.5rem, env(safe-area-inset-right))' }),
+                    right: 'max(0.5rem, env(safe-area-inset-right))',
                   }}
                 >
                   <Button
