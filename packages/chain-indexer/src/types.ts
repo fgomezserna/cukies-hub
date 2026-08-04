@@ -90,6 +90,7 @@ export type IndexerConfig = {
   chains: ChainName[];
   bscRpcUrl: string;
   bscRpcUrls: string[];
+  bscExpectedChainId: 56 | 97;
   tronApiBaseUrl: string;
   tronApiKey?: string;
   bscStartBlock: number;

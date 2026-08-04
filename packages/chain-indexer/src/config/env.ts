@@ -47,6 +47,10 @@ const envSchema = z.object({
   CHAIN_INDEXER_BSC_RPC_URLS: z.string().optional(),
   CHAIN_INDEXER_BSC_RPC_URL: z.string().optional(),
   BSC_RPC_URL: z.string().optional(),
+  CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: z.coerce.number().int().refine(
+    (value) => value === 56 || value === 97,
+    'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID debe ser 56 o 97.',
+  ).default(56),
   CHAIN_INDEXER_PRESALE_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_TRON_API_BASE_URL: z.string().default('https://api.trongrid.io/v1'),
@@ -105,6 +109,29 @@ function parseRpcUrls(...values: Array<string | undefined>) {
   return [...new Set(urls)];
 }
 
+export function resolveBscRpcUrls(input: {
+  expectedChainId: 56 | 97;
+  rpcUrls?: string;
+  rpcUrl?: string;
+  legacyRpcUrl?: string;
+}) {
+  const configured = parseRpcUrls(
+    input.rpcUrls,
+    input.rpcUrl,
+    input.expectedChainId === 56 ? input.legacyRpcUrl : undefined,
+  );
+
+  if (configured.length > 0) return configured;
+
+  if (input.expectedChainId === 97) {
+    throw new Error(
+      'BSC Testnet exige CHAIN_INDEXER_BSC_RPC_URLS o CHAIN_INDEXER_BSC_RPC_URL; no se permite fallback a mainnet.',
+    );
+  }
+
+  return ['https://bsc.rpc.blxrbdn.com'];
+}
+
 export function getIndexerConfig(): IndexerConfig {
   loadIndexerEnvFiles();
   const env = envSchema.parse(process.env);
@@ -119,12 +146,13 @@ export function getIndexerConfig(): IndexerConfig {
   const chains = parseChains(env.CHAIN_INDEXER_CHAINS);
   const contractAliases = parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES);
   const presaleAddress = env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS;
-  const bscRpcUrls = parseRpcUrls(
-    env.CHAIN_INDEXER_BSC_RPC_URLS,
-    env.CHAIN_INDEXER_BSC_RPC_URL,
-    env.BSC_RPC_URL,
-    'https://bsc.rpc.blxrbdn.com',
-  );
+  const bscExpectedChainId = env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID as 56 | 97;
+  const bscRpcUrls = resolveBscRpcUrls({
+    expectedChainId: bscExpectedChainId,
+    rpcUrls: env.CHAIN_INDEXER_BSC_RPC_URLS,
+    rpcUrl: env.CHAIN_INDEXER_BSC_RPC_URL,
+    legacyRpcUrl: env.BSC_RPC_URL,
+  });
 
   if (contractAliases?.includes('PRESALE') && !presaleAddress) {
     throw new Error('Falta CHAIN_INDEXER_PRESALE_ADDRESS o NEXT_PUBLIC_UKI_PRESALE_ADDRESS para indexar la preventa.');
@@ -137,6 +165,7 @@ export function getIndexerConfig(): IndexerConfig {
     contractAliases,
     bscRpcUrl: bscRpcUrls[0],
     bscRpcUrls,
+    bscExpectedChainId,
     tronApiBaseUrl: env.CHAIN_INDEXER_TRON_API_BASE_URL.replace(/\/$/, ''),
     tronApiKey: env.TRON_API_KEY ?? env.TRONGRID_API_KEY,
     bscStartBlock: env.CHAIN_INDEXER_START_BSC_BLOCK,
