@@ -104,10 +104,26 @@ Reglas operativas:
 
 - staging debe tener `NEXTAUTH_URL` y callbacks OAuth propios,
 - staging debe usar base de datos y secrets separados,
+- `STAGING_ONLY_GUARD=true` es obligatorio en la app Coolify `28`; el arranque de `dapp`, `chain-indexer` y `cuki-card-worker` se detiene antes de cualquier setup si el guard no valida el perimetro,
 - `main` solo debe recibir merges promovidos tras QA y go/no-go,
 - `cukies.world` no debe recibir variables ni contratos de staging,
 - los nombres de routers Traefik deben ser unicos por entorno,
 - ambos servicios deben vivir en la red Docker externa `coolify`.
+
+### Preflight staging-only
+
+El guard `pnpm guard:staging` valida sin imprimir secretos:
+
+- `APP_ENV=staging`;
+- rama real inyectada por Coolify `COOLIFY_BRANCH=staging`;
+- UUID real del recurso `u4s804o4wwcckowgk0woo4wg` (app `28`);
+- BSC Testnet `97` tanto en la dapp como en el indexer;
+- `DATABASE_URL` -> `cukies-hub-staging`;
+- `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`;
+- `CHAIN_INDEXER_DB_NAME` y `CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`;
+- `NEXTAUTH_URL` -> uno de los hosts HTTPS aprobados de staging.
+
+El mismo guard se ejecuta automaticamente en `scripts/docker-start.sh` con alcance por servicio y antes de los setups que escriben en Mongo. Los wrappers manuales `pnpm staging:indexer:setup` y `pnpm staging:cards:setup` aplican el alcance correspondiente; `pnpm guard:staging` ejecuta el preflight completo. `pnpm guard:staging:test` cubre explicitamente los rechazos de `main`, app/UUID de produccion, chain `56`, bases live y `cukies.world`.
 
 ## Matriz de envs
 
@@ -194,6 +210,7 @@ Antes de considerar staging valido:
 ### Checklist posterior a la separacion
 
 - [x] Integrar el guardarrail de RPC/chain id de BSC Testnet en `staging` (PR #188, merge `290cc643`).
+- [x] Anadir preflight staging-only fail-closed para rama, recurso Coolify, chain, bases y URL de autenticacion antes de arrancar o ejecutar setups.
 - [x] Reapuntar el recurso Coolify staging a la rama `staging`.
 - [x] Separar las tres bases staging y habilitar transacciones mediante Mongo replica set `rs0`.
 - [x] Desplegar y financiar un nuevo `VestingVault` y `Presale` en BSC Testnet.
