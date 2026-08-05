@@ -179,6 +179,12 @@ describe('economy indexes', () => {
       index.collection === 'game_economy_sessions'
       && index.keys === '{"settlementIntent.decidedAt":1,"_id":1}'
     )));
+    const pendingSettlement = ECONOMY_INDEXES.find((index) => (
+      index.options?.name === 'game_session_pending_settlement_census'
+    ));
+    assert.deepEqual(pendingSettlement?.options?.partialFilterExpression, {
+      'settlementIntent.decidedAt': { $type: 'date' },
+    });
     assert.ok(indexes.some((index) => (
       index.collection === 'game_economy_sessions'
       && index.keys === '{"validation.evidenceId":1}'
