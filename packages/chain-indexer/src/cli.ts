@@ -3,6 +3,7 @@ import { getIndexerConfig, getLegacyImportConfig } from './config/env.js';
 import { importLegacyCukiesMetadata, importLegacyProcessedEvents } from './legacy/importer.js';
 import { projectOnce } from './projectors/index.js';
 import { IndexerStore } from './storage/index.js';
+import { ECONOMY_SCHEMA_VERSION } from './storage/economy-schema.js';
 import { now } from './utils/json.js';
 
 function log(message: string, context?: Record<string, unknown>) {
@@ -25,6 +26,28 @@ async function setup() {
   await withStore(async (store) => {
     await store.ensureIndexes();
     log('setup ok');
+  });
+}
+
+async function setupEconomy() {
+  await withStore(async (store) => {
+    const metadata = await store.ensureEconomySetup();
+    log('economy setup ok', {
+      dbName: store.db.databaseName,
+      schemaVersion: ECONOMY_SCHEMA_VERSION,
+      transactionVerified: Boolean(metadata.transactionVerifiedAt),
+    });
+  });
+}
+
+async function migrateEconomyV2() {
+  await withStore(async (store) => {
+    const metadata = await store.migrateEconomySchemaV2();
+    log('economy schema v2 migration ok', {
+      dbName: store.db.databaseName,
+      schemaVersion: metadata.schemaVersion,
+      migrationId: metadata.migrationId,
+    });
   });
 }
 
@@ -209,6 +232,10 @@ const command = process.argv[2] ?? 'status';
 
 if (command === 'setup') {
   await setup();
+} else if (command === 'setup-economy' || command === 'setup:economy') {
+  await setupEconomy();
+} else if (command === 'migrate-economy-v2' || command === 'migrate:economy:v2') {
+  await migrateEconomyV2();
 } else if (command === 'ingest-once') {
   await ingestOnce();
 } else if (command === 'import-legacy') {

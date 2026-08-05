@@ -11,13 +11,18 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/cli.js run",
     "setup:prod": "node dist/cli.js setup",
+    "setup:economy:prod": "node dist/cli.js setup-economy",
+    "migrate:economy:v2:prod": "node dist/cli.js migrate-economy-v2",
     "setup": "tsx src/cli.ts setup",
+    "setup:economy": "tsx src/cli.ts setup-economy",
+    "migrate:economy:v2": "tsx src/cli.ts migrate-economy-v2",
     "status": "tsx src/cli.ts status",
     "ingest:once": "tsx src/cli.ts ingest-once",
     "import:legacy": "tsx src/cli.ts import-legacy",
     "import:legacy-metadata": "tsx src/cli.ts import-legacy-metadata",
     "project:once": "tsx src/cli.ts project-once",
     "test": "node --import tsx --test test/*.test.ts",
+    "test:economy": "tsx --test \"src/storage/*economy*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

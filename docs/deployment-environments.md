@@ -125,6 +125,16 @@ El guard `pnpm guard:staging` valida sin imprimir secretos:
 
 El mismo guard se ejecuta automaticamente en `scripts/docker-start.sh` con alcance por servicio y antes de los setups que escriben en Mongo. Los wrappers manuales `pnpm staging:indexer:setup` y `pnpm staging:cards:setup` aplican el alcance correspondiente; `pnpm guard:staging` ejecuta el preflight completo. `pnpm guard:staging:test` cubre explicitamente los rechazos de `main`, app/UUID de produccion, chain `56`, bases live y `cukies.world`.
 
+El schema de economia se inicializa de forma deliberada, no durante el arranque normal del indexer:
+
+1. comprobar el sentinel en `cukieshub-new-staging`;
+2. si no existe, ejecutar dentro del contenedor de staging `pnpm staging:economy:setup:prod`;
+3. si existe en v1, usar `pnpm staging:economy:migrate:v2:prod` y despues repetir el setup;
+4. verificar `schemaVersion=2`, `dbName=cukieshub-new-staging` y `transactionVerifiedAt`;
+5. mantener todos los schedulers desactivados hasta cargar reglas y probar leases/idempotencia.
+
+Ambos comandos vuelven a ejecutar el guard staging-only antes de crear indices, escribir el sentinel o abrir la transaccion de prueba.
+
 ## Matriz de envs
 
 ### Dapp

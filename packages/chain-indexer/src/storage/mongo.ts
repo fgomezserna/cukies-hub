@@ -8,6 +8,12 @@ import {
 
 import type { ChainCursor, ChainEvent, ContractEventConfig, IndexerConfig } from '../types.js';
 import { now } from '../utils/json.js';
+import { ECONOMY_INDEXES } from './economy-indexes.js';
+import {
+  ensureEconomySchema,
+  migrateEconomySchemaV1ToV2,
+  verifyEconomyTransactionSupport,
+} from './economy-schema.js';
 
 export class IndexerStore {
   private client: MongoClient;
@@ -33,6 +39,25 @@ export class IndexerStore {
 
   cursors(): Collection<ChainCursor> {
     return this.db.collection<ChainCursor>('chain_cursors');
+  }
+
+  async ensureEconomyIndexes() {
+    for (const index of ECONOMY_INDEXES) {
+      await this.db.collection(index.collection).createIndex(index.keys, index.options);
+    }
+  }
+
+  async ensureEconomySetup() {
+    await this.ensureEconomyIndexes();
+    await ensureEconomySchema(this.db, this.db.databaseName);
+    return verifyEconomyTransactionSupport(this.db, this.db.databaseName);
+  }
+
+  async migrateEconomySchemaV2() {
+    await this.ensureEconomyIndexes();
+    const metadata = await migrateEconomySchemaV1ToV2(this.db, this.db.databaseName);
+    await verifyEconomyTransactionSupport(this.db, this.db.databaseName);
+    return metadata;
   }
 
   async ensureIndexes() {
