@@ -183,7 +183,7 @@ Antes de considerar staging valido:
 - [x] Separar las tres bases staging y habilitar transacciones mediante Mongo replica set `rs0`.
 - [x] Desplegar y financiar un nuevo `VestingVault` y `Presale` en BSC Testnet.
 - [x] Ejecutar una compra on-chain smoke de `5 tASM -> 500 UKI` y validar pago, venta y vesting.
-- [ ] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
+- [x] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
 - [ ] Crear usuarios Mongo con minimo privilegio y habilitar `security.authorization` tras validar los consumidores legacy.
 - [ ] Desplegar/verificar `UKIStaking` y `RewardsDistributor` en BSC Testnet.
 - [ ] Configurar HMAC exclusivos de staging y ejecutar el setup de economia v2.

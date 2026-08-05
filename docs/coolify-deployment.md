@@ -122,7 +122,7 @@ CHAIN_INDEXER_BSC_CONFIRMATIONS=12
 - Vault financiado: tx `0xaafce634b0221268ced2d9e64a1ab8438365072e09cd11aa016dafadf3e65444`.
 - Rol y apertura: tx `0x51117e37bf957a911626d797c7045c03e6ab27d9e98a21a9632d81a74e7a7b1a` y `0x4e8c4ec8ca66c7b2c449a68f60eec23b4a27b7ccbf8d8204ad1f901015cf3ed8`.
 - Compra smoke: `5 tASM -> 500 UKI` en tx `0x9b5f3a5724028f464fa582be7d3178dbf872964b6161123cd0987daf3010f9bd`.
-- Verificacion de fuente en explorer: pendiente de migrar Hardhat/BscScan desde API V1 a Etherscan API V2 y disponer de una API key V2 valida.
+- Source verificado mediante Etherscan API V2: [VestingVault](https://testnet.bscscan.com/address/0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154#code) y [Presale](https://testnet.bscscan.com/address/0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA#code).
 
 Config inicial en Mongo para referidos de preventa:
 

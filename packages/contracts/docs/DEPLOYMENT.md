@@ -36,7 +36,7 @@ Required for deploy:
 - `SALE_OWNER_ADDRESS` for BSC testnet/mainnet. Use the launch Safe multisig/admin owner.
 - `SALE_START`, `SALE_END`, `VESTING_START`, `VESTING_DURATION`.
 - `UKI_PER_ASM`, `MIN_ASM_PER_PURCHASE`, `TOTAL_UKI_FOR_SALE`.
-- `BSCSCAN_API_KEY` for verification
+- `ETHERSCAN_API_KEY` for Etherscan API V2 verification. `BSCSCAN_API_KEY` remains a temporary fallback for existing local operator envs.
 
 Optional:
 
