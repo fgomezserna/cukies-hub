@@ -1,4 +1,4 @@
-import { bsc } from 'viem/chains';
+import { bsc, bscTestnet } from 'viem/chains';
 import { createPublicClient, http, type Address } from 'viem';
 
 import { bscEventAbis } from '../config/abis.js';
@@ -13,6 +13,7 @@ export type BscRpcClient = {
   url: string;
   host: string;
   client: BscClient;
+  validatedChainId?: number;
 };
 
 export interface BscIngestDependencies {
@@ -27,12 +28,12 @@ function rpcHost(url: string) {
   }
 }
 
-function createBscRpcClients(urls: string[]) {
+function createBscRpcClients(urls: string[], expectedChainId: 56 | 97) {
   return urls.map((url) => ({
     url,
     host: rpcHost(url),
     client: createPublicClient({
-      chain: bsc,
+      chain: expectedChainId === 97 ? bscTestnet : bsc,
       transport: http(url),
     }),
   }));
@@ -51,12 +52,23 @@ function isRpcRangeLimitError(error: unknown) {
 
 async function withBscRpcFallback<T>(
   rpcClients: BscRpcClient[],
+  expectedChainId: 56 | 97,
   operation: (rpc: BscRpcClient) => Promise<T>,
 ) {
   const failures: string[] = [];
 
   for (const rpc of rpcClients) {
     try {
+      if (rpc.validatedChainId !== expectedChainId) {
+        const actualChainId = await rpc.client.getChainId();
+        if (actualChainId !== expectedChainId) {
+          throw new Error(
+            `chainId inesperado: esperado ${expectedChainId}, recibido ${actualChainId}`,
+          );
+        }
+        rpc.validatedChainId = actualChainId;
+      }
+
       return {
         value: await operation(rpc),
         rpc,
@@ -80,6 +92,7 @@ async function getBlockTimestampMs(input: {
   blockNumber: number;
   preferredRpc: BscRpcClient;
   rpcClients: BscRpcClient[];
+  expectedChainId: 56 | 97;
   timestampCache: Map<number, number>;
 }) {
   const cached = input.timestampCache.get(input.blockNumber);
@@ -87,6 +100,7 @@ async function getBlockTimestampMs(input: {
 
   const { value: block } = await withBscRpcFallback(
     rpcClientsWithPreferredFirst(input.preferredRpc, input.rpcClients),
+    input.expectedChainId,
     (rpc) => rpc.client.getBlock({ blockNumber: BigInt(input.blockNumber) }),
   );
   const timestampMsBigInt = block.timestamp * BigInt(1_000);
@@ -135,10 +149,12 @@ export async function ingestBscOnce(
 
   const rpcClients = dependencies.rpcClients ?? createBscRpcClients(
     config.bscRpcUrls.length > 0 ? config.bscRpcUrls : [config.bscRpcUrl],
+    config.bscExpectedChainId,
   );
 
   const { value: latestBlockValue, rpc: latestBlockRpc } = await withBscRpcFallback(
     rpcClients,
+    config.bscExpectedChainId,
     (rpc) => rpc.client.getBlockNumber(),
   );
   const latestBlock = Number(latestBlockValue);
@@ -166,6 +182,7 @@ export async function ingestBscOnce(
         blockNumber: safeBlock,
         preferredRpc: latestBlockRpc,
         rpcClients,
+        expectedChainId: config.bscExpectedChainId,
         timestampCache,
       });
       await store.updateCursor(contractEvent, {
@@ -193,10 +210,12 @@ export async function ingestBscOnce(
           blockNumber: processedFromBlock,
           preferredRpc: latestBlockRpc,
           rpcClients,
+          expectedChainId: config.bscExpectedChainId,
           timestampCache,
         });
     const { value: logs, rpc: logsRpc } = await withBscRpcFallback(
       rpcClients,
+      config.bscExpectedChainId,
       (rpc) => getLogsWithFallback(
         rpc.client,
         {
@@ -218,6 +237,7 @@ export async function ingestBscOnce(
         blockNumber,
         preferredRpc: logsRpc,
         rpcClients,
+        expectedChainId: config.bscExpectedChainId,
         timestampCache,
       });
 
@@ -261,6 +281,7 @@ export async function ingestBscOnce(
       blockNumber: toBlock,
       preferredRpc: logsRpc,
       rpcClients,
+      expectedChainId: config.bscExpectedChainId,
       timestampCache,
     });
     await store.updateCursor(contractEvent, {

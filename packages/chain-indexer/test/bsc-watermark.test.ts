@@ -15,6 +15,7 @@ function config(overrides: Partial<IndexerConfig> = {}): IndexerConfig {
     chains: ['BSC'],
     bscRpcUrl: 'https://primary.test',
     bscRpcUrls: ['https://primary.test', 'https://secondary.test'],
+    bscExpectedChainId: 56,
     tronApiBaseUrl: 'https://tron.test',
     bscStartBlock: 100,
     tronStartTimestampMs: 0,
@@ -60,11 +61,13 @@ function rpc(input: {
   onGetBlock?: (blockNumber: bigint) => Promise<{ timestamp: bigint }>;
   blockCalls?: bigint[];
   logCalls?: Array<{ fromBlock: bigint; toBlock: bigint }>;
+  chainId?: number;
 }) {
   return {
     url: `https://${input.host}`,
     host: input.host,
     client: {
+      getChainId: async () => input.chainId ?? 56,
       getBlockNumber: async () => input.latestBlock ?? BigInt(120),
       getLogs: async ({ fromBlock, toBlock }: { fromBlock: bigint; toBlock: bigint }) => {
         input.logCalls?.push({ fromBlock, toBlock });
@@ -186,4 +189,30 @@ test('records safe head as explicit coverage origin for a new start-block zero c
     processedThroughBlock: 110,
     processedThroughTimestampMs: 1_100_000,
   }]);
+});
+
+test('skips an RPC from a different chain before reading blocks', async () => {
+  const mainnetBlockCalls: bigint[] = [];
+  const testnetBlockCalls: bigint[] = [];
+  const mainnet = rpc({
+    host: 'mainnet.test',
+    chainId: 56,
+    blockCalls: mainnetBlockCalls,
+  });
+  const testnet = rpc({
+    host: 'testnet.test',
+    chainId: 97,
+    blockCalls: testnetBlockCalls,
+  });
+  const { store } = fakeStore({ nextBlock: 111 });
+
+  const result = await ingestBscOnce(
+    store,
+    config({ bscExpectedChainId: 97 }),
+    { rpcClients: [mainnet, testnet] },
+  );
+
+  assert.deepEqual(mainnetBlockCalls, []);
+  assert.deepEqual(testnetBlockCalls, [BigInt(110)]);
+  assert.equal(result.latestBlockRpcHost, 'testnet.test');
 });

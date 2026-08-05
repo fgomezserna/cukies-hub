@@ -22,8 +22,9 @@ Variables principales:
 - `CHAIN_INDEXER_DB_NAME`: nombre de la BD nueva. Default: `cukieshub-new`.
 - `CHAIN_INDEXER_MONGO_URL`: URI Mongo para el indexer.
 - `CHAIN_INDEXER_CHAINS`: `BSC,TRON`, `BSC` o `TRON`.
-- `CHAIN_INDEXER_BSC_RPC_URLS`: lista de RPCs BSC separados por coma. El indexer prueba el siguiente si uno falla.
-- `CHAIN_INDEXER_BSC_RPC_URL`: RPC BSC unico. Fallback legacy: `BSC_RPC_URL`.
+- `CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID`: solo `56` o `97`. Cada RPC debe responder con ese chain id. Default: `56`.
+- `CHAIN_INDEXER_BSC_RPC_URLS`: lista de RPCs BSC separados por coma. El indexer valida el chain id antes de usar cada uno y prueba el siguiente si uno falla.
+- `CHAIN_INDEXER_BSC_RPC_URL`: RPC BSC unico. En chain `56`, `BSC_RPC_URL` y `https://bsc.rpc.blxrbdn.com` quedan como fallback legacy. En chain `97` se exige un RPC explicito y nunca se añade un fallback mainnet.
 - `TRON_API_KEY` o `TRONGRID_API_KEY`: API key opcional de TronGrid.
 - `CHAIN_INDEXER_START_BSC_BLOCK`: bloque inicial BSC. Default: `0`, que significa empezar live desde el ultimo bloque seguro. Para backfill historico usa un archive RPC y fija el bloque inicial legacy (`16906879`).
 - `CHAIN_INDEXER_START_TRON_TIMESTAMP_MS`: timestamp inicial TRON. Default: `0`.
