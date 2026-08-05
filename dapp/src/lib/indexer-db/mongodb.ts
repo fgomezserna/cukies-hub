@@ -1,6 +1,23 @@
 import 'server-only';
 
-import { Db, MongoClient } from 'mongodb';
+import { type ClientSession, Db, MongoClient, ReadPreference } from 'mongodb';
+
+import { SchemaNotReadyError } from '@/lib/uki-economy/errors';
+
+import { getIndexerDbName } from './name';
+
+export const ECONOMY_SCHEMA_METADATA_COLLECTION = 'economy_schema_metadata';
+export const ECONOMY_SCHEMA_METADATA_ID = 'uki-economy';
+export const ECONOMY_SCHEMA_VERSION = 2;
+
+export type EconomySchemaMetadata = {
+  _id: typeof ECONOMY_SCHEMA_METADATA_ID;
+  schemaVersion: typeof ECONOMY_SCHEMA_VERSION;
+  dbName: string;
+  initializedAt: Date;
+  updatedAt: Date;
+  transactionVerifiedAt: Date;
+};
 
 declare global {
   // eslint-disable-next-line no-var
@@ -59,13 +76,80 @@ function getConnection() {
 async function ensureConnection() {
   const connection = getConnection();
   await connection.client.connect();
-  return connection.db;
+  return connection;
 }
 
 export async function getIndexerDb() {
-  return ensureConnection();
+  const connection = await ensureConnection();
+  return connection.db;
 }
 
-export function getIndexerDbName() {
-  return process.env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new';
+export async function assertEconomySchema(
+  db: Db,
+  expectedDbName = getIndexerDbName(),
+  session?: ClientSession,
+) {
+  if (db.databaseName !== expectedDbName) {
+    throw new SchemaNotReadyError(
+      `La conexion apunta a ${db.databaseName}, no a la base de economia esperada ${expectedDbName}.`,
+    );
+  }
+
+  const metadata = await db
+    .collection<EconomySchemaMetadata>(ECONOMY_SCHEMA_METADATA_COLLECTION)
+    .findOne({ _id: ECONOMY_SCHEMA_METADATA_ID }, { session });
+
+  if (!metadata) {
+    throw new SchemaNotReadyError(
+      `La base ${expectedDbName} no tiene inicializado el schema de economia UKI.`,
+    );
+  }
+
+  if (
+    metadata.schemaVersion !== ECONOMY_SCHEMA_VERSION
+    || metadata.dbName !== expectedDbName
+    || !(metadata.initializedAt instanceof Date)
+    || !(metadata.updatedAt instanceof Date)
+    || !(metadata.transactionVerifiedAt instanceof Date)
+  ) {
+    throw new SchemaNotReadyError(
+      `El sentinel de economia de ${expectedDbName} es incompatible con schemaVersion ${ECONOMY_SCHEMA_VERSION} o no acredita transacciones.`,
+    );
+  }
+
+  return metadata;
 }
+
+export async function getEconomyDb() {
+  const connection = await ensureConnection();
+  await assertEconomySchema(connection.db);
+  return connection.db;
+}
+
+export type EconomyTransactionWork<T> = (
+  db: Db,
+  session: ClientSession,
+) => Promise<T>;
+
+export async function withEconomyTransaction<T>(work: EconomyTransactionWork<T>) {
+  const connection = await ensureConnection();
+  const session = connection.client.startSession();
+
+  try {
+    return await session.withTransaction(
+      async () => {
+        await assertEconomySchema(connection.db, getIndexerDbName(), session);
+        return work(connection.db, session);
+      },
+      {
+        readConcern: { level: 'snapshot' },
+        writeConcern: { w: 'majority' },
+        readPreference: ReadPreference.primary,
+      },
+    );
+  } finally {
+    await session.endSession();
+  }
+}
+
+export { getIndexerDbName } from './name';
