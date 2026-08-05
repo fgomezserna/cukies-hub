@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const contracts = ['UKIToken', 'VestingVault', 'Presale'];
+const contracts = ['UKIToken', 'VestingVault', 'Presale', 'UKIStaking', 'RewardsDistributor'];
 const root = path.resolve(__dirname, '..');
 const dappTarget = path.resolve(root, '../../dapp/src/lib/contracts/abis');
 

@@ -216,3 +216,21 @@ test('skips an RPC from a different chain before reading blocks', async () => {
   assert.deepEqual(testnetBlockCalls, [BigInt(110)]);
   assert.equal(result.latestBlockRpcHost, 'testnet.test');
 });
+
+test('uses the deployment block configured for each UKI economy contract', async () => {
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({ host: 'primary.test', logCalls });
+  const { store, updates } = fakeStore();
+
+  await ingestBscOnce(store, config({
+    contractAliases: ['UKI_STAKING'],
+    ukiStakingAddress: `0x${'3'.repeat(40)}`,
+    ukiStakingStartBlock: 105,
+  }), { rpcClients: [client] });
+
+  assert.deepEqual(logCalls, [
+    { fromBlock: 105n, toBlock: 109n },
+    { fromBlock: 105n, toBlock: 109n },
+  ]);
+  assert.deepEqual(updates.map(({ update }) => update.processedFromBlock), [105, 105]);
+});

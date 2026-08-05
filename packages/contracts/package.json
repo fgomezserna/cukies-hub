@@ -11,11 +11,13 @@
     "deploy:local": "hardhat run scripts/deploy-presale.cjs --network hardhat",
     "deploy:testnet": "hardhat run scripts/deploy-presale.production.cjs --network bscTestnet",
     "deploy:testnet:operational": "hardhat run scripts/deploy-testnet-operational.cjs --network bscTestnet",
+    "deploy:testnet:staking-rewards": "hardhat run scripts/deploy-staking-rewards.testnet.cjs --network bscTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy-presale.production.cjs --network bsc",
     "deploy:mainnet:operational": "hardhat run scripts/deploy-mainnet-operational.cjs --network bsc",
     "handover:mainnet:safe": "hardhat run scripts/safe-handover-mainnet.cjs --network bsc",
     "preflight:presale": "hardhat run scripts/preflight-presale.cjs",
     "simulate:deploy": "hardhat run scripts/simulate-full-deploy.cjs --network hardhat",
+    "rewards:merkle": "node scripts/generate-rewards-merkle.cjs",
     "export:abi": "node scripts/export-abi.cjs",
     "freeze:manifest": "node scripts/print-freeze-manifest.cjs"
   },
