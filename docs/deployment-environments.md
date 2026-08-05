@@ -26,6 +26,8 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 - Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
 - Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
+- Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`). Ambos apuntan al UKI testnet existente.
+- El smoke `STAGING_SMOKE_C31176A_2026_08_05` movio temporalmente `1 UKI` por contrato y termino con staking, reservas y balance del distribuidor a cero. No representa una cifra de producto.
 - Staging usa `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging` sobre Mongo replica set `rs0`.
 - Produccion conserva BSC mainnet y sus bases de produccion; no se han reapuntado durante esta separacion.
 - La VM Coolify/Traefik observada es `1001` (`192.168.1.201`) y publica Traefik en `80/443`.
@@ -131,6 +133,8 @@ Reglas operativas:
 | `NEXT_PUBLIC_UKI_TOKEN_ADDRESS` | UKI testnet | UKI mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS` | Vault testnet | Vault mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_PRESALE_ADDRESS` | Presale testnet | Presale mainnet | Desde freeze/deploy. |
+| `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
+| `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
 | `NEXT_PUBLIC_BSCSCAN_BASE_URL` | `https://testnet.bscscan.com` | `https://bscscan.com` | Enlaces de tx/address. |
 | `NEXT_PUBLIC_GAME_HYPPIE_ROAD` | URL staging game | URL production game | Si el juego vive separado. |
 | `NEXT_PUBLIC_GAME_SYBIL_SLAYER` | URL staging game | URL production game | Si el juego vive separado. |
@@ -165,6 +169,17 @@ Reglas operativas:
 | `VESTING_DURATION` | Duracion testnet | Duracion mainnet | Segundos. |
 | `VESTING_CONFIG_FROZEN` | Estado testnet | Estado mainnet | `false` antes de TGE; `true` antes de claims. |
 
+### Chain indexer
+
+| Variable | Staging | Nota |
+| --- | --- | --- |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,REWARDS_DISTRIBUTOR` | Activacion explicita; una address por si sola no habilita ingesta. |
+| `CHAIN_INDEXER_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Debe coincidir con la variable publica. |
+| `CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK` | `123359165` | Bloque exacto de despliegue. |
+| `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Debe coincidir con la variable publica. |
+| `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK` | `123359171` | Bloque exacto de despliegue. |
+| `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Gate de finalidad para las proyecciones UKI. |
+
 ## Gates para staging
 
 Antes de considerar staging valido:
@@ -185,7 +200,8 @@ Antes de considerar staging valido:
 - [x] Ejecutar una compra on-chain smoke de `5 tASM -> 500 UKI` y validar pago, venta y vesting.
 - [x] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
 - [ ] Crear usuarios Mongo con minimo privilegio y habilitar `security.authorization` tras validar los consumidores legacy.
-- [ ] Desplegar/verificar `UKIStaking` y `RewardsDistributor` en BSC Testnet.
+- [x] Desplegar `UKIStaking` y `RewardsDistributor`, configurar sus cinco cursores y proyectar un smoke completo en Mongo staging (PR #192, merge `c31176ab`).
+- [ ] Publicar el source de ambos contratos en BscScan cuando haya `ETHERSCAN_API_KEY`/`BSCSCAN_API_KEY`; el entorno actual no conserva ninguna.
 - [ ] Configurar HMAC exclusivos de staging y ejecutar el setup de economia v2.
 - [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
 - [ ] Desplegar los cinco schedulers con gates desactivados; activarlos uno a uno tras validar heartbeats, leases e idempotencia.
@@ -193,7 +209,7 @@ Antes de considerar staging valido:
 - [ ] Separar OAuth, Pusher, Resend y Telegram antes de QA externa.
 - [ ] Completar smoke E2E con una segunda wallet desde la UI y conservar evidencia de APIs, Mongo e indexer.
 
-Tras el escenario de preventa, el siguiente bloque recomendado es `UKIStaking` + `RewardsDistributor`, seguido del setup transaccional de economia v2. Los schedulers deben quedarse cerrados hasta que contratos, reglas y secretos internos esten verificados.
+El siguiente bloque recomendado es configurar HMAC exclusivos de staging y ejecutar el setup transaccional de economia v2. Despues deben cargarse reglas aprobadas y validarse APIs/leases antes de habilitar ningun scheduler.
 
 ## Gates para produccion
 
