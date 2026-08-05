@@ -49,7 +49,7 @@ Comprobacion: RPC publico de BSC testnet.
 | `PRESALE` | `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`; desplegado en bloque `123291898`. |
 | `PRESALE_TREASURY` | `0x19907a00abf02975fb60d616c99565894c08d859` | N/A | `Presale.treasury()`. |
 
-El escenario activo abre del `2026-08-05T10:59:20Z` al `2026-09-04T10:59:20Z`, usa `100 UKI/ASM`, compra minima de `5 ASM`, cap de `250,000,000 UKI` y vesting lineal de 9 meses. El vault quedo financiado con el cap completo y la unica cuenta con `PRESALE_VESTING_ROLE` es el contrato `Presale` anterior.
+El escenario activo abre del `2026-08-05T10:59:20Z` al `2026-09-04T10:59:20Z`, usa `100 UKI/ASM`, compra minima de `5 ASM`, cap de `250,000,000 UKI` y vesting lineal de 9 meses. El vault quedo financiado con el cap completo, la unica cuenta con `PRESALE_VESTING_ROLE` es el contrato `Presale` anterior y ambos contratos tienen el source verificado en BscScan mediante Etherscan API V2.
 
 ## ASM BSC mainnet
 
