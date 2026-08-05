@@ -38,10 +38,9 @@ module.exports = {
     }
   },
   etherscan: {
-    apiKey: {
-      bsc: process.env.BSCSCAN_API_KEY || '',
-      bscTestnet: process.env.BSCSCAN_API_KEY || ''
-    },
+    // A single key makes hardhat-verify use Etherscan API V2 for every
+    // supported chain. Keep the legacy env name as a transition fallback.
+    apiKey: process.env.ETHERSCAN_API_KEY || process.env.BSCSCAN_API_KEY || '',
     customChains: [
       {
         network: 'bsc',
