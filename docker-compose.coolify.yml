@@ -5,12 +5,12 @@ services:
       dockerfile: Dockerfile
       target: staging-mongo
     environment:
-      APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
-      STAGING_ONLY_GUARD: ${STAGING_ONLY_GUARD:?Set STAGING_ONLY_GUARD=true for staging}
-      COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Set the exact staging Coolify resource UUID}
-      MONGO_INITDB_ROOT_USERNAME: ${STAGING_MONGO_ROOT_USERNAME:?Set the staging-only Mongo root username}
-      MONGO_INITDB_ROOT_PASSWORD: ${STAGING_MONGO_ROOT_PASSWORD:?Set the staging-only Mongo root password}
-      STAGING_MONGO_REPLICA_KEY: ${STAGING_MONGO_REPLICA_KEY:?Set the staging-only Mongo replica key}
+      APP_ENV: ${APP_ENV}
+      STAGING_ONLY_GUARD: ${STAGING_ONLY_GUARD}
+      COOLIFY_RESOURCE_UUID: ${STAGING_MONGO_RESOURCE_UUID}
+      MONGO_INITDB_ROOT_USERNAME: ${STAGING_MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${STAGING_MONGO_ROOT_PASSWORD}
+      STAGING_MONGO_REPLICA_KEY: ${STAGING_MONGO_REPLICA_KEY}
       STAGING_MONGO_SOURCE_HUB_URL: ${DATABASE_URL}
       STAGING_MONGO_SOURCE_LEGACY_URL: ${CUKIES_DATABASE_URL}
       STAGING_MONGO_SOURCE_ECONOMY_URL: ${CHAIN_INDEXER_MONGO_URL}
@@ -396,6 +396,6 @@ networks:
 
 volumes:
   staging-mongo-data:
-    name: ${STAGING_MONGO_DATA_VOLUME:?Set the staging-only Mongo data volume name}
+    name: cukies-hub-staging-mongo-data-u4s804o4wwcckowgk0woo4wg
   staging-mongo-config:
-    name: ${STAGING_MONGO_CONFIG_VOLUME:?Set the staging-only Mongo config volume name}
+    name: cukies-hub-staging-mongo-config-u4s804o4wwcckowgk0woo4wg
