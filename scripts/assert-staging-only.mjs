@@ -84,12 +84,19 @@ function requireStagingAuthUrl(environment, failures) {
 
 export function validateStagingEnvironment(environment = process.env, scope = 'full') {
   const failures = [];
-  const supportedScopes = new Set(['full', 'dapp', 'chain-indexer', 'cuki-card-worker']);
+  const supportedScopes = new Set([
+    'full',
+    'dapp',
+    'chain-indexer',
+    'cuki-card-worker',
+    'economy-scheduler',
+  ]);
   if (!supportedScopes.has(scope)) {
     throw new StagingGuardError([`unsupported guard scope ${scope}`]);
   }
 
   const appEnv = requireExact(environment, 'APP_ENV', STAGING_TARGET.appEnv, failures);
+  requireExact(environment, 'STAGING_ONLY_GUARD', 'true', failures);
   const gitBranch = requireQuotedOrExact(
     environment,
     'COOLIFY_BRANCH',
@@ -113,7 +120,9 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
   );
   let legacyDatabaseName = null;
   let indexerDatabaseName = null;
+  let indexerMongoDatabaseName = null;
   let cardWorkerDatabaseName = null;
+  let cardWorkerMongoDatabaseName = null;
   let authHost = null;
 
   if (scope === 'full' || scope === 'dapp') {
@@ -135,10 +144,16 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
       STAGING_TARGET.indexerDatabaseName,
       failures,
     );
+    indexerMongoDatabaseName = requireMongoDatabase(
+      environment,
+      'CHAIN_INDEXER_MONGO_URL',
+      STAGING_TARGET.indexerDatabaseName,
+      failures,
+    );
     authHost = requireStagingAuthUrl(environment, failures);
   }
 
-  if (scope === 'full' || scope === 'chain-indexer') {
+  if (scope === 'full' || scope === 'chain-indexer' || scope === 'economy-scheduler') {
     indexerChainId = requireExact(
       environment,
       'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID',
@@ -151,12 +166,24 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
       STAGING_TARGET.indexerDatabaseName,
       failures,
     );
+    indexerMongoDatabaseName ??= requireMongoDatabase(
+      environment,
+      'CHAIN_INDEXER_MONGO_URL',
+      STAGING_TARGET.indexerDatabaseName,
+      failures,
+    );
   }
 
   if (scope === 'full' || scope === 'cuki-card-worker') {
     cardWorkerDatabaseName = requireExact(
       environment,
       'CARD_WORKER_DB_NAME',
+      STAGING_TARGET.indexerDatabaseName,
+      failures,
+    );
+    cardWorkerMongoDatabaseName = requireMongoDatabase(
+      environment,
+      'CARD_WORKER_MONGO_URL',
       STAGING_TARGET.indexerDatabaseName,
       failures,
     );
@@ -177,7 +204,9 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     databaseName,
     legacyDatabaseName,
     indexerDatabaseName,
+    indexerMongoDatabaseName,
     cardWorkerDatabaseName,
+    cardWorkerMongoDatabaseName,
     authHost,
   };
 }
