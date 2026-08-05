@@ -189,6 +189,50 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (eventName === 'Staked' || eventName === 'Unstaked') {
+    const account = getString(args.account);
+    return toJsonRecord({
+      account,
+      accountNormalized: normalizeAddress(chain, account),
+      amountRaw: getString(args.amount),
+      accountBalanceRaw: getString(args.accountBalance),
+      totalStakedRaw: getString(args.totalStaked),
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'BatchPublished') {
+    return toJsonRecord({
+      batchId: getString(args.batchId),
+      merkleRoot: getString(args.merkleRoot),
+      inputHash: getString(args.inputHash),
+      metadataHash: getString(args.metadataHash),
+      totalAllocatedRaw: getString(args.totalAllocated),
+      startsAtRaw: getString(args.startsAt),
+      expiresAtRaw: getString(args.expiresAt),
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'RewardClaimed') {
+    const account = getString(args.account);
+    return toJsonRecord({
+      batchId: getString(args.batchId),
+      account,
+      accountNormalized: normalizeAddress(chain, account),
+      amountRaw: getString(args.amount),
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'BatchClosed') {
+    return toJsonRecord({
+      batchId: getString(args.batchId),
+      unclaimedAmountRaw: getString(args.unclaimedAmount),
+      txType: eventName,
+    });
+  }
+
   return toJsonRecord({
     ...base,
     contractAlias,

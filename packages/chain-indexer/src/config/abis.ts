@@ -28,6 +28,16 @@ export const eventSignatures: Record<EventName, string> = {
     'event JumpOutBridge(uint256 tokenId, address destOwner, uint256 createdAt)',
   Purchased:
     'event Purchased(address indexed buyer, uint256 asmAmount, uint256 ukiAmount, uint256 totalBuyerAsm, uint256 totalBuyerUki)',
+  Staked:
+    'event Staked(address indexed account, uint256 amount, uint256 accountBalance, uint256 totalStaked)',
+  Unstaked:
+    'event Unstaked(address indexed account, uint256 amount, uint256 accountBalance, uint256 totalStaked)',
+  BatchPublished:
+    'event BatchPublished(bytes32 indexed batchId, bytes32 indexed merkleRoot, bytes32 inputHash, bytes32 metadataHash, uint256 totalAllocated, uint64 startsAt, uint64 expiresAt)',
+  RewardClaimed:
+    'event RewardClaimed(bytes32 indexed batchId, address indexed account, uint256 amount)',
+  BatchClosed:
+    'event BatchClosed(bytes32 indexed batchId, uint256 unclaimedAmount)',
 };
 
 export const bscEventAbis = Object.fromEntries(

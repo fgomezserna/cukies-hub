@@ -64,6 +64,18 @@ export class IndexerStore {
       this.db.collection('presale_referral_contributions').createIndex({ eventId: 1, level: 1 }, { unique: true }),
       this.db.collection('presale_referral_contributions').createIndex({ sponsorWalletNormalized: 1, level: 1, confirmedAt: -1 }),
       this.db.collection('presale_referral_campaign_config').createIndex({ active: 1 }),
+      this.db.collection('uki_staking_positions')
+        .createIndex({ walletNormalized: 1 }, { unique: true }),
+      this.db.collection('uki_staking_state')
+        .createIndex({ contractAddressNormalized: 1 }, { unique: true }),
+      this.db.collection('reward_claim_batches')
+        .createIndex({ batchId: 1 }, { unique: true }),
+      this.db.collection('reward_claims')
+        .createIndex({ eventId: 1 }, { unique: true }),
+      this.db.collection('reward_claims')
+        .createIndex({ batchId: 1, walletNormalized: 1 }, { unique: true }),
+      this.db.collection('reward_claims')
+        .createIndex({ transactionHash: 1, logIndex: 1 }, { unique: true }),
       this.db.collection('chain_dead_letters').createIndex({ eventId: 1 }, { unique: true }),
       this.db.collection('chain_indexer_runs').createIndex({ startedAt: -1 }),
       this.db.collection('cukies').createIndex({ state: 1, network: 1, ownerNormalized: 1, timeStamp: -1 }),

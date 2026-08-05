@@ -7,7 +7,9 @@ export type ContractAlias =
   | 'BREEDING_POINTS'
   | 'MARKETPLACE'
   | 'BRIDGE'
-  | 'PRESALE';
+  | 'PRESALE'
+  | 'UKI_STAKING'
+  | 'REWARDS_DISTRIBUTOR';
 
 export type EventName =
   | 'Transfer'
@@ -23,7 +25,12 @@ export type EventName =
   | 'MarketTokenPriceChanged'
   | 'JumpInBridge'
   | 'JumpOutBridge'
-  | 'Purchased';
+  | 'Purchased'
+  | 'Staked'
+  | 'Unstaked'
+  | 'BatchPublished'
+  | 'RewardClaimed'
+  | 'BatchClosed';
 
 export type ChainEventStatus =
   | 'ingested'
@@ -102,6 +109,10 @@ export type IndexerConfig = {
   pollIntervalMs: number;
   projectBatchSize: number;
   presaleAddress?: string;
+  ukiStakingAddress?: string;
+  rewardsDistributorAddress?: string;
+  ukiStakingStartBlock?: number;
+  rewardsDistributorStartBlock?: number;
   contractAliases?: ContractAlias[];
 };
 

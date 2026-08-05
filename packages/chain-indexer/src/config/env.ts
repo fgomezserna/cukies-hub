@@ -2,9 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import dotenv from 'dotenv';
+import { isAddress } from 'viem';
 import { z } from 'zod';
 
 import type { ChainName, ContractAlias, IndexerConfig, LegacyImportConfig } from '../types.js';
+
+const optionalBlockSchema = z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.coerce.number().int().min(1).optional(),
+);
 
 function findWorkspaceRoot(startDir: string) {
   let current = startDir;
@@ -53,6 +59,12 @@ const envSchema = z.object({
   ).default(56),
   CHAIN_INDEXER_PRESALE_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_UKI_STAKING_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_TRON_API_BASE_URL: z.string().default('https://api.trongrid.io/v1'),
   CUKIES_DATABASE_URL: z.string().optional(),
   TRON_API_KEY: z.string().optional(),
@@ -94,10 +106,28 @@ function parseContractAliases(value?: string): ContractAlias[] | undefined {
       item === 'BREEDING_POINTS' ||
       item === 'MARKETPLACE' ||
       item === 'BRIDGE' ||
-      item === 'PRESALE',
+      item === 'PRESALE' ||
+      item === 'UKI_STAKING' ||
+      item === 'REWARDS_DISTRIBUTOR',
   );
 
   return valid.length > 0 ? valid : undefined;
+}
+
+function resolveOptionalBscAddress(
+  value: string | undefined,
+  alias: 'UKI_STAKING' | 'REWARDS_DISTRIBUTOR',
+  requested: boolean,
+) {
+  const address = value?.trim();
+  if (!address) {
+    if (requested) throw new Error(`${alias} fue solicitado sin una address BSC configurada.`);
+    return undefined;
+  }
+  if (!isAddress(address) || /^0x0{40}$/i.test(address)) {
+    throw new Error(`${alias} no tiene una address BSC no nula valida.`);
+  }
+  return address;
 }
 
 function parseRpcUrls(...values: Array<string | undefined>) {
@@ -146,6 +176,20 @@ export function getIndexerConfig(): IndexerConfig {
   const chains = parseChains(env.CHAIN_INDEXER_CHAINS);
   const contractAliases = parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES);
   const presaleAddress = env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS;
+  const ukiStakingRequested = contractAliases?.includes('UKI_STAKING') ?? false;
+  const rewardsDistributorRequested =
+    contractAliases?.includes('REWARDS_DISTRIBUTOR') ?? false;
+  const ukiStakingAddress = resolveOptionalBscAddress(
+    env.CHAIN_INDEXER_UKI_STAKING_ADDRESS ?? env.NEXT_PUBLIC_UKI_STAKING_ADDRESS,
+    'UKI_STAKING',
+    ukiStakingRequested,
+  );
+  const rewardsDistributorAddress = resolveOptionalBscAddress(
+    env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS
+      ?? env.NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS,
+    'REWARDS_DISTRIBUTOR',
+    rewardsDistributorRequested,
+  );
   const bscExpectedChainId = env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID as 56 | 97;
   const bscRpcUrls = resolveBscRpcUrls({
     expectedChainId: bscExpectedChainId,
@@ -156,6 +200,23 @@ export function getIndexerConfig(): IndexerConfig {
 
   if (contractAliases?.includes('PRESALE') && !presaleAddress) {
     throw new Error('Falta CHAIN_INDEXER_PRESALE_ADDRESS o NEXT_PUBLIC_UKI_PRESALE_ADDRESS para indexar la preventa.');
+  }
+
+  for (const [alias, requested, startBlock] of [
+    ['UKI_STAKING', ukiStakingRequested, env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK],
+    [
+      'REWARDS_DISTRIBUTOR',
+      rewardsDistributorRequested,
+      env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK,
+    ],
+  ] as const) {
+    if (requested && startBlock === undefined) {
+      throw new Error(`${alias} requiere un bloque de despliegue/inicio explicito.`);
+    }
+  }
+
+  if ((ukiStakingRequested || rewardsDistributorRequested) && !chains.includes('BSC')) {
+    throw new Error('Los contratos UKI de staking/rewards solo se pueden indexar con BSC habilitada.');
   }
 
   return {
@@ -177,6 +238,10 @@ export function getIndexerConfig(): IndexerConfig {
     pollIntervalMs: env.CHAIN_INDEXER_POLL_INTERVAL_MS,
     projectBatchSize: env.CHAIN_INDEXER_PROJECT_BATCH_SIZE,
     presaleAddress,
+    ukiStakingAddress,
+    rewardsDistributorAddress,
+    ukiStakingStartBlock: env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK,
+    rewardsDistributorStartBlock: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK,
   };
 }
 

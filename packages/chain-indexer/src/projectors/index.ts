@@ -1,4 +1,5 @@
 import { formatUnits } from 'viem';
+import type { ClientSession } from 'mongodb';
 
 import { monitoredContractAddresses } from '../config/contracts.js';
 import type { ChainEvent, JsonValue } from '../types.js';
@@ -7,6 +8,61 @@ import type { IndexerStore } from '../storage/index.js';
 
 function collection(store: IndexerStore, name: string) {
   return store.db.collection<any>(name);
+}
+
+function isMongoDuplicateKey(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 11000);
+}
+
+type MonotonicTuple = { blockNumber: number; logIndex: number };
+type MonotonicCollection = {
+  updateOne(
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<{ matchedCount: number }>;
+  insertOne(document: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+};
+
+function monotonicTupleFilter(id: string, tuple: MonotonicTuple) {
+  return {
+    _id: id,
+    $or: [
+      { lastBlockNumber: { $exists: false } },
+      { lastBlockNumber: { $lt: tuple.blockNumber } },
+      { lastBlockNumber: tuple.blockNumber, lastLogIndex: { $lte: tuple.logIndex } },
+    ],
+  };
+}
+
+export async function monotonicAbsoluteUpdate(
+  target: MonotonicCollection,
+  id: string,
+  tuple: MonotonicTuple,
+  values: Record<string, unknown>,
+  createdAt: Date,
+  session?: ClientSession,
+) {
+  const set = {
+    ...values,
+    lastBlockNumber: tuple.blockNumber,
+    lastLogIndex: tuple.logIndex,
+  };
+  const updateExisting = () => target.updateOne(
+    monotonicTupleFilter(id, tuple),
+    { $set: set },
+    { upsert: false, session },
+  );
+  const updated = await updateExisting();
+  if (updated.matchedCount > 0) return true;
+
+  try {
+    await target.insertOne({ _id: id, ...set, createdAt }, { session });
+    return true;
+  } catch (error) {
+    if (!isMongoDuplicateKey(error)) throw error;
+    return (await updateExisting()).matchedCount > 0;
+  }
 }
 
 function field(event: ChainEvent, key: string) {
@@ -814,6 +870,183 @@ async function projectPresalePurchase(store: IndexerStore, event: ChainEvent) {
   return null;
 }
 
+export async function projectUkiStakingPosition(
+  store: IndexerStore,
+  event: ChainEvent,
+  session?: ClientSession,
+) {
+  const account = stringField(event, 'account');
+  const accountNormalized = stringField(event, 'accountNormalized');
+  const amountRaw = stringField(event, 'amountRaw');
+  const accountBalanceRaw = stringField(event, 'accountBalanceRaw');
+  const totalStakedRaw = stringField(event, 'totalStakedRaw');
+
+  if (!account || !accountNormalized) return `${event.eventName} sin account`;
+  if (
+    !amountRaw
+    || !accountBalanceRaw
+    || !totalStakedRaw
+    || ![amountRaw, accountBalanceRaw, totalStakedRaw].every((value) => /^\d+$/.test(value))
+  ) {
+    return `${event.eventName} con montos raw invalidos`;
+  }
+
+  const observedAt = eventDate(event);
+  const tuple = { blockNumber: event.blockNumber, logIndex: event.logIndex };
+  await monotonicAbsoluteUpdate(
+    collection(store, 'uki_staking_positions'),
+    accountNormalized,
+    tuple,
+    {
+      walletAddress: account,
+      walletNormalized: accountNormalized,
+      accountBalanceRaw,
+      lastAmountRaw: amountRaw,
+      lastEventName: event.eventName,
+      lastEventId: event._id,
+      lastTxHash: event.txHash,
+      observedAt,
+      updatedAt: observedAt,
+    },
+    observedAt,
+    session,
+  );
+
+  await monotonicAbsoluteUpdate(
+    collection(store, 'uki_staking_state'),
+    event.contractAddress.toLowerCase(),
+    tuple,
+    {
+      chain: event.chain,
+      contractAddress: event.contractAddress,
+      contractAddressNormalized: event.contractAddress.toLowerCase(),
+      totalStakedRaw,
+      lastEventName: event.eventName,
+      lastEventId: event._id,
+      lastTxHash: event.txHash,
+      observedAt,
+      updatedAt: observedAt,
+    },
+    observedAt,
+    session,
+  );
+
+  return null;
+}
+
+function canonicalBytes32(event: ChainEvent, key: string) {
+  const value = stringField(event, key)?.toLowerCase();
+  return value && /^0x[0-9a-f]{64}$/.test(value) ? value : null;
+}
+
+export async function projectRewardsDistributorEvent(store: IndexerStore, event: ChainEvent) {
+  const batchId = canonicalBytes32(event, 'batchId');
+  if (!batchId) return `${event.eventName} sin batchId valido`;
+  const observedAt = eventDate(event);
+
+  if (event.eventName === 'BatchPublished') {
+    const immutable = {
+      merkleRoot: canonicalBytes32(event, 'merkleRoot'),
+      inputHash: canonicalBytes32(event, 'inputHash'),
+      metadataHash: canonicalBytes32(event, 'metadataHash'),
+      totalAllocatedRaw: stringField(event, 'totalAllocatedRaw'),
+      startsAtRaw: stringField(event, 'startsAtRaw'),
+      expiresAtRaw: stringField(event, 'expiresAtRaw'),
+    };
+    if (
+      !immutable.merkleRoot
+      || !immutable.inputHash
+      || !immutable.metadataHash
+      || ![immutable.totalAllocatedRaw, immutable.startsAtRaw, immutable.expiresAtRaw]
+        .every((value) => value && /^\d+$/.test(value))
+    ) return 'BatchPublished con campos invalidos';
+
+    const existing = await collection(store, 'reward_claim_batches').findOne({ batchId });
+    if (existing && Object.entries(immutable).some(([key, value]) => existing[key] !== value)) {
+      throw new Error(`BatchPublished ${batchId} contradice el lote ya indexado.`);
+    }
+    await collection(store, 'reward_claim_batches').updateOne(
+      { batchId },
+      {
+        $setOnInsert: {
+          _id: batchId,
+          batchId,
+          chain: event.chain,
+          contractAddress: event.contractAddress,
+          ...immutable,
+          status: 'published',
+          publicationEventId: event._id,
+          publicationTransactionHash: event.txHash,
+          publicationBlockNumber: event.blockNumber,
+          publishedAt: observedAt,
+          createdAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+    return null;
+  }
+
+  if (event.eventName === 'RewardClaimed') {
+    const account = stringField(event, 'account');
+    const accountNormalized = stringField(event, 'accountNormalized');
+    const amountRaw = stringField(event, 'amountRaw');
+    if (!account || !accountNormalized || !amountRaw || !/^\d+$/.test(amountRaw)) {
+      return 'RewardClaimed con campos invalidos';
+    }
+    if (!await collection(store, 'reward_claim_batches').findOne({ batchId })) {
+      throw new Error(`RewardClaimed ${batchId} no tiene BatchPublished proyectado.`);
+    }
+    await collection(store, 'reward_claims').updateOne(
+      { _id: event._id },
+      {
+        $setOnInsert: {
+          _id: event._id,
+          eventId: event._id,
+          batchId,
+          walletAddress: account,
+          walletNormalized: accountNormalized,
+          amountRaw,
+          transactionHash: event.txHash,
+          logIndex: event.logIndex,
+          blockNumber: event.blockNumber,
+          claimedAt: observedAt,
+          createdAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+    return null;
+  }
+
+  if (event.eventName === 'BatchClosed') {
+    const unclaimedAmountRaw = stringField(event, 'unclaimedAmountRaw');
+    if (!unclaimedAmountRaw || !/^\d+$/.test(unclaimedAmountRaw)) {
+      return 'BatchClosed sin unclaimedAmount valido';
+    }
+    const updated = await collection(store, 'reward_claim_batches').updateOne(
+      { batchId },
+      {
+        $set: {
+          status: 'closed',
+          unclaimedAmountRaw,
+          closeEventId: event._id,
+          closeTransactionHash: event.txHash,
+          closeBlockNumber: event.blockNumber,
+          closedAt: observedAt,
+          updatedAt: now(),
+        },
+      },
+    );
+    if (updated.matchedCount === 0) {
+      throw new Error(`BatchClosed ${batchId} no tiene BatchPublished proyectado.`);
+    }
+    return null;
+  }
+
+  return `Evento RewardsDistributor no soportado: ${event.eventName}`;
+}
+
 export async function projectEvent(store: IndexerStore, event: ChainEvent) {
   if (event.eventName === 'Transfer') return projectTransfer(store, event);
 
@@ -844,6 +1077,18 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'Purchased') {
     return projectPresalePurchase(store, event);
+  }
+
+  if (event.eventName === 'Staked' || event.eventName === 'Unstaked') {
+    return projectUkiStakingPosition(store, event);
+  }
+
+  if (
+    event.eventName === 'BatchPublished'
+    || event.eventName === 'RewardClaimed'
+    || event.eventName === 'BatchClosed'
+  ) {
+    return projectRewardsDistributorEvent(store, event);
   }
 
   return `Evento sin projector: ${event.eventName}`;

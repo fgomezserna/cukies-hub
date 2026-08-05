@@ -161,6 +161,8 @@ export async function ingestBscOnce(
   const safeBlock = Math.max(0, latestBlock - config.bscConfirmations);
   const contractEvents = getContractEventConfigs(['BSC'], {
     presaleAddress: config.presaleAddress,
+    ukiStakingAddress: config.ukiStakingAddress,
+    rewardsDistributorAddress: config.rewardsDistributorAddress,
     contractAliases: config.contractAliases,
   });
   const timestampCache = new Map<number, number>();
@@ -174,8 +176,15 @@ export async function ingestBscOnce(
       Number(cursor?.processedFromBlock) >= 0 &&
       Number.isSafeInteger(cursor?.processedFromTimestampMs) &&
       Number(cursor?.processedFromTimestampMs) >= 0;
-    const fromBlock =
-      cursor?.nextBlock ?? (config.bscStartBlock > 0 ? config.bscStartBlock : safeBlock);
+    const configuredStartBlock = contractEvent.contractAlias === 'UKI_STAKING'
+      ? config.ukiStakingStartBlock
+      : contractEvent.contractAlias === 'REWARDS_DISTRIBUTOR'
+        ? config.rewardsDistributorStartBlock
+        : config.bscStartBlock;
+    const fromBlock = cursor?.nextBlock
+      ?? (configuredStartBlock !== undefined && configuredStartBlock > 0
+        ? configuredStartBlock
+        : safeBlock);
 
     if (fromBlock > safeBlock) {
       const processedThroughTimestampMs = await getBlockTimestampMs({
