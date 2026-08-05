@@ -1,6 +1,13 @@
 #!/bin/sh
 set -eu
 
+if [ "${STAGING_ONLY_GUARD:-}" != "true" ]; then
+  echo "STAGING-ONLY guard is mandatory for this deployment branch"
+  exit 1
+fi
+
+node scripts/assert-staging-only.mjs --scope "${CUKIES_SERVICE:-dapp}"
+
 case "${CUKIES_SERVICE:-dapp}" in
   dapp)
     exec pnpm --filter dapp exec next start --hostname 0.0.0.0 -p "${PORT:-3000}"
