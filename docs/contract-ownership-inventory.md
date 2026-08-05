@@ -1,7 +1,7 @@
 # Contract ownership inventory
 
 Estado: inventario operativo de seguridad.
-Ultima comprobacion on-chain: 2026-06-04.
+Ultima comprobacion on-chain: 2026-08-05.
 
 Este documento registra las direcciones de contratos conocidas y los owners/admins observados. Si una direccion marcada como critica aparece todavia como owner/admin, debe tratarse como riesgo activo hasta completar rotacion a una wallet limpia o multisig.
 
@@ -44,10 +44,12 @@ Comprobacion: RPC publico de BSC testnet.
 | Alias | Contract / wallet address | Owner/admin observado | Nota |
 | --- | --- | --- | --- |
 | `ASM_TESTNET` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` | No expone `owner()` en la comprobacion usada | Token ASM testnet / `tASM`. |
-| `UKI_TOKEN` | `0x90f87D01984A336eD1AaF8fFcdA7BcDaF839ae36` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`. |
-| `VESTING_VAULT` | `0xA22AF68c7AF2e13C9d7217fDA705132080e91Ba5` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `DEFAULT_ADMIN_ROLE`. |
-| `PRESALE` | `0x24aC03c96649C7fb8DDF4E92fB9aB072592f2ED0` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`. |
+| `UKI_TOKEN` | `0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`; token testnet reutilizado. |
+| `VESTING_VAULT` | `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `DEFAULT_ADMIN_ROLE`; desplegado en bloque `123291890`. |
+| `PRESALE` | `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`; desplegado en bloque `123291898`. |
 | `PRESALE_TREASURY` | `0x19907a00abf02975fb60d616c99565894c08d859` | N/A | `Presale.treasury()`. |
+
+El escenario activo abre del `2026-08-05T10:59:20Z` al `2026-09-04T10:59:20Z`, usa `100 UKI/ASM`, compra minima de `5 ASM`, cap de `250,000,000 UKI` y vesting lineal de 9 meses. El vault quedo financiado con el cap completo y la unica cuenta con `PRESALE_VESTING_ROLE` es el contrato `Presale` anterior.
 
 ## ASM BSC mainnet
 

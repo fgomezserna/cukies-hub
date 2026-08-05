@@ -18,7 +18,7 @@ pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts deploy:testnet:operational
 pnpm --filter @cukies/contracts deploy:mainnet:operational
 pnpm --filter @cukies/contracts handover:mainnet:safe
-pnpm --filter @cukies/contracts preflight:presale -- --network bscTestnet
+pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
 pnpm --filter @cukies/contracts export:abi
 pnpm --filter @cukies/contracts freeze:manifest
 ```
@@ -242,7 +242,7 @@ TOTAL_UKI_FOR_SALE=... \
 SALE_ENABLED=false \
 VESTING_CONFIG_FROZEN=false \
 DEPLOYER_ADDRESS=0x... \
-pnpm --filter @cukies/contracts preflight:presale -- --network bscTestnet
+pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
 ```
 
 The preflight fails unless:
@@ -256,7 +256,8 @@ The preflight fails unless:
 - `Presale` and `UKIToken` are not paused,
 - `Presale` points to the expected vault,
 - `Presale` has `PRESALE_VESTING_ROLE` and is the only holder of that role,
-- deployer has no owner/admin/manager powers when `DEPLOYER_ADDRESS` is provided,
+- en BSC mainnet, el deployer no conserva ownership ni permisos admin/manager cuando se proporciona `DEPLOYER_ADDRESS`,
+- en BSC testnet el deployer puede conservar ownership/admin para operar el ensayo, pero no puede tener `PRESALE_VESTING_ROLE` ni `ALLOCATION_MANAGER_ROLE`,
 - `DEFAULT_ADMIN_ROLE`, `PRESALE_VESTING_ROLE` and `ALLOCATION_MANAGER_ROLE` holder sets exactly match the approved matrix,
 - vault unallocated UKI covers `totalUkiForSale`,
 - `VestingVault.unallocatedWithdrawalUnlockTime()` equals `SALE_END`,
