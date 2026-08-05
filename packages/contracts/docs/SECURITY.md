@@ -11,7 +11,7 @@ pnpm --filter @cukies/contracts compile
 pnpm --filter @cukies/contracts test
 pnpm --filter @cukies/contracts coverage
 pnpm --filter @cukies/contracts security:slither
-pnpm --filter @cukies/contracts preflight:presale -- --network bscTestnet
+pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
 ```
 
 ## Static analysis

@@ -1,57 +1,35 @@
 # UKI deployment environments
 
-Estado: decision operativa inicial.
+Estado: topologia activa y checklist operativo.
 Issue: #166 `UKI-090.4`.
-Fecha: 2026-05-13.
+Fecha de ultima comprobacion: 2026-08-05.
 
 ## Decision
 
-Usamos dos carriles permanentes:
+Usamos dos carriles separados:
 
-- `main` -> staging.
-- `production` -> produccion.
+- `staging` -> staging/integracion sobre BSC Testnet y bases staging.
+- `main` -> live actual sobre `cukies.world`.
 
-Produccion no debe seguir automaticamente a `main`. El paso a produccion se hace mediante release aprobada, con PR o merge controlado hacia `production` y tag versionado.
+Los cambios se validan primero en `staging`. El paso a `main` requiere una promocion controlada y no debe arrastrar variables, contratos ni datos de testnet.
 
 La estrategia de tags recomendada es:
 
 - `staging-YYYYMMDD.N` para candidatos validados en staging si hace falta fijar un punto.
 - `prod-YYYYMMDD.N` para lo que se publica en produccion.
 
-Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `main` sigue avanzando mientras una release se estabiliza.
+Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `staging` sigue avanzando mientras una release se estabiliza.
 
 ## Estado actual observado
 
-- Existe `main`.
-- Existe rama remota `production`, creada desde `origin/main` el 2026-05-13.
-- `production` tiene proteccion de rama en GitHub:
-  - PR obligatorio,
-  - una aprobacion requerida,
-  - conversaciones resueltas,
-  - admins incluidos,
-  - force push y borrado deshabilitados.
-- La dapp tiene `dapp/apphosting.yaml`, pero el hosting activo observado es Coolify.
-- Coolify tiene una app live/integracion para `game-hub`:
-  - `applicationId`: `12`.
-  - `uuid`: `jookw8ow8woks088s44404ok`.
-  - `resourceName`/`serviceName`: `game-hub`.
-  - `project`: `cukies.world`.
-  - `environmentName`: `production` en Coolify, aunque logicamente opera como staging/integracion.
-  - rama configurada: `main`.
-  - dominio: `cukieshub.eurekand.com`.
-  - autodespliegue: activado para seguir `main`.
-- Coolify tiene una app placeholder de produccion para `game-hub`:
-  - `uuid`: `u4s804o4wwcckowgk0woo4wg`.
-  - `name`: `game-hub-production`.
-  - rama configurada: `production`.
-  - dominio publico: ninguno todavia.
-  - autodespliegue: desactivado.
-- `cukies.world` esta actualmente ocupado por la app `cukiesworld-web` (`x8s8g8o04kwg0csg8w4ww8sg`) en rama `main`.
+- Staging/integracion: Coolify app `game-hub-staging`, application ID `28`, UUID `u4s804o4wwcckowgk0woo4wg`, rama `staging`, URL `https://cukieshub.eurekand.com`.
+- Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
+- Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
+- Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
+- Staging usa `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging` sobre Mongo replica set `rs0`.
+- Produccion conserva BSC mainnet y sus bases de produccion; no se han reapuntado durante esta separacion.
 - La VM Coolify/Traefik observada es `1001` (`192.168.1.201`) y publica Traefik en `80/443`.
 - Cloudflare Tunnel ya tiene ruta para `cukieshub.eurekand.com` hacia `https://192.168.1.201:443`.
-- No se ha modificado Cloudflare para publicar `game-hub-production` en `cukies.world`.
-- No se ha observado `.github/workflows`, `vercel.json`, `netlify.toml` ni configuracion de produccion en repo.
-- `dapp/.next-dev/` aparece como archivo local no trackeado y no forma parte de este trabajo.
 
 ## Topologia objetivo
 
@@ -59,19 +37,19 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `mai
 | --- | --- | --- | --- | --- | --- |
 | Local | Cualquier rama local | Maquina local | Hardhat/local o testnet puntual | Dev/local | Implementacion rapida. |
 | Preview PR | Branch del PR | Coolify preview si se habilita | Sin valor real | Datos aislados o mocks | Revision visual/tecnica. |
-| Staging | `main` o `release/staging-*` | Coolify app/env staging | BSC testnet | DB staging | QA integrada. |
-| Production | `production` + tag `prod-*` | Coolify app/env production | BSC mainnet | DB production | Usuarios reales. |
+| Staging | `staging` | Coolify `game-hub-staging` | BSC testnet | DB staging | QA integrada. |
+| Production | `main` + tag `prod-*` | Coolify `game-hub` | BSC mainnet | DB production | Usuarios reales. |
 
 ## Reglas de ramas
 
 | Rama | Regla |
 | --- | --- |
 | `codex/issue-<numero>-<slug>` | Trabajo aislado por issue. PR draft hasta validar. |
-| `main` | Integracion. Debe poder desplegarse a staging. No publica a produccion. |
-| `release/staging-YYYY-MM-DD` | Congela un candidato cuando `main` necesita seguir avanzando. |
-| `production` | Rama protegida. Solo recibe release aprobada. |
+| `staging` | Integracion. Debe ser segura para testnet y datos staging. |
+| `main` | Live actual. Solo recibe cambios promovidos tras QA. |
+| `release/staging-YYYY-MM-DD` | Congela un candidato cuando `staging` necesita seguir avanzando. |
 
-Protecciones recomendadas para `production`:
+Protecciones recomendadas para `main`:
 
 - bloquear pushes directos,
 - requerir PR,
@@ -80,40 +58,36 @@ Protecciones recomendadas para `production`:
 - requerir comentario de go/no-go en la release,
 - restringir quien puede hacer merge.
 
-Protecciones recomendadas para `main`:
+Protecciones recomendadas para `staging`:
 
 - PR obligatorio,
 - checks de area cuando existan,
 - permitir PRs draft para trabajo en curso,
-- no exigir que todo este listo para produccion, solo que sea staging-safe.
+- no exigir que todo este listo para produccion, solo que sea seguro para staging.
 
 ## Flujo de promocion
 
 1. Issue hoja -> rama `codex/issue-*`.
 2. PR draft -> validacion tecnica.
-3. PR ready -> merge a `main`.
-4. `main` -> deploy a staging.
+3. PR ready -> merge a `staging`.
+4. `staging` -> deploy a staging.
 5. Staging QA -> evidencia en issue/release candidate.
 6. Release candidate -> go/no-go.
-7. Merge controlado a `production` o tag `prod-*`.
+7. Merge controlado de `staging` a `main` y tag `prod-*`.
 8. Deploy production.
 9. Validacion post-deploy.
 10. Cierre de issues que realmente quedaron publicadas o cumplidas.
 
 ## Configuracion Coolify
 
-El proveedor activo observado es Coolify. La app que sirve `cukieshub.eurekand.com` debe seguir `main`. La app de produccion real queda preparada como placeholder sobre `production`, sin dominio publico ni autodespliegue hasta go/no-go.
+El proveedor activo observado es Coolify. `cukieshub.eurekand.com` sigue `staging`; `cukies.world` sigue `main`.
 
 Trabajo pendiente en Coolify:
 
-- separar secrets/env vars por entorno,
-- cargar `DATABASE_URL` staging y secrets OAuth/Pusher/Resend/Telegram separados,
-- cargar `CUKIES_DATABASE_URL` staging contra la replica legacy sanitizada,
-- ejecutar o verificar deploy de `cukieshub.eurekand.com` desde `main`,
-- antes de go-live, asignar `cukies.world` a `game-hub-production` y retirar o reemplazar la app actual `cukiesworld-web`,
-- no modificar Cloudflare para `cukies.world` hasta aprobacion de publicacion,
-- documentar rollback concreto desde Coolify tras el primer deploy,
-- confirmar si los juegos tienen hosting separado o se sirven desde la dapp.
+- completar usuarios/credenciales Mongo limitados a las tres bases staging antes de QA externa,
+- separar OAuth, Pusher, Resend y Telegram,
+- desplegar los contratos de economia pendientes y mantener schedulers desactivados hasta completar sus gates,
+- documentar rollback por commit y por variables para cada promocion a `main`.
 
 Nada de esto debe usar secrets en el repo.
 
@@ -121,16 +95,15 @@ Nada de esto debe usar secrets en el repo.
 
 | Entorno | Coolify project | Coolify environment | Branch | Dominio |
 | --- | --- | --- | --- | --- |
-| Staging/integracion | `cukies.world` | `production` en Coolify | `main` | `cukieshub.eurekand.com` |
-| Production placeholder | `cukies.world` | `production` | `production` | sin dominio hasta go-live |
-| Production final | `cukies.world` | `production` | `production` | `cukies.world` |
+| Staging/integracion | `cukies.world` | `production` en Coolify | `staging` | `cukieshub.eurekand.com` |
+| Production/live | `cukies.world` | `production` en Coolify | `main` | `cukies.world` |
 
 Reglas operativas:
 
 - staging debe tener `NEXTAUTH_URL` y callbacks OAuth propios,
 - staging debe usar base de datos y secrets separados,
-- production no debe autodesplegar commits de `main`,
-- `cukies.world` no debe reasignarse al hub hasta aprobacion de publicacion,
+- `main` solo debe recibir merges promovidos tras QA y go/no-go,
+- `cukies.world` no debe recibir variables ni contratos de staging,
 - los nombres de routers Traefik deben ser unicos por entorno,
 - ambos servicios deben vivir en la red Docker externa `coolify`.
 
@@ -196,19 +169,38 @@ Reglas operativas:
 
 Antes de considerar staging valido:
 
-- deploy de staging apunta a `main` o release candidate acordada,
+- deploy de staging apunta a `staging` o a una release candidate acordada,
 - env staging no comparte DB ni secrets con produccion,
 - `NEXT_PUBLIC_UKI_CHAIN_ID=97` si hay flujo on-chain,
 - contratos testnet y direcciones documentadas si la pantalla los usa,
 - smoke test de rutas criticas documentado,
 - fallos de lint/typecheck/test documentados si son preexistentes.
 
+### Checklist posterior a la separacion
+
+- [x] Integrar el guardarrail de RPC/chain id de BSC Testnet en `staging` (PR #188, merge `290cc643`).
+- [x] Reapuntar el recurso Coolify staging a la rama `staging`.
+- [x] Separar las tres bases staging y habilitar transacciones mediante Mongo replica set `rs0`.
+- [x] Desplegar y financiar un nuevo `VestingVault` y `Presale` en BSC Testnet.
+- [x] Ejecutar una compra on-chain smoke de `5 tASM -> 500 UKI` y validar pago, venta y vesting.
+- [ ] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
+- [ ] Crear usuarios Mongo con minimo privilegio y habilitar `security.authorization` tras validar los consumidores legacy.
+- [ ] Desplegar/verificar `UKIStaking` y `RewardsDistributor` en BSC Testnet.
+- [ ] Configurar HMAC exclusivos de staging y ejecutar el setup de economia v2.
+- [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
+- [ ] Desplegar los cinco schedulers con gates desactivados; activarlos uno a uno tras validar heartbeats, leases e idempotencia.
+- [ ] Dar al card worker un bucket/prefijo staging propio o retirarlo del compose de staging.
+- [ ] Separar OAuth, Pusher, Resend y Telegram antes de QA externa.
+- [ ] Completar smoke E2E con una segunda wallet desde la UI y conservar evidencia de APIs, Mongo e indexer.
+
+Tras el escenario de preventa, el siguiente bloque recomendado es `UKIStaking` + `RewardsDistributor`, seguido del setup transaccional de economia v2. Los schedulers deben quedarse cerrados hasta que contratos, reglas y secretos internos esten verificados.
+
 ## Gates para produccion
 
 Antes de publicar produccion:
 
 - release candidate validada en staging,
-- PR/merge hacia `production` aprobado,
+- PR/merge de promocion hacia `main` aprobado,
 - tag `prod-*` creado,
 - env production revisado por ops,
 - contratos mainnet congelados y verificados si la release toca on-chain,
@@ -221,7 +213,7 @@ Antes de publicar produccion:
 Rollback de app:
 
 1. identificar tag/commit estable anterior,
-2. redeploy desde `production` anterior o tag anterior,
+2. redeploy desde el commit estable anterior de `main` o desde el tag anterior,
 3. validar health/smoke,
 4. comentar issue de release con hora, commit y motivo.
 
@@ -240,19 +232,6 @@ Contratos:
 4. reconciliar backend/indexer,
 5. no asumir que se puede hacer rollback on-chain.
 
-## Checklist de ejecucion para #166
-
-- [x] Crear rama remota `production` desde un commit aprobado.
-- [x] Proteger `production`.
-- [x] Configurar `cukieshub.eurekand.com` para seguir `main`.
-- [x] Crear placeholder production sobre rama `production` sin dominio publico.
-- [x] Confirmar que no se publica `cukies.world` todavia.
-- [x] Documentar refresh Mongo production -> staging con backup y sanitizacion.
-- [ ] Separar secrets/env vars.
-- [x] Documentar URLs finales de staging y produccion.
-- [ ] Documentar rollback concreto del proveedor.
-- [ ] Ejecutar dry-run de release en #168.
-
 ## Resultado esperado
 
-Despues de aplicar esta decision, el equipo puede seguir desarrollando en `main` y ramas de issue mientras produccion solo cambia por release aprobada. Staging se convierte en el punto de integracion real y deja de ser una idea informal.
+El equipo integra en `staging`, valida contra BSC Testnet y bases aisladas, y solo promociona a `main` mediante una release aprobada. Produccion no comparte contratos, datos ni secretos con staging.

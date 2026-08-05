@@ -132,7 +132,7 @@ async function main() {
   console.log(`   UKI_VESTING_VAULT_ADDRESS=${await vestingVault.getAddress()} \\`);
   console.log(`   SALE_OWNER_ADDRESS=${owner} \\`);
   console.log(`   SALE_TREASURY_ADDRESS=${treasury} \\`);
-  console.log(`   pnpm --filter @cukies/contracts preflight:presale -- --network ${hre.network.name}`);
+  console.log(`   pnpm --filter @cukies/contracts preflight:presale --network ${hre.network.name}`);
   console.log('8. Verify contracts with hardhat verify once constructor args are recorded.');
 }
 

@@ -179,9 +179,17 @@ async function main() {
   );
   if (deployerAddress) {
     const deployer = normalizeAddress(deployerAddress, 'DEPLOYER_ADDRESS');
-    record('deployer is not UKI owner', ukiOwner !== deployer, deployer);
-    record('deployer is not Presale owner', presaleOwner !== deployer, deployer);
-    record('deployer does not have DEFAULT_ADMIN_ROLE', !(await vault.hasRole(defaultAdminRole, deployer)), deployer);
+    if (hre.network.config.chainId === 56) {
+      record('deployer is not UKI owner', ukiOwner !== deployer, deployer);
+      record('deployer is not Presale owner', presaleOwner !== deployer, deployer);
+      record('deployer does not have DEFAULT_ADMIN_ROLE', !(await vault.hasRole(defaultAdminRole, deployer)), deployer);
+    } else {
+      record(
+        'deployer ownership cleanup is mainnet-only',
+        true,
+        `chain id ${hre.network.config.chainId}; testnet may retain deployer ownership for the rehearsal`,
+      );
+    }
     record('deployer does not have PRESALE_VESTING_ROLE', !(await vault.hasRole(presaleRole, deployer)), deployer);
     record('deployer does not have ALLOCATION_MANAGER_ROLE', !(await vault.hasRole(allocationRole, deployer)), deployer);
   }

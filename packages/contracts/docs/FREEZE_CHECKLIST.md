@@ -54,7 +54,7 @@ The final freeze PR must include:
 | Vault funding | `VestingVault` funded with at least `totalUkiForSale`. | Pending deploy. |
 | Presale role grant | `Presale` has `PRESALE_VESTING_ROLE`. | Pending deploy. |
 | Sale enable gate | `Presale.saleEnabled()` matches the intended phase: false before launch, true while open. | Pending deploy. |
-| Preflight | `pnpm --filter @cukies/contracts preflight:presale -- --network <target>` passes. | Pending deploy. |
+| Preflight | `pnpm --filter @cukies/contracts preflight:presale --network <target>` passes. | Pending deploy. |
 | Dapp config | `NEXT_PUBLIC_*` env values match deployed addresses. | Pending deploy. |
 | ABI versioning | ABI export committed and hash recorded in manifest. | Pending final deploy. |
 | External review | Audit or independent review complete. | Pending. |
