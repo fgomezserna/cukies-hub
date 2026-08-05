@@ -1,4 +1,45 @@
 services:
+  staging-mongo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: staging-mongo
+    environment:
+      APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
+      STAGING_ONLY_GUARD: ${STAGING_ONLY_GUARD:?Set STAGING_ONLY_GUARD=true for staging}
+      COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Set the exact staging Coolify resource UUID}
+      MONGO_INITDB_ROOT_USERNAME: ${STAGING_MONGO_ROOT_USERNAME:?Set the staging-only Mongo root username}
+      MONGO_INITDB_ROOT_PASSWORD: ${STAGING_MONGO_ROOT_PASSWORD:?Set the staging-only Mongo root password}
+      STAGING_MONGO_REPLICA_KEY: ${STAGING_MONGO_REPLICA_KEY:?Set the staging-only Mongo replica key}
+      STAGING_MONGO_SOURCE_HUB_URL: ${DATABASE_URL}
+      STAGING_MONGO_SOURCE_LEGACY_URL: ${CUKIES_DATABASE_URL}
+      STAGING_MONGO_SOURCE_ECONOMY_URL: ${CHAIN_INDEXER_MONGO_URL}
+      STAGING_MONGO_SOURCE_CARD_URL: ${CARD_WORKER_MONGO_URL}
+    volumes:
+      - staging-mongo-data:/data/db
+      - staging-mongo-config:/data/configdb
+    mem_limit: 2g
+    cpus: 1.5
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongo --quiet --host 127.0.0.1 --port 27017
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          cukies_staging_mongo_admin
+          --eval 'quit(db.isMaster().ismaster === true && db.bootstrap_state.countDocuments({_id:"logical-staging-v1"}) === 1 ? 0 : 1)'
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    networks:
+      coolify:
+        aliases:
+          - cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg
+
   dapp:
     build:
       context: .
@@ -352,3 +393,9 @@ services:
 networks:
   coolify:
     external: true
+
+volumes:
+  staging-mongo-data:
+    name: ${STAGING_MONGO_DATA_VOLUME:?Set the staging-only Mongo data volume name}
+  staging-mongo-config:
+    name: ${STAGING_MONGO_CONFIG_VOLUME:?Set the staging-only Mongo config volume name}
