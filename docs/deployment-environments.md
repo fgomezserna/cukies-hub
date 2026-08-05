@@ -28,7 +28,7 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
 - Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`). Ambos apuntan al UKI testnet existente.
 - El smoke `STAGING_SMOKE_C31176A_2026_08_05` movio temporalmente `1 UKI` por contrato y termino con staking, reservas y balance del distribuidor a cero. No representa una cifra de producto.
-- Staging usa `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging` sobre Mongo replica set `rs0`.
+- Staging usa las bases logicas `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging`. El cutover a la instancia fisica exclusiva `cukies-staging-rs0` se prepara en dos despliegues para no apuntar la aplicacion a una replica a medio inicializar.
 - Produccion conserva BSC mainnet y sus bases de produccion; no se han reapuntado durante esta separacion.
 - La VM Coolify/Traefik observada es `1001` (`192.168.1.201`) y publica Traefik en `80/443`.
 - Cloudflare Tunnel ya tiene ruta para `cukieshub.eurekand.com` hacia `https://192.168.1.201:443`.
@@ -86,9 +86,9 @@ El proveedor activo observado es Coolify. `cukieshub.eurekand.com` sigue `stagin
 
 Trabajo pendiente en Coolify:
 
-- completar usuarios/credenciales Mongo limitados a las tres bases staging antes de QA externa,
-- separar OAuth, Pusher, Resend y Telegram,
-- desplegar los contratos de economia pendientes y mantener schedulers desactivados hasta completar sus gates,
+- completar el cutover desde las bases logicas staging del host compartido a `cukies-staging-rs0`, sin leer ni escribir las bases live,
+- sustituir las integraciones externas deshabilitadas por credenciales realmente exclusivas cuando QA las necesite,
+- mantener los cinco schedulers desplegados pero desactivados hasta aprobar y cargar sus reglas,
 - documentar rollback por commit y por variables para cada promocion a `main`.
 
 Nada de esto debe usar secrets en el repo.
@@ -134,6 +134,21 @@ El schema de economia se inicializa de forma deliberada, no durante el arranque 
 5. mantener todos los schedulers desactivados hasta cargar reglas y probar leases/idempotencia.
 
 Ambos comandos vuelven a ejecutar el guard staging-only antes de crear indices, escribir el sentinel o abrir la transaccion de prueba.
+
+### Mongo fisico exclusivo de staging
+
+El servicio `staging-mongo` del compose crea un replica set de un solo nodo llamado `cukies-staging-rs0`, sin puerto publico y con volumenes exclusivos de la app Coolify `28`. Su entrypoint falla cerrado salvo que coincidan `APP_ENV=staging`, `STAGING_ONLY_GUARD=true` y el UUID `u4s804o4wwcckowgk0woo4wg`.
+
+El cutover se hace siempre en dos despliegues:
+
+1. desplegar `staging-mongo` manteniendo las cuatro URLs de aplicacion en el origen actual;
+2. el bootstrap valida que solo lee los tres namespaces `*-staging`, los copia a la replica exclusiva, conserva los cuatro usuarios limitados y escribe el marcador `logical-staging-v1`;
+3. verificar replica PRIMARY, conteos, indices, sentinel v2, usuarios/roles y transacciones;
+4. detener temporalmente solo los contenedores de la app `28` y ejecutar `cukies-staging-mongo-resync` dentro del nuevo Mongo para cerrar el delta con las tres fuentes staging ya quietas;
+5. cambiar solo las URLs de la app `28` al alias interno `cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg:27017`, con `replicaSet=cukies-staging-rs0`;
+6. redesplegar y repetir health, schema setup y comprobaciones de no escritura de los schedulers.
+
+No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap solo acepta como origen el host `192.168.1.221:27017`, los cuatro usuarios de staging conocidos y los tres nombres de base exactos; cualquier otra combinacion aborta el contenedor.
 
 ## Matriz de envs
 
@@ -233,21 +248,22 @@ Antes de considerar staging valido:
 - [x] Integrar el guardarrail de RPC/chain id de BSC Testnet en `staging` (PR #188, merge `290cc643`).
 - [x] Anadir preflight staging-only fail-closed para rama, recurso Coolify, chain, bases y URL de autenticacion antes de arrancar o ejecutar setups.
 - [x] Reapuntar el recurso Coolify staging a la rama `staging`.
-- [x] Separar las tres bases staging y habilitar transacciones mediante Mongo replica set `rs0`.
+- [x] Separar los tres namespaces y los cuatro usuarios staging sin reapuntar ninguna base live.
+- [ ] Completar el cutover de esos namespaces a la instancia fisica exclusiva `cukies-staging-rs0` y validar transacciones tras el cambio de URLs.
 - [x] Desplegar y financiar un nuevo `VestingVault` y `Presale` en BSC Testnet.
 - [x] Ejecutar una compra on-chain smoke de `5 tASM -> 500 UKI` y validar pago, venta y vesting.
 - [x] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
-- [ ] Crear usuarios Mongo con minimo privilegio y habilitar `security.authorization` tras validar los consumidores legacy.
+- [x] Crear cuatro usuarios Mongo staging con roles `readWrite` + `dbAdmin` limitados a su unica base.
 - [x] Desplegar `UKIStaking` y `RewardsDistributor`, configurar sus cinco cursores y proyectar un smoke completo en Mongo staging (PR #192, merge `c31176ab`).
 - [ ] Publicar el source de ambos contratos en BscScan cuando haya `ETHERSCAN_API_KEY`/`BSCSCAN_API_KEY`; el entorno actual no conserva ninguna.
-- [ ] Configurar HMAC exclusivos de staging y ejecutar el setup de economia v2.
+- [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
 - [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
-- [ ] Desplegar los cinco schedulers con gates desactivados; activarlos uno a uno tras validar heartbeats, leases e idempotencia.
+- [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`; sigue desactivado hasta disponer de S3 propio.
-- [ ] Separar OAuth, Pusher, Resend y Telegram antes de QA externa.
+- [x] Vaciar OAuth social, Pusher, Resend, Telegram e IFTTT en staging; quedan deshabilitados hasta tener destinos exclusivos.
 - [ ] Completar smoke E2E con una segunda wallet desde la UI y conservar evidencia de APIs, Mongo e indexer.
 
-El siguiente bloque recomendado es configurar HMAC exclusivos de staging y ejecutar el setup transaccional de economia v2. Despues deben cargarse reglas aprobadas y validarse APIs/leases antes de habilitar ningun scheduler.
+El siguiente bloque recomendado es completar el cutover al Mongo fisico exclusivo y repetir el setup transaccional. Despues se debe ejecutar el E2E con dos wallets y cargar solo las reglas numericas que producto haya aprobado; ningun scheduler se habilita antes.
 
 ## Gates para produccion
 

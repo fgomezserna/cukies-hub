@@ -1,3 +1,14 @@
+FROM mongo:4.4 AS staging-mongo
+
+COPY infrastructure/staging-mongo/entrypoint.sh /usr/local/bin/cukies-staging-mongo-entrypoint
+COPY infrastructure/staging-mongo/resync.sh /usr/local/bin/cukies-staging-mongo-resync
+
+RUN chmod 0755 \
+  /usr/local/bin/cukies-staging-mongo-entrypoint \
+  /usr/local/bin/cukies-staging-mongo-resync
+
+ENTRYPOINT ["/usr/local/bin/cukies-staging-mongo-entrypoint"]
+
 FROM node:22-bookworm-slim AS app
 
 ARG CUKIES_SERVICE=dapp
