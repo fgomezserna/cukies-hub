@@ -13,6 +13,7 @@
     "postinstall": "prisma generate",
     "init-chat-rooms": "node scripts/init-chat-rooms-with-env.mjs",
     "test": "jest",
+    "test:schedulers": "node --test scripts/*scheduler-policy.test.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
