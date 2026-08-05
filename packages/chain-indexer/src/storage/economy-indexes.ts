@@ -502,7 +502,6 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
       name: 'game_session_pending_settlement_census',
       partialFilterExpression: {
         'settlementIntent.decidedAt': { $type: 'date' },
-        settlementCommand: { $exists: false },
       },
     },
   },
