@@ -206,6 +206,17 @@ Ambos comandos vuelven a ejecutar el guard staging-only antes de crear indices, 
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK` | `123359171` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Gate de finalidad para las proyecciones UKI. |
 
+### Card worker en staging
+
+`cuki-card-worker` queda fuera del arranque por defecto mediante el profile Compose `card-worker`. Mientras staging no tenga bucket, prefijo, URL publica y credenciales S3 propios, no se debe definir `COMPOSE_PROFILES=card-worker` en la app 28. Esto elimina el bucle de reinicios causado por `CARD_WORKER_UPLOAD=false` sin fingir que el renderer/uploader esta operativo.
+
+Para habilitarlo en el futuro:
+
+1. crear destino S3 exclusivo de staging;
+2. configurar `CARD_WORKER_S3_*`, `CARD_WORKER_PUBLIC_BASE_URL` y credenciales limitadas a ese prefijo;
+3. validar `pnpm staging:cards:setup` y una generacion de prueba;
+4. definir `COMPOSE_PROFILES=card-worker` solo en la app 28 y redesplegar.
+
 ## Gates para staging
 
 Antes de considerar staging valido:
@@ -232,7 +243,7 @@ Antes de considerar staging valido:
 - [ ] Configurar HMAC exclusivos de staging y ejecutar el setup de economia v2.
 - [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
 - [ ] Desplegar los cinco schedulers con gates desactivados; activarlos uno a uno tras validar heartbeats, leases e idempotencia.
-- [ ] Dar al card worker un bucket/prefijo staging propio o retirarlo del compose de staging.
+- [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`; sigue desactivado hasta disponer de S3 propio.
 - [ ] Separar OAuth, Pusher, Resend y Telegram antes de QA externa.
 - [ ] Completar smoke E2E con una segunda wallet desde la UI y conservar evidencia de APIs, Mongo e indexer.
 
