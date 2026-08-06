@@ -14,6 +14,7 @@ export type ContractAlias =
 
 export type EventName =
   | 'Transfer'
+  | 'CukieMetadataConfigured'
   | 'Mint'
   | 'Burn'
   | 'Stake'
@@ -78,7 +79,12 @@ export type ChainCursor = {
   updatedAt: Date;
 };
 
-export type VerifiedBscContractAlias = 'UKI_STAKING' | 'VESTING_VAULT';
+export type VerifiedBscContractAlias =
+  | 'TOKEN'
+  | 'MARKETPLACE'
+  | 'BRIDGE'
+  | 'UKI_STAKING'
+  | 'VESTING_VAULT';
 
 export type VerifiedBscContractIdentity = {
   alias: VerifiedBscContractAlias;
@@ -133,10 +139,16 @@ export type IndexerConfig = {
   pollIntervalMs: number;
   projectBatchSize: number;
   presaleAddress?: string;
+  tokenAddress?: string;
+  marketplaceAddress?: string;
+  bridgeAddress?: string;
   ukiStakingAddress?: string;
   rewardsDistributorAddress?: string;
   vestingVaultAddress?: string;
   ukiStakingStartBlock?: number;
+  tokenStartBlock?: number;
+  marketplaceStartBlock?: number;
+  bridgeStartBlock?: number;
   rewardsDistributorStartBlock?: number;
   vestingVaultStartBlock?: number;
   verifiedBscContracts: Partial<

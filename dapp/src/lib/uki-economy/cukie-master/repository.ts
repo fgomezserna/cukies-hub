@@ -70,11 +70,19 @@ export type ExpectedIndexerContractConfig = {
   contractConfigHash: string;
 };
 
-const CUKIE_MASTER_NFT_ADDRESSES = {
+const CUKIE_MASTER_MAINNET_NFT_ADDRESSES = {
   TOKEN: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
   MARKETPLACE: '0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91',
   BRIDGE: '0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E',
 } as const;
+
+function expectedNftAddress(
+  alias: keyof typeof CUKIE_MASTER_MAINNET_NFT_ADDRESSES,
+  chainId: 56 | 97,
+) {
+  const configured = firstEnvironmentValue(`CHAIN_INDEXER_${alias}_ADDRESS`);
+  return configured ?? (chainId === 56 ? CUKIE_MASTER_MAINNET_NFT_ADDRESSES[alias] : undefined);
+}
 
 function environmentInteger(name: string) {
   const value = process.env[name]?.trim();
@@ -163,21 +171,21 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
   return {
     TOKEN: expectedContractConfig({
       chainId,
-      address: CUKIE_MASTER_NFT_ADDRESSES.TOKEN,
+      address: expectedNftAddress('TOKEN', chainId),
       startBlock: environmentInteger('CHAIN_INDEXER_TOKEN_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_TOKEN_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_TOKEN_RUNTIME_CODE_HASH'),
     }),
     MARKETPLACE: expectedContractConfig({
       chainId,
-      address: CUKIE_MASTER_NFT_ADDRESSES.MARKETPLACE,
+      address: expectedNftAddress('MARKETPLACE', chainId),
       startBlock: environmentInteger('CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_MARKETPLACE_RUNTIME_CODE_HASH'),
     }),
     BRIDGE: expectedContractConfig({
       chainId,
-      address: CUKIE_MASTER_NFT_ADDRESSES.BRIDGE,
+      address: expectedNftAddress('BRIDGE', chainId),
       startBlock: environmentInteger('CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_BRIDGE_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_BRIDGE_RUNTIME_CODE_HASH'),
@@ -376,6 +384,7 @@ export const EXPECTED_UKI_CURSOR_IDS = [
 
 export const EXPECTED_NFT_CURSOR_IDS = [
   'TOKEN:Transfer',
+  'TOKEN:CukieMetadataConfigured',
   'MARKETPLACE:TokenOnSale',
   'MARKETPLACE:TokenBought',
   'MARKETPLACE:MarketTokenSaleCancelled',

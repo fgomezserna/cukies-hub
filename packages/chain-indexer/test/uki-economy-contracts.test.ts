@@ -4,6 +4,7 @@ import test from 'node:test';
 import { getContractEventConfigs } from '../src/config/contracts.js';
 import { normalizeDomainEvent } from '../src/normalize.js';
 import {
+  projectEvent,
   projectRewardsDistributorEvent,
   projectUkiStakingPosition,
   projectUkiVestingPosition,
@@ -13,6 +14,9 @@ import type { ChainEvent } from '../src/types.js';
 const STAKING = `0x${'1'.repeat(40)}`;
 const REWARDS = `0x${'2'.repeat(40)}`;
 const VESTING = `0x${'3'.repeat(40)}`;
+const TOKEN = `0x${'4'.repeat(40)}`;
+const MARKETPLACE = `0x${'5'.repeat(40)}`;
+const BRIDGE = `0x${'6'.repeat(40)}`;
 const WALLET = `0x${'a'.repeat(40)}`;
 const BATCH_ID = `0x${'b'.repeat(64)}`;
 
@@ -182,6 +186,34 @@ test('registers staking, vesting and rewards only when their BSC addresses are e
   );
 });
 
+test('registers the explicit verified BSC NFT sources without mainnet address fallback', () => {
+  const configs = getContractEventConfigs(['BSC'], {
+    tokenAddress: TOKEN,
+    marketplaceAddress: MARKETPLACE,
+    bridgeAddress: BRIDGE,
+    contractAliases: ['TOKEN', 'MARKETPLACE', 'BRIDGE'],
+  });
+  assert.deepEqual(
+    configs.map(({ contractAlias, eventName, contractAddress }) => (
+      `${contractAlias}:${eventName}:${contractAddress.toLowerCase()}`
+    )),
+    [
+      `TOKEN:Transfer:${TOKEN}`,
+      `TOKEN:CukieMetadataConfigured:${TOKEN}`,
+      `MARKETPLACE:TokenOnSale:${MARKETPLACE}`,
+      `MARKETPLACE:TokenBought:${MARKETPLACE}`,
+      `MARKETPLACE:MarketTokenSaleCancelled:${MARKETPLACE}`,
+      `MARKETPLACE:MarketTokenPriceChanged:${MARKETPLACE}`,
+      `BRIDGE:JumpInBridge:${BRIDGE}`,
+      `BRIDGE:JumpOutBridge:${BRIDGE}`,
+    ],
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], { contractAliases: ['TOKEN'] }),
+    /TOKEN fue solicitado sin una address BSC configurada/,
+  );
+});
+
 test('normalizes all raw staking and rewards fields without lossy number conversion', () => {
   assert.deepEqual(
     normalizeDomainEvent('BSC', 'Staked', 'UKI_STAKING', {
@@ -232,6 +264,42 @@ test('normalizes all raw staking and rewards fields without lossy number convers
       txType: 'VestingCreated',
     },
   );
+});
+
+test('projects a verified BSC mint and its on-chain rarity metadata', async () => {
+  const context = fakeStore();
+  const mint = {
+    ...event('Transfer', normalizeDomainEvent('BSC', 'Transfer', 'TOKEN', {
+      from: `0x${'0'.repeat(40)}`,
+      to: WALLET,
+      tokenId: 97_000_001n,
+    }), 10),
+    contractAlias: 'TOKEN' as const,
+    contractAddress: TOKEN,
+  };
+  const metadata = {
+    ...event('CukieMetadataConfigured', normalizeDomainEvent(
+      'BSC',
+      'CukieMetadataConfigured',
+      'TOKEN',
+      { tokenId: 97_000_001n, rarity: 6, generation: 1 },
+    ), 10),
+    _id: 'BSC:test:CukieMetadataConfigured:10:1',
+    contractAlias: 'TOKEN' as const,
+    contractAddress: TOKEN,
+    logIndex: 1,
+  };
+
+  assert.equal(await projectEvent(context.store as never, mint), null);
+  assert.equal(await projectEvent(context.store as never, metadata), null);
+  const projected = context.collections.get('cukies')?.documents.get('97000001');
+  assert.equal(projected?.tokenId, '97000001');
+  assert.equal(projected?.ownerNormalized, WALLET.toLowerCase());
+  assert.equal(projected?.network, 'BSC');
+  assert.equal(projected?.state, 'available');
+  assert.equal(projected?.rarity, 6);
+  assert.equal(projected?.generation, 1);
+  assert.equal(projected?.metadataEventId, metadata._id);
 });
 
 test('staking projector keeps absolute latest balances and rejects stale overwrite', async () => {

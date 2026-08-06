@@ -21,6 +21,33 @@ function assetWithLocks(locks: Array<Record<string, unknown>>) {
 }
 
 describe('Cukie Master NFT entitlement', () => {
+  it('maps every launch rarity to 1/2/4/7/10/15 points and caps the route at 5 slots', () => {
+    const rarities = [
+      ['common', 1],
+      ['uncommon', 2],
+      ['rare', 4],
+      ['epic', 7],
+      ['legendary', 10],
+      ['goat', 15],
+    ] as const;
+    const assets = rarities.map(([rarity], index) => normalizeCukiesInventoryDocument({
+      _id: String(97_000_001 + index),
+      tokenId: String(97_000_001 + index),
+      owner,
+      ownerNormalized: owner.toLowerCase(),
+      network: 'BSC',
+      state: 'available',
+      rarity,
+      generation: 1,
+    }, [], now));
+    const summary = summarizeCukieMasterNftRoute({ walletAddress: owner, assets });
+
+    expect(summary.eligibleAssets.map((asset) => [asset.rarity, asset.rarityPoints]))
+      .toEqual(rarities);
+    expect(summary.originalCukiePoints).toBe(39);
+    expect(summary.slotPreview.nftSlots).toBe(5);
+  });
+
   it('keeps available NFTs in preview but excludes them from active entitlement', () => {
     const asset = assetWithLocks([]);
     expect(summarizeCukieMasterNftRoute({ walletAddress: owner, assets: [asset] }).originalCukiePoints)

@@ -215,7 +215,14 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 | Variable | Staging | Nota |
 | --- | --- | --- |
-| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,VESTING_VAULT,REWARDS_DISTRIBUTOR` | Activacion explicita de la ruta UKI; una address por si sola no habilita ingesta. No incluir aun los aliases NFT legacy en testnet. |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,VESTING_VAULT,REWARDS_DISTRIBUTOR` hasta desplegar la fuente NFT; despues anadir `TOKEN,MARKETPLACE,BRIDGE` juntos | Una address por si sola no habilita ingesta. Nunca usar las direcciones NFT legacy de mainnet en chain `97`. |
+| `CHAIN_INDEXER_TOKEN_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | `StagingCukiesNft` de chain `97`; sin fallback mainnet. |
+| `CHAIN_INDEXER_MARKETPLACE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos marketplace, sin custodia ni valor. |
+| `CHAIN_INDEXER_BRIDGE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos bridge, sin custodia ni valor. |
+| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_START_BSC_BLOCK` | Pendiente de los receipts | Debe ser el bloque exacto de despliegue de cada contrato. |
+| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_DEPLOYMENT_BSC_BLOCK` | Pendiente de los receipts | Debe coincidir exactamente con el start block. |
+| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_DEPLOYMENT_TX_HASH` | Pendiente de los receipts | Evidencia publica BSC Testnet que el indexer verifica. |
+| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_RUNTIME_CODE_HASH` | Pendiente del despliegue | Keccak-256 del bytecode runtime de cada fuente testnet. |
 | `CHAIN_INDEXER_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK` | `123359165` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK` | `123359165` | Debe coincidir con el receipt de despliegue y con el start block. |
@@ -232,7 +239,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 El indexer no marca un cursor UKI como `verified` por confiar en la configuracion. En cada arranque comprueba chain ID, receipt de despliegue, address, bloque y hash del bytecode runtime; despues sella el checkpoint canonico y la identidad de configuracion en los cursores. `VestingCreated` y `TokensReleased` se guardan en un ledger inmutable y reconstruyen la posicion por wallet/schedule, de modo que un replay repara una escritura parcial sin duplicar importes.
 
-Las direcciones legacy `TOKEN`, `MARKETPLACE` y `BRIDGE` documentadas para BSC no tienen bytecode en chain `97` y no son fuentes validas de staging. La ruta NFT permanece fail-closed hasta desplegar equivalentes testnet o aprobar un adaptador de simulacion aislado; nunca debe leer mainnet para completar un tick de staging.
+Las direcciones legacy `TOKEN`, `MARKETPLACE` y `BRIDGE` documentadas para BSC no tienen bytecode en chain `97` y no son fuentes validas de staging. La fuente equivalente testnet ya esta implementada en `packages/contracts`, pero el despliegue permanece fail-closed hasta que la wallet `0x3d80cbEd6CA067a154A22659224EB5194aDCe24C` disponga de tBNB. No se usara el faucet oficial que exige saldo BNB de mainnet ni se leera mainnet para completar un tick de staging.
 
 ### Card worker en staging
 

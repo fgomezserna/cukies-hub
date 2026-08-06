@@ -5,6 +5,8 @@ import type { EventName } from '../types.js';
 export const eventSignatures: Record<EventName, string> = {
   Transfer:
     'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+  CukieMetadataConfigured:
+    'event CukieMetadataConfigured(uint256 indexed tokenId, uint8 rarity, uint8 generation)',
   Mint: 'event Mint(address indexed user, uint256 points)',
   Burn: 'event Burn(address indexed user, uint256 points)',
   Stake: 'event Stake(address indexed user, uint256 tokenId, uint256 date)',

@@ -16,6 +16,7 @@ pnpm --filter @cukies/contracts simulate:deploy
 pnpm --filter @cukies/contracts deploy:local
 pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts deploy:testnet:operational
+pnpm --filter @cukies/contracts deploy:testnet:nft-source
 pnpm --filter @cukies/contracts deploy:mainnet:operational
 pnpm --filter @cukies/contracts handover:mainnet:safe
 pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
@@ -177,6 +178,22 @@ Do not reuse addresses across environments:
 | Prod | BSC mainnet | `56` | `0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c` (`CONCILIUM`) |
 
 The deploy script validates `ASM_TOKEN_ADDRESS` against the approved address for BSC testnet and BSC mainnet. Hardhat/local deployments are exempt so dev simulations can use local mocks.
+
+## BSC Testnet NFT source for Cukie Master
+
+`deploy:testnet:nft-source` is a separate, testnet-only harness. It deploys:
+
+- `StagingCukiesNft`, an intentionally minimal ownership/event source with immutable mint metadata;
+- `StagingCukiesMarketplaceSource`, matching the historical marketplace events without custody or value movement;
+- `StagingCukiesBridgeSource`, matching the historical bridge events without bridging or custody.
+
+The script rejects every network except `bscTestnet` / chain `97`, requires the configured private key to resolve to `DEPLOYER_ADDRESS`, and additionally requires:
+
+```bash
+STAGING_NFT_DEPLOYMENT_CONFIRM=BSC_TESTNET_97_ONLY
+```
+
+It mints six original-generation fixtures to the testnet deployer, one for each stable rarity value `1..6`. Their expected Cukie Master points are `1, 2, 4, 7, 10, 15` (39 total), which must produce the route maximum of five slots. The output includes only public evidence: contract addresses, deployment receipts/blocks, runtime bytecode hashes and fixture mint transactions. Never reuse these contracts or fixtures in mainnet/production.
 
 ## Deployment order
 

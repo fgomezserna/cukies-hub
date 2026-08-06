@@ -11,6 +11,7 @@
     "deploy:local": "hardhat run scripts/deploy-presale.cjs --network hardhat",
     "deploy:testnet": "hardhat run scripts/deploy-presale.production.cjs --network bscTestnet",
     "deploy:testnet:operational": "hardhat run scripts/deploy-testnet-operational.cjs --network bscTestnet",
+    "deploy:testnet:nft-source": "hardhat run scripts/deploy-nft-source.testnet.cjs --network bscTestnet",
     "deploy:testnet:staking-rewards": "hardhat run scripts/deploy-staking-rewards.testnet.cjs --network bscTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy-presale.production.cjs --network bsc",
     "deploy:mainnet:operational": "hardhat run scripts/deploy-mainnet-operational.cjs --network bsc",

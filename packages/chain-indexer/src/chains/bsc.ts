@@ -218,6 +218,9 @@ export async function ingestBscOnce(
   const latestBlock = Number(latestBlockValue);
   const safeBlock = Math.max(0, latestBlock - config.bscConfirmations);
   const contractEvents = getContractEventConfigs(['BSC'], {
+    tokenAddress: config.tokenAddress,
+    marketplaceAddress: config.marketplaceAddress,
+    bridgeAddress: config.bridgeAddress,
     presaleAddress: config.presaleAddress,
     ukiStakingAddress: config.ukiStakingAddress,
     vestingVaultAddress: config.vestingVaultAddress,
@@ -275,9 +278,15 @@ export async function ingestBscOnce(
       ? config.ukiStakingStartBlock
       : contractEvent.contractAlias === 'VESTING_VAULT'
         ? config.vestingVaultStartBlock
-      : contractEvent.contractAlias === 'REWARDS_DISTRIBUTOR'
-        ? config.rewardsDistributorStartBlock
-        : config.bscStartBlock;
+        : contractEvent.contractAlias === 'REWARDS_DISTRIBUTOR'
+          ? config.rewardsDistributorStartBlock
+          : contractEvent.contractAlias === 'TOKEN'
+            ? config.tokenStartBlock
+            : contractEvent.contractAlias === 'MARKETPLACE'
+              ? config.marketplaceStartBlock
+              : contractEvent.contractAlias === 'BRIDGE'
+                ? config.bridgeStartBlock
+                : config.bscStartBlock;
     const verified = verifiedContracts.get(contractEvent.contractAlias);
     if (
       verified
