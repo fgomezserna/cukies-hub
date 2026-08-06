@@ -36,6 +36,9 @@ services:
       retries: 20
       start_period: 180s
     networks:
+      default:
+        aliases:
+          - cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg
       coolify:
         aliases:
           - cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg
@@ -391,6 +394,7 @@ services:
     restart: unless-stopped
 
 networks:
+  default: {}
   coolify:
     external: true
 
