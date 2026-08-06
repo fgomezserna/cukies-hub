@@ -26,7 +26,8 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 - Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
 - Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
-- Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`). Ambos apuntan al UKI testnet existente.
+- Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`, tx `0xc09b84077e97fe32b198ed99f1a56829ccc60c1dbe401e7bb20b66983ddc670e`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`, tx `0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639`). Ambos apuntan al UKI testnet existente y tienen source publico con `exact_match` de creacion y runtime en Sourcify para chain `97`.
+- Verificacion publica: [UKIStaking en Sourcify](https://repo.sourcify.dev/97/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205) y [RewardsDistributor en Sourcify](https://repo.sourcify.dev/97/0xc2252D797Da294D16b84282d213604b4Bcf6EE09).
 - El smoke `STAGING_SMOKE_C31176A_2026_08_05` movio temporalmente `1 UKI` por contrato y termino con staking, reservas y balance del distribuidor a cero. No representa una cifra de producto.
 - Staging usa las bases logicas `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging`. El cutover a la instancia fisica exclusiva `cukies-staging-rs0` se prepara en dos despliegues para no apuntar la aplicacion a una replica a medio inicializar.
 - Produccion conserva BSC mainnet y sus bases de produccion; no se han reapuntado durante esta separacion.
@@ -255,7 +256,8 @@ Antes de considerar staging valido:
 - [x] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
 - [x] Crear cuatro usuarios Mongo staging con roles `readWrite` + `dbAdmin` limitados a su unica base.
 - [x] Desplegar `UKIStaking` y `RewardsDistributor`, configurar sus cinco cursores y proyectar un smoke completo en Mongo staging (PR #192, merge `c31176ab`).
-- [ ] Publicar el source de ambos contratos en BscScan cuando haya `ETHERSCAN_API_KEY`/`BSCSCAN_API_KEY`; el entorno actual no conserva ninguna.
+- [x] Publicar el source de ambos contratos en Sourcify para BSC Testnet con coincidencia exacta de creacion y runtime (`UKIStaking` match `43348012`; `RewardsDistributor` match `43348027`).
+- [ ] Confirmar o repetir el mirror secundario en BscScan cuando haya `ETHERSCAN_API_KEY`/`BSCSCAN_API_KEY`; Sourcify lo solicito, pero su estado externo no se puede consultar sin una API key valida.
 - [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
 - [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
@@ -263,7 +265,7 @@ Antes de considerar staging valido:
 - [x] Vaciar OAuth social, Pusher, Resend, Telegram e IFTTT en staging; quedan deshabilitados hasta tener destinos exclusivos.
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 
-El siguiente bloque recomendado es resolver la contradiccion de emision `500,000 UKI/dia` frente al pool de `450,000,000 UKI` durante 6 anos y decidir si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban leases e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. La verificacion de source de `UKIStaking`/`RewardsDistributor`, un S3 exclusivo para tarjetas y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloque recomendado es resolver la contradiccion de emision `500,000 UKI/dia` frente al pool de `450,000,000 UKI` durante 6 anos y decidir si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban leases e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. El mirror secundario de source en BscScan, un S3 exclusivo para tarjetas y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 
