@@ -101,3 +101,20 @@ test('verified BSC identity requires exact deployment evidence without network d
     requested: false,
   }), undefined);
 });
+
+test('verified BSC identity applies the same exact evidence to NFT aliases', () => {
+  const identity = resolveVerifiedBscContractIdentity({
+    alias: 'TOKEN',
+    chainId: 97,
+    address: `0x${'4'.repeat(40)}`,
+    startBlock: 456,
+    deploymentBlock: 456,
+    deploymentTxHash: `0x${'5'.repeat(64)}`,
+    runtimeCodeHash: `0x${'6'.repeat(64)}`,
+    requested: true,
+  });
+  assert.equal(identity?.alias, 'TOKEN');
+  assert.equal(identity?.chainId, 97);
+  assert.equal(identity?.startBlock, 456);
+  assert.match(identity?.configHash ?? '', /^0x[0-9a-f]{64}$/);
+});

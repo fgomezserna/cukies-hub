@@ -27,7 +27,7 @@ const tronContracts = {
 >, string>;
 
 const eventsByContract = {
-  TOKEN: ['Transfer'],
+  TOKEN: ['Transfer', 'CukieMetadataConfigured'],
   POINTS: ['Mint', 'Burn'],
   STAKING_POINTS: ['Stake', 'Unstake'],
   BREEDING_POINTS: ['BreedStart', 'BreedFinish'],
@@ -44,20 +44,28 @@ const eventsByContract = {
   REWARDS_DISTRIBUTOR: ['BatchPublished', 'RewardClaimed', 'BatchClosed'],
 } as const;
 
-export function getMonitoredContractAddresses(
-  presaleAddress?: string,
-  ukiStakingAddress?: string,
-  vestingVaultAddress?: string,
-  rewardsDistributorAddress?: string,
-) {
+type BscContractAddressOptions = {
+  tokenAddress?: string;
+  marketplaceAddress?: string;
+  bridgeAddress?: string;
+  presaleAddress?: string;
+  ukiStakingAddress?: string;
+  vestingVaultAddress?: string;
+  rewardsDistributorAddress?: string;
+};
+
+export function getMonitoredContractAddresses(options: BscContractAddressOptions = {}) {
   return {
     BSC: {
       ...bscContracts,
-      ...(presaleAddress ? { PRESALE: presaleAddress } : {}),
-      ...(ukiStakingAddress ? { UKI_STAKING: ukiStakingAddress } : {}),
-      ...(vestingVaultAddress ? { VESTING_VAULT: vestingVaultAddress } : {}),
-      ...(rewardsDistributorAddress
-        ? { REWARDS_DISTRIBUTOR: rewardsDistributorAddress }
+      ...(options.tokenAddress ? { TOKEN: options.tokenAddress } : {}),
+      ...(options.marketplaceAddress ? { MARKETPLACE: options.marketplaceAddress } : {}),
+      ...(options.bridgeAddress ? { BRIDGE: options.bridgeAddress } : {}),
+      ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
+      ...(options.ukiStakingAddress ? { UKI_STAKING: options.ukiStakingAddress } : {}),
+      ...(options.vestingVaultAddress ? { VESTING_VAULT: options.vestingVaultAddress } : {}),
+      ...(options.rewardsDistributorAddress
+        ? { REWARDS_DISTRIBUTOR: options.rewardsDistributorAddress }
         : {}),
     },
     TRON: tronContracts,
@@ -82,6 +90,9 @@ export function getContractAliasByAddress(chain: ChainName, address: string) {
 export function getContractEventConfigs(
   chains: ChainName[],
   options: {
+    tokenAddress?: string;
+    marketplaceAddress?: string;
+    bridgeAddress?: string;
     presaleAddress?: string;
     ukiStakingAddress?: string;
     vestingVaultAddress?: string;
@@ -91,11 +102,17 @@ export function getContractEventConfigs(
 ) {
   const configs: ContractEventConfig[] = [];
   const allowedAliases = options.contractAliases ? new Set(options.contractAliases) : null;
+  const tokenAddress = options.tokenAddress?.trim();
+  const marketplaceAddress = options.marketplaceAddress?.trim();
+  const bridgeAddress = options.bridgeAddress?.trim();
   const ukiStakingAddress = options.ukiStakingAddress?.trim();
   const vestingVaultAddress = options.vestingVaultAddress?.trim();
   const rewardsDistributorAddress = options.rewardsDistributorAddress?.trim();
 
   for (const [alias, address] of [
+    ['TOKEN', tokenAddress],
+    ['MARKETPLACE', marketplaceAddress],
+    ['BRIDGE', bridgeAddress],
     ['UKI_STAKING', ukiStakingAddress],
     ['VESTING_VAULT', vestingVaultAddress],
     ['REWARDS_DISTRIBUTOR', rewardsDistributorAddress],
@@ -111,14 +128,17 @@ export function getContractEventConfigs(
   if (
     allowedAliases
     && [...allowedAliases].some((alias) => (
-      alias === 'UKI_STAKING'
+      alias === 'TOKEN'
+      || alias === 'MARKETPLACE'
+      || alias === 'BRIDGE'
+      || alias === 'UKI_STAKING'
       || alias === 'VESTING_VAULT'
       || alias === 'REWARDS_DISTRIBUTOR'
     ))
     && !chains.includes('BSC')
   ) {
     throw new Error(
-      'Los contratos UKI_STAKING, VESTING_VAULT y REWARDS_DISTRIBUTOR solo se indexan en BSC.',
+      'Los contratos BSC configurables solo se indexan con BSC habilitada.',
     );
   }
 
@@ -126,6 +146,15 @@ export function getContractEventConfigs(
     const addresses: Partial<Record<ContractAlias, string>> = chain === 'BSC'
       ? {
           ...bscContracts,
+          ...((!allowedAliases || allowedAliases.has('TOKEN')) && tokenAddress
+            ? { TOKEN: tokenAddress }
+            : {}),
+          ...((!allowedAliases || allowedAliases.has('MARKETPLACE')) && marketplaceAddress
+            ? { MARKETPLACE: marketplaceAddress }
+            : {}),
+          ...((!allowedAliases || allowedAliases.has('BRIDGE')) && bridgeAddress
+            ? { BRIDGE: bridgeAddress }
+            : {}),
           ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
           ...(allowedAliases?.has('UKI_STAKING') && ukiStakingAddress
             ? { UKI_STAKING: ukiStakingAddress }
@@ -144,6 +173,7 @@ export function getContractEventConfigs(
       if (!(contractAlias in addresses)) continue;
 
       for (const eventName of eventNames) {
+        if (chain === 'TRON' && eventName === 'CukieMetadataConfigured') continue;
         configs.push({
           chain,
           contractAlias: contractAlias as ContractAlias,

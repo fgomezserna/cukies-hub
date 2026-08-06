@@ -1,8 +1,12 @@
 import { formatUnits } from 'viem';
 import type { ClientSession } from 'mongodb';
 
-import { monitoredContractAddresses } from '../config/contracts.js';
-import type { ChainEvent, JsonValue } from '../types.js';
+import { getMonitoredContractAddresses } from '../config/contracts.js';
+import type {
+  ChainEvent,
+  JsonValue,
+  VerifiedBscContractAlias,
+} from '../types.js';
 import { getNumber, getString, normalizeAddress, now } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
 
@@ -105,7 +109,15 @@ function tokenAmount(event: ChainEvent, key: string) {
 
 function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
   if (!value) return false;
-  const addresses = monitoredContractAddresses[event.chain];
+  const addresses = getMonitoredContractAddresses({
+    tokenAddress: process.env.CHAIN_INDEXER_TOKEN_ADDRESS,
+    marketplaceAddress: process.env.CHAIN_INDEXER_MARKETPLACE_ADDRESS,
+    bridgeAddress: process.env.CHAIN_INDEXER_BRIDGE_ADDRESS,
+    presaleAddress: process.env.CHAIN_INDEXER_PRESALE_ADDRESS,
+    ukiStakingAddress: process.env.CHAIN_INDEXER_UKI_STAKING_ADDRESS,
+    vestingVaultAddress: process.env.CHAIN_INDEXER_VESTING_VAULT_ADDRESS,
+    rewardsDistributorAddress: process.env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS,
+  })[event.chain];
   const normalized = normalizeAddress(event.chain, value);
 
   return Object.values(addresses).some(
@@ -153,6 +165,7 @@ async function insertNftTx(store: IndexerStore, event: ChainEvent, extra: Record
 }
 
 async function projectTransfer(store: IndexerStore, event: ChainEvent) {
+  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'TOKEN');
   const id = tokenId(event);
   if (!id) return 'Transfer sin tokenId';
 
@@ -160,8 +173,8 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   const to = stringField(event, 'to');
   const isMint = field(event, 'isMint') === true;
 
-  if (event.chain === 'BSC' && (isZeroAddress(event, from) || isZeroAddress(event, to))) {
-    return 'Transfer BSC mint/burn interno; lo resuelve bridge/marketplace/staking';
+  if (event.chain === 'BSC' && isZeroAddress(event, to)) {
+    return 'Transfer BSC burn interno; lo resuelve bridge/marketplace/staking';
   }
 
   if (event.chain === 'TRON' && isZeroAddress(event, to)) {
@@ -212,7 +225,40 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   return null;
 }
 
+async function projectCukieMetadata(store: IndexerStore, event: ChainEvent) {
+  if (event.chain !== 'BSC') return 'CukieMetadataConfigured solo se soporta en BSC';
+  await verifiedContractCursor(store, event, 'TOKEN');
+  const id = tokenId(event);
+  const rarity = numberField(event, 'rarity');
+  const generation = numberField(event, 'generation');
+  if (!id) return 'CukieMetadataConfigured sin tokenId';
+  if (rarity === null || !Number.isInteger(rarity) || rarity < 1 || rarity > 6) {
+    return 'CukieMetadataConfigured con rareza invalida';
+  }
+  if (generation !== 1 && generation !== 2) {
+    return 'CukieMetadataConfigured con generacion invalida';
+  }
+  const updated = await collection(store, 'cukies').updateOne(
+    { _id: id },
+    {
+      $set: {
+        tokenId: id,
+        rarity,
+        generation,
+        metadataEventId: event._id,
+        metadataBlockNumber: event.blockNumber,
+        updatedAt: now(),
+      },
+    },
+  );
+  if (updated.matchedCount === 0) {
+    throw new Error(`CukieMetadataConfigured ${id} no tiene Transfer mint proyectado.`);
+  }
+  return null;
+}
+
 async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
+  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'MARKETPLACE');
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
 
@@ -552,6 +598,7 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
 }
 
 async function projectBridge(store: IndexerStore, event: ChainEvent) {
+  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'BRIDGE');
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
 
@@ -873,7 +920,7 @@ async function projectPresalePurchase(store: IndexerStore, event: ChainEvent) {
 async function verifiedContractCursor(
   store: IndexerStore,
   event: ChainEvent,
-  alias: 'UKI_STAKING' | 'VESTING_VAULT',
+  alias: VerifiedBscContractAlias,
 ) {
   const cursor = await store.cursors().findOne({
     chain: event.chain,
@@ -1228,6 +1275,10 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
 
 export async function projectEvent(store: IndexerStore, event: ChainEvent) {
   if (event.eventName === 'Transfer') return projectTransfer(store, event);
+
+  if (event.eventName === 'CukieMetadataConfigured') {
+    return projectCukieMetadata(store, event);
+  }
 
   if (
     event.eventName === 'TokenOnSale' ||

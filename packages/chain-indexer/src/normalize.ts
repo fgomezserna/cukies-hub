@@ -64,6 +64,15 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (eventName === 'CukieMetadataConfigured') {
+    return toJsonRecord({
+      ...base,
+      rarity: getNumber(args.rarity),
+      generation: getNumber(args.generation),
+      txType: eventName,
+    });
+  }
+
   if (eventName === 'TokenOnSale') {
     const price = normalizePrice(chain, args.price);
 
