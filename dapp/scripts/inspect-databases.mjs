@@ -1,7 +1,21 @@
 import { MongoClient } from 'mongodb';
 
-const CUKIES_HUB_URL = 'mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin';
-const CUKIES_URL = 'mongodb://admin:changeme123@192.168.1.221:27017/cukies?authSource=admin';
+function requireDatabaseConfig(envName) {
+  const url = process.env[envName]?.trim();
+  if (!url) throw new Error(`${envName} es obligatoria.`);
+
+  const match = url.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/i);
+  if (!match || !match[1]) {
+    throw new Error(`${envName} debe incluir explicitamente el nombre de la base de datos.`);
+  }
+
+  const dbName = decodeURIComponent(match[1]);
+  if (dbName.length > 64 || /[\s/\\."$*<>:|?\u0000]/.test(dbName)) {
+    throw new Error(`${envName} contiene un nombre de base de datos invalido.`);
+  }
+
+  return { url, dbName };
+}
 
 async function inspectDatabase(url, dbName) {
   const client = new MongoClient(url);
@@ -28,10 +42,7 @@ async function inspectDatabase(url, dbName) {
         keys.forEach(key => {
           const value = sample[key];
           const type = Array.isArray(value) ? 'Array' : typeof value;
-          const preview = typeof value === 'object' && value !== null 
-            ? (Array.isArray(value) ? `[${value.length} items]` : '{...}')
-            : String(value).substring(0, 50);
-          console.log(`     - ${key}: ${type} ${preview.length > 0 ? `(${preview})` : ''}`);
+          console.log(`     - ${key}: ${type}`);
         });
       }
     }
@@ -45,12 +56,17 @@ async function inspectDatabase(url, dbName) {
 
 async function main() {
   console.log('🔍 Inspeccionando estructuras de bases de datos...\n');
-  
-  await inspectDatabase(CUKIES_HUB_URL, 'cukies-hub');
-  await inspectDatabase(CUKIES_URL, 'cukies');
+
+  const hub = requireDatabaseConfig('DATABASE_URL');
+  const legacy = requireDatabaseConfig('CUKIES_DATABASE_URL');
+
+  await inspectDatabase(hub.url, hub.dbName);
+  await inspectDatabase(legacy.url, legacy.dbName);
   
   console.log('\n✅ Inspección completada\n');
 }
 
-main().catch(console.error);
-
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

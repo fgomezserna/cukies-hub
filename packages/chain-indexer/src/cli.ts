@@ -116,6 +116,7 @@ async function importLegacy() {
       legacyConfig.legacyMongoUrl,
       legacyConfig.limit,
       legacyConfig.networks,
+      legacyConfig.legacyDbName,
     );
     const endedAt = now();
 
@@ -146,6 +147,7 @@ async function importLegacyMetadata() {
       store,
       legacyConfig.legacyMongoUrl,
       legacyConfig.limit,
+      legacyConfig.legacyDbName,
     );
     const endedAt = now();
 

@@ -91,6 +91,29 @@ function parseChains(value: string): ChainName[] {
   return valid.length > 0 ? valid : ['BSC', 'TRON'];
 }
 
+export function resolveMongoDatabaseNameFromUrl(databaseUrl: string, envName: string) {
+  const match = databaseUrl.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/i);
+  if (!match || !match[1]) {
+    throw new Error(`${envName} debe incluir explicitamente el nombre de la base de datos.`);
+  }
+
+  let databaseName: string;
+  try {
+    databaseName = decodeURIComponent(match[1]);
+  } catch {
+    throw new Error(`${envName} contiene un nombre de base de datos invalido.`);
+  }
+
+  if (
+    databaseName.length > 64
+    || /[\s/\\."$*<>:|?\u0000]/.test(databaseName)
+  ) {
+    throw new Error(`${envName} contiene un nombre de base de datos invalido.`);
+  }
+
+  return databaseName;
+}
+
 function parseContractAliases(value?: string): ContractAlias[] | undefined {
   if (!value) return undefined;
 
@@ -255,6 +278,10 @@ export function getLegacyImportConfig(): LegacyImportConfig {
 
   return {
     legacyMongoUrl: env.CUKIES_DATABASE_URL,
+    legacyDbName: resolveMongoDatabaseNameFromUrl(
+      env.CUKIES_DATABASE_URL,
+      'CUKIES_DATABASE_URL',
+    ),
     limit: env.CHAIN_INDEXER_IMPORT_LEGACY_LIMIT,
     networks: env.CHAIN_INDEXER_IMPORT_LEGACY_NETWORK
       ? parseChains(env.CHAIN_INDEXER_IMPORT_LEGACY_NETWORK)
