@@ -1,6 +1,6 @@
 # UKI current operating rules
 
-Estado: fuente operativa vigente para especificacion tecnica, con reconciliacion de emision pendiente.
+Estado: fuente operativa vigente para especificacion tecnica, con configuracion temporal de emision pendiente.
 Fecha de sincronizacion de reglas aprobadas: 2026-05-17.
 Fecha de revision de la fuente mas reciente: 2026-08-06.
 Fuentes consolidadas: `/Users/fgomezserna/Downloads/Token UKI.docx`, `/Users/fgomezserna/Downloads/Funcionamiento.docx` y `/Users/fgomezserna/Downloads/UKI/Preventa UKI.docx`.
@@ -11,20 +11,21 @@ Este documento sustituye como referencia de producto a los documentos antiguos d
 
 `Token UKI.docx` es el ultimo documento recibido y la fuente mas reciente revisada. Prevalece para las reglas operativas que contiene: 500 cupos iniciales por ruta; maximo de 5 cupos por cada ruta y 10 agregados por wallet; requisitos iniciales de 3 puntos NFT o 20,000 UKI; tabla de puntos por rareza; ventana de ajuste de 48 horas; espera minima de 24 horas; y 100 creditos diarios por cupo. El documento no vuelve a fijar el supply, el reparto 45%/25%/18%/12%, el precio de preventa, el listing, la compra minima ni los vestings; para esos puntos siguen vigentes las fuentes consolidadas anteriores.
 
-La regla de cupos queda reconciliada con la implementacion versionada `cukie-master-v1-5-per-route`. Permanece una contradiccion economica pendiente:
+La regla de cupos queda reconciliada con la implementacion versionada `cukie-master-v1-5-per-route`. La reserva de recompensas se reconcilia de esta forma:
 
-1. **Reserva diaria frente a duracion del pool.** `Token UKI.docx` mantiene 500,000 UKI diarios. Las reglas consolidadas anteriores asignan 450,000,000 UKI al programa durante 6 anos. Tomadas conjuntamente, una emision constante de 500,000 UKI durante 6 anos consumiria aproximadamente 1,095,000,000 UKI. El pool de 450,000,000 UKI solo cubre 900 dias a ese ritmo. Para durar 6 anos, el promedio nominal seria de aproximadamente 205,479 UKI diarios. Hasta que producto decida, 500,000 UKI no debe cargarse como emision diaria garantizada. La opcion tecnica recomendada es tratarlo como capacidad maxima diaria, con techo acumulado de 450,000,000 UKI y reglas explicitas para UKI no distribuidos.
+1. **Maximo diario y techo del programa.** Los 500,000 UKI son el maximo que puede reservar el conjunto de juegos en un dia, no una emision garantizada. El techo acumulado es 450,000,000 UKI, correspondiente al 45% del supply asignado al programa. Un dia al maximo consume presupuesto para 900 dias; para extender el programa durante 6 anos el uso diario real debe ser menor. La capacidad diaria no usada expira y no se acumula.
+2. **Exceso y UKI no distribuido.** Una fuente que exceda el maximo diario o acumulado se bloquea y nunca crea claims implicitos. El importe ya reservado que una regla calcule como no distribuido se materializa de forma determinista: 80% tesoreria, 5% marketing, 5% desarrollo y 10% reduccion de supply.
 
 Tambien aparecen dos matices que no cambian cifras congeladas por ahora:
 
 - La preventa podria ampliarse despues de los 30 dias si no alcanza 3,000 ASM. El contrato soporta que el owner actualice la ventana con `setSaleWindow`, pero falta aprobar el criterio, la autoridad y el limite de extension antes de convertirlo en regla operativa.
 - El desbloqueo progresivo de claim 20%/40%/60%/80%/100% aparece como propuesta a valorar, no como decision aprobada ni comportamiento implementado.
 
-Mientras la emision siga abierta, los rulesets de rewards y sus schedulers deben permanecer desactivados en staging.
+Antes de cargar el ruleset siguen pendientes `programStartsAt`, la frontera diaria UTC, la gracia de reserva tardia y las direcciones staging de los destinos. Hasta entonces los rulesets de rewards y sus schedulers deben permanecer desactivados en staging.
 
 ### Guardarrail tecnico de emision
 
-La Economy v2 exige ahora que cada `RewardRule` declare de forma explicita `programStartsAt`, frontera diaria UTC, gracia de reserva, `dailyCapRaw`, `lifetimeCapRaw`, politica de capacidad no usada y politica de exceso. No existen defaults para `500,000` ni `450,000,000` UKI: hasta que producto apruebe esas cifras y fechas no debe cargarse una regla activa.
+La Economy v2 exige ahora que cada `RewardRule` declare de forma explicita `programStartsAt`, frontera diaria UTC, gracia de reserva, `dailyCapRaw`, `lifetimeCapRaw`, politica de capacidad no usada y politica de exceso. No existen defaults en codigo: el ruleset staging debera cargar explicitamente 500,000 UKI como maximo diario y 450,000,000 UKI como techo acumulado una vez aprobados sus parametros temporales y destinos.
 
 Antes de crear un manifest, allocation o accrual, el servicio reserva el total bruto de la fuente dentro de la misma transaccion Mongo. El ledger usa tres colecciones globales:
 
@@ -32,7 +33,7 @@ Antes de crear un manifest, allocation o accrual, el servicio reserva el total b
 - `reward_emission_budget_days`: consumo por ventana diaria UTC;
 - `reward_emission_budget_events`: decision inmutable por `sourceId`, con saldos anterior/posterior, regla, hashes de calculo y motivo de bloqueo.
 
-Los replays no vuelven a consumir saldo. Un exceso diario/acumulado, una fuente anterior al inicio, una fecha economica futura o una reserva posterior al cierre devuelve `budget_blocked` y no materializa rewards. El sello semanal ancla tanto las reservas como los bloqueos y vuelve a validar cada evento antes de crear un draft Merkle; una decision ausente o manipulada impide claims. El techo acumulado, el inicio, la frontera, la gracia y las politicas no pueden cambiar mediante una nueva version ordinaria una vez iniciado el ledger; cualquier migracion futura requeriria una operacion separada y auditada. `unusedDailyCapacity=expires` y `overflowPolicy=block` son las unicas politicas implementadas en esta primera version, pero no se activan hasta recibir aprobacion de producto.
+Los replays no vuelven a consumir saldo. Un exceso diario/acumulado, una fuente anterior al inicio, una fecha economica futura o una reserva posterior al cierre devuelve `budget_blocked` y no materializa rewards. El sello semanal ancla tanto las reservas como los bloqueos y vuelve a validar cada evento antes de crear un draft Merkle; una decision ausente o manipulada impide claims. El techo acumulado, el inicio, la frontera, la gracia y las politicas no pueden cambiar mediante una nueva version ordinaria una vez iniciado el ledger; cualquier migracion futura requeriria una operacion separada y auditada. Las politicas vigentes son `unusedDailyCapacity=expires`, `overflowPolicy=block` y reparto no distribuido 80/5/5/10; no se activan hasta completar la configuracion temporal y de destinos.
 
 ## Preventa UKI
 
@@ -279,7 +280,7 @@ Puede quedar UKI sin distribuir si:
 - Hay creditos que se usan pero no se convierten a UKI.
 - Un jugador no tiene ranking #1 y por tanto no recibe el 100% de la parte restante.
 
-Distribucion propuesta:
+Distribucion vigente segun `Token UKI.docx`:
 
 | Destino | Porcentaje |
 | --- | ---: |

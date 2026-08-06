@@ -260,7 +260,8 @@ Antes de considerar staging valido:
 - [x] Confirmar el mirror secundario en las paginas publicas de BscScan Testnet: `UKIStaking` y `RewardsDistributor` muestran source verificado con coincidencia exacta, compilador `0.8.28` y 200 runs; no fue necesario obtener ni exponer una API key.
 - [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
 - [x] Implementar el ledger global fail-closed de presupuesto diario/acumulado, con fencing, replay por `sourceId` y auditoria de saldos; no contiene cifras aprobadas ni activa schedulers (issue #213).
-- [ ] Aprobar y cargar en staging los valores de `programStartsAt`, frontera/gracia UTC, maximo diario y techo acumulado irreversible del `RewardRule`.
+- [x] Reconciliar `500,000 UKI/dia` como maximo, `450,000,000 UKI` como techo acumulado, capacidad no usada `expires`, exceso `block` y reparto no distribuido 80/5/5/10.
+- [ ] Aprobar y cargar en staging `programStartsAt`, frontera/gracia UTC y direcciones de destino del `RewardRule`; los caps deben declararse explicitamente sin defaults.
 - [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
@@ -270,7 +271,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloque recomendado depende de decisiones de producto: aprobar la interpretacion de `500,000 UKI/dia`, el techo acumulado del pool de `450,000,000 UKI` y el inicio/frontera/gracia del ledger. El limite Cukie Master ya esta reconciliado en 5 cupos por ruta y 10 agregados. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloque recomendado depende de aprobar el inicio/frontera/gracia UTC del ledger y las direcciones staging de sus destinos. Los caps y las politicas ya estan reconciliados, y el limite Cukie Master queda en 5 cupos por ruta y 10 agregados. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 

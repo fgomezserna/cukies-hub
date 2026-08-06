@@ -70,14 +70,45 @@ export function calculateUndistributedRewardAllocations(
 ) {
   assertRewardRule(rule);
   const total = parseRawAmount(totalRaw);
+  const allocations = total === BigInt(0)
+    ? []
+    : apportionRaw(total, [
+        {
+          key: "treasury",
+          walletNormalized: rule.destinations.treasury,
+          category: "treasury" as const,
+          weight: BigInt(rule.undistributedBps.treasury),
+        },
+        {
+          key: "marketing",
+          walletNormalized: rule.destinations.marketing,
+          category: "marketing" as const,
+          weight: BigInt(rule.undistributedBps.marketing),
+        },
+        {
+          key: "development",
+          walletNormalized: rule.destinations.development,
+          category: "development" as const,
+          weight: BigInt(rule.undistributedBps.development),
+        },
+        {
+          key: "supply_reduction",
+          walletNormalized: rule.destinations.supplyReduction,
+          category: "supply_reduction" as const,
+          weight: BigInt(rule.undistributedBps.supplyReduction),
+        },
+      ].filter(({ weight }) => weight > BigInt(0))).map(({
+        walletNormalized,
+        category,
+        amountRaw,
+      }) => ({
+        walletNormalized,
+        category,
+        amountRaw: formatRawAmount(amountRaw),
+      }));
   return {
-    allocations: [] as RewardAllocationDraft[],
-    accruals: total === BigInt(0)
-      ? [] as RewardAccrualDraft[]
-      : [{
-          category: "undistributed_pending" as const,
-          amountRaw: formatRawAmount(total),
-        }],
+    allocations: combineDrafts(allocations),
+    accruals: [] as RewardAccrualDraft[],
     totalRaw: formatRawAmount(total),
   };
 }

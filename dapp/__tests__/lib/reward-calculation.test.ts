@@ -145,12 +145,56 @@ describe("reward settlement calculations", () => {
 });
 
 describe("reward pool calculations", () => {
-  it("mantiene el UKI no distribuido no claimable hasta resolver la contradiccion operativa", () => {
-    const result = calculateUndistributedRewardAllocations(testRewardRule(), "7");
-    expect(result.allocations).toEqual([]);
-    expect(result.accruals).toEqual([
-      { category: "undistributed_pending", amountRaw: "7" },
-    ]);
+  it("reparte el UKI no distribuido 80/5/5/10 y conserva el total", () => {
+    const result = calculateUndistributedRewardAllocations(testRewardRule(), "10000");
+    expect(amountsByCategory(result.allocations)).toEqual({
+      treasury: "8000",
+      marketing: "500",
+      development: "500",
+      supply_reduction: "1000",
+    });
+    expect(result.accruals).toEqual([]);
+    expect(result.allocations.reduce(
+      (sum, allocation) => sum + BigInt(allocation.amountRaw),
+      BigInt(0),
+    )).toBe(BigInt(10000));
+  });
+
+  it("asigna el remainder raw de forma determinista sin perder unidades", () => {
+    const first = calculateUndistributedRewardAllocations(testRewardRule(), "7");
+    const replay = calculateUndistributedRewardAllocations(testRewardRule(), "7");
+
+    expect(first).toEqual(replay);
+    expect(amountsByCategory(first.allocations)).toEqual({
+      treasury: "6",
+      supply_reduction: "1",
+    });
+    expect(first.allocations.reduce(
+      (sum, allocation) => sum + BigInt(allocation.amountRaw),
+      BigInt(0),
+    )).toBe(BigInt(7));
+  });
+
+  it("omite destinos al 0% sin invalidar un reparto que conserva el 100%", () => {
+    const rule = testRewardRule({
+      undistributedBps: {
+        treasury: 10_000,
+        marketing: 0,
+        development: 0,
+        supplyReduction: 0,
+      },
+    });
+    rule.configHash = buildRewardRuleConfigHash(rule);
+
+    expect(calculateUndistributedRewardAllocations(rule, "7")).toMatchObject({
+      allocations: [{
+        walletNormalized: rule.destinations.treasury,
+        category: "treasury",
+        amountRaw: "7",
+      }],
+      accruals: [],
+      totalRaw: "7",
+    });
   });
 
   it("activa el floor de 0.75 por cada 10 solo si la regla lo declara", () => {
