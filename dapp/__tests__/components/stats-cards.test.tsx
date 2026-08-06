@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import StatsCards from '@/components/home/stats-cards'
 import { useAuth } from '@/providers/auth-provider'
 import { User } from '@/types'
@@ -88,18 +88,20 @@ describe('components/home/StatsCards', () => {
 
   it('should display placeholder when user is not available', () => {
     mockUseAuth.mockReturnValue(mockAuthValue(null))
+    ;(global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}))
 
     render(<StatsCards />)
 
-    expect(screen.getByText('--')).toBeInTheDocument()
+    expect(screen.getAllByText('--')).toHaveLength(4)
   })
 
-  it('should display placeholder when user is loading', () => {
+  it('should display placeholders while platform stats are loading', () => {
     mockUseAuth.mockReturnValue(mockAuthValue(null, true))
+    ;(global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}))
 
     render(<StatsCards />)
 
-    expect(screen.getByText('--')).toBeInTheDocument()
+    expect(screen.getAllByText('--')).toHaveLength(4)
   })
 
   it('should render correct icons', () => {
@@ -113,7 +115,7 @@ describe('components/home/StatsCards', () => {
     expect(screen.getByTestId('coins-icon')).toBeInTheDocument()
   })
 
-  it('should format XP with commas', () => {
+  it('should format XP with commas', async () => {
     const userWithHighXP = {
       ...mockUser,
       xp: 1234567,
@@ -123,10 +125,14 @@ describe('components/home/StatsCards', () => {
 
     render(<StatsCards />)
 
-    expect(screen.getByText('1,234,567')).toBeInTheDocument()
+    await waitFor(() => {
+      const myXpCard = screen.getByRole('heading', { name: 'My XP' }).closest('.rounded-lg')
+      expect(myXpCard).not.toBeNull()
+      expect(within(myXpCard as HTMLElement).getByText('1,234,567')).toBeInTheDocument()
+    })
   })
 
-  it('should handle zero XP', () => {
+  it('should handle zero XP', async () => {
     const userWithZeroXP = {
       ...mockUser,
       xp: 0,
@@ -136,7 +142,9 @@ describe('components/home/StatsCards', () => {
 
     render(<StatsCards />)
 
-    expect(screen.getByText('0')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('0')).toBeInTheDocument()
+    })
   })
 
   it('should render dynamic values for rank, total players, and total XP', async () => {
@@ -157,7 +165,7 @@ describe('components/home/StatsCards', () => {
     const { container } = render(<StatsCards />)
     const gridContainer = container.firstChild
 
-    expect(gridContainer).toHaveClass('grid', 'gap-4', 'md:grid-cols-2', 'lg:grid-cols-4')
+    expect(gridContainer).toHaveClass('grid', 'gap-6', 'md:grid-cols-2', 'lg:grid-cols-4')
   })
 
   it('should render card structure correctly', async () => {
@@ -167,10 +175,10 @@ describe('components/home/StatsCards', () => {
 
     // Check that each stat has both title and value
     await waitFor(() => {
-      const myXpCard = screen.getByText('My XP').closest('div')
+      const myXpCard = screen.getByRole('heading', { name: 'My XP' }).closest('.rounded-lg')
       expect(myXpCard).toContainElement(screen.getByText('1,500'))
 
-      const myRankCard = screen.getByText('My Rank').closest('div')
+      const myRankCard = screen.getByRole('heading', { name: 'My Rank' }).closest('.rounded-lg')
       expect(myRankCard).toContainElement(screen.getByText('#1,234'))
     })
   })

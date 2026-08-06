@@ -1,267 +1,212 @@
-import { NextRequest } from 'next/server'
-import { POST } from '@/app/api/auth/login/route'
-
-// Mock Prisma module
-const mockFindUnique = jest.fn()
-const mockCreate = jest.fn()
+const mockFindUnique = jest.fn();
+const mockReadWalletSession = jest.fn();
+const mockReadWalletChallenge = jest.fn();
+const mockVerifyWalletSignature = jest.fn();
+const mockSetWalletSessionCookie = jest.fn();
+const mockClearWalletChallengeCookie = jest.fn();
+const mockFindOrSyncUserFromCukies = jest.fn();
+const mockCreateUserDirectly = jest.fn();
+const mockEnsureHubWalletForLogin = jest.fn();
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
-      findUnique: mockFindUnique,
-      create: mockCreate,
+      findUnique: (...args: unknown[]) => mockFindUnique(...args),
     },
   },
-}))
+}));
+
+jest.mock('@/lib/wallet-auth', () => ({
+  clearWalletChallengeCookie: (...args: unknown[]) => mockClearWalletChallengeCookie(...args),
+  evmWalletSessionMatchesSignedAddress: jest.fn(() => false),
+  isValidEvmWalletAddress: (walletAddress: string) => (
+    /^0x[a-f0-9]{40}$/i.test(walletAddress)
+    && walletAddress.toLowerCase() !== '0x0000000000000000000000000000000000000000'
+  ),
+  readWalletChallenge: (...args: unknown[]) => mockReadWalletChallenge(...args),
+  readWalletSession: (...args: unknown[]) => mockReadWalletSession(...args),
+  resolveWalletType: (walletAddress: string, walletType?: string) => (
+    walletType === 'tron' || walletAddress.startsWith('T') ? 'tron' : 'evm'
+  ),
+  setWalletSessionCookie: (...args: unknown[]) => mockSetWalletSessionCookie(...args),
+  verifyWalletSignature: (...args: unknown[]) => mockVerifyWalletSignature(...args),
+  walletSessionMatchesAddress: jest.fn(() => false),
+}));
+
+jest.mock('@/lib/user-sync', () => ({
+  findOrSyncUserFromCukies: (...args: unknown[]) => mockFindOrSyncUserFromCukies(...args),
+}));
+
+jest.mock('@/lib/mongodb-hub', () => ({
+  createUserDirectly: (...args: unknown[]) => mockCreateUserDirectly(...args),
+}));
+
+jest.mock('@/lib/user-wallets', () => ({
+  ensureHubWalletForLogin: (...args: unknown[]) => mockEnsureHubWalletForLogin(...args),
+}));
+
+import { POST } from '@/app/api/auth/login/route';
+
+const walletAddress = '0x1111111111111111111111111111111111111111';
+const message = 'Cukies wallet login challenge';
+const signature = '0xsigned';
+const user = {
+  id: 'user-1',
+  walletAddress,
+  username: walletAddress,
+  completedQuests: [],
+};
+
+function request(body: unknown) {
+  return new Request('https://hub.test/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+}
+
+function signedBody(overrides: Record<string, unknown> = {}) {
+  return {
+    walletAddress,
+    walletType: 'evm',
+    message,
+    signature,
+    ...overrides,
+  };
+}
 
 describe('API /auth/login', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+    mockReadWalletSession.mockResolvedValue(null);
+    mockReadWalletChallenge.mockResolvedValue({
+      walletAddress,
+      walletType: 'evm',
+      message,
+    });
+    mockVerifyWalletSignature.mockResolvedValue(true);
+    mockSetWalletSessionCookie.mockResolvedValue(undefined);
+    mockClearWalletChallengeCookie.mockResolvedValue(undefined);
+    mockFindOrSyncUserFromCukies.mockResolvedValue(null);
+    mockCreateUserDirectly.mockResolvedValue('user-1');
+    mockEnsureHubWalletForLogin.mockResolvedValue(undefined);
+  });
 
-  const mockUser = {
-    id: '1',
-    walletAddress: '0x123456789abcdef',
-    username: 'user_0x1234',
-    email: null,
-    profilePictureUrl: null,
-    xp: 0,
-    twitterHandle: null,
-    discordUsername: null,
-    telegramUsername: null,
-    referralCode: null,
-    referredById: null,
-    referralRewards: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastCheckIn: null,
-    completedQuests: [],
-  }
+  it('devuelve el usuario existente tras validar la firma', async () => {
+    mockFindUnique.mockResolvedValue(user);
 
-  it('should return existing user when wallet address exists', async () => {
-    const walletAddress = '0x123456789ABCDEF'
-    
-    mockFindUnique.mockResolvedValue(mockUser)
+    const response = await POST(request(signedBody()));
 
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data).toEqual(mockUser)
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(user);
     expect(mockFindUnique).toHaveBeenCalledWith({
-      where: {
-        walletAddress: walletAddress.toLowerCase(),
-      },
+      where: { walletAddress },
       include: {
         lastCheckIn: true,
-        completedQuests: {
-          include: {
-            quest: true,
-          },
-        },
+        completedQuests: { include: { quest: true } },
       },
-    })
-  })
+    });
+    expect(mockVerifyWalletSignature).toHaveBeenCalledWith({
+      walletAddress,
+      walletType: 'evm',
+      message,
+      signature,
+    });
+    expect(mockEnsureHubWalletForLogin).toHaveBeenCalledWith(user.id, walletAddress, 'evm');
+    expect(mockSetWalletSessionCookie).toHaveBeenCalledWith({
+      userId: user.id,
+      walletAddress,
+      signedWalletAddress: walletAddress,
+      walletType: 'evm',
+    });
+    expect(mockClearWalletChallengeCookie).toHaveBeenCalled();
+  });
 
-  it('should create new user when wallet address does not exist', async () => {
-    const walletAddress = '0x123456789ABCDEF'
-    const newUser = {
-      id: '2',
-      walletAddress: walletAddress.toLowerCase(),
-      username: `user_${walletAddress.toLowerCase().slice(0, 6)}`,
-    }
+  it('reutiliza un usuario sincronizado desde la base Cukies', async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockFindOrSyncUserFromCukies.mockResolvedValue(user);
 
-    // First call returns null (user doesn't exist)
-    // Second call returns the created user with includes
+    const response = await POST(request(signedBody()));
+
+    expect(response.status).toBe(200);
+    expect(mockFindOrSyncUserFromCukies).toHaveBeenCalledWith(walletAddress);
+    expect(mockCreateUserDirectly).not.toHaveBeenCalled();
+    expect(mockEnsureHubWalletForLogin).toHaveBeenCalledWith(user.id, walletAddress, 'evm');
+  });
+
+  it('crea directamente un usuario nuevo y lo vuelve a leer con relaciones', async () => {
     mockFindUnique
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(mockUser)
-    
-    mockCreate.mockResolvedValue(newUser as any)
+      .mockResolvedValueOnce(user);
 
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
-    })
+    const response = await POST(request(signedBody()));
 
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data).toEqual(mockUser)
-    expect(mockCreate).toHaveBeenCalledWith({
-      data: {
-        walletAddress: walletAddress.toLowerCase(),
-        username: `user_${walletAddress.toLowerCase().slice(0, 6)}`,
-      },
-    })
-  })
-
-  it('should convert wallet address to lowercase', async () => {
-    const walletAddress = '0X123456789ABCDEF'
-    
-    mockFindUnique.mockResolvedValue(mockUser)
-
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
-    })
-
-    await POST(request)
-
-    expect(mockFindUnique).toHaveBeenCalledWith({
-      where: {
-        walletAddress: walletAddress.toLowerCase(),
-      },
-      include: {
-        lastCheckIn: true,
-        completedQuests: {
-          include: {
-            quest: true,
-          },
-        },
-      },
-    })
-  })
-
-  it('should return 400 when wallet address is missing', async () => {
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(400)
-    expect(data.error).toBe('Wallet address is required')
-  })
-
-  it('should return 400 when wallet address is not a string', async () => {
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress: 123 }),
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(400)
-    expect(data.error).toBe('Wallet address is required')
-  })
-
-  it('should return 400 when wallet address is empty string', async () => {
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress: '' }),
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(400)
-    expect(data.error).toBe('Wallet address is required')
-  })
-
-  it('should return 500 when database error occurs', async () => {
-    const walletAddress = '0x123456789ABCDEF'
-    
-    mockFindUnique.mockRejectedValue(new Error('Database error'))
-
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(500)
-    expect(data.error).toBe('Internal Server Error')
-  })
-
-  it('should handle JSON parsing errors', async () => {
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: 'invalid json',
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(500)
-    expect(data.error).toBe('Internal Server Error')
-  })
-
-  it('should include correct relations when fetching existing user', async () => {
-    const walletAddress = '0x123456789ABCDEF'
-    
-    mockFindUnique.mockResolvedValue(mockUser)
-
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
-    })
-
-    await POST(request)
-
-    expect(mockFindUnique).toHaveBeenCalledWith({
-      where: {
-        walletAddress: walletAddress.toLowerCase(),
-      },
-      include: {
-        lastCheckIn: true,
-        completedQuests: {
-          include: {
-            quest: true,
-          },
-        },
-      },
-    })
-  })
-
-  it('should include correct relations when fetching newly created user', async () => {
-    const walletAddress = '0x123456789ABCDEF'
-    const newUser = {
-      id: '2',
-      walletAddress: walletAddress.toLowerCase(),
-      username: `user_${walletAddress.toLowerCase().slice(0, 6)}`,
-    }
-
-    mockFindUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(mockUser)
-    
-    mockCreate.mockResolvedValue(newUser as any)
-
-    const request = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
-    })
-
-    await POST(request)
-
-    // Should call findUnique twice: once to check if user exists, once to fetch with includes
-    expect(mockFindUnique).toHaveBeenCalledTimes(2)
-    
-    // Second call should include relations
+    expect(response.status).toBe(200);
+    expect(mockCreateUserDirectly).toHaveBeenCalledWith({
+      walletAddress,
+      username: walletAddress,
+    });
     expect(mockFindUnique).toHaveBeenLastCalledWith({
-      where: {
-        id: newUser.id,
-      },
+      where: { id: user.id },
       include: {
         lastCheckIn: true,
-        completedQuests: {
-          include: {
-            quest: true,
-          },
-        },
+        completedQuests: { include: { quest: true } },
       },
-    })
-  })
-})
+    });
+  });
+
+  it.each([
+    [{}, 'missing'],
+    [{ walletAddress: 123 }, 'non-string'],
+    [{ walletAddress: '' }, 'empty'],
+  ])('rechaza walletAddress invalida (%s)', async (body, _caseName) => {
+    const response = await POST(request(body));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Wallet address is required' });
+    expect(mockReadWalletSession).not.toHaveBeenCalled();
+  });
+
+  it('exige firma cuando no hay una sesion reutilizable', async () => {
+    const response = await POST(request({ walletAddress }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: 'Wallet signature is required',
+      requiresSignature: true,
+    });
+  });
+
+  it('rechaza un challenge que no coincide con la wallet', async () => {
+    mockReadWalletChallenge.mockResolvedValue({
+      walletAddress: '0x2222222222222222222222222222222222222222',
+      walletType: 'evm',
+      message,
+    });
+
+    const response = await POST(request(signedBody()));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: 'Invalid or expired wallet challenge',
+      requiresSignature: true,
+    });
+    expect(mockVerifyWalletSignature).not.toHaveBeenCalled();
+  });
+
+  it('devuelve 500 sin filtrar detalles ante un error de base de datos', async () => {
+    mockFindUnique.mockRejectedValue(new Error('Database error'));
+
+    const response = await POST(request(signedBody()));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Internal Server Error' });
+  });
+
+  it('devuelve 500 ante JSON malformado', async () => {
+    const response = await POST(request('invalid json'));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Internal Server Error' });
+  });
+});
