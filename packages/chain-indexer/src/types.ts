@@ -9,6 +9,7 @@ export type ContractAlias =
   | 'BRIDGE'
   | 'PRESALE'
   | 'UKI_STAKING'
+  | 'VESTING_VAULT'
   | 'REWARDS_DISTRIBUTOR';
 
 export type EventName =
@@ -28,6 +29,8 @@ export type EventName =
   | 'Purchased'
   | 'Staked'
   | 'Unstaked'
+  | 'VestingCreated'
+  | 'TokensReleased'
   | 'BatchPublished'
   | 'RewardClaimed'
   | 'BatchClosed';
@@ -64,7 +67,28 @@ export type ChainCursor = {
   nextTimestampMs?: number;
   fingerprint?: string | null;
   safeBlock?: number;
+  bootstrapStatus?: 'verified';
+  bootstrapStartBlock?: number;
+  bootstrapVerifiedAt?: Date;
+  verifiedChainId?: 56 | 97;
+  contractCodeHash?: string;
+  contractDeploymentBlock?: number;
+  contractDeploymentTxHash?: string;
+  contractConfigHash?: string;
   updatedAt: Date;
+};
+
+export type VerifiedBscContractAlias = 'UKI_STAKING' | 'VESTING_VAULT';
+
+export type VerifiedBscContractIdentity = {
+  alias: VerifiedBscContractAlias;
+  chainId: 56 | 97;
+  address: string;
+  startBlock: number;
+  deploymentBlock: number;
+  deploymentTxHash: string;
+  runtimeCodeHash: string;
+  configHash: string;
 };
 
 export type ChainEvent = {
@@ -111,8 +135,13 @@ export type IndexerConfig = {
   presaleAddress?: string;
   ukiStakingAddress?: string;
   rewardsDistributorAddress?: string;
+  vestingVaultAddress?: string;
   ukiStakingStartBlock?: number;
   rewardsDistributorStartBlock?: number;
+  vestingVaultStartBlock?: number;
+  verifiedBscContracts: Partial<
+    Record<VerifiedBscContractAlias, VerifiedBscContractIdentity>
+  >;
   contractAliases?: ContractAlias[];
 };
 

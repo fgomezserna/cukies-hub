@@ -32,6 +32,10 @@ export const eventSignatures: Record<EventName, string> = {
     'event Staked(address indexed account, uint256 amount, uint256 accountBalance, uint256 totalStaked)',
   Unstaked:
     'event Unstaked(address indexed account, uint256 amount, uint256 accountBalance, uint256 totalStaked)',
+  VestingCreated:
+    'event VestingCreated(address indexed beneficiary, bytes32 indexed scheduleId, uint256 amount, uint64 start, uint64 cliff, uint64 duration)',
+  TokensReleased:
+    'event TokensReleased(address indexed beneficiary, bytes32 indexed scheduleId, uint256 amount)',
   BatchPublished:
     'event BatchPublished(bytes32 indexed batchId, bytes32 indexed merkleRoot, bytes32 inputHash, bytes32 metadataHash, uint256 totalAllocated, uint64 startsAt, uint64 expiresAt)',
   RewardClaimed:

@@ -6,11 +6,13 @@ import { normalizeDomainEvent } from '../src/normalize.js';
 import {
   projectRewardsDistributorEvent,
   projectUkiStakingPosition,
+  projectUkiVestingPosition,
 } from '../src/projectors/index.js';
 import type { ChainEvent } from '../src/types.js';
 
 const STAKING = `0x${'1'.repeat(40)}`;
 const REWARDS = `0x${'2'.repeat(40)}`;
+const VESTING = `0x${'3'.repeat(40)}`;
 const WALLET = `0x${'a'.repeat(40)}`;
 const BATCH_ID = `0x${'b'.repeat(64)}`;
 
@@ -21,6 +23,28 @@ class MemoryCollection {
     return [...this.documents.values()].find((document) => (
       Object.entries(filter).every(([key, value]) => document[key] === value)
     )) ?? null;
+  }
+
+  find(filter: Record<string, unknown>) {
+    let values = [...this.documents.values()].filter((document) => (
+      Object.entries(filter).every(([key, value]) => document[key] === value)
+    ));
+    const cursor = {
+      sort(sort: Record<string, number>) {
+        values = values.sort((left, right) => {
+          for (const [key, direction] of Object.entries(sort)) {
+            if (left[key] === right[key]) continue;
+            return (left[key]! < right[key]! ? -1 : 1) * direction;
+          }
+          return 0;
+        });
+        return cursor;
+      },
+      async toArray() {
+        return values.map((value) => ({ ...value }));
+      },
+    };
+    return cursor;
   }
 
   async updateOne(
@@ -66,6 +90,21 @@ function fakeStore() {
   return {
     collections,
     store: {
+      cursors() {
+        return {
+          findOne: async (filter: Record<string, unknown>) => ({
+            contractAddress: filter.contractAddress,
+            bootstrapStatus: 'verified',
+            bootstrapStartBlock: 1,
+            bootstrapVerifiedAt: new Date(0),
+            verifiedChainId: 97,
+            contractCodeHash: `0x${'1'.repeat(64)}`,
+            contractDeploymentBlock: 1,
+            contractDeploymentTxHash: `0x${'2'.repeat(64)}`,
+            contractConfigHash: `0x${'3'.repeat(64)}`,
+          }),
+        };
+      },
       db: {
         collection(name: string) {
           const existing = collections.get(name);
@@ -89,8 +128,14 @@ function event(
     chain: 'BSC',
     contractAlias: eventName === 'Staked' || eventName === 'Unstaked'
       ? 'UKI_STAKING'
-      : 'REWARDS_DISTRIBUTOR',
-    contractAddress: eventName === 'Staked' || eventName === 'Unstaked' ? STAKING : REWARDS,
+      : eventName === 'VestingCreated' || eventName === 'TokensReleased'
+        ? 'VESTING_VAULT'
+        : 'REWARDS_DISTRIBUTOR',
+    contractAddress: eventName === 'Staked' || eventName === 'Unstaked'
+      ? STAKING
+      : eventName === 'VestingCreated' || eventName === 'TokensReleased'
+        ? VESTING
+        : REWARDS,
     eventName,
     txHash: `0x${String(blockNumber).padStart(64, '0')}`,
     logIndex: 0,
@@ -108,17 +153,20 @@ function event(
   };
 }
 
-test('registers staking and rewards only when their BSC addresses are explicit', () => {
+test('registers staking, vesting and rewards only when their BSC addresses are explicit', () => {
   const configs = getContractEventConfigs(['BSC'], {
     ukiStakingAddress: STAKING,
+    vestingVaultAddress: VESTING,
     rewardsDistributorAddress: REWARDS,
-    contractAliases: ['UKI_STAKING', 'REWARDS_DISTRIBUTOR'],
+    contractAliases: ['UKI_STAKING', 'VESTING_VAULT', 'REWARDS_DISTRIBUTOR'],
   });
   assert.deepEqual(
     configs.map(({ contractAlias, eventName }) => `${contractAlias}:${eventName}`),
     [
       'UKI_STAKING:Staked',
       'UKI_STAKING:Unstaked',
+      'VESTING_VAULT:VestingCreated',
+      'VESTING_VAULT:TokensReleased',
       'REWARDS_DISTRIBUTOR:BatchPublished',
       'REWARDS_DISTRIBUTOR:RewardClaimed',
       'REWARDS_DISTRIBUTOR:BatchClosed',
@@ -126,6 +174,10 @@ test('registers staking and rewards only when their BSC addresses are explicit',
   );
   assert.throws(
     () => getContractEventConfigs(['BSC'], { contractAliases: ['UKI_STAKING'] }),
+    /sin una address BSC configurada/,
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], { contractAliases: ['VESTING_VAULT'] }),
     /sin una address BSC configurada/,
   );
 });
@@ -158,6 +210,28 @@ test('normalizes all raw staking and rewards fields without lossy number convers
   });
   assert.equal(published.totalAllocatedRaw, '100');
   assert.equal(published.expiresAtRaw, '300');
+  assert.deepEqual(
+    normalizeDomainEvent('BSC', 'VestingCreated', 'VESTING_VAULT', {
+      beneficiary: WALLET,
+      scheduleId: BATCH_ID,
+      amount: 100n,
+      start: 200n,
+      cliff: 300n,
+      duration: 400n,
+    }),
+    {
+      beneficiary: WALLET,
+      beneficiaryNormalized: WALLET.toLowerCase(),
+      scheduleId: BATCH_ID,
+      amountRaw: '100',
+      allocatedAmountRaw: '100',
+      releasedAmountRaw: '0',
+      startRaw: '200',
+      cliffRaw: '300',
+      durationRaw: '400',
+      txType: 'VestingCreated',
+    },
+  );
 });
 
 test('staking projector keeps absolute latest balances and rejects stale overwrite', async () => {
@@ -213,4 +287,38 @@ test('rewards projector materializes publish, claim and close idempotently', asy
     [...context.collections.get('reward_claim_batches')!.documents.values()][0].status,
     'closed',
   );
+});
+
+test('vesting projector rebuilds an idempotent ledger-backed position', async () => {
+  const context = fakeStore();
+  const created = event('VestingCreated', {
+    beneficiary: WALLET,
+    beneficiaryNormalized: WALLET.toLowerCase(),
+    scheduleId: BATCH_ID,
+    allocatedAmountRaw: '100',
+    releasedAmountRaw: '0',
+    startRaw: '200',
+    cliffRaw: '300',
+    durationRaw: '400',
+  }, 10);
+  const released = event('TokensReleased', {
+    beneficiary: WALLET,
+    beneficiaryNormalized: WALLET.toLowerCase(),
+    scheduleId: BATCH_ID,
+    allocatedAmountRaw: '0',
+    releasedAmountRaw: '40',
+  }, 11);
+  await projectUkiVestingPosition(context.store as never, created);
+  await projectUkiVestingPosition(context.store as never, created);
+  await projectUkiVestingPosition(context.store as never, released);
+  await projectUkiVestingPosition(context.store as never, released);
+
+  assert.equal(context.collections.get('uki_vesting_events')?.documents.size, 2);
+  const position = context.collections.get('uki_vesting_positions')?.documents
+    .get(`${WALLET.toLowerCase()}:${BATCH_ID}`);
+  assert.equal(position?.totalAllocatedRaw, '100');
+  assert.equal(position?.releasedRaw, '40');
+  assert.equal(position?.lockedRaw, '60');
+  assert.equal(position?.ledgerEventCount, 2);
+  assert.equal(position?.lastEventId, released._id);
 });

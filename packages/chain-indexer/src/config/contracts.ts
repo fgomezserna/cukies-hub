@@ -11,7 +11,7 @@ const bscContracts = {
   BRIDGE: '0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E',
 } as const satisfies Record<Exclude<
   ContractAlias,
-  'PRESALE' | 'UKI_STAKING' | 'REWARDS_DISTRIBUTOR'
+  'PRESALE' | 'UKI_STAKING' | 'VESTING_VAULT' | 'REWARDS_DISTRIBUTOR'
 >, string>;
 
 const tronContracts = {
@@ -23,7 +23,7 @@ const tronContracts = {
   BRIDGE: 'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ',
 } as const satisfies Record<Exclude<
   ContractAlias,
-  'PRESALE' | 'UKI_STAKING' | 'REWARDS_DISTRIBUTOR'
+  'PRESALE' | 'UKI_STAKING' | 'VESTING_VAULT' | 'REWARDS_DISTRIBUTOR'
 >, string>;
 
 const eventsByContract = {
@@ -40,12 +40,14 @@ const eventsByContract = {
   BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
   PRESALE: ['Purchased'],
   UKI_STAKING: ['Staked', 'Unstaked'],
+  VESTING_VAULT: ['VestingCreated', 'TokensReleased'],
   REWARDS_DISTRIBUTOR: ['BatchPublished', 'RewardClaimed', 'BatchClosed'],
 } as const;
 
 export function getMonitoredContractAddresses(
   presaleAddress?: string,
   ukiStakingAddress?: string,
+  vestingVaultAddress?: string,
   rewardsDistributorAddress?: string,
 ) {
   return {
@@ -53,6 +55,7 @@ export function getMonitoredContractAddresses(
       ...bscContracts,
       ...(presaleAddress ? { PRESALE: presaleAddress } : {}),
       ...(ukiStakingAddress ? { UKI_STAKING: ukiStakingAddress } : {}),
+      ...(vestingVaultAddress ? { VESTING_VAULT: vestingVaultAddress } : {}),
       ...(rewardsDistributorAddress
         ? { REWARDS_DISTRIBUTOR: rewardsDistributorAddress }
         : {}),
@@ -81,6 +84,7 @@ export function getContractEventConfigs(
   options: {
     presaleAddress?: string;
     ukiStakingAddress?: string;
+    vestingVaultAddress?: string;
     rewardsDistributorAddress?: string;
     contractAliases?: ContractAlias[];
   } = {},
@@ -88,10 +92,12 @@ export function getContractEventConfigs(
   const configs: ContractEventConfig[] = [];
   const allowedAliases = options.contractAliases ? new Set(options.contractAliases) : null;
   const ukiStakingAddress = options.ukiStakingAddress?.trim();
+  const vestingVaultAddress = options.vestingVaultAddress?.trim();
   const rewardsDistributorAddress = options.rewardsDistributorAddress?.trim();
 
   for (const [alias, address] of [
     ['UKI_STAKING', ukiStakingAddress],
+    ['VESTING_VAULT', vestingVaultAddress],
     ['REWARDS_DISTRIBUTOR', rewardsDistributorAddress],
   ] as const) {
     if (address && !isAddress(address)) {
@@ -105,11 +111,15 @@ export function getContractEventConfigs(
   if (
     allowedAliases
     && [...allowedAliases].some((alias) => (
-      alias === 'UKI_STAKING' || alias === 'REWARDS_DISTRIBUTOR'
+      alias === 'UKI_STAKING'
+      || alias === 'VESTING_VAULT'
+      || alias === 'REWARDS_DISTRIBUTOR'
     ))
     && !chains.includes('BSC')
   ) {
-    throw new Error('Los contratos UKI_STAKING y REWARDS_DISTRIBUTOR solo se indexan en BSC.');
+    throw new Error(
+      'Los contratos UKI_STAKING, VESTING_VAULT y REWARDS_DISTRIBUTOR solo se indexan en BSC.',
+    );
   }
 
   for (const chain of chains) {
@@ -119,6 +129,9 @@ export function getContractEventConfigs(
           ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
           ...(allowedAliases?.has('UKI_STAKING') && ukiStakingAddress
             ? { UKI_STAKING: ukiStakingAddress }
+            : {}),
+          ...(allowedAliases?.has('VESTING_VAULT') && vestingVaultAddress
+            ? { VESTING_VAULT: vestingVaultAddress }
             : {}),
           ...(allowedAliases?.has('REWARDS_DISTRIBUTOR') && rewardsDistributorAddress
             ? { REWARDS_DISTRIBUTOR: rewardsDistributorAddress }

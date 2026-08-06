@@ -201,6 +201,22 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (eventName === 'VestingCreated' || eventName === 'TokensReleased') {
+    const beneficiary = getString(args.beneficiary);
+    return toJsonRecord({
+      beneficiary,
+      beneficiaryNormalized: normalizeAddress(chain, beneficiary),
+      scheduleId: getString(args.scheduleId),
+      amountRaw: getString(args.amount),
+      allocatedAmountRaw: eventName === 'VestingCreated' ? getString(args.amount) : '0',
+      releasedAmountRaw: eventName === 'TokensReleased' ? getString(args.amount) : '0',
+      startRaw: eventName === 'VestingCreated' ? getString(args.start) : null,
+      cliffRaw: eventName === 'VestingCreated' ? getString(args.cliff) : null,
+      durationRaw: eventName === 'VestingCreated' ? getString(args.duration) : null,
+      txType: eventName,
+    });
+  }
+
   if (eventName === 'BatchPublished') {
     return toJsonRecord({
       batchId: getString(args.batchId),

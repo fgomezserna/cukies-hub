@@ -45,7 +45,7 @@ Comprobacion: RPC publico de BSC testnet.
 | --- | --- | --- | --- |
 | `ASM_TESTNET` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` | No expone `owner()` en la comprobacion usada | Token ASM testnet / `tASM`. |
 | `UKI_TOKEN` | `0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`; token testnet reutilizado. |
-| `VESTING_VAULT` | `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `DEFAULT_ADMIN_ROLE`; desplegado en bloque `123291890`. |
+| `VESTING_VAULT` | `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `DEFAULT_ADMIN_ROLE`; desplegado en bloque `123291890`, tx `0x14292fc576ddff260572c4d7de7a7538d8f0aed8f3147d20f65d2cb77a0fa00b`. |
 | `PRESALE` | `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`; desplegado en bloque `123291898`. |
 | `PRESALE_TREASURY` | `0x19907a00abf02975fb60d616c99565894c08d859` | N/A | `Presale.treasury()`. |
 

@@ -2,10 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import dotenv from 'dotenv';
-import { isAddress } from 'viem';
+import { isAddress, keccak256, stringToHex } from 'viem';
 import { z } from 'zod';
 
-import type { ChainName, ContractAlias, IndexerConfig, LegacyImportConfig } from '../types.js';
+import type {
+  ChainName,
+  ContractAlias,
+  IndexerConfig,
+  LegacyImportConfig,
+  VerifiedBscContractAlias,
+  VerifiedBscContractIdentity,
+} from '../types.js';
 
 const optionalBlockSchema = z.preprocess(
   (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -61,9 +68,19 @@ const envSchema = z.object({
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_UKI_STAKING_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_STAKING_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_VESTING_VAULT_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_VESTING_VAULT_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_UKI_STAKING_RUNTIME_CODE_HASH: z.string().optional(),
+  CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_TRON_API_BASE_URL: z.string().default('https://api.trongrid.io/v1'),
   CUKIES_DATABASE_URL: z.string().optional(),
@@ -131,6 +148,7 @@ function parseContractAliases(value?: string): ContractAlias[] | undefined {
       item === 'BRIDGE' ||
       item === 'PRESALE' ||
       item === 'UKI_STAKING' ||
+      item === 'VESTING_VAULT' ||
       item === 'REWARDS_DISTRIBUTOR',
   );
 
@@ -139,7 +157,7 @@ function parseContractAliases(value?: string): ContractAlias[] | undefined {
 
 function resolveOptionalBscAddress(
   value: string | undefined,
-  alias: 'UKI_STAKING' | 'REWARDS_DISTRIBUTOR',
+  alias: 'UKI_STAKING' | 'VESTING_VAULT' | 'REWARDS_DISTRIBUTOR',
   requested: boolean,
 ) {
   const address = value?.trim();
@@ -151,6 +169,74 @@ function resolveOptionalBscAddress(
     throw new Error(`${alias} no tiene una address BSC no nula valida.`);
   }
   return address;
+}
+
+function canonicalHash(value: string | undefined, label: string) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || !/^0x[0-9a-f]{64}$/.test(normalized)) {
+    throw new Error(`${label} debe ser un hash 0x de 32 bytes.`);
+  }
+  return normalized;
+}
+
+export function buildVerifiedBscContractConfigHash(input: {
+  chainId: 56 | 97;
+  address: string;
+  deploymentBlock: number;
+  runtimeCodeHash: string;
+}) {
+  return keccak256(stringToHex(JSON.stringify({
+    chainId: input.chainId,
+    address: input.address.toLowerCase(),
+    deploymentBlock: input.deploymentBlock,
+    contractCodeHash: input.runtimeCodeHash.toLowerCase(),
+  }))).toLowerCase();
+}
+
+export function resolveVerifiedBscContractIdentity(input: {
+  alias: VerifiedBscContractAlias;
+  chainId: 56 | 97;
+  address: string | undefined;
+  startBlock: number | undefined;
+  deploymentBlock: number | undefined;
+  deploymentTxHash: string | undefined;
+  runtimeCodeHash: string | undefined;
+  requested: boolean;
+}): VerifiedBscContractIdentity | undefined {
+  if (!input.requested) return undefined;
+  const address = resolveOptionalBscAddress(input.address, input.alias, true)!.toLowerCase();
+  if (
+    !Number.isSafeInteger(input.startBlock)
+    || !Number.isSafeInteger(input.deploymentBlock)
+    || input.startBlock !== input.deploymentBlock
+  ) {
+    throw new Error(
+      `${input.alias} requiere start block y deployment block explicitos e iguales.`,
+    );
+  }
+  const deploymentTxHash = canonicalHash(
+    input.deploymentTxHash,
+    `CHAIN_INDEXER_${input.alias}_DEPLOYMENT_TX_HASH`,
+  );
+  const runtimeCodeHash = canonicalHash(
+    input.runtimeCodeHash,
+    `CHAIN_INDEXER_${input.alias}_RUNTIME_CODE_HASH`,
+  );
+  return {
+    alias: input.alias,
+    chainId: input.chainId,
+    address,
+    startBlock: input.startBlock!,
+    deploymentBlock: input.deploymentBlock!,
+    deploymentTxHash,
+    runtimeCodeHash,
+    configHash: buildVerifiedBscContractConfigHash({
+      chainId: input.chainId,
+      address,
+      deploymentBlock: input.deploymentBlock!,
+      runtimeCodeHash,
+    }),
+  };
 }
 
 function parseRpcUrls(...values: Array<string | undefined>) {
@@ -200,12 +286,20 @@ export function getIndexerConfig(): IndexerConfig {
   const contractAliases = parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES);
   const presaleAddress = env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS;
   const ukiStakingRequested = contractAliases?.includes('UKI_STAKING') ?? false;
+  const vestingVaultRequested = contractAliases?.includes('VESTING_VAULT') ?? false;
   const rewardsDistributorRequested =
     contractAliases?.includes('REWARDS_DISTRIBUTOR') ?? false;
   const ukiStakingAddress = resolveOptionalBscAddress(
     env.CHAIN_INDEXER_UKI_STAKING_ADDRESS ?? env.NEXT_PUBLIC_UKI_STAKING_ADDRESS,
     'UKI_STAKING',
     ukiStakingRequested,
+  );
+  const vestingVaultAddress = resolveOptionalBscAddress(
+    env.CHAIN_INDEXER_VESTING_VAULT_ADDRESS
+      ?? env.NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS
+      ?? env.NEXT_PUBLIC_VESTING_VAULT_ADDRESS,
+    'VESTING_VAULT',
+    vestingVaultRequested,
   );
   const rewardsDistributorAddress = resolveOptionalBscAddress(
     env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS
@@ -214,6 +308,26 @@ export function getIndexerConfig(): IndexerConfig {
     rewardsDistributorRequested,
   );
   const bscExpectedChainId = env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID as 56 | 97;
+  const ukiStakingIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'UKI_STAKING',
+    chainId: bscExpectedChainId,
+    address: ukiStakingAddress,
+    startBlock: env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_UKI_STAKING_RUNTIME_CODE_HASH,
+    requested: ukiStakingRequested,
+  });
+  const vestingVaultIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'VESTING_VAULT',
+    chainId: bscExpectedChainId,
+    address: vestingVaultAddress,
+    startBlock: env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH,
+    requested: vestingVaultRequested,
+  });
   const bscRpcUrls = resolveBscRpcUrls({
     expectedChainId: bscExpectedChainId,
     rpcUrls: env.CHAIN_INDEXER_BSC_RPC_URLS,
@@ -227,6 +341,7 @@ export function getIndexerConfig(): IndexerConfig {
 
   for (const [alias, requested, startBlock] of [
     ['UKI_STAKING', ukiStakingRequested, env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK],
+    ['VESTING_VAULT', vestingVaultRequested, env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK],
     [
       'REWARDS_DISTRIBUTOR',
       rewardsDistributorRequested,
@@ -238,7 +353,10 @@ export function getIndexerConfig(): IndexerConfig {
     }
   }
 
-  if ((ukiStakingRequested || rewardsDistributorRequested) && !chains.includes('BSC')) {
+  if (
+    (ukiStakingRequested || vestingVaultRequested || rewardsDistributorRequested)
+    && !chains.includes('BSC')
+  ) {
     throw new Error('Los contratos UKI de staking/rewards solo se pueden indexar con BSC habilitada.');
   }
 
@@ -262,9 +380,15 @@ export function getIndexerConfig(): IndexerConfig {
     projectBatchSize: env.CHAIN_INDEXER_PROJECT_BATCH_SIZE,
     presaleAddress,
     ukiStakingAddress,
+    vestingVaultAddress,
     rewardsDistributorAddress,
     ukiStakingStartBlock: env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK,
+    vestingVaultStartBlock: env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK,
     rewardsDistributorStartBlock: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK,
+    verifiedBscContracts: {
+      ...(ukiStakingIdentity ? { UKI_STAKING: ukiStakingIdentity } : {}),
+      ...(vestingVaultIdentity ? { VESTING_VAULT: vestingVaultIdentity } : {}),
+    },
   };
 }
 

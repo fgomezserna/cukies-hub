@@ -6,7 +6,13 @@ import {
   type OptionalUnlessRequiredId,
 } from 'mongodb';
 
-import type { ChainCursor, ChainEvent, ContractEventConfig, IndexerConfig } from '../types.js';
+import type {
+  ChainCursor,
+  ChainEvent,
+  ContractEventConfig,
+  IndexerConfig,
+  VerifiedBscContractIdentity,
+} from '../types.js';
 import { now } from '../utils/json.js';
 import { ECONOMY_INDEXES } from './economy-indexes.js';
 import {
@@ -146,6 +152,118 @@ export class IndexerStore {
           eventName: config.eventName,
           ...update,
           updatedAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  async upsertBscCheckpoint(input: {
+    chainId: 56 | 97;
+    safeBlockNumber: number;
+    safeBlockHash: string;
+    checkedAt: Date;
+  }) {
+    await this.db.collection<Document & { _id: string }>('chain_bsc_checkpoints').updateOne(
+      { _id: 'canonical-safe' },
+      {
+        $set: {
+          chain: 'BSC',
+          chainId: input.chainId,
+          safeBlockNumber: input.safeBlockNumber,
+          safeBlockHash: input.safeBlockHash.toLowerCase(),
+          checkedAt: input.checkedAt,
+          updatedAt: input.checkedAt,
+        },
+        $setOnInsert: {
+          _id: 'canonical-safe',
+          createdAt: input.checkedAt,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  async reconcileVerifiedUkiStakingBootstrap(input: {
+    identity: VerifiedBscContractIdentity;
+    safeBlockNumber: number;
+    safeBlockHash: string;
+    verifiedAt: Date;
+  }) {
+    if (input.identity.alias !== 'UKI_STAKING') return;
+    const positions = await this.db.collection('uki_staking_positions')
+      .find({}, { projection: { accountBalanceRaw: 1 } })
+      .limit(5_001)
+      .toArray();
+    if (positions.length > 5_000) {
+      throw new Error('UKI_STAKING excede el maximo auditable de 5.000 posiciones.');
+    }
+    let materializedTotal = BigInt(0);
+    for (const position of positions) {
+      if (
+        typeof position.accountBalanceRaw !== 'string'
+        || !/^\d+$/.test(position.accountBalanceRaw)
+      ) {
+        throw new Error('UKI_STAKING contiene una posicion con raw invalido.');
+      }
+      materializedTotal += BigInt(position.accountBalanceRaw);
+    }
+    const states = this.db.collection<Document & { _id: string }>('uki_staking_state');
+    const state = await states.findOne({ _id: input.identity.address });
+    const latestProjected = await this.events().findOne(
+      {
+        chain: 'BSC',
+        contractAlias: 'UKI_STAKING',
+        contractAddress: {
+          $regex: `^${input.identity.address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+          $options: 'i',
+        },
+        status: 'projected',
+      },
+      { sort: { blockNumber: -1, logIndex: -1, _id: -1 } },
+    );
+    const totalStakedRaw = typeof state?.totalStakedRaw === 'string'
+      && /^\d+$/.test(state.totalStakedRaw)
+      ? state.totalStakedRaw
+      : '0';
+    const consistent = materializedTotal.toString(10) === totalStakedRaw
+      && (latestProjected ? state?.lastEventId === latestProjected._id : !state?.lastEventId);
+    const identityFields = {
+      chain: 'BSC',
+      contractAddress: input.identity.address,
+      contractAddressNormalized: input.identity.address,
+      bootstrapStatus: 'verified',
+      bootstrapStartBlock: input.identity.startBlock,
+      bootstrapVerifiedAt: input.verifiedAt,
+      bootstrapSafeBlock: input.safeBlockNumber,
+      bootstrapSafeBlockHash: input.safeBlockHash.toLowerCase(),
+      verifiedChainId: input.identity.chainId,
+      contractCodeHash: input.identity.runtimeCodeHash,
+      contractDeploymentBlock: input.identity.deploymentBlock,
+      contractDeploymentTxHash: input.identity.deploymentTxHash,
+      contractConfigHash: input.identity.configHash,
+      materializationStatus: consistent ? 'consistent' : 'inconsistent',
+      materializedTotalRaw: materializedTotal.toString(10),
+      ...(latestProjected
+        ? {
+            materializedThroughEventId: latestProjected._id,
+            materializedThroughBlockNumber: latestProjected.blockNumber,
+            materializedThroughLogIndex: latestProjected.logIndex,
+          }
+        : {
+            materializedThroughSafeBlock: input.safeBlockNumber,
+            materializedThroughSafeBlockHash: input.safeBlockHash.toLowerCase(),
+          }),
+      updatedAt: input.verifiedAt,
+    };
+    await states.updateOne(
+      { _id: input.identity.address },
+      {
+        $set: identityFields,
+        $setOnInsert: {
+          _id: input.identity.address,
+          totalStakedRaw: '0',
+          createdAt: input.verifiedAt,
         },
       },
       { upsert: true },

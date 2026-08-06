@@ -223,6 +223,11 @@ async function runForever() {
         startedAt,
         endedAt: now(),
         error: message,
+        // Conservador por diseno: mientras el loop no pueda atribuir el fallo
+        // a una unica fuente, todas las fuentes BSC seleccionadas quedan
+        // marcadas como afectadas. Los consumidores fail-closed ya consultan
+        // este campo y no deben aceptar el ultimo run bueno tras un error nuevo.
+        failedContractAliases: config.contractAliases,
       });
     }
 

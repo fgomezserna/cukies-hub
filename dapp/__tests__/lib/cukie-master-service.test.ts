@@ -303,15 +303,16 @@ describe('Cukie Master canonical sources', () => {
   it('rejects a corrupt vesting aggregate even when lastEventId still matches', () => {
     const ledger = [
       {
-        eventId: 'vesting-created', scheduleId: 'schedule',
+        eventId: 'vesting-created', beneficiaryNormalized: '0xabc', scheduleId: 'schedule',
         allocatedAmountRaw: '100', releasedAmountRaw: '0', blockNumber: 10, logIndex: 0,
       },
       {
-        eventId: 'tokens-released', scheduleId: 'schedule',
+        eventId: 'tokens-released', beneficiaryNormalized: '0xabc', scheduleId: 'schedule',
         allocatedAmountRaw: '0', releasedAmountRaw: '40', blockNumber: 12, logIndex: 1,
       },
     ];
     const canonical = {
+      walletNormalized: '0xabc',
       scheduleId: 'schedule',
       lastEventId: 'tokens-released',
       lastBlockNumber: 12,
@@ -331,6 +332,26 @@ describe('Cukie Master canonical sources', () => {
       ...canonical,
       ledgerEventCount: 1,
     }])).toBe(false);
+    expect(vestingLedgerMatchesPositions([
+      ...ledger,
+      {
+        eventId: 'other-wallet', beneficiaryNormalized: '0xdef', scheduleId: 'schedule',
+        allocatedAmountRaw: '25', releasedAmountRaw: '0', blockNumber: 13, logIndex: 0,
+      },
+    ], [
+      canonical,
+      {
+        ...canonical,
+        walletNormalized: '0xdef',
+        lastEventId: 'other-wallet',
+        lastBlockNumber: 13,
+        lastLogIndex: 0,
+        ledgerEventCount: 1,
+        totalAllocatedRaw: '25',
+        releasedRaw: '0',
+        lockedRaw: '25',
+      },
+    ])).toBe(true);
   });
   it('counts locked vesting plus stake exactly, never total purchases plus stake', async () => {
     const { repo, state } = memoryRepository();
