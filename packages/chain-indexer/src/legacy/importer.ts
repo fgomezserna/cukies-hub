@@ -1,6 +1,7 @@
 import { MongoClient, type Document } from 'mongodb';
 
 import { getContractAliasByAddress } from '../config/contracts.js';
+import { resolveMongoDatabaseNameFromUrl } from '../config/env.js';
 import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ChainName, EventName } from '../types.js';
 import type { IndexerStore } from '../storage/index.js';
@@ -142,12 +143,15 @@ export async function importLegacyProcessedEvents(
   legacyMongoUrl: string,
   limit: number,
   networks?: ChainName[],
+  configuredLegacyDbName?: string,
 ) {
+  const legacyDbName = configuredLegacyDbName
+    ?? resolveMongoDatabaseNameFromUrl(legacyMongoUrl, 'CUKIES_DATABASE_URL');
   const client = new MongoClient(legacyMongoUrl);
   await client.connect();
 
   try {
-    const legacyDb = client.db('cukies');
+    const legacyDb = client.db(legacyDbName);
     const filter = networks?.length ? { network: { $in: networks } } : {};
     const cursor = legacyDb
       .collection<LegacyProcessedEvent & Document>('processedEvents')
@@ -263,12 +267,15 @@ export async function importLegacyCukiesMetadata(
   store: IndexerStore,
   legacyMongoUrl: string,
   limit: number,
+  configuredLegacyDbName?: string,
 ) {
+  const legacyDbName = configuredLegacyDbName
+    ?? resolveMongoDatabaseNameFromUrl(legacyMongoUrl, 'CUKIES_DATABASE_URL');
   const client = new MongoClient(legacyMongoUrl);
   await client.connect();
 
   try {
-    const legacyDb = client.db('cukies');
+    const legacyDb = client.db(legacyDbName);
     const cursor = legacyDb
       .collection<LegacyCukiDocument & Document>('cukies')
       .find({})

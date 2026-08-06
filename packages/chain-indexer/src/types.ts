@@ -118,6 +118,7 @@ export type IndexerConfig = {
 
 export type LegacyImportConfig = {
   legacyMongoUrl: string;
+  legacyDbName: string;
   limit: number;
   networks?: ChainName[];
 };
