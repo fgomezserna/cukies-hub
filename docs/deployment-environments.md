@@ -224,14 +224,14 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 ### Card worker en staging
 
-`cuki-card-worker` queda fuera del arranque por defecto mediante el profile Compose `card-worker`. Staging dispone del bucket MinIO exclusivo `cukies-cards-staging`, hostname publico, prefijo y credenciales limitadas; el upload real y su limpieza se validaron el 6 de agosto de 2026. No se debe definir `COMPOSE_PROFILES=card-worker` ni cambiar `CARD_WORKER_UPLOAD=true` en la app 28 hasta desplegar y validar las URLs inmutables de #216. Esto evita tanto el bucle de reinicios como servir una card anterior desde la cache de Cloudflare despues de una regeneracion.
+`cuki-card-worker` queda fuera del arranque por defecto mediante el profile Compose `card-worker`, pero esta habilitado explicitamente en la app 28 con `COMPOSE_PROFILES=card-worker` y `CARD_WORKER_UPLOAD=true`. Usa el bucket MinIO exclusivo `cukies-cards-staging`, hostname publico, prefijo y credenciales limitadas. Las URLs inmutables de #216, dos regeneraciones con hashes distintos, los headers de cache, el setup y la limpieza completa se validaron el 6 de agosto de 2026; el despliegue 1109 dejo los nueve contenedores en ejecucion con cero reinicios.
 
-Para habilitarlo en el futuro:
+Controles operativos:
 
-1. desplegar #216 en `staging` y validar que cada URL incluye el SHA-256 del PNG;
-2. repetir `pnpm staging:cards:setup` y una generacion con fixture aislado, comprobando `Cache-Control: public, max-age=31536000, immutable`;
-3. eliminar el fixture, su job, el PNG local y el objeto S3 de prueba;
-4. definir `CARD_WORKER_UPLOAD=true` y `COMPOSE_PROFILES=card-worker` solo en la app 28, redesplegar y verificar que el noveno contenedor queda sano.
+1. mantener `CARD_WORKER_UPLOAD=true` y `COMPOSE_PROFILES=card-worker` exclusivamente en la app 28 mientras use el destino staging aislado;
+2. validar tras cada deploy el guard `staging-only`, `setup:prod`, `start`, acceso `HeadBucket`, Mongo ping y `restartCount=0`;
+3. comprobar que una regeneracion con contenido distinto produce otra URL `<prefix>/<tokenId-base64url>/<sha256>.png` con `Cache-Control: public, max-age=31536000, immutable`;
+4. para desactivarlo, cambiar `CARD_WORKER_UPLOAD=false`, retirar `COMPOSE_PROFILES` solo en la app 28 y redesplegar; no modificar la app 12.
 
 ## Gates para staging
 
@@ -265,12 +265,12 @@ Antes de considerar staging valido:
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
 - [x] Provisionar bucket MinIO, hostname publico, prefijo y credenciales exclusivos de staging; validar setup, upload/render real y limpieza completa del fixture.
-- [ ] Desplegar URLs de card inmutables (#216), repetir el smoke y activar el profile `card-worker` solo en la app 28.
+- [x] Desplegar URLs de card inmutables (#216), repetir dos regeneraciones con hashes distintos, limpiar el fixture y activar el profile `card-worker` solo en la app 28 (PR #217; despliegue 1109).
 - [x] Vaciar OAuth social, Pusher, Resend, Telegram e IFTTT en staging; quedan deshabilitados hasta tener destinos exclusivos.
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloque recomendado es desplegar #216, repetir el smoke aislado del card worker y activar solo ese worker en la app 28. En paralelo siguen pendientes decisiones de producto: aprobar la interpretacion de `500,000 UKI/dia`, el techo acumulado del pool de `450,000,000 UKI`, el inicio/frontera/gracia del ledger y si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. El mirror secundario de source en BscScan y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloque recomendado depende de decisiones de producto: aprobar la interpretacion de `500,000 UKI/dia`, el techo acumulado del pool de `450,000,000 UKI`, el inicio/frontera/gracia del ledger y si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. El mirror secundario de source en BscScan y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 
