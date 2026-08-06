@@ -1,6 +1,6 @@
 # UKI current operating rules
 
-Estado: fuente operativa vigente para especificacion tecnica, con configuracion temporal de emision pendiente.
+Estado: fuente operativa vigente para especificacion tecnica, con ruleset de prueba de staging definido pero pendiente de aplicar.
 Fecha de sincronizacion de reglas aprobadas: 2026-05-17.
 Fecha de revision de la fuente mas reciente: 2026-08-06.
 Fuentes consolidadas: `/Users/fgomezserna/Downloads/Token UKI.docx`, `/Users/fgomezserna/Downloads/Funcionamiento.docx` y `/Users/fgomezserna/Downloads/UKI/Preventa UKI.docx`.
@@ -21,11 +21,11 @@ Tambien aparecen dos matices que no cambian cifras congeladas por ahora:
 - La preventa podria ampliarse despues de los 30 dias si no alcanza 3,000 ASM. El contrato soporta que el owner actualice la ventana con `setSaleWindow`, pero falta aprobar el criterio, la autoridad y el limite de extension antes de convertirlo en regla operativa.
 - El desbloqueo progresivo de claim 20%/40%/60%/80%/100% aparece como propuesta a valorar, no como decision aprobada ni comportamiento implementado.
 
-Antes de cargar el ruleset siguen pendientes `programStartsAt`, la frontera diaria UTC, la gracia de reserva tardia y las direcciones staging de los destinos. Hasta entonces los rulesets de rewards y sus schedulers deben permanecer desactivados en staging.
+Para probar la economia aislada se define `staging-test-v1`, exclusivamente para Coolify app 28, BSC Testnet (`97`) y `cukieshub-new-staging`. No es una aprobacion de parametros temporales ni wallets para produccion. Usa `programStartsAt=2026-08-10T00:00:00.000Z`, frontera diaria `00:00 UTC`, gracia tardia de 24 horas y siete direcciones sink distintas con prefijo `0x97...` que solo identifican destinos de prueba. El bootstrap hace `plan/apply` atomico de rewards, competition credits, Treasure Hunt y ranking; exige los cinco sources contractuales verificados y frescos en chain `97`, las bases staging exactas y todos los gates runtime en `false`. Mientras falte el source NFT testnet o el plan no quede limpio, no escribe ninguna regla. Los schedulers siguen desactivados hasta completar la verificacion manual posterior.
 
 ### Guardarrail tecnico de emision
 
-La Economy v2 exige ahora que cada `RewardRule` declare de forma explicita `programStartsAt`, frontera diaria UTC, gracia de reserva, `dailyCapRaw`, `lifetimeCapRaw`, politica de capacidad no usada y politica de exceso. No existen defaults en codigo: el ruleset staging debera cargar explicitamente 500,000 UKI como maximo diario y 450,000,000 UKI como techo acumulado una vez aprobados sus parametros temporales y destinos.
+La Economy v2 exige ahora que cada `RewardRule` declare de forma explicita `programStartsAt`, frontera diaria UTC, gracia de reserva, `dailyCapRaw`, `lifetimeCapRaw`, politica de capacidad no usada y politica de exceso. No existen defaults en codigo: `staging-test-v1` carga explicitamente 500,000 UKI como maximo diario y 450,000,000 UKI como techo acumulado. La configuracion equivalente de produccion sigue pendiente de aprobacion expresa de sus parametros temporales y destinos reales.
 
 Antes de crear un manifest, allocation o accrual, el servicio reserva el total bruto de la fuente dentro de la misma transaccion Mongo. El ledger usa tres colecciones globales:
 
