@@ -33,7 +33,10 @@ pnpm cards:dev
 - `CARD_WORKER_S3_PREFIX`: prefijo S3. Default: `png/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe`.
 - `CARD_WORKER_S3_ENDPOINT`: opcional para S3-compatible.
 - `CARD_WORKER_S3_FORCE_PATH_STYLE`: `true` para endpoints compatibles.
+- `CARD_WORKER_S3_ACL`: ACL opcional del objeto; en staging se usa `private` y el bucket concede solo lectura publica.
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`: credenciales S3.
+
+Cada PNG se publica bajo una clave inmutable `<prefix>/<tokenId-base64url>/<sha256>.png` y con `Cache-Control: public, max-age=31536000, immutable`. Una regeneracion con contenido distinto cambia la URL antes de actualizar Mongo, por lo que CDN y clientes no pueden mezclar la card nueva con una version cacheada anterior.
 
 ## Seleccion de pendientes
 

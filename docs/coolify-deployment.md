@@ -162,7 +162,7 @@ AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
 
-En staging, mantener `CARD_WORKER_UPLOAD=false` hasta disponer de bucket/prefijo propios. No activar `true` con el destino compartido de produccion.
+En staging, el destino exclusivo es el bucket MinIO `cukies-cards-staging`. Mantener `CARD_WORKER_UPLOAD=false` y el profile `card-worker` desactivado hasta desplegar las URLs inmutables de #216 y repetir el smoke; despues, activar ambos valores solo en la app Coolify 28. No usar nunca el destino compartido de produccion.
 
 ## Validacion post deploy
 
