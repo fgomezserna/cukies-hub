@@ -42,6 +42,7 @@
     "cards:process": "pnpm --filter @cukies/cuki-card-worker run process:once",
     "cards:render": "pnpm --filter @cukies/cuki-card-worker run render",
     "cards:generate": "pnpm --filter @cukies/cuki-card-worker run generate",
+    "test:cards": "pnpm --filter @cukies/cuki-card-worker run test",
     "build:cards": "pnpm --filter @cukies/cuki-card-worker run build",
     "start:cards": "pnpm --filter @cukies/cuki-card-worker run start",
     "build:dapp": "pnpm --filter dapp build",

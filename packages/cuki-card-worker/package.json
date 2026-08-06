@@ -16,6 +16,7 @@
     "process:once": "tsx src/cli.ts process-once",
     "render": "tsx src/cli.ts render-token",
     "generate": "tsx src/cli.ts generate-token",
+    "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
