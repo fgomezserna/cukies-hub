@@ -62,6 +62,7 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
     "settlementBps",
     "rankingPlayerBps",
     "creditPoolDaily",
+    "emissionBudget",
     "cukiePool",
     "undistributedBps",
     "destinations",
@@ -86,6 +87,19 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
     item.creditPoolDaily,
     ["sourceShareBps", "floorEnabled", "floorCreditsStep", "floorAmountRaw"],
     "creditPoolDaily",
+  );
+  const emissionBudget = nested(
+    item.emissionBudget,
+    [
+      "programStartsAt",
+      "dayBoundarySecondUtc",
+      "lateReservationGraceSeconds",
+      "dailyCapRaw",
+      "lifetimeCapRaw",
+      "unusedDailyCapacity",
+      "overflowPolicy",
+    ],
+    "emissionBudget",
   );
   const cukiePool = nested(item.cukiePool, ["cumulativeTierCount"], "cukiePool");
   const undistributedBps = nested(
@@ -118,6 +132,13 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
     settlementBps,
     rankingPlayerBps,
     creditPoolDaily,
+    emissionBudget: {
+      ...emissionBudget,
+      programStartsAt: isoDate(
+        emissionBudget.programStartsAt,
+        "emissionBudget.programStartsAt",
+      ),
+    },
     cukiePool,
     undistributedBps,
     destinations,

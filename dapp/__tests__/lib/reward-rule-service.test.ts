@@ -1,4 +1,5 @@
 import { RewardRuleService } from "@/lib/uki-economy/rewards/rule-service";
+import { parseRewardInternalCommand } from "@/lib/uki-economy/rewards/internal-command";
 import {
   createMemoryRewardTransactionRunner,
   MemoryRewardRepository,
@@ -38,5 +39,33 @@ describe("RewardRuleService", () => {
 
     await expect(service.persistRule(input(overlapping))).rejects.toThrow(/solapa/);
     expect(repository.state.rules).toHaveLength(1);
+  });
+
+  it("parsea la configuracion explicita de presupuesto sin defaults", () => {
+    const { now: _now, ...payload } = input(testRewardRule());
+    const command = parseRewardInternalCommand(Buffer.from(JSON.stringify({
+      command: "persist_rule",
+      payload,
+    })));
+
+    expect(command).toMatchObject({
+      command: "persist_rule",
+      payload: {
+        emissionBudget: {
+          programStartsAt: expect.any(Date),
+          dayBoundarySecondUtc: 0,
+          unusedDailyCapacity: "expires",
+          overflowPolicy: "block",
+        },
+      },
+    });
+  });
+
+  it("rechaza una regla interna sin presupuesto de emision", () => {
+    const { now: _now, emissionBudget: _budget, ...payload } = input(testRewardRule());
+    expect(() => parseRewardInternalCommand(Buffer.from(JSON.stringify({
+      command: "persist_rule",
+      payload,
+    })))).toThrow(/emissionBudget debe ser un objeto/);
   });
 });

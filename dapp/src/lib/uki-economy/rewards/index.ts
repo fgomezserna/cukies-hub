@@ -1,5 +1,6 @@
 export * from "./calculation";
 export * from "./coordinator";
+export * from "./emission-budget";
 export * from "./index-definitions";
 export * from "./internal-command";
 export * from "./merkle";

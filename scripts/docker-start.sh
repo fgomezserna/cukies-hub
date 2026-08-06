@@ -14,6 +14,7 @@ case "${CUKIES_SERVICE:-dapp}" in
     ;;
   chain-indexer)
     pnpm --filter @cukies/chain-indexer run setup:prod
+    pnpm --filter @cukies/chain-indexer run setup:economy:prod
     exec pnpm --filter @cukies/chain-indexer run start
     ;;
   cuki-card-worker)

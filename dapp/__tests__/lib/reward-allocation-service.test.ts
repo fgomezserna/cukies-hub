@@ -62,6 +62,11 @@ describe("RewardAllocationService", () => {
       first.allocations.length
     );
     expect(repository.state.sourceManifests).toHaveLength(1);
+    expect(repository.state.emissionBudgetEvents).toHaveLength(1);
+    expect(repository.state.emissionBudgetStates[0].reservedLifetimeRaw).toBe(
+      input.sourceTotalRaw,
+    );
+    expect(repository.state.emissionBudgetDays[0].reservedRaw).toBe(input.sourceTotalRaw);
     expect(first.accruals).toEqual(expect.arrayContaining([
       expect.objectContaining({ category: "weekly_prize_pool", status: "accrued" }),
       expect.objectContaining({ category: "credit_pool_weekly", status: "accrued" }),
@@ -169,6 +174,9 @@ describe("RewardAllocationService", () => {
     expect(repository.state.sourceManifests).toHaveLength(0);
     expect(repository.state.allocations).toHaveLength(0);
     expect(repository.state.periodStates).toHaveLength(0);
+    expect(repository.state.emissionBudgetEvents).toHaveLength(0);
+    expect(repository.state.emissionBudgetStates).toHaveLength(0);
+    expect(repository.state.emissionBudgetDays).toHaveLength(0);
   });
 
   it("bloquea el source y abre incidente si detecta tamper", async () => {
@@ -207,6 +215,29 @@ describe("RewardAllocationService", () => {
     if (result.status === "blocked") {
       expect(result.incident.reasonCodes).toContain("ALLOCATION_SET_MISMATCH");
     }
+  });
+
+  it("bloquea un replay que cambia la evidencia de calculo ya reservada", async () => {
+    const { repository, service, input } = fixture();
+    await service.persistAllocationSet(input);
+
+    const result = await service.persistAllocationSet({
+      ...input,
+      calculation: {
+        ...input.calculation,
+        outputHash: "c".repeat(64),
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    if (result.status === "blocked") {
+      expect(result.incident.reasonCodes).toEqual(expect.arrayContaining([
+        "ALLOCATION_SOURCE_MISMATCH",
+        "SOURCE_MANIFEST_MISMATCH",
+      ]));
+    }
+    expect(repository.state.allocations.every((item) => item.status === "blocked")).toBe(true);
+    expect(repository.state.emissionBudgetEvents).toHaveLength(1);
   });
 
   it("rechaza antes de persistir un total incompleto", async () => {

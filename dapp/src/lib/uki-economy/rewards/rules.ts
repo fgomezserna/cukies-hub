@@ -105,6 +105,7 @@ export function buildRewardRuleConfigHash(rule: RewardRule) {
       )
     ),
     creditPoolDaily: rule.creditPoolDaily,
+    emissionBudget: rule.emissionBudget,
     cukiePool: rule.cukiePool,
     undistributedBps: rule.undistributedBps,
     destinations: Object.fromEntries(
@@ -204,6 +205,46 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
   }
   if (!rule.creditPoolDaily.floorEnabled && parseRawAmount(rule.creditPoolDaily.floorAmountRaw) !== BigInt(0)) {
     throw new DomainValidationError("El floor deshabilitado debe tener floorAmountRaw=0.");
+  }
+  const emissionBudget = rule.emissionBudget;
+  if (!emissionBudget || typeof emissionBudget !== "object") {
+    throw new DomainValidationError("emissionBudget es obligatorio.");
+  }
+  validRewardDate(emissionBudget.programStartsAt, "emissionBudget.programStartsAt");
+  boundedInteger(
+    emissionBudget.dayBoundarySecondUtc,
+    "emissionBudget.dayBoundarySecondUtc",
+    0,
+    86_399,
+  );
+  boundedInteger(
+    emissionBudget.lateReservationGraceSeconds,
+    "emissionBudget.lateReservationGraceSeconds",
+    0,
+    604_800,
+  );
+  const dailyCapRaw = formatRawAmount(parseRawAmount(emissionBudget.dailyCapRaw));
+  const lifetimeCapRaw = formatRawAmount(parseRawAmount(emissionBudget.lifetimeCapRaw));
+  if (
+    dailyCapRaw !== emissionBudget.dailyCapRaw
+    || lifetimeCapRaw !== emissionBudget.lifetimeCapRaw
+  ) {
+    throw new DomainValidationError("Los caps de emissionBudget deben usar raw canonico.");
+  }
+  if (
+    parseRawAmount(dailyCapRaw) <= BigInt(0)
+    || parseRawAmount(lifetimeCapRaw) <= BigInt(0)
+    || parseRawAmount(dailyCapRaw) > parseRawAmount(lifetimeCapRaw)
+  ) {
+    throw new DomainValidationError(
+      "emissionBudget exige caps positivos y dailyCapRaw <= lifetimeCapRaw.",
+    );
+  }
+  if (emissionBudget.unusedDailyCapacity !== "expires") {
+    throw new DomainValidationError("unusedDailyCapacity debe ser expires en rewards v1.");
+  }
+  if (emissionBudget.overflowPolicy !== "block") {
+    throw new DomainValidationError("overflowPolicy debe ser block en rewards v1.");
   }
   if (rule.cukiePool.cumulativeTierCount !== 6) {
     throw new DomainValidationError("El pool de Cukies debe tener seis tramos acumulativos.");

@@ -24,6 +24,18 @@ Tambien aparecen dos matices que no cambian cifras congeladas por ahora:
 
 Mientras estos puntos sigan abiertos, los rulesets economicos y sus schedulers deben permanecer desactivados en staging.
 
+### Guardarrail tecnico de emision
+
+La Economy v2 exige ahora que cada `RewardRule` declare de forma explicita `programStartsAt`, frontera diaria UTC, gracia de reserva, `dailyCapRaw`, `lifetimeCapRaw`, politica de capacidad no usada y politica de exceso. No existen defaults para `500,000` ni `450,000,000` UKI: hasta que producto apruebe esas cifras y fechas no debe cargarse una regla activa.
+
+Antes de crear un manifest, allocation o accrual, el servicio reserva el total bruto de la fuente dentro de la misma transaccion Mongo. El ledger usa tres colecciones globales:
+
+- `reward_emission_budget_state`: total acumulado, revision de fencing y configuracion irreversible del programa;
+- `reward_emission_budget_days`: consumo por ventana diaria UTC;
+- `reward_emission_budget_events`: decision inmutable por `sourceId`, con saldos anterior/posterior, regla, hashes de calculo y motivo de bloqueo.
+
+Los replays no vuelven a consumir saldo. Un exceso diario/acumulado, una fuente anterior al inicio, una fecha economica futura o una reserva posterior al cierre devuelve `budget_blocked` y no materializa rewards. El sello semanal ancla tanto las reservas como los bloqueos y vuelve a validar cada evento antes de crear un draft Merkle; una decision ausente o manipulada impide claims. El techo acumulado, el inicio, la frontera, la gracia y las politicas no pueden cambiar mediante una nueva version ordinaria una vez iniciado el ledger; cualquier migracion futura requeriria una operacion separada y auditada. `unusedDailyCapacity=expires` y `overflowPolicy=block` son las unicas politicas implementadas en esta primera version, pero no se activan hasta recibir aprobacion de producto.
+
 ## Preventa UKI
 
 - Inicio previsto: primera semana de junio de 2026.

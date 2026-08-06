@@ -68,6 +68,7 @@ async function fixture() {
     repository.state.allocations,
     repository.state.accruals,
     repository.state.sourceManifests,
+    repository.state.emissionBudgetEvents,
   );
   await sealService.sealPeriod({
     periodId: "2026-W28",
@@ -123,6 +124,84 @@ describe("reward claim batch draft", () => {
     })).rejects.toThrow(/sigue en curso/);
     expect(repository.state.periodStates).toEqual([]);
     expect(repository.state.periodSeals).toEqual([]);
+  });
+
+  it("sella el censo incluyendo sources bloqueados explicitamente por presupuesto", async () => {
+    const baseRule = testRewardRule();
+    const rule = testRewardRule({
+      emissionBudget: {
+        ...baseRule.emissionBudget,
+        dailyCapRaw: "10000",
+        lifetimeCapRaw: "100000",
+      },
+    });
+    const repository = new MemoryRewardRepository(rule);
+    const runner = createMemoryRewardTransactionRunner(repository);
+    const allocations = new RewardAllocationService(runner);
+    const seal = new RewardPeriodSealService(runner);
+    const persist = async (sessionId: string) => {
+      const calculated = calculateSettlementRewardAllocations(rule, {
+        periodId: "2026-W28",
+        sourceId: `game-session:${sessionId}`,
+        playerWallet: PLAYER,
+        grossConvertedRaw: "7500",
+        maxConvertibleRaw: "7500",
+        creditSource: "pool",
+        cukieSource: "own",
+        ranking: 5,
+        creditCostUnits: 100,
+        weeklyReserveUnits: 25,
+      });
+      return allocations.persistAllocationSet({
+        periodId: "2026-W28",
+        sourceId: `game-session:${sessionId}`,
+        sourceTotalRaw: calculated.totals.sourceTotalRaw,
+        expectedRuleVersion: rule.version,
+        ruleEffectiveAt: NOW,
+        allocations: calculated.allocations,
+        accruals: calculated.accruals,
+        calculation: {
+          jobRunId: `reward-job:${sessionId}`,
+          kind: "settlement",
+          inputHash: sessionId === "budget-ok" ? "a".repeat(64) : "c".repeat(64),
+          outputHash: sessionId === "budget-ok" ? "b".repeat(64) : "d".repeat(64),
+        },
+        now: NOW,
+      });
+    };
+
+    await expect(persist("budget-ok")).resolves.toMatchObject({ status: "allocated" });
+    await expect(persist("budget-blocked")).resolves.toMatchObject({
+      status: "budget_blocked",
+      emissionBudgetEvent: { reason: "DAILY_CAP_EXCEEDED" },
+    });
+    repository.state.settledGameSessions.push(
+      { sessionId: "budget-ok", settledAt: NOW },
+      { sessionId: "budget-blocked", settledAt: NOW },
+    );
+    const periodAllocationHash = buildRewardPeriodAllocationHash(
+      "2026-W28",
+      repository.state.allocations,
+      repository.state.accruals,
+      repository.state.sourceManifests,
+      repository.state.emissionBudgetEvents,
+    );
+    const expectedSourceIds = [
+      "game-session:budget-blocked",
+      "game-session:budget-ok",
+    ];
+
+    await expect(seal.sealPeriod({
+      periodId: "2026-W28",
+      expectedSourceIds,
+      expectedPeriodAllocationHash: periodAllocationHash,
+      expectedRuleVersion: rule.version,
+      sealedBy: "reward-test-coordinator",
+      now: W28_CLOSED_AT,
+    })).resolves.toMatchObject({
+      replayed: false,
+      seal: { expectedSourceIds },
+    });
   });
 
   it("materializa Merkle determinista y compatible con proof por wallet", async () => {
@@ -240,6 +319,17 @@ describe("reward claim batch draft", () => {
       metadata: "preview",
       now: NOW,
     })).rejects.toThrow(/manifest global/);
+
+    const tamperedBudget = await fixture();
+    tamperedBudget.repository.state.emissionBudgetEvents[0].payloadHash = "f".repeat(64);
+    await expect(tamperedBudget.claimService.createDraft({
+      periodId: "2026-W28",
+      expectedPeriodAllocationHash: tamperedBudget.periodAllocationHash,
+      chainId: 56,
+      distributorAddress: DISTRIBUTOR,
+      metadata: "preview",
+      now: NOW,
+    })).rejects.toThrow(/presupuesto manipuladas/);
   });
 
   it("rechaza sources nuevos o incidentes despues de sellar el periodo", async () => {
@@ -335,6 +425,7 @@ describe("reward claim batch draft", () => {
       repository.state.allocations,
       repository.state.accruals,
       repository.state.sourceManifests,
+      repository.state.emissionBudgetEvents,
     );
     await expect(seal.sealPeriod({
       periodId: "2026-W28",
@@ -425,6 +516,7 @@ describe("reward claim batch draft", () => {
       repository.state.allocations,
       repository.state.accruals,
       repository.state.sourceManifests,
+      repository.state.emissionBudgetEvents,
     );
     await seal.sealPeriod({
       periodId: "2026-W29",

@@ -10,6 +10,9 @@ import {
   type RewardClaimBatch,
   type RewardClaimProof,
   type RewardIntegrityIncident,
+  type RewardEmissionBudgetDay,
+  type RewardEmissionBudgetEvent,
+  type RewardEmissionBudgetState,
   type RewardPeriodSeal,
   type RewardPeriodState,
   type RewardPoolAccrual,
@@ -27,6 +30,18 @@ export interface RewardRepository {
   ): Promise<RewardRule | null>;
   insertRule(rule: RewardRule): Promise<void>;
   advanceRuleScope(now: Date): Promise<RewardRuleState>;
+  findEmissionBudgetEvent(sourceId: string): Promise<RewardEmissionBudgetEvent | null>;
+  insertEmissionBudgetEvent(event: RewardEmissionBudgetEvent): Promise<void>;
+  findEmissionBudgetState(): Promise<RewardEmissionBudgetState | null>;
+  persistEmissionBudgetState(
+    expectedRevision: number | null,
+    state: RewardEmissionBudgetState,
+  ): Promise<void>;
+  findEmissionBudgetDay(dayId: string): Promise<RewardEmissionBudgetDay | null>;
+  persistEmissionBudgetDay(
+    expectedRevision: number | null,
+    day: RewardEmissionBudgetDay,
+  ): Promise<void>;
   findSourceManifest(sourceId: string): Promise<RewardSourceManifest | null>;
   findAnyAllocationBySourceId(sourceId: string): Promise<RewardAllocation | null>;
   findAnyAccrualBySourceId(sourceId: string): Promise<RewardPoolAccrual | null>;
@@ -46,6 +61,11 @@ export interface RewardRepository {
     afterSourceId: string | null,
     limit: number,
   ): Promise<RewardSourceManifest[]>;
+  listPeriodEmissionBudgetEventsPage(
+    periodId: string,
+    afterSourceId: string | null,
+    limit: number,
+  ): Promise<RewardEmissionBudgetEvent[]>;
   listPeriodAccrualsPage(
     periodId: string,
     afterAccrualId: string | null,
@@ -96,6 +116,15 @@ export function createMongoRewardRepository(
 ): RewardRepository {
   const rules = db.collection<RewardRule>("economy_rule_versions");
   const ruleStates = db.collection<RewardRuleState>("reward_rule_state");
+  const emissionBudgetEvents = db.collection<RewardEmissionBudgetEvent>(
+    "reward_emission_budget_events",
+  );
+  const emissionBudgetStates = db.collection<RewardEmissionBudgetState>(
+    "reward_emission_budget_state",
+  );
+  const emissionBudgetDays = db.collection<RewardEmissionBudgetDay>(
+    "reward_emission_budget_days",
+  );
   const sourceManifests = db.collection<RewardSourceManifest>("reward_source_manifests");
   const allocations = db.collection<RewardAllocation>("reward_allocations");
   const accruals = db.collection<RewardPoolAccrual>("reward_pool_accruals");
@@ -158,6 +187,46 @@ export function createMongoRewardRepository(
         throw new DomainConflictError("Fence obsoleto del scope de reglas rewards.");
       }
       return replacement;
+    },
+    findEmissionBudgetEvent: (sourceId) => emissionBudgetEvents.findOne(
+      { _id: sourceId },
+      options,
+    ),
+    async insertEmissionBudgetEvent(event) {
+      await emissionBudgetEvents.insertOne(event, options);
+    },
+    findEmissionBudgetState: () => emissionBudgetStates.findOne(
+      { _id: REWARD_RULE_SCOPE },
+      options,
+    ),
+    async persistEmissionBudgetState(expectedRevision, state) {
+      if (expectedRevision === null) {
+        await emissionBudgetStates.insertOne(state, options);
+        return;
+      }
+      const result = await emissionBudgetStates.replaceOne(
+        { _id: REWARD_RULE_SCOPE, revision: expectedRevision },
+        state,
+        options,
+      );
+      if (result.matchedCount !== 1) {
+        throw new DomainConflictError("Fence obsoleto del presupuesto acumulado rewards.");
+      }
+    },
+    findEmissionBudgetDay: (dayId) => emissionBudgetDays.findOne({ _id: dayId }, options),
+    async persistEmissionBudgetDay(expectedRevision, day) {
+      if (expectedRevision === null) {
+        await emissionBudgetDays.insertOne(day, options);
+        return;
+      }
+      const result = await emissionBudgetDays.replaceOne(
+        { _id: day._id, revision: expectedRevision },
+        day,
+        options,
+      );
+      if (result.matchedCount !== 1) {
+        throw new DomainConflictError(`Fence obsoleto del presupuesto diario ${day.dayId}.`);
+      }
     },
     findSourceManifest: (sourceId) => sourceManifests.findOne({ _id: sourceId }, options),
     findAnyAllocationBySourceId: (sourceId) => allocations.findOne(
@@ -231,6 +300,15 @@ export function createMongoRewardRepository(
         .toArray(),
     listPeriodSourceManifestsPage: (periodId, afterSourceId, limit) =>
       sourceManifests
+        .find({
+          periodId,
+          ...(afterSourceId ? { _id: { $gt: afterSourceId } } : {}),
+        }, options)
+        .sort({ _id: 1 })
+        .limit(limit)
+        .toArray(),
+    listPeriodEmissionBudgetEventsPage: (periodId, afterSourceId, limit) =>
+      emissionBudgetEvents
         .find({
           periodId,
           ...(afterSourceId ? { _id: { $gt: afterSourceId } } : {}),

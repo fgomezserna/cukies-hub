@@ -4,6 +4,9 @@ import type {
   RewardAllocation,
   RewardClaimBatch,
   RewardClaimProof,
+  RewardEmissionBudgetDay,
+  RewardEmissionBudgetEvent,
+  RewardEmissionBudgetState,
   RewardIntegrityIncident,
   RewardPeriodSeal,
   RewardPeriodState,
@@ -75,6 +78,15 @@ export function testRewardRule(overrides: Partial<RewardRule> = {}): RewardRule 
       floorCreditsStep: 10,
       floorAmountRaw: "750000000000000000",
     },
+    emissionBudget: {
+      programStartsAt: now,
+      dayBoundarySecondUtc: 0,
+      lateReservationGraceSeconds: 86_400,
+      dailyCapRaw: "1000000000000000000000000000000",
+      lifetimeCapRaw: "100000000000000000000000000000000",
+      unusedDailyCapacity: "expires",
+      overflowPolicy: "block",
+    },
     cukiePool: { cumulativeTierCount: 6 },
     undistributedBps: {
       treasury: 8_000,
@@ -103,6 +115,9 @@ type MemoryState = {
   ruleStates: RewardRuleState[];
   sourceManifests: RewardSourceManifest[];
   accruals: RewardPoolAccrual[];
+  emissionBudgetDays: RewardEmissionBudgetDay[];
+  emissionBudgetEvents: RewardEmissionBudgetEvent[];
+  emissionBudgetStates: RewardEmissionBudgetState[];
   settledGameSessions: Array<{ sessionId: string; settledAt: Date }>;
   pendingGameSettlements: Array<{ sessionId: string; decidedAt: Date }>;
 };
@@ -122,6 +137,9 @@ export class MemoryRewardRepository implements RewardRepository {
       ruleStates: [],
       sourceManifests: [],
       accruals: [],
+      emissionBudgetDays: [],
+      emissionBudgetEvents: [],
+      emissionBudgetStates: [],
       settledGameSessions: [],
       pendingGameSettlements: [],
     };
@@ -184,6 +202,69 @@ export class MemoryRewardRepository implements RewardRepository {
     current.revision += 1;
     current.updatedAt = clone(now);
     return clone(current);
+  }
+
+  async findEmissionBudgetEvent(sourceId: string) {
+    return clone(
+      this.state.emissionBudgetEvents.find((event) => event.sourceId === sourceId) ?? null,
+    );
+  }
+
+  async insertEmissionBudgetEvent(event: RewardEmissionBudgetEvent) {
+    if (this.state.emissionBudgetEvents.some((item) => (
+      item._id === event._id || item.eventId === event.eventId || item.sourceId === event.sourceId
+    ))) {
+      throw Object.assign(new Error(`Decision de presupuesto duplicada: ${event.sourceId}.`), {
+        code: 11000,
+      });
+    }
+    this.state.emissionBudgetEvents.push(clone(event));
+  }
+
+  async findEmissionBudgetState() {
+    return clone(this.state.emissionBudgetStates[0] ?? null);
+  }
+
+  async persistEmissionBudgetState(
+    expectedRevision: number | null,
+    state: RewardEmissionBudgetState,
+  ) {
+    const current = this.state.emissionBudgetStates[0];
+    if (expectedRevision === null) {
+      if (current) {
+        throw Object.assign(new Error("Estado de presupuesto acumulado duplicado."), { code: 11000 });
+      }
+      this.state.emissionBudgetStates.push(clone(state));
+      return;
+    }
+    if (!current || current.revision !== expectedRevision) {
+      throw new DomainConflictError("Fence obsoleto del presupuesto acumulado rewards.");
+    }
+    this.state.emissionBudgetStates[0] = clone(state);
+  }
+
+  async findEmissionBudgetDay(dayId: string) {
+    return clone(this.state.emissionBudgetDays.find((day) => day.dayId === dayId) ?? null);
+  }
+
+  async persistEmissionBudgetDay(
+    expectedRevision: number | null,
+    day: RewardEmissionBudgetDay,
+  ) {
+    const index = this.state.emissionBudgetDays.findIndex((item) => item.dayId === day.dayId);
+    if (expectedRevision === null) {
+      if (index >= 0) {
+        throw Object.assign(new Error(`Dia de presupuesto duplicado: ${day.dayId}.`), {
+          code: 11000,
+        });
+      }
+      this.state.emissionBudgetDays.push(clone(day));
+      return;
+    }
+    if (index < 0 || this.state.emissionBudgetDays[index].revision !== expectedRevision) {
+      throw new DomainConflictError(`Fence obsoleto del presupuesto diario ${day.dayId}.`);
+    }
+    this.state.emissionBudgetDays[index] = clone(day);
   }
 
   async listSourceAllocations(periodId: string, sourceId: string) {
@@ -290,6 +371,20 @@ export class MemoryRewardRepository implements RewardRepository {
         .sort((left, right) => left._id.localeCompare(right._id))
         .slice(0, limit)
     );
+  }
+
+  async listPeriodEmissionBudgetEventsPage(
+    periodId: string,
+    afterSourceId: string | null,
+    limit: number,
+  ) {
+    return clone(this.state.emissionBudgetEvents
+      .filter((item) => (
+        item.periodId === periodId
+        && (!afterSourceId || item._id > afterSourceId)
+      ))
+      .sort((left, right) => left._id.localeCompare(right._id))
+      .slice(0, limit));
   }
 
   async listPeriodAccrualsPage(
@@ -441,13 +536,22 @@ export class MemoryRewardRepository implements RewardRepository {
 }
 
 export function createMemoryRewardTransactionRunner(repository: MemoryRewardRepository) {
+  let queue = Promise.resolve();
   const runner: RewardTransactionRunner = async (work) => {
+    let release: () => void = () => undefined;
+    const previous = queue;
+    queue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
     const snapshot = repository.snapshot();
     try {
       return await work(repository);
     } catch (error) {
       repository.restore(snapshot);
       throw error;
+    } finally {
+      release();
     }
   };
   return runner;

@@ -5,6 +5,23 @@ export const REWARD_MAX_ALLOCATIONS_PER_SOURCE = 10_000 as const;
 export const REWARD_MAX_ALLOCATIONS_PER_PERIOD = 100_000 as const;
 export const REWARD_ALLOCATION_PAGE_SIZE = 1_000 as const;
 
+export const REWARD_EMISSION_BUDGET_SCOPE = REWARD_RULE_SCOPE;
+
+export type RewardEmissionBudgetConfig = {
+  /** Inicio irreversible del programa global; cambiarlo no reinicia el ledger. */
+  programStartsAt: Date;
+  /** Segundo UTC (0-86399) en el que empieza cada ventana diaria. */
+  dayBoundarySecondUtc: number;
+  /** Gracia explicita para materializar una fuente despues del fin de su dia. */
+  lateReservationGraceSeconds: number;
+  dailyCapRaw: string;
+  lifetimeCapRaw: string;
+  /** V1 no acumula capacidad diaria no utilizada. */
+  unusedDailyCapacity: "expires";
+  /** V1 nunca convierte un exceso en un claim o accrual implicito. */
+  overflowPolicy: "block";
+};
+
 export type RewardCategory =
   | "player"
   | "credit_pool_daily"
@@ -55,6 +72,7 @@ export type RewardRule = {
     floorCreditsStep: number;
     floorAmountRaw: string;
   };
+  emissionBudget: RewardEmissionBudgetConfig;
   cukiePool: {
     cumulativeTierCount: 6;
   };
@@ -175,6 +193,80 @@ export type RewardSourceManifest = {
   updatedAt: Date;
 };
 
+export type RewardEmissionBudgetState = {
+  _id: typeof REWARD_EMISSION_BUDGET_SCOPE;
+  scope: typeof REWARD_EMISSION_BUDGET_SCOPE;
+  programStartsAt: Date;
+  dayBoundarySecondUtc: number;
+  lateReservationGraceSeconds: number;
+  unusedDailyCapacity: RewardEmissionBudgetConfig["unusedDailyCapacity"];
+  overflowPolicy: RewardEmissionBudgetConfig["overflowPolicy"];
+  lifetimeCapRaw: string;
+  reservedLifetimeRaw: string;
+  revision: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type RewardEmissionBudgetDay = {
+  _id: string;
+  dayId: string;
+  startsAt: Date;
+  endsAt: Date;
+  reservationClosesAt: Date;
+  reservedRaw: string;
+  revision: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type RewardEmissionBudgetReason =
+  | "RESERVED"
+  | "PROGRAM_NOT_STARTED"
+  | "SOURCE_EFFECTIVE_AT_IN_FUTURE"
+  | "DAY_CLOSED"
+  | "DAILY_CAP_EXCEEDED"
+  | "LIFETIME_CAP_EXCEEDED";
+
+/**
+ * Decision inmutable y global por source. Tambien actua como fence de replay:
+ * una fuente rechazada no puede reaparecer con otra fecha, regla o reparto.
+ */
+export type RewardEmissionBudgetEvent = {
+  _id: string;
+  eventId: string;
+  sourceId: string;
+  periodId: string;
+  dayId: string;
+  dayStartsAt: Date;
+  dayEndsAt: Date;
+  reservationClosesAt: Date;
+  sourceTotalRaw: string;
+  status: "reserved" | "blocked";
+  reason: RewardEmissionBudgetReason;
+  previousDailyRaw: string;
+  resultingDailyRaw: string;
+  dailyCapRaw: string;
+  previousLifetimeRaw: string;
+  resultingLifetimeRaw: string;
+  lifetimeCapRaw: string;
+  programStartsAt: Date;
+  dayBoundarySecondUtc: number;
+  lateReservationGraceSeconds: number;
+  unusedDailyCapacity: RewardEmissionBudgetConfig["unusedDailyCapacity"];
+  overflowPolicy: RewardEmissionBudgetConfig["overflowPolicy"];
+  ruleVersion: string;
+  ruleConfigHash: string;
+  ruleEffectiveAt: Date;
+  sourceSetHash: string;
+  calculationJobRunId: string;
+  calculationKind: RewardAllocation["calculationKind"];
+  calculationInputHash: string;
+  calculationOutputHash: string;
+  payloadHash: string;
+  createdAt: Date;
+};
+
 export type CreditSourceKind = "own" | "pool";
 export type CukieSourceKind = "own" | "pool_original" | "pool_second_plus";
 
@@ -254,6 +346,7 @@ export type PersistRewardAllocationSetResult =
       allocations: RewardAllocation[];
       accruals: RewardPoolAccrual[];
       sourceSetHash: string;
+      emissionBudgetEvent: RewardEmissionBudgetEvent;
     }
   | {
       status: "blocked";
@@ -262,6 +355,15 @@ export type PersistRewardAllocationSetResult =
       accruals: RewardPoolAccrual[];
       incident: RewardIntegrityIncident;
       sourceSetHash: string;
+      emissionBudgetEvent: RewardEmissionBudgetEvent;
+    }
+  | {
+      status: "budget_blocked";
+      replayed: boolean;
+      allocations: [];
+      accruals: [];
+      sourceSetHash: string;
+      emissionBudgetEvent: RewardEmissionBudgetEvent;
     };
 
 export type CreditPoolContributor = {

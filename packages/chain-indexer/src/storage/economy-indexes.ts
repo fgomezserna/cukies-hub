@@ -47,6 +47,9 @@ export const ECONOMY_COLLECTIONS = [
   'game_economy_runtime_state',
   'game_economy_runtime_runs',
   'reward_rule_state',
+  'reward_emission_budget_state',
+  'reward_emission_budget_days',
+  'reward_emission_budget_events',
   'reward_source_manifests',
   'reward_allocations',
   'reward_pool_accruals',
@@ -652,6 +655,41 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     collection: 'reward_rule_state',
     keys: { scope: 1, revision: 1 },
     options: { unique: true, name: 'reward_rule_scope_fence' },
+  },
+  {
+    collection: 'reward_emission_budget_state',
+    keys: { scope: 1, revision: 1 },
+    options: { unique: true, name: 'reward_emission_budget_global_fence' },
+  },
+  {
+    collection: 'reward_emission_budget_days',
+    keys: { dayId: 1 },
+    options: { unique: true, name: 'reward_emission_budget_day' },
+  },
+  {
+    collection: 'reward_emission_budget_days',
+    keys: { startsAt: 1, _id: 1 },
+    options: { name: 'reward_emission_budget_day_cursor' },
+  },
+  {
+    collection: 'reward_emission_budget_events',
+    keys: { eventId: 1 },
+    options: { unique: true, name: 'reward_emission_budget_event' },
+  },
+  {
+    collection: 'reward_emission_budget_events',
+    keys: { sourceId: 1 },
+    options: { unique: true, name: 'reward_emission_budget_source_fence' },
+  },
+  {
+    collection: 'reward_emission_budget_events',
+    keys: { dayId: 1, status: 1, createdAt: 1, _id: 1 },
+    options: { name: 'reward_emission_budget_audit_cursor' },
+  },
+  {
+    collection: 'reward_emission_budget_events',
+    keys: { periodId: 1, _id: 1 },
+    options: { name: 'reward_emission_budget_period_cursor' },
   },
   {
     collection: 'reward_source_manifests',
