@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   resolveBscRpcUrls,
   resolveMongoDatabaseNameFromUrl,
+  resolveVerifiedBscContractIdentity,
 } from '../src/config/env.js';
 
 test('testnet ignores the legacy mainnet RPC and keeps only explicit URLs', () => {
@@ -61,4 +62,42 @@ test('legacy imports fail closed when the URL has no database', () => {
     ),
     /debe incluir explicitamente el nombre de la base de datos/,
   );
+});
+
+test('verified BSC identity requires exact deployment evidence without network defaults', () => {
+  const identity = resolveVerifiedBscContractIdentity({
+    alias: 'VESTING_VAULT',
+    chainId: 97,
+    address: `0x${'1'.repeat(40)}`,
+    startBlock: 123,
+    deploymentBlock: 123,
+    deploymentTxHash: `0x${'2'.repeat(64)}`,
+    runtimeCodeHash: `0x${'3'.repeat(64)}`,
+    requested: true,
+  });
+  assert.equal(identity?.chainId, 97);
+  assert.match(identity?.configHash ?? '', /^0x[0-9a-f]{64}$/);
+  assert.throws(
+    () => resolveVerifiedBscContractIdentity({
+      alias: 'VESTING_VAULT',
+      chainId: 97,
+      address: `0x${'1'.repeat(40)}`,
+      startBlock: 122,
+      deploymentBlock: 123,
+      deploymentTxHash: `0x${'2'.repeat(64)}`,
+      runtimeCodeHash: `0x${'3'.repeat(64)}`,
+      requested: true,
+    }),
+    /start block y deployment block explicitos e iguales/,
+  );
+  assert.equal(resolveVerifiedBscContractIdentity({
+    alias: 'VESTING_VAULT',
+    chainId: 97,
+    address: undefined,
+    startBlock: undefined,
+    deploymentBlock: undefined,
+    deploymentTxHash: undefined,
+    runtimeCodeHash: undefined,
+    requested: false,
+  }), undefined);
 });

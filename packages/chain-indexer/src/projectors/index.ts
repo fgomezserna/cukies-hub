@@ -870,6 +870,40 @@ async function projectPresalePurchase(store: IndexerStore, event: ChainEvent) {
   return null;
 }
 
+async function verifiedContractCursor(
+  store: IndexerStore,
+  event: ChainEvent,
+  alias: 'UKI_STAKING' | 'VESTING_VAULT',
+) {
+  const cursor = await store.cursors().findOne({
+    chain: event.chain,
+    contractAlias: alias,
+    eventName: event.eventName,
+    contractAddress: event.contractAddress,
+    bootstrapStatus: 'verified',
+  });
+  if (
+    !cursor
+    || !(cursor.bootstrapVerifiedAt instanceof Date)
+    || event.chain !== 'BSC'
+    || (cursor.verifiedChainId !== 56 && cursor.verifiedChainId !== 97)
+    || typeof cursor.contractAddress !== 'string'
+    || cursor.contractAddress.toLowerCase() !== event.contractAddress.toLowerCase()
+    || typeof cursor.contractCodeHash !== 'string'
+    || !/^0x[0-9a-f]{64}$/.test(cursor.contractCodeHash)
+    || typeof cursor.contractConfigHash !== 'string'
+    || !/^0x[0-9a-f]{64}$/.test(cursor.contractConfigHash)
+    || typeof cursor.contractDeploymentTxHash !== 'string'
+    || !/^0x[0-9a-f]{64}$/.test(cursor.contractDeploymentTxHash)
+    || !Number.isSafeInteger(cursor.contractDeploymentBlock)
+    || !Number.isSafeInteger(cursor.bootstrapStartBlock)
+    || cursor.bootstrapStartBlock !== cursor.contractDeploymentBlock
+  ) {
+    throw new Error(`${event.eventName} no tiene cursor contractual verificado.`);
+  }
+  return cursor;
+}
+
 export async function projectUkiStakingPosition(
   store: IndexerStore,
   event: ChainEvent,
@@ -892,6 +926,7 @@ export async function projectUkiStakingPosition(
   }
 
   const observedAt = eventDate(event);
+  const cursor = await verifiedContractCursor(store, event, 'UKI_STAKING');
   const tuple = { blockNumber: event.blockNumber, logIndex: event.logIndex };
   await monotonicAbsoluteUpdate(
     collection(store, 'uki_staking_positions'),
@@ -906,6 +941,19 @@ export async function projectUkiStakingPosition(
       lastEventId: event._id,
       lastTxHash: event.txHash,
       observedAt,
+      bootstrapStatus: cursor.bootstrapStatus,
+      bootstrapStartBlock: cursor.bootstrapStartBlock,
+      bootstrapVerifiedAt: cursor.bootstrapVerifiedAt,
+      verifiedChainId: cursor.verifiedChainId,
+      contractCodeHash: cursor.contractCodeHash,
+      contractDeploymentBlock: cursor.contractDeploymentBlock,
+      contractDeploymentTxHash: cursor.contractDeploymentTxHash,
+      contractConfigHash: cursor.contractConfigHash,
+      materializationStatus: 'consistent',
+      materializedTotalRaw: totalStakedRaw,
+      materializedThroughEventId: event._id,
+      materializedThroughBlockNumber: event.blockNumber,
+      materializedThroughLogIndex: event.logIndex,
       updatedAt: observedAt,
     },
     observedAt,
@@ -931,6 +979,137 @@ export async function projectUkiStakingPosition(
     session,
   );
 
+  return null;
+}
+
+type VestingLedgerProjection = {
+  _id: string;
+  eventId: string;
+  eventName: 'VestingCreated' | 'TokensReleased';
+  beneficiary: string;
+  beneficiaryNormalized: string;
+  scheduleId: string;
+  allocatedAmountRaw: string;
+  releasedAmountRaw: string;
+  startRaw: string | null;
+  cliffRaw: string | null;
+  durationRaw: string | null;
+  transactionHash: string;
+  blockNumber: number;
+  logIndex: number;
+  observedAt: Date;
+  createdAt: Date;
+};
+
+function sameVestingLedgerProjection(
+  left: Record<string, unknown>,
+  right: VestingLedgerProjection,
+) {
+  return Object.entries(right).every(([key, value]) => {
+    const current = left[key];
+    return current instanceof Date && value instanceof Date
+      ? current.getTime() === value.getTime()
+      : current === value;
+  });
+}
+
+export async function projectUkiVestingPosition(
+  store: IndexerStore,
+  event: ChainEvent,
+) {
+  await verifiedContractCursor(store, event, 'VESTING_VAULT');
+  const beneficiary = stringField(event, 'beneficiary');
+  const beneficiaryNormalized = stringField(event, 'beneficiaryNormalized');
+  const scheduleId = canonicalBytes32(event, 'scheduleId');
+  const allocatedAmountRaw = stringField(event, 'allocatedAmountRaw');
+  const releasedAmountRaw = stringField(event, 'releasedAmountRaw');
+  if (!beneficiary || !beneficiaryNormalized) {
+    return `${event.eventName} sin beneficiary`;
+  }
+  if (!scheduleId) return `${event.eventName} sin scheduleId valido`;
+  if (
+    !allocatedAmountRaw
+    || !releasedAmountRaw
+    || !/^\d+$/.test(allocatedAmountRaw)
+    || !/^\d+$/.test(releasedAmountRaw)
+  ) {
+    return `${event.eventName} con montos raw invalidos`;
+  }
+  const optionalRaw = (key: string) => {
+    const value = stringField(event, key);
+    return value && /^\d+$/.test(value) ? value : null;
+  };
+  const observedAt = eventDate(event);
+  const ledgerEntry: VestingLedgerProjection = {
+    _id: event._id,
+    eventId: event._id,
+    eventName: event.eventName as VestingLedgerProjection['eventName'],
+    beneficiary,
+    beneficiaryNormalized,
+    scheduleId,
+    allocatedAmountRaw,
+    releasedAmountRaw,
+    startRaw: optionalRaw('startRaw'),
+    cliffRaw: optionalRaw('cliffRaw'),
+    durationRaw: optionalRaw('durationRaw'),
+    transactionHash: event.txHash,
+    blockNumber: event.blockNumber,
+    logIndex: event.logIndex,
+    observedAt,
+    createdAt: observedAt,
+  };
+  const ledger = collection(store, 'uki_vesting_events');
+  const existing = await ledger.findOne({ _id: event._id });
+  if (existing && !sameVestingLedgerProjection(existing, ledgerEntry)) {
+    throw new Error(`El evento vesting ${event._id} contradice el ledger.`);
+  }
+  if (!existing) {
+    try {
+      await ledger.insertOne(ledgerEntry);
+    } catch (error) {
+      if (!isMongoDuplicateKey(error)) throw error;
+      const replay = await ledger.findOne({ _id: event._id });
+      if (!replay || !sameVestingLedgerProjection(replay, ledgerEntry)) {
+        throw new Error(`El replay vesting ${event._id} no coincide con el ledger.`);
+      }
+    }
+  }
+
+  const entries = await ledger.find({ beneficiaryNormalized, scheduleId })
+    .sort({ blockNumber: 1, logIndex: 1, _id: 1 })
+    .toArray() as VestingLedgerProjection[];
+  let allocated = BigInt(0);
+  let released = BigInt(0);
+  for (const item of entries) {
+    allocated += BigInt(item.allocatedAmountRaw);
+    released += BigInt(item.releasedAmountRaw);
+  }
+  if (released > allocated) {
+    throw new Error(`El schedule ${scheduleId} libera mas UKI del asignado.`);
+  }
+  const latest = entries.at(-1);
+  if (!latest) throw new Error(`El ledger vesting ${scheduleId} no se pudo releer.`);
+  const positionId = `${beneficiaryNormalized}:${scheduleId}`;
+  await monotonicAbsoluteUpdate(
+    collection(store, 'uki_vesting_positions'),
+    positionId,
+    { blockNumber: latest.blockNumber, logIndex: latest.logIndex },
+    {
+      walletAddress: beneficiary,
+      walletNormalized: beneficiaryNormalized,
+      scheduleId,
+      totalAllocatedRaw: allocated.toString(10),
+      releasedRaw: released.toString(10),
+      lockedRaw: (allocated - released).toString(10),
+      ledgerEventCount: entries.length,
+      lastEventId: latest.eventId,
+      lastEventName: latest.eventName,
+      lastTxHash: latest.transactionHash,
+      observedAt: latest.observedAt,
+      updatedAt: latest.observedAt,
+    },
+    entries[0].observedAt,
+  );
   return null;
 }
 
@@ -1081,6 +1260,10 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'Staked' || event.eventName === 'Unstaked') {
     return projectUkiStakingPosition(store, event);
+  }
+
+  if (event.eventName === 'VestingCreated' || event.eventName === 'TokensReleased') {
+    return projectUkiVestingPosition(store, event);
   }
 
   if (

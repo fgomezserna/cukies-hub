@@ -1,10 +1,20 @@
 import { bsc, bscTestnet } from 'viem/chains';
-import { createPublicClient, http, type Address } from 'viem';
+import {
+  createPublicClient,
+  http,
+  keccak256,
+  type Address,
+  type Hash,
+} from 'viem';
 
 import { bscEventAbis } from '../config/abis.js';
 import { getContractEventConfigs } from '../config/contracts.js';
 import { normalizeDomainEvent } from '../normalize.js';
-import type { ChainEvent, IndexerConfig } from '../types.js';
+import type {
+  ChainEvent,
+  IndexerConfig,
+  VerifiedBscContractIdentity,
+} from '../types.js';
 import { now, toJsonRecord } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
 
@@ -112,6 +122,54 @@ async function getBlockTimestampMs(input: {
   return timestampMs;
 }
 
+async function verifyBscContractIdentity(input: {
+  identity: VerifiedBscContractIdentity;
+  rpcClients: BscRpcClient[];
+  expectedChainId: 56 | 97;
+}) {
+  if (input.identity.chainId !== input.expectedChainId) {
+    throw new Error(
+      `${input.identity.alias} fue configurado para chain ${input.identity.chainId}, no ${input.expectedChainId}.`,
+    );
+  }
+  const { value, rpc } = await withBscRpcFallback(
+    input.rpcClients,
+    input.expectedChainId,
+    async (candidate) => {
+      const [receipt, bytecode] = await Promise.all([
+        candidate.client.getTransactionReceipt({
+          hash: input.identity.deploymentTxHash as Hash,
+        }),
+        candidate.client.getBytecode({ address: input.identity.address as Address }),
+      ]);
+      return { receipt, bytecode };
+    },
+  );
+  const receiptAddress = value.receipt.contractAddress?.toLowerCase();
+  const receiptBlock = Number(value.receipt.blockNumber);
+  if (
+    value.receipt.status !== 'success'
+    || receiptAddress !== input.identity.address
+    || receiptBlock !== input.identity.deploymentBlock
+  ) {
+    throw new Error(
+      `${input.identity.alias} no coincide con su receipt de despliegue configurado.`,
+    );
+  }
+  if (!value.bytecode || value.bytecode === '0x') {
+    throw new Error(`${input.identity.alias} no tiene bytecode runtime.`);
+  }
+  const runtimeCodeHash = keccak256(value.bytecode).toLowerCase();
+  if (runtimeCodeHash !== input.identity.runtimeCodeHash) {
+    throw new Error(`${input.identity.alias} no coincide con el runtimeCodeHash configurado.`);
+  }
+  return {
+    identity: input.identity,
+    verifiedAt: now(),
+    rpcHost: rpc.host,
+  };
+}
+
 async function getLogsWithFallback(
   client: BscClient,
   params: {
@@ -162,10 +220,47 @@ export async function ingestBscOnce(
   const contractEvents = getContractEventConfigs(['BSC'], {
     presaleAddress: config.presaleAddress,
     ukiStakingAddress: config.ukiStakingAddress,
+    vestingVaultAddress: config.vestingVaultAddress,
     rewardsDistributorAddress: config.rewardsDistributorAddress,
     contractAliases: config.contractAliases,
   });
   const timestampCache = new Map<number, number>();
+  const { value: safeHead, rpc: safeHeadRpc } = await withBscRpcFallback(
+    rpcClientsWithPreferredFirst(latestBlockRpc, rpcClients),
+    config.bscExpectedChainId,
+    (rpc) => rpc.client.getBlock({ blockNumber: BigInt(safeBlock) }),
+  );
+  if (!safeHead.hash || !/^0x[0-9a-f]{64}$/i.test(safeHead.hash)) {
+    throw new Error(`El bloque seguro BSC ${safeBlock} no tiene hash canonico.`);
+  }
+  const safeBlockHash = safeHead.hash.toLowerCase();
+  const safeTimestampMsBigInt = safeHead.timestamp * BigInt(1_000);
+  if (
+    safeTimestampMsBigInt < BigInt(0)
+    || safeTimestampMsBigInt > BigInt(Number.MAX_SAFE_INTEGER)
+  ) {
+    throw new Error(`Timestamp BSC fuera de rango seguro para el bloque ${safeBlock}`);
+  }
+  timestampCache.set(safeBlock, Number(safeTimestampMsBigInt));
+  const checkpointAt = now();
+  await store.upsertBscCheckpoint({
+    chainId: config.bscExpectedChainId,
+    safeBlockNumber: safeBlock,
+    safeBlockHash,
+    checkedAt: checkpointAt,
+  });
+  const verifiedContracts = new Map<string, Awaited<
+    ReturnType<typeof verifyBscContractIdentity>
+  >>();
+  for (const identity of Object.values(config.verifiedBscContracts)) {
+    if (!identity) continue;
+    const verified = await verifyBscContractIdentity({
+      identity,
+      rpcClients: rpcClientsWithPreferredFirst(safeHeadRpc, rpcClients),
+      expectedChainId: config.bscExpectedChainId,
+    });
+    verifiedContracts.set(identity.alias, verified);
+  }
   let inserted = 0;
   let ranges = 0;
 
@@ -178,9 +273,36 @@ export async function ingestBscOnce(
       Number(cursor?.processedFromTimestampMs) >= 0;
     const configuredStartBlock = contractEvent.contractAlias === 'UKI_STAKING'
       ? config.ukiStakingStartBlock
+      : contractEvent.contractAlias === 'VESTING_VAULT'
+        ? config.vestingVaultStartBlock
       : contractEvent.contractAlias === 'REWARDS_DISTRIBUTOR'
         ? config.rewardsDistributorStartBlock
         : config.bscStartBlock;
+    const verified = verifiedContracts.get(contractEvent.contractAlias);
+    if (
+      verified
+      && cursor
+      && (
+        !cursorHasCoverageOrigin
+        || Number(cursor.processedFromBlock) !== verified.identity.startBlock
+      )
+    ) {
+      throw new Error(
+        `${contractEvent.contractAlias}:${contractEvent.eventName} no demuestra cobertura desde el bloque de despliegue verificado.`,
+      );
+    }
+    const verifiedCursorFields = verified
+      ? {
+          bootstrapStatus: 'verified' as const,
+          bootstrapStartBlock: verified.identity.startBlock,
+          bootstrapVerifiedAt: verified.verifiedAt,
+          verifiedChainId: verified.identity.chainId,
+          contractCodeHash: verified.identity.runtimeCodeHash,
+          contractDeploymentBlock: verified.identity.deploymentBlock,
+          contractDeploymentTxHash: verified.identity.deploymentTxHash,
+          contractConfigHash: verified.identity.configHash,
+        }
+      : {};
     const fromBlock = cursor?.nextBlock
       ?? (configuredStartBlock !== undefined && configuredStartBlock > 0
         ? configuredStartBlock
@@ -195,6 +317,7 @@ export async function ingestBscOnce(
         timestampCache,
       });
       await store.updateCursor(contractEvent, {
+        ...verifiedCursorFields,
         nextBlock: fromBlock,
         safeBlock,
         processedThroughBlock: safeBlock,
@@ -294,6 +417,7 @@ export async function ingestBscOnce(
       timestampCache,
     });
     await store.updateCursor(contractEvent, {
+      ...verifiedCursorFields,
       nextBlock: toBlock + 1,
       safeBlock,
       processedFromBlock,
@@ -303,10 +427,21 @@ export async function ingestBscOnce(
     });
   }
 
+  const verifiedStaking = verifiedContracts.get('UKI_STAKING');
+  if (verifiedStaking) {
+    await store.reconcileVerifiedUkiStakingBootstrap({
+      identity: verifiedStaking.identity,
+      safeBlockNumber: safeBlock,
+      safeBlockHash,
+      verifiedAt: verifiedStaking.verifiedAt,
+    });
+  }
+
   return {
     inserted,
     ranges,
     safeBlock,
+    safeBlockHash,
     rpcHosts: rpcClients.map((rpc) => rpc.host),
     latestBlockRpcHost: latestBlockRpc.host,
   };

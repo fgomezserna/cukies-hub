@@ -215,12 +215,24 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 | Variable | Staging | Nota |
 | --- | --- | --- |
-| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,REWARDS_DISTRIBUTOR` | Activacion explicita; una address por si sola no habilita ingesta. |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,VESTING_VAULT,REWARDS_DISTRIBUTOR` | Activacion explicita de la ruta UKI; una address por si sola no habilita ingesta. No incluir aun los aliases NFT legacy en testnet. |
 | `CHAIN_INDEXER_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK` | `123359165` | Bloque exacto de despliegue. |
+| `CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK` | `123359165` | Debe coincidir con el receipt de despliegue y con el start block. |
+| `CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_TX_HASH` | `0xc09b84077e97fe32b198ed99f1a56829ccc60c1dbe401e7bb20b66983ddc670e` | Evidencia publica testnet; el indexer verifica status, address y bloque. |
+| `CHAIN_INDEXER_UKI_STAKING_RUNTIME_CODE_HASH` | `0xb4976a78dc9d9792842ce7d6a8fa689bc187661cf7c076753e326fd07e20d732` | Keccak-256 del bytecode runtime testnet actual. |
+| `CHAIN_INDEXER_VESTING_VAULT_ADDRESS` | `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154` | VestingVault testnet de la preventa staging. |
+| `CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK` | `123291890` | Bloque exacto de despliegue. |
+| `CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_BSC_BLOCK` | `123291890` | Debe coincidir con el receipt de despliegue y con el start block. |
+| `CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH` | `0x14292fc576ddff260572c4d7de7a7538d8f0aed8f3147d20f65d2cb77a0fa00b` | Evidencia publica testnet; el indexer verifica status, address y bloque. |
+| `CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH` | `0x7fa2f464e4ee11ac2c37c4adeb28b0b81c261b1e6a755ca65d159dfb3a60249c` | Keccak-256 del bytecode runtime testnet actual. |
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK` | `123359171` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Gate de finalidad para las proyecciones UKI. |
+
+El indexer no marca un cursor UKI como `verified` por confiar en la configuracion. En cada arranque comprueba chain ID, receipt de despliegue, address, bloque y hash del bytecode runtime; despues sella el checkpoint canonico y la identidad de configuracion en los cursores. `VestingCreated` y `TokensReleased` se guardan en un ledger inmutable y reconstruyen la posicion por wallet/schedule, de modo que un replay repara una escritura parcial sin duplicar importes.
+
+Las direcciones legacy `TOKEN`, `MARKETPLACE` y `BRIDGE` documentadas para BSC no tienen bytecode en chain `97` y no son fuentes validas de staging. La ruta NFT permanece fail-closed hasta desplegar equivalentes testnet o aprobar un adaptador de simulacion aislado; nunca debe leer mainnet para completar un tick de staging.
 
 ### Card worker en staging
 

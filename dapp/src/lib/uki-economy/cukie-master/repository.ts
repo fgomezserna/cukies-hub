@@ -273,6 +273,9 @@ export function vestingLedgerMatchesPositions(
     latestLogIndex: number;
   }>();
   for (const item of ledger) {
+    const beneficiaryNormalized = typeof item.beneficiaryNormalized === 'string'
+      ? item.beneficiaryNormalized
+      : null;
     const scheduleId = typeof item.scheduleId === 'string' ? item.scheduleId : null;
     const eventId = typeof item.eventId === 'string' ? item.eventId : null;
     const allocatedRaw = typeof item.allocatedAmountRaw === 'string'
@@ -286,18 +289,20 @@ export function vestingLedgerMatchesPositions(
     const blockNumber = safeInteger(item.blockNumber);
     const logIndex = safeInteger(item.logIndex);
     if (
-      !scheduleId
+      !beneficiaryNormalized
+      || !scheduleId
       || !eventId
       || allocatedRaw === null
       || releasedRaw === null
       || blockNumber === null
       || logIndex === null
     ) return false;
-    const current = aggregates.get(scheduleId);
+    const key = `${beneficiaryNormalized}:${scheduleId}`;
+    const current = aggregates.get(key);
     const isLatest = !current
       || blockNumber > current.latestBlockNumber
       || (blockNumber === current.latestBlockNumber && logIndex > current.latestLogIndex);
-    aggregates.set(scheduleId, {
+    aggregates.set(key, {
       count: (current?.count ?? 0) + 1,
       totalAllocated: (current?.totalAllocated ?? BigInt(0)) + BigInt(allocatedRaw),
       totalReleased: (current?.totalReleased ?? BigInt(0)) + BigInt(releasedRaw),
@@ -309,9 +314,14 @@ export function vestingLedgerMatchesPositions(
 
   const matchedSchedules = new Set<string>();
   for (const position of positions) {
+    const walletNormalized = typeof position.walletNormalized === 'string'
+      ? position.walletNormalized
+      : null;
     const scheduleId = typeof position.scheduleId === 'string' ? position.scheduleId : null;
-    if (!scheduleId || matchedSchedules.has(scheduleId)) return false;
-    const aggregate = aggregates.get(scheduleId);
+    if (!walletNormalized || !scheduleId) return false;
+    const key = `${walletNormalized}:${scheduleId}`;
+    if (matchedSchedules.has(key)) return false;
+    const aggregate = aggregates.get(key);
     if (!aggregate || aggregate.totalReleased > aggregate.totalAllocated) return false;
     if (
       position.lastEventId !== aggregate.latestEventId
@@ -322,7 +332,7 @@ export function vestingLedgerMatchesPositions(
       || position.releasedRaw !== aggregate.totalReleased.toString()
       || position.lockedRaw !== (aggregate.totalAllocated - aggregate.totalReleased).toString()
     ) return false;
-    matchedSchedules.add(scheduleId);
+    matchedSchedules.add(key);
   }
   return matchedSchedules.size === aggregates.size;
 }
