@@ -18,6 +18,7 @@ import { formatRawAmount, parseRawAmount } from "../money";
 import { getIsoWeekPeriodFromId } from "../periods";
 import type { RewardRepository, RewardTransactionRunner } from "./repository";
 import { mongoRewardTransactionRunner } from "./repository";
+import { validateRewardEmissionBudgetEvent } from "./emission-budget";
 import {
   assertRewardRule,
   compareRewardText,
@@ -38,6 +39,7 @@ import {
   REWARD_MAX_ALLOCATIONS_PER_PERIOD,
   type DraftRewardClaimBatchInput,
   type RewardAllocation,
+  type RewardEmissionBudgetEvent,
   type RewardPoolAccrual,
   type RewardSourceManifest,
   type RewardClaimBatch,
@@ -228,6 +230,36 @@ async function listAllPeriodSourceManifests(
   return manifests;
 }
 
+async function listAllPeriodEmissionBudgetEvents(
+  repository: RewardRepository,
+  periodId: string,
+) {
+  const events: RewardEmissionBudgetEvent[] = [];
+  let afterSourceId: string | null = null;
+  while (events.length <= REWARD_MAX_ALLOCATIONS_PER_PERIOD) {
+    const page = await repository.listPeriodEmissionBudgetEventsPage(
+      periodId,
+      afterSourceId,
+      REWARD_ALLOCATION_PAGE_SIZE,
+    );
+    if (page.length === 0) break;
+    if (page.some((event) => event.periodId !== periodId)) {
+      throw new DomainConflictError("El repositorio devolvio budgets de otro periodo.");
+    }
+    const lastId = page.at(-1)!._id;
+    if (afterSourceId && lastId <= afterSourceId) {
+      throw new DomainConflictError("La paginacion de budgets no avanzo.");
+    }
+    events.push(...page);
+    afterSourceId = lastId;
+    if (page.length < REWARD_ALLOCATION_PAGE_SIZE) break;
+  }
+  if (events.length > REWARD_MAX_ALLOCATIONS_PER_PERIOD) {
+    throw new DomainConflictError("El periodo excede el limite de decisiones de presupuesto.");
+  }
+  return events;
+}
+
 async function listAllPeriodAccruals(
   repository: RewardRepository,
   periodId: string,
@@ -320,6 +352,7 @@ async function assertPeriodSourceManifests(
   accruals: RewardPoolAccrual[],
 ) {
   const manifests = await listAllPeriodSourceManifests(repository, periodId);
+  const budgetEvents = await listAllPeriodEmissionBudgetEvents(repository, periodId);
   const allocationSources = new Map<string, RewardAllocation[]>();
   for (const allocation of allocations) {
     allocationSources.set(
@@ -338,6 +371,24 @@ async function assertPeriodSourceManifests(
   if (manifests.length !== sourceIds.size) {
     throw new DomainConflictError("Los manifests globales no cubren exactamente el periodo.");
   }
+  if (budgetEvents.some((event) => !validateRewardEmissionBudgetEvent(event))) {
+    throw new DomainConflictError(
+      "El periodo contiene decisiones de presupuesto manipuladas.",
+    );
+  }
+  const budgetSourceIds = new Set(budgetEvents.map((event) => event.sourceId));
+  if (budgetSourceIds.size !== budgetEvents.length) {
+    throw new DomainConflictError("El periodo contiene decisiones de presupuesto duplicadas.");
+  }
+  const reservedBudgetEvents = budgetEvents.filter((event) => event.status === "reserved");
+  if (reservedBudgetEvents.length !== manifests.length) {
+    throw new DomainConflictError(
+      "Las reservas de presupuesto no cubren exactamente los manifests del periodo.",
+    );
+  }
+  const budgetBySource = new Map(
+    reservedBudgetEvents.map((event) => [event.sourceId, event]),
+  );
   for (const manifest of manifests) {
     const sourceAllocations = allocationSources.get(manifest.sourceId) ?? [];
     const sourceAccruals = accrualSources.get(manifest.sourceId) ?? [];
@@ -350,8 +401,24 @@ async function assertPeriodSourceManifests(
       (sum, accrual) => sum + parseRawAmount(accrual.amountRaw),
       BigInt(0),
     );
+    const budgetEvent = budgetBySource.get(manifest.sourceId);
     if (
       !first
+      || !budgetEvent
+      || !validateRewardEmissionBudgetEvent(budgetEvent)
+      || budgetEvent.status !== "reserved"
+      || budgetEvent.reason !== "RESERVED"
+      || budgetEvent.periodId !== manifest.periodId
+      || budgetEvent.sourceTotalRaw !== manifest.sourceTotalRaw
+      || budgetEvent.ruleVersion !== manifest.ruleVersion
+      || budgetEvent.ruleConfigHash !== manifest.ruleConfigHash
+      || budgetEvent.ruleEffectiveAt.getTime() !== manifest.ruleEffectiveAt.getTime()
+      || budgetEvent.sourceSetHash !== manifest.sourceSetHash
+      || budgetEvent.calculationJobRunId !== manifest.calculationJobRunId
+      || budgetEvent.calculationKind !== manifest.calculationKind
+      || budgetEvent.calculationInputHash !== manifest.calculationInputHash
+      || budgetEvent.calculationOutputHash !== manifest.calculationOutputHash
+      || budgetEvent.createdAt.getTime() !== manifest.createdAt.getTime()
       || !validateRewardSourceManifest(manifest)
       || manifest.status !== "allocated"
       || manifest.periodId !== first.periodId
@@ -377,16 +444,20 @@ async function assertPeriodSourceManifests(
     }
   }
   const canonicalGameSources = await listCanonicalSettledGameSourceIds(repository, periodId);
-  const manifestedGameSources = manifests
-    .filter((manifest) => manifest.calculationKind === "settlement")
-    .map((manifest) => manifest.sourceId)
-    .sort(compareRewardText);
-  if (!sameSourceIds(canonicalGameSources, manifestedGameSources)) {
+  const coveredGameSources = [
+    ...manifests
+      .filter((manifest) => manifest.calculationKind === "settlement")
+      .map((manifest) => manifest.sourceId),
+    ...budgetEvents
+      .filter((event) => event.status === "blocked" && event.calculationKind === "settlement")
+      .map((event) => event.sourceId),
+  ].sort(compareRewardText);
+  if (!sameSourceIds(canonicalGameSources, coveredGameSources)) {
     throw new DomainConflictError(
-      "El censo canonico de game sessions settled no coincide con sus obligaciones rewards.",
+      "El censo canonico de game sessions settled no coincide con sus rewards o bloqueos de presupuesto.",
     );
   }
-  return manifests;
+  return { manifests, budgetEvents };
 }
 
 function recomputeRewardSourceSetHash(
@@ -425,6 +496,7 @@ export function buildRewardPeriodAllocationHash(
   allocations: RewardAllocation[],
   accruals: RewardPoolAccrual[] = [],
   manifests: RewardSourceManifest[] = [],
+  budgetEvents: RewardEmissionBudgetEvent[] = [],
 ) {
   return stableRewardHash({
     kind: "reward-period-allocation-set",
@@ -453,6 +525,15 @@ export function buildRewardPeriodAllocationHash(
         sourceSetHash: manifest.sourceSetHash,
         status: manifest.status,
       })),
+    emissionBudgetEvents: [...budgetEvents]
+      .sort((left, right) => compareRewardText(left._id, right._id))
+      .map((event) => ({
+        sourceId: event.sourceId,
+        payloadHash: event.payloadHash,
+        sourceSetHash: event.sourceSetHash,
+        status: event.status,
+        reason: event.reason,
+      })),
   });
 }
 
@@ -461,6 +542,7 @@ function validatePeriodAllocationSet(
   allocations: RewardAllocation[],
   accruals: RewardPoolAccrual[],
   manifests: RewardSourceManifest[],
+  budgetEvents: RewardEmissionBudgetEvent[],
 ) {
   if (allocations.length > REWARD_MAX_ALLOCATIONS_PER_PERIOD) {
     throw new DomainConflictError("El periodo excede el limite de allocations materializables.");
@@ -475,15 +557,24 @@ function validatePeriodAllocationSet(
       throw new DomainConflictError(`Accrual manipulado o bloqueado: ${accrual._id}.`);
     }
   }
-  if (manifests.length === 0) {
-    throw new DomainConflictError("No hay obligaciones materializadas para el periodo.");
+  if (manifests.length === 0 && budgetEvents.length === 0) {
+    throw new DomainConflictError("No hay sources auditados para el periodo.");
   }
-  const ruleVersions = new Set(manifests.map((manifest) => manifest.ruleVersion));
-  const configHashes = new Set(manifests.map((manifest) => manifest.ruleConfigHash));
+  const ruleVersions = new Set([
+    ...manifests.map((manifest) => manifest.ruleVersion),
+    ...budgetEvents.map((event) => event.ruleVersion),
+  ]);
+  const configHashes = new Set([
+    ...manifests.map((manifest) => manifest.ruleConfigHash),
+    ...budgetEvents.map((event) => event.ruleConfigHash),
+  ]);
   if (ruleVersions.size !== 1 || configHashes.size !== 1) {
     throw new DomainConflictError("Un batch no puede mezclar reglas de rewards.");
   }
-  const sourceIds = manifests.map((manifest) => manifest.sourceId).sort(compareRewardText);
+  const sourceIds = [...new Set([
+    ...manifests.map((manifest) => manifest.sourceId),
+    ...budgetEvents.map((event) => event.sourceId),
+  ])].sort(compareRewardText);
   return {
     sourceIds,
     ruleVersion: [...ruleVersions][0],
@@ -493,6 +584,7 @@ function validatePeriodAllocationSet(
       allocations,
       accruals,
       manifests,
+      budgetEvents,
     ),
   };
 }
@@ -753,7 +845,7 @@ export class RewardPeriodSealService {
       }
       const allocations = await listAllPeriodAllocations(repository, periodId);
       const accruals = await listAllPeriodAccruals(repository, periodId);
-      const manifests = await assertPeriodSourceManifests(
+      const { manifests, budgetEvents } = await assertPeriodSourceManifests(
         repository,
         periodId,
         allocations,
@@ -764,6 +856,7 @@ export class RewardPeriodSealService {
         allocations,
         accruals,
         manifests,
+        budgetEvents,
       );
       if (!sameSourceIds(summary.sourceIds, expectedSourceIds)) {
         throw new DomainConflictError("El manifiesto de sources no coincide con el periodo.");
@@ -874,7 +967,7 @@ export class RewardClaimBatchService {
       }
       const allocations = await listAllPeriodAllocations(repository, valid.periodId);
       const accruals = await listAllPeriodAccruals(repository, valid.periodId);
-      const manifests = await assertPeriodSourceManifests(
+      const { manifests, budgetEvents } = await assertPeriodSourceManifests(
         repository,
         valid.periodId,
         allocations,
@@ -885,6 +978,7 @@ export class RewardClaimBatchService {
         allocations,
         accruals,
         manifests,
+        budgetEvents,
       );
       if (
         summary.periodAllocationHash !== seal.periodAllocationHash ||

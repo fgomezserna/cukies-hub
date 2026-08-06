@@ -134,7 +134,7 @@ El schema de economia se inicializa de forma deliberada, no durante el arranque 
 4. verificar `schemaVersion=2`, `dbName=cukieshub-new-staging` y `transactionVerifiedAt`;
 5. mantener todos los schedulers desactivados hasta cargar reglas y probar leases/idempotencia.
 
-Ambos comandos vuelven a ejecutar el guard staging-only antes de crear indices, escribir el sentinel o abrir la transaccion de prueba.
+Ambos comandos vuelven a ejecutar el guard staging-only antes de crear indices, escribir el sentinel o abrir la transaccion de prueba. Ademas, el arranque normal de `chain-indexer` ejecuta primero `setup:prod` y `setup:economy:prod`; asi cualquier coleccion o indice nuevo de Economy v2 queda instalado antes de iniciar el loop del indexer. Los wrappers manuales se conservan para diagnostico o reparacion controlada.
 
 ### Mongo fisico exclusivo de staging
 
@@ -259,13 +259,16 @@ Antes de considerar staging valido:
 - [x] Publicar el source de ambos contratos en Sourcify para BSC Testnet con coincidencia exacta de creacion y runtime (`UKIStaking` match `43348012`; `RewardsDistributor` match `43348027`).
 - [ ] Confirmar o repetir el mirror secundario en BscScan cuando haya `ETHERSCAN_API_KEY`/`BSCSCAN_API_KEY`; Sourcify lo solicito, pero su estado externo no se puede consultar sin una API key valida.
 - [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
+- [x] Implementar el ledger global fail-closed de presupuesto diario/acumulado, con fencing, replay por `sourceId` y auditoria de saldos; no contiene cifras aprobadas ni activa schedulers (issue #213).
+- [ ] Aprobar y cargar en staging los valores de `programStartsAt`, frontera/gracia UTC, maximo diario y techo acumulado irreversible del `RewardRule`.
 - [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`; sigue desactivado hasta disponer de S3 propio.
 - [x] Vaciar OAuth social, Pusher, Resend, Telegram e IFTTT en staging; quedan deshabilitados hasta tener destinos exclusivos.
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
+- [ ] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada antes de habilitar workers, reiniciar solo la replica staging y repetir health/transacciones; no reutilizar ni cambiar ninguna credencial de produccion.
 
-El siguiente bloque recomendado es resolver la contradiccion de emision `500,000 UKI/dia` frente al pool de `450,000,000 UKI` durante 6 anos y decidir si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban leases e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. El mirror secundario de source en BscScan, un S3 exclusivo para tarjetas y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloque recomendado es aprobar la interpretacion de `500,000 UKI/dia`, el techo acumulado del pool de `450,000,000 UKI`, el inicio/frontera/gracia del ledger y si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. El mirror secundario de source en BscScan, un S3 exclusivo para tarjetas y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 

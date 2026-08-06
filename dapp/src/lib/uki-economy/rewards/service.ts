@@ -2,6 +2,7 @@ import "server-only";
 
 import { DomainConflictError, DomainNotFoundError, DomainValidationError } from "../errors";
 import { formatRawAmount, parseRawAmount } from "../money";
+import { reserveRewardEmissionBudget } from "./emission-budget";
 import type { RewardRepository, RewardTransactionRunner } from "./repository";
 import { mongoRewardTransactionRunner } from "./repository";
 import {
@@ -646,7 +647,6 @@ export class RewardAllocationService {
         expected.periodId,
         expected.sourceId,
       );
-      const replayed = manifest !== null;
       if (manifest) {
         if (!validateRewardSourceManifest(manifest)) {
           throw new DomainConflictError(
@@ -658,7 +658,60 @@ export class RewardAllocationService {
             `El source ${expected.sourceId} ya pertenece al periodo ${manifest.periodId}.`,
           );
         }
-      } else {
+      } else if (
+        await repository.findAnyAllocationBySourceId(expected.sourceId)
+        || await repository.findAnyAccrualBySourceId(expected.sourceId)
+      ) {
+        throw new DomainConflictError(
+          `El source ${expected.sourceId} tiene allocations sin manifest global.`,
+        );
+      }
+      const budget = await reserveRewardEmissionBudget(repository, rule, {
+        periodId: expected.periodId,
+        sourceId: expected.sourceId,
+        sourceTotalRaw: expected.sourceTotalRaw,
+        sourceSetHash: expected.setHash,
+        calculationJobRunId: expected.manifest.calculationJobRunId,
+        calculationKind: expected.manifest.calculationKind,
+        calculationInputHash: expected.manifest.calculationInputHash,
+        calculationOutputHash: expected.manifest.calculationOutputHash,
+        ruleEffectiveAt,
+        now,
+      });
+      if (budget.event.status === "blocked") {
+        if (
+          manifest
+          || persisted.length > 0
+          || persistedAccruals.length > 0
+          || await repository.findAnyAllocationBySourceId(expected.sourceId)
+          || await repository.findAnyAccrualBySourceId(expected.sourceId)
+        ) {
+          throw new DomainConflictError(
+            `El source ${expected.sourceId} esta bloqueado por presupuesto pero ya tiene rewards.`,
+          );
+        }
+        // El primer bloqueo forma parte del censo auditado del periodo. Escribe
+        // el mismo fence que el sellado para que ninguno pueda aparecer despues
+        // de calcular el anchor semanal.
+        if (!budget.replayed) {
+          await repository.advanceOpenPeriod(expected.periodId, expected.now);
+        }
+        return {
+          status: "budget_blocked",
+          replayed: budget.replayed,
+          allocations: [],
+          accruals: [],
+          sourceSetHash: expected.setHash,
+          emissionBudgetEvent: budget.event,
+        };
+      }
+      if ((manifest !== null) !== budget.replayed) {
+        throw new DomainConflictError(
+          `El fence de presupuesto y el manifest del source ${expected.sourceId} no reconcilian.`,
+        );
+      }
+      const replayed = budget.replayed;
+      if (!manifest) {
         // Fail closed ante datos previos sin fence. Su adopcion requiere una
         // migracion auditada que compruebe primero todos los periodos.
         if (
@@ -691,6 +744,21 @@ export class RewardAllocationService {
         persistedAccruals,
         expected,
       );
+      if (
+        budget.event.periodId !== expected.manifest.periodId
+        || budget.event.sourceTotalRaw !== expected.manifest.sourceTotalRaw
+        || budget.event.ruleVersion !== expected.manifest.ruleVersion
+        || budget.event.ruleConfigHash !== expected.manifest.ruleConfigHash
+        || budget.event.ruleEffectiveAt.getTime()
+          !== expected.manifest.ruleEffectiveAt.getTime()
+        || budget.event.sourceSetHash !== expected.manifest.sourceSetHash
+        || budget.event.calculationJobRunId !== expected.manifest.calculationJobRunId
+        || budget.event.calculationKind !== expected.manifest.calculationKind
+        || budget.event.calculationInputHash !== expected.manifest.calculationInputHash
+        || budget.event.calculationOutputHash !== expected.manifest.calculationOutputHash
+      ) {
+        reasonCodes.push("EMISSION_BUDGET_EVENT_MISMATCH");
+      }
       if (!manifest || !validateRewardSourceManifest(manifest)) {
         reasonCodes.push("SOURCE_MANIFEST_TAMPERED");
       } else {
@@ -731,6 +799,7 @@ export class RewardAllocationService {
           accruals: blockedAccruals,
           incident,
           sourceSetHash: expected.setHash,
+          emissionBudgetEvent: budget.event,
         };
       }
       return {
@@ -739,6 +808,7 @@ export class RewardAllocationService {
         allocations: persisted,
         accruals: persistedAccruals,
         sourceSetHash: expected.setHash,
+        emissionBudgetEvent: budget.event,
       };
       });
     try {
