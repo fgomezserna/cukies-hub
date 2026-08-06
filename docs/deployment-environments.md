@@ -278,10 +278,15 @@ Antes de considerar staging valido:
 - [x] Publicar el source de ambos contratos en Sourcify para BSC Testnet con coincidencia exacta de creacion y runtime (`UKIStaking` match `43348012`; `RewardsDistributor` match `43348027`).
 - [x] Confirmar el mirror secundario en las paginas publicas de BscScan Testnet: `UKIStaking` y `RewardsDistributor` muestran source verificado con coincidencia exacta, compilador `0.8.28` y 200 runs; no fue necesario obtener ni exponer una API key.
 - [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
-- [x] Implementar el ledger global fail-closed de presupuesto diario/acumulado, con fencing, replay por `sourceId` y auditoria de saldos; no contiene cifras aprobadas ni activa schedulers (issue #213).
+- [x] Implementar el ledger global fail-closed de presupuesto diario/acumulado, con fencing, replay por `sourceId` y auditoria de saldos; el runtime no contiene defaults ni activa schedulers (issue #213).
 - [x] Reconciliar `500,000 UKI/dia` como maximo, `450,000,000 UKI` como techo acumulado, capacidad no usada `expires`, exceso `block` y reparto no distribuido 80/5/5/10.
-- [ ] Aprobar y cargar en staging `programStartsAt`, frontera/gracia UTC y direcciones de destino del `RewardRule`; los caps deben declararse explicitamente sin defaults.
-- [ ] Cargar reglas aprobadas de creditos, juegos, pools y ranking.
+- [x] Definir el ruleset exclusivo de prueba `staging-test-v1`: inicio `2026-08-10T00:00:00.000Z`, frontera `00:00 UTC`, gracia de 24h y siete destinos sink `0x97...`; los parametros equivalentes de produccion siguen sin aprobar (PR #226, merge `509ef4ca`).
+- [x] Implementar un bootstrap atomico `plan/apply` para rewards, competition credits, Treasure Hunt y ranking, con replay idempotente y rechazo de chain, base, recurso, gates o cursores no verificados (PR #226).
+- [x] Auditar y cerrar el motor de requisito dinamico: capacidad llena, gracia fija de 48h, proteccion, barrido paginado y cierre de ronda versionado (#61; implementado en PR #209).
+- [ ] Financiar el deployer con tBNB sin usar mainnet, desplegar TOKEN/MARKETPLACE/BRIDGE equivalentes de #60 y verificar sus cursores en chain `97`.
+- [ ] Ejecutar `pnpm staging:economy:rules:plan` y despues `pnpm staging:economy:rules:apply`; repetir el plan y exigir cuatro acciones `replay`.
+- [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para Cukie Master, creditos, Game Economy, Cukie Pool y ranking; comprobar fencing, idempotencia, auditoria y ausencia de escrituras fuera de staging.
+- [ ] Habilitar como maximo un scheduler, observar al menos dos ciclos y volver a apagarlo antes de avanzar al siguiente.
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
 - [x] Provisionar bucket MinIO, hostname publico, prefijo y credenciales exclusivos de staging; validar setup, upload/render real y limpieza completa del fixture.
@@ -290,7 +295,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloque recomendado depende de aprobar el inicio/frontera/gracia UTC del ledger y las direcciones staging de sus destinos. Los caps y las politicas ya estan reconciliados, y el limite Cukie Master queda en 5 cupos por ruta y 10 agregados. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloqueo es exclusivamente #60: obtener tBNB por una via que no requiera saldo ni transaccion de mainnet, desplegar las tres fuentes NFT equivalentes y dejar sus cursores verificados. A continuacion se ejecuta el bootstrap `staging-test-v1` con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 
