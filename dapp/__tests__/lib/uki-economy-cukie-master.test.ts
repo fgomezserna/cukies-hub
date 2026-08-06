@@ -35,6 +35,31 @@ function nftAssetSnapshot(assetId: string, overrides: Partial<{
 }
 
 describe('Cukie Master snapshots', () => {
+  it.each([
+    { eligibleUki: 100_000, originalCukiePoints: 0, ukiSlots: 5, nftSlots: 0 },
+    { eligibleUki: 0, originalCukiePoints: 15, ukiSlots: 0, nftSlots: 5 },
+    { eligibleUki: 60_000, originalCukiePoints: 6, ukiSlots: 3, nftSlots: 2 },
+    { eligibleUki: 100_000, originalCukiePoints: 15, ukiSlots: 5, nftSlots: 5 },
+    { eligibleUki: 999_999, originalCukiePoints: 999, ukiSlots: 5, nftSlots: 5 },
+  ])(
+    'keeps $ukiSlots UKI + $nftSlots NFT slots within the independent route limits',
+    ({ eligibleUki, originalCukiePoints, ukiSlots, nftSlots }) => {
+      const snapshot = buildCukieMasterSnapshot({
+        walletAddress: '0xABCDEF',
+        periodId: '2026-07-08',
+        eligibleUki,
+        originalCukiePoints,
+        calculatedAt,
+      });
+
+      expect(snapshot.routes.uki.slots).toBe(ukiSlots);
+      expect(snapshot.routes.nft.slots).toBe(nftSlots);
+      expect(snapshot.totalSlots).toBe(ukiSlots + nftSlots);
+      expect(snapshot.maxTotalSlots).toBe(10);
+      expect(snapshot.dailyCreditsPreview).toBe((ukiSlots + nftSlots) * 100);
+    },
+  );
+
   it('builds a 5-per-route snapshot with a potential total of 10 slots', () => {
     const snapshot = buildCukieMasterSnapshot({
       walletAddress: '0xABCDEF',

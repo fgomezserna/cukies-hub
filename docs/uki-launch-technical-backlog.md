@@ -351,7 +351,7 @@ Issues hijas:
 
 - UKI-014.1 Task - Especificar cupos por UKI
   - Inicial: 20,000 UKI por cupo.
-  - Maximo: 5 cupos por wallet sumando rutas.
+  - Maximo: 5 cupos por ruta y 10 agregados por wallet.
   - Requisito dinamico si se llenan cupos.
   - UKI comprado en preventa con vesting cuenta directamente para cupos.
   - Acceptance criteria:
@@ -719,7 +719,7 @@ UX image gate:
 - Estado: pendiente de validacion del usuario.
 - Pantalla: `Cukie Master`.
 - Prompt propuesto para imagen:
-  - "Pantalla Cukie Master para Cukies World, dos rutas de desbloqueo UKI staking y NFT points, contador de cupos, limite 5 por wallet, configuracion de creditos diarios, avisos de requisito dinamico, dark mode con acentos teal y magenta moderados."
+  - "Pantalla Cukie Master para Cukies World, dos rutas de desbloqueo UKI staking y NFT points, contador de cupos, limite 5 por ruta y 10 agregados por wallet, configuracion de creditos diarios, avisos de requisito dinamico, dark mode con acentos teal y magenta moderados."
 - No generar hasta recibir validacion explicita.
 
 Issues hijas:

@@ -270,7 +270,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloque recomendado depende de decisiones de producto: aprobar la interpretacion de `500,000 UKI/dia`, el techo acumulado del pool de `450,000,000 UKI`, el inicio/frontera/gracia del ledger y si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloque recomendado depende de decisiones de producto: aprobar la interpretacion de `500,000 UKI/dia`, el techo acumulado del pool de `450,000,000 UKI` y el inicio/frontera/gracia del ledger. El limite Cukie Master ya esta reconciliado en 5 cupos por ruta y 10 agregados. Despues se cargan rulesets versionados con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 

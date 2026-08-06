@@ -130,13 +130,13 @@ Ruta: `/cukie-master`.
 Prompt propuesto:
 
 ```text
-Pantalla Cukie Master para Cukies World UKI, fase coming next. Dos rutas de cupos: staking UKI y puntos de Cukies Originales. Mostrar 500 cupos iniciales por ruta, maximo 5 cupos por wallet, requisito 20,000 UKI por cupo, 3 puntos de Cukies Originales, UKI con vesting cuenta para cupos, espera 24h para creditos diarios y aviso de requisito dinamico con ventana 48h. UI operativa con contadores, sliders/inputs de stake, tabla de rarezas, alertas claras, dark mode teal/gold. Sin ranking completo, sin partida concreta, sin prometer recompensas economicas.
+Pantalla Cukie Master para Cukies World UKI, fase coming next. Dos rutas de cupos: staking UKI y puntos de Cukies Originales. Mostrar 500 cupos iniciales por ruta, maximo 5 cupos por ruta y 10 agregados por wallet, requisito 20,000 UKI por cupo, 3 puntos de Cukies Originales, UKI con vesting cuenta para cupos, espera 24h para creditos diarios y aviso de requisito dinamico con ventana 48h. UI operativa con contadores, sliders/inputs de stake, tabla de rarezas, alertas claras, dark mode teal/gold. Sin ranking completo, sin partida concreta, sin prometer recompensas economicas.
 ```
 
 Debe mostrar:
 
 - Dos rutas separadas.
-- Limite 5 cupos por wallet.
+- Limite de 5 cupos por ruta y 10 agregados por wallet.
 - Requisito dinamico y aviso 48h.
 - Fase posterior/coming next si no esta activo.
 
