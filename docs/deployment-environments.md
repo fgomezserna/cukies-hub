@@ -229,7 +229,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 Para habilitarlo en el futuro:
 
 1. crear destino S3 exclusivo de staging;
-2. configurar `CARD_WORKER_S3_*`, `CARD_WORKER_PUBLIC_BASE_URL` y credenciales limitadas a ese prefijo;
+2. configurar `CARD_WORKER_S3_*`, `CARD_WORKER_PUBLIC_BASE_URL` y credenciales limitadas a ese prefijo; para MinIO u otro destino compatible tambien son obligatorios su endpoint y `CARD_WORKER_S3_FORCE_PATH_STYLE=true`;
 3. validar `pnpm staging:cards:setup` y una generacion de prueba;
 4. definir `COMPOSE_PROFILES=card-worker` solo en la app 28 y redesplegar.
 
