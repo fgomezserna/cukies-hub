@@ -1,8 +1,4 @@
-import { MongoClient, Db, ObjectId } from 'mongodb';
-
-// Connection URL for cukies-hub database
-const HUB_DATABASE_URL = process.env.DATABASE_URL || 
-  'mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin';
+import { Db, MongoClient, ObjectId } from 'mongodb';
 
 declare global {
   // allow global `var` declarations
@@ -12,32 +8,76 @@ declare global {
   var mongoHubDb: Db | undefined;
 }
 
-let mongoHubClient: MongoClient;
-let mongoHubDb: Db;
+let mongoHubClient: MongoClient | undefined;
+let mongoHubDb: Db | undefined;
 
-if (process.env.NODE_ENV === 'production') {
-  mongoHubClient = new MongoClient(HUB_DATABASE_URL);
-  mongoHubDb = mongoHubClient.db('cukies-hub');
-} else {
-  // In development, use a global variable to prevent multiple connections
-  if (!global.mongoHubClient) {
-    global.mongoHubClient = new MongoClient(HUB_DATABASE_URL);
-    global.mongoHubDb = global.mongoHubClient.db('cukies-hub');
+function databaseNameFromMongoUrl(databaseUrl: string) {
+  const match = databaseUrl.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/i);
+  if (!match || !match[1]) return null;
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    throw new Error('DATABASE_URL contains an invalid database name.');
   }
-  mongoHubClient = global.mongoHubClient;
-  mongoHubDb = global.mongoHubDb!; // Safe to use ! here as we check above
 }
 
-// Ensure connection is established
-async function ensureConnection() {
-  try {
-    // Try to ping the database to check connection
-    await mongoHubDb.admin().ping();
-  } catch {
-    // If ping fails, connect
-    await mongoHubClient.connect();
+function validDatabaseName(value: string) {
+  return value.length > 0 && value.length <= 64 && !/[\s/\\."$*<>:|?\u0000]/.test(value);
+}
+
+export function requireHubDatabaseConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const databaseUrl = env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required to access the Cukies Hub database.');
   }
-  return mongoHubDb;
+
+  const databaseName = databaseNameFromMongoUrl(databaseUrl);
+  if (!databaseName || !validDatabaseName(databaseName)) {
+    throw new Error('Hub database name is required in DATABASE_URL.');
+  }
+
+  return { databaseUrl, databaseName };
+}
+
+function getOrCreateHubConnection() {
+  const config = requireHubDatabaseConfig();
+
+  if (mongoHubClient && mongoHubDb) {
+    if (mongoHubDb.databaseName !== config.databaseName) {
+      throw new Error('Cached hub database does not match DATABASE_URL.');
+    }
+    return { client: mongoHubClient, db: mongoHubDb };
+  }
+
+  if (process.env.NODE_ENV !== 'production' && global.mongoHubClient) {
+    mongoHubClient = global.mongoHubClient;
+    if (global.mongoHubDb && global.mongoHubDb.databaseName !== config.databaseName) {
+      throw new Error('Cached hub database does not match DATABASE_URL.');
+    }
+    mongoHubDb = global.mongoHubDb ?? mongoHubClient.db(config.databaseName);
+    global.mongoHubDb = mongoHubDb;
+    return { client: mongoHubClient, db: mongoHubDb };
+  }
+
+  mongoHubClient = new MongoClient(config.databaseUrl);
+  mongoHubDb = mongoHubClient.db(config.databaseName);
+
+  if (process.env.NODE_ENV !== 'production') {
+    global.mongoHubClient = mongoHubClient;
+    global.mongoHubDb = mongoHubDb;
+  }
+
+  return { client: mongoHubClient, db: mongoHubDb };
+}
+
+async function ensureConnection() {
+  const { client, db } = getOrCreateHubConnection();
+  await client.connect();
+  await db.admin().ping();
+  return db;
 }
 
 export async function getHubDb(): Promise<Db> {
@@ -92,5 +132,10 @@ export async function closeHubConnection() {
   if (mongoHubClient) {
     await mongoHubClient.close();
   }
+  if (global.mongoHubClient === mongoHubClient) {
+    global.mongoHubClient = undefined;
+    global.mongoHubDb = undefined;
+  }
+  mongoHubClient = undefined;
+  mongoHubDb = undefined;
 }
-
