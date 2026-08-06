@@ -249,7 +249,7 @@ Antes de considerar staging valido:
 - [x] Anadir preflight staging-only fail-closed para rama, recurso Coolify, chain, bases y URL de autenticacion antes de arrancar o ejecutar setups.
 - [x] Reapuntar el recurso Coolify staging a la rama `staging`.
 - [x] Separar los tres namespaces y los cuatro usuarios staging sin reapuntar ninguna base live.
-- [ ] Completar el cutover de esos namespaces a la instancia fisica exclusiva `cukies-staging-rs0` y validar transacciones tras el cambio de URLs.
+- [x] Completar el cutover de esos namespaces a la instancia fisica exclusiva `cukies-staging-rs0` y validar replica PRIMARY, aislamiento de usuarios y transacciones Economy v2 tras el cambio de URLs.
 - [x] Desplegar y financiar un nuevo `VestingVault` y `Presale` en BSC Testnet.
 - [x] Ejecutar una compra on-chain smoke de `5 tASM -> 500 UKI` y validar pago, venta y vesting.
 - [x] Migrar la verificacion del explorer a Etherscan API V2 y verificar el source de Vault/Presale.
@@ -261,9 +261,9 @@ Antes de considerar staging valido:
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`; sigue desactivado hasta disponer de S3 propio.
 - [x] Vaciar OAuth social, Pusher, Resend, Telegram e IFTTT en staging; quedan deshabilitados hasta tener destinos exclusivos.
-- [ ] Completar smoke E2E con una segunda wallet desde la UI y conservar evidencia de APIs, Mongo e indexer.
+- [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 
-El siguiente bloque recomendado es completar el cutover al Mongo fisico exclusivo y repetir el setup transaccional. Despues se debe ejecutar el E2E con dos wallets y cargar solo las reglas numericas que producto haya aprobado; ningun scheduler se habilita antes.
+El siguiente bloque recomendado es resolver la contradiccion de emision `500,000 UKI/dia` frente al pool de `450,000,000 UKI` durante 6 anos y decidir si el limite de Cukie Master es 5 cupos totales o 5 por ruta. Despues se cargan rulesets versionados con todos los gates apagados, se prueban leases e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. La verificacion de source de `UKIStaking`/`RewardsDistributor`, un S3 exclusivo para tarjetas y las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 

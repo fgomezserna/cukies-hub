@@ -1,10 +1,28 @@
 # UKI current operating rules
 
-Estado: fuente operativa vigente para especificacion tecnica.
-Fecha de sincronizacion: 2026-05-17.
-Fuentes: `/Users/fgomezserna/Downloads/Funcionamiento.docx` y `/Users/fgomezserna/Downloads/UKI/Preventa UKI.docx`.
+Estado: fuente operativa vigente para especificacion tecnica, con reconciliacion de producto pendiente.
+Fecha de sincronizacion de reglas aprobadas: 2026-05-17.
+Fecha de revision de la fuente mas reciente: 2026-08-06.
+Fuentes consolidadas: `/Users/fgomezserna/Downloads/Funcionamiento.docx` y `/Users/fgomezserna/Downloads/UKI/Preventa UKI.docx`.
+Fuente posterior revisada pero no consolidada: `/Users/fgomezserna/Downloads/Token UKI.docx`.
 
 Este documento sustituye como referencia de producto a los documentos antiguos de `Funcionamiento`, `dudas` y `para comentar`. Si una issue o documento anterior contradice estas reglas, estas reglas prevalecen hasta que producto apruebe una version nueva.
+
+## Reconciliacion pendiente con `Token UKI.docx`
+
+`Token UKI.docx` es el ultimo documento recibido y la fuente mas reciente revisada. Las cifras operativas que repite coinciden en lo esencial con estas reglas: 500 cupos iniciales por ruta; requisitos iniciales de 3 puntos NFT o 20,000 UKI; tabla de puntos por rareza; ventana de ajuste de 48 horas; espera minima de 24 horas; y 100 creditos diarios por cupo. El documento no vuelve a fijar el supply, el reparto 45%/25%/18%/12%, el precio de preventa, el listing, la compra minima ni los vestings; para esos puntos siguen vigentes las fuentes consolidadas anteriores.
+
+No se adopta todavia como nueva fuente operativa porque quedan dos contradicciones que cambian el modelo economico:
+
+1. **Reserva diaria frente a duracion del pool.** `Token UKI.docx` mantiene 500,000 UKI diarios. Las reglas consolidadas anteriores asignan 450,000,000 UKI al programa durante 6 anos. Tomadas conjuntamente, una emision constante de 500,000 UKI durante 6 anos consumiria aproximadamente 1,095,000,000 UKI. El pool de 450,000,000 UKI solo cubre 900 dias a ese ritmo. Para durar 6 anos, el promedio nominal seria de aproximadamente 205,479 UKI diarios. Hasta que producto decida, 500,000 UKI no debe cargarse como emision diaria garantizada. La opcion tecnica recomendada es tratarlo como capacidad maxima diaria, con techo acumulado de 450,000,000 UKI y reglas explicitas para UKI no distribuidos.
+2. **Limite de cupos Cukie Master.** La regla consolidada limita a 5 cupos totales por wallet sumando las rutas NFT y UKI. `Token UKI.docx` describe un maximo de 5 cupos por cada tipo, lo que permitiria hasta 10 por wallet. No se debe activar la regla de capacidad hasta elegir una de las dos interpretaciones.
+
+Tambien aparecen dos matices que no cambian cifras congeladas por ahora:
+
+- La preventa podria ampliarse despues de los 30 dias si no alcanza 3,000 ASM. El contrato soporta que el owner actualice la ventana con `setSaleWindow`, pero falta aprobar el criterio, la autoridad y el limite de extension antes de convertirlo en regla operativa.
+- El desbloqueo progresivo de claim 20%/40%/60%/80%/100% aparece como propuesta a valorar, no como decision aprobada ni comportamiento implementado.
+
+Mientras estos puntos sigan abiertos, los rulesets economicos y sus schedulers deben permanecer desactivados en staging.
 
 ## Preventa UKI
 
