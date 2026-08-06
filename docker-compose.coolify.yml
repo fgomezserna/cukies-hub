@@ -36,9 +36,6 @@ services:
       retries: 20
       start_period: 180s
     networks:
-      default:
-        aliases:
-          - cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg
       coolify:
         aliases:
           - cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg
@@ -174,6 +171,8 @@ services:
       TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
       CHAIN_INDEXER_POLL_INTERVAL_MS: ${CHAIN_INDEXER_POLL_INTERVAL_MS:-60000}
     restart: unless-stopped
+    networks:
+      - coolify
 
   cukie-master-scheduler:
     build:
@@ -392,9 +391,10 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION:-${CARD_WORKER_S3_REGION}}
     restart: unless-stopped
+    networks:
+      - coolify
 
 networks:
-  default: {}
   coolify:
     external: true
 
