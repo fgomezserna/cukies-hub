@@ -19,7 +19,7 @@ export default function CukieMasterPage() {
       metrics={[
         { label: 'Ruta UKI', value: '500 cupos', helper: '20,000 UKI por cupo inicial' },
         { label: 'Ruta Cukies', value: '500 cupos', helper: '3 puntos en Cukies Originales' },
-        { label: 'Límite wallet', value: '5 cupos', helper: 'Sumando ruta UKI y ruta NFT' },
+        { label: 'Límite wallet', value: '10 cupos', helper: 'Máximo 5 por cada ruta' },
         { label: 'Créditos', value: '100 diarios', helper: 'Por cupo activo tras 24h' },
       ]}
       sections={[

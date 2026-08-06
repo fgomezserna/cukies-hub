@@ -736,18 +736,23 @@ describe('Cukie Master transactional allocation', () => {
     )).rejects.toThrow('ronda uki cambio');
     expect(mutableAllocationSnapshot(state)).toBe(before);
   });
-  it('allocates up to 5 per route, keeps one transaction and makes retries idempotent', async () => {
+  it('allocates up to 5 per route and serializes concurrent idempotent retries', async () => {
     const { repo, state } = memoryRepository();
     state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(100_000), releasedRaw: '0' });
     state.nftPoints.set('0xabc', 15);
     let transactions = 0;
-    const service = createCukieMasterService(async (work) => {
+    let transactionQueue = Promise.resolve();
+    const service = createCukieMasterService(<T>(work: (repository: CukieMasterRepository) => Promise<T>) => {
       transactions += 1;
-      return work(repo);
+      const transaction = transactionQueue.then(() => work(repo));
+      transactionQueue = transaction.then(() => undefined, () => undefined);
+      return transaction;
     });
 
-    const first = await service.recalculateCukieMasterWallet('0xABC', now, 'req-1');
-    const duplicate = await service.recalculateCukieMasterWallet('0xABC', now, 'req-1');
+    const [first, duplicate] = await Promise.all([
+      service.recalculateCukieMasterWallet('0xABC', now, 'req-1'),
+      service.recalculateCukieMasterWallet('0xABC', now, 'req-1'),
+    ]);
 
     expect(first.positions.uki.allocatedSlots).toBe(5);
     expect(first.positions.nft.allocatedSlots).toBe(5);
@@ -755,6 +760,8 @@ describe('Cukie Master transactional allocation', () => {
     expect(first.positions.uki.activeFrom).toEqual(new Date(now.getTime() + DAY));
     expect(duplicate.positions.uki.revision).toBe(first.positions.uki.revision);
     expect(state.capacities.get('uki')?.allocatedSlots).toBe(5);
+    expect(state.capacities.get('nft')?.allocatedSlots).toBe(5);
+    expect(state.slots.size).toBe(10);
     expect(state.events.size).toBe(12);
     expect(transactions).toBe(2);
 
