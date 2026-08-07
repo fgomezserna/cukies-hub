@@ -66,7 +66,14 @@ describe('CukieMasterStatusPanel', () => {
                 route: 'uki', ordinal: 1, eligibilityEpoch: 1, status: 'active',
                 creditEligibleFrom: '2026-07-10T00:00:00.000Z', graceEndsAt: null,
               }],
-              source: { complete: true, status: 'available' },
+              source: {
+                complete: true,
+                status: 'available',
+                route: 'uki',
+                totalUkiRaw: '45000000000000000000000',
+                presaleLockedRaw: '40000000000000000000000',
+                stakedUkiRaw: '5000000000000000000000',
+              },
             },
             nft: {
               position: { status: 'qualifying', desiredSlots: 1, allocatedSlots: 0, protectedSlots: 0, graceEndsAt: null },
@@ -90,6 +97,10 @@ describe('CukieMasterStatusPanel', () => {
     expect(screen.getByText('Ruta UKI')).toBeInTheDocument();
     expect(screen.getByText('Ruta Cukies')).toBeInTheDocument();
     expect(screen.getByText('Cupo 1')).toBeInTheDocument();
+    expect(screen.getByText('UKI computables')).toBeInTheDocument();
+    expect(screen.getByText('Exceso tras cupos')).toBeInTheDocument();
+    expect(screen.getByText('45.000 UKI')).toBeInTheDocument();
+    expect(screen.getByText('Exceso tras cupos').parentElement).toHaveTextContent('5000 UKI');
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/economy/v1/cukie-master?walletAddress=${walletAddress}`,
       expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),

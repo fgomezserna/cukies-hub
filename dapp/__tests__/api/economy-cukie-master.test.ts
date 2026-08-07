@@ -32,6 +32,15 @@ function request(walletAddress = WALLET) {
 }
 
 function route(routeName: 'uki' | 'nft') {
+  const completeness = {
+    complete: true,
+    warnings: ['internal warning must not leak'],
+    presaleRaw: true,
+    vestingRaw: true,
+    stakingRaw: true,
+    nftInventory: true,
+    indexerHealth: true,
+  };
   return {
     position: {
       _id: `${WALLET}:${routeName}`,
@@ -85,15 +94,24 @@ function route(routeName: 'uki' | 'nft') {
       : { route: 'nft' as const, nftPoints: 3 },
     deficitToPreserveSlots: null,
     countdownEndsAt: null,
-    sourceCompleteness: {
-      complete: true,
-      warnings: ['internal warning must not leak'],
-      presaleRaw: true,
-      vestingRaw: true,
-      stakingRaw: true,
-      nftInventory: true,
-      indexerHealth: true,
+    source: routeName === 'uki' ? {
+      route: 'uki' as const,
+      totalUkiRaw: '25000000000000000000000',
+      presaleLockedRaw: '20000000000000000000000',
+      stakedUkiRaw: '5000000000000000000000',
+      refs: [{ source: 'secret-ref', collection: 'secret', documentId: 'secret' }],
+      completeness,
+      sourceHash: 'secret-source-hash',
+    } : {
+      route: 'nft' as const,
+      originalCukiePoints: 3,
+      nftAssetIds: ['secret-asset-id'],
+      assets: [],
+      refs: [{ source: 'secret-ref', collection: 'secret', documentId: 'secret' }],
+      completeness,
+      sourceHash: 'secret-source-hash',
     },
+    sourceCompleteness: completeness,
   };
 }
 
@@ -129,7 +147,15 @@ describe('GET /api/economy/v1/cukie-master', () => {
     expect(response.headers.get('cache-control')).toContain('no-store');
     expect(body.data.totals.maxPotentialSlots).toBe(10);
     expect(body.data.routes.uki.slots[0]).not.toHaveProperty('_id');
-    expect(JSON.stringify(body)).not.toMatch(/sourceHash|refs|internal warning/);
+    expect(body.data.routes.uki.source).toEqual({
+      complete: true,
+      status: 'available',
+      route: 'uki',
+      totalUkiRaw: '25000000000000000000000',
+      presaleLockedRaw: '20000000000000000000000',
+      stakedUkiRaw: '5000000000000000000000',
+    });
+    expect(JSON.stringify(body)).not.toMatch(/sourceHash|refs|internal warning|secret-asset-id/);
   });
 
   it('fails closed when the economy source is unavailable', async () => {

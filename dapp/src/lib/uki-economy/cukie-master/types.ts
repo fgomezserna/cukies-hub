@@ -188,6 +188,7 @@ export type CukieMasterWalletStatus = {
     deficitToNextSlot: CukieMasterRequirement | null;
     deficitToPreserveSlots: CukieMasterRequirement | null;
     countdownEndsAt: Date | null;
+    source: CukieMasterRouteSource;
     sourceCompleteness: CukieMasterSourceCompleteness;
   }>;
   totals: {

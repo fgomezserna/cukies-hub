@@ -55,6 +55,14 @@ function publicRouteStatus(
     source: {
       complete: route.sourceCompleteness.complete,
       status: route.sourceCompleteness.complete ? 'available' : 'unavailable',
+      route: route.source.route,
+      ...(route.source.route === 'uki' ? {
+        totalUkiRaw: route.source.totalUkiRaw,
+        presaleLockedRaw: route.source.presaleLockedRaw,
+        stakedUkiRaw: route.source.stakedUkiRaw,
+      } : {
+        originalCukiePoints: route.source.originalCukiePoints,
+      }),
     },
   };
 }

@@ -33,13 +33,17 @@ type InfoPageProps = {
   sections: InfoSection[];
   primaryCta: { label: string; href: string };
   secondaryCta?: { label: string; href: string };
+  beforeSections?: ReactNode;
   afterSections?: ReactNode;
   note?: string;
 };
 
 const publicNav = [
   { label: 'Inicio', href: '/' },
+  { label: 'Jugar', href: '/games/treasure-hunt' },
   { label: 'Premios', href: '/premios' },
+  { label: 'Vesting', href: '/vesting' },
+  { label: 'Cukie Master', href: '/cukie-master' },
 ];
 
 export function LaunchInfoPage({
@@ -52,6 +56,7 @@ export function LaunchInfoPage({
   sections,
   primaryCta,
   secondaryCta,
+  beforeSections,
   afterSections,
   note,
 }: InfoPageProps) {
@@ -111,6 +116,8 @@ export function LaunchInfoPage({
           </article>
         ))}
       </section>
+
+      {beforeSections}
 
       <section className="uki-container relative z-[2] grid gap-4 pb-10 lg:grid-cols-2">
         {sections.map((section) => (
