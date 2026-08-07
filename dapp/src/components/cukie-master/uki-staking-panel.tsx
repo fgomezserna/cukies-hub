@@ -246,6 +246,21 @@ export function UkiStakingPanel() {
     setAmount(formatUnits(availableBalance, TOKEN_DECIMALS));
   }
 
+  function switchToStagingNetwork() {
+    switchChain(
+      { chainId: UKI_PRESALE_CHAIN_ID },
+      {
+        onError: () => {
+          toast({
+            title: 'No se pudo cambiar la red',
+            description: `Abre tu wallet y acepta el cambio a ${UKI_PRESALE_CHAIN_LABEL}.`,
+            variant: 'destructive',
+          });
+        },
+      },
+    );
+  }
+
   function handleSubmit() {
     if (!tokenAddress || !stakingAddress || !parsedAmount || !canTransact) return;
     reset();
@@ -373,6 +388,7 @@ export function UkiStakingPanel() {
               {!hasMounted || !isConnected ? (
                 <LandingWalletConnectButton
                   className="w-full justify-center"
+                  evmOnly
                   label="Conectar wallet para gestionar staking"
                   compactLabel="Conectar wallet"
                   showCompactText={false}
@@ -381,7 +397,7 @@ export function UkiStakingPanel() {
                 <button
                   type="button"
                   disabled={isSwitching}
-                  onClick={() => switchChain({ chainId: UKI_PRESALE_CHAIN_ID })}
+                  onClick={switchToStagingNetwork}
                   className="uki-button uki-button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span>{isSwitching ? 'Cambiando red' : `Cambiar a ${UKI_PRESALE_CHAIN_LABEL}`}</span>

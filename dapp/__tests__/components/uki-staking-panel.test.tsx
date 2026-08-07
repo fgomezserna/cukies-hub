@@ -22,7 +22,11 @@ jest.mock('wagmi', () => ({
 jest.mock('@/hooks/use-has-mounted');
 jest.mock('@/hooks/use-toast');
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
-  LandingWalletConnectButton: () => <button type="button">Conectar wallet para gestionar staking</button>,
+  LandingWalletConnectButton: ({ evmOnly }: { evmOnly?: boolean }) => (
+    <button type="button" data-evm-only={String(Boolean(evmOnly))}>
+      Conectar wallet para gestionar staking
+    </button>
+  ),
 }));
 jest.mock('@/components/landing/sale-config', () => ({
   UKI_PRESALE_CHAIN_ID: 97,
@@ -125,7 +129,8 @@ describe('UkiStakingPanel', () => {
 
     render(<UkiStakingPanel />);
 
-    expect(screen.getByRole('button', { name: /Conectar wallet para gestionar staking/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Conectar wallet para gestionar staking/i }))
+      .toHaveAttribute('data-evm-only', 'true');
     expect(writeContract).not.toHaveBeenCalled();
   });
 
@@ -139,8 +144,31 @@ describe('UkiStakingPanel', () => {
     render(<UkiStakingPanel />);
     fireEvent.click(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain Testnet/i }));
 
-    expect(switchChain).toHaveBeenCalledWith({ chainId: 97 });
+    expect(switchChain).toHaveBeenCalledWith(
+      { chainId: 97 },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
     expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it('explains how to finish the switch when the EVM wallet rejects it', () => {
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 56,
+      isConnected: true,
+    } as never);
+
+    render(<UkiStakingPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain Testnet/i }));
+
+    const switchOptions = switchChain.mock.calls[0]?.[1] as { onError?: () => void } | undefined;
+    switchOptions?.onError?.();
+
+    expect(toast).toHaveBeenCalledWith({
+      title: 'No se pudo cambiar la red',
+      description: 'Abre tu wallet y acepta el cambio a BNB Smart Chain Testnet.',
+      variant: 'destructive',
+    });
   });
 
   it('approves only the entered UKI amount when allowance is insufficient', () => {

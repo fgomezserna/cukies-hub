@@ -13,6 +13,7 @@ import { WalletConnectorDialog } from './wallet-connector-dialog';
 
 type WalletConnectButtonProps = {
   className?: string;
+  evmOnly?: boolean;
   label?: string;
   compactLabel?: string;
   showCompactText?: boolean;
@@ -32,6 +33,7 @@ function isSameWalletAddress(left?: string | null, right?: string | null) {
 
 export function WalletConnectButton({
   className = '',
+  evmOnly = false,
   label = 'Conectar wallet',
   compactLabel = 'Wallet',
   showCompactText = true,
@@ -58,11 +60,25 @@ export function WalletConnectButton({
     () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
     [connectors, hasMounted],
   );
-  const activeAddress = hasMounted && isConnected ? address : hasMounted && isTronConnected ? tronAddress : null;
-  const activeWalletType = hasMounted && isConnected ? 'evm' : hasMounted && isTronConnected ? 'tron' : null;
+  const activeAddress = hasMounted && isConnected
+    ? address
+    : hasMounted && !evmOnly && isTronConnected
+      ? tronAddress
+      : null;
+  const activeWalletType = hasMounted && isConnected
+    ? 'evm'
+    : hasMounted && !evmOnly && isTronConnected
+      ? 'tron'
+      : null;
   const isWrongChain = hasMounted && isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
   const isAuthenticatedWallet = isSameWalletAddress(user?.walletAddress, activeAddress);
-  const isBusy = hasMounted && (isPending || isSwitching || isAuthLoading || isWaitingForApproval || isTronLoading);
+  const isBusy = hasMounted && (
+    isPending ||
+    isSwitching ||
+    isAuthLoading ||
+    isWaitingForApproval ||
+    (!evmOnly && isTronLoading)
+  );
 
   const handleSwitchToPresaleChain = () => {
     switchChain(
@@ -165,7 +181,7 @@ export function WalletConnectButton({
       return;
     }
 
-    if (evmConnectors.length === 0 && !isTronInstalled) {
+    if (evmConnectors.length === 0 && (evmOnly || !isTronInstalled)) {
       toast({
         title: 'Wallet no encontrada',
         description: 'Instala una wallet EVM compatible para conectar.',
@@ -230,13 +246,17 @@ export function WalletConnectButton({
             : undefined
         }
         isConnecting={isPending}
-        description="Elige una wallet EVM para BSC o conecta TronLink en modo TRON."
-        tronLinkNative={{
-          error: tronError,
-          isInstalled: isTronInstalled,
-          isLoading: isTronLoading,
-          onSelect: handleConnectTron,
-        }}
+        description={evmOnly
+          ? `Elige una wallet EVM y acepta el cambio a ${UKI_PRESALE_CHAIN_LABEL}.`
+          : 'Elige una wallet EVM para BSC o conecta TronLink en modo TRON.'}
+        tronLinkNative={evmOnly
+          ? undefined
+          : {
+              error: tronError,
+              isInstalled: isTronInstalled,
+              isLoading: isTronLoading,
+              onSelect: handleConnectTron,
+            }}
       />
     </>
   );
