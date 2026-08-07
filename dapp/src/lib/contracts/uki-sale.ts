@@ -156,6 +156,51 @@ export const erc20Abi = [
   },
 ] as const;
 
+export const ukiStakingAbi = [
+  {
+    type: 'function',
+    name: 'ukiToken',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'stakedBalance',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'totalStaked',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'paused',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    type: 'function',
+    name: 'stake',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'unstake',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+  },
+] as const;
+
 export const vestingVaultAbi = [
   {
     type: 'function',
@@ -266,6 +311,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_UKI_CHAIN_ID: z.coerce.number().default(56),
   NEXT_PUBLIC_ASM_TOKEN_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_TOKEN_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_BSCSCAN_BASE_URL: z.string().url().default('https://bscscan.com'),
@@ -275,6 +321,7 @@ const env = envSchema.parse({
   NEXT_PUBLIC_UKI_CHAIN_ID: process.env.NEXT_PUBLIC_UKI_CHAIN_ID,
   NEXT_PUBLIC_ASM_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_ASM_TOKEN_ADDRESS,
   NEXT_PUBLIC_UKI_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_UKI_TOKEN_ADDRESS,
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: process.env.NEXT_PUBLIC_UKI_STAKING_ADDRESS,
   NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS: process.env.NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS,
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: process.env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS,
   NEXT_PUBLIC_BSCSCAN_BASE_URL: process.env.NEXT_PUBLIC_BSCSCAN_BASE_URL,
@@ -284,6 +331,7 @@ export const ukiSaleContracts = {
   chainId: env.NEXT_PUBLIC_UKI_CHAIN_ID,
   asmTokenAddress: env.NEXT_PUBLIC_ASM_TOKEN_ADDRESS,
   ukiTokenAddress: env.NEXT_PUBLIC_UKI_TOKEN_ADDRESS,
+  ukiStakingAddress: env.NEXT_PUBLIC_UKI_STAKING_ADDRESS,
   vestingVaultAddress: env.NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS,
   presaleAddress: env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS,
   blockExplorerBaseUrl: env.NEXT_PUBLIC_BSCSCAN_BASE_URL,

@@ -30,7 +30,15 @@ type PublicRoute = {
   deficitToNextSlot: Requirement | null;
   deficitToPreserveSlots: Requirement | null;
   slots: PublicSlot[];
-  source: { complete: boolean; status: 'available' | 'unavailable' };
+  source: {
+    complete: boolean;
+    status: 'available' | 'unavailable';
+    route?: 'uki' | 'nft';
+    totalUkiRaw?: string;
+    presaleLockedRaw?: string;
+    stakedUkiRaw?: string;
+    originalCukiePoints?: number;
+  };
 };
 
 type Requirement = { route: 'uki'; ukiRaw: string } | { route: 'nft'; nftPoints: number };
@@ -252,6 +260,7 @@ export function CukieMasterStatusPanel() {
 }
 
 function RouteCard({ label, route }: { label: string; route: PublicRoute }) {
+  const ukiBreakdown = getUkiBreakdown(route);
   return (
     <div className="rounded-[8px] border border-white/10 bg-black/20 p-5">
       <div className="flex items-center justify-between gap-3">
@@ -298,6 +307,14 @@ function RouteCard({ label, route }: { label: string; route: PublicRoute }) {
           </dd>
         </div>
       </dl>
+      {ukiBreakdown ? (
+        <dl className="mt-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-4 text-xs font-semibold">
+          <SourceMetric label="UKI computables" value={ukiBreakdown.total} />
+          <SourceMetric label="Exceso tras cupos" value={ukiBreakdown.excess} />
+          <SourceMetric label="En vesting" value={ukiBreakdown.locked} />
+          <SourceMetric label="Staking indexado" value={ukiBreakdown.staked} />
+        </dl>
+      ) : null}
       <div className="mt-4 space-y-2">
         {route.slots.length === 0 ? (
           <p className="text-xs font-semibold text-[var(--uki-muted)]">Sin cupos en esta ruta.</p>
@@ -317,6 +334,44 @@ function RouteCard({ label, route }: { label: string; route: PublicRoute }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function getUkiBreakdown(route: PublicRoute) {
+  if (
+    !route.source.complete ||
+    route.source.route !== 'uki' ||
+    route.source.totalUkiRaw === undefined ||
+    route.source.presaleLockedRaw === undefined ||
+    route.source.stakedUkiRaw === undefined ||
+    route.currentRequirement.route !== 'uki'
+  ) return null;
+
+  try {
+    const total = BigInt(route.source.totalUkiRaw);
+    const requirement = BigInt(route.currentRequirement.ukiRaw);
+    if (requirement <= BigInt(0)) return null;
+    const qualifyingSlots = total / requirement > BigInt(5)
+      ? BigInt(5)
+      : total / requirement;
+    const excess = total - (qualifyingSlots * requirement);
+    return {
+      total: requirementLabel({ route: 'uki', ukiRaw: total.toString() }),
+      excess: requirementLabel({ route: 'uki', ukiRaw: excess.toString() }),
+      locked: requirementLabel({ route: 'uki', ukiRaw: route.source.presaleLockedRaw }),
+      staked: requirementLabel({ route: 'uki', ukiRaw: route.source.stakedUkiRaw }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function SourceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[var(--uki-muted)]">{label}</dt>
+      <dd className="mt-1 text-[var(--uki-text)]">{value}</dd>
     </div>
   );
 }

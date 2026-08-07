@@ -14,6 +14,7 @@ const navItems = [
   { label: { es: 'Jugar', en: 'Play' }, href: '/games/treasure-hunt' },
   { label: { es: 'Premios', en: 'Rewards' }, href: '/premios' },
   { label: { es: 'Vesting', en: 'Vesting' }, href: '/vesting' },
+  { label: { es: 'Cukie Master', en: 'Cukie Master' }, href: '/cukie-master' },
 ];
 
 const localeLabels: Record<PublicLocale, string> = {

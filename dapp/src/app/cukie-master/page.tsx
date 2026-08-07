@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
+import { CukieMasterStatusPanel } from '@/components/cukie-master/status-panel';
+import { UkiStakingPanel } from '@/components/cukie-master/uki-staking-panel';
 import { LaunchInfoPage } from '@/components/launch/info-page';
 
 export const metadata: Metadata = {
@@ -9,19 +12,26 @@ export const metadata: Metadata = {
 export default function CukieMasterPage() {
   return (
     <LaunchInfoPage
-      eyebrow="Próximamente"
+      eyebrow="Funcional en BSC Testnet"
       title="Cukie Master"
-      subtitle="La figura avanzada de la economía Cukies: cupos por UKI o Cukies Originales, créditos diarios y reglas dinámicas después de la preventa."
+      subtitle="Gestiona el staking de UKI, consulta tus cupos por UKI o Cukies Originales y revisa los créditos de competición desde un único apartado."
       heroImage="/brand/generated/uki-cukie-master-scene-v2.png"
       heroAlt="Escena Cukie Master con token UKI y bóveda"
-      primaryCta={{ label: 'Ver wallet', href: '/wallet' }}
-      secondaryCta={{ label: 'Cómo jugar', href: '/como-jugar' }}
+      primaryCta={{ label: 'Gestionar staking', href: '#uki-staking' }}
+      secondaryCta={{ label: 'Ver mis cupos', href: '#mi-estado' }}
       metrics={[
         { label: 'Ruta UKI', value: '500 cupos', helper: '20,000 UKI por cupo inicial' },
         { label: 'Ruta Cukies', value: '500 cupos', helper: '3 puntos en Cukies Originales' },
         { label: 'Límite wallet', value: '10 cupos', helper: 'Máximo 5 por cada ruta' },
         { label: 'Créditos', value: '100 diarios', helper: 'Por cupo activo tras 24h' },
       ]}
+      beforeSections={
+        <>
+          <UkiStakingPanel />
+          <CukieMasterStatusPanel />
+          <CompetitionCreditPanel />
+        </>
+      }
       sections={[
         {
           title: 'Ruta UKI',

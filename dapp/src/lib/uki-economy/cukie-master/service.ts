@@ -1118,6 +1118,7 @@ export async function getCukieMasterWalletStatus(
           ? null
           : requirementDeficit(preserveDeficit),
         countdownEndsAt: nextMaturity,
+        source,
         sourceCompleteness: sources[route].completeness,
       }];
     })) as CukieMasterWalletStatus['routes'],
