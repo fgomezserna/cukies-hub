@@ -2,7 +2,7 @@
 
 Estado: topologia activa y checklist operativo.
 Issue: #166 `UKI-090.4`.
-Fecha de ultima comprobacion: 2026-08-05.
+Fecha de ultima comprobacion: 2026-08-07.
 
 ## Decision
 
@@ -27,6 +27,9 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 - Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
 - Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`, tx `0xc09b84077e97fe32b198ed99f1a56829ccc60c1dbe401e7bb20b66983ddc670e`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`, tx `0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639`). Ambos apuntan al UKI testnet existente y tienen source publico con coincidencia exacta en Sourcify y BscScan Testnet.
+- La fuente NFT aislada de staging usa `StagingCukiesNft` `0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` (bloque `123673635`), `StagingCukiesMarketplaceSource` `0x95780d891461e3183562B5D785f2D2c1c72ecE65` (bloque `123673640`) y `StagingCukiesBridgeSource` `0x6E29448282bCc1c568Ec9450Bef50a01d67845C2` (bloque `123673645`). Los tres contratos pertenecen al deployer exclusivo de staging `0x3d80cbEd6CA067a154A22659224EB5194aDCe24C`; el harness no custodia ni mueve valor.
+- El smoke UKI del 7 de agosto uso la wallet controlada `0xf2764E40bbA3B66995f55E955f8D22a6b4f620F5`: compra `200 tASM -> 20,000 UKI` en vesting (tx `0xddba32defcbc259cc1eed18c5ca858d5f772f905de96a9c90b34c4e35cfb728d`) y `20,000 UKI` liquidos en staking (tx `0x3644d951bdb975b28f434c0440bfa166cfcb457cc08d92fb9682836b4043e9f4`). El recalculo proyecto dos cupos UKI en cualificacion, uno por cada fuente de `20,000 UKI`; tambien se valido `unstake` y reentrada sin dead letters.
+- El smoke NFT visible uso la wallet `0x26789b9743d187174c3e3a87729730824a4d0c13`: los seis fixtures se activaron desde `/cukie-master`, sumaron `39` puntos y produjeron los cinco cupos de la ruta NFT en cualificacion. Tambien se probo retirada y reactivacion de un lock desde la UI. El despliegue Coolify `jokcwwkw0gsogc4ocow8wccs` dejo solo `CHAIN_INDEXER_CUKIE_MASTER_ENABLED=true`; los otros cuatro runtimes permanecen apagados. Los ciclos Cukie Master de `2026-08-07T11:38:00.741Z` y `2026-08-07T11:41:01.194Z` terminaron en `success`, con cero fallos e incidentes.
 - Verificacion publica: [UKIStaking en Sourcify](https://repo.sourcify.dev/97/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205), [RewardsDistributor en Sourcify](https://repo.sourcify.dev/97/0xc2252D797Da294D16b84282d213604b4Bcf6EE09), [UKIStaking en BscScan Testnet](https://testnet.bscscan.com/address/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205#code) y [RewardsDistributor en BscScan Testnet](https://testnet.bscscan.com/address/0xc2252D797Da294D16b84282d213604b4Bcf6EE09#code). BscScan muestra `Source Code Verified`, `Exact Match`, Solidity `v0.8.28+commit.7893614a` y optimizacion de 200 runs para ambos contratos (comprobado el 6 de agosto de 2026).
 - El smoke `STAGING_SMOKE_C31176A_2026_08_05` movio temporalmente `1 UKI` por contrato y termino con staking, reservas y balance del distribuidor a cero. No representa una cifra de producto.
 - Staging usa las bases logicas `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging`. El cutover a la instancia fisica exclusiva `cukies-staging-rs0` se prepara en dos despliegues para no apuntar la aplicacion a una replica a medio inicializar.
@@ -215,14 +218,19 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 | Variable | Staging | Nota |
 | --- | --- | --- |
-| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,VESTING_VAULT,REWARDS_DISTRIBUTOR` hasta desplegar la fuente NFT; despues anadir `TOKEN,MARKETPLACE,BRIDGE` juntos | Una address por si sola no habilita ingesta. Nunca usar las direcciones NFT legacy de mainnet en chain `97`. |
-| `CHAIN_INDEXER_TOKEN_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | `StagingCukiesNft` de chain `97`; sin fallback mainnet. |
-| `CHAIN_INDEXER_MARKETPLACE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos marketplace, sin custodia ni valor. |
-| `CHAIN_INDEXER_BRIDGE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos bridge, sin custodia ni valor. |
-| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_START_BSC_BLOCK` | Pendiente de los receipts | Debe ser el bloque exacto de despliegue de cada contrato. |
-| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_DEPLOYMENT_BSC_BLOCK` | Pendiente de los receipts | Debe coincidir exactamente con el start block. |
-| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_DEPLOYMENT_TX_HASH` | Pendiente de los receipts | Evidencia publica BSC Testnet que el indexer verifica. |
-| `CHAIN_INDEXER_{TOKEN,MARKETPLACE,BRIDGE}_RUNTIME_CODE_HASH` | Pendiente del despliegue | Keccak-256 del bytecode runtime de cada fuente testnet. |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | `PRESALE,UKI_STAKING,VESTING_VAULT,REWARDS_DISTRIBUTOR,TOKEN,MARKETPLACE,BRIDGE` | Los tres aliases NFT se activan juntos y nunca apuntan a las direcciones legacy de mainnet. |
+| `CHAIN_INDEXER_TOKEN_ADDRESS` | `0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | `StagingCukiesNft` de chain `97`; sin fallback mainnet. |
+| `CHAIN_INDEXER_TOKEN_START_BSC_BLOCK` / `CHAIN_INDEXER_TOKEN_DEPLOYMENT_BSC_BLOCK` | `123673635` | Bloque exacto del receipt. |
+| `CHAIN_INDEXER_TOKEN_DEPLOYMENT_TX_HASH` | `0x6ed9211fa37490fa55382254a224c5e3cf4b5ff149d84877ae4e90517fa0b741` | Evidencia publica BSC Testnet. |
+| `CHAIN_INDEXER_TOKEN_RUNTIME_CODE_HASH` | `0x9ac386fda34278ee45a470fea9d6097a8180d376a3fad3c47b54ac04f05fddd9` | Keccak-256 del bytecode runtime. |
+| `CHAIN_INDEXER_MARKETPLACE_ADDRESS` | `0x95780d891461e3183562B5D785f2D2c1c72ecE65` | Emisor testnet de eventos marketplace, sin custodia ni valor. |
+| `CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK` / `CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_BSC_BLOCK` | `123673640` | Bloque exacto del receipt. |
+| `CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_TX_HASH` | `0xeb44620d953939596a4c1ffd32fcda27ecaeb11c36d5c24e3c8bf17fe63a33d2` | Evidencia publica BSC Testnet. |
+| `CHAIN_INDEXER_MARKETPLACE_RUNTIME_CODE_HASH` | `0x90441ea4ad451e251b7a9ba455db1be59c7dd38a10aad6f7ad904d90acac6710` | Keccak-256 del bytecode runtime. |
+| `CHAIN_INDEXER_BRIDGE_ADDRESS` | `0x6E29448282bCc1c568Ec9450Bef50a01d67845C2` | Emisor testnet de eventos bridge, sin custodia ni valor. |
+| `CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK` / `CHAIN_INDEXER_BRIDGE_DEPLOYMENT_BSC_BLOCK` | `123673645` | Bloque exacto del receipt. |
+| `CHAIN_INDEXER_BRIDGE_DEPLOYMENT_TX_HASH` | `0x50090ece74871055691632ac681452ab71be91841b87ab38da73c2db8c8a9c4c` | Evidencia publica BSC Testnet. |
+| `CHAIN_INDEXER_BRIDGE_RUNTIME_CODE_HASH` | `0x512bbefe6dea920912f5ddd839a4cd2bd214680a62790251a7a713023a754408` | Keccak-256 del bytecode runtime. |
 | `CHAIN_INDEXER_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK` | `123359165` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK` | `123359165` | Debe coincidir con el receipt de despliegue y con el start block. |
@@ -239,7 +247,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 El indexer no marca un cursor UKI como `verified` por confiar en la configuracion. En cada arranque comprueba chain ID, receipt de despliegue, address, bloque y hash del bytecode runtime; despues sella el checkpoint canonico y la identidad de configuracion en los cursores. `VestingCreated` y `TokensReleased` se guardan en un ledger inmutable y reconstruyen la posicion por wallet/schedule, de modo que un replay repara una escritura parcial sin duplicar importes.
 
-Las direcciones legacy `TOKEN`, `MARKETPLACE` y `BRIDGE` documentadas para BSC no tienen bytecode en chain `97` y no son fuentes validas de staging. La fuente equivalente testnet ya esta implementada en `packages/contracts`, pero el despliegue permanece fail-closed hasta que la wallet `0x3d80cbEd6CA067a154A22659224EB5194aDCe24C` disponga de tBNB. No se usara el faucet oficial que exige saldo BNB de mainnet ni se leera mainnet para completar un tick de staging.
+Las direcciones legacy `TOKEN`, `MARKETPLACE` y `BRIDGE` documentadas para BSC no tienen bytecode en chain `97` y no son fuentes validas de staging. El 7 de agosto se transfirieron `0.03 tBNB` desde una wallet local de BSC Testnet al deployer aislado, sin consultar ni usar mainnet, y se desplegaron las tres fuentes equivalentes anteriores. El script acuno seis originales fixture, token IDs `97000001..97000006`, con rarezas `1..6`: suman `39` puntos y deben saturar la ruta NFT en cinco slots.
 
 ### Card worker en staging
 
@@ -283,10 +291,12 @@ Antes de considerar staging valido:
 - [x] Definir el ruleset exclusivo de prueba `staging-test-v1`: inicio `2026-08-10T00:00:00.000Z`, frontera `00:00 UTC`, gracia de 24h y siete destinos sink `0x97...`; los parametros equivalentes de produccion siguen sin aprobar (PR #226, merge `509ef4ca`).
 - [x] Implementar un bootstrap atomico `plan/apply` para rewards, competition credits, Treasure Hunt y ranking, con replay idempotente y rechazo de chain, base, recurso, gates o cursores no verificados (PR #226).
 - [x] Auditar y cerrar el motor de requisito dinamico: capacidad llena, gracia fija de 48h, proteccion, barrido paginado y cierre de ronda versionado (#61; implementado en PR #209).
-- [ ] Financiar el deployer con tBNB sin usar mainnet, desplegar TOKEN/MARKETPLACE/BRIDGE equivalentes de #60 y verificar sus cursores en chain `97`.
-- [ ] Ejecutar `pnpm staging:economy:rules:plan` y despues `pnpm staging:economy:rules:apply`; repetir el plan y exigir cuatro acciones `replay`.
-- [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para Cukie Master, creditos, Game Economy, Cukie Pool y ranking; comprobar fencing, idempotencia, auditoria y ausencia de escrituras fuera de staging.
-- [ ] Habilitar como maximo un scheduler, observar al menos dos ciclos y volver a apagarlo antes de avanzar al siguiente.
+- [x] Financiar el deployer con tBNB sin usar mainnet, desplegar TOKEN/MARKETPLACE/BRIDGE equivalentes de #60 y verificar sus ocho cursores en chain `97`; los seis fixtures quedaron proyectados con generacion, rareza y propietario correctos, sin dead letters.
+- [x] Ejecutar `pnpm staging:economy:rules:plan` y despues `pnpm staging:economy:rules:apply`; la repeticion del plan devolvio las cuatro acciones `replay` sin bloqueos.
+- [x] Ejecutar ticks manuales Cukie Master con gate efimero, comprobar fencing `200/409`, replay `200`, auditoria, reconciliacion y ausencia de escrituras fuera de staging.
+- [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para creditos, Game Economy, Cukie Pool y ranking.
+- [x] Habilitar solo el scheduler Cukie Master y observar dos ciclos `success`; se mantiene activo para la prueba funcional solicitada. Debe apagarse antes de habilitar cualquier otro scheduler.
+- [ ] Repetir la ventana controlada para los otros cuatro schedulers: uno cada vez, dos ciclos y apagado antes del siguiente.
 - [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
 - [x] Provisionar bucket MinIO, hostname publico, prefijo y credenciales exclusivos de staging; validar setup, upload/render real y limpieza completa del fixture.
@@ -295,7 +305,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloqueo es exclusivamente #60: obtener tBNB por una via que no requiera saldo ni transaccion de mainnet, desplegar las tres fuentes NFT equivalentes y dejar sus cursores verificados. A continuacion se ejecuta el bootstrap `staging-test-v1` con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+Staging ya permite probar Cukie Master por ambas rutas. La wallet visible `0x26789b9743d187174c3e3a87729730824a4d0c13` conserva `25,000 UKI` liquidos, `250 tASM`, gas testnet y los seis NFTs en soft-staking; el usuario puede completar `approve` y `stake` desde la UI. La siguiente ampliacion del checklist es validar creditos, Game Economy, Cukie Pool y ranking de uno en uno, apagando primero Cukie Master antes de activar el siguiente scheduler. Las integraciones externas propias de staging siguen siendo ampliaciones separadas y no bloquean esta version de prueba base.
 
 ## Gates para produccion
 

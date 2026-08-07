@@ -48,6 +48,9 @@ Comprobacion: RPC publico de BSC testnet.
 | `VESTING_VAULT` | `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `DEFAULT_ADMIN_ROLE`; desplegado en bloque `123291890`, tx `0x14292fc576ddff260572c4d7de7a7538d8f0aed8f3147d20f65d2cb77a0fa00b`. |
 | `PRESALE` | `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA` | `0xba84bffad693edbd4b3f7899fb6e3ccb0c1d7820` | `owner()`; desplegado en bloque `123291898`. |
 | `PRESALE_TREASURY` | `0x19907a00abf02975fb60d616c99565894c08d859` | N/A | `Presale.treasury()`. |
+| `TOKEN` (staging) | `0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | `0x3d80cbed6ca067a154a22659224eb5194adce24c` | `StagingCukiesNft`; bloque `123673635`, solo chain `97`. |
+| `MARKETPLACE` (staging) | `0x95780d891461e3183562B5D785f2D2c1c72ecE65` | `0x3d80cbed6ca067a154a22659224eb5194adce24c` | Fuente de eventos sin custodia; bloque `123673640`. |
+| `BRIDGE` (staging) | `0x6E29448282bCc1c568Ec9450Bef50a01d67845C2` | `0x3d80cbed6ca067a154a22659224eb5194adce24c` | Fuente de eventos sin bridge ni custodia; bloque `123673645`. |
 
 El escenario activo abre del `2026-08-05T10:59:20Z` al `2026-09-04T10:59:20Z`, usa `100 UKI/ASM`, compra minima de `5 ASM`, cap de `250,000,000 UKI` y vesting lineal de 9 meses. El vault quedo financiado con el cap completo, la unica cuenta con `PRESALE_VESTING_ROLE` es el contrato `Presale` anterior y ambos contratos tienen el source verificado en BscScan mediante Etherscan API V2.
 
