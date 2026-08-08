@@ -134,6 +134,20 @@ describe('GET /api/economy/v1/cukie-master', () => {
 
   it('returns a no-store public DTO without source refs or hashes', async () => {
     mockVerify.mockResolvedValue({ id: 'user-1' } as never);
+    mockInventory.mockResolvedValue([{
+      assetId: 'cukies:42',
+      tokenId: '42',
+      imageUrl: 'https://cukies.s3.eu-west-3.amazonaws.com/png/tokens/v2/contract/42.png',
+      rarity: 'rare',
+      rarityPoints: 4,
+      contributesToCukieMaster: true,
+      contributionPoints: 4,
+      state: 'soft_staked',
+      blockers: [],
+      lock: { lockId: 'lock-42', fencingToken: 2 },
+      canSoftStake: false,
+      canUnstake: true,
+    }]);
     mockStatus.mockResolvedValue({
       walletAddress: WALLET,
       walletNormalized: WALLET,
@@ -155,6 +169,12 @@ describe('GET /api/economy/v1/cukie-master', () => {
       presaleLockedRaw: '20000000000000000000000',
       stakedUkiRaw: '5000000000000000000000',
     });
+    expect(body.data.nftInventory[0]).toEqual(expect.objectContaining({
+      assetId: 'cukies:42',
+      imageUrl: expect.stringContaining('/42.png'),
+      contributesToCukieMaster: true,
+      contributionPoints: 4,
+    }));
     expect(JSON.stringify(body)).not.toMatch(/sourceHash|refs|internal warning|secret-asset-id/);
   });
 

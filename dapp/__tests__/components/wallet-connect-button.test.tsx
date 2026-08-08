@@ -88,4 +88,24 @@ describe('components/landing/WalletConnectButton', () => {
       });
     });
   });
+
+  it('does not offer a native TRON session inside an EVM-only flow', async () => {
+    mockUseAccount.mockReturnValue({ isConnected: false } as any);
+    mockUseTronLink.mockReturnValue({
+      address: 'TJEAyJ111111111111111111111111111VjhM',
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      error: null,
+      isConnected: true,
+      isInstalled: true,
+      isLoading: false,
+    } as any);
+
+    render(<WalletConnectButton evmOnly label="Conectar wallet EVM" />);
+    fireEvent.click(screen.getByRole('button', { name: /Conectar wallet EVM/i }));
+
+    expect(await screen.findByText(/Elige una wallet EVM y acepta el cambio/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /TronLink TRON/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Firmar wallet actual/i })).not.toBeInTheDocument();
+  });
 });
