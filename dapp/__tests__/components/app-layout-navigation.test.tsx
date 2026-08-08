@@ -66,5 +66,7 @@ describe('AppLayout launch navigation', () => {
     ]) {
       expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
     }
+
+    expect(document.querySelector('a[href^="/indexer"]')).not.toBeInTheDocument();
   });
 });

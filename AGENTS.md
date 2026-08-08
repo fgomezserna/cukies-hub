@@ -169,7 +169,7 @@ Operational rules:
 - Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
 - Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
 - In app 28, `CARD_WORKER_UPLOAD=true` and `COMPOSE_PROFILES=card-worker` are allowed only with the exclusive `cukies-cards-staging` bucket, staging-only credentials and the guard validated. Do not copy those values or credentials to another resource.
-- Validate post-deploy with `/api/health`, `/indexer?collection=chain_indexer_runs`, `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`.
+- Validate post-deploy with `/api/health`, authenticated admin access to `/indexer?collection=chain_indexer_runs` and `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`. `/indexer` must never open Mongo without a signed EVM wallet included in `ADMIN_WALLET_ALLOWLIST`.
 - Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
 
 ## Testing

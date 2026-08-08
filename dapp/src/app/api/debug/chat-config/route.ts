@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireLocalAdminApiAccess } from '@/lib/operational-access';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  const accessDenied = await requireLocalAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     const rooms = await prisma.chatRoom.findMany({
       select: {
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
       rooms: roomsWithMessages,
       telegramConfig: {
         botToken: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'missing',
-        groupId: process.env.TELEGRAM_CHAT_ID || 'missing'
+        groupId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'missing'
       }
     });
   } catch (error) {

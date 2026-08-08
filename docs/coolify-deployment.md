@@ -164,10 +164,60 @@ AWS_SECRET_ACCESS_KEY=...
 
 En staging, el destino exclusivo es el bucket MinIO `cukies-cards-staging`. Las URLs inmutables de #216 y el smoke real quedaron validados, por lo que `CARD_WORKER_UPLOAD=true` y `COMPOSE_PROFILES=card-worker` estan activos solo en la app Coolify 28 desde el despliegue 1109. El valor `false` del ejemplo sigue siendo el default seguro para cualquier recurso nuevo. No usar nunca el destino compartido de produccion ni copiar las credenciales de app 28.
 
+## Preflight de rutas operativas y Telegram
+
+Los cambios de seguridad de rutas no autorizan por sí mismos ninguna modificación
+en Coolify, Telegram, IFTTT ni producción. El estado actual de staging mantiene esas
+integraciones externas vacías hasta disponer de destinos exclusivos. En ese modo el
+candidato se puede desplegar de forma segura: los webhooks responden `503`, las
+rutas admin responden `503` sin allowlist y `Join Group` queda oculto. Esto es el
+comportamiento fail-closed esperado, no un motivo para activar integraciones reales.
+
+La activación posterior es un cambio operativo separado y exige autorización. Solo
+entonces:
+
+1. Cargar en la app 28 una `ADMIN_WALLET_ALLOWLIST` de wallets EVM administrativas
+   de staging y valores exclusivos para `IFTTT_WEBHOOK_SECRET`,
+   `TELEGRAM_WEBHOOK_SECRET` y `TELEGRAM_CLEANUP_SECRET`. Cada secreto debe tener al
+   menos 32 bytes, 12 caracteres distintos y no puede reutilizarse ni exponerse como
+   `NEXT_PUBLIC_*`.
+2. Generar `TELEGRAM_WEBHOOK_SECRET` desde 32 bytes aleatorios en base64url: 43
+   caracteres sin `=`, usando solo `A-Z`, `a-z`, `0-9`, `_` y `-`. Telegram limita
+   `secret_token` a 256 caracteres.
+3. Configurar `TELEGRAM_GROUP_INVITE` con el enlace `https://t.me/...` exclusivo del
+   entorno. Si falta o no es válido, `/api/telegram/group-invite` falla cerrado y la
+   UI no muestra `Join Group`.
+4. Confirmar primero el modo de ingreso de Telegram. `setWebhook` y `getUpdates` no
+   pueden operar simultáneamente; no convertir un entorno que usa polling sin una
+   ventana y una decisión operativa separadas.
+5. Configurar el mismo `IFTTT_WEBHOOK_SECRET` privado dentro del JSON de la acción
+   IFTTT antes de habilitar su trigger. La app no mantiene una ventana de doble
+   secreto: cualquier rotación posterior exige una ventana coordinada y reintentar
+   los eventos que coincidan con el corte.
+
+La primera migración de un webhook Telegram que todavía apunta a una versión sin
+validación de cabecera puede hacerse en dos fases:
+
+1. Guardar el nuevo valor en la configuración del siguiente despliegue, sin
+   redesplegar todavía.
+2. Actualizar `setWebhook` con ese mismo `secret_token` mientras la versión anterior
+   aún tolera la nueva cabecera y comprobar que Telegram sigue entregando updates.
+3. Desplegar el candidato y verificar que una cabecera ausente o errónea devuelve
+   `401`, la correcta permite el update y el cuerpo no aparece en logs.
+
+Las rotaciones posteriores también requieren ventana coordinada porque el runtime
+acepta un único secreto; no se debe reutilizar el procedimiento anterior como si la
+versión ya protegida tolerase simultáneamente el valor viejo y el nuevo.
+
+La promoción a producción requiere evidencia de staging, un go/no-go independiente
+y repetir la rotación con valores de producción. Nunca copiar los de staging ni
+aplicar este runbook directamente sobre `cukies.world` como parte de un PR.
+
 ## Validacion post deploy
 
 - Abrir la web publica y revisar `/api/health`.
-- Abrir `/indexer?collection=chain_indexer_runs`.
+- Iniciar una sesión firmada con una wallet EVM incluida en `ADMIN_WALLET_ALLOWLIST`.
+- Abrir `/indexer?collection=chain_indexer_runs`; sin esa sesión debe responder como ruta inexistente y no abrir Mongo.
 - Abrir `/indexer?collection=presale_purchases` tras una compra de prueba confirmada.
 - Abrir `/indexer?collection=presale_participants` y comprobar `totalUkiPurchased`, `referralUnlockedAt`, sponsor provisional/bloqueado y acumulados N1/N2/N3.
 - Abrir `/indexer?collection=presale_referral_contributions` y verificar que una compra atribuida crea hasta tres filas, una por nivel.

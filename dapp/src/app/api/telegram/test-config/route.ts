@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
+import { requireLocalAdminApiAccess } from '@/lib/operational-access';
 
 export async function GET() {
+  const accessDenied = await requireLocalAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     // Check if bot token and chat ID are configured
     if (!process.env.TELEGRAM_BOT_TOKEN) {

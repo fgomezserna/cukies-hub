@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTelegramUpdates, processTelegramMessage } from '@/lib/telegram-chat-utils';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 let isAutoSyncActive = false;
 let syncInterval: NodeJS.Timeout | null = null;
@@ -47,8 +48,22 @@ async function performAutoSync() {
 }
 
 export async function POST(request: NextRequest) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     const { action, intervalSeconds = 30 } = await request.json();
+
+    if (
+      !Number.isInteger(intervalSeconds) ||
+      intervalSeconds < 15 ||
+      intervalSeconds > 300
+    ) {
+      return NextResponse.json(
+        { error: 'intervalSeconds must be an integer between 15 and 300' },
+        { status: 400 },
+      );
+    }
     
     if (action === 'start') {
       if (isAutoSyncActive) {
@@ -114,15 +129,16 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('❌ Auto-sync endpoint error:', error);
-    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ 
-      error: 'Internal server error',
-      details: message
+      error: 'Internal server error'
     }, { status: 500 });
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   return NextResponse.json({
     isActive: isAutoSyncActive,
     intervalMs: syncInterval ? 30000 : null,
@@ -132,4 +148,3 @@ export async function GET(request: NextRequest) {
     chatId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'not configured'
   });
 }
-

@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getTelegramUpdates, processTelegramMessage } from '@/lib/telegram-chat-utils';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 let isPolling = false;
 let lastUpdateId = 0;
 
-export async function POST(request: NextRequest) {
+export async function POST() {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     console.log('🔄 Manual Telegram sync triggered...');
     
@@ -55,17 +59,18 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Sync error:', error);
     isPolling = false;
-    const message = error instanceof Error ? error.message : String(error);
     
     return NextResponse.json({ 
       success: false,
-      error: 'Sync failed',
-      details: message
+      error: 'Sync failed'
     }, { status: 500 });
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   // Get sync status
   return NextResponse.json({
     isPolling,
@@ -74,4 +79,3 @@ export async function GET(request: NextRequest) {
     chatId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'not configured'
   });
 }
-

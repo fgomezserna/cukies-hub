@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,13 +32,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await auth();
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
 
+  try {
     const { gameId, name, description, telegramTopicId, telegramGroupId } = await request.json();
 
     if (!gameId || !name) {

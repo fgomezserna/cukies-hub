@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 export async function GET() {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     // Check how many verification codes are active
     const activeCodesCount = await prisma.emailVerification.count({

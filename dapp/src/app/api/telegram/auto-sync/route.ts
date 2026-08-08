@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTelegramUpdates, processTelegramMessage } from '@/lib/telegram-chat-utils';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 let isPolling = false;
 let pollingInterval: NodeJS.Timeout | null = null;
@@ -33,8 +34,18 @@ async function performSync() {
 }
 
 export async function POST(request: NextRequest) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     const { action, interval = 10000 } = await request.json();
+
+    if (!Number.isSafeInteger(interval) || interval < 5_000 || interval > 300_000) {
+      return NextResponse.json(
+        { error: 'Interval must be an integer between 5000 and 300000 milliseconds' },
+        { status: 400 },
+      );
+    }
     
     if (action === 'start') {
       if (isPolling) {
@@ -85,6 +96,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   return NextResponse.json({ 
     isActive: isPolling,
     hasInterval: pollingInterval !== null,

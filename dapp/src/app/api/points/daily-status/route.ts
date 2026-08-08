@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyWalletAuth } from '@/lib/auth-utils';
 
 // Helper to check if two dates are on the same calendar day
 const isSameDay = (d1: Date, d2: Date) =>
@@ -23,8 +24,18 @@ export async function GET(request: Request) {
   }
 
   try {
+    let authenticatedUser;
+    try {
+      authenticatedUser = await verifyWalletAuth(walletAddress);
+    } catch {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: { 'Cache-Control': 'private, no-store' } },
+      );
+    }
+
     const user = await prisma.user.findUnique({
-      where: { walletAddress },
+      where: { id: authenticatedUser.id },
       include: {
         lastCheckIn: true,
         dailyCheckIns: {
@@ -79,14 +90,17 @@ export async function GET(request: Request) {
       currentStreak = 0;
     }
 
-    return NextResponse.json({
-      canClaim,
-      currentStreak,
-      hasClaimedToday: !canClaim && todayCheckIn !== undefined,
-    });
+    return NextResponse.json(
+      {
+        canClaim,
+        currentStreak,
+        hasClaimedToday: !canClaim && todayCheckIn !== undefined,
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    );
 
   } catch (error) {
     console.error('Failed to fetch daily status:', error);
     return NextResponse.json({ error: 'Failed to fetch daily status' }, { status: 500 });
   }
-} 
+}

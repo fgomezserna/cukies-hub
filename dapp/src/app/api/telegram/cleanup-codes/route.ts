@@ -1,20 +1,27 @@
 import { NextResponse } from 'next/server';
 import { cleanupOldVerificationCodes } from '@/lib/telegram-utils';
+import {
+  requireLocalAdminApiAccess,
+  requirePrivateSecretApiAccess,
+} from '@/lib/operational-access';
 
 export async function POST(request: Request) {
-  try {
-    // Optional: Add authentication here to prevent unauthorized cleanup
-    // For example, check for a secret header or API key
-    const authHeader = request.headers.get('x-cleanup-secret');
-    if (authHeader !== process.env.TELEGRAM_CLEANUP_SECRET) {
-      return NextResponse.json({ 
-        error: 'Unauthorized' 
-      }, { status: 401 });
-    }
+  const accessDenied = requirePrivateSecretApiAccess(
+    request.headers.get('x-cleanup-secret'),
+    'TELEGRAM_CLEANUP_SECRET',
+  );
+  if (accessDenied) return accessDenied;
 
+  try {
     // Get optional parameters from request body
     const body = await request.json().catch(() => ({}));
-    const maxAgeMinutes = body.maxAgeMinutes || 10;
+    const maxAgeMinutes = body.maxAgeMinutes ?? 10;
+    if (!Number.isSafeInteger(maxAgeMinutes) || maxAgeMinutes < 1 || maxAgeMinutes > 1_440) {
+      return NextResponse.json(
+        { error: 'maxAgeMinutes must be an integer between 1 and 1440' },
+        { status: 400 },
+      );
+    }
     
     // Run the cleanup
     const deletedCount = await cleanupOldVerificationCodes(
@@ -37,7 +44,9 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  // GET endpoint for manual testing (should be protected in production)
+  const accessDenied = await requireLocalAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   return NextResponse.json({
     message: 'Use POST method to trigger cleanup',
     info: 'This endpoint cleans up old verification codes from Telegram'
