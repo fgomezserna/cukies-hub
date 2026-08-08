@@ -1,0 +1,357 @@
+name: CI quality
+
+on:
+  pull_request_target:
+    branches:
+      - staging
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - staging
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: ci/quality-target-resolver
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      base_ref: ${{ steps.target.outputs.base_ref }}
+      base_sha: ${{ steps.target.outputs.base_sha }}
+      environment_name: ${{ steps.target.outputs.environment_name }}
+      head_sha: ${{ steps.target.outputs.head_sha }}
+      profile: ${{ steps.target.outputs.profile }}
+      target_ref: ${{ steps.target.outputs.target_ref }}
+      target_sha: ${{ steps.target.outputs.target_sha }}
+    steps:
+      # actions/github-script v7, pinned. This trusted base workflow resolves only live API refs.
+      - name: Resolve and validate the exact quality target
+        id: target
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fullSha = /^[0-9a-f]{40}$/;
+            const { owner, repo } = context.repo;
+
+            async function refSha(ref) {
+              const response = await github.rest.git.getRef({ owner, repo, ref });
+              const sha = response?.data?.object?.sha;
+              if (!fullSha.test(sha ?? '')) {
+                throw new Error(`GitHub ref ${ref} did not resolve to a full SHA.`);
+              }
+              return sha;
+            }
+
+            let baseRef;
+            let baseSha;
+            let headSha;
+            let profile;
+            let targetRef;
+            let targetSha;
+
+            if (context.eventName === 'push') {
+              baseRef = context.ref.replace(/^refs\/heads\//, '');
+              if (!['staging', 'main'].includes(baseRef) || !fullSha.test(context.sha ?? '')) {
+                throw new Error('Push quality only accepts a full SHA on staging or main.');
+              }
+              const liveBranchSha = await refSha(`heads/${baseRef}`);
+              if (liveBranchSha !== context.sha) {
+                throw new Error('The protected branch advanced before quality target resolution.');
+              }
+              baseSha = context.sha;
+              headSha = context.sha;
+              profile = 'candidate';
+              targetRef = context.sha;
+              targetSha = context.sha;
+            } else if (context.eventName === 'pull_request_target') {
+              const number = context.payload.pull_request?.number;
+              if (!Number.isSafeInteger(number) || number <= 0) {
+                throw new Error('Pull request number is invalid.');
+              }
+
+              let pull;
+              for (let attempt = 1; attempt <= 12; attempt += 1) {
+                ({ data: pull } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
+                if (pull?.mergeable !== null) break;
+                if (attempt === 12) {
+                  throw new Error('GitHub did not resolve pull request mergeability.');
+                }
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+              }
+
+              baseRef = pull?.base?.ref;
+              headSha = pull?.head?.sha;
+              if (
+                pull?.state !== 'open'
+                || !['staging', 'main'].includes(baseRef)
+                || pull?.base?.repo?.full_name !== `${owner}/${repo}`
+                || pull?.head?.repo?.full_name !== `${owner}/${repo}`
+                || !fullSha.test(headSha ?? '')
+                || pull?.mergeable !== true
+                || !fullSha.test(pull?.merge_commit_sha ?? '')
+              ) {
+                throw new Error('Pull request is not an eligible same-repository quality target.');
+              }
+
+              baseSha = await refSha(`heads/${baseRef}`);
+              targetSha = await refSha(`pull/${number}/merge`);
+              if (targetSha !== pull.merge_commit_sha) {
+                throw new Error('The live pull merge ref differs from the pull request payload.');
+              }
+              const mergeCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: targetSha });
+              const parents = mergeCommit?.data?.parents?.map(({ sha }) => sha) ?? [];
+              if (parents.length !== 2 || parents[0] !== baseSha || parents[1] !== headSha) {
+                throw new Error('The quality target is not the exact current GitHub test merge.');
+              }
+              profile = baseRef === 'main' ? 'candidate' : 'quick';
+              targetRef = `refs/pull/${number}/merge`;
+            } else {
+              throw new Error('Unsupported quality event.');
+            }
+
+            core.setOutput('base_ref', baseRef);
+            core.setOutput('base_sha', baseSha);
+            core.setOutput('environment_name', baseRef === 'main' ? 'Release Gate' : 'Staging');
+            core.setOutput('head_sha', headSha);
+            core.setOutput('profile', profile);
+            core.setOutput('target_ref', targetRef);
+            core.setOutput('target_sha', targetSha);
+
+  quality:
+    name: ci/quality-runner
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # Candidate code is isolated and never receives an Environment or App credential.
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.prepare.outputs.target_ref }}
+          path: workspace
+          persist-credentials: false
+          fetch-depth: 1
+
+      # actions/setup-node v4, pinned.
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Validate exact checkout and declared pnpm version
+        env:
+          EXPECTED_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(git -C workspace rev-parse HEAD)"
+          if [[ "$actual_sha" != "$EXPECTED_SHA" ]]; then
+            echo 'Candidate checkout does not match the resolved quality target.' >&2
+            exit 1
+          fi
+          package_manager="$(node -e '
+            const value = require("./workspace/package.json").packageManager;
+            if (typeof value !== "string" || !/^pnpm@[0-9]+\.[0-9]+\.[0-9]+$/.test(value)) process.exit(1);
+            process.stdout.write(value);
+          ')"
+          test -n "$package_manager"
+
+      # No candidate process has executed before trusted tooling is loaded.
+      - name: Checkout trusted CI tooling
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.prepare.outputs.base_sha }}
+          path: trusted
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate trusted tooling checkout
+        env:
+          EXPECTED_BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(git -C trusted rev-parse HEAD)"
+          if [[ "$actual_sha" != "$EXPECTED_BASE_SHA" ]]; then
+            echo 'Trusted tooling checkout does not match the live base.' >&2
+            exit 1
+          fi
+          git -C trusted diff --quiet HEAD --
+          test -z "$(git -C trusted status --porcelain --untracked-files=all)"
+
+      - name: Build the immutable isolated candidate image
+        id: candidate_image
+        env:
+          EXPECTED_TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+          QUALITY_IMAGE: cukies-quality:${{ needs.prepare.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          node trusted/scripts/ci/prepare-quality-container.mjs \
+            --workspace workspace \
+            --expected-sha "$EXPECTED_TARGET_SHA" \
+            --image "$QUALITY_IMAGE"
+          quality_image_id="$(docker image inspect --format='{{.Id}}' "$QUALITY_IMAGE")"
+          if [[ ! "$quality_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo 'Docker did not resolve the candidate tag to an immutable image ID.' >&2
+            exit 1
+          fi
+          quality_target_sha="$(docker image inspect \
+            --format='{{ index .Config.Labels "com.cukies.quality.target-sha" }}' \
+            "$quality_image_id")"
+          if [[ "$quality_target_sha" != "$EXPECTED_TARGET_SHA" ]]; then
+            echo 'Candidate image label does not match the resolved quality target.' >&2
+            exit 1
+          fi
+          printf 'image_id=%s\n' "$quality_image_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run the trusted fail-closed quality contract
+        env:
+          QUALITY_CONTAINER_IMAGE: ${{ steps.candidate_image.outputs.image_id }}
+          QUALITY_EXPECTED_SHA: ${{ needs.prepare.outputs.target_sha }}
+          QUALITY_PROFILE: ${{ needs.prepare.outputs.profile }}
+          QUALITY_WORKSPACE: ${{ github.workspace }}/workspace
+        run: >-
+          node trusted/scripts/ci/run-quality.mjs
+          --profile "$QUALITY_PROFILE"
+          --workspace "$QUALITY_WORKSPACE"
+          --expected-sha "$QUALITY_EXPECTED_SHA"
+          --container-image "$QUALITY_CONTAINER_IMAGE"
+
+      - name: Revalidate both checkouts after candidate execution
+        if: always()
+        env:
+          EXPECTED_BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          EXPECTED_TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C workspace rev-parse HEAD)" = "$EXPECTED_TARGET_SHA"
+          test "$(git -C trusted rev-parse HEAD)" = "$EXPECTED_BASE_SHA"
+          git -C workspace diff --no-ext-diff --quiet "$EXPECTED_TARGET_SHA" --
+          git -C trusted diff --no-ext-diff --quiet "$EXPECTED_BASE_SHA" --
+          test -z "$(git -C workspace status --porcelain --untracked-files=no)"
+          test -z "$(git -C trusted status --porcelain --untracked-files=all)"
+
+  attest:
+    name: ci/quality-attestor
+    needs:
+      - prepare
+      - quality
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ needs.prepare.outputs.environment_name }}
+      url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      # Revalidation uses only the read-only GITHUB_TOKEN and trusted workflow code.
+      - name: Revalidate the live target before signing
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          EXPECTED_BASE_REF: ${{ needs.prepare.outputs.base_ref }}
+          EXPECTED_BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ needs.prepare.outputs.head_sha }}
+          EXPECTED_TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fullSha = /^[0-9a-f]{40}$/;
+            const { owner, repo } = context.repo;
+            const expected = {
+              baseRef: process.env.EXPECTED_BASE_REF,
+              baseSha: process.env.EXPECTED_BASE_SHA,
+              headSha: process.env.EXPECTED_HEAD_SHA,
+              targetSha: process.env.EXPECTED_TARGET_SHA,
+            };
+            if (
+              !['staging', 'main'].includes(expected.baseRef)
+              || !fullSha.test(expected.baseSha ?? '')
+              || !fullSha.test(expected.headSha ?? '')
+              || !fullSha.test(expected.targetSha ?? '')
+            ) {
+              throw new Error('Resolved quality outputs are invalid.');
+            }
+
+            const branch = await github.rest.git.getRef({ owner, repo, ref: `heads/${expected.baseRef}` });
+            if (branch?.data?.object?.sha !== expected.baseSha) {
+              throw new Error('The protected base branch changed before quality attestation.');
+            }
+
+            if (context.eventName === 'push') {
+              if (context.sha !== expected.targetSha || expected.headSha !== expected.targetSha) {
+                throw new Error('Push quality target changed before attestation.');
+              }
+            } else {
+              const number = context.payload.pull_request?.number;
+              if (!Number.isSafeInteger(number) || number <= 0) {
+                throw new Error('Pull request number is invalid before quality attestation.');
+              }
+              const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+              const mergeRef = await github.rest.git.getRef({ owner, repo, ref: `pull/${number}/merge` });
+              if (
+                pull?.state !== 'open'
+                || pull?.base?.ref !== expected.baseRef
+                || pull?.base?.repo?.full_name !== `${owner}/${repo}`
+                || pull?.head?.sha !== expected.headSha
+                || pull?.head?.repo?.full_name !== `${owner}/${repo}`
+                || pull?.mergeable !== true
+                || pull?.merge_commit_sha !== expected.targetSha
+                || mergeRef?.data?.object?.sha !== expected.targetSha
+              ) {
+                throw new Error('The live pull request changed before quality attestation.');
+              }
+              const commit = await github.rest.git.getCommit({
+                owner,
+                repo,
+                commit_sha: expected.targetSha,
+              });
+              const parents = commit?.data?.parents?.map(({ sha }) => sha) ?? [];
+              if (parents.length !== 2 || parents[0] !== expected.baseSha || parents[1] !== expected.headSha) {
+                throw new Error('The live quality target is no longer the exact test merge.');
+              }
+            }
+
+      - name: Mint the dedicated quality check token
+        id: release_app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.RELEASE_GATE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_GATE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-checks: write
+
+      - name: Publish the app-bound required quality check
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          PROFILE: ${{ needs.prepare.outputs.profile }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        with:
+          github-token: ${{ steps.release_app.outputs.token }}
+          script: |
+            const success = process.env.QUALITY_RESULT === 'success';
+            const detailsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.checks.create({
+              ...context.repo,
+              name: 'CI Quality / Required',
+              head_sha: process.env.TARGET_SHA,
+              status: 'completed',
+              conclusion: success ? 'success' : 'failure',
+              details_url: detailsUrl,
+              output: {
+                title: success ? 'Quality contract passed' : 'Quality contract failed',
+                summary: `Profile ${process.env.PROFILE}; runner result ${process.env.QUALITY_RESULT}.`,
+              },
+            });

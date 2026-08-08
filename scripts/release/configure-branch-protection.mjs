@@ -397,7 +397,7 @@ async function verifyCiContextOnSha({
 
   if (matchingChecks.length === 0) {
     throw new ReleaseGuardConfigurationError(
-      'The selected CI context is not an app-bound check on current main.',
+      'The selected CI context is not an app-bound check on the selected SHA.',
     );
   }
   const appIds = new Set(matchingChecks.map((check) => check.app.id));
@@ -409,7 +409,7 @@ async function verifyCiContextOnSha({
   const latestCheck = matchingChecks.reduce((latest, check) => check.id > latest.id ? check : latest);
   if (latestCheck.status !== 'completed' || latestCheck.conclusion !== 'success') {
     throw new ReleaseGuardConfigurationError(
-      'The latest selected CI check is not completed successfully on current main.',
+      'The latest selected CI check is not completed successfully on the selected SHA.',
     );
   }
   return { kind: 'check', context: ciContext, appId: latestCheck.app.id };
@@ -483,6 +483,7 @@ export async function applyReleaseGuardPlan({
   } else if (phase === 'bootstrap-attested') {
     validatedReleaseAppId = validateReleaseAppId(releaseAppId);
     validatedReleaseAppSlug = validateReleaseAppSlug(releaseAppSlug);
+    validatedCiContext = validateCiContext(ciContext);
     if (typeof candidateSha !== 'string' || !FULL_GIT_SHA_PATTERN.test(candidateSha)) {
       throw new ReleaseGuardConfigurationError(
         'bootstrap-attested apply requires the exact full staging candidate SHA.',
@@ -547,6 +548,19 @@ export async function applyReleaseGuardPlan({
       fetchFn,
       statusCreatorLogin: `${validatedReleaseAppSlug}[bot]`,
     });
+    ciRequirement = await verifyCiContextOnSha({
+      apiBaseUrl: validatedApiUrl,
+      repository: validatedRepository,
+      candidateSha,
+      ciContext: validatedCiContext,
+      token,
+      fetchFn,
+    });
+    if (ciRequirement.appId !== validatedReleaseAppId) {
+      throw new ReleaseGuardConfigurationError(
+        'The required staging CI check must use the dedicated release GitHub App.',
+      );
+    }
   } else if (phase === 'steady-state') {
     await verifyPromotionWorkflowOnMain({
       apiBaseUrl: validatedApiUrl,
@@ -570,7 +584,7 @@ export async function applyReleaseGuardPlan({
       token,
       fetchFn,
     });
-    ciRequirement = await verifyCiContextOnSha({
+    const mainCiRequirement = await verifyCiContextOnSha({
       apiBaseUrl: validatedApiUrl,
       repository: validatedRepository,
       candidateSha,
@@ -578,11 +592,28 @@ export async function applyReleaseGuardPlan({
       token,
       fetchFn,
     });
-    if (ciRequirement.appId !== validatedReleaseAppId) {
+    if (mainCiRequirement.appId !== validatedReleaseAppId) {
       throw new ReleaseGuardConfigurationError(
-        'The required CI check must be emitted by the same dedicated release GitHub App.',
+        'The required CI check on main must use the dedicated release GitHub App.',
       );
     }
+    const stagingCiRequirement = await verifyCiContextOnSha({
+      apiBaseUrl: validatedApiUrl,
+      repository: validatedRepository,
+      candidateSha: branchShas.staging,
+      ciContext: validatedCiContext,
+      token,
+      fetchFn,
+    });
+    if (
+      stagingCiRequirement.appId !== validatedReleaseAppId
+      || mainCiRequirement.context !== stagingCiRequirement.context
+    ) {
+      throw new ReleaseGuardConfigurationError(
+        'The required CI check on main and staging must use the same dedicated release GitHub App.',
+      );
+    }
+    ciRequirement = mainCiRequirement;
   }
 
   const plan = buildReleaseGuardPlan({
@@ -621,8 +652,8 @@ export async function runConfigureBranchProtectionCli({
         'Dry-run (default): configure-branch-protection.mjs [--phase bootstrap-lock|bootstrap-attested|steady-state]',
         `Apply: add --apply --confirm ${RELEASE_GUARDS_CONFIRMATION}`,
         'bootstrap-attested/steady-state require --release-app-id <id> and --release-app-slug <slug>.',
-        'bootstrap-attested apply also requires --candidate-sha <40-hex>.',
-        'steady-state apply also requires --candidate-sha <current-main-40-hex> and --ci-context <existing-context>.',
+        'bootstrap-attested requires --ci-context <existing-context>; apply also requires --candidate-sha <40-hex>.',
+        'steady-state requires --ci-context <existing-context>; apply also requires --candidate-sha <current-main-40-hex>.',
         '',
       ].join('\n'));
       return 0;
@@ -638,10 +669,21 @@ export async function runConfigureBranchProtectionCli({
       ? undefined
       : validateReleaseAppSlug(rawReleaseAppSlug);
     if (!args.apply) {
+      const ciContext = args.phase === 'bootstrap-attested' || args.phase === 'steady-state'
+        ? validateCiContext(args.ciContext)
+        : undefined;
+      const ciRequirement = args.phase === 'bootstrap-attested' || args.phase === 'steady-state'
+        ? {
+            kind: 'check',
+            context: ciContext,
+            appId: releaseAppId,
+          }
+        : undefined;
       const plan = buildReleaseGuardPlan({
         phase: args.phase,
         repository,
-        ciContext: args.ciContext,
+        ciContext,
+        ciRequirement,
         releaseAppId,
       });
       stdout.write(`DRY-RUN: no GitHub settings were changed.\n${JSON.stringify(plan, null, 2)}\n`);

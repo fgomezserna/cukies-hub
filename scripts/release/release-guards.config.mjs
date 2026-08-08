@@ -27,6 +27,7 @@ export const RELEASE_GUARD_PHASES = Object.freeze({
       'The release tooling is already merged and deployed from staging.',
       'A dedicated release GitHub App is installed and its key is scoped to protected environments.',
       'Both staging attestations exist on the exact candidate SHA.',
+      'The app-bound CI quality check is green on the exact staging candidate SHA.',
       'main is an ancestor of that candidate SHA.',
       'The first staging -> main PR is reviewed manually because pull_request_target is not active yet.',
     ]),
@@ -127,6 +128,9 @@ export function buildReleaseGuardPlan({
   ) {
     throw new Error('ciRequirement must be an app-bound check resolved by the apply preflight.');
   }
+  if (phase === 'bootstrap-attested' && ciRequirement === undefined) {
+    throw new Error('bootstrap-attested requires the app-bound staging CI check.');
+  }
 
   const existingMain = normalizeExistingRequirements(existingContexts.main);
   const existingStaging = normalizeExistingRequirements(existingContexts.staging);
@@ -143,7 +147,7 @@ export function buildReleaseGuardPlan({
   ) {
     throw new Error('releaseAppId must identify a dedicated GitHub App, never GitHub Actions.');
   }
-  if (phase === 'steady-state' && ciRequirement && ciRequirement.appId !== releaseAppId) {
+  if (phase !== 'bootstrap-lock' && ciRequirement && ciRequirement.appId !== releaseAppId) {
     throw new Error('The required CI check must use the dedicated release GitHub App.');
   }
   const plainPhaseContexts = phaseConfig.mainContexts
@@ -166,9 +170,19 @@ export function buildReleaseGuardPlan({
   mainChecks = uniqueChecks(mainChecks);
   const mainCheckContexts = new Set(mainChecks.map(({ context }) => context));
   mainContexts = mainContexts.filter((context) => !mainCheckContexts.has(context));
-  const stagingChecks = uniqueChecks(existingStaging.checks);
+  let stagingChecks = [...existingStaging.checks];
+  let stagingContexts = [...existingStaging.contexts];
+  if (
+    (phase === 'bootstrap-attested' || phase === 'steady-state')
+    && ciRequirementContext
+  ) {
+    stagingChecks = stagingChecks.filter((check) => check.context !== ciRequirementContext);
+    stagingContexts = stagingContexts.filter((context) => context !== ciRequirementContext);
+    stagingChecks.push({ context: ciRequirementContext, app_id: ciRequirement.appId });
+  }
+  stagingChecks = uniqueChecks(stagingChecks);
   const stagingCheckContexts = new Set(stagingChecks.map(({ context }) => context));
-  const stagingContexts = uniqueContexts(existingStaging.contexts)
+  stagingContexts = uniqueContexts(stagingContexts)
     .filter((context) => !stagingCheckContexts.has(context));
 
   return {

@@ -82,7 +82,7 @@ export function GameControls({
 
         {!canAdvance && canCashOut && (
           <p className="col-span-full text-sm text-blue-600 text-center mt-3">
-            🎉 You've reached the end! You can only cash out
+            🎉 You&apos;ve reached the end! You can only cash out
           </p>
         )}
     </div>

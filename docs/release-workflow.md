@@ -126,16 +126,22 @@ La activacion es fail-closed y no se ejecuta durante el freeze actual:
    y policy custom exacta: solo `staging` para el primero y solo `main` para el segundo.
 4. Guardar `RELEASE_GATE_APP_PRIVATE_KEY` como secret de ambos Environments y
    `RELEASE_GATE_APP_ID` como variable. La clave nunca es secret de repo ni archivo.
-5. Mergear el tooling por PR a `staging`. Su `push` espera aprobacion de `Staging` y genera las dos
-   attestations firmadas por la App dedicada.
+5. Mergear por PR a `staging` el tooling release de #232 y el contrato CI de #235. Sus jobs de
+   `push` esperan aprobacion de `Staging`: release genera las dos attestations y CI publica
+   `CI Quality / Required` sobre el SHA exacto, todo firmado por la App dedicada.
 6. `bootstrap-attested`: verifica SHA actual de staging, App, Environment/policy exacta, statuses,
-   creador, Actions run y ancestry antes de sustituir el read-only por checks obligatorios en
-   `main`. El configurador no fabrica attestations.
-7. Hacer la primera promocion revisada. El workflow llega a `main`; su merge debe volver a
-   `staging` mediante el PR de sync y **Create a merge commit**.
-8. Implementar #235: el CI requerido debe ser un check real emitido por la misma App dedicada.
-9. `steady-state`: exige `release/promotion-gate` y CI, ambos ligados al `app_id` dedicado. El
-   configurador rechaza cualquier CI de la App global de Actions.
+   creador, Actions run, ancestry y `CI Quality / Required` verde/app-bound sobre ese mismo SHA.
+   Antes de sustituir el read-only de `main`, instala tambien ese CI como requisito obligatorio de
+   `staging`. El configurador no fabrica attestations ni checks.
+7. Hacer la primera promocion revisada. Los workflows `pull_request_target` todavia no existen en
+   la base `main`, por lo que esta unica promocion permanece bajo `bootstrap-attested` y revision
+   manual. El `push` resultante a `main` ejecuta el perfil candidate de CI.
+8. Integrar el PR `sync/main-<sha>` en `staging` con **Create a merge commit** y esperar el CI del
+   nuevo SHA de staging. No activar steady-state hasta que el check exista y este verde tanto en el
+   SHA actual de `main` como en el de `staging`, emitido por la misma App dedicada.
+9. `steady-state`: exige `release/promotion-gate` y `CI Quality / Required` en `main`, y el mismo
+   check CI en `staging`, siempre ligados al `app_id` dedicado. El configurador rechaza la App
+   global de Actions, checks ambiguos y cualquier preflight sin verde en ambas ramas.
 
 Payload base de cada Environment (solo tras go operativo):
 
@@ -171,7 +177,8 @@ Dry-run de ejemplo una vez conocida la identidad publica de la App:
 node scripts/release/configure-branch-protection.mjs \
   --phase bootstrap-attested \
   --release-app-id <APP_ID> \
-  --release-app-slug <app-slug>
+  --release-app-slug <app-slug> \
+  --ci-context 'CI Quality / Required'
 ```
 
 Validacion local determinista del tooling:
@@ -179,6 +186,48 @@ Validacion local determinista del tooling:
 ```bash
 node --test --test-reporter=spec scripts/release/*.test.mjs
 ```
+
+## Contrato CI fail-closed
+
+El monorepo declara una version exacta de pnpm en `package.json`. El runner confiable materializa
+los blobs del arbol Git exacto sin obedecer `export-ignore`/`export-subst`, rechaza `node_modules`
+tracked y crea una imagen efimera identificada por su digest `sha256`. Instala con
+`pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`; la imagen compartida no ejecuta
+ningun generator candidato. Los gates que necesitan Prisma lo generan dentro de su propio
+contenedor desechable, solo despues de que un parser root-owned confirme el unico generator
+`client` con provider `prisma-client-js`, y revalidan el source antes del gate. Un lockfile
+desactualizado detiene la ejecucion. Cada gate corre en un contenedor nuevo, sin red, mounts, secretos,
+capabilities ni reutilizacion de su capa writable; un proceso candidato no puede alterar
+el toolchain del siguiente.
+Los comandos locales son:
+
+```bash
+pnpm verify:quick
+pnpm verify:candidate
+pnpm verify
+```
+
+`verify:quick` es el gate de PR hacia `staging`: guards de staging y release, tests de la propia policy CI, lint,
+TypeScript y tests disponibles de dapp, los tres juegos, game bridge, indexer, card worker y
+contratos. `verify:candidate` anade los builds de dapp, juegos y workers mas la compilacion de
+contratos. Todo PR hacia `main`, incluido `hotfix/*`, y todo push protegido ejecuta candidate antes
+de permitir la promocion. `pnpm verify` es el alias no interactivo del perfil candidate completo.
+
+En GitHub, los PRs a `staging` prueban el `refs/pull/<n>/merge` actual con quick y los PRs a `main`,
+incluidos `hotfix/*`, lo prueban con candidate; los pushes protegidos a ambas ramas prueban su SHA
+exacto con candidate. El resolver y el runner
+proceden de la base confiable. CI instala primero el candidato sin ejecutar codigo suyo, comprueba
+que el checkout sigue intacto y solo entonces descarga el tooling confiable. Cada filtro pnpm usa
+`--fail-if-no-match`, por lo que quitar o renombrar un workspace no produce un verde vacio. El
+checkout candidato y sus scripts no reciben Environment, clave de App ni permisos de escritura.
+Solo despues de revalidar rama, head, base, test merge y resultado, el attestor protegido publica
+`CI Quality / Required` con la App dedicada. Un cambio de SHA, fork, test merge obsoleto, fallo de
+guard/test/TypeScript/build o ausencia de aprobacion deja el check ausente o en failure.
+
+Los warnings de lint ya inventariados no falsean el resultado; cualquier error devuelve codigo no
+cero. No quedan builds con `ignoreBuildErrors`/`ignoreDuringBuilds`, lint interactivo ni exclusiones
+temporales para Hyppie Road o Tower Builder. `scripts/ci/`, el workflow y las configuraciones que
+definen este contrato estan bajo CODEOWNERS.
 
 `--apply` requiere el literal `APPLY_RELEASE_GUARDS_AFTER_FREEZE`, token administrativo y los
 preflights de la fase. Conserva requirements ajenos, protege primero `main` y despues `staging`, y
@@ -247,7 +296,8 @@ Gates minimos para staging:
 - Env staging separado de produccion.
 - BSC testnet para compras/vesting/claims on-chain.
 - Datos de prueba que no afecten usuarios reales.
-- `pnpm dapp lint`, `pnpm dapp typecheck` y tests relevantes, o fallos documentados si son preexistentes.
+- `pnpm verify` completo sobre el SHA candidato, sin excepciones silenciosas.
+- `CI Quality / Required` verde sobre el SHA actual de `staging` y emitido por la App dedicada.
 - `/api/health` responde HTTP 200 JSON y expone exactamente app, entorno, commit completo,
   ref `staging`, UUID y host esperados sin secretos.
 - Smoke test de rutas criticas.
@@ -276,7 +326,7 @@ Gates minimos:
 - manifiesto inmutable ligado al PR y al SHA actual de `main`,
 - `release/promotion-gate` verde sobre el test merge exacto,
 - tree del test merge igual al tree desplegado de staging para una promocion normal,
-- CI dedicado de #235 verde y ligado al mismo `app_id` release,
+- `CI Quality / Required` verde y ligado al mismo `app_id` release,
 - no issues P0 abiertas que bloqueen la fase,
 - env produccion revisado,
 - contratos mainnet verificados si la release toca on-chain,
@@ -431,8 +481,10 @@ Siguiente paso recomendado:
 
 Estas tareas deben existir antes de una promocion real a `main`:
 
-- #232 Completar bootstrap y aplicar steady-state con App y Environments dedicados.
-- #235 Producir el CI fail-closed con la misma App dedicada antes de steady-state.
+- Mergear #232 y #235 por sus PRs revisados a `staging`; no aplicar bootstrap ni steady-state desde
+  una rama de trabajo.
+- Completar la primera promocion bootstrap, su sync con merge commit y los checks CI de ambos SHA
+  antes de aplicar steady-state con App y Environments dedicados.
 - #233 y #234 cerrar superficies internas y configuracion tipada antes de promocion real.
 - #166 Mantener deploy staging separado de live.
 - #166 Mantener env staging y live con nombres claros.

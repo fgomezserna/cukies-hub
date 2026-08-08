@@ -10,12 +10,6 @@ const nextConfig: NextConfig = {
       process.env.SOURCE_COMMIT ??
       'dev',
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   images: {
     remotePatterns: [
       {
