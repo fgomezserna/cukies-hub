@@ -1,5 +1,31 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireWalletSession } from '@/lib/wallet-auth';
+
+const PRIVATE_NO_STORE = { 'Cache-Control': 'private, no-store' } as const;
+
+async function getPersonalizationSession(walletAddress: string | null) {
+  if (!walletAddress || walletAddress.length > 80) return null;
+
+  try {
+    return await requireWalletSession(walletAddress);
+  } catch {
+    return null;
+  }
+}
+
+function publicQuests<
+  TQuest extends { isStarter: boolean | null; tasks: readonly Record<string, unknown>[] },
+>(quests: readonly TQuest[]) {
+  return quests.map((quest) => ({
+    ...quest,
+    tasks: quest.tasks.map((task) => ({ ...task, completed: false })),
+    isCompleted: false,
+    // Preserve the existing anonymous response contract; this security change
+    // only removes cross-wallet personalization.
+    isLocked: Boolean(quest.isStarter),
+  }));
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,17 +41,15 @@ export async function GET(request: Request) {
       },
     });
 
-    if (!walletAddress) {
-      return NextResponse.json(quests.map(q => ({
-        ...q,
-        tasks: q.tasks.map(t => ({...t, completed: false})),
-        isCompleted: false,
-        isLocked: !!q.isStarter, // Lock non-starter quests initially
-      })));
+    const walletSession = await getPersonalizationSession(walletAddress);
+    if (!walletSession) {
+      return NextResponse.json(publicQuests(quests), {
+        headers: walletAddress ? PRIVATE_NO_STORE : undefined,
+      });
     }
 
     const user = await prisma.user.findUnique({
-      where: { walletAddress },
+      where: { id: walletSession.userId },
       include: { 
         completedQuests: true,
         completedTasks: true,
@@ -33,13 +57,7 @@ export async function GET(request: Request) {
     });
 
     if (!user) {
-      // Return public quest data if user not found for some reason
-      return NextResponse.json(quests.map(q => ({
-        ...q,
-        tasks: q.tasks.map(t => ({...t, completed: false})),
-        isCompleted: false,
-        isLocked: !q.isStarter,
-      })));
+      return NextResponse.json(publicQuests(quests), { headers: PRIVATE_NO_STORE });
     }
     
     const completedTaskIds = new Set(user.completedTasks.map(uct => uct.taskId));
@@ -66,9 +84,9 @@ export async function GET(request: Request) {
         }
     })
 
-    return NextResponse.json(questsWithUserData);
+    return NextResponse.json(questsWithUserData, { headers: PRIVATE_NO_STORE });
   } catch (error) {
     console.error('Failed to fetch quests:', error);
     return NextResponse.json({ error: 'Failed to fetch quests' }, { status: 500 });
   }
-} 
+}

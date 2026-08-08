@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 export async function POST(request: NextRequest) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     const body = await request.json();
     const { gameId, telegramTopicId } = body;
@@ -26,7 +30,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     // Return current room configurations
     const rooms = await prisma.chatRoom.findMany({

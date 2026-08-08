@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 export async function GET(
   request: NextRequest,
@@ -41,14 +42,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ gameId: string }> }
 ) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     const { gameId } = await params;
-    const session = await auth();
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { name, description, telegramTopicId, telegramGroupId, isActive } = await request.json();
 
     const room = await prisma.chatRoom.update({

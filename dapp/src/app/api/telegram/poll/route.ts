@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTelegramUpdates, processTelegramMessage } from '@/lib/telegram-chat-utils';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
 let lastUpdateId = 0;
 
 export async function POST(request: NextRequest) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     console.log('🔄 Polling Telegram messages...');
     
@@ -40,6 +44,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   return NextResponse.json({ 
     message: 'Telegram polling endpoint',
     lastUpdateId,

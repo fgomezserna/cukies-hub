@@ -1,73 +1,54 @@
 import { NextResponse } from 'next/server';
+import { readWalletSession } from '@/lib/wallet-auth';
 
 export async function GET() {
+  let walletSession;
   try {
-    if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
-      return NextResponse.json({ 
-        error: 'Telegram bot configuration missing' 
-      }, { status: 500 });
-    }
+    walletSession = await readWalletSession();
+  } catch {
+    return NextResponse.json(
+      { error: 'Wallet authentication is not configured' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
 
-    // Get chat info to extract the invite link
-    const chatInfoResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getChat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: process.env.TELEGRAM_CHAT_ID
-      })
-    });
+  if (!walletSession?.signedWalletAddress) {
+    return NextResponse.json(
+      { error: 'Wallet session is required' },
+      { status: 401, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
 
-    if (!chatInfoResponse.ok) {
-      return NextResponse.json({ 
-        error: 'Failed to get chat info' 
-      }, { status: 500 });
-    }
-
-    const chatInfo = await chatInfoResponse.json();
-    
-    // Try to get the invite link from chat info
-    let inviteLink = chatInfo.result.invite_link;
-    
-    // If no invite link, try to create one
+  try {
+    const inviteLink = process.env.TELEGRAM_GROUP_INVITE?.trim();
     if (!inviteLink) {
-      const createInviteResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/createChatInviteLink`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: process.env.TELEGRAM_CHAT_ID,
-          name: 'Hyppie Community Invite',
-          creates_join_request: false
-        })
-      });
-
-      if (createInviteResponse.ok) {
-        const inviteData = await createInviteResponse.json();
-        inviteLink = inviteData.result.invite_link;
-      }
+      return NextResponse.json(
+        { error: 'Telegram group invite is not configured' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
-    // Fallback to environment variable if available
-    if (!inviteLink && process.env.TELEGRAM_GROUP_INVITE) {
-      inviteLink = process.env.TELEGRAM_GROUP_INVITE;
+    const inviteUrl = new URL(inviteLink);
+    if (inviteUrl.protocol !== 'https:' || inviteUrl.hostname !== 't.me') {
+      return NextResponse.json(
+        { error: 'Telegram group invite is not configured' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     return NextResponse.json({
       success: true,
       chatInfo: {
-        title: chatInfo.result.title,
-        type: chatInfo.result.type,
-        id: chatInfo.result.id,
-        username: chatInfo.result.username
+        title: 'Cukies World',
       },
-      inviteLink: inviteLink || null,
-      // Create a fallback link if we have the username
-      fallbackLink: chatInfo.result.username ? `https://t.me/${chatInfo.result.username}` : null
-    });
+      inviteLink: inviteUrl.toString(),
+      fallbackLink: null,
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
 
   } catch (error) {
     console.error('Error getting Telegram group invite:', error);
     return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 });
+      error: 'Telegram group invite is not configured'
+    }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }

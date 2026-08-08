@@ -166,7 +166,8 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `DISCORD_GUILD_ID` | Guild staging o real segun QA | Guild production | Definir antes de QA. |
 | `TWITTER_CLIENT_ID` | OAuth staging/dev app | OAuth production app | Callbacks separados. |
 | `TWITTER_CLIENT_SECRET` | Secret staging | Secret production | Distinto por entorno. |
-| `IFTTT_WEBHOOK_SECRET` | Secret staging | Secret production | Separado por entorno. |
+| `ADMIN_WALLET_ALLOWLIST` | Wallets EVM admin de staging | Wallets EVM admin de production | CSV de wallets que han firmado la sesión; sin defaults ni wallets de perfil como fallback. |
+| `IFTTT_WEBHOOK_SECRET` | Secret staging de 32+ bytes | Secret production de 32+ bytes | Separado por entorno; ausencia o valor débil deshabilita el webhook. |
 | `TREASURE_HUNT_MULTIPLAYER_ENABLED` | `true` solo durante QA autorizada | `false` | Gate servidor; el limiter actual exige una unica replica de `dapp`. |
 | `NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED` (`sybil-slayer`) | `true` solo durante QA autorizada | `false` | Variable de build del recurso separado; exige rebuild. |
 | `NEXT_PUBLIC_DAPP_ORIGIN` (`sybil-slayer`) | `https://cukieshub.eurekand.com` | Origen dapp production | Variable de build y origen exacto permitido por `frame-ancestors`. |
@@ -186,7 +187,18 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `PUSHER_SECRET` | Secret staging | Secret production | Separado. |
 | `TELEGRAM_BOT_TOKEN` | Bot staging | Bot production | Evitar publicar en chats reales durante QA. |
 | `TELEGRAM_CHAT_ID` | Chat staging | Chat production | Separado. |
-| `TELEGRAM_CLEANUP_SECRET` | Secret staging | Secret production | Separado. |
+| `TELEGRAM_GROUP_INVITE` | Invite `https://t.me/...` de staging | Invite `https://t.me/...` de production | Obligatoria para mostrar `Join Group`; no se obtiene ni crea dinámicamente. |
+| `TELEGRAM_WEBHOOK_SECRET` | Base64url staging de 32 bytes aleatorios | Base64url production de 32 bytes aleatorios | 43 chars sin `=`; debe coincidir con `secret_token` de `setWebhook` y ser distinto de todos los demás secretos. |
+| `TELEGRAM_CLEANUP_SECRET` | Secret staging de 32+ bytes | Secret production de 32+ bytes | Separado del webhook; ausencia deshabilita cleanup. |
+
+Las rutas operativas y `/indexer` exigen una sesión EVM firmada cuya
+`signedWalletAddress` esté en `ADMIN_WALLET_ALLOWLIST`. Una sesión OAuth, una wallet
+de perfil o una allowlist ausente no conceden acceso. Las rutas debug solo existen
+en entorno local y además mantienen el mismo requisito admin.
+
+Los secretos operativos deben tener al menos 32 bytes, 12 caracteres distintos, no
+contener marcadores de ejemplo, no llevar espacios en los extremos y no reutilizarse
+entre contratos ni en ninguna variable `NEXT_PUBLIC_*`.
 
 ### Contracts deploy
 

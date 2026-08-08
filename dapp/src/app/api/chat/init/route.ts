@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getOrCreateWebGameChatRoom } from '@/lib/game-chat-room';
+import { requireAdminApiAccess } from '@/lib/operational-access';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
+  const accessDenied = await requireAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     console.log('🚀 Initializing chat rooms...');
 

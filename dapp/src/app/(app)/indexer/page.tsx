@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import type { Sort } from 'mongodb';
 import { AlertTriangle, Database, RefreshCw, Search } from 'lucide-react';
 
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getIndexerDb, getIndexerDbName } from '@/lib/indexer-db/mongodb';
+import { hasAdminPageAccess } from '@/lib/operational-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,6 +146,9 @@ async function getViewerData(collectionName: string, q: string, limit: number) {
 }
 
 export default async function IndexerPage({ searchParams }: PageProps) {
+  const hasAccess = await hasAdminPageAccess();
+  if (!hasAccess) notFound();
+
   const params = (await searchParams) ?? {};
   const collection = params.collection ?? 'chain_events';
   const q = params.q ?? '';
@@ -269,7 +274,9 @@ export default async function IndexerPage({ searchParams }: PageProps) {
       </main>
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    console.error('Indexer viewer failed', {
+      name: error instanceof Error ? error.name : 'UnknownError',
+    });
 
     return (
       <main className="min-h-screen bg-background px-5 py-6 text-foreground md:px-8">
@@ -278,7 +285,9 @@ export default async function IndexerPage({ searchParams }: PageProps) {
             <AlertTriangle className="mt-1 h-5 w-5 text-red-200" />
             <div>
               <h1 className="text-xl font-semibold text-white">No se pudo abrir el viewer</h1>
-              <p className="mt-2 text-sm text-red-100">{message}</p>
+              <p className="mt-2 text-sm text-red-100">
+                El visor no está disponible temporalmente.
+              </p>
             </div>
           </div>
         </section>

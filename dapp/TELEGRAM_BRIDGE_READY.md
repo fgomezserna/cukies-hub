@@ -66,9 +66,18 @@ Los logs aparecen en la consola del servidor Next.js con prefijos:
 - `❌` - Errores
 
 ### Endpoints de diagnóstico:
-- `GET /api/chat/auto-sync` - Estado del auto-sync
-- `POST /api/chat/sync-telegram` - Sync manual
-- `GET /api/debug/chat-config` - Configuración de rooms
+- `GET /api/chat/auto-sync` - Estado del auto-sync; requiere wallet admin firmada
+- `POST /api/chat/sync-telegram` - Sync manual; requiere wallet admin firmada
+- `GET /api/debug/chat-config` - Configuración de rooms; solo local y con wallet admin firmada
+
+El ingreso normal debe usar `/api/telegram/webhook` con
+`X-Telegram-Bot-Api-Secret-Token`. Polling, sync manual y debug son herramientas
+operativas, no endpoints públicos. `TELEGRAM_WEBHOOK_SECRET` debe ser distinto por
+entorno y configurarse también como `secret_token` en Telegram antes de activar el
+webhook. Si la integración está desactivada puede permanecer vacío y la ruta falla
+cerrada con `503`; cargarlo o llamar a `setWebhook` es un cambio operativo separado.
+Debe ser base64url generado desde 32 bytes aleatorios (43 caracteres, sin `=`),
+porque la Bot API solo acepta `A-Z`, `a-z`, `0-9`, `_` y `-` en este campo.
 
 ## 🎯 Próximos Pasos Opcionales:
 
@@ -84,6 +93,5 @@ Los logs aparecen en la consola del servidor Next.js con prefijos:
 - El polling se puede ajustar entre 10-30 segundos según necesidad
 - Los mensajes de ambas direcciones se guardan en la misma tabla `ChatMessage`
 
-¡El bridge está listo para producción! 🚀
-
-
+El bridge solo está listo cuando bot, chat, webhook secret y allowlist administrativa
+están separados y validados en el entorno correspondiente.

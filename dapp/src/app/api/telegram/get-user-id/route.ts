@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
+import { requireLocalAdminApiAccess } from '@/lib/operational-access';
 
 export async function POST(request: Request) {
+  const accessDenied = await requireLocalAdminApiAccess();
+  if (accessDenied) return accessDenied;
+
   try {
     const { username } = await request.json();
 

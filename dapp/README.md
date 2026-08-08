@@ -31,13 +31,18 @@ TWITTER_CLIENT_SECRET="your-twitter-client-secret"
 TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
 TELEGRAM_CHAT_ID="your-telegram-group-chat-id"
 TELEGRAM_GROUP_INVITE="https://t.me/your-group-invite"
+TELEGRAM_WEBHOOK_SECRET="<base64url generado desde 32 bytes aleatorios>"
+TELEGRAM_CLEANUP_SECRET="generate-a-different-random-secret-with-at-least-32-bytes"
+
+# Operational access (signed EVM wallets only, comma separated)
+ADMIN_WALLET_ALLOWLIST="0x0000000000000000000000000000000000000001"
 
 # Social Media URLs (for frontend)
 NEXT_PUBLIC_TWITTER_PROFILE_URL="https://x.com/cukiesworld"
 NEXT_PUBLIC_DISCORD_INVITE_URL="https://discord.gg/your-invite-code"
 
 # Webhooks
-IFTTT_WEBHOOK_SECRET="super-secret-value"
+IFTTT_WEBHOOK_SECRET="generate-a-third-random-secret-with-at-least-32-bytes"
 
 # Games
 GAME_SYBILSLASH="https://hyppie-games-sybilslayer.vercel.app/"
@@ -111,6 +116,16 @@ To set up Telegram verification:
 4. Add the bot to your Telegram group as an administrator
 5. Get the chat ID by sending a message to your group, then visiting: `https://api.telegram.org/bot<YourBotToken>/getUpdates`
 6. Find the chat ID in the response and save it as `TELEGRAM_CHAT_ID`
+
+Antes de activar el webhook, configura Telegram con un `secret_token` que coincida
+exactamente con `TELEGRAM_WEBHOOK_SECRET`. Si el webhook ya está activo, coordina esa
+primera migración antes de desplegar el guard: las entregas sin la cabecera secreta
+serán rechazadas. Con la integración desactivada, dejar el secreto vacío es seguro y
+la ruta responde `503`. Usa bot, chat y secretos distintos en staging y producción.
+Genera 32 bytes aleatorios en
+base64url (43 caracteres, sin `=`): Telegram solo admite `A-Z`, `a-z`, `0-9`, `_` y
+`-`, con un máximo de 256 caracteres. El ejemplo de `.env` es un marcador y no es
+una configuración válida.
 
 ## Database Configuration
 

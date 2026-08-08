@@ -1,5 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireWalletSession } from '@/lib/wallet-auth';
+
+const PRIVATE_NO_STORE = { 'Cache-Control': 'private, no-store' } as const;
+
+async function getPersonalizationSession(walletAddress: string | null) {
+  if (!walletAddress || walletAddress.length > 80) return null;
+
+  try {
+    return await requireWalletSession(walletAddress);
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(
   request: Request,
@@ -19,15 +32,19 @@ export async function GET(
       return NextResponse.json({ error: 'Quest not found' }, { status: 404 });
     }
 
-    if (!walletAddress) {
+    const walletSession = await getPersonalizationSession(walletAddress);
+    if (!walletSession) {
       const tasks = quest.tasks.map(t => ({ ...t, isCompleted: false }));
-      return NextResponse.json({ ...quest, tasks });
+      return NextResponse.json(
+        { ...quest, tasks },
+        { headers: walletAddress ? PRIVATE_NO_STORE : undefined },
+      );
     }
     
-    const user = await prisma.user.findUnique({ where: { walletAddress } });
+    const user = await prisma.user.findUnique({ where: { id: walletSession.userId } });
     if (!user) {
       const tasks = quest.tasks.map(t => ({ ...t, isCompleted: false }));
-      return NextResponse.json({ ...quest, tasks });
+      return NextResponse.json({ ...quest, tasks }, { headers: PRIVATE_NO_STORE });
     }
 
     const completedUserTasks = await prisma.userCompletedTask.findMany({
@@ -77,7 +94,10 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ ...quest, tasks: tasksWithCompletion, isClaimed: !!isClaimed, isLocked });
+    return NextResponse.json(
+      { ...quest, tasks: tasksWithCompletion, isClaimed: !!isClaimed, isLocked },
+      { headers: PRIVATE_NO_STORE },
+    );
 
   } catch (error) {
     console.error(`Failed to fetch quest ${questId}:`, error);
