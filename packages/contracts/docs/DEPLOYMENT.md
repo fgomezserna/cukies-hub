@@ -195,6 +195,16 @@ STAGING_NFT_DEPLOYMENT_CONFIRM=BSC_TESTNET_97_ONLY
 
 It mints six original-generation fixtures to the testnet deployer, one for each stable rarity value `1..6`. Their expected Cukie Master points are `1, 2, 4, 7, 10, 15` (39 total), which must produce the route maximum of five slots. The output includes only public evidence: contract addresses, deployment receipts/blocks, runtime bytecode hashes and fixture mint transactions. Never reuse these contracts or fixtures in mainnet/production.
 
+Deployed BSC Testnet evidence (2026-08-07):
+
+| Alias | Address | Block | Deployment transaction | Runtime code hash |
+| --- | --- | ---: | --- | --- |
+| `TOKEN` | `0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | `123673635` | `0x6ed9211fa37490fa55382254a224c5e3cf4b5ff149d84877ae4e90517fa0b741` | `0x9ac386fda34278ee45a470fea9d6097a8180d376a3fad3c47b54ac04f05fddd9` |
+| `MARKETPLACE` | `0x95780d891461e3183562B5D785f2D2c1c72ecE65` | `123673640` | `0xeb44620d953939596a4c1ffd32fcda27ecaeb11c36d5c24e3c8bf17fe63a33d2` | `0x90441ea4ad451e251b7a9ba455db1be59c7dd38a10aad6f7ad904d90acac6710` |
+| `BRIDGE` | `0x6E29448282bCc1c568Ec9450Bef50a01d67845C2` | `123673645` | `0x50090ece74871055691632ac681452ab71be91841b87ab38da73c2db8c8a9c4c` | `0x512bbefe6dea920912f5ddd839a4cd2bd214680a62790251a7a713023a754408` |
+
+The owner of all three sources is the isolated staging deployer `0x3d80cbEd6CA067a154A22659224EB5194aDCe24C`. Fixture token IDs are `97000001..97000006`; they were minted to that deployer and later transferred to the staging QA wallet `0x26789b9743d187174c3e3a87729730824a4d0c13` for the visible Cukie Master smoke test.
+
 ## Deployment order
 
 1. Create and test the launch Safe on the target network.
