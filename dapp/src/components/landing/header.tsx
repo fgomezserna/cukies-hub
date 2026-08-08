@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -39,9 +39,11 @@ const headerCopy = {
   },
 } as const satisfies Record<PublicLocale, Record<string, string>>;
 
-export function LandingHeader() {
+export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { locale, setLocale } = usePublicLocale();
 
@@ -61,6 +63,39 @@ export function LandingHeader() {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const menu = mobileMenuRef.current;
+    const focusable = () => Array.from(menu?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? []);
+    focusable()[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      const first = items[0];
+      const last = items.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
@@ -93,14 +128,18 @@ export function LandingHeader() {
 
           <div className="hidden items-center gap-3 lg:flex">
             <LanguageSwitcher locale={locale} setLocale={setLocale} selectorLabel={copy.languageSelector} />
-            <LandingWalletConnectButton />
+            <LandingWalletConnectButton evmOnly={evmOnly} />
           </div>
 
           {/* Botón de Menú Móvil */}
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-white/10 bg-white/5 text-[var(--uki-cyan)] hover:bg-white/10 lg:hidden"
+            ref={menuButtonRef}
+            type="button"
+            className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10 bg-white/5 text-[var(--uki-cyan)] hover:bg-white/10 lg:hidden"
             onClick={toggleMenu}
             aria-label={isOpen ? copy.closeMenu : copy.openMenu}
+            aria-expanded={isOpen}
+            aria-controls="uki-mobile-navigation"
           >
             {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -109,7 +148,14 @@ export function LandingHeader() {
 
       {/* Drawer del Menú Móvil */}
       <div
-        className={`fixed inset-y-0 right-0 z-[70] w-64 transform border-l border-white/10 bg-[#060a12]/95 p-6 shadow-[0_0_40px_rgba(228,92,255,0.15)] backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
+        ref={mobileMenuRef}
+        id="uki-mobile-navigation"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden={!isOpen}
+        inert={isOpen ? undefined : ('' as unknown as boolean)}
+        aria-label={copy.menuTitle}
+        className={`fixed inset-y-0 right-0 z-[70] w-64 max-w-[calc(100vw-2rem)] transform border-l border-white/10 bg-[#060a12]/95 p-6 shadow-[0_0_40px_rgba(228,92,255,0.15)] backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -118,7 +164,8 @@ export function LandingHeader() {
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <span className="font-headline text-lg font-black uppercase text-[var(--uki-cyan)]">{copy.menuTitle}</span>
               <button
-                className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-white/10 bg-white/5 text-[var(--uki-muted)] hover:text-white"
+                type="button"
+                className="flex h-11 w-11 items-center justify-center rounded-[6px] border border-white/10 bg-white/5 text-[var(--uki-muted)] hover:text-white"
                 onClick={closeMenu}
                 aria-label={copy.closeMenu}
               >
@@ -145,7 +192,7 @@ export function LandingHeader() {
             <LanguageSwitcher locale={locale} setLocale={setLocale} onChange={closeMenu} className="pt-1" selectorLabel={copy.languageSelector} />
           </div>
           <div className="pt-6 border-t border-white/10" onClick={closeMenu}>
-            <LandingWalletConnectButton />
+            <LandingWalletConnectButton evmOnly={evmOnly} />
           </div>
         </div>
       </div>

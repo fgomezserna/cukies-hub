@@ -11,6 +11,7 @@ import {
 import { UkiStakingPanel } from '@/components/cukie-master/uki-staking-panel';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/providers/auth-provider';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
@@ -21,6 +22,7 @@ jest.mock('wagmi', () => ({
 }));
 jest.mock('@/hooks/use-has-mounted');
 jest.mock('@/hooks/use-toast');
+jest.mock('@/providers/auth-provider');
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
   LandingWalletConnectButton: ({ evmOnly }: { evmOnly?: boolean }) => (
     <button type="button" data-evm-only={String(Boolean(evmOnly))}>
@@ -46,6 +48,7 @@ jest.mock('lucide-react', () => ({
   AlertTriangle: () => null,
   ArrowDownToLine: () => null,
   ArrowUpFromLine: () => null,
+  Check: () => null,
   ExternalLink: () => null,
   Loader2: () => null,
   ShieldCheck: () => null,
@@ -60,6 +63,7 @@ const mockUseWaitForTransactionReceipt = useWaitForTransactionReceipt as jest.Mo
 const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useWriteContract>;
 const mockUseHasMounted = useHasMounted as jest.MockedFunction<typeof useHasMounted>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 const walletAddress = '0x3333333333333333333333333333333333333333';
 const tokenAddress = '0x1111111111111111111111111111111111111111';
@@ -106,6 +110,13 @@ describe('UkiStakingPanel', () => {
       isSuccess: false,
     } as never);
     mockUseToast.mockReturnValue({ toast } as never);
+    mockUseAuth.mockReturnValue({
+      user: { walletAddress },
+      isLoading: false,
+      isWaitingForApproval: false,
+      walletType: 'evm',
+      fetchUser: jest.fn(),
+    } as never);
     mockUseReadContract.mockImplementation((config) => {
       switch (config?.functionName) {
         case 'ukiToken':
@@ -134,6 +145,23 @@ describe('UkiStakingPanel', () => {
     expect(writeContract).not.toHaveBeenCalled();
   });
 
+  it('offers quick amounts and previews the resulting route capacity with vesting included', () => {
+    render(<UkiStakingPanel routePreview={{
+      currentRequirementRaw: parseUnits('20000', 18).toString(),
+      presaleLockedRaw: parseUnits('20000', 18).toString(),
+      indexedStakedRaw: parseUnits('25000', 18).toString(),
+      allocatedSlots: 2,
+    }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '40.000' }));
+    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('40000');
+    expect(screen.getByText(/Capacidad teórica tras confirmar: 4\/5 cupos por UKI/i)).toBeInTheDocument();
+    expect(screen.getByText(/20\.000 en vesting \+ 65\.000 en staking/i)).toBeInTheDocument();
+    expect(screen.getByText('Conectar')).toBeInTheDocument();
+    expect(screen.getByText('Autorizar')).toBeInTheDocument();
+    expect(screen.getAllByText('Depositar')).toHaveLength(2);
+  });
+
   it('switches explicitly to BSC Testnet when the wallet is on another chain', () => {
     mockUseAccount.mockReturnValue({
       address: walletAddress,
@@ -148,6 +176,23 @@ describe('UkiStakingPanel', () => {
       { chainId: 97 },
       expect.objectContaining({ onError: expect.any(Function) }),
     );
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it('blocks contract writes until the connected EVM wallet has authenticated', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isLoading: false,
+      isWaitingForApproval: false,
+      walletType: null,
+      fetchUser: jest.fn(),
+    } as never);
+
+    render(<UkiStakingPanel />);
+
+    expect(screen.getByText(/Firma el acceso con esta wallet/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Conectar wallet para gestionar staking/i }))
+      .toHaveAttribute('data-evm-only', 'true');
     expect(writeContract).not.toHaveBeenCalled();
   });
 

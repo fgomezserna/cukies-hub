@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Check, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import {
   useAccount,
@@ -14,6 +14,7 @@ import {
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Panel } from '@/components/landing/primitives';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from '@/components/landing/sale-config';
+import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -22,12 +23,14 @@ import {
   ukiSaleContracts,
   ukiStakingAbi,
 } from '@/lib/contracts/uki-sale';
+import { useAuth } from '@/providers/auth-provider';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '20000';
 
 type StakingOperation = 'stake' | 'unstake';
 type TransactionAction = 'approve' | 'stake' | 'unstake' | null;
+type WorkflowStepState = 'done' | 'current' | 'upcoming';
 
 function parseTokenAmount(value: string) {
   const trimmed = value.trim();
@@ -52,7 +55,13 @@ function sameAddress(left?: string, right?: string) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
-export function UkiStakingPanel() {
+export function UkiStakingPanel({
+  routePreview = null,
+  testnetOnly = false,
+}: {
+  routePreview?: UkiRoutePreview | null;
+  testnetOnly?: boolean;
+}) {
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { writeContract, data: txHash, error, isPending, reset } = useWriteContract();
@@ -61,20 +70,31 @@ export function UkiStakingPanel() {
     query: { enabled: Boolean(txHash) },
   });
   const { toast } = useToast();
+  const {
+    user,
+    isLoading: authLoading,
+    isWaitingForApproval,
+    walletType,
+  } = useAuth();
   const hasMounted = useHasMounted();
   const handledReceiptHashRef = useRef<string | null>(null);
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [operation, setOperation] = useState<StakingOperation>('stake');
   const [lastAction, setLastAction] = useState<TransactionAction>(null);
+  const [lastCompletedAction, setLastCompletedAction] = useState<TransactionAction>(null);
   const [approvedAmount, setApprovedAmount] = useState<bigint | null>(null);
 
   const tokenAddress = ukiSaleContracts.ukiTokenAddress as Address | undefined;
   const stakingAddress = ukiSaleContracts.ukiStakingAddress as Address | undefined;
   const parsedAmount = useMemo(() => parseTokenAmount(amount), [amount]);
   const isWrongChain = Boolean(hasMounted && isConnected && chainId !== UKI_PRESALE_CHAIN_ID);
+  const isUnsafeStagingChain = testnetOnly && UKI_PRESALE_CHAIN_ID !== 97;
+  const isAuthenticatedEvm = Boolean(
+    walletType === 'evm' && sameAddress(user?.walletAddress, address),
+  );
   const hasContractConfig = Boolean(tokenAddress && stakingAddress);
-  const publicReadsEnabled = Boolean(hasContractConfig);
-  const walletReadsEnabled = Boolean(address && hasContractConfig && !isWrongChain);
+  const publicReadsEnabled = Boolean(hasContractConfig && !isUnsafeStagingChain);
+  const walletReadsEnabled = Boolean(address && hasContractConfig && !isWrongChain && !isUnsafeStagingChain);
 
   const {
     data: stakingToken,
@@ -160,6 +180,10 @@ export function UkiStakingPanel() {
     hasMounted &&
     isConnected &&
     !isWrongChain &&
+    !isUnsafeStagingChain &&
+    !authLoading &&
+    !isWaitingForApproval &&
+    isAuthenticatedEvm &&
     hasContractConfig &&
     protocolReadsReady &&
     tokenMatches &&
@@ -173,10 +197,25 @@ export function UkiStakingPanel() {
     !isBusy,
   );
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
+  const outcomePreview = useMemo(() => buildOutcomePreview({
+    operation,
+    parsedAmount,
+    stakedBalance,
+    routePreview,
+  }), [operation, parsedAmount, routePreview, stakedBalance]);
+  const workflowSteps = buildWorkflowSteps({
+    operation,
+    isConnected,
+    isWrongChain,
+    isAuthenticatedEvm,
+    needsApproval,
+    lastCompletedAction,
+  });
 
   useEffect(() => {
     setApprovedAmount(null);
     setLastAction(null);
+    setLastCompletedAction(null);
     handledReceiptHashRef.current = null;
   }, [address, stakingAddress, tokenAddress]);
 
@@ -192,6 +231,7 @@ export function UkiStakingPanel() {
 
     if (lastAction === 'approve' && parsedAmount) {
       setApprovedAmount(parsedAmount);
+      setLastCompletedAction('approve');
       toast({
         title: 'Permiso UKI confirmado',
         description: 'Ahora puedes confirmar el staking con una segunda firma.',
@@ -199,12 +239,16 @@ export function UkiStakingPanel() {
     } else if (lastAction === 'stake') {
       setAmount(DEFAULT_AMOUNT);
       setApprovedAmount(null);
+      setLastCompletedAction('stake');
+      window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
       toast({
         title: 'Staking confirmado',
         description: 'Tus UKI ya constan en el contrato de Cukie Master.',
       });
     } else if (lastAction === 'unstake') {
       setAmount(DEFAULT_AMOUNT);
+      setLastCompletedAction('unstake');
+      window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
       toast({
         title: 'Retirada confirmada',
         description: 'Los UKI retirados han vuelto a tu wallet.',
@@ -238,12 +282,18 @@ export function UkiStakingPanel() {
     setOperation(nextOperation);
     setAmount(DEFAULT_AMOUNT);
     setLastAction(null);
+    setLastCompletedAction(null);
     reset();
   }
 
   function useMaximumBalance() {
     if (availableBalance === undefined) return;
     setAmount(formatUnits(availableBalance, TOKEN_DECIMALS));
+  }
+
+  function selectQuickAmount(value: string) {
+    setAmount(value);
+    setLastCompletedAction(null);
   }
 
   function switchToStagingNetwork() {
@@ -265,6 +315,7 @@ export function UkiStakingPanel() {
     if (!tokenAddress || !stakingAddress || !parsedAmount || !canTransact) return;
     reset();
     handledReceiptHashRef.current = null;
+    setLastCompletedAction(null);
 
     if (needsApproval) {
       setLastAction('approve');
@@ -301,17 +352,17 @@ export function UkiStakingPanel() {
             : 'Retirar UKI';
 
   return (
-    <section id="uki-staking" className="uki-container relative z-[2] pb-6 pt-2">
-      <Panel innerClassName="p-5 sm:p-7">
-        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-          <div>
-            <p className="uki-label">Contrato activo en testnet</p>
+    <section id="uki-staking" className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-8">
+      <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
+        <div className="grid min-w-0 gap-8 lg:grid-cols-[0.78fr_1.22fr]">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Contrato configurado · {UKI_PRESALE_CHAIN_LABEL}</p>
             <h2 className="mt-2 font-headline text-3xl font-black uppercase leading-tight text-[var(--uki-cream)]">
               Staking de UKI
             </h2>
             <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Deposita UKI en el contrato de Cukie Master o retíralos cuando quieras. La operación
-              no genera rentabilidad: se usa para calcular tus cupos y créditos de competición.
+              Deposita solo los UKI que te falten o retíralos cuando quieras. El vesting ya cuenta
+              por separado y la operación no implica una rentabilidad garantizada.
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -323,12 +374,14 @@ export function UkiStakingPanel() {
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" />
               <p className="text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
                 Red: {UKI_PRESALE_CHAIN_LABEL}. Necesitas tBNB para el gas. El requisito oficial,
-                los UKI en vesting y tus cupos aparecen en “Mis cupos Cukie Master”.
+                los UKI en vesting y tus cupos aparecen en “Tus cupos Cukie Master”.
               </p>
             </div>
           </div>
 
-          <div className="rounded-[10px] border border-white/10 bg-black/25 p-4 sm:p-5">
+          <div className="min-w-0 rounded-[10px] border border-white/10 bg-black/25 p-4 sm:p-5">
+            <StakingWorkflow steps={workflowSteps} />
+
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="Operación de staking">
               <OperationButton
                 active={operation === 'stake'}
@@ -347,30 +400,43 @@ export function UkiStakingPanel() {
             <label htmlFor="uki-staking-amount" className="mt-5 block text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
               Cantidad de UKI
             </label>
-            <div className="mt-2 flex overflow-hidden rounded-[8px] border border-white/15 bg-[#02090d] focus-within:border-[var(--uki-cyan)]">
+            <div className="mt-2 flex min-w-0 overflow-hidden rounded-[8px] border border-white/15 bg-[#02090d] focus-within:border-[var(--uki-cyan)]">
               <input
                 id="uki-staking-amount"
                 inputMode="decimal"
                 autoComplete="off"
                 value={amount}
                 disabled={isBusy}
-                onChange={(event) => setAmount(event.target.value)}
+                aria-describedby="uki-staking-available"
+                aria-invalid={Boolean(!parsedAmount || (availableBalance !== undefined && !hasEnoughBalance))}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setLastCompletedAction(null);
+                }}
                 className="min-w-0 flex-1 bg-transparent px-4 py-3 text-lg font-black text-[var(--uki-cream)] outline-none disabled:opacity-50"
               />
-              <button
-                type="button"
-                disabled={availableBalance === undefined || isBusy}
-                onClick={useMaximumBalance}
-                className="border-l border-white/10 px-4 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:opacity-40"
-              >
-                Máximo
-              </button>
+              <span className="flex shrink-0 items-center border-l border-white/10 px-4 text-xs font-black uppercase text-[var(--uki-muted)]">UKI</span>
             </div>
-            <p className="mt-2 text-right text-xs font-semibold text-[var(--uki-muted)]">
+            <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Cantidades rápidas">
+              <QuickAmountButton label="20.000" onClick={() => selectQuickAmount('20000')} disabled={isBusy} />
+              <QuickAmountButton label="40.000" onClick={() => selectQuickAmount('40000')} disabled={isBusy} />
+              <QuickAmountButton label="Máximo" onClick={useMaximumBalance} disabled={availableBalance === undefined || isBusy} />
+            </div>
+            <p id="uki-staking-available" className="mt-2 text-right text-xs font-semibold text-[var(--uki-muted)]">
               Disponible: {formatTokenAmount(availableBalance)} UKI
             </p>
 
-            {!hasContractConfig ? (
+            {outcomePreview ? (
+              <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Resultado estimado</p>
+                <p className="mt-2 text-sm font-black leading-relaxed text-[var(--uki-cream)]">{outcomePreview.summary}</p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{outcomePreview.detail}</p>
+              </div>
+            ) : null}
+
+            {isUnsafeStagingChain ? (
+              <InlineWarning text="Configuración bloqueada: el entorno staging exige BNB Smart Chain Testnet (chain 97)." />
+            ) : !hasContractConfig ? (
               <InlineWarning text="El contrato de staking no está configurado para este entorno." />
             ) : protocolReadFailed ? (
               <InlineWarning text="No se ha podido verificar que token y contrato coincidan. Las operaciones están bloqueadas." />
@@ -378,6 +444,10 @@ export function UkiStakingPanel() {
               <InlineWarning text="Los nuevos depósitos están pausados en el contrato. Las retiradas siguen disponibles." />
             ) : walletReadFailed ? (
               <InlineWarning text="No se han podido leer los balances con garantías. No se enviará ninguna transacción." />
+            ) : hasMounted && isConnected && !isWrongChain && !authLoading && !isAuthenticatedEvm ? (
+              <InlineWarning text={isWaitingForApproval
+                ? 'Aprueba el mensaje de acceso en tu wallet.'
+                : 'Firma el acceso con esta wallet antes de autorizar o depositar UKI.'} />
             ) : parsedAmount && availableBalance !== undefined && !hasEnoughBalance ? (
               <InlineWarning text={`No tienes suficiente UKI ${operation === 'stake' ? 'líquido' : 'en staking'} para esta operación.`} />
             ) : !parsedAmount ? (
@@ -385,7 +455,15 @@ export function UkiStakingPanel() {
             ) : null}
 
             <div className="mt-5">
-              {!hasMounted || !isConnected ? (
+              {isUnsafeStagingChain ? (
+                <button
+                  type="button"
+                  disabled
+                  className="uki-button uki-button-primary w-full justify-center cursor-not-allowed opacity-40"
+                >
+                  Staging bloqueado por configuración
+                </button>
+              ) : !hasMounted || !isConnected ? (
                 <LandingWalletConnectButton
                   className="w-full justify-center"
                   evmOnly
@@ -402,6 +480,14 @@ export function UkiStakingPanel() {
                 >
                   <span>{isSwitching ? 'Cambiando red' : `Cambiar a ${UKI_PRESALE_CHAIN_LABEL}`}</span>
                 </button>
+              ) : !isAuthenticatedEvm ? (
+                <LandingWalletConnectButton
+                  className="w-full justify-center"
+                  evmOnly
+                  label="Firmar wallet"
+                  compactLabel="Firmar"
+                  showCompactText={false}
+                />
               ) : (
                 <button
                   type="button"
@@ -421,12 +507,26 @@ export function UkiStakingPanel() {
               </p>
             ) : null}
 
+            {isBusy || lastCompletedAction ? (
+              <p role="status" aria-live="polite" className="mt-3 text-center text-xs font-semibold text-[var(--uki-muted)]">
+                {isConfirming
+                  ? `Esperando confirmación en ${UKI_PRESALE_CHAIN_LABEL}…`
+                  : lastCompletedAction === 'approve'
+                    ? 'Autorización confirmada. Ya puedes depositar.'
+                    : lastCompletedAction === 'stake'
+                      ? 'Depósito confirmado. Actualizando tus cupos.'
+                      : lastCompletedAction === 'unstake'
+                        ? 'Retirada confirmada. Actualizando tus cupos.'
+                        : 'Abre tu wallet y confirma la operación.'}
+              </p>
+            ) : null}
+
             {txUrl ? (
               <a
                 href={txUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase text-[var(--uki-cyan)] hover:underline"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase text-[var(--uki-cyan)] hover:underline"
               >
                 Ver última transacción <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -463,7 +563,7 @@ function OperationButton({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-[7px] border px-4 py-3 text-xs font-black uppercase transition-colors ${
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[7px] border px-4 py-3 text-xs font-black uppercase transition-colors ${
         active
           ? 'border-[var(--uki-cyan)] bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]'
           : 'border-white/10 text-[var(--uki-muted)] hover:border-white/25 hover:text-[var(--uki-text)]'
@@ -473,6 +573,136 @@ function OperationButton({
       {label}
     </button>
   );
+}
+
+function QuickAmountButton({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-[7px] border border-white/10 px-2 text-center text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-cyan-border)] hover:text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {label}
+    </button>
+  );
+}
+
+function StakingWorkflow({
+  steps,
+}: {
+  steps: Array<{ label: string; state: WorkflowStepState }>;
+}) {
+  return (
+    <div className="mb-5 min-w-0 border-b border-white/10 pb-5">
+      <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Pasos de la operación</p>
+      <ol className={`mt-3 grid min-w-0 gap-2 ${steps.length === 5 ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
+        {steps.map((step, index) => (
+          <li
+            key={step.label}
+            aria-current={step.state === 'current' ? 'step' : undefined}
+            className={`min-w-0 rounded-[7px] border p-2.5 ${
+              step.state === 'done'
+                ? 'border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] text-[var(--uki-cyan)]'
+                : step.state === 'current'
+                  ? 'border-[var(--uki-gold)]/45 bg-[var(--uki-gold)]/10 text-[var(--uki-gold)]'
+                  : 'border-white/10 text-[var(--uki-muted)]'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-current text-xs font-black">
+                {step.state === 'done' ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : index + 1}
+              </span>
+              <span className="min-w-0 break-words text-xs font-black uppercase leading-tight">{step.label}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function buildWorkflowSteps({
+  operation,
+  isConnected,
+  isWrongChain,
+  isAuthenticatedEvm,
+  needsApproval,
+  lastCompletedAction,
+}: {
+  operation: StakingOperation;
+  isConnected: boolean;
+  isWrongChain: boolean;
+  isAuthenticatedEvm: boolean;
+  needsApproval: boolean;
+  lastCompletedAction: TransactionAction;
+}) {
+  const networkStepLabel = UKI_PRESALE_CHAIN_ID === 97 ? 'BSC Testnet' : 'BSC Mainnet';
+  const labels = operation === 'stake'
+    ? ['Conectar', networkStepLabel, 'Firmar', 'Autorizar', 'Depositar']
+    : ['Conectar', networkStepLabel, 'Firmar', 'Retirar'];
+  let completedSteps = 0;
+  if (isConnected) completedSteps = 1;
+  if (isConnected && !isWrongChain) completedSteps = 2;
+  if (isConnected && !isWrongChain && isAuthenticatedEvm) completedSteps = 3;
+  if (operation === 'stake' && isAuthenticatedEvm && !needsApproval) completedSteps = 4;
+  if (operation === 'stake' && lastCompletedAction === 'stake') completedSteps = 5;
+  if (operation === 'unstake' && lastCompletedAction === 'unstake') completedSteps = 4;
+
+  return labels.map((label, index) => ({
+    label,
+    state: (index < completedSteps
+      ? 'done'
+      : index === completedSteps
+        ? 'current'
+        : 'upcoming') as WorkflowStepState,
+  }));
+}
+
+function buildOutcomePreview({
+  operation,
+  parsedAmount,
+  stakedBalance,
+  routePreview,
+}: {
+  operation: StakingOperation;
+  parsedAmount: bigint | null;
+  stakedBalance?: bigint;
+  routePreview: UkiRoutePreview | null;
+}) {
+  if (!parsedAmount || !routePreview) return null;
+  try {
+    const requirement = BigInt(routePreview.currentRequirementRaw);
+    const locked = BigInt(routePreview.presaleLockedRaw);
+    const currentStaked = stakedBalance ?? BigInt(routePreview.indexedStakedRaw);
+    if (requirement <= BigInt(0) || locked < BigInt(0) || currentStaked < BigInt(0)) return null;
+    if (operation === 'unstake' && parsedAmount > currentStaked) return null;
+    const projectedStaked = operation === 'stake'
+      ? currentStaked + parsedAmount
+      : currentStaked - parsedAmount;
+    const total = locked + projectedStaked;
+    const theoreticalSlots = Math.min(5, Number(total / requirement));
+    const remainder = total % requirement;
+    const deficit = theoreticalSlots >= 5
+      ? BigInt(0)
+      : remainder === BigInt(0) ? requirement : requirement - remainder;
+    return {
+      summary: `Capacidad teórica tras confirmar: ${theoreticalSlots}/5 cupos por UKI.`,
+      detail: `${formatTokenAmount(total)} UKI computables = ${formatTokenAmount(locked)} en vesting + ${formatTokenAmount(projectedStaked)} en staking.${
+        deficit > BigInt(0) ? ` Faltarían ${formatTokenAmount(deficit)} UKI para el siguiente cupo.` : ' Máximo de la ruta alcanzado.'
+      } La asignación final se actualiza cuando el indexador confirma la operación.`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function InlineWarning({ text }: { text: string }) {

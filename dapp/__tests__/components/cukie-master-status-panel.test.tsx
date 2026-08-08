@@ -1,16 +1,30 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { CukieMasterStatusPanel } from '@/components/cukie-master/status-panel';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
+  LandingWalletConnectButton: ({ evmOnly }: { evmOnly?: boolean }) => (
+    <button type="button" data-evm-only={String(Boolean(evmOnly))}>Conectar wallet EVM</button>
+  ),
+}));
+jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
+  CukiImage: ({ alt, src }: { alt: string; src?: string | null }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt={alt} src={src ?? undefined} />
+  ),
+}));
 jest.mock('lucide-react', () => ({
   AlertTriangle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ArrowRight: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   CheckCircle2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Clock3: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Loader2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Lock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ShieldCheck: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Sparkles: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Unlock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
 }));
 
@@ -42,7 +56,7 @@ describe('CukieMasterStatusPanel', () => {
     render(<CukieMasterStatusPanel />);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Conecta y autentica tu wallet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Conecta una wallet EVM/i)).toBeInTheDocument();
   });
 
   it('renders only the persisted public slot status returned by the API', async () => {
@@ -93,18 +107,23 @@ describe('CukieMasterStatusPanel', () => {
 
     render(<CukieMasterStatusPanel />);
 
-    await waitFor(() => expect(screen.getByText('Total activo')).toBeInTheDocument());
-    expect(screen.getByText('Ruta UKI')).toBeInTheDocument();
-    expect(screen.getByText('Ruta Cukies')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Cupos activos')).toBeInTheDocument());
+    expect(screen.getByText('1/10')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Ruta UKI/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Ruta Cukies/i })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Progreso Ruta UKI' })).toHaveAttribute('aria-valuenow', '2');
     expect(screen.getByText('Cupo 1')).toBeInTheDocument();
-    expect(screen.getByText('UKI computables')).toBeInTheDocument();
-    expect(screen.getByText('Exceso tras cupos')).toBeInTheDocument();
-    expect(screen.getByText('45.000 UKI')).toBeInTheDocument();
-    expect(screen.getByText('Exceso tras cupos').parentElement).toHaveTextContent('5000 UKI');
+    expect(screen.getByText('UKI que ya cuentan')).toBeInTheDocument();
+    expect(screen.getByText(/45\.000 UKI = 40\.000 UKI en vesting \+ 5000 UKI en staking/i)).toBeInTheDocument();
+    expect(screen.getByText('Margen tras cupos').parentElement).toHaveTextContent('5000 UKI');
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/economy/v1/cukie-master?walletAddress=${walletAddress}`,
       expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   });
 
   it('fails closed without showing stale slot numbers when the API is unavailable', async () => {
@@ -116,8 +135,71 @@ describe('CukieMasterStatusPanel', () => {
 
     render(<CukieMasterStatusPanel />);
 
-    await waitFor(() => expect(screen.getByText(/no está disponible con garantías/i)).toBeInTheDocument());
-    expect(screen.queryByText('Total activo')).not.toBeInTheDocument();
-    expect(screen.queryByText('cupos asignados')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/No podemos verificar tu estado económico/i)).toBeInTheDocument());
+    expect(screen.queryByText('Cupos activos')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+
+  it('shows NFT contribution separately from potential points and exposes contextual actions', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'ok',
+        data: {
+          walletNormalized: walletAddress,
+          totals: { desiredSlots: 1, allocatedSlots: 1, maxPotentialSlots: 10 },
+          routes: {
+            uki: {
+              position: null,
+              currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
+              pendingRequirement: null,
+              requirementGraceEndsAt: null,
+              deficitToNextSlot: { route: 'uki', ukiRaw: '20000000000000000000000' },
+              deficitToPreserveSlots: null,
+              slots: [],
+              source: { complete: true, status: 'available', route: 'uki', totalUkiRaw: '0', presaleLockedRaw: '0', stakedUkiRaw: '0' },
+            },
+            nft: {
+              position: { status: 'active', desiredSlots: 1, allocatedSlots: 1, protectedSlots: 0, graceEndsAt: null },
+              currentRequirement: { route: 'nft', nftPoints: 3 },
+              pendingRequirement: null,
+              requirementGraceEndsAt: null,
+              deficitToNextSlot: { route: 'nft', nftPoints: 2 },
+              deficitToPreserveSlots: null,
+              slots: [{
+                route: 'nft', ordinal: 1, eligibilityEpoch: 1, status: 'active',
+                creditEligibleFrom: '2026-07-10T00:00:00.000Z', graceEndsAt: null,
+              }],
+              source: { complete: true, status: 'available', route: 'nft', originalCukiePoints: 4 },
+            },
+          },
+          nftInventory: [
+            {
+              assetId: 'cukies:42', tokenId: '42', imageUrl: 'https://example.com/42.png', rarity: 'rare', rarityPoints: 4,
+              contributesToCukieMaster: true, contributionPoints: 4, state: 'soft_staked', blockers: [],
+              lock: { lockId: 'lock-42', fencingToken: 1 }, canSoftStake: false, canUnstake: true,
+            },
+            {
+              assetId: 'cukies:7', tokenId: '7', imageUrl: null, rarity: 'common', rarityPoints: 1,
+              contributesToCukieMaster: false, contributionPoints: 0, state: 'available', blockers: [],
+              lock: null, canSoftStake: true, canUnstake: false,
+            },
+          ],
+        },
+      }),
+    });
+
+    render(<CukieMasterStatusPanel />);
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Ruta Cukies/i })).toBeInTheDocument());
+    const nftTab = screen.getByRole('tab', { name: /Ruta Cukies/i });
+    fireEvent.mouseDown(nftTab, { button: 0, ctrlKey: false });
+    fireEvent.click(nftTab);
+
+    await waitFor(() => expect(screen.getByText('Aporta 4 puntos a tu ruta')).toBeInTheDocument());
+    expect(screen.getByText('Puede aportar 1 punto')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dejar de usar Cukie #42 para Cukie Master' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Usar Cukie #7 para Cukie Master' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Cukie #42' })).toHaveAttribute('src', 'https://example.com/42.png');
   });
 });

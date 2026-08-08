@@ -9,9 +9,11 @@ import {
 import { createMongoNftAssetLockRepository } from '@/lib/nft-inventory/lock-repository';
 import { createNftAssetLockService } from '@/lib/nft-inventory/locks';
 import type { NftAssetLockDocument } from '@/lib/nft-inventory/lock-types';
+import { getLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 import { DomainConflictError, DomainNotFoundError, DomainValidationError } from '../errors';
+import { CUKIE_MASTER_ORIGINAL_RARITY_POINTS } from '../rules';
 import { createMongoCukieMasterRepository } from './repository';
 import { createCukieMasterService } from './service';
 
@@ -20,14 +22,25 @@ export type CukieMasterNftOperation = 'soft_stake' | 'unstake';
 export type CukieMasterNftInventoryItem = {
   assetId: string;
   tokenId: string | null;
+  imageUrl: string | null;
   rarity: string;
   rarityPoints: number | null;
+  contributesToCukieMaster: boolean;
+  contributionPoints: number;
   state: string;
   blockers: NftInventoryBlocker[];
   lock: null | { lockId: string; fencingToken: number };
   canSoftStake: boolean;
   canUnstake: boolean;
 };
+
+function pointsForRarity(rarity: string) {
+  return Object.prototype.hasOwnProperty.call(CUKIE_MASTER_ORIGINAL_RARITY_POINTS, rarity)
+    ? CUKIE_MASTER_ORIGINAL_RARITY_POINTS[
+      rarity as keyof typeof CUKIE_MASTER_ORIGINAL_RARITY_POINTS
+    ]
+    : null;
+}
 
 export type CukieMasterNftOperationInput = {
   walletAddress: string;
@@ -87,20 +100,28 @@ async function inventoryFromDb(
   return normalized
     .map(({ asset, rarityPoints, blockers }) => {
       const lock = activeByAsset.get(asset.assetId);
-      const compatible = lock?.reason === 'soft_stake'
+      const compatibleSoftStake = lock?.reason === 'soft_stake'
         && lock.ownerNormalized === summary.walletNormalized;
+      const retainedGameEntitlement = lock?.reason === 'game_assignment'
+        && lock.ownerNormalized === summary.walletNormalized
+        && lock.retainsSoftStakeEntitlement === true;
+      const contributesToCukieMaster = compatibleSoftStake || retainedGameEntitlement;
+      const potentialPoints = rarityPoints ?? pointsForRarity(asset.rarity);
       return {
         assetId: asset.assetId,
         tokenId: asset.tokenId,
+        imageUrl: asset.tokenId ? getLegacyMarketplaceNftImageUrl(asset.tokenId) : null,
         rarity: asset.rarity,
-        rarityPoints,
+        rarityPoints: potentialPoints,
+        contributesToCukieMaster,
+        contributionPoints: contributesToCukieMaster ? potentialPoints ?? 0 : 0,
         state: asset.canonicalState,
         blockers,
-        lock: compatible && lock
+        lock: compatibleSoftStake && lock
           ? { lockId: lock.lockId, fencingToken: lock.fencingToken }
           : null,
         canSoftStake: asset.canonicalState === 'available' && blockers.length === 0,
-        canUnstake: asset.canonicalState === 'soft_staked' && compatible,
+        canUnstake: asset.canonicalState === 'soft_staked' && compatibleSoftStake,
       } satisfies CukieMasterNftInventoryItem;
     })
     .sort((left, right) => left.assetId.localeCompare(right.assetId));

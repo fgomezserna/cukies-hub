@@ -1,20 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, Loader2, Lock, Unlock } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  Unlock,
+} from 'lucide-react';
 import { formatUnits } from 'viem';
 
-import { Panel } from '@/components/landing/primitives';
+import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
+import { LandingButton, Panel } from '@/components/landing/primitives';
+import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useAuth } from '@/providers/auth-provider';
 
+const MAX_ROUTE_SLOTS = 5;
+const CUKIE_MASTER_REFRESH_EVENT = 'cukies:cukie-master:refresh';
+const STAKING_REFRESH_DELAYS_MS = [0, 3_000, 8_000, 15_000] as const;
+
+type RouteKey = 'uki' | 'nft';
+
 type PublicSlot = {
-  route: 'uki' | 'nft';
+  route: RouteKey;
   ordinal: number;
   eligibilityEpoch: number;
   status: 'qualifying' | 'active' | 'grace' | 'inactive';
   creditEligibleFrom: string;
   graceEndsAt: string | null;
 };
+
+type Requirement = { route: 'uki'; ukiRaw: string } | { route: 'nft'; nftPoints: number };
 
 type PublicRoute = {
   position: null | {
@@ -33,7 +54,7 @@ type PublicRoute = {
   source: {
     complete: boolean;
     status: 'available' | 'unavailable';
-    route?: 'uki' | 'nft';
+    route?: RouteKey;
     totalUkiRaw?: string;
     presaleLockedRaw?: string;
     stakedUkiRaw?: string;
@@ -41,14 +62,16 @@ type PublicRoute = {
   };
 };
 
-type Requirement = { route: 'uki'; ukiRaw: string } | { route: 'nft'; nftPoints: number };
-
 type PublicNft = {
   assetId: string;
   tokenId: string | null;
+  imageUrl: string | null;
   rarity: string;
   rarityPoints: number | null;
+  contributesToCukieMaster: boolean;
+  contributionPoints: number;
   state: string;
+  blockers: string[];
   lock: null | { lockId: string; fencingToken: number };
   canSoftStake: boolean;
   canUnstake: boolean;
@@ -76,23 +99,52 @@ function dateLabel(value: string | null) {
   }).format(date);
 }
 
-export function CukieMasterStatusPanel() {
+function slotCounts(route: PublicRoute) {
+  return route.slots.reduce(
+    (counts, slot) => ({ ...counts, [slot.status]: counts[slot.status] + 1 }),
+    { active: 0, qualifying: 0, grace: 0, inactive: 0 },
+  );
+}
+
+export function CukieMasterStatusPanel({
+  onUkiRouteData,
+}: {
+  onUkiRouteData?: (preview: UkiRoutePreview | null) => void;
+} = {}) {
   const { user, isLoading: authLoading } = useAuth();
   const [status, setStatus] = useState<PublicStatus | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const [activeRoute, setActiveRoute] = useState<RouteKey>('uki');
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [mutatingAsset, setMutatingAsset] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const hasReadyStatusRef = useRef(false);
+  const loadedWalletRef = useRef<string | null>(null);
+  const requestIdRef = useRef(0);
+  const refreshTimersRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user?.walletAddress) {
+      hasReadyStatusRef.current = false;
+      loadedWalletRef.current = null;
       setStatus(null);
       setState('idle');
+      setIsRefreshing(false);
       return;
     }
+    const walletNormalized = user.walletAddress.toLowerCase();
+    const backgroundRefresh = hasReadyStatusRef.current
+      && loadedWalletRef.current === walletNormalized;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     const controller = new AbortController();
-    setState('loading');
+    if (backgroundRefresh) setIsRefreshing(true);
+    else {
+      setStatus(null);
+      setState('loading');
+    }
     fetch(
       `/api/economy/v1/cukie-master?walletAddress=${encodeURIComponent(user.walletAddress)}`,
       { cache: 'no-store', credentials: 'same-origin', signal: controller.signal },
@@ -100,16 +152,73 @@ export function CukieMasterStatusPanel() {
       .then(async (response) => {
         const body = await response.json() as { data?: PublicStatus };
         if (!response.ok || !body.data) throw new Error('CUKIE_MASTER_UNAVAILABLE');
+        hasReadyStatusRef.current = true;
+        loadedWalletRef.current = walletNormalized;
         setStatus(body.data);
         setState('ready');
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        setStatus(null);
-        setState('unavailable');
+        if (!backgroundRefresh) {
+          hasReadyStatusRef.current = false;
+          loadedWalletRef.current = null;
+          setStatus(null);
+          setState('unavailable');
+        }
+      })
+      .finally(() => {
+        if (requestIdRef.current === requestId) setIsRefreshing(false);
       });
     return () => controller.abort();
   }, [authLoading, reloadNonce, user?.walletAddress]);
+
+  useEffect(() => {
+    const clearRefreshTimers = () => {
+      refreshTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      refreshTimersRef.current = [];
+    };
+    const refresh = () => {
+      clearRefreshTimers();
+      refreshTimersRef.current = STAKING_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(
+        () => setReloadNonce((value) => value + 1),
+        delay,
+      ));
+    };
+    window.addEventListener(CUKIE_MASTER_REFRESH_EVENT, refresh);
+    return () => {
+      window.removeEventListener(CUKIE_MASTER_REFRESH_EVENT, refresh);
+      clearRefreshTimers();
+    };
+  }, []);
+
+  useEffect(() => {
+    const route = status?.routes.uki;
+    if (
+      state !== 'ready'
+      || !route?.source.complete
+      || route.currentRequirement.route !== 'uki'
+      || route.source.presaleLockedRaw === undefined
+      || route.source.stakedUkiRaw === undefined
+    ) {
+      onUkiRouteData?.(null);
+      return;
+    }
+    onUkiRouteData?.({
+      currentRequirementRaw: route.currentRequirement.ukiRaw,
+      presaleLockedRaw: route.source.presaleLockedRaw,
+      indexedStakedRaw: route.source.stakedUkiRaw,
+      allocatedSlots: route.position?.allocatedSlots ?? 0,
+    });
+  }, [onUkiRouteData, state, status]);
+
+  const inventory = useMemo(() => [...(status?.nftInventory ?? [])].sort((left, right) => {
+    if (left.contributesToCukieMaster !== right.contributesToCukieMaster) {
+      return left.contributesToCukieMaster ? -1 : 1;
+    }
+    if (left.canSoftStake !== right.canSoftStake) return left.canSoftStake ? -1 : 1;
+    return (right.rarityPoints ?? -1) - (left.rarityPoints ?? -1)
+      || left.assetId.localeCompare(right.assetId);
+  }), [status?.nftInventory]);
 
   async function mutateNft(asset: PublicNft, operation: 'soft_stake' | 'unstake') {
     if (!user?.walletAddress || mutatingAsset) return;
@@ -135,225 +244,433 @@ export function CukieMasterStatusPanel() {
       if (!response.ok) throw new Error('NFT_OPERATION_FAILED');
       setReloadNonce((value) => value + 1);
     } catch {
-      setMutationError('No se pudo completar la operación NFT con garantías. Revisa el estado e inténtalo de nuevo.');
+      setMutationError('No se pudo completar la operación. El estado del NFT no ha cambiado; inténtalo de nuevo.');
     } finally {
       setMutatingAsset(null);
     }
   }
 
+  const totalCounts = status ? {
+    active: slotCounts(status.routes.uki).active + slotCounts(status.routes.nft).active,
+    qualifying: slotCounts(status.routes.uki).qualifying + slotCounts(status.routes.nft).qualifying,
+    grace: slotCounts(status.routes.uki).grace + slotCounts(status.routes.nft).grace,
+  } : null;
+
   return (
-    <section id="mi-estado" className="uki-container relative z-[2] pb-10">
-      <Panel innerClassName="p-5 sm:p-7">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="uki-label">Estado verificable</p>
-            <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">
-              Mis cupos Cukie Master
+    <section id="mi-estado" className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-8">
+      <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tu estado personal</p>
+            <h2 className="mt-2 break-words font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
+              Tus cupos Cukie Master
             </h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Revisamos vesting, staking e inventario antes de recomendarte ninguna acción.
+            </p>
           </div>
           {status ? (
-            <p className="text-xs font-semibold text-[var(--uki-muted)]">
-              Wallet {shortWallet(status.walletNormalized)}
-            </p>
+            <div className="flex min-w-0 flex-col items-start gap-2 sm:items-end">
+              <p className="max-w-full truncate text-xs font-semibold text-[var(--uki-muted)]">
+                Wallet {shortWallet(status.walletNormalized)}
+              </p>
+              <button
+                type="button"
+                disabled={isRefreshing}
+                onClick={() => setReloadNonce((value) => value + 1)}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-[7px] border border-white/10 px-3 text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-cyan-border)] hover:text-[var(--uki-cyan)] disabled:cursor-wait disabled:opacity-60"
+              >
+                {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                {isRefreshing ? 'Actualizando' : 'Actualizar estado'}
+              </button>
+            </div>
           ) : null}
         </div>
 
         {authLoading || state === 'loading' ? (
-          <div className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" />
-            Verificando fuentes e inventario…
+          <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
+            Verificando tus activos y cupos…
           </div>
         ) : null}
 
         {!authLoading && state === 'idle' ? (
-          <p className="mt-6 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-            Conecta y autentica tu wallet para consultar cupos. No se muestra ninguna estimación
-            si las fuentes on-chain o el inventario no están completos.
-          </p>
+          <div className="mt-6 grid min-w-0 gap-4 rounded-[10px] border border-[var(--uki-cyan-border)] bg-black/20 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="min-w-0">
+              <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Conecta una wallet EVM</p>
+              <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                Firma el acceso para consultar datos personales. No calculamos cupos con información incompleta.
+              </p>
+            </div>
+            <LandingWalletConnectButton
+              className="min-h-11 justify-center"
+              evmOnly
+              label="Conectar wallet EVM"
+              compactLabel="Conectar"
+              showCompactText={false}
+            />
+          </div>
         ) : null}
 
         {state === 'unavailable' ? (
-          <div className="mt-6 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+          <div role="alert" className="mt-6 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
             <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              El estado económico no está disponible con garantías ahora mismo. Los cupos
-              persistidos no se alteran y volveremos a mostrarlos cuando indexador, bootstrap y
-              reconciliación estén saludables.
+              No podemos verificar tu estado económico ahora mismo. No mostramos cifras antiguas ni cambiamos tus cupos; vuelve a intentarlo en unos minutos.
             </p>
           </div>
         ) : null}
 
-        {state === 'ready' && status ? (
-          <div className="mt-6 grid gap-4 lg:grid-cols-[0.72fr_1fr_1fr]">
-            <div className="rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 p-5">
-              <p className="uki-label">Total activo</p>
-              <p className="mt-2 font-headline text-4xl font-black text-[var(--uki-cyan)]">
-                {status.totals.allocatedSlots}
-              </p>
-              <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">
-                de {status.totals.maxPotentialSlots} posibles, máximo 5 por ruta
-              </p>
+        {state === 'ready' && status && totalCounts ? (
+          <>
+            <div className="mt-6 grid min-w-0 gap-3 sm:grid-cols-3">
+              <StatusMetric
+                label="Cupos activos"
+                value={`${totalCounts.active}/${status.totals.maxPotentialSlots}`}
+                helper={`${status.totals.allocatedSlots} asignados entre las dos rutas`}
+                tone="cyan"
+              />
+              <StatusMetric
+                label="En validación"
+                value={String(totalCounts.qualifying)}
+                helper="Pendientes de completar las primeras 24 horas"
+              />
+              <StatusMetric
+                label="En gracia"
+                value={String(totalCounts.grace)}
+                helper="Cupos que aún puedes conservar ajustando activos"
+                tone={totalCounts.grace > 0 ? 'warning' : 'neutral'}
+              />
             </div>
-            <RouteCard label="Ruta UKI" route={status.routes.uki} />
-            <RouteCard label="Ruta Cukies" route={status.routes.nft} />
-          </div>
-        ) : null}
 
-        {state === 'ready' && status ? (
-          <div className="mt-4 rounded-[8px] border border-white/10 bg-black/20 p-5">
-            <div>
-              <p className="uki-label">Inventario Original BSC</p>
-              <h3 className="mt-2 font-headline text-xl font-black uppercase text-[var(--uki-cream)]">
-                Soft-staking Cukies
-              </h3>
-              <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                La operación solo bloquea el uso económico del NFT; nunca transfiere el token ni firma automáticamente.
-              </p>
-            </div>
-            {mutationError ? (
-              <p role="alert" className="mt-3 text-sm font-semibold text-amber-300">{mutationError}</p>
-            ) : null}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {status.nftInventory.length === 0 ? (
-                <p className="text-sm font-semibold text-[var(--uki-muted)]">Sin Cukies Originales BSC operables.</p>
-              ) : status.nftInventory.map((asset) => (
-                <div key={asset.assetId} className="flex items-center justify-between gap-3 rounded-[8px] border border-white/10 p-3">
-                  <div>
-                    <p className="text-sm font-bold text-[var(--uki-cream)]">
-                      Cukie #{asset.tokenId ?? asset.assetId.slice(-8)}
-                    </p>
-                    <p className="text-xs font-semibold capitalize text-[var(--uki-muted)]">
-                      {asset.rarity} · {asset.rarityPoints ?? 0} puntos · {asset.state}
-                    </p>
-                  </div>
-                  {asset.canSoftStake ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(mutatingAsset)}
-                      onClick={() => void mutateNft(asset, 'soft_stake')}
-                      className="inline-flex items-center gap-1.5 rounded-[7px] border border-[var(--uki-cyan-border)] px-3 py-2 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:opacity-50"
-                    >
-                      {mutatingAsset === asset.assetId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
-                      Activar
-                    </button>
-                  ) : asset.canUnstake ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(mutatingAsset)}
-                      onClick={() => void mutateNft(asset, 'unstake')}
-                      className="inline-flex items-center gap-1.5 rounded-[7px] border border-white/15 px-3 py-2 text-xs font-black uppercase text-[var(--uki-text)] disabled:opacity-50"
-                    >
-                      {mutatingAsset === asset.assetId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
-                      Retirar
-                    </button>
-                  ) : (
-                    <span className="text-[10px] font-black uppercase text-[var(--uki-muted)]">No disponible</span>
-                  )}
+            <Tabs value={activeRoute} onValueChange={(value) => setActiveRoute(value as RouteKey)} className="mt-5 min-w-0">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Elige una ruta</p>
+                  <h3 className="mt-1 font-headline text-xl font-black uppercase text-[var(--uki-cream)]">Estado y siguiente acción</h3>
                 </div>
-              ))}
-            </div>
-          </div>
+                <p className="text-xs font-semibold text-[var(--uki-muted)]">Máximo {MAX_ROUTE_SLOTS} cupos por ruta</p>
+              </div>
+              <TabsList className="mt-4 grid h-auto w-full min-w-0 grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-2">
+                <RouteTab value="uki" label="Ruta UKI" route={status.routes.uki} />
+                <RouteTab value="nft" label="Ruta Cukies" route={status.routes.nft} />
+              </TabsList>
+
+              <TabsContent value="uki" className="mt-4 min-w-0">
+                <RouteDetail label="Ruta UKI" route={status.routes.uki} />
+                <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-[var(--uki-cream)]">¿Te faltan UKI para el siguiente cupo?</p>
+                    <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">El vesting ya está incluido. Deposita únicamente el déficit que quieras cubrir.</p>
+                  </div>
+                  <LandingButton href="#uki-staking" className="shrink-0">Gestionar staking</LandingButton>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="nft" className="mt-4 min-w-0">
+                <RouteDetail label="Ruta Cukies" route={status.routes.nft} />
+                <NftInventory
+                  assets={inventory}
+                  activePoints={status.routes.nft.source.originalCukiePoints}
+                  mutatingAsset={mutatingAsset}
+                  mutationError={mutationError}
+                  onMutate={mutateNft}
+                />
+              </TabsContent>
+            </Tabs>
+          </>
         ) : null}
       </Panel>
     </section>
   );
 }
 
-function RouteCard({ label, route }: { label: string; route: PublicRoute }) {
-  const ukiBreakdown = getUkiBreakdown(route);
+function StatusMetric({
+  label,
+  value,
+  helper,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  tone?: 'cyan' | 'warning' | 'neutral';
+}) {
+  const valueClass = tone === 'cyan'
+    ? 'text-[var(--uki-cyan)]'
+    : tone === 'warning'
+      ? 'text-amber-300'
+      : 'text-[var(--uki-cream)]';
   return (
-    <div className="rounded-[8px] border border-white/10 bg-black/20 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">{label}</p>
-        {route.source.complete ? (
-          <CheckCircle2 className="h-5 w-5 text-[var(--uki-cyan)]" />
-        ) : (
-          <AlertTriangle className="h-5 w-5 text-amber-300" />
-        )}
-      </div>
-      <p className="mt-3 text-3xl font-black text-[var(--uki-gold)]">
-        {route.position?.allocatedSlots ?? 0}
-      </p>
-      <p className="text-xs font-semibold text-[var(--uki-muted)]">cupos asignados</p>
-      <dl className="mt-4 grid gap-2 text-xs font-semibold">
-        <div className="flex justify-between gap-3">
-          <dt className="text-[var(--uki-muted)]">Requisito actual</dt>
-          <dd className="text-right text-[var(--uki-text)]">{requirementLabel(route.currentRequirement)}</dd>
-        </div>
-        {route.pendingRequirement ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-amber-300">Nuevo requisito</dt>
-            <dd className="text-right text-amber-200">
-              {requirementLabel(route.pendingRequirement)} · hasta {dateLabel(route.requirementGraceEndsAt) ?? '48h'}
-            </dd>
-          </div>
-        ) : null}
-        <div className="flex justify-between gap-3">
-          <dt className="text-[var(--uki-muted)]">Cupos protegidos</dt>
-          <dd className="text-right text-[var(--uki-text)]">{route.position?.protectedSlots ?? 0}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-[var(--uki-muted)]">
-            {route.deficitToPreserveSlots ? 'Déficit para conservar cupos' : 'Déficit próximo cupo'}
-          </dt>
-          <dd className="text-right text-[var(--uki-text)]">
-            {route.deficitToPreserveSlots
-              ? requirementLabel(route.deficitToPreserveSlots)
-              : route.deficitToNextSlot
-                ? requirementLabel(route.deficitToNextSlot)
-                : route.source.complete
-                  ? 'Máximo alcanzado'
-                  : 'No disponible'}
-          </dd>
-        </div>
-      </dl>
-      {ukiBreakdown ? (
-        <dl className="mt-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-4 text-xs font-semibold">
-          <SourceMetric label="UKI computables" value={ukiBreakdown.total} />
-          <SourceMetric label="Exceso tras cupos" value={ukiBreakdown.excess} />
-          <SourceMetric label="En vesting" value={ukiBreakdown.locked} />
-          <SourceMetric label="Staking indexado" value={ukiBreakdown.staked} />
-        </dl>
-      ) : null}
-      <div className="mt-4 space-y-2">
-        {route.slots.length === 0 ? (
-          <p className="text-xs font-semibold text-[var(--uki-muted)]">Sin cupos en esta ruta.</p>
-        ) : route.slots.map((slot) => (
-          <div key={`${slot.route}:${slot.ordinal}:${slot.eligibilityEpoch}`} className="flex items-center justify-between gap-3 text-xs font-semibold">
-            <span className="text-[var(--uki-text)]">Cupo {slot.ordinal}</span>
-            <span className="flex items-center gap-1.5 text-[var(--uki-muted)]">
-              <Clock3 className="h-3.5 w-3.5" />
-              {slot.status === 'active'
-                ? 'Activo'
-                : slot.status === 'grace'
-                  ? `Gracia hasta ${dateLabel(slot.graceEndsAt) ?? 'pendiente'}`
-                  : slot.status === 'qualifying'
-                    ? `Disponible ${dateLabel(slot.creditEligibleFrom) ?? 'tras 24h'}`
-                    : 'Inactivo'}
+    <div className="min-w-0 rounded-[8px] border border-white/10 bg-black/20 p-4">
+      <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">{label}</p>
+      <p className={`mt-2 font-headline text-3xl font-black ${valueClass}`}>{value}</p>
+      <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{helper}</p>
+    </div>
+  );
+}
+
+function RouteTab({ value, label, route }: { value: RouteKey; label: string; route: PublicRoute }) {
+  const allocated = route.position?.allocatedSlots ?? 0;
+  const counts = slotCounts(route);
+  return (
+    <TabsTrigger
+      value={value}
+      className="group min-h-[7.5rem] min-w-0 whitespace-normal rounded-[10px] border border-white/10 bg-black/20 p-4 text-left text-[var(--uki-text)] shadow-none data-[state=active]:border-[var(--uki-cyan)] data-[state=active]:bg-[var(--uki-cyan-soft)] data-[state=active]:text-[var(--uki-cream)]"
+    >
+      <span className="block min-w-0 w-full">
+        <span className="flex items-center justify-between gap-3">
+          <span className="font-headline text-lg font-black uppercase">{label}</span>
+          {route.source.complete
+            ? <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--uki-cyan)]" aria-hidden="true" />
+            : <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />}
+        </span>
+        <span className="mt-2 flex items-end justify-between gap-3">
+          <span className="font-headline text-2xl font-black text-[var(--uki-gold)]">{allocated}/{MAX_ROUTE_SLOTS}</span>
+          <span className="text-xs font-semibold text-[var(--uki-muted)]">{counts.active} activos · {counts.qualifying} validando</span>
+        </span>
+        <span
+          role="progressbar"
+          aria-label={`Progreso ${label}`}
+          aria-valuemin={0}
+          aria-valuemax={MAX_ROUTE_SLOTS}
+          aria-valuenow={allocated}
+          aria-valuetext={`${allocated} de ${MAX_ROUTE_SLOTS} cupos`}
+          className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
+        >
+          <span className="block h-full rounded-full bg-[var(--uki-cyan)]" style={{ width: `${Math.min(100, allocated * 20)}%` }} />
+        </span>
+      </span>
+    </TabsTrigger>
+  );
+}
+
+function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
+  const ukiBreakdown = getUkiBreakdown(route);
+  const counts = slotCounts(route);
+  const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
+  return (
+    <div className="min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:p-5">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h4 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">{label}</h4>
+            <span className="w-fit rounded-full border border-white/10 px-3 py-1 text-xs font-black uppercase text-[var(--uki-muted)]">
+              {counts.active} activos · {counts.qualifying} en validación · {counts.grace} en gracia
             </span>
           </div>
-        ))}
+
+          {!route.source.complete ? (
+            <div role="alert" className="mt-4 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+              <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">La fuente de esta ruta está incompleta; no uses estas cifras para operar.</p>
+            </div>
+          ) : ukiBreakdown ? (
+            <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">UKI que ya cuentan</p>
+              <p className="mt-2 break-words text-base font-black text-[var(--uki-cream)]">
+                {ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Puntos que ya cuentan</p>
+              <p className="mt-2 text-2xl font-black text-[var(--uki-gold)]">{route.source.originalCukiePoints ?? 0} puntos</p>
+            </div>
+          )}
+
+          <dl className="mt-4 grid min-w-0 gap-3 text-sm font-semibold sm:grid-cols-2">
+            <RouteMetric label="Requisito vigente" value={requirementLabel(route.currentRequirement)} />
+            <RouteMetric
+              label={route.deficitToPreserveSlots ? 'Déficit para conservar' : 'Déficit siguiente cupo'}
+              value={deficit
+                ? requirementLabel(deficit)
+                : route.source.complete ? 'Máximo alcanzado' : 'No disponible'}
+            />
+            <RouteMetric label="Cupos protegidos" value={String(route.position?.protectedSlots ?? 0)} />
+            {ukiBreakdown ? <RouteMetric label="Margen tras cupos" value={ukiBreakdown.excess} /> : null}
+          </dl>
+
+          {route.pendingRequirement ? (
+            <div className="mt-4 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-semibold leading-relaxed text-amber-100">
+              Próximo requisito: {requirementLabel(route.pendingRequirement)}. Puedes ajustarte hasta {dateLabel(route.requirementGraceEndsAt) ?? 'el final de la ventana de 48 horas'}.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="min-w-0 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Estado de cada cupo</p>
+          <div className="mt-3 space-y-2">
+            {route.slots.length === 0 ? (
+              <p className="text-sm font-semibold text-[var(--uki-muted)]">Todavía no hay cupos asignados en esta ruta.</p>
+            ) : route.slots.map((slot) => (
+              <div key={`${slot.route}:${slot.ordinal}:${slot.eligibilityEpoch}`} className="flex min-w-0 items-start justify-between gap-3 rounded-[7px] border border-white/10 px-3 py-2.5 text-xs font-semibold">
+                <span className="shrink-0 text-[var(--uki-text)]">Cupo {slot.ordinal}</span>
+                <span className="flex min-w-0 items-start gap-1.5 text-right text-[var(--uki-muted)]">
+                  <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{slotStatusLabel(slot)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function RouteMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-[7px] border border-white/10 p-3">
+      <dt className="text-xs text-[var(--uki-muted)]">{label}</dt>
+      <dd className="mt-1 break-words text-[var(--uki-text)]">{value}</dd>
+    </div>
+  );
+}
+
+function NftInventory({
+  assets,
+  activePoints,
+  mutatingAsset,
+  mutationError,
+  onMutate,
+}: {
+  assets: PublicNft[];
+  activePoints?: number;
+  mutatingAsset: string | null;
+  mutationError: string | null;
+  onMutate: (asset: PublicNft, operation: 'soft_stake' | 'unstake') => Promise<void>;
+}) {
+  const availablePoints = assets.reduce(
+    (total, asset) => total + (asset.canSoftStake ? asset.rarityPoints ?? 0 : 0),
+    0,
+  );
+  return (
+    <section aria-labelledby="cukie-master-inventory-title" className="mt-4 min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:p-5">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Inventario Original BSC</p>
+          <h4 id="cukie-master-inventory-title" className="mt-1 font-headline text-xl font-black uppercase text-[var(--uki-cream)]">Elige qué Cukies usar</h4>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+            Usar un Cukie bloquea su uso económico, pero no transfiere el NFT ni firma por ti.
+          </p>
+        </div>
+        <div className="grid shrink-0 grid-cols-2 gap-2">
+          <MiniMetric label="Activos" value={`${activePoints ?? 0} pts`} />
+          <MiniMetric label="Disponibles" value={`+${availablePoints} pts`} />
+        </div>
+      </div>
+
+      {mutationError ? <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">{mutationError}</p> : null}
+      {mutatingAsset ? <p role="status" aria-live="polite" className="mt-3 text-xs font-semibold text-[var(--uki-cyan)]">Actualizando el inventario de forma segura…</p> : null}
+
+      <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {assets.length === 0 ? (
+          <p className="text-sm font-semibold text-[var(--uki-muted)]">No hay Cukies Originales BSC disponibles para esta wallet.</p>
+        ) : assets.map((asset) => {
+          const name = `Cukie #${asset.tokenId ?? asset.assetId.slice(-8)}`;
+          const points = asset.rarityPoints;
+          const isMutating = mutatingAsset === asset.assetId;
+          return (
+            <article key={asset.assetId} className="min-w-0 overflow-hidden rounded-[10px] border border-white/10 bg-[#07131d]">
+              <div className="relative aspect-[4/3] min-w-0 overflow-hidden bg-black/25">
+                <CukiImage src={asset.imageUrl} alt={name} sizes="(min-width: 1280px) 24vw, (min-width: 640px) 44vw, 90vw" className="object-contain p-3" />
+                <span className={`absolute left-3 top-3 rounded-full border px-2.5 py-1 text-xs font-black uppercase ${rarityClass(asset.rarity)}`}>
+                  {rarityLabel(asset.rarity)}
+                </span>
+                {asset.contributesToCukieMaster ? (
+                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[var(--uki-cyan-border)] bg-[#160a22]/90 px-2.5 py-1 text-xs font-black text-[var(--uki-cyan)]">
+                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> En uso
+                  </span>
+                ) : null}
+              </div>
+              <div className="min-w-0 p-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h5 className="truncate text-base font-black text-[var(--uki-cream)]">{name}</h5>
+                    <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{stateLabel(asset.state)}</p>
+                  </div>
+                  <span className="shrink-0 text-right font-headline text-lg font-black text-[var(--uki-gold)]">
+                    {points === null ? '—' : `${points} pts`}
+                  </span>
+                </div>
+
+                <div className={`mt-3 flex min-h-11 items-center gap-2 rounded-[7px] border p-3 text-xs font-semibold ${
+                  asset.contributesToCukieMaster
+                    ? 'border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] text-[var(--uki-text)]'
+                    : 'border-white/10 text-[var(--uki-muted)]'
+                }`}>
+                  <Sparkles className="h-4 w-4 shrink-0 text-[var(--uki-cyan)]" aria-hidden="true" />
+                  {asset.contributesToCukieMaster
+                    ? `Aporta ${pointsLabel(asset.contributionPoints)} a tu ruta`
+                    : points === null
+                      ? 'Puntuación no verificable'
+                      : asset.canSoftStake
+                        ? `Puede aportar ${pointsLabel(points)}`
+                        : blockerLabel(asset.blockers[0])}
+                </div>
+
+                {asset.canSoftStake ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(mutatingAsset)}
+                    onClick={() => void onMutate(asset, 'soft_stake')}
+                    aria-label={`Usar ${name} para Cukie Master`}
+                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-cyan-border)] px-3 py-2 text-center text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isMutating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Lock className="h-4 w-4" aria-hidden="true" />}
+                    Usar para Cukie Master
+                  </button>
+                ) : asset.canUnstake ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(mutatingAsset)}
+                    onClick={() => void onMutate(asset, 'unstake')}
+                    aria-label={`Dejar de usar ${name} para Cukie Master`}
+                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-white/15 px-3 py-2 text-center text-xs font-black uppercase text-[var(--uki-text)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isMutating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Unlock className="h-4 w-4" aria-hidden="true" />}
+                    Dejar de usar
+                  </button>
+                ) : (
+                  <p className="mt-3 flex min-h-11 items-center justify-center rounded-[7px] border border-white/10 px-3 text-center text-xs font-black uppercase text-[var(--uki-muted)]">
+                    {asset.contributesToCukieMaster ? 'Aportación mantenida' : 'No disponible'}
+                  </p>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[7px] border border-white/10 bg-black/20 px-3 py-2 text-right">
+      <p className="text-xs font-semibold text-[var(--uki-muted)]">{label}</p>
+      <p className="mt-1 font-black text-[var(--uki-cream)]">{value}</p>
     </div>
   );
 }
 
 function getUkiBreakdown(route: PublicRoute) {
   if (
-    !route.source.complete ||
-    route.source.route !== 'uki' ||
-    route.source.totalUkiRaw === undefined ||
-    route.source.presaleLockedRaw === undefined ||
-    route.source.stakedUkiRaw === undefined ||
-    route.currentRequirement.route !== 'uki'
+    !route.source.complete
+    || route.source.route !== 'uki'
+    || route.source.totalUkiRaw === undefined
+    || route.source.presaleLockedRaw === undefined
+    || route.source.stakedUkiRaw === undefined
+    || route.currentRequirement.route !== 'uki'
   ) return null;
 
   try {
     const total = BigInt(route.source.totalUkiRaw);
     const requirement = BigInt(route.currentRequirement.ukiRaw);
     if (requirement <= BigInt(0)) return null;
-    const qualifyingSlots = total / requirement > BigInt(5)
-      ? BigInt(5)
+    const qualifyingSlots = total / requirement > BigInt(MAX_ROUTE_SLOTS)
+      ? BigInt(MAX_ROUTE_SLOTS)
       : total / requirement;
     const excess = total - (qualifyingSlots * requirement);
     return {
@@ -367,13 +684,65 @@ function getUkiBreakdown(route: PublicRoute) {
   }
 }
 
-function SourceMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[var(--uki-muted)]">{label}</dt>
-      <dd className="mt-1 text-[var(--uki-text)]">{value}</dd>
-    </div>
-  );
+function slotStatusLabel(slot: PublicSlot) {
+  if (slot.status === 'active') return 'Activo';
+  if (slot.status === 'grace') return `En gracia hasta ${dateLabel(slot.graceEndsAt) ?? 'fecha pendiente'}`;
+  if (slot.status === 'qualifying') return `Activo desde ${dateLabel(slot.creditEligibleFrom) ?? 'que complete 24h'}`;
+  return 'Inactivo';
+}
+
+function rarityLabel(rarity: string) {
+  return ({
+    common: 'Común',
+    uncommon: 'No común',
+    rare: 'Raro',
+    epic: 'Épico',
+    legendary: 'Legendario',
+    goat: 'Goat',
+  } as Record<string, string>)[rarity] ?? 'Sin verificar';
+}
+
+function pointsLabel(points: number) {
+  return `${points} ${points === 1 ? 'punto' : 'puntos'}`;
+}
+
+function rarityClass(rarity: string) {
+  return ({
+    common: 'border-white/20 bg-black/70 text-[var(--uki-text)]',
+    uncommon: 'border-emerald-300/30 bg-emerald-950/80 text-emerald-200',
+    rare: 'border-cyan-300/30 bg-cyan-950/80 text-cyan-200',
+    epic: 'border-purple-300/30 bg-purple-950/80 text-purple-200',
+    legendary: 'border-amber-300/30 bg-amber-950/80 text-amber-200',
+    goat: 'border-pink-300/30 bg-pink-950/80 text-pink-200',
+  } as Record<string, string>)[rarity] ?? 'border-white/20 bg-black/70 text-[var(--uki-muted)]';
+}
+
+function stateLabel(state: string) {
+  return ({
+    available: 'Disponible',
+    soft_staked: 'Usado en Cukie Master',
+    assigned_to_game: 'Asignado temporalmente a una partida',
+    in_pool: 'Depositado en un pool',
+    listed: 'Listado en marketplace',
+    bridging: 'En proceso de bridge',
+    invalidated: 'Pendiente de revisión',
+  } as Record<string, string>)[state] ?? 'Estado no verificable';
+}
+
+function blockerLabel(blocker?: string) {
+  return ({
+    missing_rarity: 'Rareza pendiente de verificar',
+    missing_generation: 'Generación pendiente de verificar',
+    second_generation: 'Solo cuentan Cukies Originales',
+    listed: 'Retíralo del marketplace para usarlo',
+    bridging: 'Espera a que termine el bridge',
+    already_locked: 'Ya está reservado para otro uso',
+    in_pool: 'Retíralo del pool para usarlo',
+    assigned_to_game: 'Está asignado a una partida',
+    invalidated: 'Requiere revisión de inventario',
+    unknown_state: 'Estado pendiente de verificar',
+    unsupported_network: 'Solo cuentan activos en BSC',
+  } as Record<string, string>)[blocker ?? ''] ?? 'No puede usarse en este momento';
 }
 
 function requirementLabel(requirement: Requirement) {
