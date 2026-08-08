@@ -85,11 +85,16 @@ describe('components/landing/LandingHeader', () => {
     );
 
     const trigger = screen.getByRole('button', { name: 'Abrir menú' });
+    const drawer = document.getElementById('uki-mobile-navigation');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(drawer).toHaveAttribute('inert');
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByRole('dialog', { name: 'Menú' })).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(drawer).not.toHaveAttribute('inert');
+    expect(drawer).toHaveAttribute('aria-hidden', 'false');
     expect(screen.getByRole('dialog', { name: 'Menú' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Wallet' }).every((button) => (
       button.getAttribute('data-evm-only') === 'true'
@@ -97,6 +102,8 @@ describe('components/landing/LandingHeader', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Menú' })).not.toBeInTheDocument();
+    expect(drawer).toHaveAttribute('inert');
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
     expect(trigger).toHaveFocus();
   });
 

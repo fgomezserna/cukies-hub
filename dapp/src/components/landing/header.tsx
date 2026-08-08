@@ -153,7 +153,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
         role="dialog"
         aria-modal="true"
         aria-hidden={!isOpen}
-        inert={isOpen ? undefined : ('' as unknown as boolean)}
+        inert={isOpen ? undefined : ('inert' as unknown as boolean)}
         aria-label={copy.menuTitle}
         className={`fixed inset-y-0 right-0 z-[70] w-64 max-w-[calc(100vw-2rem)] transform border-l border-white/10 bg-[#060a12]/95 p-6 shadow-[0_0_40px_rgba(228,92,255,0.15)] backdrop-blur-md transition-transform duration-300 ease-in-out lg:hidden ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
