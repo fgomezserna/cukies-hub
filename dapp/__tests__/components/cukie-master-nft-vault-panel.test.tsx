@@ -157,6 +157,24 @@ describe('CukieMasterNftVaultPanel', () => {
     })));
   });
 
+  it('pide autenticación sin mostrar un falso conflicto de configuración', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isLoading: false,
+      isWaitingForApproval: false,
+      walletType: null,
+      fetchUser: jest.fn(),
+    } as never);
+    mockUseAccount.mockReturnValue({ address: undefined, chainId: undefined, isConnected: false } as never);
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(screen.getByText(/Conecta y autentica tu wallet EVM/i)).toBeInTheDocument();
+    expect(screen.queryByText(/configuración pública y la del servidor no coinciden/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No hay Cukies Originales/i)).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('no renderiza una segunda ruta NFT en modo legacy', () => {
     (ukiNftVaults.mode as { cukieMaster: string }).cukieMaster = 'legacy';
     mockUseAuth.mockReturnValue({

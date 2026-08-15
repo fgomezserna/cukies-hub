@@ -250,7 +250,7 @@ export function CukieMasterNftVaultPanel() {
           El Cukie entra físicamente en el contrato y deja de poder venderse, transferirse o jugarse. La retirada es inmediata y los créditos ya ganados se conservan.
         </p>
 
-        {!configMatches ? (
+        {serverConfig && !configMatches ? (
           <p role="alert" className="mt-5 flex gap-2 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100">
             <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
             La configuración pública y la del servidor no coinciden. Los depósitos están bloqueados.
@@ -276,12 +276,20 @@ export function CukieMasterNftVaultPanel() {
         {error ? <p role="alert" className="mt-4 text-sm font-semibold text-amber-200">{error}</p> : null}
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {loading ? (
+          {authLoading || loading ? (
             <p role="status" className="flex items-center gap-2 text-sm font-semibold text-[var(--uki-text)]">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando inventario custodial…
             </p>
-          ) : assets.length === 0 ? (
+          ) : !user?.walletAddress ? (
+            <p className="text-sm font-semibold text-[var(--uki-text)]">
+              Conecta y autentica tu wallet EVM para consultar tus Cukies y gestionar el staking NFT.
+            </p>
+          ) : status && assets.length === 0 ? (
             <p className="text-sm font-semibold text-[var(--uki-muted)]">No hay Cukies Originales disponibles o depositados para esta wallet.</p>
+          ) : !status ? (
+            <p role="alert" className="text-sm font-semibold text-amber-200">
+              No se pudo verificar el inventario custodial. Los depósitos permanecen bloqueados; la recuperación on-chain sigue disponible.
+            </p>
           ) : assets.map((asset) => {
             const working = activeAssetId === asset.assetId;
             return (
