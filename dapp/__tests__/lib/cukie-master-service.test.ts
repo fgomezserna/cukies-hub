@@ -14,7 +14,9 @@ import {
   createCukieMasterWaitlistJobs,
 } from '@/lib/uki-economy/cukie-master/jobs';
 import {
+  EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
   EXPECTED_NFT_CURSOR_IDS,
+  cukieMasterNftHealthScope,
   expectedBscChainId,
   operationalIndexerHealthWarnings,
   projectionSafetyWarnings,
@@ -464,6 +466,7 @@ describe('Cukie Master canonical sources', () => {
         bootstrapStartBlock: 1,
         contractDeploymentBlock: 1,
         contractCodeHash: `0x${'1'.repeat(64)}`,
+        contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
         contractConfigHash: `0x${'2'.repeat(64)}`,
       }]),
     );
@@ -487,6 +490,7 @@ describe('Cukie Master canonical sources', () => {
       verifiedChainId: 56,
       contractCodeHash: `0x${'1'.repeat(64)}`,
       contractDeploymentBlock: 1,
+      contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
       contractConfigHash: `0x${'2'.repeat(64)}`,
     }));
     expect(operationalIndexerHealthWarnings({
@@ -571,6 +575,7 @@ describe('Cukie Master canonical sources', () => {
         bootstrapStartBlock: 1,
         contractDeploymentBlock: 1,
         contractCodeHash: `0x${'1'.repeat(64)}`,
+        contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
         contractConfigHash: `0x${'2'.repeat(64)}`,
       }]),
     );
@@ -589,6 +594,68 @@ describe('Cukie Master canonical sources', () => {
       expect.stringContaining('MARKETPLACE:TokenOnSale'),
       expect.stringContaining('BRIDGE:JumpOutBridge'),
     ]));
+  });
+
+  it('uses TOKEN_V2 for custodial NFT health and never accepts TOKEN as a substitute', () => {
+    expect(cukieMasterNftHealthScope('custodial')).toEqual({
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+      cursorIds: EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
+    });
+    const contractAddress = '0x00000000000000000000000000000000000000cc';
+    const deploymentTxHash = `0x${'4'.repeat(64)}`;
+    const expectedContractConfigs = {
+      TOKEN_V2: {
+        contractAddress,
+        bootstrapStartBlock: 10,
+        contractDeploymentBlock: 10,
+        contractCodeHash: `0x${'1'.repeat(64)}`,
+        contractDeploymentTxHash: deploymentTxHash,
+        contractConfigHash: `0x${'2'.repeat(64)}`,
+      },
+    };
+    const cursor = {
+      chain: 'BSC',
+      contractAlias: 'TOKEN',
+      contractAddress,
+      eventName: 'Transfer',
+      updatedAt: now,
+      safeBlock: 100,
+      nextBlock: 101,
+      bootstrapStatus: 'verified',
+      bootstrapStartBlock: 10,
+      bootstrapVerifiedAt: now,
+      verifiedChainId: 97,
+      contractCodeHash: `0x${'1'.repeat(64)}`,
+      contractDeploymentBlock: 10,
+      contractDeploymentTxHash: deploymentTxHash,
+      contractConfigHash: `0x${'2'.repeat(64)}`,
+    };
+    const input = {
+      checkedAt: now,
+      latestSuccessEndedAt: now,
+      latestErrorEndedAt: null,
+      checkpoint: {
+        checkedAt: now,
+        safeBlockNumber: 100,
+        safeBlockHash: `0x${'a'.repeat(64)}`,
+      },
+      expectedChainId: 97 as const,
+      expectedContractConfigs,
+      expectedCursorIds: ['TOKEN_V2:Transfer'] as const,
+    };
+    expect(operationalIndexerHealthWarnings({ ...input, cursors: [cursor] })).toContain(
+      'Cursor BSC TOKEN_V2:Transfer ausente, stale, sin verificacion o con backlog.',
+    );
+    expect(operationalIndexerHealthWarnings({
+      ...input,
+      cursors: [{ ...cursor, contractAlias: 'TOKEN_V2', contractDeploymentTxHash: `0x${'5'.repeat(64)}` }],
+    })).toContain(
+      'Cursor BSC TOKEN_V2:Transfer ausente, stale, sin verificacion o con backlog.',
+    );
+    expect(operationalIndexerHealthWarnings({
+      ...input,
+      cursors: [{ ...cursor, contractAlias: 'TOKEN_V2' }],
+    })).toEqual([]);
   });
 
   it('marks NFT sources incomplete for unknown attributes but accepts quiet old assets', async () => {
@@ -643,6 +710,7 @@ describe('Cukie Master canonical sources', () => {
       bootstrapSafeBlockHash: `0x${'a'.repeat(64)}`,
       verifiedChainId: 56,
       contractCodeHash: `0x${'1'.repeat(64)}`,
+      contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
       contractConfigHash: `0x${'2'.repeat(64)}`,
     })).toBe(true);
     expect(stakingBalancesMatchState([], { _id: 'staking', totalStakedRaw: '0' })).toBe(false);
@@ -665,6 +733,7 @@ describe('Cukie Master canonical sources', () => {
       bootstrapStartBlock: 10,
       contractDeploymentBlock: 10,
       contractCodeHash: `0x${'1'.repeat(64)}`,
+      contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
       contractConfigHash: `0x${'2'.repeat(64)}`,
     };
     const state = {
@@ -681,6 +750,7 @@ describe('Cukie Master canonical sources', () => {
       bootstrapStartBlock: 10,
       contractDeploymentBlock: 10,
       contractCodeHash: expected.contractCodeHash,
+      contractDeploymentTxHash: expected.contractDeploymentTxHash,
       contractConfigHash: expected.contractConfigHash,
     };
     expect(stakingMaterializationMatchesState(state, expected, 56)).toBe(true);

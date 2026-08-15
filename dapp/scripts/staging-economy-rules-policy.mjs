@@ -26,14 +26,18 @@ const SOURCE_ENVIRONMENT_KEYS = Object.freeze({
   UKI_STAKING: 'CHAIN_INDEXER_UKI_STAKING_ADDRESS',
   VESTING_VAULT: 'CHAIN_INDEXER_VESTING_VAULT_ADDRESS',
   TOKEN: 'CHAIN_INDEXER_TOKEN_ADDRESS',
+  TOKEN_V2: 'CHAIN_INDEXER_TOKEN_V2_ADDRESS',
   MARKETPLACE: 'CHAIN_INDEXER_MARKETPLACE_ADDRESS',
   BRIDGE: 'CHAIN_INDEXER_BRIDGE_ADDRESS',
+  CUKIE_MASTER_NFT_VAULT: 'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS',
+  CUKIE_POOL_NFT_VAULT: 'CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS',
 });
 
 export const STAGING_ECONOMY_CURSOR_EVENTS = Object.freeze({
   UKI_STAKING: ['Staked', 'Unstaked'],
   VESTING_VAULT: ['VestingCreated', 'TokensReleased'],
   TOKEN: ['Transfer', 'CukieMetadataConfigured'],
+  TOKEN_V2: ['Transfer', 'CukieMetadataConfigured'],
   MARKETPLACE: [
     'TokenOnSale',
     'TokenBought',
@@ -41,6 +45,21 @@ export const STAGING_ECONOMY_CURSOR_EVENTS = Object.freeze({
     'MarketTokenPriceChanged',
   ],
   BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
+  CUKIE_MASTER_NFT_VAULT: [
+    'CukieMasterCollectionAllowedUpdated',
+    'CukieMasterDeposited',
+    'CukieMasterWithdrawn',
+    'CukieMasterUntrackedERC721Recovered',
+  ],
+  CUKIE_POOL_NFT_VAULT: [
+    'CukiePoolCollectionAllowedUpdated',
+    'CukiePoolCalendarVersionScheduled',
+    'CukiePoolDeposited',
+    'CukiePoolExitRequested',
+    'CukiePoolWithdrawableAtAdvanced',
+    'CukiePoolWithdrawn',
+    'CukiePoolUntrackedERC721Recovered',
+  ],
 });
 
 const TEST_ONLY_DESTINATIONS = Object.freeze({
@@ -217,6 +236,11 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
       `${alias}.contractConfigHash`,
       blockers,
     );
+    const deploymentTxHash = canonicalHash(
+      first?.contractDeploymentTxHash,
+      `${alias}.contractDeploymentTxHash`,
+      blockers,
+    );
     const deploymentBlock = first?.contractDeploymentBlock;
     if (!Number.isSafeInteger(deploymentBlock) || deploymentBlock < 0) {
       blockers.push(`${alias}.contractDeploymentBlock must be a non-negative integer`);
@@ -234,6 +258,7 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
         || cursor.verifiedChainId !== 97
         || cursor.contractCodeHash?.toLowerCase() !== runtimeCodeHash
         || cursor.contractConfigHash?.toLowerCase() !== configHash
+        || cursor.contractDeploymentTxHash?.toLowerCase() !== deploymentTxHash
         || cursor.contractDeploymentBlock !== deploymentBlock
         || cursor.bootstrapStartBlock !== deploymentBlock
         || !(cursor.bootstrapVerifiedAt instanceof Date)
@@ -247,8 +272,8 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
       }
     }
 
-    if (runtimeCodeHash && configHash && Number.isSafeInteger(deploymentBlock)) {
-      identities[alias] = { runtimeCodeHash, configHash, deploymentBlock };
+    if (runtimeCodeHash && configHash && deploymentTxHash && Number.isSafeInteger(deploymentBlock)) {
+      identities[alias] = { runtimeCodeHash, configHash, deploymentTxHash, deploymentBlock };
     }
   }
 
@@ -267,7 +292,8 @@ function buildRewardRule(activeFrom, now) {
     runCredits: {
       unitScale: 10,
       totalUnits: 100,
-      weeklyReserveUnits: 25,
+      weeklyReserveUnits: 20,
+      ambassadorReserveUnits: 5,
       convertibleUnits: 75,
     },
     settlementBps: {
@@ -294,14 +320,19 @@ function buildRewardRule(activeFrom, now) {
     },
     emissionBudget: {
       programStartsAt: activeFrom,
-      dayBoundarySecondUtc: 0,
+      dayBoundarySecondUtc: 14 * 60 * 60,
       lateReservationGraceSeconds: 86_400,
       dailyCapRaw: '500000000000000000000000',
       lifetimeCapRaw: '450000000000000000000000000',
       unusedDailyCapacity: 'expires',
       overflowPolicy: 'block',
     },
-    cukiePool: { cumulativeTierCount: 6 },
+    cukiePool: {
+      cumulativeTierCount: 6,
+      cumulativeTierBps: /** @type {[number, number, number, number, number, number]} */ (
+        [4_500, 2_000, 1_500, 1_200, 700, 100]
+      ),
+    },
     undistributedBps: {
       treasury: 8_000,
       marketing: 500,

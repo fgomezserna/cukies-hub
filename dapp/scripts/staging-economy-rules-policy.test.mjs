@@ -11,8 +11,11 @@ const SOURCE_ADDRESSES = Object.freeze({
   UKI_STAKING: '0x1111111111111111111111111111111111111111',
   VESTING_VAULT: '0x2222222222222222222222222222222222222222',
   TOKEN: '0x3333333333333333333333333333333333333333',
+  TOKEN_V2: '0x6666666666666666666666666666666666666666',
   MARKETPLACE: '0x4444444444444444444444444444444444444444',
   BRIDGE: '0x5555555555555555555555555555555555555555',
+  CUKIE_MASTER_NFT_VAULT: '0x7777777777777777777777777777777777777777',
+  CUKIE_POOL_NFT_VAULT: '0x8888888888888888888888888888888888888888',
 });
 
 function environment(overrides = {}) {
@@ -27,7 +30,7 @@ function environment(overrides = {}) {
     CHAIN_INDEXER_MONGO_URL:
       'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CHAIN_INDEXER_CONTRACT_ALIASES:
-      'PRESALE,UKI_STAKING,VESTING_VAULT,TOKEN,MARKETPLACE,BRIDGE,REWARDS_DISTRIBUTOR',
+      'PRESALE,UKI_STAKING,VESTING_VAULT,TOKEN,TOKEN_V2,MARKETPLACE,BRIDGE,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT,REWARDS_DISTRIBUTOR',
     CHAIN_INDEXER_CUKIE_MASTER_ENABLED: 'false',
     COMPETITION_CREDITS_RUNTIME_ENABLED: 'false',
     GAME_ECONOMY_RUNTIME_ENABLED: 'false',
@@ -36,8 +39,11 @@ function environment(overrides = {}) {
     CHAIN_INDEXER_UKI_STAKING_ADDRESS: SOURCE_ADDRESSES.UKI_STAKING,
     CHAIN_INDEXER_VESTING_VAULT_ADDRESS: SOURCE_ADDRESSES.VESTING_VAULT,
     CHAIN_INDEXER_TOKEN_ADDRESS: SOURCE_ADDRESSES.TOKEN,
+    CHAIN_INDEXER_TOKEN_V2_ADDRESS: SOURCE_ADDRESSES.TOKEN_V2,
     CHAIN_INDEXER_MARKETPLACE_ADDRESS: SOURCE_ADDRESSES.MARKETPLACE,
     CHAIN_INDEXER_BRIDGE_ADDRESS: SOURCE_ADDRESSES.BRIDGE,
+    CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS: SOURCE_ADDRESSES.CUKIE_MASTER_NFT_VAULT,
+    CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS: SOURCE_ADDRESSES.CUKIE_POOL_NFT_VAULT,
     ...overrides,
   };
 }
@@ -47,6 +53,7 @@ function cursors(now = new Date('2026-08-06T12:00:00.000Z')) {
     UKI_STAKING: ['Staked', 'Unstaked'],
     VESTING_VAULT: ['VestingCreated', 'TokensReleased'],
     TOKEN: ['Transfer', 'CukieMetadataConfigured'],
+    TOKEN_V2: ['Transfer', 'CukieMetadataConfigured'],
     MARKETPLACE: [
       'TokenOnSale',
       'TokenBought',
@@ -54,6 +61,21 @@ function cursors(now = new Date('2026-08-06T12:00:00.000Z')) {
       'MarketTokenPriceChanged',
     ],
     BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
+    CUKIE_MASTER_NFT_VAULT: [
+      'CukieMasterCollectionAllowedUpdated',
+      'CukieMasterDeposited',
+      'CukieMasterWithdrawn',
+      'CukieMasterUntrackedERC721Recovered',
+    ],
+    CUKIE_POOL_NFT_VAULT: [
+      'CukiePoolCollectionAllowedUpdated',
+      'CukiePoolCalendarVersionScheduled',
+      'CukiePoolDeposited',
+      'CukiePoolExitRequested',
+      'CukiePoolWithdrawableAtAdvanced',
+      'CukiePoolWithdrawn',
+      'CukiePoolUntrackedERC721Recovered',
+    ],
   };
   return Object.entries(events).flatMap(([alias, eventNames], aliasIndex) =>
     eventNames.map((eventName) => ({
@@ -67,7 +89,8 @@ function cursors(now = new Date('2026-08-06T12:00:00.000Z')) {
       verifiedChainId: 97,
       contractCodeHash: `0x${String(aliasIndex + 1).repeat(64)}`,
       contractDeploymentBlock: 100 + aliasIndex,
-      contractConfigHash: `0x${String(aliasIndex + 5).repeat(64)}`,
+      contractDeploymentTxHash: `0x${'a'.repeat(64)}`,
+      contractConfigHash: `0x${(aliasIndex + 5).toString(16).slice(-1).repeat(64)}`,
       updatedAt: now,
       safeBlock: 1_000,
       nextBlock: 1_001,
@@ -82,7 +105,7 @@ test('builds the immutable staging-test-v1 ruleset with the approved caps', () =
   assert.equal(rules.reward.version, 'rewards-staging-test-v1');
   assert.equal(rules.reward.activeFrom.toISOString(), '2026-08-10T00:00:00.000Z');
   assert.equal(rules.reward.emissionBudget.programStartsAt.toISOString(), '2026-08-10T00:00:00.000Z');
-  assert.equal(rules.reward.emissionBudget.dayBoundarySecondUtc, 0);
+  assert.equal(rules.reward.emissionBudget.dayBoundarySecondUtc, 14 * 60 * 60);
   assert.equal(rules.reward.emissionBudget.lateReservationGraceSeconds, 86_400);
   assert.equal(rules.reward.emissionBudget.dailyCapRaw, '500000000000000000000000');
   assert.equal(rules.reward.emissionBudget.lifetimeCapRaw, '450000000000000000000000000');
@@ -152,5 +175,27 @@ test('rejects an incomplete or unverified NFT cursor set before creating rules',
   assert.throws(
     () => buildStagingEconomyRuleSet({ environment: environment(), cursors: unverified }),
     /BRIDGE:JumpInBridge is not a fresh verified chain-97 cursor/,
+  );
+
+  const wrongTokenV2Deployment = cursors();
+  wrongTokenV2Deployment.find(
+    (cursor) => cursor.contractAlias === 'TOKEN_V2' && cursor.eventName === 'Transfer',
+  ).contractDeploymentTxHash = `0x${'b'.repeat(64)}`;
+  assert.throws(
+    () => buildStagingEconomyRuleSet({
+      environment: environment(),
+      cursors: wrongTokenV2Deployment,
+    }),
+    /TOKEN_V2:Transfer is not a fresh verified chain-97 cursor/,
+  );
+});
+
+test('rejects TOKEN_V2 when its address is absent even if legacy TOKEN is configured', () => {
+  assert.throws(
+    () => buildStagingEconomyRuleSet({
+      environment: environment({ CHAIN_INDEXER_TOKEN_V2_ADDRESS: '' }),
+      cursors: cursors(),
+    }),
+    /CHAIN_INDEXER_TOKEN_V2_ADDRESS must be a non-zero EVM address/,
   );
 });

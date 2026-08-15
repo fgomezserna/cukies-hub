@@ -50,7 +50,7 @@ export type NftInventoryBlocker =
   | 'soft_stake_required';
 
 export type NftAssetSourceRef = {
-  source: 'cukies' | 'nft_asset_locks';
+  source: 'cukies' | 'nft_asset_locks' | 'cukie_master_nft_positions';
   collection: string;
   documentId: string | null;
   tokenId?: string | null;

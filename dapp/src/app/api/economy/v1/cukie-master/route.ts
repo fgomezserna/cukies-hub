@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { verifyWalletAuth } from '@/lib/auth-utils';
+import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 import {
   getCukieMasterWalletStatus,
   getCukieMasterNftInventory,
@@ -101,6 +102,19 @@ export async function GET(request: NextRequest) {
         },
         totals: status.totals,
         nftInventory,
+        nftCustody: {
+          mode: ukiNftVaults.mode.cukieMaster,
+          chainId: ukiNftVaults.chainId,
+          vaultAddress: ukiNftVaults.cukieMasterNftVaultAddress,
+          collectionAddresses: ukiNftVaults.collectionAddresses,
+          recoveryCollectionAddresses: ukiNftVaults.recoveryCollectionAddresses,
+          explorerBaseUrl: ukiNftVaults.explorerBaseUrl,
+          indexer: {
+            status: status.routes.nft.sourceCompleteness.complete
+              ? 'ready'
+              : 'unavailable',
+          },
+        },
       },
     });
     response.headers.set('Cache-Control', 'private, no-store, max-age=0');
@@ -153,6 +167,19 @@ function parsePostBody(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  if (ukiNftVaults.mode.cukieMaster === 'invalid') {
+    return NextResponse.json(
+      { status: 'error', code: 'CUKIE_MASTER_NFT_VAULT_CONFIG_INVALID' },
+      { status: 503 },
+    );
+  }
+  if (ukiNftVaults.mode.cukieMaster === 'custodial') {
+    return NextResponse.json(
+      { status: 'error', code: 'CUKIE_MASTER_NFT_ONCHAIN_REQUIRED' },
+      { status: 410 },
+    );
+  }
+
   try {
     const contentLength = request.headers.get('content-length');
     if (contentLength && (!/^\d+$/.test(contentLength) || Number(contentLength) > 16_384)) {

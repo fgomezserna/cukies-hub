@@ -21,6 +21,13 @@ export const ECONOMY_COLLECTIONS = [
   'cukie_master_recalculation_jobs',
   'cukie_master_runtime_runs',
   'cukie_master_runtime_state',
+  'cukie_master_nft_positions',
+  'cukie_pool_nft_vault_positions',
+  'nft_vault_collections',
+  'cukie_pool_calendar_versions',
+  'cukie_pool_vault_asset_leases',
+  'cukie_pool_vault_period_usage',
+  'nft_vault_recovery_audit',
   'uki_staking_positions',
   'uki_staking_state',
   'uki_vesting_events',
@@ -315,6 +322,86 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
   {
     collection: 'cukie_master_slot_events',
     keys: { walletNormalized: 1, createdAt: -1 },
+  },
+  {
+    collection: 'cukie_master_nft_positions',
+    keys: { assetId: 1, depositEpoch: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_master_nft_positions',
+    keys: { assetId: 1, lifecycleOpen: 1 },
+    options: { unique: true, partialFilterExpression: { lifecycleOpen: true } },
+  },
+  {
+    collection: 'cukie_master_nft_positions',
+    keys: { beneficiaryNormalized: 1, lifecycleOpen: 1, updatedAt: -1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { assetId: 1, depositEpoch: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { assetId: 1, lifecycleOpen: 1 },
+    options: { unique: true, partialFilterExpression: { lifecycleOpen: true } },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { beneficiaryNormalized: 1, lifecycleOpen: 1, updatedAt: -1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { lifecycleOpen: 1, activationAt: 1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { lifecycleOpen: 1, withdrawableAt: 1 },
+  },
+  {
+    collection: 'nft_vault_collections',
+    keys: { vaultAlias: 1, vaultAddressNormalized: 1, collectionAddressNormalized: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_pool_calendar_versions',
+    keys: { chainId: 1, vaultAddressNormalized: 1, calendarVersion: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { positionId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_lease_position_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { assignmentId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_lease_assignment_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { sessionId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_lease_session_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { expiresAt: 1, _id: 1 },
+    options: { name: 'cukie_pool_vault_lease_expiry_audit' },
+  },
+  {
+    collection: 'cukie_pool_vault_period_usage',
+    keys: { assetId: 1, depositEpoch: 1, periodId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_usage_epoch_period_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_period_usage',
+    keys: { periodId: 1, _id: 1 },
+    options: { name: 'cukie_pool_vault_usage_period_audit' },
+  },
+  {
+    collection: 'nft_vault_recovery_audit',
+    keys: { assetId: 1, 'evidence.blockNumber': -1 },
   },
   {
     collection: 'cukie_pool_positions',

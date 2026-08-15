@@ -53,7 +53,7 @@ describe("RewardRuleService", () => {
       payload: {
         emissionBudget: {
           programStartsAt: expect.any(Date),
-          dayBoundarySecondUtc: 0,
+          dayBoundarySecondUtc: 14 * 60 * 60,
           unusedDailyCapacity: "expires",
           overflowPolicy: "block",
         },

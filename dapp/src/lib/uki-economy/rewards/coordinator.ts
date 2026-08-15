@@ -162,6 +162,7 @@ export function assertSettlementResourceBindings(
         `La asignacion del pool no liga exactamente la session ${game.sessionId}.`,
       );
     }
+    if (assignment.kind === "seiku") return "seiku" as const;
     return assignment.generation === "original"
       ? "pool_original" as const
       : "pool_second_plus" as const;

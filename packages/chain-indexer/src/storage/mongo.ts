@@ -111,6 +111,35 @@ export class IndexerStore {
       this.db.collection('chain_indexer_runs').createIndex({ startedAt: -1 }),
       this.db.collection('cukies').createIndex({ state: 1, network: 1, ownerNormalized: 1, timeStamp: -1 }),
       this.db.collection('cukies').createIndex({ ownerNormalized: 1, state: 1, network: 1 }),
+      this.db.collection('cukies').createIndex(
+        { chainId: 1, collectionAddressNormalized: 1, tokenId: 1 },
+        {
+          name: 'cukies_bsc_asset_identity_unique',
+          unique: true,
+          partialFilterExpression: {
+            chainId: { $type: 'number' },
+            collectionAddressNormalized: { $type: 'string' },
+            tokenId: { $exists: true },
+          },
+        },
+      ),
+      this.db.collection('nft_vault_collections').createIndex(
+        { chainId: 1, vaultAlias: 1, vaultAddressNormalized: 1, collectionAddressNormalized: 1 },
+        { unique: true },
+      ),
+      this.db.collection('cukie_master_nft_positions').createIndex(
+        { chainId: 1, beneficiaryNormalized: 1, lifecycleOpen: 1, assetId: 1 },
+      ),
+      this.db.collection('cukie_pool_nft_vault_positions').createIndex(
+        { chainId: 1, beneficiaryNormalized: 1, lifecycleOpen: 1, assetId: 1 },
+      ),
+      this.db.collection('cukie_pool_calendar_versions').createIndex(
+        { chainId: 1, vaultAddressNormalized: 1, calendarVersion: 1 },
+        { unique: true },
+      ),
+      this.db.collection('nft_vault_recovery_audit').createIndex(
+        { chainId: 1, vaultAlias: 1, assetId: 1, 'evidence.blockNumber': -1 },
+      ),
       this.db.collection('tx_nfts').createIndex({ tokenId: 1, timestampMs: -1 }),
       this.db.collection('point_transactions').createIndex({ addressNormalized: 1, chain: 1, type: 1, timestampMs: -1 }),
       this.db.collection('point_transactions').createIndex({ chain: 1, type: 1, timestampMs: -1 }),

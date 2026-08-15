@@ -105,7 +105,7 @@ describe('public reward claimable', () => {
       cukieSource: 'own',
       ranking: 5,
       creditCostUnits: 100,
-      weeklyReserveUnits: 25,
+      weeklyReserveUnits: 20,
     });
     const persisted = await service.persistAllocationSet({
       periodId: '2026-W28',

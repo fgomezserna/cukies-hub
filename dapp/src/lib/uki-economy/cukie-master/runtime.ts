@@ -40,10 +40,12 @@ import {
   type RuntimeRouteBinding,
 } from './runtime-policy';
 import { createMongoCukieMasterRepository } from './repository';
-import { recalculateCukieMasterWallet } from './service';
+import { recalculateCukieMasterRoute } from './service';
 import {
+  fullReconciliationRoutesForSource,
   recalculationFenceFilter,
   recalculationRetryBackoffMs,
+  routedRecalculationJobId,
   type CukieMasterRecalculationJob,
 } from './runtime-queue';
 import type { CukieMasterRouteRound } from './types';
@@ -292,6 +294,7 @@ async function claimRecalculationJob(
   const jobs = db.collection<CukieMasterRecalculationJob>(QUEUE_COLLECTION);
   return jobs.findOneAndUpdate(
     {
+      route: { $in: ['uki', 'nft'] },
       $or: [
         { status: { $in: ['pending', 'failed'] }, availableAt: { $lte: now } },
         { status: 'processing', leaseExpiresAt: { $lte: now } },
@@ -339,8 +342,9 @@ async function processRecalculationQueue(input: {
     const fence = recalculationFenceFilter(job, input.workerId);
     try {
       const recalculationTime = validClockDate(input.clock);
-      await recalculateCukieMasterWallet(
+      await recalculateCukieMasterRoute(
         job.walletNormalized,
+        job.route,
         recalculationTime,
         `outbox:${job._id}`,
       );
@@ -754,28 +758,36 @@ async function enqueueFullReconciliationBatch(
     .limit(FULL_RECONCILIATION_BATCH_SIZE)
     .toArray();
   const wallets = normalizedWalletsFromSourcePage(documents, source.walletField);
+  const routes = fullReconciliationRoutesForSource(source.id);
   const queue = db.collection<CukieMasterRecalculationJob>(QUEUE_COLLECTION);
   let enqueued = 0;
   for (const walletNormalized of wallets) {
-    const id = fullReconciliationJobId(cycleId, walletNormalized);
-    const result = await queue.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          walletNormalized,
-          status: 'pending',
-          sourceType: 'full_reconciliation',
-          availableAt: now,
-          attempts: 0,
-          fenceToken: 0,
-          createdAt: now,
-          updatedAt: now,
+    for (const route of routes) {
+      const id = routedRecalculationJobId(
+        fullReconciliationJobId(cycleId, walletNormalized),
+        route,
+      );
+      const result = await queue.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            walletNormalized,
+            route,
+            status: 'pending',
+            sourceType: 'full_reconciliation',
+            sourceId: source.id,
+            availableAt: now,
+            attempts: 0,
+            fenceToken: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
-      },
-      { upsert: true },
-    );
-    enqueued += result.upsertedCount;
+        { upsert: true },
+      );
+      enqueued += result.upsertedCount;
+    }
   }
 
   const sourceDone = documents.length < FULL_RECONCILIATION_BATCH_SIZE;

@@ -27,8 +27,6 @@ export type RewardCategory =
   | "credit_pool_daily"
   | "cukie_pool_original_distribution"
   | "cukie_pool_second_plus_distribution"
-  | "cukie_pool_original_carry"
-  | "cukie_pool_second_plus_carry"
   | "treasury"
   | "marketing"
   | "development"
@@ -40,6 +38,7 @@ export type RewardCategory =
  */
 export type RewardAccrualCategory =
   | "weekly_prize_pool"
+  | "ambassador_program_pending"
   | "credit_pool_weekly"
   | "cukie_pool_original_weekly"
   | "cukie_pool_second_plus_weekly"
@@ -58,6 +57,7 @@ export type RewardRule = {
     unitScale: number;
     totalUnits: number;
     weeklyReserveUnits: number;
+    ambassadorReserveUnits: number;
     convertibleUnits: number;
   };
   settlementBps: {
@@ -75,6 +75,8 @@ export type RewardRule = {
   emissionBudget: RewardEmissionBudgetConfig;
   cukiePool: {
     cumulativeTierCount: 6;
+    /** Comun, No Comun+, Raro+, Epico+, Legendario+, Goat. */
+    cumulativeTierBps: [number, number, number, number, number, number];
   };
   undistributedBps: {
     treasury: number;
@@ -268,7 +270,7 @@ export type RewardEmissionBudgetEvent = {
 };
 
 export type CreditSourceKind = "own" | "pool";
-export type CukieSourceKind = "own" | "pool_original" | "pool_second_plus";
+export type CukieSourceKind = "own" | "pool_original" | "pool_second_plus" | "seiku";
 
 export type SettlementRewardInput = {
   periodId: string;
@@ -390,7 +392,6 @@ export type CukiePoolParticipant = {
 export type CukiePoolDistributionInput = {
   generation: CukiePoolGeneration;
   sourcePoolRaw: string;
-  carryWallet: string;
   participants: CukiePoolParticipant[];
 };
 

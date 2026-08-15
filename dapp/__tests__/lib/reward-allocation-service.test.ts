@@ -25,7 +25,7 @@ function fixture() {
     cukieSource: "own",
     ranking: 5,
     creditCostUnits: 100,
-    weeklyReserveUnits: 25,
+    weeklyReserveUnits: 20,
   });
   const input = {
     periodId: "2026-W28",
@@ -69,6 +69,7 @@ describe("RewardAllocationService", () => {
     expect(repository.state.emissionBudgetDays[0].reservedRaw).toBe(input.sourceTotalRaw);
     expect(first.accruals).toEqual(expect.arrayContaining([
       expect.objectContaining({ category: "weekly_prize_pool", status: "accrued" }),
+      expect.objectContaining({ category: "ambassador_program_pending", status: "accrued" }),
       expect.objectContaining({ category: "credit_pool_weekly", status: "accrued" }),
     ]));
     expect(repository.state.sourceManifests[0]).toMatchObject({
@@ -89,11 +90,15 @@ describe("RewardAllocationService", () => {
     const result = await service.persistAllocationSet({
       periodId: "2026-W28",
       sourceId: "game-session:zero",
-      sourceTotalRaw: "2500",
+      sourceTotalRaw: "10000",
       expectedRuleVersion: rule.version,
       ruleEffectiveAt: NOW,
       allocations: [],
-      accruals: [{ category: "weekly_prize_pool", amountRaw: "2500" }],
+      accruals: [
+        { category: "weekly_prize_pool", amountRaw: "2000" },
+        { category: "ambassador_program_pending", amountRaw: "500" },
+        { category: "undistributed_pending", amountRaw: "7500" },
+      ],
       calculation: {
         jobRunId: "reward-job:zero",
         kind: "settlement",
@@ -105,18 +110,35 @@ describe("RewardAllocationService", () => {
     expect(result).toMatchObject({
       status: "allocated",
       allocations: [],
-      accruals: [expect.objectContaining({
-        category: "weekly_prize_pool",
-        amountRaw: "2500",
-        status: "accrued",
-      })],
+      accruals: expect.arrayContaining([
+        expect.objectContaining({
+          category: "weekly_prize_pool",
+          amountRaw: "2000",
+          status: "accrued",
+        }),
+        expect.objectContaining({
+          category: "ambassador_program_pending",
+          amountRaw: "500",
+          status: "accrued",
+        }),
+        expect.objectContaining({
+          category: "undistributed_pending",
+          amountRaw: "7500",
+          status: "accrued",
+        }),
+      ]),
     });
     expect(repository.state.sourceManifests[0]).toMatchObject({
-      sourceTotalRaw: "2500",
+      sourceTotalRaw: "10000",
       claimableTotalRaw: "0",
-      accrualTotalRaw: "2500",
+      accrualTotalRaw: "10000",
       allocationCount: 0,
-      accrualCount: 1,
+      accrualCount: 3,
+    });
+    expect(repository.state.emissionBudgetEvents[0]).toMatchObject({
+      sourceId: "game-session:zero",
+      sourceTotalRaw: "10000",
+      status: "reserved",
     });
   });
 

@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 
 import {
   STAGING_ECONOMY_CONFIRMATION,
+  STAGING_ECONOMY_CURSOR_EVENTS,
   STAGING_ECONOMY_RULESET,
   StagingEconomyRulesError,
   buildStagingEconomyRuleSet,
@@ -175,7 +176,7 @@ async function main() {
     await client.connect();
     const db = client.db(process.env.CHAIN_INDEXER_DB_NAME);
     const cursors = await db.collection('chain_cursors').find({
-      contractAlias: { $in: ['UKI_STAKING', 'VESTING_VAULT', 'TOKEN', 'MARKETPLACE', 'BRIDGE'] },
+      contractAlias: { $in: Object.keys(STAGING_ECONOMY_CURSOR_EVENTS) },
     }).toArray();
     const now = new Date();
     const rules = buildStagingEconomyRuleSet({ environment: process.env, cursors, now });

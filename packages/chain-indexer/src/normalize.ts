@@ -258,6 +258,57 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (
+    contractAlias === 'CUKIE_MASTER_NFT_VAULT'
+    || contractAlias === 'CUKIE_POOL_NFT_VAULT'
+  ) {
+    const collection = getString(args.collection);
+    const beneficiary = getString(args.beneficiary);
+    const recipient = getString(args.recipient);
+    const lifecycle = eventName === 'CukieMasterDeposited'
+      ? 'custodied'
+      : eventName === 'CukieMasterWithdrawn'
+        ? 'withdrawn'
+        : eventName === 'CukiePoolDeposited'
+          ? 'pending_activation'
+          : eventName === 'CukiePoolExitRequested'
+            ? 'exit_requested'
+            : eventName === 'CukiePoolWithdrawn'
+              ? 'withdrawn'
+              : null;
+
+    return toJsonRecord({
+      ...base,
+      collection,
+      collectionNormalized: normalizeAddress(chain, collection),
+      beneficiary,
+      beneficiaryNormalized: normalizeAddress(chain, beneficiary),
+      recipient,
+      recipientNormalized: normalizeAddress(chain, recipient),
+      allowed: typeof args.allowed === 'boolean' ? args.allowed : null,
+      depositEpochRaw: getString(args.depositEpoch),
+      depositedAtRaw: getString(args.depositedAt),
+      withdrawnAtRaw: getString(args.withdrawnAt),
+      recoveredAtRaw: getString(args.recoveredAt),
+      requestedAtRaw: getString(args.requestedAt),
+      depositPeriodIdRaw: getString(args.depositPeriodId),
+      activationAtRaw: getString(args.activationAt),
+      activationPeriodIdRaw: getString(args.activationPeriodId),
+      exitPeriodIdRaw: getString(args.exitPeriodId),
+      withdrawableAtRaw: getString(args.withdrawableAt),
+      previousWithdrawableAtRaw: getString(args.previousWithdrawableAt),
+      newWithdrawableAtRaw: getString(args.newWithdrawableAt),
+      calendarVersionRaw: getString(args.calendarVersion),
+      versionRaw: getString(args.version),
+      effectiveAtRaw: getString(args.effectiveAt),
+      firstCutoffAtRaw: getString(args.firstCutoffAt),
+      firstPeriodIdRaw: getString(args.firstPeriodId),
+      periodAnchorSecondsRaw: getString(args.periodAnchorSeconds),
+      lifecycle,
+      txType: eventName,
+    });
+  }
+
   return toJsonRecord({
     ...base,
     contractAlias,

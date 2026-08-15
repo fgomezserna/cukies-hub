@@ -118,3 +118,32 @@ test('verified BSC identity applies the same exact evidence to NFT aliases', () 
   assert.equal(identity?.startBlock, 456);
   assert.match(identity?.configHash ?? '', /^0x[0-9a-f]{64}$/);
 });
+
+test('TOKEN_V2 requires its own complete deployment identity and never falls back to TOKEN', () => {
+  assert.throws(
+    () => resolveVerifiedBscContractIdentity({
+      alias: 'TOKEN_V2',
+      chainId: 97,
+      address: undefined,
+      startBlock: 456,
+      deploymentBlock: 456,
+      deploymentTxHash: `0x${'5'.repeat(64)}`,
+      runtimeCodeHash: `0x${'6'.repeat(64)}`,
+      requested: true,
+    }),
+    /TOKEN_V2 fue solicitado sin una address BSC configurada/,
+  );
+  const identity = resolveVerifiedBscContractIdentity({
+    alias: 'TOKEN_V2',
+    chainId: 97,
+    address: `0x${'7'.repeat(40)}`,
+    startBlock: 789,
+    deploymentBlock: 789,
+    deploymentTxHash: `0x${'8'.repeat(64)}`,
+    runtimeCodeHash: `0x${'9'.repeat(64)}`,
+    requested: true,
+  });
+  assert.equal(identity?.alias, 'TOKEN_V2');
+  assert.equal(identity?.address, `0x${'7'.repeat(40)}`);
+  assert.equal(identity?.startBlock, 789);
+});

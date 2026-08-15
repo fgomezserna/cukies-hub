@@ -25,6 +25,10 @@ describe('economy indexes', () => {
         'cukie_pool_assignments:{"sessionId":1}',
         'cukie_pool_assignments:{"assignmentId":1}',
         'cukie_pool_assignments:{"idempotencyKey":1}',
+        'cukie_pool_vault_asset_leases:{"positionId":1}',
+        'cukie_pool_vault_asset_leases:{"assignmentId":1}',
+        'cukie_pool_vault_asset_leases:{"sessionId":1}',
+        'cukie_pool_vault_period_usage:{"assetId":1,"depositEpoch":1,"periodId":1}',
         'cukie_pool_events:{"eventId":1}',
         'cukie_pool_events:{"idempotencyKey":1}',
         'cukie_master_snapshots:{"walletNormalized":1,"periodId":1,"ruleVersion":1}',
@@ -135,6 +139,14 @@ describe('economy indexes', () => {
     assert.ok(indexes.some((index) => (
       index.collection === 'cukie_pool_assignments'
       && index.keys === '{"status":1,"expiresAt":1,"_id":1}'
+    )));
+    assert.ok(indexes.some((index) => (
+      index.collection === 'cukie_pool_vault_asset_leases'
+      && index.keys === '{"expiresAt":1,"_id":1}'
+    )));
+    assert.ok(indexes.some((index) => (
+      index.collection === 'cukie_pool_vault_period_usage'
+      && index.keys === '{"periodId":1,"_id":1}'
     )));
     assert.ok(indexes.some((index) => (
       index.collection === 'cukie_pool_positions'

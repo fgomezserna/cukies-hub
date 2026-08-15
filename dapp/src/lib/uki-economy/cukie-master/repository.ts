@@ -7,6 +7,7 @@ import {
   getCukieMasterNftEntitlementFromDb,
   type CukieMasterNftRouteSummary,
 } from '@/lib/nft-inventory';
+import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 
 import { DomainConflictError } from '../errors';
 import type { CukieMasterRoute } from '../rules';
@@ -22,6 +23,7 @@ import type {
   CukieMasterRouteRound,
   CukieMasterSlot,
 } from './types';
+import { getCukieMasterNftVaultEntitlementFromDb } from './nft-vault-source';
 
 export type PresaleParticipantRawDocument = {
   _id?: unknown;
@@ -49,6 +51,7 @@ export type UkiStakingStateRawDocument = {
   bootstrapSafeBlockHash?: unknown;
   verifiedChainId?: unknown;
   contractCodeHash?: unknown;
+  contractDeploymentTxHash?: unknown;
   contractConfigHash?: unknown;
   contractDeploymentBlock?: unknown;
   bootstrapStartBlock?: unknown;
@@ -67,6 +70,7 @@ export type ExpectedIndexerContractConfig = {
   bootstrapStartBlock: number;
   contractDeploymentBlock: number;
   contractCodeHash: string;
+  contractDeploymentTxHash: string;
   contractConfigHash: string;
 };
 
@@ -96,6 +100,10 @@ function environmentCodeHash(name: string) {
   return value && /^0x[0-9a-f]{64}$/.test(value) ? value : undefined;
 }
 
+function environmentTransactionHash(name: string) {
+  return environmentCodeHash(name);
+}
+
 function firstEnvironmentValue(...names: string[]) {
   for (const name of names) {
     const value = process.env[name]?.trim();
@@ -110,6 +118,7 @@ function expectedContractConfig(input: {
   startBlock?: number;
   deploymentBlock?: number;
   codeHash?: string;
+  deploymentTxHash?: string;
 }): ExpectedIndexerContractConfig | undefined {
   if (
     !input.address
@@ -119,6 +128,7 @@ function expectedContractConfig(input: {
     || !Number.isSafeInteger(input.deploymentBlock)
     || input.startBlock !== input.deploymentBlock
     || !input.codeHash
+    || !input.deploymentTxHash
   ) return undefined;
   const contractAddress = input.address.toLowerCase();
   const contractCodeHash = input.codeHash.toLowerCase();
@@ -127,6 +137,7 @@ function expectedContractConfig(input: {
     bootstrapStartBlock: input.startBlock!,
     contractDeploymentBlock: input.deploymentBlock!,
     contractCodeHash,
+    contractDeploymentTxHash: input.deploymentTxHash.toLowerCase(),
     contractConfigHash: keccak256(stringToHex(JSON.stringify({
       chainId: input.chainId,
       address: contractAddress,
@@ -152,6 +163,9 @@ function expectedUkiContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_UKI_STAKING_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_TX_HASH',
+      ),
     }),
     VESTING_VAULT: expectedContractConfig({
       chainId,
@@ -163,6 +177,9 @@ function expectedUkiContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH',
+      ),
     }),
   };
 }
@@ -175,6 +192,15 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_TOKEN_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_TOKEN_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_TOKEN_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash('CHAIN_INDEXER_TOKEN_DEPLOYMENT_TX_HASH'),
+    }),
+    TOKEN_V2: expectedContractConfig({
+      chainId,
+      address: firstEnvironmentValue('CHAIN_INDEXER_TOKEN_V2_ADDRESS'),
+      startBlock: environmentInteger('CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK'),
+      deploymentBlock: environmentInteger('CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_BSC_BLOCK'),
+      codeHash: environmentCodeHash('CHAIN_INDEXER_TOKEN_V2_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash('CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_TX_HASH'),
     }),
     MARKETPLACE: expectedContractConfig({
       chainId,
@@ -182,6 +208,9 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_MARKETPLACE_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_TX_HASH',
+      ),
     }),
     BRIDGE: expectedContractConfig({
       chainId,
@@ -189,6 +218,23 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_BRIDGE_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_BRIDGE_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash('CHAIN_INDEXER_BRIDGE_DEPLOYMENT_TX_HASH'),
+    }),
+    CUKIE_MASTER_NFT_VAULT: expectedContractConfig({
+      chainId,
+      address: firstEnvironmentValue('CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS'),
+      startBlock: environmentInteger(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_START_BSC_BLOCK',
+      ),
+      deploymentBlock: environmentInteger(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_BSC_BLOCK',
+      ),
+      codeHash: environmentCodeHash(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_RUNTIME_CODE_HASH',
+      ),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_TX_HASH',
+      ),
     }),
   };
 }
@@ -211,6 +257,7 @@ export function stakingMaterializationMatchesState(
     || state.bootstrapStartBlock !== expected.bootstrapStartBlock
     || state.contractDeploymentBlock !== expected.contractDeploymentBlock
     || state.contractCodeHash !== expected.contractCodeHash
+    || state.contractDeploymentTxHash !== expected.contractDeploymentTxHash
     || state.contractConfigHash !== expected.contractConfigHash
   ) return false;
   if (typeof state.lastEventId === 'string') {
@@ -393,6 +440,28 @@ export const EXPECTED_NFT_CURSOR_IDS = [
   'BRIDGE:JumpOutBridge',
 ] as const;
 
+export const EXPECTED_CUSTODIAL_NFT_CURSOR_IDS = [
+  'TOKEN_V2:Transfer',
+  'TOKEN_V2:CukieMetadataConfigured',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterCollectionAllowedUpdated',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterDeposited',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterWithdrawn',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterUntrackedERC721Recovered',
+] as const;
+
+export function cukieMasterNftHealthScope(mode: 'legacy' | 'custodial' | 'invalid') {
+  if (mode === 'custodial') {
+    return {
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'] as const,
+      cursorIds: EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
+    };
+  }
+  return {
+    aliases: ['TOKEN', 'MARKETPLACE', 'BRIDGE'] as const,
+    cursorIds: EXPECTED_NFT_CURSOR_IDS,
+  };
+}
+
 export function operationalIndexerHealthWarnings(input: {
   checkedAt: Date;
   latestSuccessEndedAt: Date | null;
@@ -416,6 +485,7 @@ export function operationalIndexerHealthWarnings(input: {
     verifiedChainId?: unknown;
     contractCodeHash?: unknown;
     contractDeploymentBlock?: unknown;
+    contractDeploymentTxHash?: unknown;
     contractConfigHash?: unknown;
   }>;
   expectedChainId: 56 | 97 | undefined;
@@ -457,6 +527,7 @@ export function operationalIndexerHealthWarnings(input: {
         && cursor.contractAddress.toLowerCase() === expected!.contractAddress
         && cursor.contractCodeHash === expected!.contractCodeHash
         && cursor.contractDeploymentBlock === expected!.contractDeploymentBlock
+        && cursor.contractDeploymentTxHash === expected!.contractDeploymentTxHash
         && cursor.contractConfigHash === expected!.contractConfigHash
         && checkpointHealthy;
     })
@@ -689,6 +760,7 @@ export function createMongoCukieMasterRepository(
         verifiedChainId?: unknown;
         contractCodeHash?: unknown;
         contractDeploymentBlock?: unknown;
+        contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
       }>('chain_cursors').find({
           chain: 'BSC',
@@ -794,7 +866,9 @@ export function createMongoCukieMasterRepository(
       return { healthy: warnings.length === 0, warnings, checkedAt };
     },
     async getNftIndexerHealth(checkedAt) {
-      const aliases = ['TOKEN', 'MARKETPLACE', 'BRIDGE'];
+      const nftMode = ukiNftVaults.mode.cukieMaster;
+      const scope = cukieMasterNftHealthScope(nftMode);
+      const aliases = [...scope.aliases];
       const chainId = expectedBscChainId();
       const expectedConfigs: Record<string, ExpectedIndexerContractConfig | undefined> = chainId
         ? expectedNftContractConfigs(chainId)
@@ -823,11 +897,12 @@ export function createMongoCukieMasterRepository(
         verifiedChainId?: unknown;
         contractCodeHash?: unknown;
         contractDeploymentBlock?: unknown;
+        contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
       }>('chain_cursors').find({
         chain: 'BSC',
         contractAlias: { $in: aliases },
-      }, { ...options, maxTimeMS: 2_000 }).limit(EXPECTED_NFT_CURSOR_IDS.length + 1).toArray();
+      }, { ...options, maxTimeMS: 2_000 }).limit(scope.cursorIds.length + 1).toArray();
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
@@ -868,14 +943,36 @@ export function createMongoCukieMasterRepository(
         cursors,
         expectedChainId: chainId,
         expectedContractConfigs: expectedConfigs,
-        expectedCursorIds: EXPECTED_NFT_CURSOR_IDS,
+        expectedCursorIds: scope.cursorIds,
       });
       if (!cukieMasterEnabled) {
         warnings.push('CHAIN_INDEXER_CUKIE_MASTER_ENABLED no esta activo.');
       }
       if (!chainId) warnings.push('CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID es invalido.');
-      if (!expectedConfigs.TOKEN || !expectedConfigs.MARKETPLACE || !expectedConfigs.BRIDGE) {
-        warnings.push('La identidad/configuracion historica NFT de Cukie Master no esta completa.');
+      if (nftMode === 'legacy') {
+        if (!expectedConfigs.TOKEN || !expectedConfigs.MARKETPLACE || !expectedConfigs.BRIDGE) {
+          warnings.push('La identidad/configuracion historica NFT legacy de Cukie Master no esta completa.');
+        }
+      } else if (nftMode === 'custodial') {
+        const tokenV2 = expectedConfigs.TOKEN_V2;
+        const masterVault = expectedConfigs.CUKIE_MASTER_NFT_VAULT;
+        const publicCollection = ukiNftVaults.collectionAddresses.length === 1
+          ? ukiNftVaults.collectionAddresses[0].toLowerCase()
+          : null;
+        const publicMasterVault = ukiNftVaults.cukieMasterNftVaultAddress?.toLowerCase() ?? null;
+        if (
+          !tokenV2
+          || !masterVault
+          || chainId !== ukiNftVaults.chainId
+          || tokenV2.contractAddress !== publicCollection
+          || masterVault.contractAddress !== publicMasterVault
+        ) {
+          warnings.push(
+            'La identidad TOKEN_V2/vault NFT custodial no coincide con la configuracion publica.',
+          );
+        }
+      } else {
+        warnings.push('La configuracion publica del vault NFT de Cukie Master es invalida.');
       }
       if (deadLetter) warnings.push('Existen dead letters del pipeline NFT.');
       if (pendingEvent) warnings.push('Existen eventos NFT pendientes de proyeccion.');
@@ -884,12 +981,21 @@ export function createMongoCukieMasterRepository(
       }
       return { healthy: warnings.length === 0, warnings, checkedAt };
     },
-    getNftEntitlement: (walletAddress, now) => getCukieMasterNftEntitlementFromDb({
-      walletAddress,
-      now,
-      db,
-      session,
-    }),
+    getNftEntitlement: (walletAddress, now) => (
+      ukiNftVaults.mode.cukieMaster === 'custodial'
+        ? getCukieMasterNftVaultEntitlementFromDb({
+            walletAddress,
+            now,
+            db,
+            session,
+          })
+        : getCukieMasterNftEntitlementFromDb({
+            walletAddress,
+            now,
+            db,
+            session,
+          })
+    ),
     listWalletPositions: (walletNormalized) => positions
       .find({ walletNormalized }, options)
       .sort({ route: 1 })

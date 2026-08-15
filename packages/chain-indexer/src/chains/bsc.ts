@@ -219,12 +219,15 @@ export async function ingestBscOnce(
   const safeBlock = Math.max(0, latestBlock - config.bscConfirmations);
   const contractEvents = getContractEventConfigs(['BSC'], {
     tokenAddress: config.tokenAddress,
+    tokenV2Address: config.tokenV2Address,
     marketplaceAddress: config.marketplaceAddress,
     bridgeAddress: config.bridgeAddress,
     presaleAddress: config.presaleAddress,
     ukiStakingAddress: config.ukiStakingAddress,
     vestingVaultAddress: config.vestingVaultAddress,
     rewardsDistributorAddress: config.rewardsDistributorAddress,
+    cukieMasterNftVaultAddress: config.cukieMasterNftVaultAddress,
+    cukiePoolNftVaultAddress: config.cukiePoolNftVaultAddress,
     contractAliases: config.contractAliases,
   });
   const timestampCache = new Map<number, number>();
@@ -282,11 +285,17 @@ export async function ingestBscOnce(
           ? config.rewardsDistributorStartBlock
           : contractEvent.contractAlias === 'TOKEN'
             ? config.tokenStartBlock
-            : contractEvent.contractAlias === 'MARKETPLACE'
-              ? config.marketplaceStartBlock
-              : contractEvent.contractAlias === 'BRIDGE'
-                ? config.bridgeStartBlock
-                : config.bscStartBlock;
+            : contractEvent.contractAlias === 'TOKEN_V2'
+              ? config.tokenV2StartBlock
+              : contractEvent.contractAlias === 'MARKETPLACE'
+                ? config.marketplaceStartBlock
+                : contractEvent.contractAlias === 'BRIDGE'
+                  ? config.bridgeStartBlock
+                  : contractEvent.contractAlias === 'CUKIE_MASTER_NFT_VAULT'
+                    ? config.cukieMasterNftVaultStartBlock
+                    : contractEvent.contractAlias === 'CUKIE_POOL_NFT_VAULT'
+                      ? config.cukiePoolNftVaultStartBlock
+                      : config.bscStartBlock;
     const verified = verifiedContracts.get(contractEvent.contractAlias);
     if (
       verified
@@ -395,6 +404,7 @@ export async function ingestBscOnce(
       events.push({
         _id: `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
         chain: 'BSC',
+        chainId: config.bscExpectedChainId,
         contractAlias: contractEvent.contractAlias,
         contractAddress: contractEvent.contractAddress,
         eventName: contractEvent.eventName,

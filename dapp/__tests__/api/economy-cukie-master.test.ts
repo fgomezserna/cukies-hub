@@ -136,6 +136,8 @@ describe('GET /api/economy/v1/cukie-master', () => {
     mockVerify.mockResolvedValue({ id: 'user-1' } as never);
     mockInventory.mockResolvedValue([{
       assetId: 'cukies:42',
+      canonicalAssetId: null,
+      collectionAddress: null,
       tokenId: '42',
       imageUrl: 'https://cukies.s3.eu-west-3.amazonaws.com/png/tokens/v2/contract/42.png',
       rarity: 'rare',
@@ -143,10 +145,15 @@ describe('GET /api/economy/v1/cukie-master', () => {
       contributesToCukieMaster: true,
       contributionPoints: 4,
       state: 'soft_staked',
+      custody: 'wallet',
+      custodyMode: 'legacy',
+      depositEpoch: null,
       blockers: [],
       lock: { lockId: 'lock-42', fencingToken: 2 },
       canSoftStake: false,
       canUnstake: true,
+      canDeposit: false,
+      canWithdraw: false,
     }]);
     mockStatus.mockResolvedValue({
       walletAddress: WALLET,
