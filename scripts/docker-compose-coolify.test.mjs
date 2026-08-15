@@ -45,3 +45,12 @@ for (const serviceName of guardedWorkers) {
     );
   });
 }
+
+test('chain-indexer reports health from its staging Mongo connection', () => {
+  const definition = serviceDefinition('chain-indexer');
+
+  assert.match(definition, /    healthcheck:\n/);
+  assert.match(definition, /serverSelectionTimeoutMS: 5000/);
+  assert.match(definition, /command\(\{ ping: 1 \}\)/);
+  assert.match(definition, /      start_period: 90s/);
+});

@@ -269,6 +269,12 @@ services:
       TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
       CHAIN_INDEXER_POLL_INTERVAL_MS: ${CHAIN_INDEXER_POLL_INTERVAL_MS:-60000}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/packages/chain-indexer && node -e \"const { MongoClient } = require('mongodb'); const client = new MongoClient(process.env.CHAIN_INDEXER_MONGO_URL || process.env.DATABASE_URL, { serverSelectionTimeoutMS: 5000 }); client.connect().then(() => client.db(process.env.CHAIN_INDEXER_DB_NAME).command({ ping: 1 })).then(() => client.close()).then(() => process.exit(0)).catch(() => process.exit(1));\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
     networks:
       - coolify
 
