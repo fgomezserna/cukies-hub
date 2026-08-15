@@ -177,6 +177,9 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_PRESALE_ADDRESS` | Presale testnet | Presale mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
 | `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
+| `NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Colección mainnet pendiente | Colección ERC-721 V2 custodiable de staging. |
+| `NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault mainnet pendiente | Custodia NFT para la ruta Cukie Master. |
+| `NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | Vault mainnet pendiente | Custodia NFT para el Cukie Pool. |
 | `NEXT_PUBLIC_BSCSCAN_BASE_URL` | `https://testnet.bscscan.com` | `https://bscscan.com` | Enlaces de tx/address. |
 | `NEXT_PUBLIC_GAME_HYPPIE_ROAD` | URL staging game | URL production game | Si el juego vive separado. |
 | `NEXT_PUBLIC_GAME_SYBIL_SLAYER` | URL staging game | URL production game | Si el juego vive separado. |
@@ -215,17 +218,22 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 | Variable | Staging | Nota |
 | --- | --- | --- |
-| `CHAIN_INDEXER_CONTRACT_ALIASES` | Mantener los aliases ya verificados y, tras los nuevos despliegues, añadir `TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT` | Una address por si sola no habilita ingesta. `TOKEN_V2` se añade; nunca sustituye ni reinicia `TOKEN`. |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | Aliases previos más `TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT` | Ya persistido en Coolify. `TOKEN_V2` se añade; nunca sustituye ni reinicia `TOKEN`. |
 | `CHAIN_INDEXER_TOKEN_ADDRESS` | Fuente legacy ya verificada | Se conserva sin cambios, con su identidad y cursores existentes. |
-| `CHAIN_INDEXER_TOKEN_V2_ADDRESS` | Pendiente de `deploy:testnet:nft-v2` | Nueva colección ERC-721 custodiable de chain `97`; sin fallback a `TOKEN`. |
-| `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS` | Pendiente de `deploy:testnet:nft-vaults` | Vault custodial independiente para Cukie Master. |
-| `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS` | Pendiente de `deploy:testnet:nft-vaults` | Vault custodial independiente para Cukie Pool. |
+| `CHAIN_INDEXER_TOKEN_V2_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Nueva colección ERC-721 custodiable de chain `97`; sin fallback a `TOKEN`. |
+| `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault custodial independiente para Cukie Master. |
+| `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | Vault custodial independiente para Cukie Pool. |
 | `CHAIN_INDEXER_MARKETPLACE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos marketplace, sin custodia ni valor. |
 | `CHAIN_INDEXER_BRIDGE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos bridge, sin custodia ni valor. |
-| `CHAIN_INDEXER_{TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT}_START_BSC_BLOCK` | Pendiente de los receipts | Debe ser el bloque exacto de despliegue de cada contrato. |
-| `CHAIN_INDEXER_{TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT}_DEPLOYMENT_BSC_BLOCK` | Pendiente de los receipts | Debe coincidir exactamente con el start block. |
-| `CHAIN_INDEXER_{TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT}_DEPLOYMENT_TX_HASH` | Pendiente de los receipts | Evidencia publica BSC Testnet que el indexer verifica por alias. |
-| `CHAIN_INDEXER_{TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT}_RUNTIME_CODE_HASH` | Pendiente del despliegue | Keccak-256 del bytecode runtime de cada contrato. |
+| `CHAIN_INDEXER_TOKEN_V2_{START_BSC_BLOCK,DEPLOYMENT_BSC_BLOCK}` | `125280412` | Start y deployment block coinciden. |
+| `CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_TX_HASH` | `0xef06344f418e176f1f1a5d7a4f7acf98680fcfd344331ff7323d0cf1ac7e77a9` | Receipt BSC Testnet verificado. |
+| `CHAIN_INDEXER_TOKEN_V2_RUNTIME_CODE_HASH` | `0x2a4da6545f6e1d1d7c304819582ca4e9ec91a8712ead55cf2383547c72e79994` | Keccak-256 del bytecode runtime. |
+| `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_{START_BSC_BLOCK,DEPLOYMENT_BSC_BLOCK}` | `125280540` | Start y deployment block coinciden. |
+| `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_TX_HASH` | `0xfad52ef19f3e98efe7cd7eede83982407e59fabcd82b7e62451da176df9a77fa` | Receipt BSC Testnet verificado. |
+| `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_RUNTIME_CODE_HASH` | `0x2cab642a77ad5d19819d4698594a8b73011bb80f0c0372dc01a43b0fbb6de3b7` | Keccak-256 del bytecode runtime. |
+| `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_{START_BSC_BLOCK,DEPLOYMENT_BSC_BLOCK}` | `125280547` | Start y deployment block coinciden. |
+| `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_DEPLOYMENT_TX_HASH` | `0x07a032f881b437f8264491fcc603466b55873a2921b16051d65f0aeecb01632f` | Receipt BSC Testnet verificado. |
+| `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_RUNTIME_CODE_HASH` | `0x36c0f9144323fc23ce9ab02063196943f7d633abb207a8df519db35caf26637a` | Keccak-256 del bytecode runtime. |
 | `CHAIN_INDEXER_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK` | `123359165` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK` | `123359165` | Debe coincidir con el receipt de despliegue y con el start block. |
@@ -242,15 +250,15 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 El indexer no marca un cursor UKI como `verified` por confiar en la configuracion. En cada arranque comprueba chain ID, receipt de despliegue, address, bloque y hash del bytecode runtime; despues sella el checkpoint canonico y la identidad de configuracion en los cursores. `VestingCreated` y `TokensReleased` se guardan en un ledger inmutable y reconstruyen la posicion por wallet/schedule, de modo que un replay repara una escritura parcial sin duplicar importes.
 
-`TOKEN` sigue siendo la fuente legacy verificada de staging y no se modifica. La nueva colección custodiable se despliega e indexa como `TOKEN_V2`, con address, start/deployment block, transaction hash, runtime code hash y cursores independientes. Los vaults de Cukie Master y Cukie Pool aplican el mismo sellado de identidad y el arranque permanece fail-closed hasta que estén configuradas todas sus evidencias.
+`TOKEN` sigue siendo la fuente legacy verificada de staging y no se modifica. La nueva colección custodiable está desplegada y configurada para indexarse como `TOKEN_V2`, con address, start/deployment block, transaction hash, runtime code hash y cursores independientes. Los vaults de Cukie Master y Cukie Pool aplican el mismo sellado de identidad. Sus evidencias ya están persistidas en Coolify y el arranque permanece fail-closed hasta que el redeploy confirme los tres cursores.
 
 ### Card worker en staging
 
-`cuki-card-worker` queda fuera del arranque por defecto mediante el profile Compose `card-worker`, pero esta habilitado explicitamente en la app 28 con `COMPOSE_PROFILES=card-worker` y `CARD_WORKER_UPLOAD=true`. Usa el bucket MinIO exclusivo `cukies-cards-staging`, hostname publico, prefijo y credenciales limitadas. Las URLs inmutables de #216, dos regeneraciones con hashes distintos, los headers de cache, el setup y la limpieza completa se validaron el 6 de agosto de 2026; el despliegue 1109 dejo los nueve contenedores en ejecucion con cero reinicios.
+`cuki-card-worker` queda fuera del arranque por defecto mediante el profile Compose `card-worker`. La app 28 conserva el contenedor para lectura y comprobaciones, pero `CARD_WORKER_UPLOAD=false`: no se permiten uploads hasta volver a validar y aprobar un destino S3/MinIO exclusivo de staging. Las URLs inmutables de #216, dos regeneraciones con hashes distintos, los headers de cache, el setup y la limpieza completa se validaron el 6 de agosto de 2026; esa evidencia histórica no sustituye el gate actual apagado.
 
 Controles operativos:
 
-1. mantener `CARD_WORKER_UPLOAD=true` y `COMPOSE_PROFILES=card-worker` exclusivamente en la app 28 mientras use el destino staging aislado;
+1. mantener `CARD_WORKER_UPLOAD=false`; solo puede volver a `true` tras validar de nuevo un destino staging aislado y aprobar expresamente la escritura;
 2. validar tras cada deploy el guard `staging-only`, `setup:prod`, `start`, acceso `HeadBucket`, Mongo ping y `restartCount=0`;
 3. comprobar que una regeneracion con contenido distinto produce otra URL `<prefix>/<tokenId-base64url>/<sha256>.png` con `Cache-Control: public, max-age=31536000, immutable`;
 4. para desactivarlo, cambiar `CARD_WORKER_UPLOAD=false`, retirar `COMPOSE_PROFILES` solo en la app 28 y redesplegar; no modificar la app 12.
@@ -286,7 +294,7 @@ Antes de considerar staging valido:
 - [x] Definir el ruleset exclusivo de prueba `staging-test-v1`: inicio `2026-08-10T00:00:00.000Z`, frontera `00:00 UTC`, gracia de 24h y siete destinos sink `0x97...`; los parametros equivalentes de produccion siguen sin aprobar (PR #226, merge `509ef4ca`).
 - [x] Implementar un bootstrap atomico `plan/apply` para rewards, competition credits, Treasure Hunt y ranking, con replay idempotente y rechazo de chain, base, recurso, gates o cursores no verificados (PR #226).
 - [x] Auditar y cerrar el motor de requisito dinamico: capacidad llena, gracia fija de 48h, proteccion, barrido paginado y cierre de ronda versionado (#61; implementado en PR #209).
-- [ ] Financiar el deployer con tBNB sin usar mainnet, desplegar `TOKEN_V2` y los vaults NFT, añadir sus aliases sin retirar `TOKEN` y verificar todos sus cursores en chain `97`.
+- [ ] `TOKEN_V2` y los dos vaults NFT ya están desplegados y sus aliases añadidos sin retirar `TOKEN`; falta completar el redeploy y verificar sus tres cursores en chain `97`.
 - [ ] Ejecutar `pnpm staging:economy:rules:plan` y despues `pnpm staging:economy:rules:apply`; repetir el plan y exigir cuatro acciones `replay`.
 - [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para Cukie Master, creditos, Game Economy, Cukie Pool y ranking; comprobar fencing, idempotencia, auditoria y ausencia de escrituras fuera de staging.
 - [ ] Habilitar como maximo un scheduler, observar al menos dos ciclos y volver a apagarlo antes de avanzar al siguiente.
@@ -298,7 +306,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloqueo NFT es obtener tBNB, desplegar `TOKEN_V2` y los dos vaults y dejar sus identidades y cursores verificados sin alterar `TOKEN`. A continuacion se ejecuta el bootstrap `staging-test-v1` con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloqueo NFT es redesplegar la app 28 y comprobar que `TOKEN_V2` y los dos vaults arrancan con identidad y cursores verificados sin alterar `TOKEN` ni `UKI_STAKING`. A continuacion se ejecuta el bootstrap `staging-test-v1` con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
 
 ## Gates para produccion
 

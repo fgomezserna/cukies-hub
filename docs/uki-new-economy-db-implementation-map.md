@@ -1,6 +1,6 @@
 # UKI new economy database implementation map
 
-Estado: mapa de implementación local; activación live bloqueada. Las decisiones de producto del 2026-08-14 sustituyen varios flujos ya implementados y se marcan como gaps, no como fallback válido.
+Estado: implementación publicada en la rama `staging` y contratos NFT desplegados en BSC Testnet; el redeploy de la aplicación, la indexación E2E y la activación de los runtimes económicos siguen bloqueados hasta completar sus verificaciones. Las decisiones de producto del 2026-08-14 sustituyen varios flujos ya implementados y se marcan como gaps, no como fallback válido.
 Decision vigente: Cukie Master permite 5 cupos por ruta UKI y 5 cupos por ruta NFT/Cukies Originales por wallet.
 Decision vigente: Cukie Master NFT y Cukie Pool requieren vaults custodiales BSC separados; el soft staking Mongo actual queda superseded.
 
@@ -56,8 +56,25 @@ Fixtures BSC Testnet comprobados:
 La colección ERC-721 real para probar los vaults se indexa con un alias nuevo
 `TOKEN_V2`. Nunca sustituye `TOKEN`: ambos aliases mantienen identidad, cursor,
 bloque de despliegue, transacción y code hash independientes. Así se conserva
-el histórico de staging y se evita reiniciar o reinterpretar sus eventos. La
-dirección de `TOKEN_V2` se completa después de su deployment en BSC Testnet.
+el histórico de staging y se evita reiniciar o reinterpretar sus eventos.
+`TOKEN_V2` está desplegado en BSC Testnet en
+`0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8`.
+
+## Evidencias de despliegue NFT en BSC Testnet
+
+Fecha de despliegue y comprobación: 2026-08-15. Chain ID: `97`.
+
+| Alias | Dirección | Bloque | Transacción | Hash de bytecode runtime |
+| --- | --- | ---: | --- | --- |
+| `TOKEN_V2` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | `125280412` | `0xef06344f418e176f1f1a5d7a4f7acf98680fcfd344331ff7323d0cf1ac7e77a9` | `0x2a4da6545f6e1d1d7c304819582ca4e9ec91a8712ead55cf2383547c72e79994` |
+| `CUKIE_MASTER_NFT_VAULT` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | `125280540` | `0xfad52ef19f3e98efe7cd7eede83982407e59fabcd82b7e62451da176df9a77fa` | `0x2cab642a77ad5d19819d4698594a8b73011bb80f0c0372dc01a43b0fbb6de3b7` |
+| `CUKIE_POOL_NFT_VAULT` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | `125280547` | `0x07a032f881b437f8264491fcc603466b55873a2921b16051d65f0aeecb01632f` | `0x36c0f9144323fc23ce9ab02063196943f7d633abb207a8df519db35caf26637a` |
+
+Los dos vaults admiten exclusivamente `TOKEN_V2`, conservan al deployer
+operativo como owner sin handoff pendiente y se comprobaron sin pausa. El Pool
+mantiene su calendario inicial diario con corte a las 14:00 UTC. Las tres
+identidades están cargadas en Coolify sin retirar `TOKEN` ni `UKI_STAKING`; falta
+confirmar sus cursores después del redeploy.
 
 Para considerar el bridge usable en staging faltan configuracion por entorno,
 origen Tron testnet, executor idempotente, confirmaciones, proteccion de replay,
@@ -165,11 +182,11 @@ El maximo potencial por wallet es 10 cupos si el usuario alcanza 5 por ruta. Est
 | Cierre preventa y extension | Contrato `Presale` permite mover ventanas; decision de prolongar se decide por estado on-chain/indexado. | Implementado en contrato, pendiente de politica ops. |
 | Torneo compradores preventa | Crear entitlement ledger: 1 partida por cada 1,000 UKI comprados, basado en eventos `Purchased`. | Pendiente. |
 | Cukie Master ruta UKI | Calculo desde vesting/preventa/stake BSC indexado. Maximo 5 por wallet en esta ruta. | **Ya implementado y desplegado en staging.** `UKIStaking` esta activo en BSC Testnet (chain `97`) en `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205`; se conservan el contrato y sus posiciones, sin migracion ni redeployment. Proyeccion, servicio, runtime, reconciliacion, API/UI y panel approve/stake/unstake estan implementados. |
-| Cukie Master ruta NFT | Custodia en `CukieMasterNftVault`; calculo desde eventos confirmados, rareza y epochs. Maximo 5 por wallet. NFT no jugable mientras esta depositado. | Vertical local implementada: contrato, ABI, deploy script, coleccion ERC721 V2 de staging, metadata/indexador, recálculo aislado, API y UI approve/deposit/withdraw. La recuperación directa no depende de API/indexador y conserva una lista pública histórica separada de las colecciones activas. Pendientes deployment real, configuración Coolify, backfill y E2E en BSC Testnet. |
+| Cukie Master ruta NFT | Custodia en `CukieMasterNftVault`; calculo desde eventos confirmados, rareza y epochs. Maximo 5 por wallet. NFT no jugable mientras esta depositado. | Vertical implementada y publicada: contrato, ABI, colección ERC721 V2, metadata/indexador, recálculo aislado, API y UI approve/deposit/withdraw. Contrato desplegado en BSC Testnet y configuración persistida en Coolify. La recuperación directa no depende de API/indexador y conserva una lista pública histórica separada de las colecciones activas. Pendientes redeploy, backfill y E2E. |
 | Capacidad/requisito Cukie Master | Empezar en 500 por ruta, ampliar hasta 5,000 o subir requisito con 48h de gracia. | Control HMAC, CAS/evento idempotente, expansion solo creciente, barrido paginado y deficit de conservacion en UI implementados. |
 | Creditos diarios | Job diario crea ledger `grant` de 100 creditos por cupo tras 24h, reconstruido `as-of-cutoff`. | Parcial: ledger/lotes, snapshot, runtime, scheduler y recálculo de fuentes UKI/NFT por rutas separadas existen. Falta `cutoffBlock` historico real, catch-up sin perdida, ventana util de grants tardios y separar tambien los watermarks/sellado del ledger por ruta. |
 | Pool de creditos | Depositos en multiplos de 10 antes del corte; reparto diario y arrastre semanal versionado. | Config por slot, corte, deposito, reservas FIFO y UI/API implementados. El calculador proporcional/floor existe, pero el payout productivo y el consumo fenced del arrastre semanal no se activan hasta cerrar funding y coordinador de reparto. |
-| Pool de Cukies | Un `CukiePoolNftVault` custodia ambas generaciones; lifecycle y cuotas son diarios; Original/Segunda se liquidan separados; Seiku no alimenta pools. | Vertical local implementada: contrato/ABI/deploy, calendario 14:00 versionado, proyección, API/UI, prioridad Original→Segunda→Seiku, lease exclusivo, cuota por epoch+periodo, salida al corte y dispatcher GameEconomy. La retirada directa sigue operativa para colecciones históricas mientras existan posiciones. El calculador aplica tramos acumulativos 45/20/15/12/7/1; Seiku y tramos sin elegibles pasan a `undistributed_pending`. Pendientes deployment/configuración/backfill/E2E y coordinador productivo de liquidación. |
+| Pool de Cukies | Un `CukiePoolNftVault` custodia ambas generaciones; lifecycle y cuotas son diarios; Original/Segunda se liquidan separados; Seiku no alimenta pools. | Vertical implementada y publicada: contrato/ABI, calendario 14:00 versionado, proyección, API/UI, prioridad Original→Segunda→Seiku, lease exclusivo, cuota por epoch+periodo, salida al corte y dispatcher GameEconomy. Contrato desplegado en BSC Testnet y configuración persistida en Coolify. La retirada directa sigue operativa para colecciones históricas mientras existan posiciones. El calculador aplica tramos acumulativos 45/20/15/12/7/1; Seiku y tramos sin elegibles pasan a `undistributed_pending`. Pendientes redeploy, backfill/E2E y coordinador productivo de liquidación. |
 | Ranking semanal | Solo partidas con creditos del pool; rank #1-#9, subida/bajada semanal, minimos de partidas. | Regla inmutable, sources, snapshots, manifest, catch-up, runtime, scheduler, health e integracion con rewards implementados; falta crear la regla aprobada y activar live. |
 | Treasure Hunt | El hub crea `game_economy_sessions`, reserva recursos y liquida. El juego no decide rewards. Horario inicial: cutoff 14:00 UTC y settlement desde 16:00 UTC, ambos versionados para cambios futuros. | Motor multi-juego, HMAC dedicado, evidencia autorizada, Cukie propio -> pool/Seiku, reserva/settlement, recuperacion y scheduler implementados. El esquema generico permite TTL de sesion hasta 24h; la regla activa debe cumplir `sessionTtlMs + validationRetryWindow < 2h` para un settlement predecible, mientras los fixtures actuales usan 10 minutos. Un resultado valido recibido dentro del TTL sigue siendo recuperable aunque se procese tarde. |
 | Reparto de recompensas | `reward_allocations` calcula claims y `reward_pool_accruals` separa `G=0..7.5` segun score, 2 UKI semanales, 0.5 UKI de embajadores, pools y no distribuido. Todas las partidas validas con Cukie prestado alimentan su generacion; rareza 45/20/15/12/7/1. Seiku no alimenta el pool y su parte pasa a `undistributed_pending`. | Cálculo local alineado y cubierto por tests. Faltan regla real aprobada, funding, coordinadores de liquidación diaria/semanal y E2E antes de activar accruals. |
