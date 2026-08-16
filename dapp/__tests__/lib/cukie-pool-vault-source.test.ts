@@ -5,6 +5,7 @@ import {
   resolveCukiePoolVaultPeriod,
   type CukiePoolVaultConfig,
 } from '@/lib/uki-economy/cukie-pool/vault-source';
+import { SchemaNotReadyError } from '@/lib/uki-economy/errors';
 
 const OWNER = `0x${'a'.repeat(40)}`;
 const VAULT = `0x${'b'.repeat(40)}`;
@@ -131,6 +132,7 @@ describe('Cukie Pool custodial source', () => {
         withdrawableAt: nowSeconds,
       }),
     ];
+    delete (rows[0] as { chain?: unknown }).chain;
     const metadata = new Map([
       ['1', { rarity: 1, generation: 1 }],
       ['2', { rarity: 6, generation: 2 }],
@@ -196,5 +198,28 @@ describe('Cukie Pool custodial source', () => {
         ownerRewardEligible: true,
       },
     ]);
+  });
+
+  it('rejects an explicit non-BSC chain while accepting only the historical omission', async () => {
+    const nowSeconds = 2_000_000_000;
+    const corrupted = {
+      ...position({
+        tokenId: '9',
+        depositedAt: nowSeconds - 2_000,
+        activationAt: nowSeconds - 1_000,
+      }),
+      chain: 'TRON',
+    };
+    const db = {
+      collection: () => ({
+        find: () => cursor([corrupted]),
+      }),
+    } as unknown as Db;
+
+    await expect(loadCukiePoolVaultCandidates(
+      db,
+      CONFIG,
+      new Date(nowSeconds * 1_000),
+    )).rejects.toBeInstanceOf(SchemaNotReadyError);
   });
 });

@@ -149,9 +149,14 @@ describe('NFT vault projectors', () => {
     await projectNftVaultEvent(context.store as never, deposit);
     const jobs = context.collections.get('cukie_master_recalculation_jobs')!;
     assert.equal(jobs.documents.size, 1);
+    const masterPositions = context.collections.get('cukie_master_nft_positions')!;
+    const depositedPosition = [...masterPositions.documents.values()][0];
+    assert.equal(depositedPosition.chain, 'BSC');
+    delete depositedPosition.chain;
     jobs.documents.clear();
     await projectNftVaultEvent(context.store as never, deposit);
     assert.equal(jobs.documents.size, 1, 'el replay reconstruye el outbox si faltaba');
+    assert.equal(depositedPosition.chain, 'BSC', 'el replay repara la chain historica ausente');
 
     const withdrawal = vaultEvent({
       alias: 'CUKIE_MASTER_NFT_VAULT',
@@ -195,12 +200,45 @@ describe('NFT vault projectors', () => {
     );
   });
 
+  it('keeps replay repair idempotent under a concurrent writer and rejects conflicting chains', async () => {
+    const concurrentContext = memoryStore();
+    const deposit = masterDeposit();
+    await projectNftVaultEvent(concurrentContext.store as never, deposit);
+    const positions = concurrentContext.collections.get('cukie_master_nft_positions')!;
+    const position = [...positions.documents.values()][0];
+    delete position.chain;
+    const originalUpdateOne = positions.updateOne.bind(positions);
+    positions.updateOne = async (filter, update, options = {}) => {
+      if (filter.chain?.$exists === false) {
+        position.chain = 'BSC';
+        return { matchedCount: 0, upsertedCount: 0 };
+      }
+      return originalUpdateOne(filter, update, options);
+    };
+    await projectNftVaultEvent(concurrentContext.store as never, deposit);
+    assert.equal(position.chain, 'BSC');
+
+    const conflictingContext = memoryStore();
+    await projectNftVaultEvent(conflictingContext.store as never, deposit);
+    const conflicting = [...conflictingContext.collections
+      .get('cukie_master_nft_positions')!.documents.values()][0];
+    conflicting.chain = 'TRON';
+    await assert.rejects(
+      projectNftVaultEvent(conflictingContext.store as never, deposit),
+      NftVaultProjectionError,
+    );
+  });
+
   it('projects the full pool exit lifecycle and derives time boundaries', async () => {
     const context = memoryStore();
     await projectNftVaultEvent(context.store as never, poolDeposit());
     const positions = context.collections.get('cukie_pool_nft_vault_positions')!;
     const id = `97:${collectionA.toLowerCase()}:2:epoch:1`;
     let position = positions.documents.get(id)!;
+    assert.equal(position.chain, 'BSC');
+    delete position.chain;
+    await projectNftVaultEvent(context.store as never, poolDeposit());
+    assert.equal(position.chain, 'BSC', 'el replay repara la chain historica ausente');
     assert.equal(deriveCukiePoolVaultLifecycle(position as never, 199n), 'pending_activation');
     assert.equal(deriveCukiePoolVaultLifecycle(position as never, 200n), 'active');
 

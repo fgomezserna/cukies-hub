@@ -233,8 +233,9 @@ describe('Cukie Pool public source health', () => {
   it('reads only the configured custodial projection and derives every public lifecycle', async () => {
     vaultConfig.ready.cukiePool = true;
     vaultConfig.mode.cukiePool = 'custodial';
+    const { chain: _historicalChain, ...historicalPosition } = vaultPosition('1', 'pending');
     const documents = [
-      vaultPosition('1', 'pending'),
+      historicalPosition,
       vaultPosition('2', 'active'),
       vaultPosition('3', 'exit_requested'),
       vaultPosition('4', 'withdrawable'),
@@ -304,12 +305,15 @@ describe('Cukie Pool public source health', () => {
     });
   });
 
-  it('fails closed instead of exposing a projection with a mismatched canonical identity', async () => {
+  it.each([
+    ['a mismatched canonical identity', { assetId: `97:${COLLECTION}:another-token` }],
+    ['an explicit non-BSC chain', { chain: 'TRON' }],
+  ])('fails closed instead of exposing a projection with %s', async (_case, override) => {
     vaultConfig.ready.cukiePool = true;
     vaultConfig.mode.cukiePool = 'custodial';
     const corrupted = {
       ...vaultPosition('9', 'active'),
-      assetId: `97:${COLLECTION}:another-token`,
+      ...override,
     };
     (getEconomyDb as jest.Mock).mockResolvedValue({
       collection: (name: string) => {
@@ -362,6 +366,11 @@ describe('Cukie Pool public source health', () => {
       assetId: asset(tokenId),
       lifecycleOpen: true,
     });
+    const {
+      chain: _historicalMasterChain,
+      ...historicalMasterPosition
+    } = open('12', 'CUKIE_MASTER_NFT_VAULT', masterVault);
+    let masterPositions: Record<string, unknown>[] = [historicalMasterPosition];
     (getEconomyDb as jest.Mock).mockResolvedValue({
       collection: (name: string) => {
         const operational = healthyOperationalCollection(name);
@@ -379,7 +388,7 @@ describe('Cukie Pool public source health', () => {
                   : name === 'nft_asset_locks'
                     ? []
                     : name === 'cukie_master_nft_positions'
-                      ? [open('12', 'CUKIE_MASTER_NFT_VAULT', masterVault)]
+                      ? masterPositions
                       : name === 'cukie_pool_nft_vault_positions'
                         ? ('beneficiaryNormalized' in filter
                             ? []
@@ -403,6 +412,16 @@ describe('Cukie Pool public source health', () => {
       status: 'available',
       canDeposit: true,
     }]);
+
+    masterPositions = [{ ...historicalMasterPosition, chain: 'TRON' }];
+    await expect(listCukiePoolWalletPositions({
+      walletAddress: OWNER,
+      now: NOW,
+    })).resolves.toMatchObject({
+      sourceHealthy: false,
+      availableAssets: [],
+      nftCustody: { indexer: { status: 'unavailable' } },
+    });
   });
 
   it('keeps canonical recovery positions visible when indexer health is unavailable', async () => {

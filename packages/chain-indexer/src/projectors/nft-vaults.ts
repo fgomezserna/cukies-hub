@@ -68,6 +68,7 @@ function assetIdentity(event: ChainEvent) {
   const collectionAddressNormalized = requiredBscAddress(event, 'collectionNormalized');
   const tokenId = requiredDecimal(event, 'tokenId');
   return {
+    chain: 'BSC' as const,
     chainId,
     collectionAddressNormalized,
     tokenId,
@@ -101,6 +102,30 @@ function sameStoredDeposit(
     && stored.beneficiaryNormalized === input.beneficiaryNormalized
     && stored.depositEvidence?.eventId === input.eventId,
   );
+}
+
+async function repairMissingStoredChain(
+  target: ReturnType<typeof collection>,
+  stored: Record<string, any>,
+  id: string,
+  session?: ClientSession,
+) {
+  if (stored.chain === 'BSC') return;
+  if (stored.chain !== undefined) {
+    throw new NftVaultProjectionError(`La posicion NFT ${id} contiene una chain conflictiva.`);
+  }
+  const repaired = await target.updateOne(
+    { _id: id, chain: { $exists: false } },
+    { $set: { chain: 'BSC', updatedAt: now() } },
+    { session },
+  );
+  if (repaired.matchedCount === 1) return;
+  const concurrent = await target.findOne({ _id: id }, { session });
+  if (concurrent?.chain === 'BSC') return;
+  if (concurrent?.chain !== undefined) {
+    throw new NftVaultProjectionError(`La posicion NFT ${id} contiene una chain conflictiva.`);
+  }
+  throw new NftVaultProjectionError(`No se pudo reparar la chain ausente de ${id}.`);
 }
 
 async function projectCollectionAllowed(
@@ -199,6 +224,7 @@ async function projectMasterDeposit(
       beneficiaryNormalized,
       eventId: event._id,
     })) {
+      await repairMissingStoredChain(target, existing, id, session);
       await enqueueCukieMasterRecalculation({
         store,
         event,
@@ -359,7 +385,10 @@ async function projectPoolDeposit(
       depositEpoch,
       beneficiaryNormalized,
       eventId: event._id,
-    })) return null;
+    })) {
+      await repairMissingStoredChain(target, existing, id, session);
+      return null;
+    }
     throw new NftVaultProjectionError(`Deposito Cukie Pool conflictivo para ${id}.`);
   }
 

@@ -448,7 +448,7 @@ function validateVaultPosition(
   now: Date,
 ) {
   if (
-    document.chain !== 'BSC'
+    (document.chain !== undefined && document.chain !== 'BSC')
     || document.chainId !== config.chainId
     || document.vaultAlias !== 'CUKIE_POOL_NFT_VAULT'
     || document.vaultAddressNormalized !== config.vaultAddressNormalized
@@ -655,7 +655,7 @@ function canonicalVaultOpenPosition(
   row: Record<string, unknown>,
   expected: { chainId: number; vaultAlias: string; vaultAddress: string; assetIds: Set<string> },
 ) {
-  return row.chain === 'BSC'
+  return (row.chain === undefined || row.chain === 'BSC')
     && row.chainId === expected.chainId
     && row.vaultAlias === expected.vaultAlias
     && row.vaultAddressNormalized === expected.vaultAddress

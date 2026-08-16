@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -96,6 +96,9 @@ type LegacyStatus = {
 
 type PoolStatus = CustodialStatus | LegacyStatus;
 type MutationPhase = 'idle' | 'approving' | 'depositing' | 'requesting_exit' | 'withdrawing' | 'syncing';
+
+const POOL_STATUS_RETRY_MS = 10_000;
+const POOL_STATUS_RETRY_WINDOW_MS = 180_000;
 
 function sameAddress(left: string | undefined | null, right: string | undefined | null) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -225,6 +228,7 @@ export function CukiePoolStatusPanel() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
+  const retryStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -247,6 +251,37 @@ export function CukiePoolStatusPanel() {
       });
     return () => controller.abort();
   }, [authLoading, reloadNonce, user?.walletAddress]);
+
+  useEffect(() => {
+    const shouldRetry = loadState === 'unavailable'
+      || (
+        loadState === 'ready'
+        && status?.mode === 'custodial_vault'
+        && status.nftCustody.indexer.status !== 'ready'
+      );
+    if (authLoading || !user?.walletAddress) {
+      retryStartedAtRef.current = null;
+      return;
+    }
+    if (loadState === 'loading') return;
+    if (!shouldRetry) {
+      retryStartedAtRef.current = null;
+      return;
+    }
+    const startedAt = retryStartedAtRef.current ?? Date.now();
+    retryStartedAtRef.current = startedAt;
+    if (Date.now() - startedAt >= POOL_STATUS_RETRY_WINDOW_MS) return;
+    const timer = window.setTimeout(
+      () => setReloadNonce((value) => value + 1),
+      POOL_STATUS_RETRY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [authLoading, loadState, status, user?.walletAddress]);
+
+  function refreshStatus() {
+    retryStartedAtRef.current = Date.now();
+    setReloadNonce((value) => value + 1);
+  }
 
   const custody = status?.mode === 'custodial_vault' ? status.nftCustody : null;
   const configMatches = Boolean(
@@ -479,7 +514,7 @@ export function CukiePoolStatusPanel() {
           {status ? (
             <button
               type="button"
-              onClick={() => setReloadNonce((value) => value + 1)}
+              onClick={refreshStatus}
               className="text-xs font-black uppercase text-[var(--uki-cyan)]"
             >
               Actualizar estado

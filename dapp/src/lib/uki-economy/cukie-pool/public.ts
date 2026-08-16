@@ -127,7 +127,10 @@ function projectVaultPosition(
     nowSeconds: bigint;
   },
 ) {
-  if (document.chain !== 'BSC' || document.chainId !== expected.chainId) {
+  if (
+    (document.chain !== undefined && document.chain !== 'BSC')
+    || document.chainId !== expected.chainId
+  ) {
     return invalidVaultProjection('la identidad de red no coincide con la configuracion activa.');
   }
   const collectionAddress = projectionAddress(

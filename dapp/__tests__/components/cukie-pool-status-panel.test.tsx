@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { CukiePoolStatusPanel } from '@/components/cukie-pool/status-panel';
@@ -275,6 +275,90 @@ describe('CukiePoolStatusPanel', () => {
     expect(await screen.findByRole('button', { name: /Solicitar salida/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Retirar NFT/i })).toBeEnabled();
     expect(screen.getByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
+  });
+
+  it('retries automatically until the indexer becomes ready', async () => {
+    jest.useFakeTimers();
+    try {
+      configureVault();
+      mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+      mockUseAccount.mockReturnValue({
+        address: walletAddress,
+        chainId: 97,
+        isConnected: true,
+      } as unknown as ReturnType<typeof useAccount>);
+      mockUsePublicClient.mockReturnValue({
+        readContract: jest.fn(),
+        waitForTransactionReceipt: jest.fn(),
+      } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+      fetchMock
+        .mockResolvedValueOnce(successfulResponse(poolStatus({ indexerStatus: 'unavailable' })))
+        .mockResolvedValueOnce(successfulResponse(poolStatus({
+          availableAssets: [availableAsset()],
+        })));
+
+      render(<CukiePoolStatusPanel />);
+
+      expect(await screen.findByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(10_000);
+      });
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(await screen.findByRole('button', { name: /Depositar/i })).toBeEnabled();
+      expect(screen.queryByText(/Los depósitos están bloqueados/i)).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops retrying after 180 seconds and a manual refresh starts a new window', async () => {
+    jest.useFakeTimers();
+    try {
+      configureVault();
+      mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+      mockUseAccount.mockReturnValue({
+        address: walletAddress,
+        chainId: 97,
+        isConnected: true,
+      } as unknown as ReturnType<typeof useAccount>);
+      mockUsePublicClient.mockReturnValue({
+        readContract: jest.fn(),
+        waitForTransactionReceipt: jest.fn(),
+      } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+      fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+        indexerStatus: 'unavailable',
+      })));
+
+      render(<CukiePoolStatusPanel />);
+
+      expect(await screen.findByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(180_000);
+      });
+      const callsAtWindowEnd = fetchMock.mock.calls.length;
+      expect(callsAtWindowEnd).toBeGreaterThan(1);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(60_000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(callsAtWindowEnd);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+        await Promise.resolve();
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(callsAtWindowEnd + 1);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(10_000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(callsAtWindowEnd + 2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shows the API activation cutoff and deposit calendar version without assuming a fixed hour', async () => {
