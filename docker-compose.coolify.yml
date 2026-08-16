@@ -193,7 +193,9 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - coolify
+      coolify:
+        aliases:
+          - dapp-${COOLIFY_RESOURCE_UUID:?Coolify must expose the resource UUID}
 
   chain-indexer:
     build:
@@ -316,7 +318,7 @@ services:
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       CHAIN_INDEXER_CUKIE_MASTER_ENABLED: ${CHAIN_INDEXER_CUKIE_MASTER_ENABLED:-false}
-      CUKIE_MASTER_DAPP_INTERNAL_URL: http://dapp:3000
+      CUKIE_MASTER_DAPP_INTERNAL_URL: http://dapp-${COOLIFY_RESOURCE_UUID}:3000
       CUKIE_MASTER_SCHEDULER_INTERVAL_MS: ${CUKIE_MASTER_SCHEDULER_INTERVAL_MS:-60000}
       CUKIE_MASTER_TICK_TIMEOUT_MS: ${CUKIE_MASTER_TICK_TIMEOUT_MS:-300000}
       CUKIE_MASTER_QUEUE_LIMIT: ${CUKIE_MASTER_QUEUE_LIMIT:-100}
@@ -328,7 +330,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://dapp:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://dapp-${COOLIFY_RESOURCE_UUID}:3000/api/health').then(async(r)=>{const b=await r.json();process.exit(r.ok&&b?.coolify?.resourceUuid===process.env.COOLIFY_RESOURCE_UUID?0:1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -374,7 +376,7 @@ services:
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       COMPETITION_CREDITS_SCHEDULER_ENABLED: ${COMPETITION_CREDITS_RUNTIME_ENABLED:-false}
-      COMPETITION_CREDITS_SCHEDULER_BASE_URL: http://dapp:3000
+      COMPETITION_CREDITS_SCHEDULER_BASE_URL: http://dapp-${COOLIFY_RESOURCE_UUID}:3000
       COMPETITION_CREDITS_SCHEDULER_INTERVAL_MS: ${COMPETITION_CREDITS_SCHEDULER_INTERVAL_MS:-30000}
       COMPETITION_CREDITS_TICK_TIMEOUT_MS: ${COMPETITION_CREDITS_TICK_TIMEOUT_MS:-240000}
       COMPETITION_CREDITS_SCHEDULER_ID: ${COMPETITION_CREDITS_SCHEDULER_ID:-coolify-staging-primary}
@@ -385,7 +387,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://dapp:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://dapp-${COOLIFY_RESOURCE_UUID}:3000/api/health').then(async(r)=>{const b=await r.json();process.exit(r.ok&&b?.coolify?.resourceUuid===process.env.COOLIFY_RESOURCE_UUID?0:1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -431,7 +433,7 @@ services:
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       GAME_ECONOMY_RUNTIME_ENABLED: ${GAME_ECONOMY_RUNTIME_ENABLED:-false}
-      GAME_ECONOMY_DAPP_INTERNAL_URL: http://dapp:3000
+      GAME_ECONOMY_DAPP_INTERNAL_URL: http://dapp-${COOLIFY_RESOURCE_UUID}:3000
       GAME_ECONOMY_SCHEDULER_INTERVAL_MS: ${GAME_ECONOMY_SCHEDULER_INTERVAL_MS:-30000}
       GAME_ECONOMY_TICK_TIMEOUT_MS: ${GAME_ECONOMY_TICK_TIMEOUT_MS:-240000}
       GAME_ECONOMY_SCHEDULER_ID: ${GAME_ECONOMY_SCHEDULER_ID:-coolify-staging-primary}
@@ -442,7 +444,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://dapp:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://dapp-${COOLIFY_RESOURCE_UUID}:3000/api/health').then(async(r)=>{const b=await r.json();process.exit(r.ok&&b?.coolify?.resourceUuid===process.env.COOLIFY_RESOURCE_UUID?0:1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -488,7 +490,7 @@ services:
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       CUKIE_POOL_RUNTIME_ENABLED: ${CUKIE_POOL_RUNTIME_ENABLED:-false}
-      CUKIE_POOL_DAPP_INTERNAL_URL: http://dapp:3000
+      CUKIE_POOL_DAPP_INTERNAL_URL: http://dapp-${COOLIFY_RESOURCE_UUID}:3000
       CUKIE_POOL_SCHEDULER_INTERVAL_MS: ${CUKIE_POOL_SCHEDULER_INTERVAL_MS:-30000}
       CUKIE_POOL_TICK_TIMEOUT_MS: ${CUKIE_POOL_TICK_TIMEOUT_MS:-240000}
       CUKIE_POOL_SCHEDULER_ID: ${CUKIE_POOL_SCHEDULER_ID:-coolify-staging-primary}
@@ -499,7 +501,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://dapp:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://dapp-${COOLIFY_RESOURCE_UUID}:3000/api/health').then(async(r)=>{const b=await r.json();process.exit(r.ok&&b?.coolify?.resourceUuid===process.env.COOLIFY_RESOURCE_UUID?0:1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -545,7 +547,7 @@ services:
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       WEEKLY_RANKING_RUNTIME_ENABLED: ${WEEKLY_RANKING_RUNTIME_ENABLED:-false}
-      WEEKLY_RANKING_DAPP_INTERNAL_URL: http://dapp:3000
+      WEEKLY_RANKING_DAPP_INTERNAL_URL: http://dapp-${COOLIFY_RESOURCE_UUID}:3000
       WEEKLY_RANKING_SCHEDULER_INTERVAL_MS: ${WEEKLY_RANKING_SCHEDULER_INTERVAL_MS:-21600000}
       WEEKLY_RANKING_TICK_TIMEOUT_MS: ${WEEKLY_RANKING_TICK_TIMEOUT_MS:-240000}
       WEEKLY_RANKING_SCHEDULER_ID: ${WEEKLY_RANKING_SCHEDULER_ID:-coolify-staging-primary}
@@ -556,7 +558,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://dapp:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://dapp-${COOLIFY_RESOURCE_UUID}:3000/api/health').then(async(r)=>{const b=await r.json();process.exit(r.ok&&b?.coolify?.resourceUuid===process.env.COOLIFY_RESOURCE_UUID?0:1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -422,6 +422,71 @@ export function projectionSafetyWarnings(input: {
   return warnings;
 }
 
+const PENDING_CHAIN_EVENT_STATUSES = ['ingested', 'projecting', 'failed'] as const;
+
+export function pendingUkiWalletEventFilter(walletNormalized: string) {
+  return {
+    chain: 'BSC',
+    status: { $in: [...PENDING_CHAIN_EVENT_STATUSES] },
+    $or: [
+      {
+        contractAlias: 'UKI_STAKING',
+        'normalized.accountNormalized': walletNormalized,
+      },
+      {
+        contractAlias: 'VESTING_VAULT',
+        'normalized.beneficiaryNormalized': walletNormalized,
+      },
+    ],
+  };
+}
+
+export function pendingNftEventFilter(input: {
+  aliases: readonly string[];
+  mode: 'legacy' | 'custodial' | 'invalid';
+  walletNormalized?: string;
+}) {
+  const base = {
+    chain: 'BSC',
+    status: { $in: [...PENDING_CHAIN_EVENT_STATUSES] },
+  };
+  if (!input.walletNormalized) {
+    return { ...base, contractAlias: { $in: [...input.aliases] } };
+  }
+  const wallet = input.walletNormalized;
+  if (input.mode === 'custodial') {
+    return {
+      ...base,
+      $or: [
+        {
+          contractAlias: 'TOKEN_V2',
+          $or: [
+            { 'normalized.fromNormalized': wallet },
+            { 'normalized.toNormalized': wallet },
+          ],
+        },
+        {
+          contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+          'normalized.beneficiaryNormalized': wallet,
+        },
+      ],
+    };
+  }
+  return {
+    ...base,
+    contractAlias: { $in: [...input.aliases] },
+    $or: [
+      { 'normalized.userNormalized': wallet },
+      { 'normalized.fromNormalized': wallet },
+      { 'normalized.toNormalized': wallet },
+      { 'normalized.ownerNormalized': wallet },
+      { 'normalized.buyerNormalized': wallet },
+      { 'normalized.originOwnerNormalized': wallet },
+      { 'normalized.destOwnerNormalized': wallet },
+    ],
+  };
+}
+
 export const EXPECTED_UKI_CURSOR_IDS = [
   'UKI_STAKING:Staked',
   'UKI_STAKING:Unstaked',
@@ -582,7 +647,7 @@ export interface CukieMasterRepository {
     walletNormalized: string,
   ): Promise<UkiVestingPositionRawDocument | null>;
   getUkiIndexerHealth(walletNormalized: string, now: Date): Promise<CukieMasterIndexerHealth>;
-  getNftIndexerHealth(now: Date): Promise<CukieMasterIndexerHealth>;
+  getNftIndexerHealth(now: Date, walletNormalized?: string): Promise<CukieMasterIndexerHealth>;
   getNftEntitlement(
     walletAddress: string,
     now: Date,
@@ -769,10 +834,16 @@ export function createMongoCukieMasterRepository(
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
-      const pendingEvent = await db.collection('chain_events').findOne({
-          contractAlias: { $in: aliases },
-          status: { $ne: 'projected' },
-        }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const legacyDeadLetterEvent = deadLetter ? null : await db.collection('chain_events').findOne({
+        chain: 'BSC',
+        contractAlias: { $in: aliases },
+        status: 'failed',
+        attempts: { $gte: 5 },
+      }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const pendingEvent = await db.collection('chain_events').findOne(
+        pendingUkiWalletEventFilter(walletNormalized),
+        { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 },
+      );
       const incident = await db.collection('chain_integrity_incidents')
         .findOne({
           status: 'open',
@@ -831,7 +902,7 @@ export function createMongoCukieMasterRepository(
       if (!expectedConfigs.UKI_STAKING || !expectedConfigs.VESTING_VAULT) {
         warnings.push('La identidad/configuracion historica UKI no esta completa.');
       }
-      if (deadLetter) warnings.push('Existen dead letters de economia UKI.');
+      if (deadLetter || legacyDeadLetterEvent) warnings.push('Existen dead letters de economia UKI.');
       if (incident) warnings.push('Existe un incidente de integridad abierto.');
       if (
         !chainId
@@ -865,7 +936,7 @@ export function createMongoCukieMasterRepository(
       }));
       return { healthy: warnings.length === 0, warnings, checkedAt };
     },
-    async getNftIndexerHealth(checkedAt) {
+    async getNftIndexerHealth(checkedAt, walletNormalized) {
       const nftMode = ukiNftVaults.mode.cukieMaster;
       const scope = cukieMasterNftHealthScope(nftMode);
       const aliases = [...scope.aliases];
@@ -906,10 +977,16 @@ export function createMongoCukieMasterRepository(
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
-      const pendingEvent = await db.collection('chain_events').findOne({
+      const legacyDeadLetterEvent = deadLetter ? null : await db.collection('chain_events').findOne({
+        chain: 'BSC',
         contractAlias: { $in: aliases },
-        status: { $in: ['ingested', 'projecting', 'failed'] },
+        status: 'failed',
+        attempts: { $gte: 5 },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const pendingEvent = await db.collection('chain_events').findOne(
+        pendingNftEventFilter({ aliases, mode: nftMode, walletNormalized }),
+        { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 },
+      );
       const commonCanonicalIncident = await db.collection('chain_integrity_incidents')
         .findOne({
           status: 'open',
@@ -974,7 +1051,7 @@ export function createMongoCukieMasterRepository(
       } else {
         warnings.push('La configuracion publica del vault NFT de Cukie Master es invalida.');
       }
-      if (deadLetter) warnings.push('Existen dead letters del pipeline NFT.');
+      if (deadLetter || legacyDeadLetterEvent) warnings.push('Existen dead letters del pipeline NFT.');
       if (pendingEvent) warnings.push('Existen eventos NFT pendientes de proyeccion.');
       if (commonCanonicalIncident) {
         warnings.push('Existe un incidente canonico BSC que afecta al pipeline NFT.');

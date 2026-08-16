@@ -43,6 +43,7 @@ import { createMongoCukieMasterRepository } from './repository';
 import { recalculateCukieMasterRoute } from './service';
 import {
   fullReconciliationRoutesForSource,
+  legacyNftRecalculationJobRepair,
   recalculationFenceFilter,
   recalculationRetryBackoffMs,
   routedRecalculationJobId,
@@ -865,6 +866,10 @@ export async function runCukieMasterRuntimeTick(input: {
     expiresAt: new Date(startedAt.getTime() + CUKIE_MASTER_RUNTIME_RUN_RETENTION_MS),
   });
   try {
+    const legacyQueueRepairAt = validClockDate(clock);
+    const legacyQueueRepairOperation = legacyNftRecalculationJobRepair(legacyQueueRepairAt);
+    const legacyQueueRepair = await db.collection<CukieMasterRecalculationJob>(QUEUE_COLLECTION)
+      .updateMany(legacyQueueRepairOperation.filter, legacyQueueRepairOperation.update);
     const queue = await processRecalculationQueue({
       db,
       clock,
@@ -915,6 +920,7 @@ export async function runCukieMasterRuntimeTick(input: {
     const reconciliation = await enqueueFullReconciliationBatch(db, clock, lease, leaseMs);
     const endedAt = validClockDate(clock);
     const result = {
+      legacyQueueRepair: { repaired: legacyQueueRepair.modifiedCount },
       queue,
       activation,
       grace,

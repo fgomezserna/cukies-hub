@@ -167,6 +167,12 @@ export const FULL_RECONCILIATION_SOURCES: readonly FullReconciliationSource[] = 
     walletField: 'ownerNormalized',
     filter: { status: 'active' },
   },
+  {
+    id: 'nft-custodial-positions',
+    collection: 'cukie_master_nft_positions',
+    walletField: 'beneficiaryNormalized',
+    filter: { lifecycleOpen: true },
+  },
 ] as const;
 
 export type FullReconciliationCursor = {

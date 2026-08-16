@@ -108,6 +108,19 @@ function configureConnectedWallet(chainId = 97) {
   } as unknown as ReturnType<typeof useAccount>);
 }
 
+function openRecoveryPanel() {
+  const title = screen.getByText('Recuperación de emergencia');
+  const summary = title.closest('summary');
+  const details = title.closest('details');
+
+  expect(summary).not.toBeNull();
+  expect(details).not.toHaveAttribute('open');
+  fireEvent.click(summary as HTMLElement);
+  expect(details).toHaveAttribute('open');
+
+  return details as HTMLDetailsElement;
+}
+
 describe('NftVaultRecoveryPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -134,6 +147,25 @@ describe('NftVaultRecoveryPanel', () => {
     jest.restoreAllMocks();
   });
 
+  it('permanece colapsado por defecto y muestra una única colección sin selector', () => {
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn(),
+      getBlock: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+
+    render(<NftVaultRecoveryPanel kind="cukie_master" />);
+
+    const title = screen.getByText('Recuperación de emergencia');
+    expect(title.closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText(/solo si un NFT que ya depositaste no aparece/i)).toBeInTheDocument();
+    expect(screen.getByText(/No sirve para depositar un NFT/i)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Colección NFT' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Colección NFT')).toHaveTextContent(collectionAddress);
+
+    openRecoveryPanel();
+  });
+
   it('retira desde Cukie Master sin auth, API ni indexador, incluso si la colección fue delistada', async () => {
     const readContract = jest.fn()
       .mockResolvedValueOnce(false)
@@ -149,7 +181,8 @@ describe('NftVaultRecoveryPanel', () => {
     writeContractAsync.mockResolvedValue(transactionHash);
 
     render(<NftVaultRecoveryPanel kind="cukie_master" />);
-    fireEvent.change(screen.getByLabelText('Token ID'), { target: { value: '7' } });
+    openRecoveryPanel();
+    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '7' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     const withdrawButton = await screen.findByRole('button', { name: 'Retirar Cukie ahora' });
@@ -182,10 +215,12 @@ describe('NftVaultRecoveryPanel', () => {
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
 
     render(<NftVaultRecoveryPanel kind="cukie_master" />);
+    openRecoveryPanel();
+    expect(screen.getByRole('combobox', { name: 'Colección NFT' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Colección NFT'), {
       target: { value: historicalCollectionAddress },
     });
-    fireEvent.change(screen.getByLabelText('Token ID'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     expect(await screen.findByRole('button', { name: 'Retirar Cukie ahora' })).toBeEnabled();
@@ -215,7 +250,8 @@ describe('NftVaultRecoveryPanel', () => {
     writeContractAsync.mockResolvedValue(transactionHash);
 
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
-    fireEvent.change(screen.getByLabelText('Token ID'), { target: { value: '8' } });
+    openRecoveryPanel();
+    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Solicitar salida on-chain' }));
 
@@ -247,7 +283,8 @@ describe('NftVaultRecoveryPanel', () => {
     writeContractAsync.mockResolvedValue(transactionHash);
 
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
-    fireEvent.change(screen.getByLabelText('Token ID'), { target: { value: '9' } });
+    openRecoveryPanel();
+    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '9' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Retirar NFT on-chain' }));
 
@@ -273,7 +310,8 @@ describe('NftVaultRecoveryPanel', () => {
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
 
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
-    fireEvent.change(screen.getByLabelText('Token ID'), { target: { value: '10' } });
+    openRecoveryPanel();
+    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     await screen.findByText(/Retirable desde/i);
@@ -291,7 +329,8 @@ describe('NftVaultRecoveryPanel', () => {
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
 
     render(<NftVaultRecoveryPanel kind="cukie_master" />);
-    fireEvent.change(screen.getByLabelText('Token ID'), { target: { value: '11' } });
+    openRecoveryPanel();
+    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '11' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     expect(await screen.findByText(/pertenece a otra wallet/i)).toBeInTheDocument();
@@ -309,6 +348,7 @@ describe('NftVaultRecoveryPanel', () => {
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
 
     render(<NftVaultRecoveryPanel kind="cukie_master" />);
+    openRecoveryPanel();
 
     expect(screen.getByText(/identidad pública del vault/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Comprobar posición' })).toBeDisabled();

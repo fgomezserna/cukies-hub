@@ -19,6 +19,8 @@ import {
   cukieMasterNftHealthScope,
   expectedBscChainId,
   operationalIndexerHealthWarnings,
+  pendingNftEventFilter,
+  pendingUkiWalletEventFilter,
   projectionSafetyWarnings,
   stakingBalancesMatchState,
   stakingMaterializationMatchesState,
@@ -300,6 +302,40 @@ describe('Cukie Master canonical sources', () => {
       expect.stringContaining('lastEventId'),
       expect.stringContaining('ultimo ledger'),
     ]));
+  });
+
+  it('acota los eventos UKI pendientes a la wallet y excluye ignored', () => {
+    expect(pendingUkiWalletEventFilter('0xabc')).toEqual({
+      chain: 'BSC',
+      status: { $in: ['ingested', 'projecting', 'failed'] },
+      $or: [
+        {
+          contractAlias: 'UKI_STAKING',
+          'normalized.accountNormalized': '0xabc',
+        },
+        {
+          contractAlias: 'VESTING_VAULT',
+          'normalized.beneficiaryNormalized': '0xabc',
+        },
+      ],
+    });
+  });
+
+  it('acota la salud NFT custodial a transferencias y vault de la wallet', () => {
+    expect(pendingNftEventFilter({
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+      mode: 'custodial',
+      walletNormalized: '0xabc',
+    })).toEqual(expect.objectContaining({
+      chain: 'BSC',
+      status: { $in: ['ingested', 'projecting', 'failed'] },
+      $or: expect.arrayContaining([
+        expect.objectContaining({
+          contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+          'normalized.beneficiaryNormalized': '0xabc',
+        }),
+      ]),
+    }));
   });
 
   it('rejects a corrupt vesting aggregate even when lastEventId still matches', () => {
@@ -1082,6 +1118,22 @@ describe('Cukie Master transactional allocation', () => {
     expect([...state.events.values()].filter((event) => event.eventType === 'slot_activated'))
       .toHaveLength(1);
     expect(await listCreditEligibleCukieMasterPositions(maturedAt, repo)).toHaveLength(1);
+  });
+
+  it('fails closed when a persisted position has no active route round', async () => {
+    const { repo, state } = memoryRepository();
+    state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(20_000), releasedRaw: '0' });
+    const service = createCukieMasterService((work) => work(repo));
+    await service.recalculateCukieMasterWallet('0xABC', now, 'round-required');
+    state.rounds.delete('uki');
+
+    const status = await getCukieMasterWalletStatus('0xABC', now, repo);
+
+    expect(status.routes.uki.position).not.toBeNull();
+    expect(status.routes.uki.sourceCompleteness.complete).toBe(false);
+    expect(status.routes.uki.sourceCompleteness.warnings).toContain(
+      'No existe una ronda activa para la ruta uki.',
+    );
   });
 
   it('protects existing slots for a fixed 48h strict requirement grace', async () => {

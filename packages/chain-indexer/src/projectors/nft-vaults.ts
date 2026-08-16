@@ -3,6 +3,7 @@ import type { ClientSession } from 'mongodb';
 import type { ChainEvent } from '../types.js';
 import { getString, now } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
+import { enqueueCukieMasterRecalculation } from './cukie-master-outbox.js';
 
 type VaultAlias = 'CUKIE_MASTER_NFT_VAULT' | 'CUKIE_POOL_NFT_VAULT';
 
@@ -197,7 +198,16 @@ async function projectMasterDeposit(
       depositEpoch,
       beneficiaryNormalized,
       eventId: event._id,
-    })) return null;
+    })) {
+      await enqueueCukieMasterRecalculation({
+        store,
+        event,
+        wallet: beneficiaryNormalized,
+        route: 'nft',
+        session,
+      });
+      return null;
+    }
     throw new NftVaultProjectionError(`Deposito Cukie Master conflictivo para ${id}.`);
   }
 
@@ -221,6 +231,13 @@ async function projectMasterDeposit(
     createdAt: now(),
     updatedAt: now(),
   }, { session });
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: beneficiaryNormalized,
+    route: 'nft',
+    session,
+  });
   return null;
 }
 
@@ -236,7 +253,16 @@ async function projectMasterWithdrawal(
   const id = positionId(identity.assetId, depositEpoch);
   const target = collection(store, 'cukie_master_nft_positions');
   const existing = await target.findOne({ _id: id }, { session });
-  if (existing?.withdrawalEvidence?.eventId === event._id) return null;
+  if (existing?.withdrawalEvidence?.eventId === event._id) {
+    await enqueueCukieMasterRecalculation({
+      store,
+      event,
+      wallet: beneficiaryNormalized,
+      route: 'nft',
+      session,
+    });
+    return null;
+  }
   if (
     !existing
     || existing.lifecycleOpen !== true
@@ -270,6 +296,13 @@ async function projectMasterWithdrawal(
   if (result.matchedCount !== 1) {
     throw new NftVaultProjectionError(`Carrera al cerrar Cukie Master ${id}.`);
   }
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: beneficiaryNormalized,
+    route: 'nft',
+    session,
+  });
   return null;
 }
 

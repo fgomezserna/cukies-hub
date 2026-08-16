@@ -17,24 +17,76 @@ function publicRouteStatus(
   route: CukieMasterWalletStatus['routes']['uki'],
 ) {
   const position = route.position;
+  const previewSlots = (() => {
+    if (!route.sourceCompleteness.complete) return null;
+    try {
+      const available = route.source.route === 'uki'
+        ? BigInt(route.source.totalUkiRaw)
+        : BigInt(route.source.originalCukiePoints);
+      const requirement = route.nextSlotRequirement.route === 'uki'
+        ? BigInt(route.nextSlotRequirement.ukiRaw)
+        : BigInt(route.nextSlotRequirement.nftPoints);
+      if (requirement <= BigInt(0)) return null;
+      return Number(available / requirement > BigInt(5) ? BigInt(5) : available / requirement);
+    } catch {
+      return null;
+    }
+  })();
+  const positionShapeValid = position
+    ? previewSlots !== null
+      && Number.isSafeInteger(position.desiredSlots)
+      && Number.isSafeInteger(position.allocatedSlots)
+      && Number.isSafeInteger(position.protectedSlots)
+      && position.desiredSlots === previewSlots
+      && position.desiredSlots >= 0
+      && position.desiredSlots <= 5
+      && position.allocatedSlots >= 0
+      && position.allocatedSlots <= 5
+      && position.protectedSlots >= 0
+      && position.protectedSlots <= position.allocatedSlots
+      && position.allocatedSlots <= Math.max(position.desiredSlots, position.protectedSlots)
+    : previewSlots === 0;
+  const positionMatchesSource = position
+    ? positionShapeValid
+      && position.sourceHash === route.source.sourceHash
+      && position.roundId === route.roundId
+      && position.ruleVersion === route.ruleVersion
+    : positionShapeValid;
+  const liveSlots = route.slots.filter((slot) => slot.status !== 'inactive');
+  const liveOrdinals = new Set(liveSlots.map((slot) => slot.ordinal));
+  const slotsMatchSource = liveSlots.length === (position?.allocatedSlots ?? 0)
+    && liveOrdinals.size === liveSlots.length
+    && liveSlots.every((slot) => (
+      slot.ordinal >= 1
+      && slot.ordinal <= (position?.allocatedSlots ?? 0)
+      && slot.sourceHash === route.source.sourceHash
+      && slot.roundId === route.roundId
+      && slot.ruleVersion === route.ruleVersion
+    ));
+  const projectionFresh = route.sourceCompleteness.complete
+    && positionMatchesSource
+    && slotsMatchSource;
+  const synchronizing = route.sourceCompleteness.complete && !projectionFresh;
+  const publicPosition = projectionFresh ? position : null;
+  const publicSlots = projectionFresh ? liveSlots : [];
   return {
-    position: position ? {
-      route: position.route,
-      status: position.status,
-      desiredSlots: position.desiredSlots,
-      allocatedSlots: position.allocatedSlots,
-      protectedSlots: position.protectedSlots,
-      qualifiedSince: position.qualifiedSince ?? null,
-      activeFrom: position.activeFrom ?? null,
-      waitlistedAt: position.waitlistedAt ?? null,
-      inactiveAt: position.inactiveAt ?? null,
-      graceEndsAt: position.graceEndsAt ?? null,
-      requirement: position.requirementSnapshot,
-      pendingRequirement: position.pendingRequirementSnapshot ?? null,
-      ruleVersion: position.ruleVersion,
-      roundId: position.roundId,
+    position: publicPosition ? {
+      route: publicPosition.route,
+      status: publicPosition.status,
+      desiredSlots: publicPosition.desiredSlots,
+      allocatedSlots: publicPosition.allocatedSlots,
+      protectedSlots: publicPosition.protectedSlots,
+      qualifiedSince: publicPosition.qualifiedSince ?? null,
+      activeFrom: publicPosition.activeFrom ?? null,
+      waitlistedAt: publicPosition.waitlistedAt ?? null,
+      inactiveAt: publicPosition.inactiveAt ?? null,
+      graceEndsAt: publicPosition.graceEndsAt ?? null,
+      requirement: publicPosition.requirementSnapshot,
+      pendingRequirement: publicPosition.pendingRequirementSnapshot ?? null,
+      ruleVersion: publicPosition.ruleVersion,
+      roundId: publicPosition.roundId,
     } : null,
-    slots: route.slots.map((slot) => ({
+    slots: publicSlots.map((slot) => ({
       route: slot.route,
       ordinal: slot.ordinal,
       eligibilityEpoch: slot.eligibilityEpoch,
@@ -51,8 +103,11 @@ function publicRouteStatus(
     pendingRequirement: route.pendingRequirement,
     requirementGraceEndsAt: route.requirementGraceEndsAt,
     deficitToNextSlot: route.deficitToNextSlot,
-    deficitToPreserveSlots: route.deficitToPreserveSlots,
-    countdownEndsAt: route.countdownEndsAt,
+    deficitToPreserveSlots: projectionFresh ? route.deficitToPreserveSlots : null,
+    countdownEndsAt: projectionFresh ? route.countdownEndsAt : null,
+    projectionFresh,
+    synchronizing,
+    previewSlots,
     source: {
       complete: route.sourceCompleteness.complete,
       status: route.sourceCompleteness.complete ? 'available' : 'unavailable',
@@ -91,16 +146,23 @@ export async function GET(request: NextRequest) {
       getCukieMasterWalletStatus(walletAddress),
       getCukieMasterNftInventory(walletAddress),
     ]);
+    const publicRoutes = {
+      uki: publicRouteStatus(status.routes.uki),
+      nft: publicRouteStatus(status.routes.nft),
+    };
     const response = NextResponse.json({
       status: 'ok',
       data: {
         walletAddress: status.walletAddress,
         walletNormalized: status.walletNormalized,
-        routes: {
-          uki: publicRouteStatus(status.routes.uki),
-          nft: publicRouteStatus(status.routes.nft),
+        routes: publicRoutes,
+        totals: {
+          desiredSlots: (publicRoutes.uki.position?.desiredSlots ?? 0)
+            + (publicRoutes.nft.position?.desiredSlots ?? 0),
+          allocatedSlots: (publicRoutes.uki.position?.allocatedSlots ?? 0)
+            + (publicRoutes.nft.position?.allocatedSlots ?? 0),
+          maxPotentialSlots: 10,
         },
-        totals: status.totals,
         nftInventory,
         nftCustody: {
           mode: ukiNftVaults.mode.cukieMaster,

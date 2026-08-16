@@ -1,8 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { CukieMasterNftVaultPanel } from '@/components/cukie-master/nft-vault-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+import {
+  savePendingNftVaultOperation,
+  type NftVaultPendingOperation,
+} from '@/lib/nft-vault/pending-operations';
 import { useAuth } from '@/providers/auth-provider';
 
 jest.mock('@/providers/auth-provider');
@@ -52,6 +56,7 @@ const approvalHash = `0x${'a'.repeat(64)}` as const;
 const depositHash = `0x${'b'.repeat(64)}` as const;
 const fetchMock = jest.fn();
 const readContract = jest.fn();
+const getTransactionReceipt = jest.fn();
 const waitForTransactionReceipt = jest.fn();
 const writeContractAsync = jest.fn();
 
@@ -74,6 +79,8 @@ function status(input: { indexer?: 'ready' | 'unavailable'; deposited?: boolean 
       imageUrl: null,
       rarity: 'rare',
       rarityPoints: 4,
+      state: deposited ? 'staked_master' : 'available',
+      blockers: [] as string[],
       custody: deposited ? 'cukie_master_nft_vault' : 'wallet',
       canDeposit: !deposited,
       canWithdraw: deposited,
@@ -85,9 +92,30 @@ function response(data: ReturnType<typeof status>) {
   return { ok: true, json: async () => ({ status: 'ok', data }) };
 }
 
+function pendingOperation(
+  overrides: Partial<NftVaultPendingOperation> = {},
+): NftVaultPendingOperation {
+  return {
+    version: 1,
+    chainId: 97,
+    walletAddress: wallet,
+    vaultAddress: vault,
+    assetId: `97:${collection}:98000001`,
+    collectionAddress: collection,
+    tokenId: '98000001',
+    action: 'deposit',
+    phase: 'awaiting_receipt',
+    txHash: depositHash,
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
 describe('CukieMasterNftVaultPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
     global.fetch = fetchMock;
     mockUseAuth.mockReturnValue({
       user: { walletAddress: wallet },
@@ -97,9 +125,10 @@ describe('CukieMasterNftVaultPanel', () => {
       fetchUser: jest.fn(),
     } as never);
     mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as never);
-    mockUsePublicClient.mockReturnValue({ readContract, waitForTransactionReceipt } as never);
+    mockUsePublicClient.mockReturnValue({ readContract, getTransactionReceipt, waitForTransactionReceipt } as never);
     mockUseWriteContract.mockReturnValue({ writeContractAsync } as never);
     waitForTransactionReceipt.mockResolvedValue({ status: 'success' });
+    getTransactionReceipt.mockRejectedValue(new Error('receipt not available yet'));
   });
 
   it('aprueba y deposita el ERC-721 directamente en el vault', async () => {
@@ -130,6 +159,128 @@ describe('CukieMasterNftVaultPanel', () => {
     }));
     expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: approvalHash });
     expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash });
+  });
+
+  it('bloquea el NFT desde el primer click y evita un segundo depósito', async () => {
+    fetchMock.mockResolvedValue(response(status()));
+    readContract
+      .mockResolvedValueOnce(wallet)
+      .mockResolvedValueOnce(vault)
+      .mockResolvedValueOnce(false);
+    let resolveWrite!: (hash: typeof depositHash) => void;
+    writeContractAsync.mockReturnValueOnce(new Promise((resolve) => { resolveWrite = resolve; }));
+
+    render(<CukieMasterNftVaultPanel />);
+    const button = await screen.findByRole('button', { name: /Hacer staking/i });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
+    await act(async () => resolveWrite(depositHash));
+    await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
+  });
+
+  it('restaura tras recargar una transacción pendiente y mantiene el NFT bloqueado', async () => {
+    const pending = pendingOperation({ action: 'deposit', phase: 'awaiting_receipt', txHash: depositHash });
+    savePendingNftVaultOperation(localStorage, pending);
+    fetchMock.mockResolvedValue(response(status()));
+
+    render(<CukieMasterNftVaultPanel />);
+
+    const button = await screen.findByRole('button', { name: /Confirmando depósito/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByRole('link', { name: /Ver transacción de esta operación/i })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/tx/${depositHash}`,
+    );
+    expect(writeContractAsync).not.toHaveBeenCalled();
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
+  });
+
+  it('reanuda el recibo tras recargar y desbloquea solo cuando el indexador refleja la custodia', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      action: 'deposit',
+      phase: 'awaiting_receipt',
+      txHash: depositHash,
+    }));
+    let resolveProjection!: (value: ReturnType<typeof response>) => void;
+    fetchMock
+      .mockResolvedValueOnce(response(status()))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveProjection = resolve; }));
+    getTransactionReceipt.mockResolvedValueOnce({ status: 'success' });
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(await screen.findByRole('button', { name: /Actualizando staking/i })).toBeDisabled();
+    await act(async () => resolveProjection(response(status({ deposited: true }))));
+    expect(await screen.findByRole('button', { name: /Retirar inmediatamente/i })).toBeEnabled();
+    await waitFor(() => expect(localStorage.length).toBe(0));
+  });
+
+  it('permite continuar el depósito solo si la aprobación sigue vigente on-chain', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock
+      .mockResolvedValueOnce(response(status()))
+      .mockResolvedValueOnce(response(status({ deposited: true })));
+    readContract
+      .mockResolvedValueOnce(wallet)
+      .mockResolvedValueOnce(vault)
+      .mockResolvedValueOnce(false);
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Continuar staking/i }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
+    expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: vault,
+      functionName: 'deposit',
+    }));
+  });
+
+  it('no persiste una operación si la firma se rechaza antes de devolver hash', async () => {
+    fetchMock.mockResolvedValue(response(status()));
+    readContract
+      .mockResolvedValueOnce(wallet)
+      .mockResolvedValueOnce(vault)
+      .mockResolvedValueOnce(false);
+    writeContractAsync.mockRejectedValueOnce(new Error('User rejected request'));
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Hacer staking/i }));
+
+    expect(await screen.findByText(/rechazó la operación antes de crear una transacción/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeEnabled();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('muestra los 12 Cukies y explica por qué los 6 de Segunda Generación no son aptos', async () => {
+    const data = status();
+    data.nftInventory = Array.from({ length: 12 }, (_, index) => {
+      const original = index < 6;
+      const tokenId = String(98_000_001 + index);
+      return {
+        ...data.nftInventory[0],
+        assetId: `97:${collection}:${tokenId}`,
+        canonicalAssetId: `97:${collection}:${tokenId}`,
+        tokenId,
+        state: original ? 'available' : 'blocked',
+        blockers: original ? [] : ['second_generation'],
+        canDeposit: original,
+      };
+    });
+    fetchMock.mockResolvedValueOnce(response(data));
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(await screen.findByText('12 Cukies detectados · 6 aptos para esta ruta')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Hacer staking/i })).toHaveLength(6);
+    expect(screen.getAllByText('Solo cuentan Cukies Originales')).toHaveLength(6);
   });
 
   it('bloquea depósitos si el indexador no está saludable y mantiene recuperación', async () => {

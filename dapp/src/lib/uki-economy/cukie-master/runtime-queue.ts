@@ -28,6 +28,7 @@ const FULL_RECONCILIATION_ROUTE_BY_SOURCE = {
   'presale-entitlements': ['uki'],
   'nft-owners': ['nft'],
   'nft-active-locks': ['nft'],
+  'nft-custodial-positions': ['nft'],
 } as const satisfies Record<string, readonly CukieMasterRoute[]>;
 
 export function routedRecalculationJobId(baseId: string, route: CukieMasterRoute) {
@@ -40,6 +41,32 @@ export function fullReconciliationRoutesForSource(sourceId: string) {
   ];
   if (!routes) throw new Error(`Fuente de reconciliacion Cukie Master desconocida: ${sourceId}.`);
   return routes;
+}
+
+export function legacyNftRecalculationJobRepair(now: Date) {
+  return {
+    filter: {
+      sourceType: 'nft_lock_event',
+      route: { $exists: false },
+      status: { $in: ['pending', 'failed'] as const },
+      walletNormalized: { $regex: '^0x[0-9a-f]{40}$' },
+    },
+    update: {
+      $set: {
+        route: 'nft' as const,
+        status: 'pending' as const,
+        availableAt: now,
+        updatedAt: now,
+      },
+      $unset: {
+        leasedBy: '' as const,
+        leaseExpiresAt: '' as const,
+        completedAt: '' as const,
+        expiresAt: '' as const,
+        lastErrorCode: '' as const,
+      },
+    },
+  };
 }
 
 export function recalculationRetryBackoffMs(attempts: number) {

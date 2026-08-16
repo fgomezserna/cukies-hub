@@ -4,7 +4,7 @@ import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 import { DomainConflictError, DomainValidationError } from '../errors';
 import { addRawAmounts, formatRawAmount, parseRawAmount } from '../money';
-import type { CukieMasterRoute } from '../rules';
+import { CUKIE_MASTER_RULE_VERSION, type CukieMasterRoute } from '../rules';
 import {
   assertStrictRequirementIncrease,
   calculateRouteSlotTarget,
@@ -270,7 +270,7 @@ async function readCukieMasterNftSource(
 ): Promise<CukieMasterNftSource> {
   const [nft, nftIndexerHealth] = await Promise.all([
     repository.getNftEntitlement(walletAddress, now),
-    repository.getNftIndexerHealth(now),
+    repository.getNftIndexerHealth(now, walletNormalized),
   ]);
   const nftAssets = nft.eligibleAssets.map((asset) => {
     const lock = asset.activeLocks.find((item) => (
@@ -1213,6 +1213,14 @@ export async function getCukieMasterWalletStatus(
         .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
       const round = rounds[route];
       const source = sources[route];
+      const sourceCompleteness = round ? source.completeness : {
+        ...source.completeness,
+        complete: false,
+        warnings: [
+          ...source.completeness.warnings,
+          `No existe una ronda activa para la ruta ${route}.`,
+        ],
+      };
       const requirement = round ? candidateRequirement(round) : initialRequirement(route);
       const available = source.route === 'uki'
         ? BigInt(source.totalUkiRaw)
@@ -1233,6 +1241,8 @@ export async function getCukieMasterWalletStatus(
           : { route: 'nft', nftPoints: Number(value) }
       );
       return [route, {
+        roundId: round?.roundId ?? `${route}:${CUKIE_MASTER_RULE_VERSION}`,
+        ruleVersion: round?.ruleVersion ?? CUKIE_MASTER_RULE_VERSION,
         position,
         slots: routeSlots,
         nextSlotRequirement: requirement,
@@ -1247,7 +1257,7 @@ export async function getCukieMasterWalletStatus(
           : requirementDeficit(preserveDeficit),
         countdownEndsAt: nextMaturity,
         source,
-        sourceCompleteness: sources[route].completeness,
+        sourceCompleteness,
       }];
     })) as CukieMasterWalletStatus['routes'],
     totals: {

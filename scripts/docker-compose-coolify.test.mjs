@@ -17,6 +17,9 @@ const guardedWorkers = [
   'cuki-card-worker',
 ];
 
+const resourceScopedDappAlias = 'dapp-${COOLIFY_RESOURCE_UUID:?Coolify must expose the resource UUID}';
+const internalResourceDappUrl = 'http://dapp-${COOLIFY_RESOURCE_UUID}:3000';
+
 function serviceDefinition(serviceName) {
   const startMarker = `  ${serviceName}:\n`;
   const start = compose.indexOf(startMarker);
@@ -54,3 +57,19 @@ test('chain-indexer reports health from its staging Mongo connection', () => {
   assert.match(definition, /command\(\{ ping: 1 \}\)/);
   assert.match(definition, /      start_period: 90s/);
 });
+
+test('dapp exposes a Docker alias scoped to its Coolify resource', () => {
+  const definition = serviceDefinition('dapp');
+
+  assert.ok(definition.includes(`          - ${resourceScopedDappAlias}`));
+});
+
+for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {
+  test(`${serviceName} only calls its resource-scoped dapp alias`, () => {
+    const definition = serviceDefinition(serviceName);
+
+    assert.ok(definition.includes(internalResourceDappUrl));
+    assert.doesNotMatch(definition, /http:\/\/dapp:3000/);
+    assert.match(definition, /b\?\.coolify\?\.resourceUuid===process\.env\.COOLIFY_RESOURCE_UUID/);
+  });
+}

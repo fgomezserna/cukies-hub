@@ -416,6 +416,13 @@ test('staking projector keeps absolute latest balances and rejects stale overwri
       ?.accountBalanceRaw,
     '10',
   );
+  const jobs = [...(context.collections.get('cukie_master_recalculation_jobs')?.documents.values() ?? [])];
+  assert.equal(jobs.length, 2);
+  assert.ok(jobs.every((job) => (
+    job.walletNormalized === WALLET.toLowerCase()
+    && job.route === 'uki'
+    && job.status === 'pending'
+  )));
 });
 
 test('rewards projector materializes publish, claim and close idempotently', async () => {
@@ -483,4 +490,11 @@ test('vesting projector rebuilds an idempotent ledger-backed position', async ()
   assert.equal(position?.lockedRaw, '60');
   assert.equal(position?.ledgerEventCount, 2);
   assert.equal(position?.lastEventId, released._id);
+  const jobs = [...(context.collections.get('cukie_master_recalculation_jobs')?.documents.values() ?? [])];
+  assert.equal(jobs.length, 2);
+  assert.ok(jobs.every((job) => (
+    job.walletNormalized === WALLET.toLowerCase()
+    && job.route === 'uki'
+    && job.status === 'pending'
+  )));
 });

@@ -179,6 +179,8 @@ export type CukieMasterWalletStatus = {
   walletAddress: string;
   walletNormalized: string;
   routes: Record<CukieMasterRoute, {
+    roundId: string;
+    ruleVersion: string;
     position: CukieMasterPosition | null;
     slots: CukieMasterSlot[];
     nextSlotRequirement: CukieMasterRequirement;

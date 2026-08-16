@@ -205,7 +205,7 @@ describe('CukiePoolStatusPanel', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByText(/Conecta y autentica tu wallet EVM/i)).toBeInTheDocument();
-    expect(screen.getByText('Salida directa del Cukie Pool')).toBeInTheDocument();
+    expect(screen.getByText('Recuperación de emergencia')).toBeInTheDocument();
   });
 
   it('approves and deposits on-chain before accepting the canonical projection', async () => {

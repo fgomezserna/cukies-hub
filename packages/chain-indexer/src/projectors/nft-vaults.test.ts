@@ -147,7 +147,11 @@ describe('NFT vault projectors', () => {
     const context = memoryStore();
     const deposit = masterDeposit();
     await projectNftVaultEvent(context.store as never, deposit);
+    const jobs = context.collections.get('cukie_master_recalculation_jobs')!;
+    assert.equal(jobs.documents.size, 1);
+    jobs.documents.clear();
     await projectNftVaultEvent(context.store as never, deposit);
+    assert.equal(jobs.documents.size, 1, 'el replay reconstruye el outbox si faltaba');
 
     const withdrawal = vaultEvent({
       alias: 'CUKIE_MASTER_NFT_VAULT',
@@ -162,7 +166,10 @@ describe('NFT vault projectors', () => {
       },
     });
     await projectNftVaultEvent(context.store as never, withdrawal);
+    jobs.documents.clear();
     await projectNftVaultEvent(context.store as never, withdrawal);
+    assert.equal(jobs.documents.size, 1, 'el replay de retirada reconstruye el outbox');
+    assert.equal([...jobs.documents.values()][0].route, 'nft');
 
     const positions = context.collections.get('cukie_master_nft_positions')!;
     assert.equal(positions.documents.size, 1);

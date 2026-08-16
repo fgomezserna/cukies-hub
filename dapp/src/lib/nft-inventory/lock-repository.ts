@@ -130,6 +130,7 @@ export function createMongoNftAssetLockRepository(
           $setOnInsert: {
             _id: id,
             walletNormalized: input.walletNormalized,
+            route: 'nft',
             status: 'pending',
             sourceType: 'nft_lock_event',
             sourceEventId: input.sourceEventId,

@@ -78,6 +78,30 @@ export class IndexerStore {
       this.events().createIndex({ status: 1, timestampMs: 1, blockNumber: 1, logIndex: 1 }),
       this.events().createIndex({ txHash: 1 }),
       this.events().createIndex({ eventName: 1, 'normalized.tokenId': 1, timestampMs: -1 }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.accountNormalized': 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.beneficiaryNormalized': 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.fromNormalized': 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.toNormalized': 1,
+      }),
       this.cursors().createIndex({ chain: 1, contractAlias: 1, eventName: 1 }),
       this.db.collection('tx_nfts').createIndex({ eventId: 1 }, { unique: true, sparse: true }),
       this.db
@@ -108,6 +132,7 @@ export class IndexerStore {
       this.db.collection('reward_claims')
         .createIndex({ transactionHash: 1, logIndex: 1 }, { unique: true }),
       this.db.collection('chain_dead_letters').createIndex({ eventId: 1 }, { unique: true }),
+      this.db.collection('chain_dead_letters').createIndex({ chain: 1, contractAlias: 1, updatedAt: -1 }),
       this.db.collection('chain_indexer_runs').createIndex({ startedAt: -1 }),
       this.db.collection('cukies').createIndex({ state: 1, network: 1, ownerNormalized: 1, timeStamp: -1 }),
       this.db.collection('cukies').createIndex({ ownerNormalized: 1, state: 1, network: 1 }),
@@ -398,6 +423,8 @@ export class IndexerStore {
             eventId: event._id,
             eventName: event.eventName,
             chain: event.chain,
+            contractAlias: event.contractAlias,
+            contractAddress: event.contractAddress,
             error: message,
             updatedAt: now(),
           },

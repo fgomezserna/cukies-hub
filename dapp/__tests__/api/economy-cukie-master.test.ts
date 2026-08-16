@@ -42,6 +42,8 @@ function route(routeName: 'uki' | 'nft') {
     indexerHealth: true,
   };
   return {
+    roundId: `${routeName}:v1`,
+    ruleVersion: 'cukie-master-v1',
     position: {
       _id: `${WALLET}:${routeName}`,
       walletAddress: WALLET,
@@ -76,7 +78,7 @@ function route(routeName: 'uki' | 'nft') {
       creditEligibleFrom: new Date('2026-07-10T12:00:00.000Z'),
       roundId: `${routeName}:v1`,
       ruleVersion: 'cukie-master-v1',
-      sourceHash: 'secret-slot-hash',
+      sourceHash: 'secret-source-hash',
       revision: 1,
       createdAt: new Date('2026-07-09T12:00:00.000Z'),
       updatedAt: new Date('2026-07-10T12:00:00.000Z'),
@@ -183,6 +185,73 @@ describe('GET /api/economy/v1/cukie-master', () => {
       contributionPoints: 4,
     }));
     expect(JSON.stringify(body)).not.toMatch(/sourceHash|refs|internal warning|secret-asset-id/);
+  });
+
+  it.each([
+    ['sourceHash', 'stale-source'],
+    ['roundId', 'uki:old-round'],
+    ['ruleVersion', 'old-rule'],
+  ] as const)('oculta posición, slots y totales con %s obsoleto', async (field, value) => {
+    mockVerify.mockResolvedValue({ id: 'user-1' } as never);
+    const uki = route('uki');
+    uki.position = { ...uki.position, [field]: value };
+    mockStatus.mockResolvedValue({
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      routes: { uki, nft: route('nft') },
+      totals: { desiredSlots: 2, allocatedSlots: 2, maxPotentialSlots: 10 },
+    });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(body.data.routes.uki).toEqual(expect.objectContaining({
+      position: null,
+      slots: [],
+      deficitToPreserveSlots: null,
+      countdownEndsAt: null,
+      projectionFresh: false,
+      synchronizing: true,
+      previewSlots: 1,
+    }));
+    expect(body.data.totals).toEqual({
+      desiredSlots: 1,
+      allocatedSlots: 1,
+      maxPotentialSlots: 10,
+    });
+  });
+
+  it('oculta una posición 5/5 matemáticamente incompatible con la fuente actual', async () => {
+    mockVerify.mockResolvedValue({ id: 'user-1' } as never);
+    const uki = route('uki');
+    uki.position = { ...uki.position, desiredSlots: 5, allocatedSlots: 5 };
+    uki.slots = Array.from({ length: 5 }, (_, index) => ({
+      ...uki.slots[0],
+      _id: `${WALLET}:uki:${index + 1}`,
+      ordinal: index + 1,
+    }));
+    mockStatus.mockResolvedValue({
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      routes: { uki, nft: route('nft') },
+      totals: { desiredSlots: 6, allocatedSlots: 6, maxPotentialSlots: 10 },
+    });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(body.data.routes.uki).toEqual(expect.objectContaining({
+      position: null,
+      slots: [],
+      projectionFresh: false,
+      synchronizing: true,
+      previewSlots: 1,
+    }));
+    expect(body.data.totals).toEqual({
+      desiredSlots: 1,
+      allocatedSlots: 1,
+      maxPotentialSlots: 10,
+    });
   });
 
   it('fails closed when the economy source is unavailable', async () => {

@@ -9,6 +9,7 @@ import type {
 } from '../types.js';
 import { getNumber, getString, normalizeAddress, now } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
+import { enqueueCukieMasterRecalculation } from './cukie-master-outbox.js';
 import { projectNftVaultEvent } from './nft-vaults.js';
 
 function collection(store: IndexerStore, name: string) {
@@ -1098,6 +1099,14 @@ export async function projectUkiStakingPosition(
     session,
   );
 
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: accountNormalized,
+    route: 'uki',
+    session,
+  });
+
   return null;
 }
 
@@ -1229,6 +1238,12 @@ export async function projectUkiVestingPosition(
     },
     entries[0].observedAt,
   );
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: beneficiaryNormalized,
+    route: 'uki',
+  });
   return null;
 }
 
