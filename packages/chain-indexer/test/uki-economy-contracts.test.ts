@@ -416,6 +416,30 @@ test('staking projector keeps absolute latest balances and rejects stale overwri
       ?.accountBalanceRaw,
     '10',
   );
+  const stakingState = context.collections.get('uki_staking_state')?.documents.get(
+    STAKING.toLowerCase(),
+  );
+  assert.deepEqual({
+    totalStakedRaw: stakingState?.totalStakedRaw,
+    materializationStatus: stakingState?.materializationStatus,
+    materializedTotalRaw: stakingState?.materializedTotalRaw,
+    materializedThroughEventId: stakingState?.materializedThroughEventId,
+    materializedThroughBlockNumber: stakingState?.materializedThroughBlockNumber,
+    materializedThroughLogIndex: stakingState?.materializedThroughLogIndex,
+    bootstrapStatus: stakingState?.bootstrapStatus,
+    verifiedChainId: stakingState?.verifiedChainId,
+    contractAddressNormalized: stakingState?.contractAddressNormalized,
+  }, {
+    totalStakedRaw: '10',
+    materializationStatus: 'consistent',
+    materializedTotalRaw: '10',
+    materializedThroughEventId: latest._id,
+    materializedThroughBlockNumber: 20,
+    materializedThroughLogIndex: 0,
+    bootstrapStatus: 'verified',
+    verifiedChainId: 97,
+    contractAddressNormalized: STAKING.toLowerCase(),
+  });
   const jobs = [...(context.collections.get('cukie_master_recalculation_jobs')?.documents.values() ?? [])];
   assert.equal(jobs.length, 2);
   assert.ok(jobs.every((job) => (

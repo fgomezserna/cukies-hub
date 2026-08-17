@@ -401,7 +401,8 @@ async function assertCukiePoolVaultOperationalHealth(
         || !(cursor.bootstrapVerifiedAt instanceof Date)
         || !(cursor.updatedAt instanceof Date)
         || cursor.updatedAt < freshnessCutoff
-        || cursor.safeBlock !== safeBlock
+        || !Number.isSafeInteger(cursor.safeBlock)
+        || Number(cursor.safeBlock) < Number(safeBlock)
         || !Number.isSafeInteger(cursor.nextBlock)
         || Number(cursor.nextBlock) <= Number(safeBlock)
         || typeof cursor.eventName !== 'string'

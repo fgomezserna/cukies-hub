@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -19,6 +19,17 @@ import {
   cukiePoolNftVaultAbi,
   ukiNftVaults,
 } from '@/lib/contracts/uki-nft-vaults';
+import {
+  clearPendingNftVaultOperation,
+  getNftVaultBrowserStorage,
+  loadPendingNftVaultOperations,
+  pendingNftVaultStorageKey,
+  savePendingNftVaultOperation,
+  type NftVaultPendingAction,
+  type NftVaultPendingContext,
+  type NftVaultPendingOperation,
+  type NftVaultPendingPhase,
+} from '@/lib/nft-vault/pending-operations';
 import { useAuth } from '@/providers/auth-provider';
 
 const erc721CustodyAbi = [
@@ -96,6 +107,7 @@ type LegacyStatus = {
 
 type PoolStatus = CustodialStatus | LegacyStatus;
 type MutationPhase = 'idle' | 'approving' | 'depositing' | 'requesting_exit' | 'withdrawing' | 'syncing';
+type PendingAsset = Pick<AvailableAsset, 'assetId' | 'collectionAddress' | 'tokenId'>;
 
 const POOL_STATUS_RETRY_MS = 10_000;
 const POOL_STATUS_RETRY_WINDOW_MS = 180_000;
@@ -130,6 +142,41 @@ function statusLabel(value: PoolPositionStatus) {
   if (value === 'exit_requested') return 'Salida solicitada';
   if (value === 'withdrawable') return 'Listo para retirar';
   return 'Retirado';
+}
+
+function pendingLabel(operation: NftVaultPendingOperation) {
+  if (operation.phase === 'approval_confirmed') return 'Continuar depósito';
+  if (operation.phase === 'syncing_projection') {
+    if (operation.action === 'deposit') return 'Actualizando depósito…';
+    if (operation.action === 'request_exit') return 'Actualizando salida…';
+    return 'Actualizando retirada…';
+  }
+  return ({
+    approval: 'Confirmando aprobación…',
+    deposit: 'Confirmando depósito…',
+    request_exit: 'Confirmando solicitud…',
+    withdraw: 'Confirmando retirada…',
+  } as const)[operation.action];
+}
+
+function projectionMatchesPoolOperation(
+  operation: NftVaultPendingOperation,
+  status: PoolStatus,
+) {
+  if (operation.phase !== 'syncing_projection' || status.mode !== 'custodial_vault') return false;
+  const position = status.positions.find((item) => item.assetId === operation.assetId);
+  if (operation.action === 'deposit') return Boolean(position?.lifecycleOpen);
+  if (operation.action === 'request_exit') {
+    return Boolean(position && (
+      position.status === 'exit_requested'
+      || position.status === 'withdrawable'
+      || position.status === 'withdrawn'
+    ));
+  }
+  if (operation.action === 'withdraw') {
+    return !position || position.status === 'withdrawn' || !position.lifecycleOpen;
+  }
+  return false;
 }
 
 function scheduleSummary(position: CustodialPosition) {
@@ -209,12 +256,6 @@ async function requestPoolStatus(walletAddress: string, signal?: AbortSignal) {
   return body.data;
 }
 
-function wait(milliseconds: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, milliseconds);
-  });
-}
-
 export function CukiePoolStatusPanel() {
   const { user, isLoading: authLoading, walletType } = useAuth();
   const { address, chainId, isConnected } = useAccount();
@@ -228,7 +269,11 @@ export function CukiePoolStatusPanel() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
+  const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
+  const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const retryStartedAtRef = useRef<number | null>(null);
+  const operationLocksRef = useRef(new Set<string>());
+  const walletOperationLockRef = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -309,38 +354,169 @@ export function CukiePoolStatusPanel() {
   );
   const depositsReady = Boolean(identityReady && custody?.indexer.status === 'ready');
 
-  async function writeAndConfirm(input: Parameters<typeof writeContractAsync>[0]) {
+  const pendingContext = useMemo<NftVaultPendingContext | null>(() => {
+    if (!ukiNftVaults.chainId || !ukiNftVaults.cukiePoolNftVaultAddress || !user?.walletAddress) return null;
+    return {
+      chainId: ukiNftVaults.chainId,
+      walletAddress: user.walletAddress,
+      vaultAddress: ukiNftVaults.cukiePoolNftVaultAddress,
+    };
+  }, [user?.walletAddress]);
+  const pendingKey = useMemo(
+    () => pendingContext ? pendingNftVaultStorageKey(pendingContext) : null,
+    [pendingContext],
+  );
+  const pendingHydrated = Boolean(pendingKey && hydratedPendingKey === pendingKey);
+
+  const persistPending = useCallback((input: {
+    asset: PendingAsset;
+    action: NftVaultPendingAction;
+    phase: NftVaultPendingPhase;
+    txHash: Hash;
+  }) => {
+    if (!pendingContext) return null;
+    const now = Date.now();
+    const storage = getNftVaultBrowserStorage();
+    const previous = loadPendingNftVaultOperations(storage, pendingContext)
+      .find((operation) => operation.assetId === input.asset.assetId);
+    const operation: NftVaultPendingOperation = {
+      version: 1,
+      ...pendingContext,
+      assetId: input.asset.assetId,
+      collectionAddress: input.asset.collectionAddress,
+      tokenId: input.asset.tokenId,
+      action: input.action,
+      phase: input.phase,
+      txHash: input.txHash,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+    };
+    savePendingNftVaultOperation(storage, operation);
+    setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+    return operation;
+  }, [pendingContext]);
+
+  const clearPending = useCallback((assetId: string) => {
+    if (pendingContext) {
+      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), pendingContext, assetId);
+    }
+    setPendingByAsset((current) => {
+      if (!current[assetId]) return current;
+      const next = { ...current };
+      delete next[assetId];
+      return next;
+    });
+  }, [pendingContext]);
+
+  useEffect(() => {
+    operationLocksRef.current.clear();
+    setHydratedPendingKey(null);
+    if (!pendingContext || !pendingKey) {
+      setPendingByAsset({});
+      return;
+    }
+    const operations = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext);
+    setPendingByAsset(Object.fromEntries(operations.map((operation) => [operation.assetId, operation])));
+    setHydratedPendingKey(pendingKey);
+  }, [pendingContext, pendingKey]);
+
+  useEffect(() => {
+    if (!pendingContext || !pendingKey) return;
+    const syncPendingFromStorage = (event: StorageEvent) => {
+      if (event.key !== pendingKey) return;
+      const operations = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext);
+      setPendingByAsset(Object.fromEntries(operations.map((operation) => [operation.assetId, operation])));
+    };
+    window.addEventListener('storage', syncPendingFromStorage);
+    return () => window.removeEventListener('storage', syncPendingFromStorage);
+  }, [pendingContext, pendingKey]);
+
+  useEffect(() => {
+    if (!status) return;
+    for (const operation of Object.values(pendingByAsset)) {
+      if (projectionMatchesPoolOperation(operation, status)) clearPending(operation.assetId);
+    }
+  }, [clearPending, pendingByAsset, status]);
+
+  useEffect(() => {
+    if (!pendingHydrated || !pendingContext || !publicClient || !user?.walletAddress) return;
+    if (Object.keys(pendingByAsset).length === 0) return;
+    let disposed = false;
+    let running = false;
+
+    const reconcile = async () => {
+      if (running || disposed) return;
+      running = true;
+      try {
+        const operations = Object.values(pendingByAsset);
+        for (const operation of operations.filter((item) => item.phase === 'awaiting_receipt')) {
+          try {
+            const receipt = await publicClient.getTransactionReceipt({ hash: operation.txHash });
+            if (disposed) return;
+            if (receipt.status === 'reverted') {
+              clearPending(operation.assetId);
+              setError(`La transacción del Cukie #${operation.tokenId} fue revertida. Puedes intentarlo de nuevo.`);
+              continue;
+            }
+            persistPending({
+              asset: operation,
+              action: operation.action,
+              phase: operation.action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
+              txHash: operation.txHash,
+            });
+          } catch {
+            // El receipt aún no está disponible y se volverá a consultar.
+          }
+        }
+
+        if (operations.some((item) => item.phase === 'syncing_projection')) {
+          try {
+            const refreshed = await requestPoolStatus(user.walletAddress);
+            if (disposed) return;
+            setStatus(refreshed);
+            for (const operation of operations) {
+              if (projectionMatchesPoolOperation(operation, refreshed)) {
+                clearPending(operation.assetId);
+              }
+            }
+          } catch {
+            // La operación confirmada permanece persistida hasta recuperar la proyección.
+          }
+        }
+      } finally {
+        running = false;
+      }
+    };
+
+    void reconcile();
+    const interval = window.setInterval(() => void reconcile(), 4_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [clearPending, pendingByAsset, pendingContext, pendingHydrated, persistPending, publicClient, user?.walletAddress]);
+
+  async function writeAndConfirm(
+    input: Parameters<typeof writeContractAsync>[0],
+    asset: PendingAsset,
+    action: NftVaultPendingAction,
+  ) {
     if (!publicClient) throw new Error('PUBLIC_CLIENT_UNAVAILABLE');
     const hash = await writeContractAsync(input);
     setLatestTxHash(hash);
+    persistPending({ asset, action, phase: 'awaiting_receipt', txHash: hash });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
-    return hash;
-  }
-
-  async function waitForProjection(input: {
-    walletAddress: string;
-    assetId: string;
-    expected: 'deposited' | 'exit_requested' | 'withdrawn';
-  }) {
-    for (let attempt = 0; attempt < 30; attempt += 1) {
-      if (attempt > 0) await wait(2_000);
-      const refreshed = await requestPoolStatus(input.walletAddress);
-      setStatus(refreshed);
-      if (refreshed.mode !== 'custodial_vault') continue;
-      const position = refreshed.positions.find((item) => item.assetId === input.assetId);
-      if (input.expected === 'deposited' && position?.lifecycleOpen) return true;
-      if (
-        input.expected === 'exit_requested'
-        && position
-        && (position.status === 'exit_requested' || position.status === 'withdrawable')
-      ) return true;
-      if (
-        input.expected === 'withdrawn'
-        && (!position || position.status === 'withdrawn' || !position.lifecycleOpen)
-      ) return true;
+    if (receipt.status !== 'success') {
+      clearPending(asset.assetId);
+      throw new Error('TRANSACTION_REVERTED');
     }
-    return false;
+    persistPending({
+      asset,
+      action,
+      phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
+      txHash: hash,
+    });
+    return hash;
   }
 
   function canonicalIdentity(asset: Pick<AvailableAsset, 'assetId' | 'chainId' | 'collectionAddress' | 'tokenId'>) {
@@ -367,16 +543,21 @@ export function CukiePoolStatusPanel() {
       || !address
       || !depositsReady
       || mutatingAssetId
+      || walletOperationLockRef.current
+      || operationLocksRef.current.has(asset.assetId)
+      || (pendingByAsset[asset.assetId] && pendingByAsset[asset.assetId].phase !== 'approval_confirmed')
+      || !pendingHydrated
       || !identity
       || !vaultAddress
       || !ukiNftVaults.chainId
       || !publicClient
     ) return;
+    walletOperationLockRef.current = true;
+    operationLocksRef.current.add(asset.assetId);
     setMutatingAssetId(asset.assetId);
     setError(null);
     setNotice(null);
     setLatestTxHash(null);
-    let confirmed = false;
     try {
       const [owner, approved, operatorApproved] = await Promise.all([
         publicClient.readContract({
@@ -407,7 +588,7 @@ export function CukiePoolStatusPanel() {
           abi: erc721CustodyAbi,
           functionName: 'approve',
           args: [vaultAddress, identity.tokenId],
-        });
+        }, asset, 'approval');
       }
       setPhase('depositing');
       await writeAndConfirm({
@@ -416,31 +597,26 @@ export function CukiePoolStatusPanel() {
         abi: cukiePoolNftVaultAbi,
         functionName: 'deposit',
         args: [identity.collection, identity.tokenId],
-      });
-      confirmed = true;
+      }, asset, 'deposit');
       setPhase('syncing');
-      setNotice('Depósito confirmado. Esperando la proyección canónica del vault…');
-      const projected = await waitForProjection({
-        walletAddress: user.walletAddress,
-        assetId: asset.assetId,
-        expected: 'deposited',
-      });
-      if (!projected) {
-        setNotice('El depósito está confirmado en BSC, pero aún no aparece en el indexador. No repitas la operación; actualiza en unos minutos.');
-        return;
-      }
-      setNotice('NFT depositado. Su fecha de activación queda fijada por el calendario vigente del vault.');
-      setPhase('idle');
-      setMutatingAssetId(null);
+      setNotice('Depósito confirmado en BSC. Este Cukie seguirá bloqueado mientras actualizamos el inventario; ya puedes operar con otro.');
     } catch {
-      if (confirmed) {
-        setPhase('syncing');
-        setNotice('El depósito está confirmado en BSC, pero su proyección sigue pendiente. No repitas la operación.');
-        return;
+      const persisted = pendingContext
+        ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
+          .find((item) => item.assetId === asset.assetId)
+        : null;
+      if (persisted) {
+        setNotice(persisted.phase === 'approval_confirmed'
+          ? 'La aprobación quedó confirmada. Pulsa «Continuar depósito» cuando quieras reanudar.'
+          : 'La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
+      } else {
+        setError('La wallet rechazó la operación antes de crear una transacción, o la transacción fue revertida.');
       }
+    } finally {
       setPhase('idle');
       setMutatingAssetId(null);
-      setError('La wallet rechazó la operación o la transacción no pudo confirmarse.');
+      operationLocksRef.current.delete(asset.assetId);
+      walletOperationLockRef.current = false;
     }
   }
 
@@ -454,15 +630,20 @@ export function CukiePoolStatusPanel() {
       !user?.walletAddress
       || !identityReady
       || mutatingAssetId
+      || walletOperationLockRef.current
+      || operationLocksRef.current.has(position.assetId)
+      || Boolean(pendingByAsset[position.assetId])
+      || !pendingHydrated
       || !identity
       || !vaultAddress
       || !ukiNftVaults.chainId
     ) return;
+    walletOperationLockRef.current = true;
+    operationLocksRef.current.add(position.assetId);
     setMutatingAssetId(position.assetId);
     setError(null);
     setNotice(null);
     setLatestTxHash(null);
-    let confirmed = false;
     try {
       setPhase(operation === 'request_exit' ? 'requesting_exit' : 'withdrawing');
       await writeAndConfirm({
@@ -471,33 +652,26 @@ export function CukiePoolStatusPanel() {
         abi: cukiePoolNftVaultAbi,
         functionName: operation === 'request_exit' ? 'requestExit' : 'withdraw',
         args: [identity.collection, identity.tokenId],
-      });
-      confirmed = true;
+      }, position, operation);
       setPhase('syncing');
-      setNotice('Transacción confirmada. Esperando la proyección canónica del vault…');
-      const projected = await waitForProjection({
-        walletAddress: user.walletAddress,
-        assetId: position.assetId,
-        expected: operation === 'request_exit' ? 'exit_requested' : 'withdrawn',
-      });
-      if (!projected) {
-        setNotice('La transacción está confirmada en BSC, pero el indexador aún no la ha proyectado. No repitas la operación; actualiza en unos minutos.');
-        return;
-      }
       setNotice(operation === 'request_exit'
-        ? 'Salida solicitada. Este Cukie ya no participa en el reparto del periodo y podrá retirarse al corte indicado.'
-        : 'NFT retirado correctamente a tu wallet.');
-      setPhase('idle');
-      setMutatingAssetId(null);
+        ? 'Salida confirmada en BSC. Este Cukie ya no participa en el reparto y seguirá bloqueado mientras actualizamos su estado.'
+        : 'Retirada confirmada en BSC. Estamos actualizando el inventario; ya puedes operar con otro Cukie.');
     } catch {
-      if (confirmed) {
-        setPhase('syncing');
-        setNotice('La transacción está confirmada en BSC, pero su proyección sigue pendiente. No repitas la operación.');
-        return;
+      const persisted = pendingContext
+        ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
+          .find((item) => item.assetId === position.assetId)
+        : null;
+      if (persisted) {
+        setNotice('La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
+      } else {
+        setError('La wallet rechazó la operación o el contrato no permitió completarla.');
       }
+    } finally {
       setPhase('idle');
       setMutatingAssetId(null);
-      setError('La wallet rechazó la operación o el contrato no permitió completarla.');
+      operationLocksRef.current.delete(position.assetId);
+      walletOperationLockRef.current = false;
     }
   }
 
@@ -607,7 +781,11 @@ export function CukiePoolStatusPanel() {
                 </p>
               ) : (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {status.availableAssets.map((asset) => (
+                  {status.availableAssets.map((asset) => {
+                    const working = mutatingAssetId === asset.assetId;
+                    const pending = pendingByAsset[asset.assetId];
+                    const pendingLocked = Boolean(pending && pending.phase !== 'approval_confirmed');
+                    return (
                     <article key={asset.assetId} className="rounded-[8px] border border-white/10 bg-black/20 p-4">
                       <p className="font-bold text-[var(--uki-cream)]">Cukie #{asset.tokenId}</p>
                       <p className="mt-1 text-xs font-semibold capitalize text-[var(--uki-muted)]">
@@ -615,21 +793,32 @@ export function CukiePoolStatusPanel() {
                       </p>
                       <button
                         type="button"
-                        disabled={Boolean(mutatingAssetId) || !depositsReady}
+                        disabled={Boolean(mutatingAssetId) || pendingLocked || !pendingHydrated || !depositsReady}
                         onClick={() => void deposit(asset)}
                         className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-cyan)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
                       >
-                        {mutatingAssetId === asset.assetId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
-                        {mutatingAssetId === asset.assetId && phase === 'approving'
+                        {working || pendingLocked ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
+                        {working && phase === 'approving'
                           ? 'Aprobando'
-                          : mutatingAssetId === asset.assetId && phase === 'depositing'
+                          : working && phase === 'depositing'
                             ? 'Depositando'
-                            : mutatingAssetId === asset.assetId && phase === 'syncing'
-                              ? 'Sincronizando'
+                            : pending
+                              ? pendingLabel(pending)
                               : 'Depositar'}
                       </button>
+                      {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
+                        <a
+                          href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 block text-xs font-black text-[var(--uki-cyan)] underline"
+                        >
+                          Ver transacción de esta operación
+                        </a>
+                      ) : null}
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -647,7 +836,10 @@ export function CukiePoolStatusPanel() {
                 <p className="mt-3 text-sm font-semibold text-[var(--uki-muted)]">Todavía no tienes posiciones en este vault.</p>
               ) : (
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  {status.positions.map((position) => (
+                  {status.positions.map((position) => {
+                    const working = mutatingAssetId === position.assetId;
+                    const pending = pendingByAsset[position.assetId];
+                    return (
                     <article key={position.positionId} className="rounded-[8px] border border-white/10 bg-black/20 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -669,26 +861,37 @@ export function CukiePoolStatusPanel() {
                       {position.lifecycleOpen && (position.status === 'pending' || position.status === 'active') ? (
                         <button
                           type="button"
-                          disabled={Boolean(mutatingAssetId) || !identityReady}
+                          disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
                           onClick={() => void mutatePosition(position, 'request_exit')}
                           className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] border border-white/15 px-3 py-2 text-xs font-black uppercase text-[var(--uki-text)] disabled:opacity-50"
                         >
-                          {mutatingAssetId === position.assetId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-                          {mutatingAssetId === position.assetId && phase === 'syncing' ? 'Sincronizando' : 'Solicitar salida'}
+                          {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+                          {pending ? pendingLabel(pending) : working ? 'Confirmando salida' : 'Solicitar salida'}
                         </button>
                       ) : position.lifecycleOpen && position.status === 'withdrawable' ? (
                         <button
                           type="button"
-                          disabled={Boolean(mutatingAssetId) || !identityReady}
+                          disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
                           onClick={() => void mutatePosition(position, 'withdraw')}
                           className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-cyan)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
                         >
-                          {mutatingAssetId === position.assetId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
-                          {mutatingAssetId === position.assetId && phase === 'syncing' ? 'Sincronizando' : 'Retirar NFT'}
+                          {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
+                          {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar NFT'}
                         </button>
                       ) : null}
+                      {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
+                        <a
+                          href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 block text-xs font-black text-[var(--uki-cyan)] underline"
+                        >
+                          Ver transacción de esta operación
+                        </a>
+                      ) : null}
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

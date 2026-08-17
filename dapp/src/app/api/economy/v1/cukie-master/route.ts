@@ -13,6 +13,41 @@ import { UkiEconomyError } from '@/lib/uki-economy/errors';
 
 export const dynamic = 'force-dynamic';
 
+const NON_RETRYABLE_NFT_INDEXER_WARNING_FRAGMENTS = [
+  'dead letters',
+  'incidente canonico',
+  'no coincide con la configuracion publica',
+  'no esta activo',
+  'es invalido',
+  'es invalida',
+  'no esta completa',
+] as const;
+
+function publicNftIndexerStatus(
+  completeness: CukieMasterWalletStatus['routes']['nft']['sourceCompleteness'],
+) {
+  if (completeness.complete) return 'ready' as const;
+  const hasExplicitFailure = completeness.warnings.some((warning) => {
+    const normalized = warning.toLowerCase();
+    return NON_RETRYABLE_NFT_INDEXER_WARNING_FRAGMENTS.some((fragment) => (
+      normalized.includes(fragment)
+    ));
+  });
+  return hasExplicitFailure ? 'unavailable' as const : 'syncing' as const;
+}
+
+function visibleCukieMasterNftInventory<T extends {
+  blockers: string[];
+  custody: 'wallet' | 'cukie_master_nft_vault';
+  canWithdraw: boolean;
+}>(inventory: T[]) {
+  return inventory.filter((asset) => (
+    !asset.blockers.includes('second_generation')
+    || asset.custody === 'cukie_master_nft_vault'
+    || asset.canWithdraw
+  ));
+}
+
 function publicRouteStatus(
   route: CukieMasterWalletStatus['routes']['uki'],
 ) {
@@ -150,6 +185,7 @@ export async function GET(request: NextRequest) {
       uki: publicRouteStatus(status.routes.uki),
       nft: publicRouteStatus(status.routes.nft),
     };
+    const publicNftInventory = visibleCukieMasterNftInventory(nftInventory);
     const response = NextResponse.json({
       status: 'ok',
       data: {
@@ -163,7 +199,7 @@ export async function GET(request: NextRequest) {
             + (publicRoutes.nft.position?.allocatedSlots ?? 0),
           maxPotentialSlots: 10,
         },
-        nftInventory,
+        nftInventory: publicNftInventory,
         nftCustody: {
           mode: ukiNftVaults.mode.cukieMaster,
           chainId: ukiNftVaults.chainId,
@@ -172,9 +208,7 @@ export async function GET(request: NextRequest) {
           recoveryCollectionAddresses: ukiNftVaults.recoveryCollectionAddresses,
           explorerBaseUrl: ukiNftVaults.explorerBaseUrl,
           indexer: {
-            status: status.routes.nft.sourceCompleteness.complete
-              ? 'ready'
-              : 'unavailable',
+            status: publicNftIndexerStatus(status.routes.nft.sourceCompleteness),
           },
         },
       },

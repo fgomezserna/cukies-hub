@@ -152,7 +152,7 @@ describe("competition credit rules", () => {
     );
   });
 
-  it("requires exact UKI cursor address, chain, safe block and verified contract identity", () => {
+  it("accepts a cursor at or ahead of the completed UKI watermark, never behind it", () => {
     const rule = testCompetitionCreditRule();
     const cursor = {
       contractAlias: "UKI_STAKING",
@@ -182,6 +182,12 @@ describe("competition credit rules", () => {
       expectedIdentity: rule.verifiedSourceIdentities.UKI_STAKING,
     };
     expect(creditSourceCursorIsHealthy(input)).toBe(true);
+    expect(
+      creditSourceCursorIsHealthy({
+        ...input,
+        cursor: { ...cursor, safeBlock: 101, nextBlock: 102 },
+      })
+    ).toBe(true);
     expect(
       creditSourceCursorIsHealthy({
         ...input,

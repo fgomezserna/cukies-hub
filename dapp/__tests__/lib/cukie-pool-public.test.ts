@@ -103,7 +103,7 @@ function allowlistProjection(
   };
 }
 
-function healthyOperationalCollection(name: string) {
+function healthyOperationalCollection(name: string, cursorSafeBlock = 100) {
   if (name === 'chain_indexer_runs') {
     return {
       findOne: async (filter: Record<string, unknown>) => (
@@ -131,8 +131,8 @@ function healthyOperationalCollection(name: string) {
         bootstrapStatus: 'verified',
         bootstrapVerifiedAt: NOW,
         updatedAt: NOW,
-        safeBlock: 100,
-        nextBlock: 101,
+        safeBlock: cursorSafeBlock,
+        nextBlock: Math.max(101, cursorSafeBlock + 1),
       }))),
     };
   }
@@ -302,6 +302,40 @@ describe('Cukie Pool public source health', () => {
       vaultAddressNormalized: VAULT,
       beneficiaryNormalized: OWNER,
       collectionAddressNormalized: { $in: [COLLECTION] },
+    });
+  });
+
+  it.each([
+    ['accepts cursors ahead of the last completed watermark', 101, true],
+    ['fails closed when cursors are behind the last completed watermark', 99, false],
+  ])('%s', async (_case, cursorSafeBlock, expectedHealthy) => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        const operational = healthyOperationalCollection(name, cursorSafeBlock);
+        if (operational) return operational;
+        if (name === 'nft_vault_collections') {
+          return { find: () => cursor([allowlistProjection()]) };
+        }
+        if (name === 'cukie_pool_calendar_versions') {
+          return { find: () => cursor([calendarVersion()]) };
+        }
+        if (name === 'cukies' || name === 'cukie_pool_nft_vault_positions') {
+          return { find: () => cursor([]) };
+        }
+        throw new Error(`unexpected collection ${name}`);
+      },
+    });
+
+    await expect(listCukiePoolWalletPositions({
+      walletAddress: OWNER,
+      now: NOW,
+    })).resolves.toMatchObject({
+      sourceHealthy: expectedHealthy,
+      nftCustody: {
+        indexer: { status: expectedHealthy ? 'ready' : 'unavailable' },
+      },
     });
   });
 

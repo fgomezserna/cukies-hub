@@ -248,13 +248,6 @@ export async function ingestBscOnce(
     throw new Error(`Timestamp BSC fuera de rango seguro para el bloque ${safeBlock}`);
   }
   timestampCache.set(safeBlock, Number(safeTimestampMsBigInt));
-  const checkpointAt = now();
-  await store.upsertBscCheckpoint({
-    chainId: config.bscExpectedChainId,
-    safeBlockNumber: safeBlock,
-    safeBlockHash,
-    checkedAt: checkpointAt,
-  });
   const verifiedContracts = new Map<string, Awaited<
     ReturnType<typeof verifyBscContractIdentity>
   >>();
@@ -269,6 +262,7 @@ export async function ingestBscOnce(
   }
   let inserted = 0;
   let ranges = 0;
+  let allCursorsCoverSafeBlock = true;
 
   for (const contractEvent of contractEvents) {
     const cursor = await store.getCursor(contractEvent);
@@ -351,6 +345,7 @@ export async function ingestBscOnce(
     }
 
     const toBlock = Math.min(fromBlock + config.maxBlockRange - 1, safeBlock);
+    if (toBlock < safeBlock) allCursorsCoverSafeBlock = false;
     const processedFromBlock = cursorHasCoverageOrigin
       ? Number(cursor?.processedFromBlock)
       : fromBlock;
@@ -453,6 +448,15 @@ export async function ingestBscOnce(
       safeBlockNumber: safeBlock,
       safeBlockHash,
       verifiedAt: verifiedStaking.verifiedAt,
+    });
+  }
+
+  if (allCursorsCoverSafeBlock) {
+    await store.upsertBscCheckpoint({
+      chainId: config.bscExpectedChainId,
+      safeBlockNumber: safeBlock,
+      safeBlockHash,
+      checkedAt: now(),
     });
   }
 

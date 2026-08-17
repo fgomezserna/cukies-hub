@@ -19,7 +19,8 @@ export function creditSourceCursorIsHealthy(input: {
     cursor.eventName === input.expectedEventName &&
     cursor.updatedAt instanceof Date &&
     cursor.updatedAt >= input.freshnessCutoff &&
-    cursor.safeBlock === input.expectedSafeBlock &&
+    Number.isSafeInteger(cursor.safeBlock) &&
+    Number(cursor.safeBlock) >= input.expectedSafeBlock &&
     Number.isSafeInteger(cursor.nextBlock) &&
     Number(cursor.nextBlock) > input.expectedSafeBlock &&
     typeof cursor.contractAddress === "string" &&

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { CukiePoolStatusPanel } from '@/components/cukie-pool/status-panel';
@@ -174,6 +174,7 @@ function successfulResponse(data: ReturnType<typeof poolStatus>) {
 describe('CukiePoolStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
     global.fetch = fetchMock;
     Object.assign(mutableVaultConfig, {
       chainId: null,
@@ -234,7 +235,7 @@ describe('CukiePoolStatusPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Depositar/i }));
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
-      'NFT depositado',
+      'Depósito confirmado en BSC',
     ));
     expect(writeContractAsync).toHaveBeenNthCalledWith(1, expect.objectContaining({
       address: collectionAddress,
@@ -248,6 +249,49 @@ describe('CukiePoolStatusPanel', () => {
     }));
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('unlocks other NFTs after the first deposit receipt while keeping that asset pending', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn()
+        .mockResolvedValueOnce(walletAddress)
+        .mockResolvedValueOnce(vaultAddress)
+        .mockResolvedValueOnce(true),
+      waitForTransactionReceipt,
+      getTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+    const first = availableAsset('7');
+    const second = availableAsset('8');
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      availableAssets: [first, second],
+    })));
+
+    render(<CukiePoolStatusPanel />);
+
+    const firstCard = (await screen.findByText('Cukie #7')).closest('article');
+    const secondCard = screen.getByText('Cukie #8').closest('article');
+    expect(firstCard).not.toBeNull();
+    expect(secondCard).not.toBeNull();
+    const firstButton = within(firstCard!).getByRole('button', { name: 'Depositar' });
+    await waitFor(() => expect(firstButton).toBeEnabled());
+    fireEvent.click(firstButton);
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+      'ya puedes operar con otro',
+    ));
+    expect(within(firstCard!).getByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
+    expect(within(secondCard!).getByRole('button', { name: 'Depositar' })).toBeEnabled();
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+    expect(waitForTransactionReceipt).toHaveBeenCalledTimes(1);
   });
 
   it('keeps exit and mature withdrawal enabled when indexer health blocks deposits', async () => {

@@ -597,6 +597,16 @@ describe('Cukie Master canonical sources', () => {
       cursors,
       ...expectedIdentity,
     })).toContain('Cursor BSC UKI_STAKING:Staked ausente, stale, sin verificacion o con backlog.');
+    cursors[0].safeBlock = 101;
+    cursors[0].nextBlock = 102;
+    expect(operationalIndexerHealthWarnings({
+      checkedAt: now,
+      latestSuccessEndedAt: now,
+      latestErrorEndedAt: null,
+      checkpoint,
+      cursors,
+      ...expectedIdentity,
+    })).toEqual([]);
   });
 
   it('marks a brand-new NFT database unhealthy until every verified history cursor exists', () => {

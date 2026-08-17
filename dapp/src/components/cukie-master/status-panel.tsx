@@ -417,7 +417,7 @@ export function CukieMasterStatusPanel({
                     <div>
                       <p className="text-sm font-black text-[var(--uki-cream)]">El staking NFT se gestiona en el vault custodial</p>
                       <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                        Elige y deposita tus Cukies Originales en el apartado siguiente. Los de Segunda Generación se muestran, pero no cuentan para esta ruta.
+                        Elige y deposita tus Cukies Originales en el apartado siguiente. Los de Segunda Generación no aparecen como disponibles; una posición ya custodiada seguirá visible para que puedas retirarla.
                       </p>
                     </div>
                     <LandingButton href="#cukie-master-nft-staking" className="shrink-0">Gestionar Cukies</LandingButton>

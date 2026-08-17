@@ -34,6 +34,9 @@ const erc721CustodyAbi = [
   { type: 'function', name: 'approve', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
 ] as const;
 
+const NFT_INDEXER_SYNC_RETRY_MS = 10_000;
+const NFT_INDEXER_SYNC_RETRY_WINDOW_MS = 180_000;
+
 type PublicNft = {
   assetId: string;
   canonicalAssetId: string | null;
@@ -55,7 +58,7 @@ type PublicNftCustody = {
   vaultAddress: string | null;
   collectionAddresses: string[];
   explorerBaseUrl: string | null;
-  indexer: { status: 'ready' | 'unavailable' };
+  indexer: { status: 'ready' | 'syncing' | 'unavailable' };
 };
 
 type PublicStatus = {
@@ -102,6 +105,12 @@ function blockerLabel(blocker?: string) {
   } as Record<string, string>)[blocker ?? ''] ?? 'Este Cukie no es apto para la ruta Cukie Master';
 }
 
+function isVisibleCukieMasterAsset(asset: PublicNft) {
+  return !asset.blockers.includes('second_generation')
+    || asset.custody === 'cukie_master_nft_vault'
+    || asset.canWithdraw;
+}
+
 function pendingLabel(operation: NftVaultPendingOperation) {
   if (operation.phase === 'approval_confirmed') return 'Continuar staking';
   if (operation.phase === 'syncing_projection') {
@@ -137,6 +146,7 @@ export function CukieMasterNftVaultPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
+  const [indexerSyncRetryExhausted, setIndexerSyncRetryExhausted] = useState(false);
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
@@ -159,10 +169,11 @@ export function CukieMasterNftVaultPanel() {
       if (
         refreshRequestIdRef.current === requestId
         && !(reason instanceof DOMException && reason.name === 'AbortError')
+        && !background
       ) setStatus(null);
       throw reason;
     } finally {
-      if (refreshRequestIdRef.current === requestId) setLoading(false);
+      if (refreshRequestIdRef.current === requestId && !background) setLoading(false);
     }
   }, [user?.walletAddress]);
 
@@ -173,7 +184,10 @@ export function CukieMasterNftVaultPanel() {
     return () => controller.abort();
   }, [authLoading, refresh, user?.walletAddress]);
 
-  const assets = useMemo(() => status?.nftInventory ?? [], [status?.nftInventory]);
+  const assets = useMemo(
+    () => (status?.nftInventory ?? []).filter(isVisibleCukieMasterAsset),
+    [status?.nftInventory],
+  );
   const eligibleAssetCount = useMemo(
     () => assets.filter((asset) => asset.canDeposit || asset.canWithdraw).length,
     [assets],
@@ -221,6 +235,42 @@ export function CukieMasterNftVaultPanel() {
     && ukiNftVaults.cukieMasterNftVaultAddress,
   );
   const depositsReady = Boolean(identityReady && serverConfig?.indexer.status === 'ready');
+
+  useEffect(() => {
+    if (serverConfig?.indexer.status !== 'syncing') {
+      setIndexerSyncRetryExhausted(false);
+      return;
+    }
+    let disposed = false;
+    let running = false;
+    const controller = new AbortController();
+    setIndexerSyncRetryExhausted(false);
+
+    const retry = async () => {
+      if (disposed || running) return;
+      running = true;
+      try {
+        await refresh(controller.signal, true);
+      } catch {
+        // Conservamos el último estado seguro y volvemos a intentarlo dentro de la ventana.
+      } finally {
+        running = false;
+      }
+    };
+
+    const interval = window.setInterval(() => void retry(), NFT_INDEXER_SYNC_RETRY_MS);
+    const timeout = window.setTimeout(() => {
+      if (!disposed) setIndexerSyncRetryExhausted(true);
+      window.clearInterval(interval);
+      controller.abort();
+    }, NFT_INDEXER_SYNC_RETRY_WINDOW_MS);
+    return () => {
+      disposed = true;
+      controller.abort();
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [refresh, serverConfig?.indexer.status, user?.walletAddress]);
 
   useEffect(() => {
     operationLocksRef.current.clear();
@@ -497,11 +547,11 @@ export function CukieMasterNftVaultPanel() {
           Staking de Cukies para Cukie Master
         </h2>
         <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-          El Cukie entra físicamente en el contrato y deja de poder venderse, transferirse o jugarse. La retirada es inmediata y los créditos ya ganados se conservan.
+          Solo puedes depositar Cukies Originales. El NFT entra físicamente en el contrato y deja de poder venderse, transferirse o jugarse; la retirada es inmediata y los créditos ya ganados se conservan.
         </p>
         {status ? (
           <p className="mt-3 text-xs font-semibold text-[var(--uki-muted)]">
-            {assets.length} Cukies detectados · {eligibleAssetCount} aptos para esta ruta
+            {assets.length} Cukies Originales o posiciones custodiadas · {eligibleAssetCount} con una acción disponible
           </p>
         ) : null}
 
@@ -511,10 +561,18 @@ export function CukieMasterNftVaultPanel() {
             La configuración pública y la del servidor no coinciden. Los depósitos están bloqueados.
           </p>
         ) : null}
-        {serverConfig?.indexer.status === 'unavailable' ? (
+        {serverConfig?.indexer.status === 'syncing' && !indexerSyncRetryExhausted ? (
+          <p role="status" aria-live="polite" className="mt-4 flex gap-2 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 text-sm font-semibold text-[var(--uki-text)]">
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
+            Estamos sincronizando los eventos y metadatos NFT. Reintentaremos automáticamente; mientras tanto no se habilitan nuevos depósitos. Las posiciones custodiadas siguen visibles y podrás retirarlas cuando la wallet, la red y la identidad del contrato estén verificadas.
+          </p>
+        ) : null}
+        {serverConfig?.indexer.status === 'unavailable' || indexerSyncRetryExhausted ? (
           <p role="alert" className="mt-4 flex gap-2 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100">
             <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
-            El indexador NFT no está saludable. No se permiten nuevos depósitos; la recuperación on-chain sigue disponible.
+            {indexerSyncRetryExhausted
+              ? 'No hemos podido completar la sincronización del índice NFT tras varios intentos. Los depósitos siguen bloqueados; las posiciones custodiadas siguen visibles y la recuperación on-chain sigue disponible.'
+              : 'El índice NFT tiene una avería o una configuración que no podemos verificar. No se permiten nuevos depósitos; las posiciones custodiadas siguen visibles y la recuperación on-chain sigue disponible.'}
           </p>
         ) : null}
         {configMatches && !walletMatches ? (
@@ -540,7 +598,7 @@ export function CukieMasterNftVaultPanel() {
               Conecta y autentica tu wallet EVM para consultar tus Cukies y gestionar el staking NFT.
             </p>
           ) : status && assets.length === 0 ? (
-            <p className="text-sm font-semibold text-[var(--uki-muted)]">No hay Cukies Originales disponibles o depositados para esta wallet.</p>
+            <p className="text-sm font-semibold text-[var(--uki-muted)]">No tienes Cukies Originales disponibles ni posiciones custodiadas para esta wallet. Los Cukies de Segunda Generación que permanezcan en tu wallet no se muestran en esta ruta.</p>
           ) : !status ? (
             <p role="alert" className="text-sm font-semibold text-amber-200">
               No se pudo verificar el inventario custodial. Los depósitos permanecen bloqueados; la recuperación on-chain sigue disponible.

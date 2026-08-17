@@ -187,6 +187,104 @@ describe('GET /api/economy/v1/cukie-master', () => {
     expect(JSON.stringify(body)).not.toMatch(/sourceHash|refs|internal warning|secret-asset-id/);
   });
 
+  it('oculta Gen2 disponibles pero conserva posiciones custodiadas recuperables', async () => {
+    mockVerify.mockResolvedValue({ id: 'user-1' } as never);
+    const baseAsset = {
+      canonicalAssetId: `97:0x${'a'.repeat(40)}:1`,
+      collectionAddress: `0x${'a'.repeat(40)}`,
+      imageUrl: null,
+      rarity: 'rare',
+      rarityPoints: 4,
+      contributesToCukieMaster: false,
+      contributionPoints: 0,
+      state: 'blocked',
+      custodyMode: 'custodial' as const,
+      depositEpoch: null,
+      lock: null,
+      canSoftStake: false,
+      canUnstake: false,
+      canDeposit: false,
+    };
+    mockInventory.mockResolvedValue([
+      {
+        ...baseAsset,
+        assetId: 'gen2-wallet',
+        tokenId: '1',
+        blockers: ['second_generation'],
+        custody: 'wallet',
+        canWithdraw: false,
+      },
+      {
+        ...baseAsset,
+        assetId: 'gen2-custodied',
+        tokenId: '2',
+        blockers: ['second_generation'],
+        custody: 'cukie_master_nft_vault',
+        canWithdraw: true,
+      },
+      {
+        ...baseAsset,
+        assetId: 'original-wallet',
+        tokenId: '3',
+        blockers: [],
+        custody: 'wallet',
+        canDeposit: true,
+        canWithdraw: false,
+      },
+    ]);
+    mockStatus.mockResolvedValue({
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      routes: { uki: route('uki'), nft: route('nft') },
+      totals: { desiredSlots: 2, allocatedSlots: 2, maxPotentialSlots: 10 },
+    });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(body.data.nftInventory.map((asset: { assetId: string }) => asset.assetId)).toEqual([
+      'gen2-custodied',
+      'original-wallet',
+    ]);
+  });
+
+  it('distingue una sincronización reintentable de una avería explícita del índice NFT', async () => {
+    mockVerify.mockResolvedValue({ id: 'user-1' } as never);
+    const syncingNft = route('nft');
+    syncingNft.sourceCompleteness = {
+      ...syncingNft.sourceCompleteness,
+      complete: false,
+      indexerHealth: false,
+      warnings: ['Existen eventos NFT pendientes de proyeccion.'],
+    };
+    mockStatus.mockResolvedValueOnce({
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      routes: { uki: route('uki'), nft: syncingNft },
+      totals: { desiredSlots: 1, allocatedSlots: 1, maxPotentialSlots: 10 },
+    });
+
+    const syncingResponse = await GET(request());
+    expect((await syncingResponse.json()).data.nftCustody.indexer.status).toBe('syncing');
+
+    const unavailableNft = route('nft');
+    unavailableNft.sourceCompleteness = {
+      ...unavailableNft.sourceCompleteness,
+      complete: false,
+      indexerHealth: false,
+      warnings: ['La configuracion publica del vault NFT de Cukie Master es invalida.'],
+    };
+    mockStatus.mockResolvedValueOnce({
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      routes: { uki: route('uki'), nft: unavailableNft },
+      totals: { desiredSlots: 1, allocatedSlots: 1, maxPotentialSlots: 10 },
+    });
+
+    const unavailableResponse = await GET(request());
+    expect((await unavailableResponse.json()).data.nftCustody.indexer.status).toBe('unavailable');
+  });
+
   it.each([
     ['sourceHash', 'stale-source'],
     ['roundId', 'uki:old-round'],

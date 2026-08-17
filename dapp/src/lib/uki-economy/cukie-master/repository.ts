@@ -581,7 +581,8 @@ export function operationalIndexerHealthWarnings(input: {
         && cursor.chain === 'BSC'
         && cursor.updatedAt instanceof Date
         && cursor.updatedAt >= freshnessCutoff
-        && cursor.safeBlock === input.checkpoint?.safeBlockNumber
+        && Number.isSafeInteger(cursor.safeBlock)
+        && Number(cursor.safeBlock) >= Number(input.checkpoint?.safeBlockNumber)
         && Number.isSafeInteger(cursor.nextBlock)
         && Number(cursor.nextBlock) > Number(input.checkpoint?.safeBlockNumber)
         && cursor.bootstrapStatus === 'verified'

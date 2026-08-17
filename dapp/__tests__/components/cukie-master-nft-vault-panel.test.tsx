@@ -60,7 +60,7 @@ const getTransactionReceipt = jest.fn();
 const waitForTransactionReceipt = jest.fn();
 const writeContractAsync = jest.fn();
 
-function status(input: { indexer?: 'ready' | 'unavailable'; deposited?: boolean } = {}) {
+function status(input: { indexer?: 'ready' | 'syncing' | 'unavailable'; deposited?: boolean } = {}) {
   const deposited = input.deposited ?? false;
   return {
     nftCustody: {
@@ -259,7 +259,7 @@ describe('CukieMasterNftVaultPanel', () => {
     expect(localStorage.length).toBe(0);
   });
 
-  it('muestra los 12 Cukies y explica por qué los 6 de Segunda Generación no son aptos', async () => {
+  it('oculta los Cukies de Segunda Generación disponibles', async () => {
     const data = status();
     data.nftInventory = Array.from({ length: 12 }, (_, index) => {
       const original = index < 6;
@@ -278,16 +278,86 @@ describe('CukieMasterNftVaultPanel', () => {
 
     render(<CukieMasterNftVaultPanel />);
 
-    expect(await screen.findByText('12 Cukies detectados · 6 aptos para esta ruta')).toBeInTheDocument();
+    expect(await screen.findByText('6 Cukies Originales o posiciones custodiadas · 6 con una acción disponible')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Hacer staking/i })).toHaveLength(6);
-    expect(screen.getAllByText('Solo cuentan Cukies Originales')).toHaveLength(6);
+    expect(screen.queryByText('Cukie #98000007')).not.toBeInTheDocument();
+    expect(screen.queryByText('Solo cuentan Cukies Originales')).not.toBeInTheDocument();
+  });
+
+  it('mantiene visible una posición Gen2 ya custodiada para retirarla', async () => {
+    const data = status();
+    data.nftInventory = [{
+      ...data.nftInventory[0],
+      state: 'staked_master',
+      blockers: ['second_generation'],
+      custody: 'cukie_master_nft_vault',
+      canDeposit: false,
+      canWithdraw: true,
+    }];
+    fetchMock.mockResolvedValueOnce(response(data));
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(await screen.findByRole('button', { name: /Retirar inmediatamente/i })).toBeEnabled();
+    expect(screen.getAllByText('Cukie #98000001')).toHaveLength(2);
+  });
+
+  it('reintenta automáticamente mientras el índice está sincronizando', async () => {
+    jest.useFakeTimers();
+    try {
+      fetchMock
+        .mockResolvedValueOnce(response(status({ indexer: 'syncing' })))
+        .mockResolvedValueOnce(response(status()));
+
+      render(<CukieMasterNftVaultPanel />);
+
+      expect(await screen.findByText(/Estamos sincronizando los eventos y metadatos NFT/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeDisabled();
+
+      await act(async () => {
+        jest.advanceTimersByTime(10_000);
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(screen.queryByText(/Estamos sincronizando los eventos y metadatos NFT/i)).not.toBeInTheDocument());
+      expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeEnabled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cancela una consulta de sincronización en vuelo al desmontarse', async () => {
+    jest.useFakeTimers();
+    try {
+      fetchMock
+        .mockResolvedValueOnce(response(status({ indexer: 'syncing' })))
+        .mockReturnValueOnce(new Promise(() => undefined));
+
+      const { unmount } = render(<CukieMasterNftVaultPanel />);
+      expect(await screen.findByText(/Estamos sincronizando los eventos y metadatos NFT/i)).toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(10_000);
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      const retrySignal = (fetchMock.mock.calls[1][1] as RequestInit).signal;
+      expect(retrySignal?.aborted).toBe(false);
+
+      unmount();
+
+      expect(retrySignal?.aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('bloquea depósitos si el indexador no está saludable y mantiene recuperación', async () => {
     fetchMock.mockResolvedValueOnce(response(status({ indexer: 'unavailable' })));
     render(<CukieMasterNftVaultPanel />);
 
-    expect(await screen.findByText(/indexador NFT no está saludable/i)).toBeInTheDocument();
+    expect(await screen.findByText(/índice NFT tiene una avería/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeDisabled();
     expect(screen.getByText('Recuperación on-chain')).toBeInTheDocument();
   });
