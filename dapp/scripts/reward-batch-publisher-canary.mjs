@@ -46,13 +46,13 @@ const mongo = new MongoClient(mongoUrl, { serverSelectionTimeoutMS: 10_000 });
 await mongo.connect();
 try {
   const db = mongo.db(databaseName);
-  if (mode === 'seed') await seed(db);
+  if (mode === 'seed') await seed(db, mongo);
   else await claim(db);
 } finally {
   await mongo.close();
 }
 
-async function seed(db) {
+async function seed(db, client) {
   const now = new Date();
   const { accountingId, amountRaw, rule, accounting, allocation } =
     buildRewardPublisherCanaryFixture({
@@ -60,14 +60,24 @@ async function seed(db) {
       distributorAddress,
       accountAddress: account.address,
     });
-  const schema = await db.collection('economy_schema_metadata')
-    .findOne({ _id: 'uki-economy' });
-  if (schema?.schemaVersion !== 3) {
-    throw new Error('El canary requiere un esquema UKI v3 ya migrado.');
+  const session = client.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const schema = await db.collection('economy_schema_metadata')
+        .findOne({ _id: 'uki-economy' }, { session });
+      if (schema?.schemaVersion !== 3) {
+        throw new Error('El canary requiere un esquema UKI v3 ya migrado.');
+      }
+      await db.collection('economy_rule_versions').insertOne(rule, { session });
+      await db.collection('reward_daily_accounting').insertOne(accounting, { session });
+      await db.collection('reward_accounting_allocations').insertOne(allocation, { session });
+    }, {
+      readConcern: { level: 'snapshot' },
+      writeConcern: { w: 'majority' },
+    });
+  } finally {
+    await session.endSession();
   }
-  await db.collection('economy_rule_versions').insertOne(rule);
-  await db.collection('reward_daily_accounting').insertOne(accounting);
-  await db.collection('reward_accounting_allocations').insertOne(allocation);
   console.log(JSON.stringify({ event: 'reward_canary_seeded', accountingId, amountRaw }));
 }
 

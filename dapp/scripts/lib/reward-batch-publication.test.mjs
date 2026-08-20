@@ -148,6 +148,7 @@ test('el fixture canary queda ligado exactamente a sus allocations selladas', ()
     accountAddress: PLAYER,
   });
   assert.equal(fixture.rule.active, false);
+  assert.equal(fixture.accounting.dayId, `canary:${DISTRIBUTOR.toLowerCase()}`);
   const artifacts = buildRewardPublicationArtifacts({
     accountingId: fixture.accountingId,
     accounting: fixture.accounting,

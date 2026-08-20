@@ -42,7 +42,7 @@ export function buildRewardPublisherCanaryFixture({
   };
   const accounting = {
     _id: accountingId,
-    dayId: 'canary',
+    dayId: `canary:${distributorAddress.toLowerCase()}`,
     ruleVersion,
     allocations: sealedAllocations,
     payloadHash: stableRewardPublicationHash({
