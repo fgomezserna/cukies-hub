@@ -107,7 +107,7 @@ test('builds the immutable staging ruleset with v4 credit and game semantics', (
   const now = new Date('2026-08-06T12:00:00.000Z');
   const rules = buildStagingEconomyRuleSet({ environment: environment(), cursors: cursors(now), now });
 
-  assert.equal(rules.reward.version, 'rewards-staging-test-v3');
+  assert.equal(rules.reward.version, 'rewards-staging-test-v4');
   assert.equal(rules.reward.activeFrom.toISOString(), '2026-08-10T14:00:00.000Z');
   assert.equal(rules.reward.emissionBudget.programStartsAt.toISOString(), '2026-08-10T00:00:00.000Z');
   assert.equal(rules.reward.emissionBudget.dayBoundarySecondUtc, 14 * 60 * 60);

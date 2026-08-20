@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 export const STAGING_ECONOMY_RULESET = Object.freeze({
   id: 'staging-test-v4',
   activeFrom: '2026-08-10T00:00:00.000Z',
-  rewardVersion: 'rewards-staging-test-v3',
+  rewardVersion: 'rewards-staging-test-v4',
   creditVersion: 'credits-staging-test-v4',
   gameId: 'treasure-hunt',
   gameVersion: 'staging-test-v4',
