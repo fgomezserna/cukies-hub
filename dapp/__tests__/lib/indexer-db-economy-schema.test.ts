@@ -28,7 +28,7 @@ function fakeDb(input: {
 function validMetadata() {
   return {
     _id: ECONOMY_SCHEMA_METADATA_ID,
-    schemaVersion: 2,
+    schemaVersion: 3,
     dbName: EXPECTED_DB,
     initializedAt: new Date('2026-08-05T20:00:00.000Z'),
     updatedAt: new Date('2026-08-05T20:01:00.000Z'),
@@ -37,7 +37,7 @@ function validMetadata() {
 }
 
 describe('dapp economy schema gate', () => {
-  it('accepts only the expected v2 sentinel with verified transactions', async () => {
+  it('accepts only the expected v3 sentinel with verified transactions', async () => {
     const { db } = fakeDb({ metadata: validMetadata() });
 
     await expect(assertEconomySchema(db, EXPECTED_DB)).resolves.toEqual(validMetadata());

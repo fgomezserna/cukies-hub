@@ -51,6 +51,17 @@ async function migrateEconomyV2() {
   });
 }
 
+async function migrateEconomyV3() {
+  await withStore(async (store) => {
+    const metadata = await store.migrateEconomySchemaV3();
+    log('economy schema v3 migration ok', {
+      dbName: store.db.databaseName,
+      schemaVersion: metadata.schemaVersion,
+      migrationId: metadata.migrationId,
+    });
+  });
+}
+
 async function ingestOnce() {
   const config = getIndexerConfig();
   const store = await new IndexerStore(config).connect();
@@ -243,6 +254,8 @@ if (command === 'setup') {
   await setupEconomy();
 } else if (command === 'migrate-economy-v2' || command === 'migrate:economy:v2') {
   await migrateEconomyV2();
+} else if (command === 'migrate-economy-v3' || command === 'migrate:economy:v3') {
+  await migrateEconomyV3();
 } else if (command === 'ingest-once') {
   await ingestOnce();
 } else if (command === 'import-legacy') {

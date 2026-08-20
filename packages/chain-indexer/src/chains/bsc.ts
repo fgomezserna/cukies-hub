@@ -30,6 +30,67 @@ export interface BscIngestDependencies {
   readonly rpcClients?: BscRpcClient[];
 }
 
+type CanonicalBlockHeader = {
+  number: bigint;
+  hash: Hash | null;
+  timestamp: bigint;
+};
+
+export async function findGreatestBscBlockBeforeTimestamp(input: {
+  cutoffTimestampMs: number;
+  safeBlockNumber: number;
+  getBlock: (blockNumber: number) => Promise<CanonicalBlockHeader>;
+}) {
+  if (
+    !Number.isSafeInteger(input.cutoffTimestampMs)
+    || input.cutoffTimestampMs <= 0
+    || !Number.isSafeInteger(input.safeBlockNumber)
+    || input.safeBlockNumber < 1
+  ) throw new Error('Parametros invalidos para resolver el bloque efectivo del cutoff.');
+  const safe = await input.getBlock(input.safeBlockNumber);
+  if (safe.timestamp * BigInt(1_000) < BigInt(input.cutoffTimestampMs)) {
+    throw new Error('El head confirmado aun no cubre el cutoff solicitado.');
+  }
+  let low = 0;
+  let high = input.safeBlockNumber;
+  let candidate = -1;
+  while (low <= high) {
+    const middle = low + Math.floor((high - low) / 2);
+    const block = middle === input.safeBlockNumber ? safe : await input.getBlock(middle);
+    if (block.timestamp * BigInt(1_000) < BigInt(input.cutoffTimestampMs)) {
+      candidate = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  if (candidate < 0) throw new Error('No existe un bloque BSC anterior al cutoff.');
+  const block = await input.getBlock(candidate);
+  const successor = candidate + 1 === input.safeBlockNumber
+    ? safe
+    : await input.getBlock(candidate + 1);
+  const timestampMs = Number(block.timestamp * BigInt(1_000));
+  const successorTimestampMs = Number(successor.timestamp * BigInt(1_000));
+  if (
+    block.number !== BigInt(candidate)
+    || successor.number !== BigInt(candidate + 1)
+    || !block.hash
+    || !successor.hash
+    || !/^0x[0-9a-f]{64}$/i.test(block.hash)
+    || !/^0x[0-9a-f]{64}$/i.test(successor.hash)
+    || timestampMs >= input.cutoffTimestampMs
+    || successorTimestampMs < input.cutoffTimestampMs
+  ) throw new Error('El RPC no demostro un limite canonico contiguo para el cutoff.');
+  return {
+    blockNumber: candidate,
+    blockHash: block.hash.toLowerCase(),
+    blockTimestamp: new Date(timestampMs),
+    successorBlockNumber: candidate + 1,
+    successorBlockHash: successor.hash.toLowerCase(),
+    successorBlockTimestamp: new Date(successorTimestampMs),
+  };
+}
+
 function rpcHost(url: string) {
   try {
     return new URL(url).host;
@@ -247,7 +308,33 @@ export async function ingestBscOnce(
   ) {
     throw new Error(`Timestamp BSC fuera de rango seguro para el bloque ${safeBlock}`);
   }
-  timestampCache.set(safeBlock, Number(safeTimestampMsBigInt));
+  const safeBlockTimestampMs = Number(safeTimestampMsBigInt);
+  timestampCache.set(safeBlock, safeBlockTimestampMs);
+  const unresolvedCutoffs = typeof store.listUnresolvedCompetitionCreditCutoffs === 'function'
+    ? await store.listUnresolvedCompetitionCreditCutoffs(new Date(safeBlockTimestampMs), 32)
+    : [];
+  for (const cutoff of unresolvedCutoffs) {
+    const evidence = await findGreatestBscBlockBeforeTimestamp({
+      cutoffTimestampMs: cutoff.getTime(),
+      safeBlockNumber: safeBlock,
+      getBlock: async (blockNumber) => {
+        const { value } = await withBscRpcFallback(
+          rpcClientsWithPreferredFirst(safeHeadRpc, rpcClients),
+          config.bscExpectedChainId,
+          (rpc) => rpc.client.getBlock({ blockNumber: BigInt(blockNumber) }),
+        );
+        return value;
+      },
+    });
+    await store.upsertCompetitionCreditCutoffBlock({
+      cutoff,
+      chainId: config.bscExpectedChainId,
+      ...evidence,
+      safeBlockNumber: safeBlock,
+      safeBlockHash,
+      resolvedAt: now(),
+    });
+  }
   const verifiedContracts = new Map<string, Awaited<
     ReturnType<typeof verifyBscContractIdentity>
   >>();
@@ -456,6 +543,7 @@ export async function ingestBscOnce(
       chainId: config.bscExpectedChainId,
       safeBlockNumber: safeBlock,
       safeBlockHash,
+      safeBlockTimestampMs,
       checkedAt: now(),
     });
   }

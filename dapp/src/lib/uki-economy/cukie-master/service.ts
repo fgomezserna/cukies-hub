@@ -26,6 +26,7 @@ import {
 } from './repository';
 import type {
   CukieMasterNftSource,
+  CukieMasterChainEvidence,
   CukieMasterPosition,
   CukieMasterPositionEvent,
   CukieMasterRecalculationResult,
@@ -141,9 +142,42 @@ function documentId(value: unknown) {
   return null;
 }
 
+function sourceEventId(value: unknown) {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 function observedAt(value: unknown) {
   const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+}
+
+function evidenceFields(evidence: CukieMasterChainEvidence | null) {
+  return evidence ? {
+    eventId: evidence.eventId,
+    blockNumber: evidence.blockNumber,
+    blockHash: evidence.blockHash,
+    blockTimestamp: evidence.blockTimestamp,
+  } : {};
+}
+
+function latestChainEvidence(refs: CukieMasterSourceRef[]) {
+  const evidenced = refs.flatMap((ref) => (
+    typeof ref.eventId === 'string' &&
+    Number.isSafeInteger(ref.blockNumber) &&
+    typeof ref.blockHash === 'string' &&
+    ref.blockTimestamp instanceof Date
+      ? [{
+          eventId: ref.eventId,
+          blockNumber: Number(ref.blockNumber),
+          blockHash: ref.blockHash,
+          blockTimestamp: ref.blockTimestamp,
+        }]
+      : []
+  ));
+  return evidenced.sort((left, right) => (
+    right.blockNumber - left.blockNumber ||
+    right.eventId.localeCompare(left.eventId)
+  ))[0];
 }
 
 function presalePurchaseRaw(document: PresaleParticipantRawDocument | null) {
@@ -201,6 +235,14 @@ async function readCukieMasterUkiSource(
       ? parseRawAmount(vestingAllocated.raw) - parseRawAmount(vestingReleased.raw)
       : BigInt(0),
   );
+  const presaleEventId = sourceEventId(presale?.lastPurchaseEventId);
+  const stakingEventId = sourceEventId(staking?.lastEventId);
+  const vestingEventId = sourceEventId(vesting?.lastEventId);
+  const [presaleEvidence, stakingEvidence, vestingEvidence] = await Promise.all([
+    presaleEventId ? repository.findProjectedChainEvidence(presaleEventId) : null,
+    stakingEventId ? repository.findProjectedChainEvidence(stakingEventId) : null,
+    vestingEventId ? repository.findProjectedChainEvidence(vestingEventId) : null,
+  ]);
   const warnings = [
     purchase.warning,
     vestingAllocated.warning,
@@ -210,6 +252,9 @@ async function readCukieMasterUkiSource(
   ].filter(
     (item): item is string => Boolean(item),
   );
+  if (presale && !presaleEvidence) warnings.push('presale_participants no conserva evidencia de bloque proyectada.');
+  if (staking && !stakingEvidence) warnings.push('uki_staking_positions no conserva evidencia de bloque proyectada.');
+  if (vesting && !vestingEvidence) warnings.push('uki_vesting_positions no conserva evidencia de bloque proyectada.');
   const vestingComplete = vestingAllocated.complete && vestingReleased.complete;
   const completeness: CukieMasterSourceCompleteness = {
     complete: warnings.length === 0 && ukiIndexerHealth.healthy,
@@ -229,6 +274,7 @@ async function readCukieMasterUkiSource(
       documentId: documentId(presale?._id),
       valueRaw: purchase.complete ? purchase.raw : undefined,
       observedAt: observedAt(presale?.updatedAt),
+      ...evidenceFields(presaleEvidence),
     },
     {
       source: 'vesting',
@@ -236,6 +282,7 @@ async function readCukieMasterUkiSource(
       documentId: documentId(vesting?._id),
       valueRaw: effectiveLockedRaw,
       observedAt: observedAt(vesting?.updatedAt),
+      ...evidenceFields(vestingEvidence),
     },
     {
       source: 'uki_staking',
@@ -243,6 +290,7 @@ async function readCukieMasterUkiSource(
       documentId: documentId(staking?._id),
       valueRaw: effectiveStakingRaw,
       observedAt: observedAt(staking?.updatedAt),
+      ...evidenceFields(stakingEvidence),
     },
   ];
   const ukiWithoutHash = {
@@ -255,6 +303,7 @@ async function readCukieMasterUkiSource(
     stakedUkiRaw: effectiveStakingRaw,
     refs: ukiRefs,
     completeness,
+    effectiveChainEvidence: latestChainEvidence(ukiRefs),
   };
   return {
     ...ukiWithoutHash,
@@ -272,26 +321,34 @@ async function readCukieMasterNftSource(
     repository.getNftEntitlement(walletAddress, now),
     repository.getNftIndexerHealth(now, walletNormalized),
   ]);
-  const nftAssets = nft.eligibleAssets.map((asset) => {
+  const nftAssets = await Promise.all(nft.eligibleAssets.map(async (asset) => {
     const lock = asset.activeLocks.find((item) => (
       (item.reason === 'soft_stake'
         || (item.reason === 'game_assignment' && item.retainsSoftStakeEntitlement === true))
       && item.ownerNormalized?.toLowerCase() === walletNormalized.toLowerCase()
     ));
+    const sourceRefs = await Promise.all(asset.sourceRefs.map(async (ref) => {
+      const eventId = sourceEventId(ref.eventId);
+      const evidence = eventId
+        ? await repository.findProjectedChainEvidence(eventId)
+        : null;
+      return {
+        source: ref.source,
+        collection: ref.collection,
+        documentId: ref.documentId,
+        observedAt: ref.observedAt,
+        ...evidenceFields(evidence),
+      };
+    }));
     return {
       assetId: asset.assetId,
       tokenId: asset.tokenId,
       rarity: asset.rarity,
       rarityPoints: asset.rarityPoints,
       lockId: lock?.lockId ?? null,
-      sourceRefs: asset.sourceRefs.map((ref) => ({
-        source: ref.source,
-        collection: ref.collection,
-        documentId: ref.documentId,
-        observedAt: ref.observedAt,
-      })),
+      sourceRefs,
     };
-  });
+  }));
   const nftRefs = nftAssets.flatMap((asset) => asset.sourceRefs);
   const incompleteNftBlockers = new Set([
     'unknown_owner',
@@ -303,6 +360,9 @@ async function readCukieMasterNftSource(
   if (nft.rejectedAssets.some((item) => item.blockers.some((blocker) => (
     incompleteNftBlockers.has(blocker)
   )))) nftInventoryWarnings.push('El inventario NFT contiene atributos canónicos unknown.');
+  if (nftAssets.some((asset) => !latestChainEvidence(asset.sourceRefs))) {
+    nftInventoryWarnings.push('Una posicion NFT elegible no conserva evidencia de bloque proyectada.');
+  }
   const nftWarnings = [...nftInventoryWarnings, ...nftIndexerHealth.warnings];
   const nftCompleteness: CukieMasterSourceCompleteness = {
     complete: nftWarnings.length === 0 && nftIndexerHealth.healthy,
@@ -320,6 +380,7 @@ async function readCukieMasterNftSource(
     assets: nftCompleteness.complete ? nftAssets : [],
     refs: nftRefs,
     completeness: nftCompleteness,
+    effectiveChainEvidence: latestChainEvidence(nftRefs),
   };
   return {
     ...nftWithoutHash,
@@ -472,6 +533,22 @@ async function syncPositionSlots(
       nextPosition.route,
     )).map((slot) => [slot.ordinal, slot]),
   );
+  const sourceEvidence = nextPosition.source.effectiveChainEvidence;
+  if (
+    (nextPosition.allocatedSlots > 0 || currentSlots.size > 0) &&
+    (
+      !sourceEvidence ||
+      !Number.isSafeInteger(sourceEvidence.blockNumber) ||
+      sourceEvidence.blockNumber < 0 ||
+      !/^0x[0-9a-f]{64}$/.test(sourceEvidence.blockHash) ||
+      !(sourceEvidence.blockTimestamp instanceof Date) ||
+      Number.isNaN(sourceEvidence.blockTimestamp.getTime())
+    )
+  ) {
+    throw new DomainConflictError(
+      `La fuente ${nextPosition.route} no acredita el bloque efectivo de sus slots.`,
+    );
+  }
   const persisted: CukieMasterSlot[] = [];
   for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
     const previous = currentSlots.get(ordinal) ?? null;
@@ -508,6 +585,9 @@ async function syncPositionSlots(
       roundId: nextPosition.roundId,
       ruleVersion: nextPosition.ruleVersion,
       sourceHash: nextPosition.sourceHash,
+      sourceBlockNumber: sourceEvidence!.blockNumber,
+      sourceBlockHash: sourceEvidence!.blockHash,
+      sourceBlockTimestamp: sourceEvidence!.blockTimestamp,
       revision: (previous?.revision ?? 0) + 1,
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,

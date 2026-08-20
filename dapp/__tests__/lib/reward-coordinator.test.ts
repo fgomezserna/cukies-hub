@@ -203,10 +203,11 @@ describe("RewardCalculationCoordinator", () => {
         assignmentId: "pool-assignment:1",
         requestHash: "3".repeat(64),
       },
-      ranking: {
-        rankingId: "ranking:1",
-        payloadHash: "4".repeat(64),
+      arenaRanking: {
+        sourceRankingId: "ranking:1",
+        evidenceHash: "4".repeat(64),
         rank: 5,
+        rewardBps: 6_000,
       },
       periodId: "2026-W28",
       sourceId: "game-session:session:canonical",
@@ -280,7 +281,12 @@ describe("RewardCalculationCoordinator", () => {
       credit: { reservationId: "credit:zero", payloadHash: "2".repeat(64), bucket: "own" },
       assignment: null,
       ownAssignment: { assignmentId: "own:zero", requestHash: "3".repeat(64) },
-      ranking: null,
+      arenaRanking: {
+        sourceRankingId: null,
+        evidenceHash: "4".repeat(64),
+        rank: null,
+        rewardBps: 10_000,
+      },
       periodId: "2026-W28",
       sourceId: "game-session:session:zero",
       creditSource: "own",

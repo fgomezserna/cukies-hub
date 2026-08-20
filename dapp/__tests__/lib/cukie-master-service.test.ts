@@ -86,6 +86,31 @@ function emptyNftSummary(walletAddress: string, points: number): CukieMasterNftR
   };
 }
 
+function syntheticNftSlots(walletAddress: string, count: number) {
+  const walletNormalized = walletAddress.toLowerCase();
+  return summarizeCukieMasterNftEntitlement({
+    walletAddress,
+    assets: Array.from({ length: count }, (_, index) => normalizeCukiesInventoryDocument({
+      _id: `synthetic-${index}`,
+      owner: walletAddress,
+      ownerNormalized: walletNormalized,
+      tokenId: String(index + 1),
+      network: 'BSC',
+      state: 'available',
+      type: 'rare',
+      skills: { generation: 1 },
+      timeStamp: now,
+    }, [{
+      _id: `synthetic-lock-${index}`,
+      assetId: `cukies:synthetic-${index}`,
+      status: 'active',
+      reason: 'soft_stake',
+      ownerNormalized: walletNormalized,
+      updatedAt: now,
+    }], now)),
+  });
+}
+
 function memoryRepository() {
   const state: MemoryState = {
     rounds: new Map(),
@@ -174,13 +199,24 @@ function memoryRepository() {
       state.events.set(event.idempotencyKey, event);
     },
     async findPresaleParticipant(wallet) {
-      return state.presale.get(wallet) ?? null;
+      const value = state.presale.get(wallet);
+      return value ? { ...value, lastPurchaseEventId: value.lastPurchaseEventId ?? `test:presale:${wallet}` } : null;
     },
     async findUkiStakingPosition(wallet) {
-      return state.staking.get(wallet) ?? null;
+      const value = state.staking.get(wallet);
+      return value ? { ...value, lastEventId: value.lastEventId ?? `test:staking:${wallet}` } : null;
     },
     async findPresaleVestingPosition(wallet) {
-      return state.vesting.get(wallet) ?? null;
+      const value = state.vesting.get(wallet);
+      return value ? { ...value, lastEventId: value.lastEventId ?? `test:vesting:${wallet}` } : null;
+    },
+    async findProjectedChainEvidence(eventId) {
+      return {
+        eventId,
+        blockNumber: 100,
+        blockHash: `0x${'a'.repeat(64)}`,
+        blockTimestamp: new Date(now.getTime() - 1_000),
+      };
     },
     async getUkiIndexerHealth(_wallet, checkedAt) {
       return {
@@ -197,8 +233,18 @@ function memoryRepository() {
       };
     },
     async getNftEntitlement(walletAddress) {
-      return state.nftSummaries.get(walletAddress.toLowerCase())
+      const summary = state.nftSummaries.get(walletAddress.toLowerCase())
         ?? emptyNftSummary(walletAddress, state.nftPoints.get(walletAddress.toLowerCase()) ?? 0);
+      return {
+        ...summary,
+        eligibleAssets: summary.eligibleAssets.map((asset) => ({
+          ...asset,
+          sourceRefs: asset.sourceRefs.map((ref, index) => ({
+            ...ref,
+            eventId: ref.eventId ?? `test:nft:${asset.assetId}:${index}`,
+          })),
+        })),
+      };
     },
     async listWalletPositions(wallet) {
       return [...state.positions.values()].filter((item) => item.walletNormalized === wallet);
@@ -811,7 +857,7 @@ describe('Cukie Master transactional allocation', () => {
   it('aborts before touching an active position, slots, or capacity when a source is unhealthy', async () => {
     const { repo, state } = memoryRepository();
     state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(20_000), releasedRaw: '0' });
-    state.nftPoints.set('0xabc', 3);
+    state.nftSummaries.set('0xabc', syntheticNftSlots('0xABC', 1));
     const service = createCukieMasterService((work) => work(repo));
     await service.recalculateCukieMasterWallet('0xABC', now, 'healthy-initial');
     await service.recalculateCukieMasterWallet('0xABC', new Date(now.getTime() + DAY), 'active');
@@ -876,7 +922,7 @@ describe('Cukie Master transactional allocation', () => {
   it('allocates up to 5 per route and serializes concurrent idempotent retries', async () => {
     const { repo, state } = memoryRepository();
     state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(100_000), releasedRaw: '0' });
-    state.nftPoints.set('0xabc', 15);
+    state.nftSummaries.set('0xabc', syntheticNftSlots('0xABC', 5));
     let transactions = 0;
     let transactionQueue = Promise.resolve();
     const service = createCukieMasterService(<T>(work: (repository: CukieMasterRepository) => Promise<T>) => {

@@ -1,6 +1,6 @@
 # UKI new economy database implementation map
 
-Estado: implementación desplegada en staging y contratos NFT desplegados en BSC Testnet; las identidades y cursores de los cinco aliases preservados/nuevos están verificados. El smoke firmado de depósitos/retiros y la activación de los runtimes económicos siguen bloqueados hasta completar sus verificaciones. Las decisiones de producto del 2026-08-14 sustituyen varios flujos ya implementados y se marcan como gaps, no como fallback válido.
+Estado: la vertical v3 de créditos, Treasure Hunt, ranking y contabilidad de rewards está implementada con gates de activación independientes. Los contratos NFT siguen desplegados en BSC Testnet y sus identidades/cursores están verificados. La publicación de batches claimables y cualquier paso a mainnet continúan siendo operaciones separadas que exigen funding y aprobación explícita.
 Decision vigente: Cukie Master permite 5 cupos por ruta UKI y 5 cupos por ruta NFT/Cukies Originales por wallet.
 Decision vigente: Cukie Master NFT y Cukie Pool requieren vaults custodiales BSC separados; el soft staking Mongo actual queda superseded.
 
@@ -88,21 +88,21 @@ si el modelo real es lock/escrow o burn/mint y auditar los privilegios legacy.
 
 Fecha de comprobacion: 2026-08-15.
 
-Veredicto: existe una base tecnica amplia, pero la economia real no debe
-activarse todavia. El codigo desplegado incluye ledger, lotes, reservas,
-configuracion de aportacion, APIs, scheduler y panel, pero el runtime permanece
-desactivado en staging y faltan requisitos P0 aprobados.
+Veredicto: la vertical v3 está cerrada en código para probarla en staging. Los
+gates permiten activar por separado snapshots/créditos, sesiones de juego,
+ranking y cierres de rewards. Un fallo de una ruta UKI/NFT, una fuente tardía o
+un cierre incompleto queda pendiente y no genera una liquidación parcial.
 
 | Area | Implementado | Pendiente antes de activar |
 | --- | --- | --- |
-| Ledger | `grant`, `pool_deposit`, `reserve`, `release`, `spend`, `expire` e historial auditable. | Snapshot historico real `as-of-cutoffBlock`, no balance live tardio. |
-| Maduracion | Slots por ruta, epochs, minimo 24h, maximo 5 por ruta y jobs de recálculo UKI/NFT independientes. | Snapshot histórico real y validación E2E de ambas rutas desplegadas. |
-| Consumo | Saldo propio completo primero; si no alcanza, reserva 10 creditos completos del pool; idempotencia por sesion. | Recuperar resultados recibidos dentro de TTL aunque su validacion se procese despues. |
-| Aportacion al pool | Configuracion por slot/epoch en multiplos de 10 y API/UI. | Coordinador productivo de liquidacion proporcional diaria. |
-| Reparto | Calculador proporcional, base 20% y floor previstos. | Settlement desde las 16:00 UTC, catch-up sin perdida y funding operativo. |
-| Semanal | Ranking y modelos base existentes. | Convertir las partes de pools del bote semanal en siete tramos diarios posteriores. |
-| Economia de partida | Tramo variable `G=0..7.5`, reserva fija de `2` al bote semanal y `0.5` a `ambassador_program_pending`, todos en unidades raw y bajo regla versionada. | Crear y aprobar la regla real de staging; los schedulers siguen apagados. |
-| Claims | `RewardsDistributor`, Merkle y API de proofs implementados. | Deployment/funding verificado y publicacion automatizada de batches. |
+| Ledger | `grant`, `pool_deposit`, `reserve`, `release`, `spend`, `expire`, compensación tardía e historial auditable por ruta. | Publicar batches solo después de reconciliar el cierre off-chain. |
+| Maduracion | Slots/epochs por ruta, mínimo 24h, máximo 5 por ruta, `cutoffBlock` canónico y reconstrucción histórica fail-closed. | Vigilar salud y cobertura histórica desde el baseline v3; no se inventa historia anterior. |
+| Consumo | Saldo propio primero; si no alcanza, 10 créditos completos del pool; reserva a las 13:59 válida al finalizar tras el corte; abandono consume y no premia. | Ninguno para la prueba funcional v3. |
+| Aportacion al pool | Configuración por slot/epoch, atribución al aportante, ledger y censo diario. | Ninguno para la prueba funcional v3. |
+| Reparto | Cierre a las 16:00, garantía sobre ordinario + tramo previo, 5% ambassador del pago final y 80/10/10 de residuos. | Funding/publicación on-chain siguen separados del cálculo off-chain. |
+| Semanal | Mejor score raw por wallet, 60/30/10, entropía BSC, payout lunes 17 y pools en siete tramos martes-lunes a las 16. | Publicación on-chain de los allocations ya sellados. |
+| Economia de partida | `G=0..7.5`, `2` al bote semanal, `0.4` ambassador ordinario y `0.1` ambassador semanal; cuotas 30/10 solo con créditos prestados. | Ninguno para la prueba funcional v3. |
+| Claims | Ledger plano por wallet, `RewardsDistributor`, Merkle y API de proofs implementados. | Funding verificado y publicación automatizada de batches; no forma parte del cierre off-chain de las 16:00. |
 
 Reglas vigentes para la implementacion:
 
@@ -167,7 +167,8 @@ El maximo potencial por wallet es 10 cupos si el usuario alcanza 5 por ruta. Est
 | `weekly_ranking_sources` / `game_weekly_rankings` | Sources canonicos y snapshot semanal con rank aplicado y siguiente rank. | Ranking #1-#9 solo con creditos del pool. |
 | `weekly_ranking_manifests` / `weekly_ranking_runs` / `weekly_ranking_audit_events` | Sellado, replay y auditoria del cierre semanal. | Umbrales, minimos y movimiento maximo semanal. |
 | `reward_allocations` / `reward_pool_accruals` / `reward_source_manifests` | Claims finales y obligaciones intermedias no claimables, fenced y reproducibles. | Jugador, bote semanal, `ambassador_program_pending`, pool creditos, pool Cukies y destinos 80/10/10 sin doble pago. |
-| `reward_emission_budget_state` / `reward_emission_budget_days` / `reward_emission_budget_events` | Reserva atomica, techo diario/acumulado, fencing e idempotencia del presupuesto UKI. | Maximo 500,000 UKI/dia, techo 450M, capacidad no usada expira y excesos fallan cerrados. |
+| `reward_emission_budget_state` / `reward_emission_budget_days` / `reward_emission_budget_events` / `reward_daily_capacity_materializations` | Reserva atomica, techo diario/acumulado, fencing, materialización del hueco hasta 500,000 e idempotencia. | Exactamente 500,000 UKI/día, techo 450M y excesos fail-closed. |
+| `reward_daily_accounting` / `reward_weekly_prize_accounting` / `reward_accounting_allocations` | Cierres inmutables y salida plana por wallet con funding `daily_emission` o `reserved_no_mint`. | Repartos diario/semanal auditables sin volver a consumir presupuesto. |
 | `reward_claim_batches` | Batches publicables para claim on-chain. | Claim final de rewards UKI. |
 | `reward_claim_proofs` / `reward_claims` | Proofs separados y estado indexado de claims por wallet/batch. | Claim ejecutado y soporte a batches grandes. |
 
@@ -186,14 +187,14 @@ El maximo potencial por wallet es 10 cupos si el usuario alcanza 5 por ruta. Est
 | Cukie Master ruta UKI | Calculo desde vesting/preventa/stake BSC indexado. Maximo 5 por wallet en esta ruta. | **Ya implementado y desplegado en staging.** `UKIStaking` esta activo en BSC Testnet (chain `97`) en `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205`; se conservan el contrato y sus posiciones, sin migracion ni redeployment. Proyeccion, servicio, runtime, reconciliacion, API/UI y panel approve/stake/unstake estan implementados. |
 | Cukie Master ruta NFT | Custodia en `CukieMasterNftVault`; calculo desde eventos confirmados, rareza y epochs. Maximo 5 por wallet. NFT no jugable mientras esta depositado. | Vertical desplegada: contrato, ABI, colección ERC721 V2, metadata/indexador, recálculo aislado, API y UI approve/deposit/withdraw. Contrato, configuración, backfill inicial e identidad/cursores están verificados en staging. La recuperación directa no depende de API/indexador y conserva una lista pública histórica separada de las colecciones activas. Pendiente smoke E2E firmado de approve/deposit/withdraw. |
 | Capacidad/requisito Cukie Master | Empezar en 500 por ruta, ampliar hasta 5,000 o subir requisito con 48h de gracia. | Control HMAC, CAS/evento idempotente, expansion solo creciente, barrido paginado y deficit de conservacion en UI implementados. |
-| Creditos diarios | Job diario crea ledger `grant` de 100 creditos por cupo tras 24h, reconstruido `as-of-cutoff`. | Parcial: ledger/lotes, snapshot, runtime, scheduler y recálculo de fuentes UKI/NFT por rutas separadas existen. Falta `cutoffBlock` historico real, catch-up sin perdida, ventana util de grants tardios y separar tambien los watermarks/sellado del ledger por ruta. |
-| Pool de creditos | Depositos en multiplos de 10 antes del corte; reparto diario y arrastre semanal versionado. | Config por slot, corte, deposito, reservas FIFO y UI/API implementados. El calculador proporcional/floor existe, pero el payout productivo y el consumo fenced del arrastre semanal no se activan hasta cerrar funding y coordinador de reparto. |
+| Creditos diarios | Job diario crea `grant` de 100 créditos por cupo tras 24h, reconstruido `as-of-cutoffBlock`. | Implementado v3: rutas UKI/NFT independientes, bloque/hash canónico, journal temporal, catch-up sin pérdida y compensación >24h idempotente. El baseline anterior a v3 falla cerrado. |
+| Pool de creditos | Depósitos en múltiplos de 10 antes del corte; reparto diario y arrastre semanal versionado. | Implementado v3: censo diario, proporcionalidad, garantía `max(ordinario + 1/7, 0.75/10)`, topup desde capacidad diaria y comisión ambassador sobre el pago final. |
 | Pool de Cukies | Un `CukiePoolNftVault` custodia ambas generaciones; lifecycle y cuotas son diarios; Original/Segunda se liquidan separados; Seiku no alimenta pools. | Vertical desplegada: contrato/ABI, calendario 14:00 versionado, proyección, API/UI, prioridad Original→Segunda→Seiku, lease exclusivo, cuota por epoch+periodo, salida al corte y dispatcher GameEconomy. Contrato, configuración, backfill inicial e identidad/cursores están verificados en staging. La retirada directa sigue operativa para colecciones históricas mientras existan posiciones. El calculador aplica tramos acumulativos 45/20/15/12/7/1; Seiku y tramos sin elegibles pasan a `undistributed_pending`. Pendientes smoke E2E firmado y coordinador productivo de liquidación. |
-| Ranking semanal | Solo partidas con creditos del pool; rank #1-#9, subida/bajada semanal, minimos de partidas. | Regla inmutable, sources, snapshots, manifest, catch-up, runtime, scheduler, health e integracion con rewards implementados; falta crear la regla aprobada y activar live. |
-| Treasure Hunt | El hub crea `game_economy_sessions`, reserva recursos y liquida. El juego no decide rewards. Horario inicial: cutoff 14:00 UTC y settlement desde 16:00 UTC, ambos versionados para cambios futuros. | Motor multi-juego, HMAC dedicado, evidencia autorizada, Cukie propio -> pool/Seiku, reserva/settlement, recuperacion y scheduler implementados. El esquema generico permite TTL de sesion hasta 24h; la regla activa debe cumplir `sessionTtlMs + validationRetryWindow < 2h` para un settlement predecible, mientras los fixtures actuales usan 10 minutos. Un resultado valido recibido dentro del TTL sigue siendo recuperable aunque se procese tarde. |
-| Reparto de recompensas | `reward_allocations` calcula claims y `reward_pool_accruals` separa `G=0..7.5` segun score, 2 UKI semanales, 0.5 UKI de embajadores, pools y no distribuido. Todas las partidas validas con Cukie prestado alimentan su generacion; rareza 45/20/15/12/7/1. Seiku no alimenta el pool y su parte pasa a `undistributed_pending`. | Cálculo local alineado y cubierto por tests. Faltan regla real aprobada, funding, coordinadores de liquidación diaria/semanal y E2E antes de activar accruals. |
-| Claim diferido | Las partes de pools derivadas del bote semanal se dividen en siete disponibilidades diarias durante la semana siguiente. | Cadencia aprobada. Falta confirmar censo diario de la semana siguiente frente a censo congelado de la semana origen, decidir representacion tecnica (`availableAt` o batches separados), implementar scheduler y probar que nunca se revoca un tramo ya cerrado. |
-| UKI no distribuido | Registrar primero como `undistributed_pending`, incluyendo `7.5-G`, Seiku, tramos sin elegibles, ranking y residuos; materializar 80% tesoreria, 10% marketing y desarrollo y 10% reduccion de supply. | Seiku y tramos vacíos ya quedan no claimables en `undistributed_pending`. Falta sustituir los campos legacy marketing/desarrollo por el bucket conjunto aprobado, materializar el manifiesto 80/10/10 y definir el mecanismo on-chain de reducción de supply. |
+| Ranking semanal | Solo partidas con créditos del pool; rank #1-#9, subida/bajada semanal y mínimos. | Implementado v3: mejor score raw, desempate temporal, snapshot de rank anterior sellado y runtime independiente. |
+| Treasure Hunt | El hub crea `game_economy_sessions`, reserva recursos y liquida; el juego no decide rewards. | Integración v3 completa: autoridad económica, checkpoints, cuotas 30/10, abandono, recuperación, periodo anclado a reserva e integración real DApp/iframe. |
+| Reparto de recompensas | `G=0..7.5`, 2 UKI semanales, reservas ambassador separadas, pools por generación/rareza y Seiku no distribuido. | Implementado v3 con cierre diario, semanal, siete tramos, censo diario y salida plana por wallet. La publicación de batches on-chain permanece separada. |
+| Claim diferido | Las partes de pools del bote semanal se dividen en siete disponibilidades durante la semana siguiente. | Implementado con censo de participantes de cada día receptor, de martes a lunes a las 16:00, funding `reserved_no_mint`. |
+| UKI no distribuido | `500,000 - todas las asignaciones/reservas del día`; residuos posteriores del semanal siguen el mismo destino. | Implementado: 80% tesorería, 10% bucket conjunto marketing/desarrollo y 10% reducción de supply, tanto diario como semanal. |
 | Conversion futura Cukie Points -> creditos | Crear regla versionada y ledger de grants diarios durante 7 dias con limites global/wallet. | Pendiente. |
 | Web IA | Las paginas publicas pueden explicar fases, pero no deben fingir que los servicios estan activos si falta backend/contrato. | Parcial: paginas coming next existentes. |
 

@@ -5,6 +5,10 @@ import {
   routeGameCheckpoint,
   routeGameEnd,
 } from '@/lib/treasure-hunt-competition/client';
+import {
+  appendTreasureHuntEconomyCheckpoint,
+  finishTreasureHuntEconomyRun,
+} from '@/lib/treasure-hunt-economy-client';
 
 const mockChannelBindings = new Map<string, (data: any) => unknown>();
 const mockChannelTrigger = jest.fn((_eventName: string, _payload?: any) => true);
@@ -31,10 +35,20 @@ jest.mock('@/lib/treasure-hunt-competition/client', () => ({
   routeGameCheckpoint: jest.fn(),
   routeGameEnd: jest.fn(),
 }));
+jest.mock('@/lib/treasure-hunt-economy-client', () => ({
+  appendTreasureHuntEconomyCheckpoint: jest.fn(),
+  finishTreasureHuntEconomyRun: jest.fn(),
+}));
 
 const mockRouteGameEnd = routeGameEnd as jest.MockedFunction<typeof routeGameEnd>;
 const mockRouteGameCheckpoint = routeGameCheckpoint as jest.MockedFunction<
   typeof routeGameCheckpoint
+>;
+const mockAppendEconomyCheckpoint = appendTreasureHuntEconomyCheckpoint as jest.MockedFunction<
+  typeof appendTreasureHuntEconomyCheckpoint
+>;
+const mockFinishEconomyRun = finishTreasureHuntEconomyRun as jest.MockedFunction<
+  typeof finishTreasureHuntEconomyRun
 >;
 
 describe('usePusherGameConnection game-end ACK', () => {
@@ -54,6 +68,18 @@ describe('usePusherGameConnection game-end ACK', () => {
     mockChannelBindings.clear();
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockAppendEconomyCheckpoint.mockResolvedValue({
+      sequence: 1,
+      evidenceHash: 'e'.repeat(64),
+    });
+    mockFinishEconomyRun.mockResolvedValue({
+      runId: 'economy-run-1',
+      status: 'settled',
+      scoreRaw: '100',
+      leaderboardEligible: true,
+      rewardEligible: true,
+      jackpotEligible: true,
+    });
   });
 
   afterEach(() => {
@@ -340,6 +366,111 @@ describe('usePusherGameConnection game-end ACK', () => {
       '❌ [PUSHER] Error processing checkpoint:',
       expect.anything(),
     );
+    unmount();
+  });
+
+  it('persists economy-only practice checkpoints without writing the retired legacy session path', async () => {
+    const onCheckpoint = jest.fn();
+    const { unmount } = renderHook(() => usePusherGameConnection(
+      'session-1',
+      authData,
+      { ...options, onCheckpoint },
+    ));
+    const handler = mockChannelBindings.get('client-checkpoint');
+
+    await act(async () => {
+      await handler?.({
+        score: 100,
+        gameTime: 5_000,
+        timestamp: 123_456,
+        nonce: 'checkpoint-1',
+        economyRunId: 'economy-run-1',
+      });
+    });
+
+    expect(mockAppendEconomyCheckpoint).toHaveBeenCalledWith({
+      runId: 'economy-run-1',
+      checkpointId: 'checkpoint-1',
+      score: 100,
+      gameTimeMs: 5_000,
+    });
+    expect(mockRouteGameCheckpoint).not.toHaveBeenCalled();
+    expect(onCheckpoint).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('settles economy practice before ACK and never invokes the legacy game-end path', async () => {
+    const onGameEndPersisted = jest.fn(() => true);
+    const { unmount } = renderHook(() => usePusherGameConnection(
+      'session-1',
+      authData,
+      { ...options, onGameEndPersisted },
+    ));
+    const handler = mockChannelBindings.get('client-game-end');
+
+    await act(async () => {
+      await handler?.({
+        resultId: 'economy-result-123',
+        finalScore: 100,
+        gameTime: 6_000,
+        economyRunId: 'economy-run-1',
+      });
+    });
+
+    expect(mockRouteGameEnd).not.toHaveBeenCalled();
+    expect(mockFinishEconomyRun).toHaveBeenCalledWith({
+      runId: 'economy-run-1',
+      resultId: 'economy-result-123',
+      score: 100,
+      gameTimeMs: 6_000,
+      outcome: 'completed',
+      authoritySource: 'economy',
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledWith('client-game-end-ack', {
+      resultId: 'economy-result-123',
+    });
+    unmount();
+  });
+
+  it('maps an economy manual close to score-zero forfeit with no eligibility', async () => {
+    mockFinishEconomyRun.mockResolvedValue({
+      runId: 'economy-run-1',
+      status: 'forfeited',
+      scoreRaw: '0',
+      leaderboardEligible: false,
+      rewardEligible: false,
+      jackpotEligible: false,
+    });
+    const onGameEndPersisted = jest.fn(() => true);
+    const { unmount } = renderHook(() => usePusherGameConnection(
+      'session-1',
+      authData,
+      { ...options, onGameEndPersisted },
+    ));
+    const handler = mockChannelBindings.get('client-game-end');
+
+    await act(async () => {
+      await handler?.({
+        resultId: 'forfeit-result-123',
+        finalScore: 999,
+        gameTime: 6_000,
+        economyRunId: 'economy-run-1',
+        metadata: { gameOverReason: 'manual' },
+      });
+    });
+
+    expect(mockRouteGameEnd).not.toHaveBeenCalled();
+    expect(mockFinishEconomyRun).toHaveBeenCalledWith({
+      runId: 'economy-run-1',
+      resultId: 'forfeit-result-123',
+      score: 0,
+      gameTimeMs: 6_000,
+      outcome: 'voluntary_forfeit',
+      authoritySource: 'economy',
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledWith('client-game-end-ack', {
+      resultId: 'forfeit-result-123',
+    });
     unmount();
   });
 });

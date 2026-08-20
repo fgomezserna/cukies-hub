@@ -2,6 +2,7 @@ import type { Db } from 'mongodb';
 
 import {
   loadCukiePoolVaultCandidates,
+  loadCukiePoolVaultRewardParticipants,
   resolveCukiePoolVaultPeriod,
   type CukiePoolVaultConfig,
 } from '@/lib/uki-economy/cukie-pool/vault-source';
@@ -221,5 +222,73 @@ describe('Cukie Pool custodial source', () => {
       CONFIG,
       new Date(nowSeconds * 1_000),
     )).rejects.toBeInstanceOf(SchemaNotReadyError);
+  });
+
+  it('builds the closed-period reward census from custodial positions', async () => {
+    const startsAtSeconds = 2_000_000_000;
+    const endsAtSeconds = startsAtSeconds + 86_400;
+    const active = position({
+      tokenId: '10',
+      depositedAt: startsAtSeconds - 86_400,
+      activationAt: startsAtSeconds,
+    });
+    const exitedAfterThePeriod = {
+      ...position({
+        tokenId: '11',
+        depositedAt: startsAtSeconds - 86_400,
+        activationAt: startsAtSeconds,
+        exitRequestedAt: endsAtSeconds + 60,
+        withdrawableAt: endsAtSeconds + 86_400,
+      }),
+      lifecycle: 'withdrawn',
+      lifecycleOpen: false,
+      custody: 'cukie_pool_nft_vault',
+    };
+    const rows = [active, exitedAfterThePeriod];
+    const metadata = new Map([
+      ['10', { rarity: 3, generation: 1 }],
+      ['11', { rarity: 6, generation: 2 }],
+    ]);
+    const db = {
+      collection: (name: string) => ({
+        find: (filter: Record<string, unknown>) => {
+          if (name === 'cukie_pool_nft_vault_positions') return cursor(rows);
+          const tokenIds = new Set((filter.tokenId as { $in: unknown[] }).$in.map(String));
+          return cursor([...metadata.entries()]
+            .filter(([tokenId]) => tokenIds.has(tokenId))
+            .map(([tokenId, values]) => ({
+              _id: tokenId,
+              tokenId,
+              owner: OWNER,
+              ownerNormalized: OWNER,
+              network: 'BSC',
+              state: 'available',
+              chainId: 97,
+              collectionAddressNormalized: COLLECTION,
+              ...values,
+            })));
+        },
+      }),
+    } as unknown as Db;
+
+    await expect(loadCukiePoolVaultRewardParticipants(
+      db,
+      CONFIG,
+      new Date(startsAtSeconds * 1_000),
+      new Date(endsAtSeconds * 1_000),
+    )).resolves.toEqual([
+      {
+        positionId: active.positionId,
+        ownerNormalized: OWNER,
+        generation: 'original',
+        rarity: 'rare',
+      },
+      {
+        positionId: exitedAfterThePeriod.positionId,
+        ownerNormalized: OWNER,
+        generation: 'second_generation',
+        rarity: 'goat',
+      },
+    ]);
   });
 });

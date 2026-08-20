@@ -89,7 +89,7 @@ Trabajo pendiente en Coolify:
 
 - completar el cutover desde las bases logicas staging del host compartido a `cukies-staging-rs0`, sin leer ni escribir las bases live,
 - sustituir las integraciones externas deshabilitadas por credenciales realmente exclusivas cuando QA las necesite,
-- mantener los cinco schedulers desplegados pero desactivados hasta aprobar y cargar sus reglas,
+- mantener los seis schedulers desplegados con gates independientes hasta aprobar y cargar sus reglas,
 - documentar rollback por commit y por variables para cada promocion a `main`.
 
 Nada de esto debe usar secrets en el repo.
@@ -290,7 +290,7 @@ Antes de considerar staging valido:
 - [x] Confirmar el mirror secundario en las paginas publicas de BscScan Testnet: `UKIStaking` y `RewardsDistributor` muestran source verificado con coincidencia exacta, compilador `0.8.28` y 200 runs; no fue necesario obtener ni exponer una API key.
 - [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
 - [x] Implementar el ledger global fail-closed de presupuesto diario/acumulado, con fencing, replay por `sourceId` y auditoria de saldos; el runtime no contiene defaults ni activa schedulers (issue #213).
-- [x] Reconciliar `500,000 UKI/dia` como maximo, `450,000,000 UKI` como techo acumulado, capacidad no usada `expires`, exceso `block` y reparto no distribuido 80/5/5/10.
+- [x] Reconciliar `500,000 UKI/dia` como presupuesto fijo en staging, `450,000,000 UKI` como techo acumulado, transformaciones semanales sin doble emision y reparto no distribuido 80/10/10 con una unica reserva de marketing y desarrollo.
 - [x] Definir el ruleset exclusivo de prueba `staging-test-v1`: inicio `2026-08-10T00:00:00.000Z`, frontera `00:00 UTC`, gracia de 24h y siete destinos sink `0x97...`; los parametros equivalentes de produccion siguen sin aprobar (PR #226, merge `509ef4ca`).
 - [x] Implementar un bootstrap atomico `plan/apply` para rewards, competition credits, Treasure Hunt y ranking, con replay idempotente y rechazo de chain, base, recurso, gates o cursores no verificados (PR #226).
 - [x] Auditar y cerrar el motor de requisito dinamico: capacidad llena, gracia fija de 48h, proteccion, barrido paginado y cierre de ronda versionado (#61; implementado en PR #209).
@@ -298,7 +298,7 @@ Antes de considerar staging valido:
 - [ ] Ejecutar `pnpm staging:economy:rules:plan` y despues `pnpm staging:economy:rules:apply`; repetir el plan y exigir cuatro acciones `replay`.
 - [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para Cukie Master, creditos, Game Economy, Cukie Pool y ranking; comprobar fencing, idempotencia, auditoria y ausencia de escrituras fuera de staging.
 - [ ] Habilitar como maximo un scheduler, observar al menos dos ciclos y volver a apagarlo antes de avanzar al siguiente.
-- [x] Desplegar los cinco schedulers con gates desactivados y verificar guardas, credencial limitada y ausencia de heartbeats/runs.
+- [x] Desplegar los seis schedulers con gates independientes y verificar guardas, credencial limitada y ausencia de ejecucion cuando cada gate esta apagado.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
 - [x] Provisionar bucket MinIO, hostname publico, prefijo y credenciales exclusivos de staging; validar setup, upload/render real y limpieza completa del fixture.
 - [x] Desplegar URLs de card inmutables (#216), repetir dos regeneraciones con hashes distintos, limpiar el fixture y activar el profile `card-worker` solo en la app 28 (PR #217; despliegue 1109).

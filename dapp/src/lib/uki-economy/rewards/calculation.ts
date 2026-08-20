@@ -92,6 +92,13 @@ export function calculateUndistributedRewardAllocations(
           weight: BigInt(rule.undistributedBps.development),
         },
         {
+          key: "marketing_development",
+          walletNormalized:
+            rule.destinations.marketingDevelopment ?? rule.destinations.marketing,
+          category: "marketing_development" as const,
+          weight: BigInt(rule.undistributedBps.marketingDevelopment ?? 0),
+        },
+        {
           key: "supply_reduction",
           walletNormalized: rule.destinations.supplyReduction,
           category: "supply_reduction" as const,
@@ -115,7 +122,8 @@ export function calculateUndistributedRewardAllocations(
 
 /**
  * Materializa todas las obligaciones de una partida: la reserva fija semanal
- * (2 UKI), la reserva de embajadores (0.5 UKI) como accruals no claimables y
+ * (2 UKI), la reserva de embajadores (0.4 ordinario + 0.1 semanal en V3)
+ * como accruals no claimables y
  * el convertible (0..7.5 UKI) como claims finales y/o accruals de pools.
  */
 export function calculateSettlementRewardAllocations(
@@ -149,11 +157,21 @@ export function calculateSettlementRewardAllocations(
     maxConvertibleRaw * BigInt(rule.runCredits.weeklyReserveUnits);
   const ambassadorReserveNumerator =
     maxConvertibleRaw * BigInt(rule.runCredits.ambassadorReserveUnits);
+  const ambassadorOrdinaryNumerator = rule.runCredits.ambassadorOrdinaryUnits === undefined
+    ? null
+    : maxConvertibleRaw * BigInt(rule.runCredits.ambassadorOrdinaryUnits);
+  const ambassadorWeeklyNumerator = rule.runCredits.ambassadorWeeklyUnits === undefined
+    ? null
+    : maxConvertibleRaw * BigInt(rule.runCredits.ambassadorWeeklyUnits);
   const reserveDenominator = BigInt(rule.runCredits.convertibleUnits);
   if (
     reserveDenominator === BigInt(0)
     || weeklyReserveNumerator % reserveDenominator !== BigInt(0)
     || ambassadorReserveNumerator % reserveDenominator !== BigInt(0)
+    || (ambassadorOrdinaryNumerator !== null
+      && ambassadorOrdinaryNumerator % reserveDenominator !== BigInt(0))
+    || (ambassadorWeeklyNumerator !== null
+      && ambassadorWeeklyNumerator % reserveDenominator !== BigInt(0))
   ) {
     throw new DomainValidationError(
       "La reserva fija no se puede derivar exactamente del maximo convertible.",
@@ -161,6 +179,12 @@ export function calculateSettlementRewardAllocations(
   }
   const weeklyPrizePoolRaw = weeklyReserveNumerator / reserveDenominator;
   const ambassadorProgramRaw = ambassadorReserveNumerator / reserveDenominator;
+  const ambassadorOrdinaryRaw = ambassadorOrdinaryNumerator === null
+    ? null
+    : ambassadorOrdinaryNumerator / reserveDenominator;
+  const ambassadorWeeklyRaw = ambassadorWeeklyNumerator === null
+    ? null
+    : ambassadorWeeklyNumerator / reserveDenominator;
   if (
     input.creditCostUnits !== rule.runCredits.totalUnits ||
     input.weeklyReserveUnits !== rule.runCredits.weeklyReserveUnits
@@ -181,10 +205,24 @@ export function calculateSettlementRewardAllocations(
   const accruals: RewardAccrualDraft[] = [{
     category: "weekly_prize_pool",
     amountRaw: formatRawAmount(weeklyPrizePoolRaw),
-  }, {
-    category: "ambassador_program_pending",
-    amountRaw: formatRawAmount(ambassadorProgramRaw),
   }];
+  if (ambassadorOrdinaryRaw !== null && ambassadorWeeklyRaw !== null) {
+    accruals.push(
+      {
+        category: "ambassador_ordinary_pending",
+        amountRaw: formatRawAmount(ambassadorOrdinaryRaw),
+      },
+      {
+        category: "ambassador_weekly_pending",
+        amountRaw: formatRawAmount(ambassadorWeeklyRaw),
+      },
+    );
+  } else {
+    accruals.push({
+      category: "ambassador_program_pending",
+      amountRaw: formatRawAmount(ambassadorProgramRaw),
+    });
+  }
   const creditPoolRaw =
     input.creditSource === "pool"
       ? rawByBps(grossRaw, rule.settlementBps.poolCredits)
@@ -249,6 +287,10 @@ export function calculateSettlementRewardAllocations(
       ),
       weeklyPrizePoolRaw: formatRawAmount(weeklyPrizePoolRaw),
       ambassadorProgramRaw: formatRawAmount(ambassadorProgramRaw),
+      ambassadorOrdinaryRaw:
+        ambassadorOrdinaryRaw === null ? null : formatRawAmount(ambassadorOrdinaryRaw),
+      ambassadorWeeklyRaw:
+        ambassadorWeeklyRaw === null ? null : formatRawAmount(ambassadorWeeklyRaw),
       grossConvertedRaw: formatRawAmount(grossRaw),
       maxConvertibleRaw: formatRawAmount(maxConvertibleRaw),
       unconvertedRaw: formatRawAmount(unconvertedRaw),

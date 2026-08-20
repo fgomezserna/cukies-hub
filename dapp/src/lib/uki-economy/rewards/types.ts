@@ -17,7 +17,7 @@ export type RewardEmissionBudgetConfig = {
   dailyCapRaw: string;
   lifetimeCapRaw: string;
   /** V1 no acumula capacidad diaria no utilizada. */
-  unusedDailyCapacity: "expires";
+  unusedDailyCapacity: "expires" | "materialize_undistributed";
   /** V1 nunca convierte un exceso en un claim o accrual implicito. */
   overflowPolicy: "block";
 };
@@ -30,6 +30,7 @@ export type RewardCategory =
   | "treasury"
   | "marketing"
   | "development"
+  | "marketing_development"
   | "supply_reduction";
 
 /**
@@ -39,6 +40,8 @@ export type RewardCategory =
 export type RewardAccrualCategory =
   | "weekly_prize_pool"
   | "ambassador_program_pending"
+  | "ambassador_ordinary_pending"
+  | "ambassador_weekly_pending"
   | "credit_pool_weekly"
   | "cukie_pool_original_weekly"
   | "cukie_pool_second_plus_weekly"
@@ -58,6 +61,9 @@ export type RewardRule = {
     totalUnits: number;
     weeklyReserveUnits: number;
     ambassadorReserveUnits: number;
+    /** V3 divide la reserva ambassador de 0.5 en 0.4 ordinario y 0.1 semanal. */
+    ambassadorOrdinaryUnits?: number;
+    ambassadorWeeklyUnits?: number;
     convertibleUnits: number;
   };
   settlementBps: {
@@ -82,6 +88,8 @@ export type RewardRule = {
     treasury: number;
     marketing: number;
     development: number;
+    /** V3 usa un unico destino contable para marketing y desarrollo. */
+    marketingDevelopment?: number;
     supplyReduction: number;
   };
   destinations: {
@@ -91,6 +99,7 @@ export type RewardRule = {
     treasury: string;
     marketing: string;
     development: string;
+    marketingDevelopment?: string;
     supplyReduction: string;
   };
   configHash: string;

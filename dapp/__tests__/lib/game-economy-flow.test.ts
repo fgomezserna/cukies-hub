@@ -21,6 +21,48 @@ function setup() {
   return { repository, ports, service };
 }
 
+function setupTreasureHunt() {
+  const treasureRule = testGameEconomyRule({
+    gameId: "treasure-hunt",
+    version: "staging-test-v3",
+    cukie: {
+      required: true,
+      consumeOnSettle: true,
+      minAssets: 1,
+      maxAssets: 1,
+      role: "competitor",
+      selectionPolicy: "legacy_client_assets_v1",
+    },
+  });
+  const repository = new MemoryGameEconomyRepository({ rules: [treasureRule] });
+  const ports = createMemoryGameEconomyPorts();
+  const service = createGameEconomyService(
+    createMemoryGameEconomyRunner(repository),
+    ports,
+  );
+  return { repository, ports, service };
+}
+
+async function createStartedTreasureHunt(
+  context: ReturnType<typeof setupTreasureHunt>,
+) {
+  const ready = await context.service.createSession({
+    walletAddress: WALLET,
+    gameId: "treasure-hunt",
+    cukieAssetIds: ["cukie-1"],
+    expectedRuleVersion: "staging-test-v3",
+    idempotencyKey: "treasure-create",
+    now: NOW,
+  });
+  return context.service.startSession({
+    sessionId: ready.sessionId,
+    walletAddress: WALLET,
+    idempotencyKey: "treasure-start",
+    expectedRevision: ready.revision,
+    now: new Date(NOW.getTime() + 1_000),
+  });
+}
+
 async function createReady(
   context: ReturnType<typeof setup>,
   idempotencyKey = "create-1"
@@ -94,6 +136,187 @@ async function createSubmitted(
 }
 
 describe("multi-game economy session saga", () => {
+  it("consumes both Treasure Hunt resources on a completed settlement", async () => {
+    const context = setupTreasureHunt();
+    const started = await createStartedTreasureHunt(context);
+    const submitted = await context.service.submitResult({
+      sessionId: started.sessionId,
+      walletAddress: WALLET,
+      evidenceReference: "treasure-evidence-completed",
+      payloadHash: "1".repeat(64),
+      idempotencyKey: "treasure-submit-completed",
+      expectedRevision: started.revision,
+      now: new Date(NOW.getTime() + 2_000),
+    });
+    context.ports.evidence.result = {
+      authorization: "server_authorized",
+      evidenceId: "treasure-evidence-completed",
+      evidenceHash: "e".repeat(64),
+      scoreRaw: "100",
+    };
+    const validated = await context.service.validateResult({
+      sessionId: submitted.sessionId,
+      idempotencyKey: "treasure-validate-completed",
+      expectedRevision: submitted.revision,
+      now: new Date(NOW.getTime() + 3_000),
+    });
+    const settled = await context.service.settleSession({
+      sessionId: validated.sessionId,
+      idempotencyKey: "treasure-settle-completed",
+      expectedRevision: validated.revision,
+      now: new Date(NOW.getTime() + 4_000),
+    });
+
+    expect(settled).toMatchObject({
+      status: "settled",
+      settlementIntent: {
+        resourceActions: { credit: "consume", cukie: "consume" },
+      },
+      credit: { state: "consumed" },
+      cukie: { state: "consumed" },
+    });
+  });
+
+  it("consumes both Treasure Hunt resources on voluntary forfeit without entering settled censuses", async () => {
+    const context = setupTreasureHunt();
+    const started = await createStartedTreasureHunt(context);
+    const forfeited = await context.service.forfeitSession({
+      sessionId: started.sessionId,
+      idempotencyKey: "treasure-forfeit-1",
+      reasonCode: "voluntary_exit",
+      expectedRevision: started.revision,
+      now: new Date(NOW.getTime() + 2_000),
+    });
+
+    expect(forfeited).toMatchObject({
+      status: "forfeited",
+      credit: { state: "consumed" },
+      cukie: { state: "consumed" },
+      terminal: { reasonCode: "voluntary_exit" },
+    });
+    expect(forfeited.validation).toBeUndefined();
+    expect(forfeited.settlementCommand).toBeUndefined();
+    expect(forfeited.settledAt).toBeUndefined();
+    expect(context.repository.state.rewardPeriodStates).toEqual([]);
+    expect(context.ports.resources.consumed).toEqual(new Set([
+      forfeited.credit.reservationId!,
+      forfeited.cukie.reservationId!,
+    ]));
+  });
+
+  it("replays a voluntary forfeit exactly once and rejects a reused key with another reason", async () => {
+    const context = setupTreasureHunt();
+    const started = await createStartedTreasureHunt(context);
+    const first = await context.service.forfeitSession({
+      sessionId: started.sessionId,
+      idempotencyKey: "treasure-forfeit-replay",
+      reasonCode: "voluntary_exit",
+      expectedRevision: started.revision,
+      now: new Date(NOW.getTime() + 2_000),
+    });
+    const replay = await context.service.forfeitSession({
+      sessionId: started.sessionId,
+      idempotencyKey: "treasure-forfeit-replay",
+      reasonCode: "voluntary_exit",
+      expectedRevision: started.revision,
+      now: new Date(NOW.getTime() + 20_000),
+    });
+    expect(replay).toEqual(first);
+    expect(
+      context.ports.resources.calls.filter((call) => call.action === "consume"),
+    ).toHaveLength(2);
+    await expect(context.service.forfeitSession({
+      sessionId: started.sessionId,
+      idempotencyKey: "treasure-forfeit-replay",
+      reasonCode: "different_reason",
+      expectedRevision: started.revision,
+      now: new Date(NOW.getTime() + 21_000),
+    })).rejects.toThrow(/otro payload/);
+  });
+
+  it("keeps the Treasure Hunt reward guard on the reservation week across Monday 14:00", async () => {
+    const context = setupTreasureHunt();
+    const reservedAt = new Date("2026-08-17T13:59:00.000Z");
+    const ready = await context.service.createSession({
+      walletAddress: WALLET,
+      gameId: "treasure-hunt",
+      cukieAssetIds: ["cukie-cross-cutoff"],
+      expectedRuleVersion: "staging-test-v3",
+      idempotencyKey: "treasure-cross-cutoff-create",
+      now: reservedAt,
+    });
+    const started = await context.service.startSession({
+      sessionId: ready.sessionId,
+      walletAddress: WALLET,
+      idempotencyKey: "treasure-cross-cutoff-start",
+      expectedRevision: ready.revision,
+      now: new Date("2026-08-17T13:59:01.000Z"),
+    });
+    const submitted = await context.service.submitResult({
+      sessionId: ready.sessionId,
+      walletAddress: WALLET,
+      idempotencyKey: "treasure-cross-cutoff-submit",
+      expectedRevision: started.revision,
+      evidenceReference: "treasure-cross-cutoff-evidence",
+      payloadHash: PAYLOAD_HASH,
+      now: new Date("2026-08-17T14:01:00.000Z"),
+    });
+    const validated = await context.service.validateResult({
+      sessionId: ready.sessionId,
+      idempotencyKey: "treasure-cross-cutoff-validate",
+      expectedRevision: submitted.revision,
+      now: new Date("2026-08-17T14:01:01.000Z"),
+    });
+    await context.service.settleSession({
+      sessionId: ready.sessionId,
+      idempotencyKey: "treasure-cross-cutoff-settle",
+      expectedRevision: validated.revision,
+      now: new Date("2026-08-17T14:01:02.000Z"),
+    });
+
+    expect(context.repository.state.rewardPeriodStates).toEqual([
+      expect.objectContaining({
+        periodId: "2026-W33",
+        status: "open",
+      }),
+    ]);
+  });
+
+  it("recovers a partial voluntary forfeit without releasing its consumed credit", async () => {
+    const context = setupTreasureHunt();
+    const started = await createStartedTreasureHunt(context);
+    context.ports.resources.fail("cukie", "consume");
+    await expect(context.service.forfeitSession({
+      sessionId: started.sessionId,
+      idempotencyKey: "treasure-forfeit-partial",
+      reasonCode: "voluntary_exit",
+      expectedRevision: started.revision,
+      now: new Date(NOW.getTime() + 2_000),
+    })).rejects.toThrow(/port failure/);
+    expect(context.repository.state.sessions[0]).toMatchObject({
+      status: "started",
+      credit: { state: "consumed" },
+      cukie: { state: "active" },
+      terminalIntent: { status: "forfeited" },
+      operation: { kind: "release" },
+    });
+
+    const recovered = await context.service.recoverBatch({
+      now: new Date(NOW.getTime() + 40_000),
+      limit: 10,
+    });
+    expect(recovered.failures).toEqual([]);
+    expect(recovered.sessions).toEqual([
+      expect.objectContaining({
+        sessionId: started.sessionId,
+        status: "forfeited",
+        credit: expect.objectContaining({ state: "consumed" }),
+        cukie: expect.objectContaining({ state: "consumed" }),
+      }),
+    ]);
+    expect(context.ports.resources.released).toEqual(new Set());
+  });
+
   it("runs the exact state machine and replays every completed request", async () => {
     const context = setup();
     const ready = await createReady(context);

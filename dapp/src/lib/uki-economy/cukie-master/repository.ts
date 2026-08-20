@@ -19,6 +19,7 @@ import type {
   CukieMasterPosition,
   CukieMasterPositionEvent,
   CukieMasterIndexerHealth,
+  CukieMasterChainEvidence,
   CukieMasterRouteCapacity,
   CukieMasterRouteRound,
   CukieMasterSlot,
@@ -642,6 +643,7 @@ export interface CukieMasterRepository {
   ): Promise<CukieMasterPosition | null>;
   findEvent(idempotencyKey: string): Promise<CukieMasterPositionEvent | null>;
   insertEvent(event: CukieMasterPositionEvent): Promise<void>;
+  findProjectedChainEvidence(eventId: string): Promise<CukieMasterChainEvidence | null>;
   findPresaleParticipant(walletNormalized: string): Promise<PresaleParticipantRawDocument | null>;
   findUkiStakingPosition(walletNormalized: string): Promise<UkiStakingPositionRawDocument | null>;
   findPresaleVestingPosition(
@@ -695,6 +697,26 @@ export function createMongoCukieMasterRepository(
   const capacities = db.collection<CukieMasterRouteCapacity>('cukie_master_route_capacity');
   const positions = db.collection<CukieMasterPosition>('cukie_master_positions');
   const slots = db.collection<CukieMasterSlot>('cukie_master_slots');
+  const slotVersions = db.collection<{
+    _id: string;
+    slotId: string;
+    route: CukieMasterRoute;
+    validFrom: Date;
+    validUntil?: Date;
+    effectiveBlockNumber: number;
+    effectiveBlockHash: string;
+    effectiveBlockTimestamp: Date;
+    observedAt: Date;
+    slot: CukieMasterSlot;
+    createdAt: Date;
+  }>('cukie_master_slot_versions');
+  const slotHistoryState = db.collection<{
+    _id: CukieMasterRoute;
+    completeFrom: Date;
+    completeFromBlockNumber?: number;
+    observedThrough: Date;
+    updatedAt: Date;
+  }>('cukie_master_slot_history_state');
   const events = db.collection<CukieMasterPositionEvent>('cukie_master_position_events');
   const options = mongoOptions(session);
 
@@ -785,6 +807,33 @@ export function createMongoCukieMasterRepository(
     findEvent: (idempotencyKey) => events.findOne({ idempotencyKey }, options),
     async insertEvent(event) {
       await events.insertOne(event, options);
+    },
+    async findProjectedChainEvidence(eventId) {
+      if (!eventId) return null;
+      const event = await db.collection<{
+        _id: string;
+        status?: unknown;
+        blockNumber?: unknown;
+        blockHash?: unknown;
+        timestampMs?: unknown;
+      }>('chain_events').findOne({ _id: eventId, status: 'projected' }, options);
+      if (
+        !event ||
+        !Number.isSafeInteger(event.blockNumber) ||
+        Number(event.blockNumber) < 0 ||
+        typeof event.blockHash !== 'string' ||
+        !/^0x[0-9a-f]{64}$/i.test(event.blockHash) ||
+        !Number.isSafeInteger(event.timestampMs) ||
+        Number(event.timestampMs) < 0
+      ) return null;
+      const blockTimestamp = new Date(Number(event.timestampMs));
+      if (Number.isNaN(blockTimestamp.getTime())) return null;
+      return {
+        eventId,
+        blockNumber: Number(event.blockNumber),
+        blockHash: event.blockHash.toLowerCase(),
+        blockTimestamp,
+      };
     },
     findPresaleParticipant: (walletNormalized) => db
       .collection<PresaleParticipantRawDocument>('presale_participants')
@@ -1092,16 +1141,97 @@ export function createMongoCukieMasterRepository(
       .toArray(),
     findSlot: (slotId) => slots.findOne({ _id: slotId }, options),
     async replaceSlot(previous, next) {
+      if (
+        !Number.isSafeInteger(next.sourceBlockNumber) ||
+        Number(next.sourceBlockNumber) < 0 ||
+        typeof next.sourceBlockHash !== 'string' ||
+        !/^0x[0-9a-f]{64}$/.test(next.sourceBlockHash) ||
+        !(next.sourceBlockTimestamp instanceof Date) ||
+        Number.isNaN(next.sourceBlockTimestamp.getTime())
+      ) {
+        throw new DomainConflictError(
+          `El slot ${next._id} no acredita un bloque efectivo canonico.`,
+        );
+      }
+      const effectiveBlockNumber = Number(next.sourceBlockNumber);
+      const effectiveBlockHash = next.sourceBlockHash;
+      const effectiveBlockTimestamp = next.sourceBlockTimestamp;
       if (!previous) {
         await slots.insertOne(next, options);
+        await slotVersions.updateOne(
+          { _id: `${next._id}:${next.revision}` },
+          {
+            $setOnInsert: {
+              _id: `${next._id}:${next.revision}`,
+              slotId: next._id,
+              route: next.route,
+              validFrom: effectiveBlockTimestamp,
+              effectiveBlockNumber,
+              effectiveBlockHash,
+              effectiveBlockTimestamp,
+              observedAt: next.updatedAt,
+              slot: next,
+              createdAt: next.updatedAt,
+            },
+          },
+          { ...options, upsert: true },
+        );
+        await slotHistoryState.updateOne(
+          { _id: next.route },
+          {
+            $setOnInsert: {
+              _id: next.route,
+              completeFrom: next.createdAt,
+              completeFromBlockNumber: effectiveBlockNumber,
+            },
+            $max: { observedThrough: next.updatedAt },
+            $set: { updatedAt: next.updatedAt },
+          },
+          { ...options, upsert: true },
+        );
         return next;
       }
       const { _id: _id, ...replacement } = next;
-      return slots.findOneAndReplace(
+      const replaced = await slots.findOneAndReplace(
         { _id: previous._id, revision: previous.revision },
         replacement as OptionalUnlessRequiredId<CukieMasterSlot>,
         { ...options, returnDocument: 'after' },
       );
+      if (!replaced) return null;
+      const closed = await slotVersions.updateOne(
+        {
+          _id: `${previous._id}:${previous.revision}`,
+          validUntil: { $exists: false },
+        },
+        { $set: { validUntil: effectiveBlockTimestamp } },
+        options,
+      );
+      if (closed.matchedCount !== 1) {
+        throw new DomainConflictError(
+          `El historial temporal del slot ${previous._id} no tiene una version abierta unica.`,
+        );
+      }
+      await slotVersions.insertOne({
+        _id: `${next._id}:${next.revision}`,
+        slotId: next._id,
+        route: next.route,
+        validFrom: effectiveBlockTimestamp,
+        effectiveBlockNumber,
+        effectiveBlockHash,
+        effectiveBlockTimestamp,
+        observedAt: next.updatedAt,
+        slot: next,
+        createdAt: next.updatedAt,
+      }, options);
+      await slotHistoryState.updateOne(
+        { _id: next.route },
+        {
+          $max: { observedThrough: next.updatedAt },
+          $set: { updatedAt: next.updatedAt },
+        },
+        options,
+      );
+      return replaced;
     },
     listCreditEligible: (periodStart) => slots.find({
       creditEligibleFrom: { $lte: periodStart },

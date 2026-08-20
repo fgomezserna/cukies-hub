@@ -34,7 +34,7 @@ import type {
 jest.setTimeout(30_000);
 
 const PERIOD = getIsoWeekPeriod(new Date("2026-07-10T12:00:00.000Z"));
-const SEALED_AT = new Date("2026-07-13T00:00:01.000Z");
+const SEALED_AT = new Date("2026-07-13T14:00:01.000Z");
 const WALLET = `0x${"1".repeat(40)}`;
 const CREDIT_CONFIG_HASH = "c".repeat(64);
 const GAME_CONFIG_HASH = "d".repeat(64);

@@ -156,6 +156,36 @@ describe("reward settlement calculations", () => {
     });
   });
 
+  it("V3 separa la reserva ambassador en 0.4 ordinario y 0.1 semanal", () => {
+    const v3 = testRewardRule();
+    v3.version = "rewards-v3";
+    v3.runCredits = {
+      ...v3.runCredits,
+      ambassadorOrdinaryUnits: 4,
+      ambassadorWeeklyUnits: 1,
+    };
+    v3.configHash = buildRewardRuleConfigHash(v3);
+
+    const result = calculateSettlementRewardAllocations(v3, {
+      ...base,
+      creditSource: "own",
+      cukieSource: "own",
+      ranking: null,
+    });
+
+    expect(result.accruals).toEqual([
+      { category: "weekly_prize_pool", amountRaw: "2000" },
+      { category: "ambassador_ordinary_pending", amountRaw: "400" },
+      { category: "ambassador_weekly_pending", amountRaw: "100" },
+    ]);
+    expect(result.totals).toMatchObject({
+      ambassadorProgramRaw: "500",
+      ambassadorOrdinaryRaw: "400",
+      ambassadorWeeklyRaw: "100",
+      sourceTotalRaw: "10000",
+    });
+  });
+
   it("conserva el presupuesto nominal con score parcial antes de repartirlo", () => {
     const result = calculateSettlementRewardAllocations(rule, {
       ...base,
@@ -222,6 +252,31 @@ describe("reward pool calculations", () => {
       (sum, allocation) => sum + BigInt(allocation.amountRaw),
       BigInt(0),
     )).toBe(BigInt(10000));
+  });
+
+  it("V3 reparte 80/10/10 con un unico destino marketing-desarrollo", () => {
+    const v3 = testRewardRule();
+    v3.version = "rewards-v3";
+    v3.undistributedBps = {
+      treasury: 8_000,
+      marketing: 0,
+      development: 0,
+      marketingDevelopment: 1_000,
+      supplyReduction: 1_000,
+    };
+    v3.destinations = {
+      ...v3.destinations,
+      marketingDevelopment: v3.destinations.marketing,
+    };
+    v3.configHash = buildRewardRuleConfigHash(v3);
+
+    expect(amountsByCategory(
+      calculateUndistributedRewardAllocations(v3, "10000").allocations,
+    )).toEqual({
+      treasury: "8000",
+      marketing_development: "1000",
+      supply_reduction: "1000",
+    });
   });
 
   it("asigna el remainder raw de forma determinista sin perder unidades", () => {

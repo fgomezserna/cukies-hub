@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 
 export const STAGING_ECONOMY_RULESET = Object.freeze({
-  id: 'staging-test-v1',
+  id: 'staging-test-v3',
   activeFrom: '2026-08-10T00:00:00.000Z',
-  rewardVersion: 'rewards-staging-test-v1',
-  creditVersion: 'credits-staging-test-v1',
+  rewardVersion: 'rewards-staging-test-v3',
+  creditVersion: 'credits-staging-test-v3',
   gameId: 'treasure-hunt',
-  gameVersion: 'staging-test-v1',
+  gameVersion: 'staging-test-v3',
   rankingVersion: 'weekly-ranking-staging-test-v1',
 });
 
-export const STAGING_ECONOMY_CONFIRMATION = 'APPLY_STAGING_TESTNET_97_RULES_V1';
+export const STAGING_ECONOMY_CONFIRMATION = 'APPLY_STAGING_TESTNET_97_RULES_V3';
 
 const STAGING_RESOURCE_UUID = 'u4s804o4wwcckowgk0woo4wg';
 const STAGING_DATABASE = 'cukieshub-new-staging';
@@ -20,6 +20,10 @@ const FALSE_RUNTIME_GATES = [
   'GAME_ECONOMY_RUNTIME_ENABLED',
   'CUKIE_POOL_RUNTIME_ENABLED',
   'WEEKLY_RANKING_RUNTIME_ENABLED',
+  'REWARD_ACCOUNTING_RUNTIME_ENABLED',
+  'REWARD_DAILY_ACCOUNTING_ENABLED',
+  'REWARD_WEEKLY_PAYOUT_ENABLED',
+  'REWARD_POOL_TRANCHES_ENABLED',
 ];
 
 const SOURCE_ENVIRONMENT_KEYS = Object.freeze({
@@ -69,6 +73,7 @@ const TEST_ONLY_DESTINATIONS = Object.freeze({
   treasury: '0x9700000000000000000000000000000000000004',
   marketing: '0x9700000000000000000000000000000000000005',
   development: '0x9700000000000000000000000000000000000006',
+  marketingDevelopment: '0x9700000000000000000000000000000000000005',
   supplyReduction: '0x9700000000000000000000000000000000000007',
 });
 
@@ -281,7 +286,7 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
   return identities;
 }
 
-function buildRewardRule(activeFrom, now) {
+function buildRewardRule(activeFrom, programStartsAt, now) {
   const base = {
     _id: `reward_allocations:${STAGING_ECONOMY_RULESET.rewardVersion}`,
     scope: 'reward_allocations',
@@ -294,6 +299,8 @@ function buildRewardRule(activeFrom, now) {
       totalUnits: 100,
       weeklyReserveUnits: 20,
       ambassadorReserveUnits: 5,
+      ambassadorOrdinaryUnits: 4,
+      ambassadorWeeklyUnits: 1,
       convertibleUnits: 75,
     },
     settlementBps: {
@@ -313,18 +320,18 @@ function buildRewardRule(activeFrom, now) {
       '9': 2_000,
     },
     creditPoolDaily: {
-      sourceShareBps: 2_000,
+      sourceShareBps: 10_000,
       floorEnabled: true,
       floorCreditsStep: 10,
       floorAmountRaw: '750000000000000000',
     },
     emissionBudget: {
-      programStartsAt: activeFrom,
+      programStartsAt,
       dayBoundarySecondUtc: 14 * 60 * 60,
       lateReservationGraceSeconds: 86_400,
       dailyCapRaw: '500000000000000000000000',
       lifetimeCapRaw: '450000000000000000000000000',
-      unusedDailyCapacity: 'expires',
+      unusedDailyCapacity: 'materialize_undistributed',
       overflowPolicy: 'block',
     },
     cukiePool: {
@@ -335,8 +342,9 @@ function buildRewardRule(activeFrom, now) {
     },
     undistributedBps: {
       treasury: 8_000,
-      marketing: 500,
-      development: 500,
+      marketing: 0,
+      development: 0,
+      marketingDevelopment: 1_000,
       supplyReduction: 1_000,
     },
     destinations: { ...TEST_ONLY_DESTINATIONS },
@@ -370,8 +378,10 @@ function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
     version: STAGING_ECONOMY_RULESET.creditVersion,
     active: true,
     activeFrom,
-    cutoffHourUtc: 12,
+    cutoffHourUtc: 14,
     cutoffMinuteUtc: 0,
+    settlementHourUtc: 16,
+    settlementMinuteUtc: 0,
     maxSnapshotLatenessMs: 30 * 60 * 1000,
     sourceFreshnessMs: 15 * 60 * 1000,
     expectedBscChainId: 97,
@@ -396,6 +406,8 @@ function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
       activeFrom: base.activeFrom,
       cutoffHourUtc: base.cutoffHourUtc,
       cutoffMinuteUtc: base.cutoffMinuteUtc,
+      settlementHourUtc: base.settlementHourUtc,
+      settlementMinuteUtc: base.settlementMinuteUtc,
       maxSnapshotLatenessMs: base.maxSnapshotLatenessMs,
       sourceFreshnessMs: base.sourceFreshnessMs,
       expectedBscChainId: base.expectedBscChainId,
@@ -433,7 +445,7 @@ function buildGameRule(activeFrom, now, rewardRule, creditRule) {
     },
     cukie: {
       required: true,
-      consumeOnSettle: false,
+      consumeOnSettle: true,
       minAssets: 0,
       maxAssets: 0,
       role: 'own_or_pool',
@@ -493,16 +505,35 @@ function buildRankingRule(activeFrom, now) {
   };
 }
 
-export function buildStagingEconomyRuleSet({ environment = process.env, cursors, now = new Date() }) {
+export function buildStagingEconomyRuleSet({
+  environment = process.env,
+  cursors,
+  now = new Date(),
+  creditBaselineAt = now,
+}) {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new StagingEconomyRulesError(['now must be a valid Date']);
   }
   const { sourceContractAddresses } = validateStagingEconomyEnvironment(environment);
   const identities = buildVerifiedSources(cursors, sourceContractAddresses, now);
   const activeFrom = new Date(STAGING_ECONOMY_RULESET.activeFrom);
-  const reward = buildRewardRule(activeFrom, now);
-  const credit = buildCreditRule(activeFrom, now, sourceContractAddresses, identities);
-  const game = buildGameRule(activeFrom, now, reward, credit);
+  if (!(creditBaselineAt instanceof Date) || Number.isNaN(creditBaselineAt.getTime())) {
+    throw new StagingEconomyRulesError(['creditBaselineAt must be a valid Date']);
+  }
+  const creditBaseline = new Date(Math.max(activeFrom.getTime(), creditBaselineAt.getTime()));
+  let creditActiveFrom = new Date(Date.UTC(
+    creditBaseline.getUTCFullYear(),
+    creditBaseline.getUTCMonth(),
+    creditBaseline.getUTCDate(),
+    14,
+    0,
+  ));
+  if (creditActiveFrom < creditBaseline) {
+    creditActiveFrom = new Date(creditActiveFrom.getTime() + 86_400_000);
+  }
+  const reward = buildRewardRule(creditActiveFrom, activeFrom, now);
+  const credit = buildCreditRule(creditActiveFrom, now, sourceContractAddresses, identities);
+  const game = buildGameRule(creditActiveFrom, now, reward, credit);
   const ranking = buildRankingRule(activeFrom, now);
   return { reward, credit, game, ranking };
 }

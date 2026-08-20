@@ -83,7 +83,7 @@ export function safeCompetitionCreditPeriodScopeId(
       return fallback;
     }
     const record = period as Record<string, unknown>;
-    const { periodId, cutoff, nextCutoff, ruleVersion, ruleConfigHash } =
+    const { periodId, cutoff, nextCutoff, settlementTarget, ruleVersion, ruleConfigHash } =
       record;
     if (
       typeof periodId !== "string" ||
@@ -95,6 +95,10 @@ export function safeCompetitionCreditPeriodScopeId(
       !(nextCutoff instanceof Date) ||
       Number.isNaN(nextCutoff.getTime()) ||
       nextCutoff.getTime() !== cutoff.getTime() + DAY_MS ||
+      !(settlementTarget instanceof Date) ||
+      Number.isNaN(settlementTarget.getTime()) ||
+      settlementTarget.getTime() < cutoff.getTime() ||
+      settlementTarget.getTime() >= nextCutoff.getTime() ||
       typeof ruleVersion !== "string" ||
       ruleVersion.length === 0 ||
       ruleVersion.length > MAX_TEXT_LENGTH ||
@@ -112,6 +116,21 @@ export function safeCompetitionCreditPeriodScopeId(
   }
 }
 
+export function safeCompetitionCreditSettlementPeriodScopeId(
+  runInput: unknown,
+  trustedRunId: string
+) {
+  if (!runInput || typeof runInput !== "object" || Array.isArray(runInput)) {
+    return safeCompetitionCreditPeriodScopeId(null, trustedRunId);
+  }
+  return safeCompetitionCreditPeriodScopeId(
+    {
+      period: (runInput as Record<string, unknown>).settlementPeriod,
+    },
+    trustedRunId
+  );
+}
+
 export function buildCompetitionCreditRuleConfigHash(
   rule: CompetitionCreditRule
 ) {
@@ -123,6 +142,8 @@ export function buildCompetitionCreditRuleConfigHash(
     activeUntil: rule.activeUntil,
     cutoffHourUtc: rule.cutoffHourUtc,
     cutoffMinuteUtc: rule.cutoffMinuteUtc,
+    settlementHourUtc: rule.settlementHourUtc,
+    settlementMinuteUtc: rule.settlementMinuteUtc,
     maxSnapshotLatenessMs: rule.maxSnapshotLatenessMs,
     sourceFreshnessMs: rule.sourceFreshnessMs,
     expectedBscChainId: rule.expectedBscChainId,
@@ -227,6 +248,8 @@ export function assertCompetitionCreditRule(rule: CompetitionCreditRule) {
   }
   validBoundedInteger(rule.cutoffHourUtc, "rule.cutoffHourUtc", 0, 23);
   validBoundedInteger(rule.cutoffMinuteUtc, "rule.cutoffMinuteUtc", 0, 59);
+  validBoundedInteger(rule.settlementHourUtc, "rule.settlementHourUtc", 0, 23);
+  validBoundedInteger(rule.settlementMinuteUtc, "rule.settlementMinuteUtc", 0, 59);
   validBoundedInteger(
     rule.maxSnapshotLatenessMs,
     "rule.maxSnapshotLatenessMs",
@@ -247,9 +270,8 @@ export function assertCompetitionCreditRule(rule: CompetitionCreditRule) {
   const sourceAliases = [
     "UKI_STAKING",
     "VESTING_VAULT",
-    "TOKEN",
-    "MARKETPLACE",
-    "BRIDGE",
+    "TOKEN_V2",
+    "CUKIE_MASTER_NFT_VAULT",
   ] as const;
   const addresses = new Set<string>();
   for (const alias of sourceAliases) {
@@ -407,10 +429,30 @@ export function buildCompetitionCreditPeriod(
     );
   }
   const nextCutoff = new Date(cutoff.getTime() + DAY_MS);
+  const settlementTarget = new Date(
+    Date.UTC(
+      cutoff.getUTCFullYear(),
+      cutoff.getUTCMonth(),
+      cutoff.getUTCDate(),
+      rule.settlementHourUtc,
+      rule.settlementMinuteUtc,
+      0,
+      0
+    )
+  );
+  if (
+    settlementTarget.getTime() < cutoff.getTime() ||
+    settlementTarget.getTime() >= nextCutoff.getTime()
+  ) {
+    throw new DomainValidationError(
+      "La hora objetivo de liquidacion debe pertenecer al periodo y ser posterior al corte."
+    );
+  }
   return {
     periodId: `${rule.version}:${rule.configHash}:${cutoff.toISOString()}`,
     cutoff,
     nextCutoff,
+    settlementTarget,
     ruleVersion: rule.version,
     ruleConfigHash: rule.configHash,
   };
@@ -490,6 +532,7 @@ export function buildCreditRunItemPayloadHash(
   return stableCreditHash({
     itemId: item.itemId,
     runId: item.runId,
+    earnedPeriodId: item.earnedPeriodId,
     periodId: item.periodId,
     walletNormalized: item.walletNormalized,
     slotId: item.slotId,
@@ -502,6 +545,13 @@ export function buildCreditRunItemPayloadHash(
     slotRevision: item.slotRevision,
     creditEligibleFrom: item.creditEligibleFrom,
     graceEndsAt: item.graceEndsAt,
+    baseGrantCredits: item.baseGrantCredits,
+    compensationCredits: item.compensationCredits,
+    compensationReason: item.compensationReason,
+    baseOwnCredits: item.baseOwnCredits,
+    basePoolCredits: item.basePoolCredits,
+    compensationOwnCredits: item.compensationOwnCredits,
+    compensationPoolCredits: item.compensationPoolCredits,
     grantCredits: item.grantCredits,
     ownCredits: item.ownCredits,
     poolCredits: item.poolCredits,

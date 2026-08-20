@@ -36,6 +36,10 @@ function environment(overrides = {}) {
     GAME_ECONOMY_RUNTIME_ENABLED: 'false',
     CUKIE_POOL_RUNTIME_ENABLED: 'false',
     WEEKLY_RANKING_RUNTIME_ENABLED: 'false',
+    REWARD_ACCOUNTING_RUNTIME_ENABLED: 'false',
+    REWARD_DAILY_ACCOUNTING_ENABLED: 'false',
+    REWARD_WEEKLY_PAYOUT_ENABLED: 'false',
+    REWARD_POOL_TRANCHES_ENABLED: 'false',
     CHAIN_INDEXER_UKI_STAKING_ADDRESS: SOURCE_ADDRESSES.UKI_STAKING,
     CHAIN_INDEXER_VESTING_VAULT_ADDRESS: SOURCE_ADDRESSES.VESTING_VAULT,
     CHAIN_INDEXER_TOKEN_ADDRESS: SOURCE_ADDRESSES.TOKEN,
@@ -98,27 +102,46 @@ function cursors(now = new Date('2026-08-06T12:00:00.000Z')) {
   );
 }
 
-test('builds the immutable staging-test-v1 ruleset with the approved caps', () => {
+test('builds the immutable staging ruleset with v3 credit and game semantics', () => {
   const now = new Date('2026-08-06T12:00:00.000Z');
   const rules = buildStagingEconomyRuleSet({ environment: environment(), cursors: cursors(now), now });
 
-  assert.equal(rules.reward.version, 'rewards-staging-test-v1');
-  assert.equal(rules.reward.activeFrom.toISOString(), '2026-08-10T00:00:00.000Z');
+  assert.equal(rules.reward.version, 'rewards-staging-test-v3');
+  assert.equal(rules.reward.activeFrom.toISOString(), '2026-08-10T14:00:00.000Z');
   assert.equal(rules.reward.emissionBudget.programStartsAt.toISOString(), '2026-08-10T00:00:00.000Z');
   assert.equal(rules.reward.emissionBudget.dayBoundarySecondUtc, 14 * 60 * 60);
   assert.equal(rules.reward.emissionBudget.lateReservationGraceSeconds, 86_400);
   assert.equal(rules.reward.emissionBudget.dailyCapRaw, '500000000000000000000000');
   assert.equal(rules.reward.emissionBudget.lifetimeCapRaw, '450000000000000000000000000');
+  assert.equal(rules.reward.emissionBudget.unusedDailyCapacity, 'materialize_undistributed');
+  assert.equal(rules.reward.creditPoolDaily.sourceShareBps, 10_000);
   assert.deepEqual(rules.reward.undistributedBps, {
     treasury: 8_000,
-    marketing: 500,
-    development: 500,
+    marketing: 0,
+    development: 0,
+    marketingDevelopment: 1_000,
     supplyReduction: 1_000,
   });
+  assert.deepEqual(rules.reward.runCredits, {
+    unitScale: 10,
+    totalUnits: 100,
+    weeklyReserveUnits: 20,
+    ambassadorReserveUnits: 5,
+    ambassadorOrdinaryUnits: 4,
+    ambassadorWeeklyUnits: 1,
+    convertibleUnits: 75,
+  });
   assert.equal(rules.credit.expectedBscChainId, 97);
+  assert.equal(rules.credit.version, 'credits-staging-test-v3');
+  assert.equal(rules.credit.activeFrom.toISOString(), '2026-08-10T14:00:00.000Z');
   assert.equal(rules.credit.creditsPerSlot, 100);
   assert.equal(rules.game.gameId, 'treasure-hunt');
+  assert.equal(rules.game.version, 'staging-test-v3');
+  assert.equal(rules.game.activeFrom.toISOString(), rules.credit.activeFrom.toISOString());
+  assert.equal(rules.game.credit.creditRuleVersion, rules.credit.version);
+  assert.equal(rules.game.credit.creditRuleConfigHash, rules.credit.configHash);
   assert.equal(rules.game.reward.maxConvertibleRaw, '7500000000000000000');
+  assert.equal(rules.game.cukie.consumeOnSettle, true);
   assert.equal(rules.game.calculation.scoreCapRaw, '3000');
   assert.equal(rules.ranking.initialRank, 5);
   assert.match(rules.reward.configHash, /^[0-9a-f]{64}$/);

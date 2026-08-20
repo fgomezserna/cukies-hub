@@ -113,6 +113,10 @@ describe("game economy exact rules", () => {
       "game_owned_cukie_assignments",
       "game_owned_cukie_events",
       "game_result_evidence",
+      "treasure_hunt_economy_runs",
+      "treasure_hunt_pool_daily_usage",
+      "treasure_hunt_pool_quota_reservations",
+      "treasure_hunt_weekly_bests",
       "game_economy_runtime_state",
       "game_economy_runtime_runs",
     ]);
@@ -135,6 +139,11 @@ describe("game economy exact rules", () => {
         'game_owned_cukie_events:{"idempotencyKey":1}',
         'game_result_evidence:{"evidenceReference":1}',
         'game_economy_events:{"sessionId":1,"toRevision":1}',
+        'treasure_hunt_economy_runs:{"authorityGameSessionId":1}',
+        'treasure_hunt_economy_runs:{"gameEconomySessionId":1}',
+        'treasure_hunt_pool_daily_usage:{"walletNormalized":1,"dailyPeriodId":1}',
+        'treasure_hunt_pool_quota_reservations:{"runId":1}',
+        'treasure_hunt_weekly_bests:{"walletNormalized":1,"weeklyPeriodId":1,"gameId":1}',
       ])
     );
     expect(GAME_ECONOMY_INDEX_DEFINITIONS).toEqual(
@@ -150,6 +159,15 @@ describe("game economy exact rules", () => {
         expect.objectContaining({
           collection: "game_economy_sessions",
           keys: { "settlementIntent.decidedAt": 1, _id: 1 },
+        }),
+        expect.objectContaining({
+          collection: "treasure_hunt_weekly_bests",
+          keys: {
+            weeklyPeriodId: 1,
+            scoreDigits: -1,
+            scoreRaw: -1,
+            achievedAt: 1,
+          },
         }),
       ])
     );

@@ -228,6 +228,7 @@ export function normalizeCanonicalCukieMasterNftPosition(input: {
         documentId: positionId,
         tokenId,
         observedAt: dateIso(evidence?.observedAt ?? input.document.updatedAt),
+        eventId,
       },
     ],
   };

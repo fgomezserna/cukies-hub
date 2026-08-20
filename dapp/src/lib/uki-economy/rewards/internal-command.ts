@@ -75,6 +75,8 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
       "totalUnits",
       "weeklyReserveUnits",
       "ambassadorReserveUnits",
+      "ambassadorOrdinaryUnits",
+      "ambassadorWeeklyUnits",
       "convertibleUnits",
     ],
     "runCredits",
@@ -114,7 +116,7 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
   );
   const undistributedBps = nested(
     item.undistributedBps,
-    ["treasury", "marketing", "development", "supplyReduction"],
+    ["treasury", "marketing", "development", "marketingDevelopment", "supplyReduction"],
     "undistributedBps",
   );
   const destinations = nested(
@@ -126,6 +128,7 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
       "treasury",
       "marketing",
       "development",
+      "marketingDevelopment",
       "supplyReduction",
     ],
     "destinations",

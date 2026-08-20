@@ -114,7 +114,7 @@ Ruta: `/games/treasure-hunt`
 
 | Estado | UI esperada | Accion principal | Secundarias |
 | --- | --- | --- | --- |
-| Coming next | Explica coste 10 creditos, 2.5 pool semanal y 7.5 en juego. | View rules. | Go to wallet. |
+| Coming next | Explica coste 10 creditos: 7.5 rendimiento, 2 bote semanal, 0.4 embajadores ordinarios y 0.1 embajadores semanales. | View rules. | Go to wallet. |
 | Wallet desconectada | Reglas publicas y bloqueo de start. | Connect wallet. | View rules. |
 | Sin creditos propios | Intentar asignar pool solo al iniciar, mostrando disponibilidad. | Start with pool credits. | View pool status. |
 | Con creditos propios | Indicar que no computa ranking ni usa rank para settlement. | Start run. | Select Cukie. |

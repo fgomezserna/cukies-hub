@@ -24,6 +24,7 @@ const PERIOD_SECONDS = BigInt(86_400);
 const BSC_ADDRESS = /^0x[0-9a-f]{40}$/;
 const DECIMAL = /^(0|[1-9][0-9]*)$/;
 const MAX_VAULT_ROWS = 1_000;
+const MAX_REWARD_CENSUS_ROWS = 10_000;
 const MAX_AVAILABLE_ASSETS = 200;
 const DEFAULT_INDEXER_FRESHNESS_MS = 15 * 60_000;
 const REQUIRED_POOL_CURSOR_EVENTS = [
@@ -66,6 +67,13 @@ export type CukiePoolVaultCandidate = {
   rarity: CukiePoolRarity;
   gamesQuota: number;
   poolPriority: 0 | 1;
+};
+
+export type CukiePoolVaultRewardParticipant = {
+  positionId: string;
+  ownerNormalized: string;
+  generation: CukiePoolGeneration;
+  rarity: CukiePoolRarity;
 };
 
 export type PublicCukiePoolAvailableAsset = {
@@ -650,6 +658,140 @@ export async function loadCukiePoolVaultCandidates(
     || left.depositedAt.getTime() - right.depositedAt.getTime()
     || left.positionId.localeCompare(right.positionId)
   ));
+}
+
+/**
+ * Reconstructs the owner census for one closed reward period from the custodial
+ * vault projection. Unlike the lending candidate view, this deliberately keeps
+ * positions whose exit was requested after the period ended: a later exit must
+ * not erase rewards already earned in the closed period.
+ */
+export async function loadCukiePoolVaultRewardParticipants(
+  db: Db,
+  config: CukiePoolVaultConfig,
+  startsAt: Date,
+  endsAt: Date,
+): Promise<CukiePoolVaultRewardParticipant[]> {
+  const startsAtSeconds = Math.floor(startsAt.getTime() / 1_000);
+  const endsAtSeconds = Math.floor(endsAt.getTime() / 1_000);
+  if (
+    !Number.isSafeInteger(startsAtSeconds)
+    || !Number.isSafeInteger(endsAtSeconds)
+    || endsAtSeconds <= startsAtSeconds
+  ) return sourceError('el periodo de recompensas no es canonico.');
+
+  const rows = await db.collection<VaultPositionDocument>(CUKIE_POOL_NFT_VAULT_POSITIONS)
+    .find({
+      chainId: config.chainId,
+      vaultAlias: 'CUKIE_POOL_NFT_VAULT',
+      vaultAddressNormalized: config.vaultAddressNormalized,
+      collectionAddressNormalized: { $in: config.collectionAddresses },
+      activationAt: { $lte: String(startsAtSeconds) },
+      $or: [
+        { exitRequestedAt: { $exists: false } },
+        { exitRequestedAt: { $gte: String(endsAtSeconds) } },
+      ],
+    } as Filter<VaultPositionDocument>)
+    .sort({ _id: 1 })
+    .limit(MAX_REWARD_CENSUS_ROWS + 1)
+    .toArray();
+  if (rows.length > MAX_REWARD_CENSUS_ROWS) {
+    return sourceError('hay demasiadas posiciones en el censo diario para liquidar con seguridad.');
+  }
+  if (rows.length === 0) return [];
+
+  const positions = rows.map((document) => {
+    if (
+      (document.chain !== undefined && document.chain !== 'BSC')
+      || document.chainId !== config.chainId
+      || document.vaultAlias !== 'CUKIE_POOL_NFT_VAULT'
+      || document.vaultAddressNormalized !== config.vaultAddressNormalized
+      || document.custody !== 'cukie_pool_nft_vault'
+    ) return sourceError('una posicion del censo no coincide con el vault configurado.');
+    const collectionAddressNormalized = address(
+      document.collectionAddressNormalized,
+      'collectionAddressNormalized',
+    );
+    if (!config.collectionAddresses.includes(collectionAddressNormalized)) {
+      return sourceError(`el censo usa una coleccion no configurada (${collectionAddressNormalized}).`);
+    }
+    const tokenId = decimal(document.tokenId, 'tokenId');
+    const depositEpoch = decimal(document.depositEpoch, 'depositEpoch', true);
+    const assetId = `${config.chainId}:${collectionAddressNormalized}:${tokenId}`;
+    const positionId = `${assetId}:epoch:${depositEpoch}`;
+    if (
+      document.assetId !== assetId
+      || document.positionId !== positionId
+      || String(document._id) !== positionId
+    ) return sourceError(`la identidad del censo ${positionId} no es canonica.`);
+    const activationAt = dateFromSeconds(document.activationAt, 'activationAt');
+    const exitRequestedAt = document.exitRequestedAt === undefined
+      ? null
+      : dateFromSeconds(document.exitRequestedAt, 'exitRequestedAt');
+    if (activationAt > startsAt || (exitRequestedAt && exitRequestedAt < endsAt)) {
+      return sourceError(`la posicion ${positionId} no pertenece al periodo consultado.`);
+    }
+    return {
+      positionId,
+      tokenId,
+      collectionAddressNormalized,
+      ownerNormalized: address(document.beneficiaryNormalized, 'beneficiaryNormalized'),
+    };
+  });
+
+  const tokenCandidates = [...new Set(positions.flatMap((position) => {
+    const numeric = Number(position.tokenId);
+    return Number.isSafeInteger(numeric) && String(numeric) === position.tokenId
+      ? [position.tokenId, numeric]
+      : [position.tokenId];
+  }))];
+  const inventory = await db.collection<CukiesVaultInventoryDocument>('cukies').find({
+    tokenId: { $in: tokenCandidates },
+    chainId: config.chainId,
+    collectionAddressNormalized: { $in: config.collectionAddresses },
+  } as Filter<CukiesVaultInventoryDocument>)
+    .limit(positions.length + 1)
+    .toArray();
+  if (inventory.length > positions.length) {
+    return sourceError('el inventario contiene metadata duplicada para el censo diario.');
+  }
+  const metadataByIdentity = new Map<string, { generation: CukiePoolGeneration; rarity: CukiePoolRarity }>();
+  for (const document of inventory) {
+    const collectionAddressNormalized = address(
+      document.collectionAddressNormalized,
+      'cukies.collectionAddressNormalized',
+    );
+    if (document.chainId !== config.chainId) {
+      return sourceError('el inventario del censo contiene metadata de otra red.');
+    }
+    const normalized = normalizeCukiesInventoryDocument(document, [], endsAt);
+    if (
+      normalized.network !== 'bsc'
+      || !normalized.tokenId
+      || !validGeneration(normalized.generation)
+      || !validRarity(normalized.rarity)
+    ) return sourceError('el inventario del censo no contiene metadata canonica.');
+    const identity = `${collectionAddressNormalized}:${normalized.tokenId}`;
+    if (metadataByIdentity.has(identity)) {
+      return sourceError(`metadata duplicada para ${identity}.`);
+    }
+    metadataByIdentity.set(identity, {
+      generation: normalized.generation,
+      rarity: normalized.rarity,
+    });
+  }
+
+  return positions.map((position) => {
+    const metadata = metadataByIdentity.get(
+      `${position.collectionAddressNormalized}:${position.tokenId}`,
+    );
+    if (!metadata) return sourceError(`falta metadata para ${position.positionId}.`);
+    return {
+      positionId: position.positionId,
+      ownerNormalized: position.ownerNormalized,
+      ...metadata,
+    };
+  });
 }
 
 function canonicalVaultOpenPosition(

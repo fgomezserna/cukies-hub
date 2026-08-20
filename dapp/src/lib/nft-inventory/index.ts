@@ -55,6 +55,7 @@ export type NftAssetSourceRef = {
   documentId: string | null;
   tokenId?: string | null;
   observedAt: string | null;
+  eventId?: string | null;
 };
 
 export type NftAssetActiveLock = {

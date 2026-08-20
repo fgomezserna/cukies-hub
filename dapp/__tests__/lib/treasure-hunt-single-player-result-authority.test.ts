@@ -12,11 +12,13 @@ describe('Treasure Hunt single-player result authority', () => {
       practice: false,
       sessionId: 'game-session-1',
       attemptId: 'competition-attempt-1',
+      economyRunId: 'economy-run-1',
     }, 'game-session-1');
 
     expect(resolveSinglePlayerResultDispatch(firstRun, 'game-session-1', null)).toEqual({
       runId: 1,
       sessionId: 'game-session-1',
+      economyRunId: 'economy-run-1',
       competitionAttemptId: 'competition-attempt-1',
     });
     expect(resolveSinglePlayerResultDispatch(firstRun, 'game-session-1', 1)).toBeNull();
@@ -27,10 +29,12 @@ describe('Treasure Hunt single-player result authority', () => {
       practice: false,
       sessionId: 'game-session-2',
       attemptId: 'competition-attempt-2',
+      economyRunId: 'economy-run-2',
     }, 'game-session-2');
     expect(resolveSinglePlayerResultDispatch(secondRun, 'game-session-2', 1)).toEqual({
       runId: 2,
       sessionId: 'game-session-2',
+      economyRunId: 'economy-run-2',
       competitionAttemptId: 'competition-attempt-2',
     });
   });
@@ -40,9 +44,11 @@ describe('Treasure Hunt single-player result authority', () => {
       eligible: false,
       practice: true,
       sessionId: 'game-session-practice',
+      economyRunId: 'economy-run-practice',
     }, 'game-session-practice')).toEqual({
       runId: 1,
       sessionId: 'game-session-practice',
+      economyRunId: 'economy-run-practice',
     });
     expect(createSinglePlayerResultAuthority(1, {
       eligible: true,
@@ -59,7 +65,13 @@ describe('Treasure Hunt single-player result authority', () => {
       practice: false,
       sessionId: 'game-session-old',
       attemptId: 'competition-attempt-old',
+      economyRunId: 'economy-run-old',
     }, 'game-session-new')).toBeNull();
+    expect(createSinglePlayerResultAuthority(1, {
+      eligible: false,
+      practice: true,
+      sessionId: 'game-session-without-economy',
+    }, 'game-session-without-economy')).toBeNull();
   });
 
   it('solo permite salir del resultado después de observar guardado y confirmación', () => {

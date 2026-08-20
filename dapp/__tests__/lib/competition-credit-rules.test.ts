@@ -19,6 +19,7 @@ describe("competition credit rules", () => {
     expect(buildCompetitionCreditPeriod(cutoff, rule)).toEqual({
       periodId: `credits-v1:${rule.configHash}:2026-07-10T12:00:00.000Z`,
       cutoff,
+      settlementTarget: new Date("2026-07-10T16:00:00.000Z"),
       nextCutoff: new Date("2026-07-11T12:00:00.000Z"),
       ruleVersion: "credits-v1",
       ruleConfigHash: rule.configHash,

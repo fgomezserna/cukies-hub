@@ -12,6 +12,10 @@ export const GAME_ECONOMY_COLLECTIONS = [
   "game_owned_cukie_assignments",
   "game_owned_cukie_events",
   "game_result_evidence",
+  "treasure_hunt_economy_runs",
+  "treasure_hunt_pool_daily_usage",
+  "treasure_hunt_pool_quota_reservations",
+  "treasure_hunt_weekly_bests",
   "game_economy_runtime_state",
   "game_economy_runtime_runs",
 ] as const;
@@ -189,6 +193,51 @@ export const GAME_ECONOMY_INDEX_DEFINITIONS = [
     collection: "game_result_evidence",
     keys: { evidenceId: 1 },
     options: { unique: true, name: "game_evidence_id_unique" },
+  },
+  {
+    collection: "treasure_hunt_economy_runs",
+    keys: { authorityGameSessionId: 1 },
+    options: { unique: true, name: "treasure_run_authority_session_unique" },
+  },
+  {
+    collection: "treasure_hunt_economy_runs",
+    keys: { gameEconomySessionId: 1 },
+    options: { unique: true, name: "treasure_run_economy_session_unique" },
+  },
+  {
+    collection: "treasure_hunt_economy_runs",
+    keys: { walletNormalized: 1, dailyPeriodId: 1, reservedAt: 1 },
+    options: { name: "treasure_run_wallet_daily_period" },
+  },
+  {
+    collection: "treasure_hunt_economy_runs",
+    keys: { status: 1, updatedAt: 1, _id: 1 },
+    options: { name: "treasure_run_recovery_scan" },
+  },
+  {
+    collection: "treasure_hunt_pool_daily_usage",
+    keys: { walletNormalized: 1, dailyPeriodId: 1 },
+    options: { unique: true, name: "treasure_pool_usage_wallet_period_unique" },
+  },
+  {
+    collection: "treasure_hunt_pool_quota_reservations",
+    keys: { runId: 1 },
+    options: { unique: true, name: "treasure_pool_quota_run_unique" },
+  },
+  {
+    collection: "treasure_hunt_pool_quota_reservations",
+    keys: { walletNormalized: 1, dailyPeriodId: 1, status: 1 },
+    options: { name: "treasure_pool_quota_wallet_period_status" },
+  },
+  {
+    collection: "treasure_hunt_weekly_bests",
+    keys: { walletNormalized: 1, weeklyPeriodId: 1, gameId: 1 },
+    options: { unique: true, name: "treasure_weekly_best_wallet_unique" },
+  },
+  {
+    collection: "treasure_hunt_weekly_bests",
+    keys: { weeklyPeriodId: 1, scoreDigits: -1, scoreRaw: -1, achievedAt: 1 },
+    options: { name: "treasure_weekly_best_score_order" },
   },
   {
     collection: "game_result_evidence",

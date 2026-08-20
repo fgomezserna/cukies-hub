@@ -1,14 +1,24 @@
 import type { CukieMasterSlot } from "../cukie-master/types";
 
-export const CREDIT_SCHEMA_VERSION = 2 as const;
+export const CREDIT_SCHEMA_VERSION = 3 as const;
 export const CREDIT_RULE_SCOPE = "competition_credits" as const;
 export const CREDIT_SOURCE_WATERMARK_ID = "cukie-master-slots" as const;
+export const CREDIT_SOURCE_WATERMARK_IDS = {
+  uki: `${CREDIT_SOURCE_WATERMARK_ID}:uki`,
+  nft: `${CREDIT_SOURCE_WATERMARK_ID}:nft`,
+} as const;
 export const CREDITS_PER_MATURE_SLOT = 100 as const;
 export const MAX_CREDIT_RESERVATION_ALLOCATIONS = 1_000 as const;
 
 export type CreditBucket = "own" | "pool";
+export type CreditRoute = "uki" | "nft";
 export type CreditLotState = "available" | "reserved" | "spent" | "expired";
-export type CreditRunStatus = "snapshotted" | "processing" | "open" | "blocked";
+export type CreditRunStatus =
+  | "snapshotted"
+  | "processing"
+  | "open"
+  | "open_with_holds"
+  | "blocked";
 
 export type CompetitionCreditCostRule = {
   costCode: string;
@@ -19,9 +29,8 @@ export type CompetitionCreditCostRule = {
 export type CreditSourceContractAlias =
   | "UKI_STAKING"
   | "VESTING_VAULT"
-  | "TOKEN"
-  | "MARKETPLACE"
-  | "BRIDGE";
+  | "TOKEN_V2"
+  | "CUKIE_MASTER_NFT_VAULT";
 
 export type CreditVerifiedContractIdentity = {
   runtimeCodeHash: string;
@@ -38,6 +47,9 @@ export type CompetitionCreditRule = {
   activeUntil?: Date;
   cutoffHourUtc: number;
   cutoffMinuteUtc: number;
+  settlementHourUtc: number;
+  settlementMinuteUtc: number;
+  /** Observability threshold only. It must never discard a period. */
   maxSnapshotLatenessMs: number;
   sourceFreshnessMs: number;
   expectedBscChainId: 56 | 97;
@@ -61,18 +73,22 @@ export type CompetitionCreditPeriod = {
   periodId: string;
   cutoff: Date;
   nextCutoff: Date;
+  settlementTarget: Date;
   ruleVersion: string;
   ruleConfigHash: string;
 };
 
 export type CreditSourceWatermark = {
-  _id: typeof CREDIT_SOURCE_WATERMARK_ID;
+  _id: string;
+  route: CreditRoute;
   status: "healthy" | "unhealthy";
   observedThrough: Date;
   sourceRuleVersions: Record<"uki" | "nft", string>;
   sourceHash: string;
   slotCount: number;
   healthEvidenceHash: string;
+  canonicalSafeBlock: number;
+  canonicalSafeBlockHash: string;
   updatedAt: Date;
 };
 
@@ -82,7 +98,15 @@ export type CreditSourceHealth = {
   observedThrough: Date | null;
   sourceRuleVersions: Record<"uki" | "nft", string> | null;
   evidenceHash: string;
+  canonicalSafeBlock: number | null;
+  canonicalSafeBlockHash: string | null;
   checkedAt: Date;
+};
+
+export type CreditCanonicalBlockEvidence = {
+  blockNumber: number;
+  blockHash: string;
+  blockTimestamp: Date;
 };
 
 export type CreditSnapshotGate = {
@@ -108,6 +132,9 @@ export type CreditSnapshotSlot = Pick<
   | "roundId"
   | "ruleVersion"
   | "sourceHash"
+  | "sourceBlockNumber"
+  | "sourceBlockHash"
+  | "sourceBlockTimestamp"
   | "revision"
   | "createdAt"
   | "updatedAt"
@@ -134,6 +161,7 @@ export type CreditRunItem = {
   _id: string;
   itemId: string;
   runId: string;
+  earnedPeriodId: string;
   periodId: string;
   walletNormalized: string;
   slotId: string;
@@ -146,7 +174,14 @@ export type CreditRunItem = {
   slotRevision: number;
   creditEligibleFrom: Date;
   graceEndsAt?: Date;
-  grantCredits: typeof CREDITS_PER_MATURE_SLOT;
+  baseGrantCredits: typeof CREDITS_PER_MATURE_SLOT;
+  compensationCredits: 0 | typeof CREDITS_PER_MATURE_SLOT;
+  compensationReason: null | "late_gt_24h";
+  baseOwnCredits: number;
+  basePoolCredits: number;
+  compensationOwnCredits: number;
+  compensationPoolCredits: number;
+  grantCredits: number;
   ownCredits: number;
   poolCredits: number;
   poolConfigId: string | null;
@@ -159,13 +194,18 @@ export type CreditRunItem = {
 export type CompetitionCreditRun = {
   _id: string;
   runId: string;
+  route: CreditRoute;
   period: CompetitionCreditPeriod;
+  settlementPeriod: CompetitionCreditPeriod;
   status: CreditRunStatus;
   expectedItemCount: number;
   expectedGrantCredits: number;
   expectedOwnCredits: number;
   expectedPoolCredits: number;
+  expectedHeldCount: number;
   sourceWatermark: CreditSourceWatermark;
+  cutoffBlock: CreditCanonicalBlockEvidence;
+  sourceSnapshotHash: string;
   snapshotHash: string;
   fenceToken: number;
   leaseOwner?: string;
@@ -176,8 +216,23 @@ export type CompetitionCreditRun = {
   openedAt?: Date;
 };
 
+export type CreditRunHold = {
+  _id: string;
+  holdId: string;
+  runId: string;
+  route: CreditRoute;
+  earnedPeriodId: string;
+  slotId: string;
+  reasonCode: "INVALID_SLOT_PROJECTION";
+  evidenceHash: string;
+  status: "held" | "resolved";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type CreditLedgerOperation =
   | "grant"
+  | "late_compensation"
   | "pool_deposit"
   | "reserve"
   | "release"
@@ -201,6 +256,9 @@ export type CompetitionCreditLedgerEntry = {
   sessionId: string | null;
   fromState: CreditLotState | null;
   toState: CreditLotState | null;
+  effectiveBlockNumber?: number;
+  effectiveBlockHash?: string;
+  effectiveBlockTimestamp?: Date;
   createdAt: Date;
 };
 
@@ -208,6 +266,7 @@ export type CreditLot = {
   _id: string;
   lotId: string;
   bucket: CreditBucket;
+  route: CreditRoute;
   walletNormalized: string | null;
   periodId: string;
   runId: string;
@@ -236,6 +295,7 @@ export type CreditLotFifoCursor = {
 export type CreditPoolPosition = {
   _id: string;
   positionId: string;
+  route: CreditRoute;
   walletNormalized: string;
   periodId: string;
   runId: string;
@@ -251,6 +311,7 @@ export type CreditPoolPosition = {
 export type CreditAccountPeriod = {
   _id: string;
   walletNormalized: string;
+  route: CreditRoute;
   periodId: string;
   grantedCredits: number;
   poolDepositedCredits: number;
@@ -267,6 +328,7 @@ export type CreditAccountPeriod = {
 export type CreditPoolPeriod = {
   _id: string;
   periodId: string;
+  route: CreditRoute;
   contributedCredits: number;
   availableCredits: number;
   reservedCredits: number;
@@ -280,9 +342,13 @@ export type CreditPoolPeriod = {
 
 export type CreditReservationAllocation = {
   lotId: string;
+  runId: string;
+  route: CreditRoute;
   amountCredits: number;
   lotRevision: number;
   lotExpiresAt: Date;
+  /** Credits already reserved remain consumable until this instant, independently of unreserved lot expiry. */
+  reservedUntil: Date;
 };
 
 export type CreditReservation = {
@@ -320,6 +386,7 @@ export type CreditIntegrityIncident = {
   type: "credit_reconciliation_mismatch";
   status: "open" | "resolved";
   runId: string;
+  route: CreditRoute;
   periodId: string;
   walletNormalized: string | null;
   reasonCodes: string[];
@@ -331,8 +398,11 @@ export type CreditIntegrityIncident = {
 export type CreditReconciliationSnapshot = {
   run: CompetitionCreditRun;
   items: CreditRunItem[];
+  holds: CreditRunHold[];
   ownLots: CreditLot[];
   poolLots: CreditLot[];
+  accountLots: CreditLot[];
+  poolPeriodLots: CreditLot[];
   poolPositions: CreditPoolPosition[];
   reservations: CreditReservation[];
   ledger: CompetitionCreditLedgerEntry[];
@@ -340,8 +410,11 @@ export type CreditReconciliationSnapshot = {
   poolPeriod: CreditPoolPeriod | null;
   collectionCounts: {
     items: number;
+    holds: number;
     ownLots: number;
     poolLots: number;
+    accountLots: number;
+    poolPeriodLots: number;
     poolPositions: number;
     reservations: number;
     ledger: number;

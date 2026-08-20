@@ -16,6 +16,12 @@ import {
   type ReloadSafeParentGameSession,
 } from '@/lib/treasure-hunt-competition/client';
 import {
+  finishTreasureHuntEconomyRun,
+  openTreasureHuntEconomyRun,
+  TreasureHuntEconomyClientError,
+} from '@/lib/treasure-hunt-economy-client';
+import type { TreasureHuntEconomyStartResponse } from '@/lib/uki-economy/game-economy/treasure-hunt-types';
+import {
   useTreasureHuntMultiplayerBridge,
 } from '@/hooks/use-treasure-hunt-multiplayer-bridge';
 import { useAuth } from '@/providers/auth-provider';
@@ -32,7 +38,7 @@ interface CompletedCompetitionResult {
   readonly resultId: string;
   readonly finalScore: number;
   readonly isValid: boolean;
-  readonly source: 'competition';
+  readonly source: 'competition' | 'legacy';
   readonly status: string | null;
   readonly clearConfirmationRequired: true;
 }
@@ -472,6 +478,11 @@ export default function TreasureHuntGameView() {
         const walletUserIdAtRequest = latestWalletUserIdRef.current;
         const resultId = event.data.resultId;
         const competitionAttemptId = event.data.competitionAttemptId;
+        const economyRunId = event.data.economyRunId;
+        const voluntaryForfeit = event.data.metadata &&
+          typeof event.data.metadata === 'object' &&
+          !Array.isArray(event.data.metadata) &&
+          event.data.metadata.gameOverReason === 'manual';
         if (
           !sessionAtRequest ||
           !walletUserIdAtRequest ||
@@ -480,9 +491,14 @@ export default function TreasureHuntGameView() {
           typeof resultId !== 'string' ||
           resultId.length < 8 ||
           resultId.length > 128 ||
-          typeof competitionAttemptId !== 'string' ||
-          competitionAttemptId.length === 0 ||
-          competitionAttemptId.length > 128 ||
+          typeof economyRunId !== 'string' ||
+          economyRunId.length === 0 ||
+          economyRunId.length > 160 ||
+          (competitionAttemptId !== undefined && (
+            typeof competitionAttemptId !== 'string' ||
+            competitionAttemptId.length === 0 ||
+            competitionAttemptId.length > 128
+          )) ||
           !Number.isSafeInteger(event.data.finalScore) ||
           event.data.finalScore < 0 ||
           !Number.isSafeInteger(event.data.gameTime) ||
@@ -494,26 +510,42 @@ export default function TreasureHuntGameView() {
         let completed = recoveredCompetitionResultsRef.current.get(resultKey);
         if (!completed) {
           try {
-            const routed = await routeGameEnd({
-              gameSessionId: sessionAtRequest.sessionId,
-              sessionToken: sessionAtRequest.sessionToken,
-              competitionCoordinator,
-              gameEnd: {
-                finalScore: event.data.finalScore,
-                gameTime: event.data.gameTime,
-                competitionAttemptId,
-              },
+            const routed = voluntaryForfeit || typeof competitionAttemptId !== 'string'
+              ? null
+              : await routeGameEnd({
+                  gameSessionId: sessionAtRequest.sessionId,
+                  sessionToken: sessionAtRequest.sessionToken,
+                  competitionCoordinator,
+                  gameEnd: {
+                    finalScore: event.data.finalScore,
+                    gameTime: event.data.gameTime,
+                    competitionAttemptId,
+                  },
+                });
+            if (routed && (routed.source !== 'competition' || !routed.success)) return;
+            const canonicalScore = voluntaryForfeit ? 0 : routed?.finalScore ?? event.data.finalScore;
+            const economy = await finishTreasureHuntEconomyRun({
+              runId: economyRunId,
+              resultId,
+              score: canonicalScore,
+              gameTimeMs: event.data.gameTime,
+              outcome: voluntaryForfeit ? 'voluntary_forfeit' : 'completed',
+              authoritySource: !voluntaryForfeit && typeof competitionAttemptId === 'string'
+                ? 'competition'
+                : 'economy',
+              ...(typeof competitionAttemptId === 'string'
+                ? { authorityReference: competitionAttemptId }
+                : {}),
             });
-            if (routed.source !== 'competition' || !routed.success) return;
-            const status = routed.result && typeof routed.result === 'object' &&
+            const status = routed?.result && typeof routed.result === 'object' &&
               'status' in routed.result && typeof routed.result.status === 'string'
               ? routed.result.status
-              : null;
+              : economy.status;
             completed = {
               resultId,
-              finalScore: routed.finalScore,
-              isValid: routed.isValid,
-              source: 'competition',
+              finalScore: canonicalScore,
+              isValid: economy.rewardEligible,
+              source: routed ? 'competition' : 'legacy',
               status,
               clearConfirmationRequired: true,
             };
@@ -601,7 +633,12 @@ export default function TreasureHuntGameView() {
           reply({ eligible: false, practice: false, reason: 'STALE_GAME_SESSION' });
           return;
         }
+        let economyRun: TreasureHuntEconomyStartResponse | null = null;
         try {
+          economyRun = await openTreasureHuntEconomyRun({
+            gameSessionId: sessionAtRequest.sessionId,
+            requestId,
+          });
           const attempt = await competitionCoordinator.start(sessionAtRequest.sessionId);
           if (
             iframeRef.current?.contentWindow !== frameWindow ||
@@ -617,6 +654,9 @@ export default function TreasureHuntGameView() {
             seed: attempt.seed,
             alias: attempt.alias,
             status: attempt.status,
+            economyRunId: economyRun.runId,
+            creditSource: economyRun.creditSource,
+            cukieSource: economyRun.cukieSource,
           });
         } catch (error) {
           if (
@@ -626,7 +666,8 @@ export default function TreasureHuntGameView() {
           ) {
             return;
           }
-          const errorCode = error instanceof CompetitionClientError
+          const errorCode = error instanceof CompetitionClientError ||
+            error instanceof TreasureHuntEconomyClientError
             ? error.code
             : 'COMPETITION_UNAVAILABLE';
           if (errorCode === 'GAME_SESSION_NOT_ELIGIBLE') {
@@ -648,6 +689,13 @@ export default function TreasureHuntGameView() {
           reply({
             eligible: false,
             practice: canSafelyPractice,
+            ...(canSafelyPractice && economyRun
+              ? {
+                  economyRunId: economyRun.runId,
+                  creditSource: economyRun.creditSource,
+                  cukieSource: economyRun.cukieSource,
+                }
+              : {}),
             reason: errorCode,
           });
         }

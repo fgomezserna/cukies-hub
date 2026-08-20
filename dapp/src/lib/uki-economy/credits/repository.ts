@@ -14,6 +14,7 @@ import {
 import {
   compareCreditText,
   safeCompetitionCreditPeriodScopeId,
+  safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
 } from "./rules";
 import {
@@ -23,11 +24,12 @@ import {
 import {
   CREDIT_RULE_SCOPE,
   CREDIT_SCHEMA_VERSION,
-  CREDIT_SOURCE_WATERMARK_ID,
+  CREDIT_SOURCE_WATERMARK_IDS,
   type CompetitionCreditLedgerEntry,
   type CompetitionCreditRule,
   type CompetitionCreditRun,
   type CreditAccountPeriod,
+  type CreditCanonicalBlockEvidence,
   type CreditIntegrityIncident,
   type CreditLot,
   type CreditLotFifoCursor,
@@ -37,10 +39,12 @@ import {
   type CreditReconciliationSnapshot,
   type CreditReservation,
   type CreditRunItem,
+  type CreditRunHold,
   type CreditSnapshotGate,
   type CreditSnapshotSlot,
   type CreditSourceHealth,
   type CreditSourceWatermark,
+  type CreditRoute,
 } from "./types";
 
 export type ReserveCreditLotsInput = {
@@ -62,15 +66,26 @@ export interface CompetitionCreditRepository {
     at: Date,
     expectedVersion?: string
   ): Promise<CompetitionCreditRule | null>;
+  findOldestRule(): Promise<CompetitionCreditRule | null>;
   readSnapshotGate(
     rule: CompetitionCreditRule,
-    cutoff: Date
+    cutoff: Date,
+    route: CreditRoute
   ): Promise<CreditSnapshotGate>;
-  listSourceSlots(limit: number): Promise<CreditSnapshotSlot[]>;
+  listSourceSlots(limit: number, route?: CreditRoute): Promise<CreditSnapshotSlot[]>;
+  listSourceSlotsAtCutoff(
+    cutoffBlock: CreditCanonicalBlockEvidence,
+    route: CreditRoute,
+    limit: number
+  ): Promise<CreditSnapshotSlot[]>;
   readSourceHealth(
     now: Date,
-    rule: CompetitionCreditRule
+    rule: CompetitionCreditRule,
+    route: CreditRoute
   ): Promise<CreditSourceHealth>;
+  findCanonicalCutoffBlock(
+    cutoff: Date
+  ): Promise<CreditCanonicalBlockEvidence | null>;
   upsertSourceWatermark(
     watermark: CreditSourceWatermark
   ): Promise<CreditSourceWatermark>;
@@ -88,10 +103,12 @@ export interface CompetitionCreditRepository {
   ): Promise<CreditPoolConfiguration | null>;
   insertPoolConfiguration(config: CreditPoolConfiguration): Promise<void>;
   findRun(runId: string): Promise<CompetitionCreditRun | null>;
-  findRunByPeriod(periodId: string): Promise<CompetitionCreditRun | null>;
+  findRunByPeriod(periodId: string, route: CreditRoute): Promise<CompetitionCreditRun | null>;
+  findLatestRunByRoute(route: CreditRoute): Promise<CompetitionCreditRun | null>;
   insertRunAndItems(
     run: CompetitionCreditRun,
-    items: CreditRunItem[]
+    items: CreditRunItem[],
+    holds: CreditRunHold[]
   ): Promise<void>;
   claimRunLease(
     runId: string,
@@ -161,12 +178,12 @@ export type CompetitionCreditTransactionRunner = <T>(
   work: (repository: CompetitionCreditRepository) => Promise<T>
 ) => Promise<T>;
 
-function accountPeriodId(walletNormalized: string, periodId: string) {
-  return `${walletNormalized}:${periodId}`;
+function accountPeriodId(walletNormalized: string, periodId: string, route: CreditRoute) {
+  return `${walletNormalized}:${periodId}:${route}`;
 }
 
-function poolPeriodId(periodId: string) {
-  return `pool:${periodId}`;
+function poolPeriodId(periodId: string, route: CreditRoute) {
+  return `pool:${periodId}:${route}`;
 }
 
 const RECONCILIATION_DOCUMENT_LIMITS = {
@@ -222,11 +239,28 @@ function mongoCollections(db: Db) {
       "competition_credit_source_watermarks"
     ),
     slots: db.collection<CreditSnapshotSlot>("cukie_master_slots"),
+    slotVersions: db.collection<{
+      _id: string;
+      slotId: string;
+      route: CreditRoute;
+      validFrom: Date;
+      validUntil?: Date;
+      effectiveBlockNumber?: number;
+      effectiveBlockHash?: string;
+      effectiveBlockTimestamp?: Date;
+      slot: CreditSnapshotSlot;
+    }>("cukie_master_slot_versions"),
+    slotHistoryState: db.collection<{
+      _id: CreditRoute;
+      completeFrom: Date;
+      completeFromBlockNumber?: number;
+    }>("cukie_master_slot_history_state"),
     configs: db.collection<CreditPoolConfiguration>(
       "competition_credit_pool_configs"
     ),
     runs: db.collection<CompetitionCreditRun>("competition_credit_runs"),
     runItems: db.collection<CreditRunItem>("competition_credit_run_items"),
+    runHolds: db.collection<CreditRunHold>("competition_credit_run_holds"),
     ledger: db.collection<CompetitionCreditLedgerEntry>(
       "competition_credit_ledger"
     ),
@@ -282,10 +316,10 @@ export function createMongoCompetitionCreditRepository(
     return collections.runs.distinct(
       "_id",
       {
-        status: "open",
-        "period.periodId": periodId,
-        "period.cutoff": { $lte: now },
-        "period.nextCutoff": { $gt: now },
+        status: { $in: ["open", "open_with_holds"] },
+        "settlementPeriod.periodId": periodId,
+        "settlementPeriod.cutoff": { $lte: now },
+        "settlementPeriod.nextCutoff": { $gt: now },
       },
       options
     );
@@ -294,6 +328,7 @@ export function createMongoCompetitionCreditRepository(
   async function incrementAccount(
     walletNormalized: string,
     periodId: string,
+    route: CreditRoute,
     increments: Partial<
       Record<
         | "grantedCredits"
@@ -307,7 +342,7 @@ export function createMongoCompetitionCreditRepository(
     >,
     now: Date
   ) {
-    const id = accountPeriodId(walletNormalized, periodId);
+    const id = accountPeriodId(walletNormalized, periodId, route);
     await collections.accounts.updateOne(
       { _id: id },
       {
@@ -315,6 +350,7 @@ export function createMongoCompetitionCreditRepository(
           _id: id,
           walletNormalized,
           periodId,
+          route,
           grantedCredits: 0,
           poolDepositedCredits: 0,
           availableCredits: 0,
@@ -343,6 +379,7 @@ export function createMongoCompetitionCreditRepository(
 
   async function incrementPoolPeriod(
     periodId: string,
+    route: CreditRoute,
     increments: Partial<
       Record<
         | "contributedCredits"
@@ -355,13 +392,14 @@ export function createMongoCompetitionCreditRepository(
     >,
     now: Date
   ) {
-    const id = poolPeriodId(periodId);
+    const id = poolPeriodId(periodId, route);
     await collections.poolPeriods.updateOne(
       { _id: id },
       {
         $setOnInsert: {
           _id: id,
           periodId,
+          route,
           contributedCredits: 0,
           availableCredits: 0,
           reservedCredits: 0,
@@ -393,7 +431,6 @@ export function createMongoCompetitionCreditRepository(
         .find(
           {
             scope: CREDIT_RULE_SCOPE,
-            active: true,
             activeFrom: { $lte: at },
             $or: [
               { activeUntil: { $exists: false } },
@@ -413,8 +450,15 @@ export function createMongoCompetitionCreditRepository(
       if (expectedVersion && found[0]?.version !== expectedVersion) return null;
       return found[0] ?? null;
     },
+    findOldestRule: () => collections.rules.findOne(
+      { scope: CREDIT_RULE_SCOPE },
+      { ...options, sort: { activeFrom: 1, _id: 1 } }
+    ),
 
-    async readSnapshotGate(rule, cutoff) {
+    async readSnapshotGate(rule, cutoff, route) {
+      const routeAliases = route === "uki"
+        ? ["UKI_STAKING", "VESTING_VAULT"]
+        : ["TOKEN_V2", "CUKIE_MASTER_NFT_VAULT"];
       const [
         sourceWatermark,
         ruleCount,
@@ -423,7 +467,7 @@ export function createMongoCompetitionCreditRepository(
         maturedQualifyingSlots,
       ] = await Promise.all([
         collections.watermarks.findOne(
-          { _id: CREDIT_SOURCE_WATERMARK_ID },
+          { _id: CREDIT_SOURCE_WATERMARK_IDS[route] },
           options
         ),
         collections.rules.countDocuments(
@@ -441,19 +485,27 @@ export function createMongoCompetitionCreditRepository(
           },
           options
         ),
-        collections.incidents.countDocuments({ status: "open" }, options),
+        collections.incidents.countDocuments({ status: "open", route }, options),
         db.collection("chain_integrity_incidents").countDocuments(
           {
             status: "open",
             $or: [
-              { scope: { $in: ["uki", "nft", "cukie_master", "credits"] } },
-              { type: { $regex: /economy|canonical|cukie|credit/i } },
+              { route },
+              { scope: route },
+              { contractAlias: { $in: routeAliases } },
+              {
+                route: { $exists: false },
+                scope: { $exists: false },
+                contractAlias: { $exists: false },
+                type: { $regex: /economy|canonical|cukie|credit/i },
+              },
             ],
           },
           options
         ),
         collections.slots.countDocuments(
           {
+            route,
             status: "qualifying",
             creditEligibleFrom: { $lte: cutoff },
           },
@@ -469,33 +521,86 @@ export function createMongoCompetitionCreditRepository(
       };
     },
 
-    listSourceSlots: (limit) =>
+    listSourceSlots: (limit, route) =>
       collections.slots
-        .find({}, options)
+        .find(route ? { route } : {}, options)
         .sort({ _id: 1 })
         .limit(limit)
         .toArray(),
-    async readSourceHealth(now, rule) {
-      const aliases = [
-        "UKI_STAKING",
-        "VESTING_VAULT",
-        "TOKEN",
-        "MARKETPLACE",
-        "BRIDGE",
-      ];
-      const expectedCursorIds = [
-        "UKI_STAKING:Staked",
-        "UKI_STAKING:Unstaked",
-        "VESTING_VAULT:VestingCreated",
-        "VESTING_VAULT:TokensReleased",
-        "TOKEN:Transfer",
-        "MARKETPLACE:TokenOnSale",
-        "MARKETPLACE:TokenBought",
-        "MARKETPLACE:MarketTokenSaleCancelled",
-        "MARKETPLACE:MarketTokenPriceChanged",
-        "BRIDGE:JumpInBridge",
-        "BRIDGE:JumpOutBridge",
-      ];
+    async listSourceSlotsAtCutoff(cutoffBlock, route, limit) {
+      const coverage = await collections.slotHistoryState.findOne(
+        { _id: route },
+        options
+      );
+      if (
+        !coverage ||
+        !Number.isSafeInteger(coverage.completeFromBlockNumber) ||
+        Number(coverage.completeFromBlockNumber) > cutoffBlock.blockNumber
+      ) {
+        throw new DomainConflictError(
+          `El historial temporal ${route} no cubre el bloque ${cutoffBlock.blockNumber}.`
+        );
+      }
+      const versions = await collections.slotVersions.aggregate<{
+        _id: string;
+        slotId: string;
+        effectiveBlockNumber: number;
+        effectiveBlockHash: string;
+        effectiveBlockTimestamp: Date;
+        slot: CreditSnapshotSlot;
+      }>([
+        {
+          $match: {
+            route,
+            effectiveBlockNumber: { $lte: cutoffBlock.blockNumber },
+            effectiveBlockHash: { $type: "string" },
+            effectiveBlockTimestamp: { $type: "date" },
+          },
+        },
+        { $sort: { slotId: 1, effectiveBlockNumber: -1, "slot.revision": -1, _id: -1 } },
+        { $group: { _id: "$slotId", version: { $first: "$$ROOT" } } },
+        { $replaceRoot: { newRoot: "$version" } },
+        { $sort: { _id: 1 } },
+        { $limit: limit },
+      ], options).toArray();
+      for (const version of versions) {
+        if (
+          !Number.isSafeInteger(version.effectiveBlockNumber) ||
+          version.effectiveBlockNumber > cutoffBlock.blockNumber ||
+          !/^0x[0-9a-f]{64}$/.test(version.effectiveBlockHash) ||
+          !(version.effectiveBlockTimestamp instanceof Date) ||
+          Number.isNaN(version.effectiveBlockTimestamp.getTime()) ||
+          version.effectiveBlockTimestamp.getTime() > cutoffBlock.blockTimestamp.getTime() ||
+          version.slot.sourceBlockNumber !== version.effectiveBlockNumber ||
+          version.slot.sourceBlockHash !== version.effectiveBlockHash ||
+          version.slot.sourceBlockTimestamp?.getTime() !== version.effectiveBlockTimestamp.getTime()
+        ) {
+          throw new DomainConflictError(
+            `La version historica ${version._id} no acredita su bloque efectivo.`,
+          );
+        }
+      }
+      return versions.map((version) => version.slot);
+    },
+    async readSourceHealth(now, rule, route) {
+      const aliases = route === "uki"
+        ? ["UKI_STAKING", "VESTING_VAULT"]
+        : ["TOKEN_V2", "CUKIE_MASTER_NFT_VAULT"];
+      const expectedCursorIds = route === "uki"
+        ? [
+            "UKI_STAKING:Staked",
+            "UKI_STAKING:Unstaked",
+            "VESTING_VAULT:VestingCreated",
+            "VESTING_VAULT:TokensReleased",
+          ]
+        : [
+            "TOKEN_V2:Transfer",
+            "TOKEN_V2:CukieMetadataConfigured",
+            "CUKIE_MASTER_NFT_VAULT:CukieMasterCollectionAllowedUpdated",
+            "CUKIE_MASTER_NFT_VAULT:CukieMasterDeposited",
+            "CUKIE_MASTER_NFT_VAULT:CukieMasterWithdrawn",
+            "CUKIE_MASTER_NFT_VAULT:CukieMasterUntrackedERC721Recovered",
+          ];
       const [
         latestSuccess,
         latestError,
@@ -561,8 +666,13 @@ export function createMongoCompetitionCreditRepository(
             status: "open",
             $or: [
               { contractAlias: { $in: aliases } },
+              { route },
+              { scope: route },
               {
                 chain: "BSC",
+                route: { $exists: false },
+                scope: { $exists: false },
+                contractAlias: { $exists: false },
                 type: { $regex: /canonical|economy|vesting|staking|nft/i },
               },
             ],
@@ -573,7 +683,7 @@ export function createMongoCompetitionCreditRepository(
           .collection("cukie_master_route_rounds")
           .find(
             {
-              route: { $in: ["uki", "nft"] },
+              route,
               status: "active",
             },
             options
@@ -609,12 +719,12 @@ export function createMongoCompetitionCreditRepository(
           .toArray(),
         db
           .collection("cukie_master_positions")
-          .find({}, options)
+          .find({ route }, options)
           .sort({ _id: 1 })
           .limit(rule.maxSnapshotSlots + 1)
           .toArray(),
         collections.slots
-          .find({}, options)
+          .find({ route }, options)
           .sort({ _id: 1 })
           .limit(rule.maxSnapshotSlots + 1)
           .toArray(),
@@ -708,11 +818,11 @@ export function createMongoCompetitionCreditRepository(
         stakingPositions.every((position) =>
           validRaw(position.accountBalanceRaw)
         ) && validRaw(stakingState?.totalStakedRaw);
-      if (
+      if (route === "uki" && (
         stakingPositions.length > rule.maxSnapshotSlots ||
         !stakingRawShapeValid ||
         !stakingBalancesMatchState(stakingPositions, stakingState as never)
-      ) {
+      )) {
         warnings.push("UKI_STAKING_PROJECTION_MISMATCH");
       }
       const vestingRawShapeValid =
@@ -727,7 +837,7 @@ export function createMongoCompetitionCreditRepository(
             validRaw(position.releasedRaw) &&
             validRaw(position.lockedRaw)
         );
-      if (
+      if (route === "uki" && (
         vestingPositions.length > rule.maxSnapshotSlots ||
         vestingLedger.length > 50_000 ||
         !vestingRawShapeValid ||
@@ -735,10 +845,10 @@ export function createMongoCompetitionCreditRepository(
           vestingLedger as never,
           vestingPositions as never
         )
-      ) {
+      )) {
         warnings.push("UKI_VESTING_PROJECTION_MISMATCH");
       }
-      if (stakingState?.totalStakedRaw === "0" && !stakingState.lastEventId) {
+      if (route === "uki" && stakingState?.totalStakedRaw === "0" && !stakingState.lastEventId) {
         const stakingIdentityMatches = cursors.some(
           (cursor) =>
             cursor.contractAlias === "UKI_STAKING" &&
@@ -818,7 +928,7 @@ export function createMongoCompetitionCreditRepository(
           routeVersions[route] = round.ruleVersion;
         else warnings.push("CUKIE_MASTER_ROUND_AMBIGUOUS");
       }
-      if (!routeVersions.uki || !routeVersions.nft || rounds.length !== 2) {
+      if (!routeVersions[route] || rounds.length !== 1) {
         warnings.push("CUKIE_MASTER_ROUNDS_UNHEALTHY");
       }
       const observedCandidates = [
@@ -832,10 +942,12 @@ export function createMongoCompetitionCreditRepository(
               Math.min(...observedCandidates.map((date) => date.getTime()))
             )
           : null;
-      const sourceRuleVersions =
-        routeVersions.uki && routeVersions.nft
-          ? { uki: routeVersions.uki, nft: routeVersions.nft }
-          : null;
+      const sourceRuleVersions = routeVersions[route]
+        ? {
+            uki: route === "uki" ? routeVersions.uki! : "independent",
+            nft: route === "nft" ? routeVersions.nft! : "independent",
+          }
+        : null;
       const sortedWarnings = [...warnings].sort(compareCreditText);
       const cukieProjectionHash = stableCreditHash({
         positions: cukiePositions.map((position) => ({
@@ -913,12 +1025,52 @@ export function createMongoCompetitionCreditRepository(
         observedThrough,
         sourceRuleVersions,
         evidenceHash,
+        canonicalSafeBlock:
+          Number.isSafeInteger(checkpoint?.safeBlockNumber)
+            ? Number(checkpoint?.safeBlockNumber)
+            : null,
+        canonicalSafeBlockHash:
+          typeof checkpoint?.safeBlockHash === "string"
+            ? checkpoint.safeBlockHash
+            : null,
         checkedAt: now,
+      };
+    },
+    async findCanonicalCutoffBlock(cutoff) {
+      const block = await db.collection<{
+        _id: string;
+        blockNumber?: unknown;
+        blockHash?: unknown;
+        blockTimestamp?: unknown;
+        successorBlockNumber?: unknown;
+        successorBlockTimestamp?: unknown;
+      }>("competition_credit_cutoff_blocks").findOne(
+        { _id: cutoff.toISOString() },
+        options
+      );
+      if (
+        !block ||
+        !Number.isSafeInteger(block.blockNumber) ||
+        Number(block.blockNumber) < 0 ||
+        typeof block.blockHash !== "string" ||
+        !/^0x[0-9a-f]{64}$/.test(block.blockHash) ||
+        !(block.blockTimestamp instanceof Date) ||
+        Number.isNaN(block.blockTimestamp.getTime()) ||
+        block.blockTimestamp.getTime() >= cutoff.getTime() ||
+        !Number.isSafeInteger(block.successorBlockNumber) ||
+        Number(block.successorBlockNumber) !== Number(block.blockNumber) + 1 ||
+        !(block.successorBlockTimestamp instanceof Date) ||
+        block.successorBlockTimestamp.getTime() < cutoff.getTime()
+      ) return null;
+      return {
+        blockNumber: Number(block.blockNumber),
+        blockHash: block.blockHash,
+        blockTimestamp: block.blockTimestamp,
       };
     },
     async upsertSourceWatermark(watermark) {
       const current = await collections.watermarks.findOne(
-        { _id: CREDIT_SOURCE_WATERMARK_ID },
+        { _id: watermark._id },
         options
       );
       if (
@@ -930,7 +1082,7 @@ export function createMongoCompetitionCreditRepository(
       try {
         const result = await collections.watermarks.replaceOne(
           {
-            _id: CREDIT_SOURCE_WATERMARK_ID,
+            _id: watermark._id,
             $or: [
               { observedThrough: { $exists: false } },
               { observedThrough: { $lte: watermark.observedThrough } },
@@ -941,7 +1093,7 @@ export function createMongoCompetitionCreditRepository(
         );
         if (result.matchedCount === 0 && result.upsertedCount === 0) {
           const winner = await collections.watermarks.findOne(
-            { _id: CREDIT_SOURCE_WATERMARK_ID },
+            { _id: watermark._id },
             options
           );
           if (winner) return winner;
@@ -953,7 +1105,7 @@ export function createMongoCompetitionCreditRepository(
         if (!duplicateKey(error)) throw error;
       }
       const persisted = await collections.watermarks.findOne(
-        { _id: CREDIT_SOURCE_WATERMARK_ID },
+        { _id: watermark._id },
         options
       );
       if (!persisted)
@@ -989,12 +1141,19 @@ export function createMongoCompetitionCreditRepository(
       await collections.configs.insertOne(config, options);
     },
     findRun: (runId) => collections.runs.findOne({ _id: runId }, options),
-    findRunByPeriod: (periodId) =>
-      collections.runs.findOne({ "period.periodId": periodId }, options),
-    async insertRunAndItems(run, items) {
+    findRunByPeriod: (periodId, route) =>
+      collections.runs.findOne({ "period.periodId": periodId, route }, options),
+    findLatestRunByRoute: (route) =>
+      collections.runs.findOne(
+        { route },
+        { ...options, sort: { "period.cutoff": -1, _id: -1 } }
+      ),
+    async insertRunAndItems(run, items, holds) {
       await collections.runs.insertOne(run, options);
       if (items.length > 0)
         await collections.runItems.insertMany(items, options);
+      if (holds.length > 0)
+        await collections.runHolds.insertMany(holds, options);
     },
     claimRunLease: (runId, workerId, now, leaseExpiresAt) =>
       collections.runs.findOneAndUpdate(
@@ -1060,6 +1219,7 @@ export function createMongoCompetitionCreditRepository(
         _id: ownLotId,
         lotId: ownLotId,
         bucket: "own",
+        route: run.route,
         walletNormalized: item.walletNormalized,
         periodId: item.periodId,
         runId,
@@ -1072,7 +1232,7 @@ export function createMongoCompetitionCreditRepository(
         reservedCredits: 0,
         spentCredits: 0,
         expiredCredits: 0,
-        expiresAt: run.period.nextCutoff,
+        expiresAt: run.settlementPeriod.nextCutoff,
         revision: 0,
         blocked: false,
         createdAt: now,
@@ -1081,11 +1241,11 @@ export function createMongoCompetitionCreditRepository(
       await collections.ownLots.insertOne(ownLot, options);
       const entries: CompetitionCreditLedgerEntry[] = [
         ledgerEntry({
-          idempotencyKey: `daily-credit:${item.walletNormalized}:${item.slotId}:${item.eligibilityEpoch}:${item.periodId}`,
+          idempotencyKey: `daily-credit:${item.itemId}`,
           payloadHash: item.payloadHash,
           operation: "grant",
           bucket: "own",
-          amountCredits: item.grantCredits,
+          amountCredits: item.baseGrantCredits,
           walletNormalized: item.walletNormalized,
           periodId: item.periodId,
           runId,
@@ -1095,9 +1255,36 @@ export function createMongoCompetitionCreditRepository(
           sessionId: null,
           fromState: null,
           toState: "available",
+          effectiveBlockNumber: run.cutoffBlock.blockNumber,
+          effectiveBlockHash: run.cutoffBlock.blockHash,
+          effectiveBlockTimestamp: run.cutoffBlock.blockTimestamp,
           createdAt: now,
         }),
       ];
+      if (item.compensationCredits > 0) {
+        entries.push(
+          ledgerEntry({
+            idempotencyKey: `late-compensation:${item.earnedPeriodId}:${run.route}:${item.slotId}:${item.eligibilityEpoch}`,
+            payloadHash: item.payloadHash,
+            operation: "late_compensation",
+            bucket: "own",
+            amountCredits: item.compensationCredits,
+            walletNormalized: item.walletNormalized,
+            periodId: item.periodId,
+            runId,
+            runItemId: item.itemId,
+            lotId: ownLotId,
+            reservationId: null,
+            sessionId: null,
+            fromState: null,
+            toState: "available",
+            effectiveBlockNumber: run.cutoffBlock.blockNumber,
+            effectiveBlockHash: run.cutoffBlock.blockHash,
+            effectiveBlockTimestamp: run.cutoffBlock.blockTimestamp,
+            createdAt: now,
+          })
+        );
+      }
 
       if (item.poolCredits > 0) {
         const poolLotId = stableCreditHash({
@@ -1108,6 +1295,7 @@ export function createMongoCompetitionCreditRepository(
           _id: poolLotId,
           lotId: poolLotId,
           bucket: "pool",
+          route: run.route,
           walletNormalized: null,
           periodId: item.periodId,
           runId,
@@ -1120,7 +1308,7 @@ export function createMongoCompetitionCreditRepository(
           reservedCredits: 0,
           spentCredits: 0,
           expiredCredits: 0,
-          expiresAt: run.period.nextCutoff,
+          expiresAt: run.settlementPeriod.nextCutoff,
           revision: 0,
           blocked: false,
           createdAt: now,
@@ -1133,6 +1321,7 @@ export function createMongoCompetitionCreditRepository(
         const position: CreditPoolPosition = {
           _id: positionId,
           positionId,
+          route: run.route,
           walletNormalized: item.walletNormalized,
           periodId: item.periodId,
           runId,
@@ -1162,6 +1351,9 @@ export function createMongoCompetitionCreditRepository(
             sessionId: null,
             fromState: "available",
             toState: null,
+            effectiveBlockNumber: run.cutoffBlock.blockNumber,
+            effectiveBlockHash: run.cutoffBlock.blockHash,
+            effectiveBlockTimestamp: run.cutoffBlock.blockTimestamp,
             createdAt: now,
           }),
           ledgerEntry({
@@ -1179,11 +1371,15 @@ export function createMongoCompetitionCreditRepository(
             sessionId: null,
             fromState: null,
             toState: "available",
+            effectiveBlockNumber: run.cutoffBlock.blockNumber,
+            effectiveBlockHash: run.cutoffBlock.blockHash,
+            effectiveBlockTimestamp: run.cutoffBlock.blockTimestamp,
             createdAt: now,
           })
         );
         await incrementPoolPeriod(
           item.periodId,
+          run.route,
           {
             contributedCredits: item.poolCredits,
             availableCredits: item.poolCredits,
@@ -1195,6 +1391,7 @@ export function createMongoCompetitionCreditRepository(
       await incrementAccount(
         item.walletNormalized,
         item.periodId,
+        run.route,
         {
           grantedCredits: item.grantCredits,
           poolDepositedCredits: item.poolCredits,
@@ -1233,6 +1430,10 @@ export function createMongoCompetitionCreditRepository(
         throw new DomainConflictError(
           `El run ${runId} aun tiene ${pending} items pendientes.`
         );
+      const held = await collections.runHolds.countDocuments(
+        { runId, status: "held" },
+        options
+      );
       await collections.poolPositions.updateMany(
         { runId, status: "pending_run" },
         { $set: { status: "open", updatedAt: now } },
@@ -1247,7 +1448,11 @@ export function createMongoCompetitionCreditRepository(
           leaseExpiresAt: { $gt: now },
         },
         {
-          $set: { status: "open", openedAt: now, updatedAt: now },
+          $set: {
+            status: held > 0 ? "open_with_holds" : "open",
+            openedAt: now,
+            updatedAt: now,
+          },
           $unset: { leaseOwner: "", leaseExpiresAt: "" },
         },
         { ...options, returnDocument: "after" }
@@ -1387,6 +1592,7 @@ export function createMongoCompetitionCreditRepository(
       );
       const entries: CompetitionCreditLedgerEntry[] = [];
       let reservedTotal = 0;
+      const reservedByRoute = new Map<CreditRoute, number>();
       for (const [index, allocation] of reservation.allocations.entries()) {
         const lot = lotsById.get(allocation.lotId);
         if (!lot)
@@ -1413,6 +1619,10 @@ export function createMongoCompetitionCreditRepository(
           })
         );
         reservedTotal += allocation.amountCredits;
+        reservedByRoute.set(
+          lot.route,
+          (reservedByRoute.get(lot.route) ?? 0) + allocation.amountCredits
+        );
       }
       if (reservedTotal !== reservation.amountCredits) {
         throw new DomainConflictError(
@@ -1420,23 +1630,27 @@ export function createMongoCompetitionCreditRepository(
         );
       }
       await collections.ledger.insertMany(entries, options);
-      const materializationIncrements = {
-        availableCredits: -reservedTotal,
-        reservedCredits: reservedTotal,
-      };
-      if (reservation.bucket === "own") {
-        await incrementAccount(
-          reservation.walletNormalized,
-          reservation.periodId,
-          materializationIncrements,
-          now
-        );
-      } else {
-        await incrementPoolPeriod(
-          reservation.periodId,
-          materializationIncrements,
-          now
-        );
+      for (const [route, routeTotal] of reservedByRoute) {
+        const materializationIncrements = {
+          availableCredits: -routeTotal,
+          reservedCredits: routeTotal,
+        };
+        if (reservation.bucket === "own") {
+          await incrementAccount(
+            reservation.walletNormalized,
+            reservation.periodId,
+            route,
+            materializationIncrements,
+            now
+          );
+        } else {
+          await incrementPoolPeriod(
+            reservation.periodId,
+            route,
+            materializationIncrements,
+            now
+          );
+        }
       }
     },
     async finishReservation(input) {
@@ -1489,12 +1703,12 @@ export function createMongoCompetitionCreditRepository(
       );
       const lotOperations = [];
       const entries: CompetitionCreditLedgerEntry[] = [];
-      const materializationIncrements = {
-        availableCredits: 0,
-        reservedCredits: 0,
-        spentCredits: 0,
-        expiredCredits: 0,
-      };
+      const materializationByRoute = new Map<CreditRoute, {
+        availableCredits: number;
+        reservedCredits: number;
+        spentCredits: number;
+        expiredCredits: number;
+      }>();
       for (const [index, allocation] of result.allocations.entries()) {
         const lot = lotsById.get(allocation.lotId);
         if (!lot)
@@ -1563,11 +1777,18 @@ export function createMongoCompetitionCreditRepository(
             createdAt: input.now,
           })
         );
+        const materializationIncrements = materializationByRoute.get(lot.route) ?? {
+          availableCredits: 0,
+          reservedCredits: 0,
+          spentCredits: 0,
+          expiredCredits: 0,
+        };
         for (const [field, amount] of Object.entries(increments)) {
           materializationIncrements[
             field as keyof typeof materializationIncrements
           ] += amount;
         }
+        materializationByRoute.set(lot.route, materializationIncrements);
       }
       const lotUpdates = await lotCollection.bulkWrite(lotOperations, {
         ...options,
@@ -1582,19 +1803,23 @@ export function createMongoCompetitionCreditRepository(
         );
       }
       await collections.ledger.insertMany(entries, options);
-      if (result.bucket === "own") {
-        await incrementAccount(
-          result.walletNormalized,
-          result.periodId,
-          materializationIncrements,
-          input.now
-        );
-      } else {
-        await incrementPoolPeriod(
-          result.periodId,
-          materializationIncrements,
-          input.now
-        );
+      for (const [route, materializationIncrements] of materializationByRoute) {
+        if (result.bucket === "own") {
+          await incrementAccount(
+            result.walletNormalized,
+            result.periodId,
+            route,
+            materializationIncrements,
+            input.now
+          );
+        } else {
+          await incrementPoolPeriod(
+            result.periodId,
+            route,
+            materializationIncrements,
+            input.now
+          );
+        }
       }
       return result;
     },
@@ -1701,6 +1926,7 @@ export function createMongoCompetitionCreditRepository(
         await incrementAccount(
           lot.walletNormalized,
           lot.periodId,
+          lot.route,
           {
             availableCredits: -lot.availableCredits,
             expiredCredits: lot.availableCredits,
@@ -1710,6 +1936,7 @@ export function createMongoCompetitionCreditRepository(
       } else {
         await incrementPoolPeriod(
           lot.periodId,
+          lot.route,
           {
             availableCredits: -lot.availableCredits,
             expiredCredits: lot.availableCredits,
@@ -1722,29 +1949,47 @@ export function createMongoCompetitionCreditRepository(
     async readReconciliationSnapshot(runId) {
       const run = await collections.runs.findOne({ _id: runId }, options);
       if (!run) return null;
-      const periodId = safeCompetitionCreditPeriodScopeId(run, runId);
-      const periodFilter = { periodId };
+      const periodId = safeCompetitionCreditSettlementPeriodScopeId(run, runId);
+      const periodFilter = { periodId, route: run.route };
       const [
         itemCount,
+        holdCount,
         ownLotCount,
         poolLotCount,
+        accountLotCount,
+        poolPeriodLotCount,
         poolPositionCount,
         reservationCount,
         ledgerCount,
         accountCount,
       ] = await Promise.all([
         collections.runItems.countDocuments({ runId }, options),
+        collections.runHolds.countDocuments({ runId }, options),
         collections.ownLots.countDocuments({ runId }, options),
         collections.poolLots.countDocuments({ runId }, options),
+        collections.ownLots.countDocuments(periodFilter, options),
+        collections.poolLots.countDocuments(periodFilter, options),
         collections.poolPositions.countDocuments({ runId }, options),
-        collections.reservations.countDocuments(periodFilter, options),
+        collections.reservations.countDocuments(
+          {
+            periodId,
+            $or: [
+              { "allocations.runId": runId },
+              { allocations: { $not: { $type: "array" } } },
+            ],
+          },
+          options
+        ),
         collections.ledger.countDocuments({ runId }, options),
         collections.accounts.countDocuments(periodFilter, options),
       ]);
       const collectionCounts = {
         items: itemCount,
+        holds: holdCount,
         ownLots: ownLotCount,
         poolLots: poolLotCount,
+        accountLots: accountLotCount,
+        poolPeriodLots: poolPeriodLotCount,
         poolPositions: poolPositionCount,
         reservations: reservationCount,
         ledger: ledgerCount,
@@ -1752,8 +1997,11 @@ export function createMongoCompetitionCreditRepository(
       };
       const [
         items,
+        holds,
         ownLots,
         poolLots,
+        accountLots,
+        poolPeriodLots,
         poolPositions,
         reservations,
         ledger,
@@ -1761,6 +2009,11 @@ export function createMongoCompetitionCreditRepository(
         poolPeriod,
       ] = await Promise.all([
         collections.runItems
+          .find({ runId }, options)
+          .sort({ _id: 1 })
+          .limit(RECONCILIATION_DOCUMENT_LIMITS.items)
+          .toArray(),
+        collections.runHolds
           .find({ runId }, options)
           .sort({ _id: 1 })
           .limit(RECONCILIATION_DOCUMENT_LIMITS.items)
@@ -1775,13 +2028,29 @@ export function createMongoCompetitionCreditRepository(
           .sort({ _id: 1 })
           .limit(RECONCILIATION_DOCUMENT_LIMITS.poolLots)
           .toArray(),
+        collections.ownLots
+          .find(periodFilter, options)
+          .sort({ _id: 1 })
+          .limit(RECONCILIATION_DOCUMENT_LIMITS.ownLots)
+          .toArray(),
+        collections.poolLots
+          .find(periodFilter, options)
+          .sort({ _id: 1 })
+          .limit(RECONCILIATION_DOCUMENT_LIMITS.poolLots)
+          .toArray(),
         collections.poolPositions
           .find({ runId }, options)
           .sort({ _id: 1 })
           .limit(RECONCILIATION_DOCUMENT_LIMITS.poolPositions)
           .toArray(),
         collections.reservations
-          .find(periodFilter, options)
+          .find({
+            periodId,
+            $or: [
+              { "allocations.runId": runId },
+              { allocations: { $not: { $type: "array" } } },
+            ],
+          }, options)
           .sort({ _id: 1 })
           .limit(RECONCILIATION_DOCUMENT_LIMITS.reservations)
           .toArray(),
@@ -1796,15 +2065,18 @@ export function createMongoCompetitionCreditRepository(
           .limit(RECONCILIATION_DOCUMENT_LIMITS.accounts)
           .toArray(),
         collections.poolPeriods.findOne(
-          { _id: poolPeriodId(periodId) },
+          { _id: poolPeriodId(periodId, run.route) },
           options
         ),
       ]);
       return {
         run,
         items,
+        holds,
         ownLots,
         poolLots,
+        accountLots,
+        poolPeriodLots,
         poolPositions,
         reservations,
         ledger,
@@ -1851,7 +2123,7 @@ export function createMongoCompetitionCreditRepository(
         options
       );
       await collections.poolPeriods.updateOne(
-        { _id: poolPeriodId(incident.periodId) },
+          { _id: poolPeriodId(incident.periodId, incident.route) },
         { $set: { blocked: true, updatedAt: incident.detectedAt } },
         options
       );

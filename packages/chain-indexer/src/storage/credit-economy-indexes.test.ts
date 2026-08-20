@@ -10,12 +10,14 @@ describe("credit economy indexes", () => {
     ).map((index) => `${index.collection}:${JSON.stringify(index.keys)}`);
     for (const expected of [
       'competition_credit_pool_configs:{"idempotencyKey":1}',
-      'competition_credit_runs:{"period.periodId":1}',
-      'competition_credit_run_items:{"periodId":1,"slotId":1,"eligibilityEpoch":1}',
+      'competition_credit_runs:{"period.periodId":1,"route":1}',
+      'competition_credit_run_items:{"earnedPeriodId":1,"slotRoute":1,"slotId":1,"eligibilityEpoch":1}',
       'competition_credit_lots:{"lotId":1}',
+      'competition_credit_lots:{"periodId":1,"route":1,"runId":1,"sourceSlotId":1,"eligibilityEpoch":1}',
       'competition_credit_pool_lots:{"lotId":1}',
-      'competition_credit_account_periods:{"walletNormalized":1,"periodId":1}',
-      'competition_credit_pool_periods:{"periodId":1}',
+      'competition_credit_pool_lots:{"periodId":1,"route":1,"runId":1,"sourceSlotId":1,"eligibilityEpoch":1}',
+      'competition_credit_account_periods:{"walletNormalized":1,"periodId":1,"route":1}',
+      'competition_credit_pool_periods:{"periodId":1,"route":1}',
       'competition_credit_reservations:{"idempotencyKey":1}',
       'competition_credit_reservations:{"sessionId":1}',
       'competition_credit_reservations:{"terminalIdempotencyKey":1}',
@@ -32,7 +34,7 @@ describe("credit economy indexes", () => {
     );
     assert.ok(
       paths.includes(
-        'competition_credit_runs:{"status":1,"leaseExpiresAt":1,"_id":1}'
+        'competition_credit_runs:{"route":1,"period.cutoff":1,"status":1,"leaseExpiresAt":1,"_id":1}'
       )
     );
     assert.ok(

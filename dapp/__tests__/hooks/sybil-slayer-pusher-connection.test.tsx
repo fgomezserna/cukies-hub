@@ -298,6 +298,9 @@ describe('usePusherConnection session refresh', () => {
           seed: 'server-seed',
           alias: 'Hunter-ABC123',
           status: 'active',
+          economyRunId: 'economy-run-1',
+          creditSource: 'pool',
+          cukieSource: 'own',
         },
       }));
     });
@@ -310,8 +313,23 @@ describe('usePusherConnection session refresh', () => {
       seed: 'server-seed',
       alias: 'Hunter-ABC123',
       status: 'active',
+      economyRunId: 'economy-run-1',
+      creditSource: 'pool',
+      cukieSource: 'own',
     });
     await expect(replay).resolves.toMatchObject({ attemptId: 'attempt-1' });
+    mockChannelTrigger.mockClear();
+    act(() => {
+      expect(result.current.sendCheckpoint({ score: 100, gameTime: 5_000 })).toBe(true);
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledWith(
+      'client-checkpoint',
+      expect.objectContaining({
+        score: 100,
+        gameTime: 5_000,
+        economyRunId: 'economy-run-1',
+      }),
+    );
     unmount();
   });
 

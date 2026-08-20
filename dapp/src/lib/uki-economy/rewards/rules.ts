@@ -154,6 +154,23 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
     0,
     rule.runCredits.totalUnits
   );
+  const hasAmbassadorSplit =
+    rule.runCredits.ambassadorOrdinaryUnits !== undefined ||
+    rule.runCredits.ambassadorWeeklyUnits !== undefined;
+  if (hasAmbassadorSplit) {
+    boundedInteger(
+      rule.runCredits.ambassadorOrdinaryUnits,
+      "runCredits.ambassadorOrdinaryUnits",
+      0,
+      rule.runCredits.totalUnits
+    );
+    boundedInteger(
+      rule.runCredits.ambassadorWeeklyUnits,
+      "runCredits.ambassadorWeeklyUnits",
+      0,
+      rule.runCredits.totalUnits
+    );
+  }
   boundedInteger(
     rule.runCredits.convertibleUnits,
     "runCredits.convertibleUnits",
@@ -168,10 +185,18 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
       rule.runCredits.totalUnits ||
     rule.runCredits.weeklyReserveUnits * 5 !== rule.runCredits.totalUnits ||
     rule.runCredits.ambassadorReserveUnits * 20 !== rule.runCredits.totalUnits ||
+    (hasAmbassadorSplit &&
+      (rule.runCredits.ambassadorOrdinaryUnits! +
+          rule.runCredits.ambassadorWeeklyUnits! !==
+        rule.runCredits.ambassadorReserveUnits ||
+        rule.runCredits.ambassadorOrdinaryUnits! * 25 !==
+          rule.runCredits.totalUnits ||
+        rule.runCredits.ambassadorWeeklyUnits! * 100 !==
+          rule.runCredits.totalUnits)) ||
     rule.runCredits.convertibleUnits * 4 !== rule.runCredits.totalUnits * 3
   ) {
     throw new DomainValidationError(
-      "runCredits debe representar 10 creditos y separar exactamente 2/0.5/7.5 sin perdida."
+      "runCredits debe representar 10 creditos y separar exactamente 2/0.5/7.5; V3 divide 0.5 en 0.4/0.1."
     );
   }
   boundedInteger(rule.settlementBps.poolCredits, "settlementBps.poolCredits", 0, 10_000);
@@ -249,8 +274,11 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
       "emissionBudget exige caps positivos y dailyCapRaw <= lifetimeCapRaw.",
     );
   }
-  if (emissionBudget.unusedDailyCapacity !== "expires") {
-    throw new DomainValidationError("unusedDailyCapacity debe ser expires en rewards v1.");
+  if (
+    emissionBudget.unusedDailyCapacity !== "expires" &&
+    emissionBudget.unusedDailyCapacity !== "materialize_undistributed"
+  ) {
+    throw new DomainValidationError("unusedDailyCapacity no es una politica soportada.");
   }
   if (emissionBudget.overflowPolicy !== "block") {
     throw new DomainValidationError("overflowPolicy debe ser block en rewards v1.");
@@ -273,10 +301,19 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
       rule.undistributedBps.treasury,
       rule.undistributedBps.marketing,
       rule.undistributedBps.development,
+      rule.undistributedBps.marketingDevelopment ?? 0,
       rule.undistributedBps.supplyReduction,
     ],
     "undistributedBps"
   );
+  if (
+    (rule.undistributedBps.marketingDevelopment ?? 0) > 0 &&
+    !rule.destinations.marketingDevelopment
+  ) {
+    throw new DomainValidationError(
+      "destinations.marketingDevelopment es obligatorio cuando su peso es positivo."
+    );
+  }
   Object.entries(rule.destinations).forEach(([key, value]) =>
     validRewardWallet(value, `destinations.${key}`)
   );
@@ -328,6 +365,8 @@ export function normalizeRewardAccrualDrafts(drafts: RewardAccrualDraft[] = []) 
       ![
         "weekly_prize_pool",
         "ambassador_program_pending",
+        "ambassador_ordinary_pending",
+        "ambassador_weekly_pending",
         "credit_pool_weekly",
         "cukie_pool_original_weekly",
         "cukie_pool_second_plus_weekly",

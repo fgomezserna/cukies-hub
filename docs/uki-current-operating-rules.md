@@ -1,9 +1,9 @@
 # UKI current operating rules
 
 Estado: fuente operativa vigente para especificacion tecnica y funcional.
-Fecha de sincronizacion: 2026-08-15.
+Fecha de sincronizacion: 2026-08-20.
 Fuentes base: `/Users/fgomezserna/Downloads/Token UKI.docx`, `/Users/fgomezserna/Downloads/Funcionamiento.docx` y `/Users/fgomezserna/Downloads/UKI/Preventa UKI.docx`.
-Revision posterior: decisiones de producto sobre staking, Cukie Master, Cukie Pool, creditos, snapshots y rewards confirmadas en la conversacion hasta el 2026-08-15. `6. comprobar.docx` se usa como comprobacion de consistencia, no como especificacion reducida que sustituya esas decisiones exhaustivas.
+Revision posterior: decisiones de producto sobre staking, Cukie Master, Cukie Pool, creditos, snapshots y rewards confirmadas en la conversacion hasta el 2026-08-20, incluido `Creditos de competicion y reparto.docx`. `6. comprobar.docx` se usa como comprobacion de consistencia, no como especificacion reducida que sustituya esas decisiones exhaustivas.
 
 Este documento sustituye como referencia de producto a los documentos antiguos de `Funcionamiento`, `dudas` y `para comentar`. Si una issue o documento anterior contradice estas reglas, estas reglas prevalecen hasta que producto apruebe una version nueva.
 
@@ -34,9 +34,18 @@ estos puntos, cerrados posteriormente en la conversacion:
 
 ### Guardarrail tecnico de emision
 
-- Los `500,000 UKI` son el maximo que puede reservar el conjunto de juegos en
-  un dia economico, no una emision garantizada. El techo acumulado del programa
-  es `450,000,000 UKI`; la capacidad diaria no usada expira y no se acumula.
+- Cada dia economico se contabilizan exactamente `500,000 UKI` del programa de
+  recompensas. La parte asignada a jugadores, pools, embajadores y reservas
+  semanales, mas la parte no distribuida, debe reconciliar exactamente ese
+  importe. No es solo un cap variable.
+- UKI tiene suministro fijo: esta contabilidad no crea supply nuevo. Los lotes
+  de rewards se financian desde la reserva UKI prefundada y las entregas
+  posteriores de importes ya reservados no vuelven a consumir presupuesto ni
+  vuelven a mintear.
+- El techo acumulado configurado para staging es `450,000,000 UKI`. A
+  `500,000 UKI` diarios cubre 900 dias; la incompatibilidad con la comunicacion
+  historica de seis anos sigue bloqueando una regla mainnet, no la validacion
+  funcional en BSC Testnet.
 - Antes de crear un manifest, allocation o accrual, el servicio reserva el
   total bruto de la fuente dentro de la misma transaccion Mongo. Los replays no
   vuelven a consumir presupuesto y un exceso diario o acumulado falla cerrado,
@@ -50,10 +59,8 @@ estos puntos, cerrados posteriormente en la conversacion:
   no se mutan sobre el mismo ledger. Si producto cambia la hora, se coordina una
   nueva version de calendario y una migracion auditada del presupuesto para
   periodos futuros; nunca se reinterpretan periodos ni salidas ya cerrados.
-- Producto expresa el reparto no distribuido como 80% tesoreria, 10% marketing
-  y desarrollo y 10% reduccion de supply. La implementacion conserva marketing
-  y desarrollo como dos subcuentas tecnicas de 5% cada una hasta definir sus
-  destinos; juntas forman el mismo bucket aprobado del 10%.
+- El reparto no distribuido usa tres destinos: 80% tesoreria, 10% una unica
+  reserva de marketing y desarrollo y 10% reduccion de supply.
 - La configuracion actual es de prueba para BSC Testnet y las bases de staging.
   No aprueba fechas ni wallets de produccion. Los schedulers permanecen
   desactivados hasta que sus fuentes, financiacion y credenciales se verifiquen
@@ -252,8 +259,16 @@ La UI debe mostrar el requisito anterior y nuevo, los cupos que se conservaran, 
 - Si una fuente no esta actualizada, el periodo queda `pending_reconciliation`; no se genera un snapshot incompleto ni se pierde la entrega.
 - Cuando los datos se recuperan, el job reconstruye el estado del corte y liquida una sola vez de forma idempotente.
 - La salud y liquidacion de UKI y NFT se separan para que el fallo de una ruta no bloquee la otra.
-- Una entrega retrasada no puede nacer caducada ni perderse por un fallo operativo; debe conservar una ventana util equivalente a la entrega normal y el mismo `periodId` de origen.
-- Si el usuario tenia configurada una aportacion al pool, la liquidacion tardia respeta esa configuracion y registra la aportacion en el periodo original.
+- Una entrega retrasada no puede nacer caducada ni perderse por un fallo
+  operativo. El ledger conserva `earnedPeriodId` como periodo de origen, pero
+  materializa los creditos en el periodo vigente de settlement para que tengan
+  una ventana util completa.
+- Si la entrega se recupera mas de 24 horas despues de su corte, cada cupo
+  recibe una unica compensacion adicional de 100 creditos. La entrega original
+  y la compensacion conservan exactamente la configuracion propia/pool fijada
+  para el corte perdido y son idempotentes por cupo, ruta y periodo de origen.
+- La salud, watermark, run y materializacion se separan entre la ruta UKI y la
+  ruta NFT; una ruta sana puede liquidarse aunque la otra permanezca retenida.
 
 Estos retrasos deben ser excepcionales, no parte del funcionamiento normal.
 Pueden producirse por caida o lag del RPC/indexador, una reorganizacion BSC
@@ -272,19 +287,27 @@ poder reconstruirse correctamente.
 - Los UKI diarios del pool se distribuyen proporcionalmente entre quienes aportaron creditos en ese periodo.
 - Quien aporto creditos conserva el derecho de ese periodo aunque despues pierda su cupo o haga unstake.
 
-Regla minima prevista:
+Garantia inicial:
 
-- La regla inicial calcula una asignacion base sobre el 20% de los creditos aportados al pool.
-- Si el calculo queda por debajo de 0.75 UKI por cada 10 creditos aportados, se planifica una asignacion base de 0.75 UKI por cada 10, sujeta a funding, regla activa y batch de settlement.
+- Para cada 10 creditos aportados se suma el reparto ordinario del dia y el
+  tramo de un septimo que corresponda del bote semanal anterior.
+- El pago final es `max(reparto ordinario + tramo semanal, 0.75 UKI)`. El tramo
+  semanal no se añade otra vez despues de aplicar el minimo.
+- El complemento necesario para alcanzar 0.75 UKI sale de la reserva del pool
+  de creditos. Si el beneficiario tiene embajador, este recibe el 5% del pago
+  final, incluido cualquier complemento de garantia. Las rewards del propio
+  embajador no generan otra comision.
 
 Complemento procedente del bote semanal:
 
 - Al cerrar el bote semanal de mejores jugadores, una parte del premio puede corresponder al pool de creditos o al Cukie Pool segun los recursos utilizados por las partidas premiadas.
-- Esa parte no se entrega completa al cierre semanal: se divide en siete tramos iguales y se distribuye diariamente durante la semana siguiente.
-- Criterio provisional pendiente de confirmacion: cada tramo se reparte entre
-  los participantes elegibles del censo diario correspondiente de la semana
-  siguiente, sin congelar el censo de la semana que genero el bote.
-- Estos tramos son adicionales a las rewards diarias normales de cada pool.
+- Esa parte no se entrega completa al cierre semanal: se divide en siete tramos
+  deterministas, desde el martes a las 16:00 UTC hasta el lunes siguiente a las
+  16:00 UTC.
+- Cada tramo se reparte entre quienes participan en el pool el dia de ese tramo;
+  no se congela el censo de la semana que genero el bote.
+- El tramo semanal participa en la garantia conjunta descrita arriba; no es un
+  extra que se vuelva a sumar despues de alcanzar el minimo.
 
 ## Pool de Cukies
 
@@ -395,6 +418,8 @@ Partidas disponibles por periodo:
 
 ## Arena ranking
 
+- Este ranking de eficiencia #1 a #9 es distinto del leaderboard semanal de
+  mejor puntuacion que reparte el bote de premios.
 - Solo se rankean los jugadores que usan creditos del pool.
 - Los jugadores empiezan en ranking #5.
 - El ranking se actualiza semanalmente.
@@ -428,11 +453,12 @@ La recompensa por ranking se aplica sobre la parte del jugador que queda despues
 - Cada partida valida tiene un presupuesto nominal maximo de 10 UKI:
   - 7.5 UKI, el 75%, forman el tramo de rendimiento diario dependiente del score.
   - 2 UKI, el 20%, se reservan para el bote semanal de mejores jugadores.
-  - 0.5 UKI, el 5%, se acumulan en `ambassador_program_pending` para el futuro
-    programa de embajadores.
-- Los 2 UKI semanales y los 0.5 UKI de embajadores se reservan al validar la
-  partida y no dependen de la puntuacion. El programa de embajadores no se
-  distribuye hasta aprobar beneficiarios, reglas y cadencia.
+  - 0.4 UKI reservan la comision ordinaria de embajadores.
+  - 0.1 UKI reservan la comision de embajadores asociada al bote semanal.
+- El embajador recibe el 5% de lo que genere efectivamente su referido,
+  incluyendo pagos a jugadores o pools y complementos de garantia. Las
+  comisiones no generan comision recursiva. La reserva que no se utiliza porque
+  no existe embajador o porque el pago efectivo es menor pasa a no distribuido.
 - Conversion de score: lineal entre 0 y 3,000 puntos.
 - El tramo de rendimiento se calcula como
   `performanceUki = 7.5 UKI * clamp(score, 0, 3000) / 3000`, con redondeo
@@ -448,6 +474,21 @@ Uso de creditos:
 - Las partidas con creditos propios no computan para ranking y no aplican el rank al jugador.
 - Si no tiene creditos propios, se asignan 10 creditos del pool mientras haya disponibilidad.
 - Las partidas con creditos del pool computan para ranking y aplican el rank sobre la parte del jugador.
+- Con creditos propios no hay limite diario de partidas y esas partidas no
+  incrementan los contadores de uso del pool.
+- Con creditos del pool existe un limite de 30 partidas por dia economico y un
+  limite de 10 partidas con puntuacion menor que 100. Una puntuacion exactamente
+  igual a 100 no es baja.
+- Al reservar una partida con creditos prestados se reserva tambien capacidad
+  para una posible partida baja. Un resultado de 100 o superior libera esa
+  capacidad; una puntuacion inferior o un abandono la consume.
+- Si el jugador abandona o cierra voluntariamente la partida, se consumen los
+  10 creditos, la cuota del Cukie y ambos contadores aplicables; el rendimiento
+  es cero y la partida no entra en ranking, rewards ni bote semanal.
+- Un fallo atribuible al sistema libera creditos y cuota, no incrementa
+  contadores y no genera ranking ni rewards.
+- Una partida reservada antes de las 14:00 UTC conserva el periodo de entrada y
+  puede finalizar despues del corte dentro de su TTL normal.
 
 Uso de Cukies:
 
@@ -479,21 +520,40 @@ del jugador pasa tambien a `undistributed_pending`.
 ### Bote semanal y entrega diferida
 
 - Los 2 UKI reservados por cada partida valida alimentan el bote semanal de mejores jugadores.
-- Al cierre de la semana se calculan los ganadores y el reparto correspondiente.
-- Si una parte del premio corresponde al pool de creditos o al pool de la generacion del Cukie utilizado, esa parte se acumula en el pool correspondiente.
-- Las cantidades derivadas a pools se dividen en siete entregas iguales durante la semana siguiente, una por dia.
-- Criterio provisional pendiente de confirmacion: cada entrega usa el censo
-  elegible de su propio dia en la semana siguiente. Salir antes de una entrega
-  futura impediria participar en ese tramo, sin revocar tramos ya cerrados.
-- La entrega diferida es independiente y adicional a la liquidacion diaria del
-  tramo de rendimiento de hasta 7.5 UKI. La reserva de 0.5 UKI para embajadores
-  mantiene un ledger separado.
+- El leaderboard conserva una unica mejor puntuacion raw por wallet, sin tope
+  de 3,000 puntos. Solo reemplaza el resultado si la nueva puntuacion es mayor;
+  en empate queda primero quien la logro antes. `winningGameId` identifica la
+  partida exacta que origina cualquier reparto.
+- El 60% se reparte entre el Top 10 con porcentajes
+  `9/8/7/6.5/6/5.5/5/4.5/4.5/4`. El 30% se reparte a partes iguales entre los
+  puestos 11 a 25, 2% cada uno. El 10% se sortea entre diez wallets fuera del
+  Top 25, 1% cada una, que hayan completado al menos diez partidas semanales
+  con puntuacion mayor que 100.
+- El sorteo usa una fuente de entropia BSC canonica posterior al cierre y queda
+  pendiente, sin elegir ganadores, mientras esa evidencia no este confirmada.
+- Los pagos a jugadores se sellan el lunes a las 17:00 UTC. Si no existen todos
+  los puestos o ganadores elegibles, la parte vacante pasa a no distribuido.
+- El origen de creditos y Cukie se toma de la partida ganadora concreta. La
+  parte correspondiente al pool de creditos o al pool de la generacion del
+  Cukie se reserva para esos pools; Seiku no genera parte de Cukie Pool.
+- Las cantidades derivadas a pools se dividen en siete tramos desde el martes
+  siguiente a las 16:00 UTC hasta el lunes siguiente a las 16:00 UTC. Cada
+  tramo usa el censo elegible de su propio dia y no vuelve a mintear ni a
+  descontar presupuesto del dia de pago.
+- La reserva semanal de embajadores acompana al beneficiario final de cada
+  parte. Lo no pagado por ausencia de embajador pasa a no distribuido.
 
 ## UKI no distribuidos
 
-Reserva diaria prevista para recompensas a usuarios: 500,000 UKI.
+Presupuesto diario fijo de recompensas: 500,000 UKI.
 
-Bloqueo de activacion: `500,000 UKI/dia` durante seis anos requeriria `1,095,000,000 UKI`, por encima de los `450,000,000 UKI` reservados al programa de recompensas. Antes de crear la regla live hay que aprobar si 500,000 es un techo variable, un presupuesto recirculado, una fase inicial de menor duracion o si cambia la dotacion/duracion. El backend debe fallar cerrado mientras esa relacion no quede versionada.
+En cada cierre debe cumplirse exactamente:
+
+`jugadores + pool de creditos + Cukie Pools + embajadores ordinarios + bote semanal + embajadores semanales + no distribuido = 500,000 UKI`.
+
+El bote semanal y su reserva de embajadores se descuentan el dia en que se
+generan. Su pago posterior transforma una obligacion ya reservada con delta de
+emision cero; no se vuelve a descontar ni a financiar desde otro dia.
 
 Puede quedar UKI sin distribuir si:
 
@@ -503,6 +563,8 @@ Puede quedar UKI sin distribuir si:
 - El ranking reduce la parte final del jugador.
 - Una partida utiliza Seiku y elimina la parte que habria correspondido al Cukie Pool.
 - Un tramo acumulativo de rareza no tiene NFTs elegibles.
+- Un puesto semanal o ganador de sorteo queda vacante.
+- Un beneficiario no tiene embajador o la comision real es menor que la reserva.
 - Un redondeo o regla versionada deja un residuo sin destinatario.
 
 Todo importe sin destinatario queda primero en `undistributed_pending`: no es
@@ -563,24 +625,16 @@ Usos propuestos para Cukie Points:
 - Incentivo concreto por compra.
 - Incentivo concreto por invitar usuarios.
 - Si el usuario elige manualmente Cukie propio en Treasure Hunt o se automatiza.
-- Numero de ganadores y formula de reparto del bote semanal de mejores
-  jugadores; la reserva de 2 UKI por partida no depende de esa decision.
-- Definir la hora de cierre semanal.
 - Antes del primer cambio del horario diario, aprobar como se trata el periodo
   de transicion si resulta mas corto que 24 horas. El cambio nunca puede
   retrasar una salida ya solicitada.
-- Confirmar si los siete tramos semanales destinados a pools usan el censo de
-  cada dia de la semana siguiente, como propone esta especificacion, o un censo
-  congelado de la semana que genero el bote.
 - Si en una version futura los NFTs custodiados para Cukie Master pueden jugar.
   El lanzamiento los mantiene estrictamente no jugables y cualquier cambio
   requerira una regla nueva aplicable solo a periodos futuros.
-- Definir beneficiarios, reglas y cadencia del 5% reservado en
-  `ambassador_program_pending` antes de distribuirlo.
 - Definir el mecanismo on-chain exacto para ejecutar el 10% de reduccion de
   supply de `undistributed_pending`.
-- Como reconciliar el techo de 500,000 UKI diarios con el pool de 450M y la
-  duracion comunicada de seis anos.
+- Antes de mainnet, reconciliar el presupuesto fijo de 500,000 UKI diarios con
+  la reserva de 450M y la duracion historicamente comunicada de seis anos.
 - Fecha de corte para Cukie Points generados por Cukies en staking.
 - Fecha de cierre para generar crias.
 - Ratios y limites finales de conversion Cukie Points -> creditos.
