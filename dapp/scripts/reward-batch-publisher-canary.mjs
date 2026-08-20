@@ -7,12 +7,11 @@ import {
   getAddress,
   http,
   parseAbi,
-  parseEther,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { bscTestnet } from 'viem/chains';
 
-import { stableRewardPublicationHash } from './lib/reward-batch-publication.mjs';
+import { buildRewardPublisherCanaryFixture } from './lib/reward-batch-publisher-canary-fixture.mjs';
 
 const DISTRIBUTOR_ABI = parseAbi([
   'function batches(bytes32 batchId) view returns (bytes32 merkleRoot, bytes32 inputHash, bytes32 metadataHash, uint256 totalAllocated, uint256 totalClaimed, uint64 startsAt, uint64 expiresAt, bool closed)',
@@ -55,61 +54,17 @@ try {
 
 async function seed(db) {
   const now = new Date();
-  const accountingId = `reward-daily:canary:${distributorAddress.toLowerCase()}`;
-  const allocationId = `reward-canary-allocation:${distributorAddress.toLowerCase()}`;
-  const amountRaw = parseEther('10').toString(10);
-  const ruleVersion = `rewards-canary:${distributorAddress.toLowerCase()}`;
-  const destinations = {
-    treasury: '0x3333333333333333333333333333333333333333',
-    marketingDevelopment: '0x4444444444444444444444444444444444444444',
-    supplyReduction: '0x5555555555555555555555555555555555555555',
-  };
-  const rule = {
-    _id: `reward_allocations:${ruleVersion}`,
-    scope: 'reward_allocations',
-    version: ruleVersion,
-    active: true,
-    activeFrom: new Date(now.getTime() - 60_000),
-    configHash: stableRewardPublicationHash({ ruleVersion, destinations }),
-    destinations,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const accounting = {
-    _id: accountingId,
-    dayId: 'canary',
-    ruleVersion,
-    payloadHash: stableRewardPublicationHash({ kind: 'reward-canary-accounting', accountingId }),
-    status: 'sealed',
-    sealedAt: now,
-  };
-  const immutable = {
-    accountingId,
-    accountingKind: 'daily',
-    periodId: 'canary',
-    allocationId,
-    walletNormalized: account.address.toLowerCase(),
-    category: 'player',
-    amountRaw,
-    fundingMode: 'daily_emission',
-    sourceIds: ['reward-canary-source'],
-    availableAt: new Date(now.getTime() - 1_000),
-    status: 'allocated_offchain',
-    createdAt: now,
-  };
-  const allocation = {
-    _id: allocationId,
-    ...immutable,
-    payloadHash: stableRewardPublicationHash({
-      kind: 'reward-accounting-allocation-document',
-      ...immutable,
-    }),
-  };
-  await db.collection('economy_schema_metadata').updateOne(
-    { _id: 'uki-economy' },
-    { $set: { schemaVersion: 3, migratedAt: now, updatedAt: now } },
-    { upsert: true },
-  );
+  const { accountingId, amountRaw, rule, accounting, allocation } =
+    buildRewardPublisherCanaryFixture({
+      now,
+      distributorAddress,
+      accountAddress: account.address,
+    });
+  const schema = await db.collection('economy_schema_metadata')
+    .findOne({ _id: 'uki-economy' });
+  if (schema?.schemaVersion !== 3) {
+    throw new Error('El canary requiere un esquema UKI v3 ya migrado.');
+  }
   await db.collection('economy_rule_versions').insertOne(rule);
   await db.collection('reward_daily_accounting').insertOne(accounting);
   await db.collection('reward_accounting_allocations').insertOne(allocation);
@@ -179,6 +134,30 @@ async function claim(db) {
   ]);
   if (receipt.status !== 'success' || !claimed || after - before !== BigInt(proof.amountRaw)) {
     throw new Error('El claim canary no acredito el saldo exacto.');
+  }
+  const completedAt = new Date();
+  const completed = await db.collection('reward_publication_plans').updateOne(
+    {
+      _id: plan._id,
+      batchId: plan.batchId,
+      distributorAddress: distributorAddress.toLowerCase(),
+      status: 'awaiting_projection',
+    },
+    {
+      $set: {
+        status: 'completed',
+        canaryClaimTransactionHash: hash,
+        canaryClaimedAt: completedAt,
+        completedAt,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        updatedAt: completedAt,
+      },
+      $inc: { revision: 1 },
+    },
+  );
+  if (completed.matchedCount !== 1) {
+    throw new Error('El plan canary no pudo cerrarse tras acreditar el claim.');
   }
   console.log(JSON.stringify({
     event: 'reward_canary_claimed',

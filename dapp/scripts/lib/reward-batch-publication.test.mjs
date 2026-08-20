@@ -7,6 +7,7 @@ import {
   buildRewardPublicationArtifacts,
   stableRewardPublicationHash,
 } from './reward-batch-publication.mjs';
+import { buildRewardPublisherCanaryFixture } from './reward-batch-publisher-canary-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const { generateRewardsMerkle } = require(
@@ -138,6 +139,29 @@ test('autoriza una ventana inmutable y mantiene el draft sin tx inventada', () =
   assert.equal(authorized.transactionHash, null);
   assert.equal(authorized.startsAtRaw, '1787241900');
   assert.equal(authorized.expiresAtRaw, '1795017900');
+});
+
+test('el fixture canary queda ligado exactamente a sus allocations selladas', () => {
+  const fixture = buildRewardPublisherCanaryFixture({
+    now: CREATED_AT,
+    distributorAddress: DISTRIBUTOR,
+    accountAddress: PLAYER,
+  });
+  assert.equal(fixture.rule.active, false);
+  const artifacts = buildRewardPublicationArtifacts({
+    accountingId: fixture.accountingId,
+    accounting: fixture.accounting,
+    rule: fixture.rule,
+    allocations: [fixture.allocation],
+    chainId: 97,
+    tokenAddress: TOKEN,
+    distributorAddress: DISTRIBUTOR,
+    createdAt: CREATED_AT,
+  });
+  assert.equal(artifacts.plan.claimableTotalRaw, '10000000000000000000');
+  assert.equal(artifacts.plan.totalRaw, '10000000000000000000');
+  assert.equal(artifacts.proofs.length, 1);
+  assert.equal(artifacts.proofs[0].walletAddress.toLowerCase(), PLAYER.toLowerCase());
 });
 
 test('rechaza una allocation manipulada o un destino de sistema incorrecto', () => {
