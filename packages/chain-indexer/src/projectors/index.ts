@@ -1283,27 +1283,54 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
     ) return 'BatchPublished con campos invalidos';
 
     const existing = await collection(store, 'reward_claim_batches').findOne({ batchId });
-    if (existing && Object.entries(immutable).some(([key, value]) => existing[key] !== value)) {
+    if (!existing) {
+      throw new Error(`BatchPublished ${batchId} no tiene draft autorizado en Mongo.`);
+    }
+    if (
+      existing.publishAuthorized !== true
+      || existing.previewOnly !== false
+      || existing.publishedProofSetHash !== existing.proofSetHash
+      || existing.publishedPeriodSealId !== existing.periodSealId
+      || existing.merkleRoot !== immutable.merkleRoot
+      || existing.canonicalInputHash !== immutable.inputHash
+      || existing.metadataHash !== immutable.metadataHash
+      || existing.totalAllocatedRaw !== immutable.totalAllocatedRaw
+      || existing.startsAtRaw !== immutable.startsAtRaw
+      || existing.expiresAtRaw !== immutable.expiresAtRaw
+    ) {
       throw new Error(`BatchPublished ${batchId} contradice el lote ya indexado.`);
     }
+    const publication = {
+      status: existing.status === 'closed' ? 'closed' : 'published',
+      previewOnly: false,
+      publishAuthorized: true,
+      signature: null,
+      transactionHash: event.txHash,
+      publicationEventId: event._id,
+      publicationTransactionHash: event.txHash,
+      publicationBlockNumber: event.blockNumber,
+      publicationBlockHash: event.blockHash,
+      publicationLogIndex: event.logIndex,
+      publishedAt: observedAt,
+      publishedBatchId: batchId,
+      publishedMerkleRoot: immutable.merkleRoot,
+      publishedInputHash: immutable.inputHash,
+      publishedMetadataHash: immutable.metadataHash,
+      publishedTotalAllocatedRaw: immutable.totalAllocatedRaw,
+      startsAtRaw: immutable.startsAtRaw,
+      expiresAtRaw: immutable.expiresAtRaw,
+      startsAt: new Date(Number(immutable.startsAtRaw) * 1_000),
+      expiresAt: new Date(Number(immutable.expiresAtRaw) * 1_000),
+      totalClaimedRaw: existing?.totalClaimedRaw ?? '0',
+      claimedCount: existing?.claimedCount ?? 0,
+      closed: existing.status === 'closed' ? true : false,
+      updatedAt: now(),
+    };
     await collection(store, 'reward_claim_batches').updateOne(
       { batchId },
       {
-        $setOnInsert: {
-          _id: batchId,
-          batchId,
-          chain: event.chain,
-          contractAddress: event.contractAddress,
-          ...immutable,
-          status: 'published',
-          publicationEventId: event._id,
-          publicationTransactionHash: event.txHash,
-          publicationBlockNumber: event.blockNumber,
-          publishedAt: observedAt,
-          createdAt: now(),
-        },
+        $set: publication,
       },
-      { upsert: true },
     );
     return null;
   }
@@ -1324,6 +1351,8 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
         $setOnInsert: {
           _id: event._id,
           eventId: event._id,
+          chain: event.chain,
+          contractAddress: event.contractAddress,
           batchId,
           walletAddress: account,
           walletNormalized: accountNormalized,
@@ -1331,7 +1360,8 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
           transactionHash: event.txHash,
           logIndex: event.logIndex,
           blockNumber: event.blockNumber,
-          claimedAt: observedAt,
+          blockHash: event.blockHash,
+          indexedAt: observedAt,
           createdAt: now(),
         },
       },

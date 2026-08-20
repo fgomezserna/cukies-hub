@@ -28,7 +28,7 @@ export type TreasureHuntEconomyRun = {
   walletNormalized: string;
   status: TreasureHuntRunStatus;
   policyVersion: "treasure-hunt-staging-v1";
-  gameRuleVersion: "staging-test-v3";
+  gameRuleVersion: "staging-test-v4";
   reservedAt: Date;
   startedAt: Date;
   dailyPeriodId: string;

@@ -72,7 +72,7 @@ Review the launch threat model before each deploy candidate:
 
 - `packages/contracts/docs/THREAT_MODEL.md`
 
-The current model covers `UKIToken`, `Presale` and `VestingVault`. `UKIStaking` and `RewardsDistributor` need their own threat-model update before those contracts can be considered launch-ready.
+The current model covers `UKIToken`, `Presale`, `VestingVault`, `UKIStaking` and `RewardsDistributor`. Mainnet reward publication still requires an approved Safe/multisig operating policy and independent audit evidence.
 
 ## Manual review checklist
 

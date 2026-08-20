@@ -1,19 +1,16 @@
 # UKI contracts threat model
 
-Estado: baseline pre-testnet.
+Estado: contratos implementados; operacion mainnet pendiente de Safe y auditoria.
 Issue: #127 `UKI-081.2`.
 Fecha: 2026-05-13.
 
 ## Scope
 
-This threat model covers the currently implemented sale contracts:
+This threat model covers the currently implemented contracts:
 
 - `UKIToken`
 - `Presale`
 - `VestingVault`
-
-It also records launch blockers for planned contracts that are not implemented yet:
-
 - `UKIStaking`
 - `RewardsDistributor`
 
@@ -28,8 +25,8 @@ The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an i
 | Buyer UKI allocations | `Presale` + `VestingVault` | Over-allocation, vesting bypass, or release accounting error. |
 | Team/advisor/ecosystem vesting | `VestingVault` | Unauthorized schedule creation or early release. |
 | Admin permissions | Owner/admin roles | Hot wallet compromise or accidental role assignment. |
-| Future reward claims | `RewardsDistributor` | Double claim, malicious root, or invalid proof domain. |
-| Future UKI staking state | `UKIStaking` | Stake accounting mismatch, unlock bypass, or snapshot manipulation. |
+| Reward claims | `RewardsDistributor` | Double claim, malicious root, invalid proof domain or unfunded batch. |
+| UKI staking state | `UKIStaking` | Stake accounting mismatch or snapshot/indexer manipulation. |
 
 ## Trust boundaries
 
@@ -60,9 +57,9 @@ The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an i
 | T14 | Sale opens before approved launch | Purchases can begin before the team has explicitly enabled the sale. | `buy()` requires `saleEnabled`; owner can disable the sale without changing timestamps. | Attach final preflight/deploy evidence that `saleEnabled()` matches the intended launch state. |
 | T15 | Role-holder invisibility | Required role holders can be checked, but extra role holders cannot be enumerated on-chain with the current vault. | `AccessControl` role checks and event logs exist. | Use enumerable/singleton roles or produce an auditable role-holder proof before launch. |
 | T16 | Legacy owner compromise | Legacy contracts may remain controlled by a risky EOA and create launch or brand risk if still in scope. | Ownership inventory documents known legacy owners. | Rotate to Safe or formally exclude legacy contracts from launch scope. |
-| T17 | Malicious rewards root | Future distributor could publish a root that overpays or excludes users. | Not implemented. | Block launch of rewards until root publication requires multisig, batch hash, input hash, period id, immutable root history and reproducible generation script. |
-| T18 | Double claim of rewards | Future distributor users claim same batch twice. | Not implemented. | `claimed[batchId][account]` or equivalent, domain-separated leaf, tests for repeated claim, wrong proof, wrong batch and amount tampering. |
-| T19 | Staking unlock bypass | Future staking users withdraw earlier than rules allow or snapshot sees wrong stake. | Not implemented. | Define stake lock model, emergency behavior, snapshot semantics and backend reconciliation before Cukie Master launch. |
+| T17 | Malicious rewards root | An owner could publish a root that overpays or excludes users. | Immutable `batchId`; event commits root, canonical input hash and metadata hash; generator is reproducible; the indexer rejects a publication without an exact authorized draft; the publisher consumes only final sealed accounting allocations. | Owner must be a Safe/multisig on mainnet, with independent calldata/root review and an approved funding/publication runbook. |
+| T18 | Double claim or unfunded rewards | A wallet repeats a claim, changes amount/domain, or a batch overcommits distributor funds. | `claimed[batchId][account]`, chain/distributor/batch domain-separated double-hash leaves, `totalReserved`, `freeBalance`, pre-funding and tests for repeat/wrong proof/wrong batch/wrong amount/cross-domain. | Rehearse publish, claim, expiry and close through the final Safe and monitor the BSC projection. |
+| T19 | Staking accounting or snapshot bypass | An unstake could leave a stale Cukie Master position or the indexer could credit the wrong cutoff. | `UKIStaking` is custodial and withdrawals are immediate by approved product decision; events expose absolute balances; credit snapshots use canonical cutoff blocks and fail closed on incomplete history. | Freeze the no-lock/no-cooldown rule, complete testnet stake/unstake/cutoff evidence and audit indexer recovery. |
 | T20 | Backend overrides on-chain truth | UI/support marks purchase, vesting or claim state incorrectly. | ADR assigns BSC as source of truth for transferable value. | Indexer must treat Mongo as cache; support actions need tx hash/event evidence. |
 
 ## Acceptance-criteria threats
@@ -70,7 +67,7 @@ The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an i
 ### Double claim
 
 Current vesting double release is mitigated by `releasedAmount` accounting in `VestingVault`.
-Future rewards double claim is not covered because `RewardsDistributor` is not implemented. Before rewards launch, the distributor must include batch-scoped claim tracking and tests for:
+Rewards double claim is mitigated by batch-scoped claim tracking and tests for:
 
 - same wallet claiming the same batch twice,
 - same proof with modified amount,
@@ -79,13 +76,14 @@ Future rewards double claim is not covered because `RewardsDistributor` is not i
 
 ### Malicious root
 
-`RewardsDistributor` is not implemented, so root publication must stay blocked. The minimum accepted design is:
+`RewardsDistributor` and its staging-only publisher implement the accepted design:
 
-- root publication by multisig or tightly scoped role,
+- root publication by the contract owner; mainnet must use a multisig/Safe,
 - immutable `batchId` or monotonic period id,
 - event with `batchId`, `root`, input hash and metadata URI/hash,
 - reproducible Merkle input generator,
-- documented approval before root publication,
+- durable funding/publication transactions and exact indexer evidence,
+- documented approval before mainnet root publication,
 - rollback policy that does not allow silently replacing a claimable batch after users start claiming.
 
 ### Admin key compromise

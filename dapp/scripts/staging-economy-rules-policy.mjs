@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 
 export const STAGING_ECONOMY_RULESET = Object.freeze({
-  id: 'staging-test-v3',
+  id: 'staging-test-v4',
   activeFrom: '2026-08-10T00:00:00.000Z',
   rewardVersion: 'rewards-staging-test-v3',
-  creditVersion: 'credits-staging-test-v3',
+  creditVersion: 'credits-staging-test-v4',
   gameId: 'treasure-hunt',
-  gameVersion: 'staging-test-v3',
+  gameVersion: 'staging-test-v4',
   rankingVersion: 'weekly-ranking-staging-test-v1',
 });
 
-export const STAGING_ECONOMY_CONFIRMATION = 'APPLY_STAGING_TESTNET_97_RULES_V3';
+export const STAGING_ECONOMY_CONFIRMATION = 'APPLY_STAGING_TESTNET_97_RULES_V4';
 
 const STAGING_RESOURCE_UUID = 'u4s804o4wwcckowgk0woo4wg';
 const STAGING_DATABASE = 'cukieshub-new-staging';
@@ -24,6 +24,7 @@ const FALSE_RUNTIME_GATES = [
   'REWARD_DAILY_ACCOUNTING_ENABLED',
   'REWARD_WEEKLY_PAYOUT_ENABLED',
   'REWARD_POOL_TRANCHES_ENABLED',
+  'REWARD_BATCH_PUBLISHER_ENABLED',
 ];
 
 const SOURCE_ENVIRONMENT_KEYS = Object.freeze({
@@ -380,7 +381,9 @@ function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
     activeFrom,
     cutoffHourUtc: 14,
     cutoffMinuteUtc: 0,
-    settlementHourUtc: 16,
+    // Competition credits become spendable at the 14:00 UTC boundary. UKI,
+    // pool and accounting settlement remains a separate 16:00 UTC process.
+    settlementHourUtc: 14,
     settlementMinuteUtc: 0,
     maxSnapshotLatenessMs: 30 * 60 * 1000,
     sourceFreshnessMs: 15 * 60 * 1000,

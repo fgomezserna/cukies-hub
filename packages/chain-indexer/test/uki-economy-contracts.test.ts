@@ -451,11 +451,31 @@ test('staking projector keeps absolute latest balances and rejects stale overwri
 
 test('rewards projector materializes publish, claim and close idempotently', async () => {
   const context = fakeStore();
+  const merkleRoot = `0x${'c'.repeat(64)}`;
+  const inputHash = `0x${'d'.repeat(64)}`;
+  const metadataHash = `0x${'e'.repeat(64)}`;
+  await context.store.db.collection('reward_claim_batches').insertOne({
+    _id: 'draft:rewards',
+    batchId: BATCH_ID,
+    merkleRoot,
+    canonicalInputHash: inputHash,
+    metadataHash,
+    totalAllocatedRaw: '100',
+    startsAtRaw: '200',
+    expiresAtRaw: '300',
+    proofSetHash: 'proof-set',
+    periodSealId: 'period-seal',
+    publishedProofSetHash: 'proof-set',
+    publishedPeriodSealId: 'period-seal',
+    publishAuthorized: true,
+    previewOnly: false,
+    status: 'draft',
+  });
   const publish = event('BatchPublished', {
     batchId: BATCH_ID,
-    merkleRoot: `0x${'c'.repeat(64)}`,
-    inputHash: `0x${'d'.repeat(64)}`,
-    metadataHash: `0x${'e'.repeat(64)}`,
+    merkleRoot,
+    inputHash,
+    metadataHash,
     totalAllocatedRaw: '100',
     startsAtRaw: '200',
     expiresAtRaw: '300',
@@ -473,12 +493,34 @@ test('rewards projector materializes publish, claim and close idempotently', asy
   await projectRewardsDistributorEvent(context.store as never, claim);
   await projectRewardsDistributorEvent(context.store as never, claim);
   await projectRewardsDistributorEvent(context.store as never, close);
+  await projectRewardsDistributorEvent(context.store as never, publish);
 
   assert.equal(context.collections.get('reward_claim_batches')?.documents.size, 1);
   assert.equal(context.collections.get('reward_claims')?.documents.size, 1);
-  assert.equal(
-    [...context.collections.get('reward_claim_batches')!.documents.values()][0].status,
-    'closed',
+  const batch = [...context.collections.get('reward_claim_batches')!.documents.values()][0];
+  assert.equal(batch.status, 'closed');
+  assert.equal(batch.publicationBlockHash, publish.blockHash);
+  const projectedClaim = [...context.collections.get('reward_claims')!.documents.values()][0];
+  assert.equal(projectedClaim.chain, 'BSC');
+  assert.equal(projectedClaim.contractAddress, REWARDS);
+  assert.equal(projectedClaim.blockHash, claim.blockHash);
+  assert.deepEqual(projectedClaim.indexedAt, new Date(claim.timestampMs));
+});
+
+test('rewards projector rejects an on-chain batch without an authorized draft', async () => {
+  const context = fakeStore();
+  const publish = event('BatchPublished', {
+    batchId: BATCH_ID,
+    merkleRoot: `0x${'c'.repeat(64)}`,
+    inputHash: `0x${'d'.repeat(64)}`,
+    metadataHash: `0x${'e'.repeat(64)}`,
+    totalAllocatedRaw: '100',
+    startsAtRaw: '200',
+    expiresAtRaw: '300',
+  }, 10);
+  await assert.rejects(
+    projectRewardsDistributorEvent(context.store as never, publish),
+    /no tiene draft autorizado/,
   );
 });
 

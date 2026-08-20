@@ -101,6 +101,7 @@ describe('economy indexes', () => {
         'reward_claim_proofs:{"batchId":1,"walletNormalized":1}',
         'reward_claim_batches:{"draftKey":1}',
         'reward_claim_batches:{"batchId":1}',
+        'reward_publication_plans:{"accountingId":1}',
         'reward_claims:{"batchId":1,"walletNormalized":1}',
         'reward_claims:{"transactionHash":1,"logIndex":1}',
         'uki_staking_positions:{"walletNormalized":1}',

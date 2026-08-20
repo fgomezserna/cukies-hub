@@ -89,7 +89,7 @@ Trabajo pendiente en Coolify:
 
 - completar el cutover desde las bases logicas staging del host compartido a `cukies-staging-rs0`, sin leer ni escribir las bases live,
 - sustituir las integraciones externas deshabilitadas por credenciales realmente exclusivas cuando QA las necesite,
-- mantener los seis schedulers desplegados con gates independientes hasta aprobar y cargar sus reglas,
+- mantener los seis schedulers economicos y el publicador de batches desplegados con gates independientes,
 - documentar rollback por commit y por variables para cada promocion a `main`.
 
 Nada de esto debe usar secrets en el repo.
@@ -248,6 +248,28 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK` | `123359171` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Gate de finalidad para las proyecciones UKI. |
 
+### Publicador de rewards en staging
+
+`reward-batch-publisher` usa la misma imagen versionada que la Dapp, pero es un
+proceso separado. Consume únicamente `reward_accounting_allocations` finales,
+prefonda `RewardsDistributor`, publica el batch y ejecuta por separado la
+transferencia a tesorería, la reserva única de marketing/desarrollo y la quema.
+UKI tiene supply fijo: este proceso materializa la reserva existente, no mintea.
+
+| Variable | Valor staging | Regla |
+| --- | --- | --- |
+| `REWARD_BATCH_PUBLISHER_ENABLED` | `false` hasta cargar autoridad | Gate explícito; nunca hereda el gate contable. |
+| `REWARD_BATCH_PUBLISHER_EXPECTED_SIGNER_ADDRESS` | owner de `RewardsDistributor` | La clave debe resolver exactamente a esta address y el preflight vuelve a contrastarla on-chain. |
+| `REWARD_BATCH_PUBLISHER_PRIVATE_KEY` | secreto Coolify pendiente | Solo se inyecta en el contenedor del publicador; no en Dapp, indexer ni schedulers. |
+| `REWARD_BATCH_PUBLISHER_CONFIRMATIONS` | `12` | Cada operación queda firmada de forma durable antes del broadcast y confirmada antes de avanzar. |
+| `REWARD_BATCH_CLAIM_WINDOW_SECONDS` | `7776000` | Ventana inicial de 90 días para staging. |
+
+El worker rechaza cualquier entorno que no sea rama `staging`, recurso
+`u4s804o4wwcckowgk0woo4wg`, base `cukieshub-new-staging` y BSC Testnet `97`.
+El canary aislado del 20-08-2026 desplegó token/distributor temporales, publicó
+el batch `0xb0ea3773...1dd7f` (`0x5d44635e...9503`) y reclamó exactamente 10
+tokens (`0xa4e92d08...e104`). Los contratos UKI activos no se tocaron.
+
 El indexer no marca un cursor UKI como `verified` por confiar en la configuracion. En cada arranque comprueba chain ID, receipt de despliegue, address, bloque y hash del bytecode runtime; despues sella el checkpoint canonico y la identidad de configuracion en los cursores. `VestingCreated` y `TokensReleased` se guardan en un ledger inmutable y reconstruyen la posicion por wallet/schedule, de modo que un replay repara una escritura parcial sin duplicar importes.
 
 `TOKEN` sigue siendo la fuente legacy verificada de staging y no se modifica. La nueva colección custodiable está desplegada e indexada como `TOKEN_V2`, con address, start/deployment block, transaction hash, runtime code hash y cursores independientes. Los vaults de Cukie Master y Cukie Pool aplican el mismo sellado de identidad. El deployment Coolify `1136` (`2df68a6`) confirmó los 13 cursores de los tres aliases nuevos en chain `97`; los cuatro cursores de `TOKEN` y `UKI_STAKING` conservaron sus direcciones, bloques, estados `verified` y avance sin reset.
@@ -291,14 +313,15 @@ Antes de considerar staging valido:
 - [x] Configurar HMAC distintas para administracion y juegos en staging y ejecutar dos veces el setup idempotente de economia v2.
 - [x] Implementar el ledger global fail-closed de presupuesto diario/acumulado, con fencing, replay por `sourceId` y auditoria de saldos; el runtime no contiene defaults ni activa schedulers (issue #213).
 - [x] Reconciliar `500,000 UKI/dia` como presupuesto fijo en staging, `450,000,000 UKI` como techo acumulado, transformaciones semanales sin doble emision y reparto no distribuido 80/10/10 con una unica reserva de marketing y desarrollo.
-- [x] Definir el ruleset exclusivo de prueba `staging-test-v1`: inicio `2026-08-10T00:00:00.000Z`, frontera `00:00 UTC`, gracia de 24h y siete destinos sink `0x97...`; los parametros equivalentes de produccion siguen sin aprobar (PR #226, merge `509ef4ca`).
+- [x] Versionar el ruleset exclusivo hasta `staging-test-v4`: periodos y entrega de créditos a las 14:00 UTC, cierre UKI/pools a las 16:00 UTC, gracia de catch-up auditable y siete destinos sink `0x97...`; los parámetros equivalentes de producción siguen sin aprobar.
 - [x] Implementar un bootstrap atomico `plan/apply` para rewards, competition credits, Treasure Hunt y ranking, con replay idempotente y rechazo de chain, base, recurso, gates o cursores no verificados (PR #226).
 - [x] Auditar y cerrar el motor de requisito dinamico: capacidad llena, gracia fija de 48h, proteccion, barrido paginado y cierre de ronda versionado (#61; implementado en PR #209).
 - [x] Desplegar `TOKEN_V2` y los dos vaults NFT, añadir sus aliases sin retirar `TOKEN` ni `UKI_STAKING` y verificar 13 cursores nuevos más cuatro conservados en chain `97` (deployment Coolify `1136`, commit `2df68a6`).
 - [ ] Ejecutar `pnpm staging:economy:rules:plan` y despues `pnpm staging:economy:rules:apply`; repetir el plan y exigir cuatro acciones `replay`.
 - [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para Cukie Master, creditos, Game Economy, Cukie Pool y ranking; comprobar fencing, idempotencia, auditoria y ausencia de escrituras fuera de staging.
 - [ ] Habilitar como maximo un scheduler, observar al menos dos ciclos y volver a apagarlo antes de avanzar al siguiente.
-- [x] Desplegar los seis schedulers con gates independientes y verificar guardas, credencial limitada y ausencia de ejecucion cuando cada gate esta apagado.
+- [x] Desplegar los seis schedulers economicos con gates independientes y verificar guardas, credencial limitada y ausencia de ejecucion cuando cada gate esta apagado.
+- [ ] Desplegar `reward-batch-publisher` apagado y cargar la autoridad testnet del owner `0xba84...7820` por canal secreto antes del primer batch UKI real; no reutilizar la clave del deployer mainnet.
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
 - [x] Provisionar bucket MinIO, hostname publico, prefijo y credenciales exclusivos de staging; validar setup, upload/render real y limpieza completa del fixture.
 - [x] Desplegar URLs de card inmutables (#216), repetir dos regeneraciones con hashes distintos, limpiar el fixture y activar el profile `card-worker` solo en la app 28 (PR #217; despliegue 1109).
@@ -306,7 +329,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloqueo NFT es ejecutar desde una wallet QA el smoke firmado approve/deposit/withdraw de Cukie Master y el flujo deposit/request-exit/withdraw del Cukie Pool respetando el corte. A continuacion se ejecuta el bootstrap `staging-test-v1` con todos los gates apagados, se prueban fencing e idempotencia mediante ticks manuales y se habilita como maximo un scheduler cada vez. Las integraciones externas propias de staging siguen siendo ampliaciones separadas; no bloquean la version de prueba base.
+El siguiente bloqueo NFT es ejecutar desde una wallet QA el smoke firmado approve/deposit/withdraw de Cukie Master y el flujo deposit/request-exit/withdraw del Cukie Pool respetando el corte. Para rewards on-chain queda cargar por canal secreto la autoridad testnet exacta del owner y ejecutar el primer batch UKI real; el canary aislado ya prueba funding, publicación y claim sin tocar los contratos activos.
 
 ## Gates para produccion
 

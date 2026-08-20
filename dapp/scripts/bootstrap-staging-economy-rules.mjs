@@ -104,7 +104,13 @@ async function inspectRules(db, rules, session) {
         )
         && typeof overlap._id === 'string'
         && overlap.activeFrom instanceof Date
-        && overlap.activeFrom < rule.activeFrom
+        && rule.createdAt instanceof Date
+        && rule.createdAt < rule.activeFrom
+        // A not-yet-effective staging rule can be superseded at the exact
+        // same boundary. Its active interval becomes empty and no runtime can
+        // ever select it. Once effective, the strict earlier-boundary path is
+        // still required so historical semantics remain immutable.
+        && overlap.activeFrom <= rule.activeFrom
       ) {
         actions.push({ ...spec, rule, action: 'insert', supersedesId: overlap._id });
       } else {

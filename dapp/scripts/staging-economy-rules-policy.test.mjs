@@ -40,6 +40,7 @@ function environment(overrides = {}) {
     REWARD_DAILY_ACCOUNTING_ENABLED: 'false',
     REWARD_WEEKLY_PAYOUT_ENABLED: 'false',
     REWARD_POOL_TRANCHES_ENABLED: 'false',
+    REWARD_BATCH_PUBLISHER_ENABLED: 'false',
     CHAIN_INDEXER_UKI_STAKING_ADDRESS: SOURCE_ADDRESSES.UKI_STAKING,
     CHAIN_INDEXER_VESTING_VAULT_ADDRESS: SOURCE_ADDRESSES.VESTING_VAULT,
     CHAIN_INDEXER_TOKEN_ADDRESS: SOURCE_ADDRESSES.TOKEN,
@@ -102,7 +103,7 @@ function cursors(now = new Date('2026-08-06T12:00:00.000Z')) {
   );
 }
 
-test('builds the immutable staging ruleset with v3 credit and game semantics', () => {
+test('builds the immutable staging ruleset with v4 credit and game semantics', () => {
   const now = new Date('2026-08-06T12:00:00.000Z');
   const rules = buildStagingEconomyRuleSet({ environment: environment(), cursors: cursors(now), now });
 
@@ -132,11 +133,13 @@ test('builds the immutable staging ruleset with v3 credit and game semantics', (
     convertibleUnits: 75,
   });
   assert.equal(rules.credit.expectedBscChainId, 97);
-  assert.equal(rules.credit.version, 'credits-staging-test-v3');
+  assert.equal(rules.credit.version, 'credits-staging-test-v4');
   assert.equal(rules.credit.activeFrom.toISOString(), '2026-08-10T14:00:00.000Z');
   assert.equal(rules.credit.creditsPerSlot, 100);
+  assert.equal(rules.credit.cutoffHourUtc, 14);
+  assert.equal(rules.credit.settlementHourUtc, 14);
   assert.equal(rules.game.gameId, 'treasure-hunt');
-  assert.equal(rules.game.version, 'staging-test-v3');
+  assert.equal(rules.game.version, 'staging-test-v4');
   assert.equal(rules.game.activeFrom.toISOString(), rules.credit.activeFrom.toISOString());
   assert.equal(rules.game.credit.creditRuleVersion, rules.credit.version);
   assert.equal(rules.game.credit.creditRuleConfigHash, rules.credit.configHash);

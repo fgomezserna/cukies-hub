@@ -14,6 +14,7 @@
     "init-chat-rooms": "node scripts/init-chat-rooms-with-env.mjs",
     "test": "jest",
     "test:schedulers": "node --test scripts/*scheduler-policy.test.mjs",
+    "test:reward-publisher": "node --test scripts/reward-batch-publisher-policy.test.mjs scripts/lib/reward-batch-publication.test.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },

@@ -24,7 +24,7 @@ function setup() {
 function setupTreasureHunt() {
   const treasureRule = testGameEconomyRule({
     gameId: "treasure-hunt",
-    version: "staging-test-v3",
+    version: "staging-test-v4",
     cukie: {
       required: true,
       consumeOnSettle: true,
@@ -50,7 +50,7 @@ async function createStartedTreasureHunt(
     walletAddress: WALLET,
     gameId: "treasure-hunt",
     cukieAssetIds: ["cukie-1"],
-    expectedRuleVersion: "staging-test-v3",
+    expectedRuleVersion: "staging-test-v4",
     idempotencyKey: "treasure-create",
     now: NOW,
   });
@@ -241,7 +241,7 @@ describe("multi-game economy session saga", () => {
       walletAddress: WALLET,
       gameId: "treasure-hunt",
       cukieAssetIds: ["cukie-cross-cutoff"],
-      expectedRuleVersion: "staging-test-v3",
+      expectedRuleVersion: "staging-test-v4",
       idempotencyKey: "treasure-cross-cutoff-create",
       now: reservedAt,
     });

@@ -86,9 +86,9 @@ si el modelo real es lock/escrow o burn/mint y auditar los privilegios legacy.
 
 ## Estado revisable: creditos de competicion y pool de creditos
 
-Fecha de comprobacion: 2026-08-15.
+Fecha de comprobacion: 2026-08-20.
 
-Veredicto: la vertical v3 está cerrada en código para probarla en staging. Los
+Veredicto: la vertical v4 está cerrada en código para probarla en staging. Los
 gates permiten activar por separado snapshots/créditos, sesiones de juego,
 ranking y cierres de rewards. Un fallo de una ruta UKI/NFT, una fuente tardía o
 un cierre incompleto queda pendiente y no genera una liquidación parcial.
@@ -102,11 +102,13 @@ un cierre incompleto queda pendiente y no genera una liquidación parcial.
 | Reparto | Cierre a las 16:00, garantía sobre ordinario + tramo previo, 5% ambassador del pago final y 80/10/10 de residuos. | Funding/publicación on-chain siguen separados del cálculo off-chain. |
 | Semanal | Mejor score raw por wallet, 60/30/10, entropía BSC, payout lunes 17 y pools en siete tramos martes-lunes a las 16. | Publicación on-chain de los allocations ya sellados. |
 | Economia de partida | `G=0..7.5`, `2` al bote semanal, `0.4` ambassador ordinario y `0.1` ambassador semanal; cuotas 30/10 solo con créditos prestados. | Ninguno para la prueba funcional v3. |
-| Claims | Ledger plano por wallet, `RewardsDistributor`, Merkle y API de proofs implementados. | Funding verificado y publicación automatizada de batches; no forma parte del cierre off-chain de las 16:00. |
+| Claims | Allocations finales de los cierres diario/semanal, Merkle reproducible, API de proofs y worker testnet-only implementados. El worker separa claims, transferencias 80/10 y quema 10, firma de forma durable y espera evidencia del indexador. | En el distributor UKI activo de staging falta cargar de forma segura la clave de su owner `0xba84...7820`; hasta entonces `REWARD_BATCH_PUBLISHER_ENABLED=false`. El canary aislado BSC97 publicó y reclamó 10 tokens de prueba el 20-08-2026 (`publish 0x5d44635e...9503`, `claim 0xa4e92d08...e104`). |
 
 Reglas vigentes para la implementacion:
 
 - Periodo diario `[14:00 UTC, 14:00 UTC siguiente)`.
+- Los 100 creditos por cupo se hacen disponibles en el propio corte de las
+  14:00 UTC; no esperan al cierre economico.
 - El reparto se intenta desde las 16:00 UTC; si faltan datos queda pendiente y
   se recupera con el mismo `periodId`.
 - 100 creditos por slot elegible tras al menos 24 horas y en el primer corte
@@ -116,11 +118,11 @@ Reglas vigentes para la implementacion:
 - UKI y NFT deben sellarse y recuperarse de forma independiente.
 - Treasure Hunt consume 10 creditos y separa nominalmente 7.5/2/0.5 UKI.
 
-En staging la API existe y exige sesion wallet, pero
-`COMPETITION_CREDITS_RUNTIME_ENABLED` permanece apagado. La activacion segura
-requiere primero cerrar los gaps anteriores, crear la regla versionada de
-14:00/16:00, ejecutar un tick manual controlado y auditar runs, ledger, lotes,
-pool, expiraciones y batches antes de encender el scheduler.
+La regla `credits-staging-test-v4` separa explícitamente entrega de créditos a
+las 14:00 y liquidación UKI/pools a las 16:00. El publicador de batches es un
+worker independiente: su secreto no se comparte con la Dapp y no puede arrancar
+en mainnet, otra base, otra rama, otra chain o con una clave que no resuelva a la
+wallet owner esperada.
 
 ## Regla Cukie Master
 

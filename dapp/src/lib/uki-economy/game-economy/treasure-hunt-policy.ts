@@ -1,7 +1,7 @@
 export const TREASURE_HUNT_ECONOMY_POLICY = Object.freeze({
   policyVersion: "treasure-hunt-staging-v1",
   gameId: "treasure-hunt",
-  gameRuleVersion: "staging-test-v3",
+  gameRuleVersion: "staging-test-v4",
   cutoffHourUtc: 14,
   cutoffMinuteUtc: 0,
   weekStartsOnUtcDay: 1,

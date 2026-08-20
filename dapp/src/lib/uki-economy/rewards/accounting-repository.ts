@@ -407,7 +407,7 @@ export function createMongoRewardAccountingRepository(
           $match: {
             status: "settled",
             gameId: "treasure-hunt",
-            "rule.version": "staging-test-v3",
+            "rule.version": "staging-test-v4",
             createdAt: { $gte: startsAt, $lt: endsAt },
           },
         },

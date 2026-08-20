@@ -165,4 +165,4 @@ Sale parameters are not contract-frozen by design. Live changes to `treasury`, `
 - BscScan verification evidence is missing.
 - Slither/static analysis evidence is missing.
 - External audit or independent security review is missing.
-- `UKIStaking` and `RewardsDistributor` are not part of the current sale freeze and need separate freeze gates when implemented.
+- `UKIStaking` and `RewardsDistributor` are not part of the current sale freeze; their implemented code and operational roles require a separate rewards/staking freeze before mainnet.
