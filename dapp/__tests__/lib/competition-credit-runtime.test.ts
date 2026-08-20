@@ -204,6 +204,32 @@ describe('competition credit runtime', () => {
     expect(runtimeServices.openRun).not.toHaveBeenCalled();
   });
 
+  it('reports a healthy waiting tick before the first eligible settlement', async () => {
+    const coordinator = new MemoryCoordinator();
+    const runtimeServices = services({
+      findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(null),
+    });
+
+    const result = await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(result.status).toBe('waiting');
+    expect(result.routeResults).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'waiting', creditRunId: '' }),
+      expect.objectContaining({ route: 'nft', status: 'waiting', creditRunId: '' }),
+    ]);
+    expect(runtimeServices.refreshSourceWatermark).not.toHaveBeenCalled();
+    expect(runtimeServices.createDailyRun).not.toHaveBeenCalled();
+    expect(coordinator.failed).toHaveLength(0);
+    expect(coordinator.finished).toHaveLength(1);
+  });
+
   it('rejects an overlapping tick before mutating the economy', async () => {
     const coordinator = new MemoryCoordinator();
     coordinator.busy = true;

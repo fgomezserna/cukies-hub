@@ -1983,7 +1983,7 @@ export function createCompetitionCreditService(
         ? current.cutoff
         : new Date(current.cutoff.getTime() - 24 * 60 * 60 * 1000);
     if (candidateCutoff.getTime() > eligibleCutoff.getTime()) {
-      throw new DomainConflictError("Aun no existe un periodo liquidable a las 16:00 UTC.");
+      return null;
     }
     return mappedTransaction(runner, async (repository) => {
       const historicalRule = await repository.findRuleAt(candidateCutoff);

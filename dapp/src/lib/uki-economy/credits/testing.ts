@@ -278,6 +278,10 @@ export class MemoryCompetitionCreditRepository
     return found[0] ? clone(found[0]) : null;
   }
 
+  async findRuleByVersion(version: string) {
+    return clone(this.state.rules.find((rule) => rule.version === version) ?? null);
+  }
+
   async findOldestRule() {
     return clone(
       [...this.state.rules]

@@ -66,6 +66,7 @@ export interface CompetitionCreditRepository {
     at: Date,
     expectedVersion?: string
   ): Promise<CompetitionCreditRule | null>;
+  findRuleByVersion(version: string): Promise<CompetitionCreditRule | null>;
   findOldestRule(): Promise<CompetitionCreditRule | null>;
   readSnapshotGate(
     rule: CompetitionCreditRule,
@@ -450,6 +451,10 @@ export function createMongoCompetitionCreditRepository(
       if (expectedVersion && found[0]?.version !== expectedVersion) return null;
       return found[0] ?? null;
     },
+    findRuleByVersion: (version) => collections.rules.findOne(
+      { scope: CREDIT_RULE_SCOPE, version },
+      options
+    ),
     findOldestRule: () => collections.rules.findOne(
       { scope: CREDIT_RULE_SCOPE },
       { ...options, sort: { activeFrom: 1, _id: 1 } }

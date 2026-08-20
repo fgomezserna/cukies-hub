@@ -10,6 +10,7 @@ import {
   type ProcessCreditRunBatchInput,
 } from './service';
 import {
+  assertCompetitionCreditRule,
   assertRuleActiveAt,
   currentCompetitionCreditPeriod,
   validCreditDate,
@@ -110,7 +111,7 @@ export type CompetitionCreditRuntimeServices = Pick<
 
 export type CompetitionCreditRouteRuntimeResult = {
   route: CreditRoute;
-  status: 'open' | 'processing' | 'blocked';
+  status: 'waiting' | 'open' | 'processing' | 'blocked';
   periodId: string;
   creditRunId: string;
   batchesProcessed: number;
@@ -121,7 +122,7 @@ export type CompetitionCreditRouteRuntimeResult = {
 };
 
 export type CompetitionCreditRuntimeResult = {
-  status: 'open' | 'processing' | 'blocked';
+  status: 'waiting' | 'open' | 'processing' | 'blocked';
   periodId: string;
   creditRunId: string;
   batchesProcessed: number;
@@ -384,13 +385,19 @@ async function loadRule(
   expectedRuleVersion: string,
   runner = mongoCompetitionCreditTransactionRunner,
 ) {
-  const rule = await runner((repository) => repository.findRuleAt(now, expectedRuleVersion));
+  const rule = await runner(async (repository) =>
+    await repository.findRuleAt(now, expectedRuleVersion)
+      ?? await repository.findRuleByVersion(expectedRuleVersion)
+  );
   if (!rule) {
     throw new CompetitionCreditRuntimeConfigurationError(
       `No existe una regla activa de creditos con version ${expectedRuleVersion}.`,
     );
   }
-  return assertRuleActiveAt(rule, now);
+  const validated = assertCompetitionCreditRule(rule);
+  return now.getTime() < validated.activeFrom.getTime()
+    ? validated
+    : assertRuleActiveAt(validated, now);
 }
 
 export async function runCompetitionCreditRuntimeTick(input: {
@@ -434,6 +441,19 @@ export async function runCompetitionCreditRuntimeTick(input: {
           rule,
           now: snapshotNow,
         });
+        if (!period) {
+          const waitingPeriod = currentCompetitionCreditPeriod(snapshotNow, rule);
+          routeResults.push({
+            route,
+            status: 'waiting',
+            periodId: waitingPeriod.periodId,
+            creditRunId: '',
+            batchesProcessed: 0,
+            itemsApplied: 0,
+            pendingItems: 0,
+          });
+          continue;
+        }
         const watermarkNow = validClockDate(clock);
         lease = await coordinator.renew(lease, watermarkNow, config.leaseMs);
         await services.refreshSourceWatermark({
@@ -530,6 +550,8 @@ export async function runCompetitionCreditRuntimeTick(input: {
         ? 'blocked'
         : routeResults.some((route) => route.status === 'processing')
           ? 'processing'
+          : routeResults.every((route) => route.status === 'waiting')
+            ? 'waiting'
           : 'open',
       periodId: primary.periodId,
       creditRunId: primary.creditRunId,
