@@ -45,6 +45,8 @@ export type CompetitionCreditRule = {
   active: boolean;
   activeFrom: Date;
   activeUntil?: Date;
+  supersededByVersion?: string;
+  supersededReason?: 'unrecoverable_pre_migration';
   cutoffHourUtc: number;
   cutoffMinuteUtc: number;
   settlementHourUtc: number;

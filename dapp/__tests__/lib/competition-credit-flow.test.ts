@@ -147,6 +147,35 @@ function replaceWithFragmentedLots(input: {
 }
 
 describe("competition credit grant -> pool -> reservation flow", () => {
+  it("does not replay a rule marked unrecoverable by the schema migration", async () => {
+    const legacyRule = testCompetitionCreditRule({
+      _id: "competition-credits:legacy",
+      version: "credits-legacy",
+      activeFrom: new Date("2026-08-10T00:00:00.000Z"),
+      activeUntil: new Date("2026-08-21T14:00:00.000Z"),
+      supersededByVersion: "credits-v3",
+      supersededReason: "unrecoverable_pre_migration",
+    });
+    const currentRule = testCompetitionCreditRule({
+      _id: "competition-credits:v3",
+      version: "credits-v3",
+      activeFrom: new Date("2026-08-21T14:00:00.000Z"),
+      cutoffHourUtc: 14,
+      settlementHourUtc: 16,
+    });
+    const repository = new MemoryCompetitionCreditRepository({ rule: currentRule });
+    repository.state.rules = [legacyRule, currentRule];
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+
+    await expect(service.findOldestPendingRoutePeriod({
+      route: "uki",
+      rule: currentRule,
+      now: new Date("2026-08-20T18:00:00.000Z"),
+    })).resolves.toBeNull();
+  });
+
   it("includes a pre-cutoff chain event even when its slot projection is processed afterwards", async () => {
     const delayedSlot = slot({
       sourceBlockNumber: 998,

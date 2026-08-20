@@ -284,7 +284,8 @@ export class MemoryCompetitionCreditRepository
 
   async findOldestRule() {
     return clone(
-      [...this.state.rules]
+      this.state.rules
+        .filter((rule) => rule.supersededReason !== "unrecoverable_pre_migration")
         .sort((left, right) => left.activeFrom.getTime() - right.activeFrom.getTime())[0] ?? null
     );
   }

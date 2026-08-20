@@ -456,7 +456,10 @@ export function createMongoCompetitionCreditRepository(
       options
     ),
     findOldestRule: () => collections.rules.findOne(
-      { scope: CREDIT_RULE_SCOPE },
+      {
+        scope: CREDIT_RULE_SCOPE,
+        supersededReason: { $ne: 'unrecoverable_pre_migration' },
+      },
       { ...options, sort: { activeFrom: 1, _id: 1 } }
     ),
 
