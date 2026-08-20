@@ -319,9 +319,6 @@ importers:
 
   games/sybil-slayer:
     dependencies:
-      '@hyppie/game-bridge':
-        specifier: workspace:*
-        version: link:../../packages/game-bridge
       '@radix-ui/react-slot':
         specifier: ^1.1.2
         version: 1.2.3(@types/react@18.3.24)(react@18.3.1)
