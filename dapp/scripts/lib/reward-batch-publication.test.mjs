@@ -49,6 +49,14 @@ function allocation(index, category, walletNormalized, amountRaw) {
 }
 
 function input() {
+  const allocations = [
+    allocation(1, 'player', PLAYER, '20'),
+    allocation(2, 'ambassador_ordinary', PLAYER, '5'),
+    allocation(3, 'credit_pool', PLAYER_TWO, '10'),
+    allocation(4, 'treasury', TREASURY, '40'),
+    allocation(5, 'marketing_development', MARKETING, '15'),
+    allocation(6, 'supply_reduction', REDUCTION, '10'),
+  ];
   return {
     accountingId: 'reward-daily:2026-08-19',
     accounting: {
@@ -56,6 +64,14 @@ function input() {
       ruleVersion: 'rewards-staging-test-v3',
       payloadHash: 'a'.repeat(64),
       status: 'sealed',
+      allocations: allocations.map((entry) => ({
+        allocationId: entry.allocationId,
+        walletNormalized: entry.walletNormalized,
+        category: entry.category,
+        amountRaw: entry.amountRaw,
+        fundingMode: entry.fundingMode,
+        sourceIds: entry.sourceIds,
+      })),
     },
     rule: {
       version: 'rewards-staging-test-v3',
@@ -66,14 +82,7 @@ function input() {
         supplyReduction: REDUCTION,
       },
     },
-    allocations: [
-      allocation(1, 'player', PLAYER, '20'),
-      allocation(2, 'ambassador_ordinary', PLAYER, '5'),
-      allocation(3, 'credit_pool', PLAYER_TWO, '10'),
-      allocation(4, 'treasury', TREASURY, '40'),
-      allocation(5, 'marketing_development', MARKETING, '15'),
-      allocation(6, 'supply_reduction', REDUCTION, '10'),
-    ],
+    allocations,
     chainId: 97,
     tokenAddress: TOKEN,
     distributorAddress: DISTRIBUTOR,
@@ -138,5 +147,34 @@ test('rechaza una allocation manipulada o un destino de sistema incorrecto', () 
 
   const wrongDestination = input();
   wrongDestination.allocations[3] = allocation(4, 'treasury', PLAYER, '40');
+  wrongDestination.accounting.allocations[3] = {
+    allocationId: wrongDestination.allocations[3].allocationId,
+    walletNormalized: wrongDestination.allocations[3].walletNormalized,
+    category: wrongDestination.allocations[3].category,
+    amountRaw: wrongDestination.allocations[3].amountRaw,
+    fundingMode: wrongDestination.allocations[3].fundingMode,
+    sourceIds: wrongDestination.allocations[3].sourceIds,
+  };
   assert.throws(() => buildRewardPublicationArtifacts(wrongDestination), /destino treasury/);
+});
+
+test('rechaza una allocation extra aunque su documento tenga un hash valido', () => {
+  const injected = input();
+  injected.allocations.push(allocation(7, 'player', PLAYER_TWO, '1'));
+  assert.throws(
+    () => buildRewardPublicationArtifacts(injected),
+    /no coinciden con su cierre sellado/,
+  );
+
+  const unknown = input();
+  unknown.allocations[0] = allocation(1, 'future_system_bucket', PLAYER, '20');
+  unknown.accounting.allocations[0] = {
+    allocationId: unknown.allocations[0].allocationId,
+    walletNormalized: unknown.allocations[0].walletNormalized,
+    category: unknown.allocations[0].category,
+    amountRaw: unknown.allocations[0].amountRaw,
+    fundingMode: unknown.allocations[0].fundingMode,
+    sourceIds: unknown.allocations[0].sourceIds,
+  };
+  assert.throws(() => buildRewardPublicationArtifacts(unknown), /no es canonica/);
 });

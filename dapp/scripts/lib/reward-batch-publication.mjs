@@ -14,6 +14,18 @@ const SYSTEM_CATEGORIES = new Set([
   'marketing_development',
   'supply_reduction',
 ]);
+const CLAIMABLE_CATEGORIES = new Set([
+  'player',
+  'credit_pool',
+  'cukie_pool_original',
+  'cukie_pool_second_plus',
+  'ambassador_ordinary',
+  'ambassador_weekly',
+]);
+const ACCOUNTING_CATEGORIES = new Set([
+  ...SYSTEM_CATEGORIES,
+  ...CLAIMABLE_CATEGORIES,
+]);
 const RAW = /^(0|[1-9][0-9]*)$/;
 
 function stableValue(value) {
@@ -77,6 +89,7 @@ function validateAccountingAllocation(document, accountingId) {
     || document.accountingId !== accountingId
     || (document.accountingKind !== 'daily' && document.accountingKind !== 'weekly')
     || document.status !== 'allocated_offchain'
+    || !ACCOUNTING_CATEGORIES.has(document.category)
     || !Array.isArray(document.sourceIds)
     || new Set(document.sourceIds).size !== document.sourceIds.length
     || (document.fundingMode !== 'daily_emission' && document.fundingMode !== 'reserved_no_mint')
@@ -291,6 +304,26 @@ export function buildRewardPublicationArtifacts(input) {
     .map((allocation) => validateAccountingAllocation(allocation, input.accountingId))
     .sort((left, right) => left._id.localeCompare(right._id));
   if (allocations.length === 0) throw new Error('El cierre no contiene allocations finales.');
+  const sealedAllocations = Array.isArray(input.accounting.allocations)
+    ? [...input.accounting.allocations].sort((left, right) => (
+        left.allocationId.localeCompare(right.allocationId)
+      ))
+    : null;
+  const allocationDocuments = allocations.map((allocation) => ({
+    allocationId: allocation.allocationId,
+    walletNormalized: allocation.walletNormalized,
+    category: allocation.category,
+    amountRaw: allocation.amountRaw,
+    fundingMode: allocation.fundingMode,
+    sourceIds: allocation.sourceIds,
+  }));
+  if (
+    !sealedAllocations
+    || stableRewardPublicationHash(sealedAllocations)
+      !== stableRewardPublicationHash(allocationDocuments)
+  ) {
+    throw new Error(`Las allocations de ${input.accountingId} no coinciden con su cierre sellado.`);
+  }
   if (allocations.some((allocation) => allocation.availableAt > createdAt)) {
     throw new Error(`El cierre ${input.accountingId} aun no esta disponible para publicar.`);
   }
