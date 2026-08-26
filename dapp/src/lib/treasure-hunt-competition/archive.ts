@@ -241,6 +241,9 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
   if (Date.parse(input.createdAt) < Date.parse(input.source.exportedAt)) {
     throw new Error('Archive creation cannot predate source export');
   }
+  if (Date.parse(input.createdAt) > now.getTime()) {
+    throw new Error('Archive creation cannot be in the future');
+  }
   if (input.pool.status !== input.stage) {
     throw new Error('Archive pool status must match snapshot stage');
   }
@@ -305,11 +308,8 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
   if (input.totalParticipants === null || input.totalWallets === null) {
     throw new Error('Archive participant and ranked-wallet totals are required');
   }
-  if (
-    input.totalParticipants > input.entries.length
-    || input.totalWallets > input.entries.length
-  ) {
-    throw new Error('Archive participant totals cannot exceed ranked entries');
+  if (input.totalWallets > input.entries.length) {
+    throw new Error('Archive ranked-wallet total cannot exceed ranked entries');
   }
   if (input.totalWallets !== representedParticipants) {
     throw new Error('Archive ranked-wallet total must match unique public aliases');
@@ -317,13 +317,6 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
   if (input.totalParticipants < input.totalWallets) {
     throw new Error('Archive participant total cannot be lower than ranked wallets');
   }
-  if (
-    input.entries.length === 0
-    && (input.totalParticipants !== 0 || input.totalWallets !== 0)
-  ) {
-    throw new Error('An empty archive cannot declare represented participants or wallets');
-  }
-
   if (input.stage === 'final') {
     const unresolved = input.entries.find((entry) => (
       entry.reviewStatus === 'pending' || entry.reviewStatus === 'review'

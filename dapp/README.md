@@ -134,10 +134,12 @@ sin premio quedan resueltos con importe nulo o `0`; una fila premiada usa `final
 con un importe fijado.
 `totalParticipants` cuenta participantes de campaña (incluidos los que no lograron
 fila clasificatoria); `totalWallets` cuenta wallets clasificadas y debe coincidir
-con los aliases públicos únicos. Ambos deben ser `0` en un archivo vacío. El payload
+con los aliases públicos únicos. El payload
 real de preventa, por ejemplo, representa 952 filas, 214 aliases clasificados y 241
-participantes. `createdAt` es la creación del snapshot y no puede
-preceder a `source.exportedAt`; la exportación tampoco puede preceder al cierre.
+participantes. En un ranking vacío `totalWallets` es `0`, pero puede haber inscritos
+en `totalParticipants`. `createdAt` es la creación del snapshot y no puede
+preceder a `source.exportedAt`; la exportación tampoco puede preceder al cierre y
+el snapshot no puede estar fechado después del momento de importación.
 La completitud se valida contra `totalRankedEntries`, ranks contiguos, IDs únicos y
 hashes del export sanitizado. Sin consultar la base de origen no es posible probar
 que el exportador omitió una fila; por eso el total del export debe obtenerse de la

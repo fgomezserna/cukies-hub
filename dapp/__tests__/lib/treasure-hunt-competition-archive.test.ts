@@ -94,9 +94,34 @@ function finalInput() {
   return value;
 }
 
-function fakeDb() {
+function matchesMongoFilter(
+  record: Record<string, unknown>,
+  filter: Record<string, unknown>,
+): boolean {
+  return Object.entries(filter).every(([key, expected]) => {
+    if (key === '$or') {
+      return (expected as Record<string, unknown>[]).some((candidate) => (
+        matchesMongoFilter(record, candidate)
+      ));
+    }
+    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
+      const operators = expected as { $lte?: unknown; $exists?: boolean };
+      if ('$lte' in operators) {
+        return typeof record[key] === 'string'
+          && typeof operators.$lte === 'string'
+          && record[key] <= operators.$lte;
+      }
+      if ('$exists' in operators) {
+        return (record[key] !== undefined) === operators.$exists;
+      }
+    }
+    return record[key] === expected;
+  });
+}
+
+function fakeDb(initialManifest: Record<string, unknown> | null = null) {
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-  let manifest: Record<string, unknown> | null = null;
+  let manifest: Record<string, unknown> | null = initialManifest && clone(initialManifest);
   let entries: Record<string, unknown>[] = [];
   const manifestCollection = {
     createIndexes: jest.fn().mockResolvedValue([]),
@@ -106,8 +131,11 @@ function fakeDb() {
       return { acknowledged: true };
     }),
     findOne: jest.fn(async () => manifest && clone(manifest)),
-    updateOne: jest.fn(async (_filter: unknown, update: { $set: Record<string, unknown> }) => {
-      if (!manifest || manifest.publicationStatus !== 'building') return { modifiedCount: 0 };
+    updateOne: jest.fn(async (
+      filter: Record<string, unknown>,
+      update: { $set: Record<string, unknown> },
+    ) => {
+      if (!manifest || !matchesMongoFilter(manifest, filter)) return { modifiedCount: 0 };
       manifest = { ...manifest, ...update.$set };
       return { modifiedCount: 1 };
     }),
@@ -246,6 +274,13 @@ describe('Competition ranking archive integrity', () => {
     ['creation before export', () => input({
       createdAt: '2026-08-26T08:59:59.999Z',
     }), /creation cannot predate/],
+    ['creation in the future', () => input({
+      createdAt: '2026-08-26T12:00:00.001Z',
+    }), /cannot be in the future/],
+    ['export and creation in the future', () => input({
+      createdAt: '2026-08-26T12:00:00.002Z',
+      source: { ...input().source, exportedAt: '2026-08-26T12:00:00.001Z' },
+    }), /cannot be in the future/],
   ])('rejects incoherent snapshot chronology: %s', (_label, build, expected) => {
     expect(() => prepared(build())).toThrow(expected);
   });
@@ -281,21 +316,21 @@ describe('Competition ranking archive integrity', () => {
   });
 
   it('reconciles ranked wallets with aliases while allowing more campaign participants', () => {
-    const value = input({ totalParticipants: 2, totalWallets: 1 });
+    const value = input({ totalParticipants: 500, totalWallets: 1 });
     expect(() => prepared(value)).not.toThrow();
     expect(() => prepared(input({ totalParticipants: 1, totalWallets: 2 })))
       .toThrow(/ranked-wallet total/);
   });
 
-  it('accepts a legitimate empty final archive only with zero participant totals', () => {
+  it('accepts an empty final ranking with registered participants but no ranked wallet', () => {
     const value = finalInput();
     value.entries = [];
     value.totalRankedEntries = 0;
-    value.totalParticipants = 0;
+    value.totalParticipants = 241;
     value.totalWallets = 0;
     expect(() => prepared(value)).not.toThrow();
 
-    value.totalParticipants = 1;
+    value.totalWallets = 1;
     expect(() => prepared(value)).toThrow(/cannot exceed ranked entries/);
   });
 
@@ -414,31 +449,56 @@ describe('Competition ranking archive integrity', () => {
 
   it('does not let a concurrent writer take over an active identical build', async () => {
     const archive = prepared();
-    const insertOne = jest.fn().mockRejectedValue({ code: 11000 });
-    const updateOne = jest.fn().mockResolvedValue({ modifiedCount: 0 });
-    const repository = new MongoCompetitionRankingArchiveRepository(async () => ({
-      collection: jest.fn((name: string) => (
-        name === 'competition_ranking_archives'
-          ? {
-            createIndexes: jest.fn(),
-            insertOne,
-            findOne: jest.fn(async () => ({
-              ...archive.manifest,
-              publicationStatus: 'building',
-              buildId: archive.manifest.outputHash,
-              writerToken: 'other-writer',
-              leaseExpiresAt: '2099-01-01T00:00:00.000Z',
-            })),
-            updateOne,
-          }
-          : { createIndexes: jest.fn() }
-      )),
-    }) as never);
+    const database = fakeDb({
+      ...archive.manifest,
+      publicationStatus: 'building',
+      buildId: archive.manifest.outputHash,
+      writerToken: 'other-writer',
+      leaseExpiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    const repository = new MongoCompetitionRankingArchiveRepository(
+      async () => database.db as never,
+    );
 
     await expect(repository.writeSnapshot(archive)).rejects.toBeInstanceOf(
       CompetitionRankingArchiveBuildInProgressError,
     );
-    expect(updateOne).toHaveBeenCalledTimes(1);
+    expect(database.manifestCollection.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        publicationStatus: 'building',
+        $or: expect.any(Array),
+      }),
+      expect.objectContaining({ $set: expect.objectContaining({ writerToken: expect.any(String) }) }),
+    );
+    expect(database.getManifest()).toMatchObject({ writerToken: 'other-writer' });
+    expect(database.getEntries()).toHaveLength(0);
+  });
+
+  it('takes over an expired build and publishes only with the new writer token', async () => {
+    const archive = prepared();
+    const database = fakeDb({
+      ...archive.manifest,
+      publicationStatus: 'building',
+      buildId: archive.manifest.outputHash,
+      writerToken: 'expired-writer',
+      leaseExpiresAt: '1970-01-01T00:00:00.000Z',
+    });
+    const repository = new MongoCompetitionRankingArchiveRepository(
+      async () => database.db as never,
+    );
+
+    await expect(repository.writeSnapshot(archive)).resolves.toMatchObject({ created: true });
+    const stored = database.getManifest();
+    expect(stored).toMatchObject({ publicationStatus: 'ready' });
+    expect(stored?.writerToken).not.toBe('expired-writer');
+    const publicationCall = database.manifestCollection.updateOne.mock.calls.find(
+      ([, update]) => update.$set.publicationStatus === 'ready',
+    );
+    expect(publicationCall?.[0]).toEqual(expect.objectContaining({
+      writerToken: stored?.writerToken,
+      publicationStatus: 'building',
+    }));
+    expect(database.getEntries()).toHaveLength(2);
   });
 
   it('uses an allowlist projection and strips unexpected private Mongo fields on reads', async () => {
