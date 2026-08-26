@@ -1,8 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { useTreasureHuntCompetitionHistory } from '@/hooks/use-treasure-hunt-competition-history';
+import type { TreasureHuntCompetitionArchiveManifest } from '@/hooks/use-treasure-hunt-competition-history';
 
-function manifest(campaignId: string) {
+function manifest(
+  campaignId: string,
+  overrides: Partial<TreasureHuntCompetitionArchiveManifest> = {},
+) {
   return {
     schemaVersion: 1,
     campaignId,
@@ -30,6 +34,7 @@ function manifest(campaignId: string) {
     inputHash: `sha256:${'a'.repeat(64)}`,
     outputHash: `sha256:${'b'.repeat(64)}`,
     publicationStatus: 'ready',
+    ...overrides,
   } as const;
 }
 
@@ -62,7 +67,8 @@ describe('useTreasureHuntCompetitionHistory', () => {
   });
 
   it('selecciona la primera edición y pagina el detalle por los endpoints congelados', async () => {
-    const archive = manifest('campaign-1');
+    const archive = manifest('campaign-1', { totalRankedEntries: 11 });
+    const pageTwoEntry = { ...entry, rank: 11, publicEntryId: 'entry-11' };
     const fetchMock = jest.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/history?page=1&pageSize=100')) {
@@ -75,7 +81,7 @@ describe('useTreasureHuntCompetitionHistory', () => {
       return jsonResponse({
         success: true,
         archive,
-        entries: [entry],
+        entries: [pageTwoEntry],
         pagination: { page: 2, pageSize: 10, total: 11, totalPages: 2 },
       });
     });
@@ -110,6 +116,95 @@ describe('useTreasureHuntCompetitionHistory', () => {
     ));
     expect(result.current.archives).toEqual([]);
     expect(result.current.selectedCampaignId).toBeNull();
+  });
+
+  it('carga y valida todas las páginas del selector', async () => {
+    const archives = Array.from({ length: 101 }, (_, index) => manifest(`campaign-${index + 1}`));
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/history?page=1&pageSize=100')) {
+        return jsonResponse({
+          success: true,
+          archives: archives.slice(0, 100),
+          pagination: { page: 1, pageSize: 100, total: 101, totalPages: 2 },
+        });
+      }
+      if (url.endsWith('/history?page=2&pageSize=100')) {
+        return jsonResponse({
+          success: true,
+          archives: archives.slice(100),
+          pagination: { page: 2, pageSize: 100, total: 101, totalPages: 2 },
+        });
+      }
+      return jsonResponse({
+        success: true,
+        archive: archives[0],
+        entries: [entry],
+        pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      });
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const { result } = renderHook(() => useTreasureHuntCompetitionHistory());
+
+    await waitFor(() => expect(result.current.archives).toHaveLength(101));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    expect(result.current.selectedCampaignId).toBe('campaign-1');
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      '/api/games/treasure-hunt/competition/history?page=1&pageSize=100',
+      '/api/games/treasure-hunt/competition/history?page=2&pageSize=100',
+      '/api/games/treasure-hunt/competition/history/campaign-1?page=1&pageSize=20',
+    ]);
+  });
+
+  it('rechaza un selector multipágina truncado', async () => {
+    const archives = Array.from({ length: 100 }, (_, index) => manifest(`campaign-${index + 1}`));
+    global.fetch = jest.fn((input: RequestInfo | URL) => (
+      String(input).endsWith('/history?page=1&pageSize=100')
+        ? jsonResponse({
+          success: true,
+          archives,
+          pagination: { page: 1, pageSize: 100, total: 101, totalPages: 2 },
+        })
+        : jsonResponse({
+          success: true,
+          archives: [],
+          pagination: { page: 2, pageSize: 100, total: 101, totalPages: 2 },
+        })
+    )) as typeof fetch;
+
+    const { result } = renderHook(() => useTreasureHuntCompetitionHistory());
+
+    await waitFor(() => expect(result.current.listError).toBe(
+      'No se pudieron cargar las ediciones finalizadas.',
+    ));
+    expect(result.current.archives).toEqual([]);
+  });
+
+  it.each([
+    ['page', { page: 2, pageSize: 20, total: 1, totalPages: 1 }, [entry]],
+    ['pageSize', { page: 1, pageSize: 10, total: 1, totalPages: 1 }, [entry]],
+    ['total', { page: 1, pageSize: 20, total: 2, totalPages: 1 }, [entry]],
+    ['cardinality', { page: 1, pageSize: 20, total: 1, totalPages: 1 }, []],
+    ['rank', { page: 1, pageSize: 20, total: 1, totalPages: 1 }, [{ ...entry, rank: 2 }]],
+  ])('rechaza un detalle con %s contradictorio', async (_case, pagination, entries) => {
+    const archive = manifest('campaign-1');
+    global.fetch = jest.fn((input: RequestInfo | URL) => (
+      String(input).endsWith('/history?page=1&pageSize=100')
+        ? jsonResponse({
+          success: true,
+          archives: [archive],
+          pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        })
+        : jsonResponse({ success: true, archive, entries, pagination })
+    )) as typeof fetch;
+
+    const { result } = renderHook(() => useTreasureHuntCompetitionHistory());
+
+    await waitFor(() => expect(result.current.detailError).toBe(
+      'No se pudo cargar la clasificación de esta edición.',
+    ));
+    expect(result.current.archive).toBeNull();
   });
 
   it('vuelve a la primera edición si la selección desaparece al recargar', async () => {

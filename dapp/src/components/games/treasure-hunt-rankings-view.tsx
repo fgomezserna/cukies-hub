@@ -56,6 +56,8 @@ function ActiveTreasureHuntRankingsView() {
       leaderboardMineOnly: filter === 'mine',
     });
   const campaign = status?.campaign;
+  const isUkiStaking = campaign?.eligibilityKind === 'uki_staking';
+  const isPresale = campaign?.eligibilityKind === 'presale';
   const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
   const eligibility = status?.eligibility;
   const myAttempts = eligibility?.topAttemptsCount ?? leaderboardMeta?.myAttempts ?? 0;
@@ -76,20 +78,22 @@ function ActiveTreasureHuntRankingsView() {
     setPage(1);
   }, [filter]);
 
-  const metrics = [
-    ['Tus tickets', isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0)],
-    ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
-    [
-      'Bote provisional',
-      isLoading && !leaderboardMeta ? '···' : prizePoolValue,
-    ],
-    [
-      'Premios disponibles',
-      isLoading && !leaderboardMeta
-        ? '···'
-        : availablePrizeSlots?.toLocaleString('es-ES') ?? '—',
-    ],
-  ] as const;
+  const metrics: readonly (readonly [string, string])[] = isUkiStaking
+    ? [
+      ['Tus tickets', isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0)],
+      ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
+      ['Bote provisional', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
+      [
+        'Premios disponibles',
+        isLoading && !leaderboardMeta
+          ? '···'
+          : availablePrizeSlots?.toLocaleString('es-ES') ?? '—',
+      ],
+    ]
+    : [
+      ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
+      ['Premio acumulado', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
+    ];
 
   return (
     <>
@@ -113,7 +117,7 @@ function ActiveTreasureHuntRankingsView() {
               Competición oficial
             </p>
             <h3 className="mt-1 font-headline text-2xl font-black tracking-[-0.02em] text-[#f1eee8]">
-              Treasure Hunt · Staking UKI
+              Treasure Hunt · {isUkiStaking ? 'Staking UKI' : isPresale ? 'Torneo de preventa' : 'Competición'}
             </h3>
           </div>
           <Link
@@ -124,7 +128,10 @@ function ActiveTreasureHuntRankingsView() {
           </Link>
         </header>
 
-        <dl className="grid grid-cols-2 gap-px border-b border-white/15 bg-white/15 sm:grid-cols-4">
+        <dl className={cn(
+          'grid grid-cols-2 gap-px border-b border-white/15 bg-white/15',
+          isUkiStaking && 'sm:grid-cols-4',
+        )}>
           {metrics.map(([label, value]) => (
             <div
               key={label}
@@ -139,9 +146,11 @@ function ActiveTreasureHuntRankingsView() {
             </div>
           ))}
         </dl>
-        <p className="border-b border-white/15 px-4 py-2 text-[11px] leading-relaxed text-[#969994] sm:px-5">
-          Premios disponibles es una estimación provisional de slots según el bote actual; no son ganadores confirmados.
-        </p>
+        {isUkiStaking ? (
+          <p className="border-b border-white/15 px-4 py-2 text-[11px] leading-relaxed text-[#969994] sm:px-5">
+            Premios disponibles es una estimación provisional de slots según el bote actual; no son ganadores confirmados.
+          </p>
+        ) : null}
 
         <div
           id="mi-participacion"
@@ -169,7 +178,9 @@ function ActiveTreasureHuntRankingsView() {
             ))}
           </div>
           <p className="text-xs text-[#969994]">
-            Cada {campaign?.pointsPerTicket ?? 100} puntos completos genera un ticket; cuentan hasta {maxAttempts} partidas.
+            {isUkiStaking
+              ? `Cada ${campaign?.pointsPerTicket ?? 100} puntos completos genera un ticket; cuentan hasta ${maxAttempts} partidas.`
+              : `Cuentan hasta ${maxAttempts} partidas válidas por wallet.`}
           </p>
         </div>
 
@@ -206,7 +217,7 @@ function ActiveTreasureHuntRankingsView() {
                     {formatTreasureHuntDuration(entry.gameTimeMs)}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                    <span className="text-[#969994]">Tickets</span>
+                    <span className="text-[#969994]">{isUkiStaking ? 'Tickets' : 'Premio/resultado'}</span>
                     <strong className={cn(
                       'font-mono text-sm',
                       entry.rewardStatus === 'pool_exhausted'
@@ -229,7 +240,7 @@ function ActiveTreasureHuntRankingsView() {
                     <th className="px-5 py-3">Jugador</th>
                     <th className="px-5 py-3 text-right">Puntuación</th>
                     <th className="px-5 py-3 text-right">Tiempo</th>
-                    <th className="px-5 py-3 text-right">Tickets</th>
+                    <th className="px-5 py-3 text-right">{isUkiStaking ? 'Tickets' : 'Premio/resultado'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">

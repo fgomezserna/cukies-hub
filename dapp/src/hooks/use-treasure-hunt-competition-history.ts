@@ -235,6 +235,30 @@ function isHistoryDetailResponse(value: unknown): value is HistoryDetailResponse
   return true;
 }
 
+function expectedPageCardinality(pagination: TreasureHuntCompetitionArchivePagination) {
+  if (pagination.total === 0 || pagination.page > pagination.totalPages) return 0;
+  const offset = (pagination.page - 1) * pagination.pageSize;
+  return Math.min(pagination.pageSize, pagination.total - offset);
+}
+
+function isExpectedHistoryDetail(
+  value: unknown,
+  expected: { readonly campaignId: string; readonly page: number; readonly pageSize: number },
+): value is HistoryDetailResponse {
+  if (!isHistoryDetailResponse(value)) return false;
+  const { archive, entries, pagination } = value;
+  if (
+    archive.campaignId !== expected.campaignId
+    || pagination.page !== expected.page
+    || pagination.pageSize !== expected.pageSize
+    || pagination.total !== archive.totalRankedEntries
+    || entries.length !== expectedPageCardinality(pagination)
+  ) return false;
+  if (pagination.total === 0 || pagination.page > pagination.totalPages) return entries.length === 0;
+  const firstRank = ((pagination.page - 1) * pagination.pageSize) + 1;
+  return entries.every((entry, index) => entry.rank === firstRank + index);
+}
+
 async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
@@ -276,6 +300,13 @@ export function useTreasureHuntCompetitionHistory(options?: {
         if (!response.ok || !isHistoryListResponse(body)) {
           throw new Error('No se pudieron cargar las ediciones finalizadas.');
         }
+        if (
+          body.pagination.page !== 1
+          || body.pagination.pageSize !== ARCHIVE_LIST_PAGE_SIZE
+          || body.archives.length !== expectedPageCardinality(body.pagination)
+        ) {
+          throw new Error('No se pudieron cargar las ediciones finalizadas.');
+        }
         if (body.pagination.totalPages > MAX_ARCHIVE_LIST_PAGES) {
           throw new Error('El histórico supera el límite de ediciones consultables.');
         }
@@ -293,6 +324,7 @@ export function useTreasureHuntCompetitionHistory(options?: {
             || nextBody.pagination.pageSize !== body.pagination.pageSize
             || nextBody.pagination.total !== body.pagination.total
             || nextBody.pagination.totalPages !== body.pagination.totalPages
+            || nextBody.archives.length !== expectedPageCardinality(nextBody.pagination)
           ) {
             throw new Error('No se pudieron cargar las ediciones finalizadas.');
           }
@@ -300,6 +332,9 @@ export function useTreasureHuntCompetitionHistory(options?: {
         }
         if (new Set(allArchives.map((item) => item.campaignId)).size !== allArchives.length) {
           throw new Error('El histórico contiene ediciones duplicadas.');
+        }
+        if (allArchives.length !== body.pagination.total) {
+          throw new Error('El histórico no contiene todas las ediciones anunciadas.');
         }
         if (controller.signal.aborted) return;
         setArchives(allArchives);
@@ -343,11 +378,12 @@ export function useTreasureHuntCompetitionHistory(options?: {
           { cache: 'no-store', credentials: 'same-origin', signal: controller.signal },
         );
         const body = await readJson(response);
-        if (!response.ok || !isHistoryDetailResponse(body)) {
+        if (!response.ok || !isExpectedHistoryDetail(body, {
+          campaignId: selectedCampaignId as string,
+          page,
+          pageSize,
+        })) {
           throw new Error('No se pudo cargar la clasificación de esta edición.');
-        }
-        if (body.archive.campaignId !== selectedCampaignId) {
-          throw new Error('La edición recibida no coincide con la seleccionada.');
         }
         if (!controller.signal.aborted) {
           setArchive(body.archive);

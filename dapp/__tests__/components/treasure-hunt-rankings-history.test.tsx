@@ -6,6 +6,8 @@ import TreasureHuntRankingsView, {
 } from '@/components/games/treasure-hunt-rankings-view';
 import type { TreasureHuntCompetitionArchiveEntry } from '@/hooks/use-treasure-hunt-competition-history';
 
+let mockActiveEligibilityKind: 'presale' | 'uki_staking' = 'uki_staking';
+
 jest.mock('lucide-react', () => ({
   Archive: () => null,
   ArrowRight: () => null,
@@ -18,6 +20,7 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   useTreasureHuntCompetitionOverview: () => ({
     status: {
       campaign: {
+        eligibilityKind: mockActiveEligibilityKind,
         topAttemptsPerWallet: 10,
         pointsPerTicket: 100,
         prizePerWinnerUkiRaw: '10000000000000000000000',
@@ -86,6 +89,42 @@ const entry: TreasureHuntCompetitionArchiveEntry = {
   tickets: null,
 };
 
+const stakingManifest = {
+  ...manifest,
+  campaignId: 'uki-staking-treasure-hunt-202608',
+  rulesVersion: 'staking-v1',
+  eligibilityKind: 'uki_staking',
+  pool: {
+    status: 'provisional',
+    totalUkiRaw: '10000000000000000000000',
+    playerUkiRaw: '10000000000000000000000',
+    sponsorUkiRaw: '0',
+  },
+  rewardMetadata: {
+    model: 'staking_draw',
+    playerPoolUkiRaw: '10000000000000000000000',
+    sponsorPoolUkiRaw: '0',
+    prizePerWinnerUkiRaw: '1000000000000000000000',
+  },
+  totalRankedEntries: 1,
+  totalParticipants: 1,
+  totalWallets: 1,
+} as const;
+
+function pageEntries(page: number) {
+  const offset = (page - 1) * 20;
+  return Array.from({ length: 20 }, (_, index): TreasureHuntCompetitionArchiveEntry => {
+    const rank = offset + index + 1;
+    return {
+      ...entry,
+      rank,
+      publicEntryId: `public-entry-${rank}`,
+      attemptId: rank === 1 ? 'private-attempt-1' : null,
+      playerAlias: rank === 1 ? 'CukieLegend' : `Player${rank}`,
+    };
+  });
+}
+
 function jsonResponse(value: unknown, status = 200) {
   return Promise.resolve(new Response(JSON.stringify(value), {
     status,
@@ -93,7 +132,7 @@ function jsonResponse(value: unknown, status = 200) {
   }));
 }
 
-function installSuccessfulHistoryFetch(entries: readonly TreasureHuntCompetitionArchiveEntry[] = [entry]) {
+function installSuccessfulHistoryFetch() {
   const fetchMock = jest.fn((input: RequestInfo | URL) => {
     const url = String(input);
     if (url === '/api/games/treasure-hunt/competition/history?page=1&pageSize=100') {
@@ -104,11 +143,12 @@ function installSuccessfulHistoryFetch(entries: readonly TreasureHuntCompetition
       });
     }
     if (url.includes('/competition/history/uki-presale-treasure-hunt-production-20260729')) {
+      const page = Number(new URL(url, 'https://cukies.test').searchParams.get('page'));
       return jsonResponse({
         success: true,
         archive: manifest,
-        entries,
-        pagination: { page: 1, pageSize: 20, total: manifest.totalRankedEntries, totalPages: 48 },
+        entries: pageEntries(page),
+        pagination: { page, pageSize: 20, total: manifest.totalRankedEntries, totalPages: 48 },
       });
     }
     throw new Error(`Unexpected request: ${url}`);
@@ -118,6 +158,10 @@ function installSuccessfulHistoryFetch(entries: readonly TreasureHuntCompetition
 }
 
 describe('histórico de Rankings de Treasure Hunt', () => {
+  beforeEach(() => {
+    mockActiveEligibilityKind = 'uki_staking';
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -146,6 +190,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     expect(screen.getAllByText('CukieLegend')).toHaveLength(2);
     expect(screen.queryByText('private-attempt-1')).not.toBeInTheDocument();
     expect(screen.queryByText('private-audit-source')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/\bganadores?\b/i);
 
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('columnheader').map((item) => item.textContent)).toEqual([
@@ -160,6 +205,26 @@ describe('histórico de Rankings de Treasure Hunt', () => {
       '/api/games/treasure-hunt/competition/history/uki-presale-treasure-hunt-production-20260729?page=1&pageSize=20',
     ]);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/leaderboard'))).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/games/treasure-hunt/competition/history/uki-presale-treasure-hunt-production-20260729?page=2&pageSize=20',
+      expect.any(Object),
+    ));
+    expect(await screen.findAllByText('Player21')).toHaveLength(2);
+  });
+
+  it('no aplica semántica de staking ni slots a una competición activa de preventa', () => {
+    mockActiveEligibilityKind = 'presale';
+    render(<TreasureHuntRankingsView />);
+
+    expect(screen.getByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).toBeInTheDocument();
+    expect(screen.getByText('Premio acumulado')).toBeInTheDocument();
+    expect(screen.queryByText('Premios disponibles')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bote provisional')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tus tickets')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Staking UKI/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/genera un ticket/)).not.toBeInTheDocument();
   });
 
   it('muestra el estado vacío del histórico', async () => {
@@ -173,6 +238,114 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
 
     expect(await screen.findByText('Aún no hay ediciones publicadas')).toBeInTheDocument();
+  });
+
+  it('selecciona la primera edición y permite cambiar a otra', async () => {
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/history?page=1&pageSize=100')) {
+        return jsonResponse({
+          success: true,
+          archives: [manifest, stakingManifest],
+          pagination: { page: 1, pageSize: 100, total: 2, totalPages: 1 },
+        });
+      }
+      if (url.includes(stakingManifest.campaignId)) {
+        return jsonResponse({
+          success: true,
+          archive: stakingManifest,
+          entries: [{ ...entry, rewardStatus: 'draw_pending', tickets: 25 }],
+          pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+        });
+      }
+      return jsonResponse({
+        success: true,
+        archive: manifest,
+        entries: pageEntries(1),
+        pagination: { page: 1, pageSize: 20, total: 952, totalPages: 48 },
+      });
+    });
+    global.fetch = fetchMock as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+
+    const selector = await screen.findByRole('combobox', { name: 'Edición finalizada' });
+    expect(selector).toHaveValue(manifest.campaignId);
+    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).toBeInTheDocument();
+
+    fireEvent.change(selector, { target: { value: stakingManifest.campaignId } });
+    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Staking UKI' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/games/treasure-hunt/competition/history/${stakingManifest.campaignId}?page=1&pageSize=20`,
+      expect.any(Object),
+    );
+  });
+
+  it('distingue resultados finales de una clasificación provisional', async () => {
+    const finalManifest = {
+      ...manifest,
+      campaignId: 'presale-final',
+      stage: 'final',
+      pool: { ...manifest.pool, status: 'final' },
+      totalRankedEntries: 1,
+      totalParticipants: 1,
+      totalWallets: 1,
+    } as const;
+    const finalEntry = {
+      ...entry,
+      reviewStatus: 'valid',
+      rewardStatus: 'final',
+      finalRewardUkiRaw: '2500000000000000000000',
+    } as const;
+    global.fetch = jest.fn((input: RequestInfo | URL) => (
+      String(input).endsWith('/history?page=1&pageSize=100')
+        ? jsonResponse({
+          success: true,
+          archives: [finalManifest],
+          pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        })
+        : jsonResponse({
+          success: true,
+          archive: finalManifest,
+          entries: [finalEntry],
+          pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+        })
+    )) as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+
+    expect(await screen.findByText('Final')).toBeInTheDocument();
+    expect(screen.getByText(/Resultados definitivos de la edición/)).toBeInTheDocument();
+    expect(screen.queryByText('Provisional')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Clasificación congelada al cierre/)).not.toBeInTheDocument();
+  });
+
+  it('muestra una edición válida sin entradas', async () => {
+    const emptyManifest = {
+      ...manifest,
+      campaignId: 'empty-campaign',
+      totalRankedEntries: 0,
+      totalParticipants: 0,
+      totalWallets: 0,
+    } as const;
+    global.fetch = jest.fn((input: RequestInfo | URL) => (
+      String(input).endsWith('/history?page=1&pageSize=100')
+        ? jsonResponse({
+          success: true,
+          archives: [emptyManifest],
+          pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        })
+        : jsonResponse({
+          success: true,
+          archive: emptyManifest,
+          entries: [],
+          pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+        })
+    )) as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+
+    expect(await screen.findByText('Esta edición no tiene entradas clasificadas')).toBeInTheDocument();
   });
 
   it('muestra un error validado y permite reintentar la lista', async () => {
@@ -191,8 +364,8 @@ describe('histórico de Rankings de Treasure Hunt', () => {
         return jsonResponse({
           success: true,
           archive: manifest,
-          entries: [entry],
-          pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+          entries: pageEntries(1),
+          pagination: { page: 1, pageSize: 20, total: 952, totalPages: 48 },
         });
       });
     global.fetch = fetchMock as typeof fetch;
