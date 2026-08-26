@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock3, Medal } from 'lucide-react';
 
+import TreasureHuntHistoryView from '@/components/games/treasure-hunt-history-view';
 import {
   formatTreasureHuntDuration,
   type TreasureHuntLeaderboardEntry,
@@ -13,7 +14,23 @@ import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { cn } from '@/lib/utils';
 
 type RankingFilter = 'general' | 'mine';
+type RankingPeriod = 'active' | 'finished';
 const PAGE_SIZE = 20;
+
+export function calculateAvailablePrizeSlots(
+  poolUkiRaw: string | null | undefined,
+  prizePerWinnerUkiRaw: string | null | undefined,
+) {
+  if (!poolUkiRaw || !prizePerWinnerUkiRaw) return null;
+  try {
+    const pool = BigInt(poolUkiRaw);
+    const prizePerWinner = BigInt(prizePerWinnerUkiRaw);
+    if (pool < BigInt(0) || prizePerWinner <= BigInt(0)) return null;
+    return pool / prizePerWinner;
+  } catch {
+    return null;
+  }
+}
 
 function rewardLabel(entry: TreasureHuntLeaderboardEntry) {
   if (entry.rewardStatus === 'draw_pending') return `${entry.tickets.toLocaleString('es-ES')} tickets`;
@@ -29,7 +46,7 @@ function pageNumbers(currentPage: number, totalPages: number) {
   return Array.from({ length: last - first + 1 }, (_, index) => first + index);
 }
 
-export default function TreasureHuntRankingsView() {
+function ActiveTreasureHuntRankingsView() {
   const [filter, setFilter] = useState<RankingFilter>('general');
   const [page, setPage] = useState(1);
   const { status, leaderboard, leaderboardMeta, isLoading, error, reload } =
@@ -46,6 +63,10 @@ export default function TreasureHuntRankingsView() {
     ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw)
     : 'Actualizando…';
   const pagination = leaderboardMeta?.pagination;
+  const availablePrizeSlots = calculateAvailablePrizeSlots(
+    leaderboardMeta?.poolUkiRaw,
+    campaign?.prizePerWinnerUkiRaw,
+  );
 
   useEffect(() => {
     if (window.location.hash === '#mi-participacion') setFilter('mine');
@@ -56,36 +77,36 @@ export default function TreasureHuntRankingsView() {
   }, [filter]);
 
   const metrics = [
-    ['Tus tickets', isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0), true],
-    ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`, false],
+    ['Tus tickets', isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0)],
+    ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
     [
-      'Premio acumulado',
+      'Bote provisional',
       isLoading && !leaderboardMeta ? '···' : prizePoolValue,
-      false,
+    ],
+    [
+      'Premios disponibles',
+      isLoading && !leaderboardMeta
+        ? '···'
+        : availablePrizeSlots?.toLocaleString('es-ES') ?? '—',
     ],
   ] as const;
 
   return (
-    <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
-      <div className="mb-4">
-        <h2 className="font-headline text-2xl font-black tracking-[-0.025em] text-[#f2eee7]">
-          Rankings de Treasure Hunt
-        </h2>
-        <p className="mt-1 text-sm text-[#aaa8a2]">
-          Las diez mejores partidas válidas por wallet, ordenadas por puntuación.
-        </p>
-      </div>
-
+    <>
       {error ? (
         <div role="alert" className="mb-4 flex items-center justify-between gap-4 rounded-[7px] border border-red-300/30 bg-red-950/25 px-4 py-3 text-sm text-red-100">
           <span>{error}</span>
-          <button type="button" onClick={reload} className="font-bold text-[#35eee2]">
+          <button
+            type="button"
+            onClick={reload}
+            className="min-h-10 rounded-[5px] px-2 font-bold text-[#35eee2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
+          >
             Reintentar
           </button>
         </div>
       ) : null}
 
-      <main className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94">
+      <section className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/15 px-5 py-5">
           <div>
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.15em] text-[#35eee2]">
@@ -97,20 +118,17 @@ export default function TreasureHuntRankingsView() {
           </div>
           <Link
             href="/games/treasure-hunt"
-            className="hidden min-h-11 items-center gap-2 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d5d57] px-5 text-sm font-bold text-white hover:bg-[#137069] sm:inline-flex"
+            className="hidden min-h-11 items-center gap-2 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d5d57] px-5 text-sm font-bold text-white hover:bg-[#137069] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] sm:inline-flex"
           >
             Jugar 1P <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </header>
 
-        <dl className="grid grid-cols-2 gap-px border-b border-white/15 bg-white/15 sm:grid-cols-3">
-          {metrics.map(([label, value, mobileHidden]) => (
+        <dl className="grid grid-cols-2 gap-px border-b border-white/15 bg-white/15 sm:grid-cols-4">
+          {metrics.map(([label, value]) => (
             <div
               key={label}
-              className={cn(
-                'min-w-0 bg-[#071312] px-3 py-3 sm:px-5 sm:py-4',
-                mobileHidden && 'hidden sm:block',
-              )}
+              className="min-w-0 bg-[#071312] px-3 py-3 sm:px-5 sm:py-4"
             >
               <dt className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#969994]">
                 {label}
@@ -121,6 +139,9 @@ export default function TreasureHuntRankingsView() {
             </div>
           ))}
         </dl>
+        <p className="border-b border-white/15 px-4 py-2 text-[11px] leading-relaxed text-[#969994] sm:px-5">
+          Premios disponibles es una estimación provisional de slots según el bote actual; no son ganadores confirmados.
+        </p>
 
         <div
           id="mi-participacion"
@@ -137,7 +158,7 @@ export default function TreasureHuntRankingsView() {
                 aria-pressed={filter === value}
                 onClick={() => setFilter(value)}
                 className={cn(
-                  'min-h-9 rounded-[5px] px-3 text-xs font-black transition',
+                  'min-h-9 rounded-[5px] px-3 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]',
                   filter === value
                     ? 'bg-[#35eee2]/15 text-[#35eee2]'
                     : 'text-[#969994] hover:text-[#f2eee7]',
@@ -260,7 +281,7 @@ export default function TreasureHuntRankingsView() {
                     type="button"
                     disabled={pagination.page <= 1}
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    className="min-h-10 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="min-h-10 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     Anterior
                   </button>
@@ -272,7 +293,7 @@ export default function TreasureHuntRankingsView() {
                       aria-label={`Página ${pageNumber}`}
                       onClick={() => setPage(pageNumber)}
                       className={cn(
-                        'min-h-10 min-w-10 rounded-[5px] border px-2 font-mono text-xs font-black',
+                        'min-h-10 min-w-10 rounded-[5px] border px-2 font-mono text-xs font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]',
                         pagination.page === pageNumber
                           ? 'border-[#35eee2]/60 bg-[#35eee2]/15 text-[#35eee2]'
                           : 'border-white/15 text-[#aaa8a2] hover:border-[#35eee2]/45',
@@ -285,7 +306,7 @@ export default function TreasureHuntRankingsView() {
                     type="button"
                     disabled={pagination.page >= pagination.totalPages}
                     onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
-                    className="min-h-10 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="min-h-10 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     Siguiente
                   </button>
@@ -294,7 +315,58 @@ export default function TreasureHuntRankingsView() {
             ) : null}
           </>
         )}
-      </main>
+      </section>
+    </>
+  );
+}
+
+export default function TreasureHuntRankingsView() {
+  const [period, setPeriod] = useState<RankingPeriod>('active');
+
+  return (
+    <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
+      <div className="mb-4">
+        <h2 className="font-headline text-2xl font-black tracking-[-0.025em] text-[#f2eee7]">
+          Rankings de Treasure Hunt
+        </h2>
+        <p className="mt-1 text-sm text-[#aaa8a2]">
+          Consulta la competición actual o las clasificaciones congeladas al cierre.
+        </p>
+      </div>
+
+      <div
+        className="mb-4 grid w-full grid-cols-2 rounded-[7px] border border-white/15 bg-black/20 p-1 sm:w-fit"
+        role="group"
+        aria-label="Estado de las competiciones"
+      >
+        {([
+          ['active', 'En curso'],
+          ['finished', 'Finalizadas'],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={period === value}
+            onClick={() => setPeriod(value)}
+            className={cn(
+              'min-h-10 rounded-[5px] px-4 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]',
+              period === value
+                ? 'bg-[#35eee2]/15 text-[#35eee2]'
+                : 'text-[#969994] hover:text-[#f2eee7]',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {period === 'active' ? (
+        <ActiveTreasureHuntRankingsView />
+      ) : (
+        <section className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94">
+          <TreasureHuntHistoryView />
+        </section>
+      )}
     </div>
   );
 }

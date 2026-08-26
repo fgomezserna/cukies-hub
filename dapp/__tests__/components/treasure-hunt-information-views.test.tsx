@@ -6,6 +6,7 @@ import TreasureHuntRulesView from '@/components/games/treasure-hunt-rules-view';
 import TreasureHuntProfile from '@/components/profile/treasure-hunt-profile';
 
 jest.mock('lucide-react', () => ({
+  Archive: () => null,
   ArrowRight: () => null,
   BarChart3: () => null,
   CalendarDays: () => null,
@@ -148,12 +149,17 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 }));
 
 describe('vistas UX de Treasure Hunt', () => {
-  it('muestra una única clasificación con las métricas del torneo', () => {
+  it('muestra por defecto la clasificación activa con las métricas del torneo', () => {
     const { container } = render(<TreasureHuntRankingsView />);
 
     expect(screen.getByText('Rankings de Treasure Hunt')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'En curso' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Finalizadas' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Mis partidas')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
+    expect(screen.getByText('Bote provisional')).toBeInTheDocument();
+    expect(screen.getByText('Premios disponibles')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
@@ -164,10 +170,9 @@ describe('vistas UX de Treasure Hunt', () => {
 
     const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
     expect(playLink).toHaveClass('hidden', 'sm:inline-flex');
-    expect(screen.getByText('Tus tickets').parentElement).toHaveClass('hidden', 'sm:block');
     expect(screen.getByText('Mejores partidas').closest('dl')).toHaveClass(
       'grid-cols-2',
-      'sm:grid-cols-3',
+      'sm:grid-cols-4',
     );
     expect(screen.getByRole('navigation', { name: 'Paginación del ranking' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
