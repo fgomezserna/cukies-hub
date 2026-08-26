@@ -9,6 +9,13 @@ import type {
   CompetitionStakingSnapshot,
 } from '..';
 import type { CompetitionStakingSource } from './models';
+import {
+  afterStagingResetFilter,
+  parseStagingStakingReset,
+  stagingStakingResetId,
+  stagingStakingResetsEnabled,
+  STAGING_STAKING_RESETS_COLLECTION,
+} from './staging-staking-reset';
 
 const STAKING_EVENTS = ['Staked', 'Unstaked'] as const;
 const PENDING_STATUSES = ['ingested', 'projecting', 'failed'] as const;
@@ -154,6 +161,17 @@ export class MongoCompetitionStakingSource implements CompetitionStakingSource {
     const expectedRuntimeCodeHash = this.environment
       .CHAIN_INDEXER_UKI_STAKING_RUNTIME_CODE_HASH?.trim().toLowerCase() ?? null;
     const options = { maxTimeMS: 2_000 } as const;
+    const stagingResetDocument = stagingStakingResetsEnabled(this.environment)
+      ? await db.collection<Document & { _id: string }>(STAGING_STAKING_RESETS_COLLECTION).findOne(
+        { _id: stagingStakingResetId(campaign.campaignId, walletAddress) },
+        options,
+      )
+      : null;
+    const stagingResetBoundary = parseStagingStakingReset(
+      stagingResetDocument,
+      campaign,
+      walletAddress,
+    );
 
     const [position, state, cursors, checkpoint, deadLetter, incident, pendingEvent, unstakeEvent] =
       await Promise.all([
@@ -198,6 +216,7 @@ export class MongoCompetitionStakingSource implements CompetitionStakingSource {
         }, { ...options, projection: { _id: 1 } }),
         db.collection('chain_events').findOne({
           ...scope,
+          ...afterStagingResetFilter(stagingResetBoundary),
           eventName: 'Unstaked',
           status: 'projected',
           'normalized.accountNormalized': walletAddress,
@@ -209,6 +228,9 @@ export class MongoCompetitionStakingSource implements CompetitionStakingSource {
       ]);
 
     const issues: string[] = [];
+    if (stagingResetDocument && !stagingResetBoundary) {
+      issues.push('STAKING_QA_RESET_INVALID');
+    }
     const indexedAt = validDate(checkpoint?.checkedAt) ? checkpoint.checkedAt : null;
     const safeBlock = Number(checkpoint?.safeBlockNumber);
     if (!indexedAt || !Number.isSafeInteger(safeBlock)) {
@@ -287,10 +309,49 @@ export class MongoCompetitionStakingSource implements CompetitionStakingSource {
       },
       { maxTimeMS: 5_000 },
     );
-    return new Set(
+    const disqualifiedWallets = new Set(
       wallets.filter((wallet): wallet is string => (
         typeof wallet === 'string' && /^0x[0-9a-f]{40}$/i.test(wallet)
       )).map((wallet) => wallet.toLowerCase()),
     );
+    if (!stagingStakingResetsEnabled(this.environment) || disqualifiedWallets.size === 0) {
+      return disqualifiedWallets;
+    }
+
+    const resetDocuments = await db.collection(STAGING_STAKING_RESETS_COLLECTION)
+      .find({ campaignId: input.campaign.campaignId }, { maxTimeMS: 2_000 })
+      .limit(101)
+      .toArray();
+    if (resetDocuments.length > 100) {
+      throw new Error('Staging staking reset limit exceeded');
+    }
+    const windowFilter = {
+      timestampMs: {
+        $gte: Date.parse(input.campaign.startsAt),
+        $lte: closedWindowEnd(input.campaign, input.now),
+      },
+    };
+    for (const resetDocument of resetDocuments) {
+      const walletAddress = typeof resetDocument.walletAddress === 'string'
+        ? resetDocument.walletAddress.toLowerCase()
+        : '';
+      if (!disqualifiedWallets.has(walletAddress)) continue;
+      const boundary = parseStagingStakingReset(
+        resetDocument,
+        input.campaign,
+        walletAddress,
+      );
+      if (!boundary) throw new Error('Invalid staging staking reset document');
+      const laterUnstake = await db.collection('chain_events').findOne({
+        ...scope,
+        ...afterStagingResetFilter(boundary),
+        eventName: 'Unstaked',
+        status: 'projected',
+        'normalized.accountNormalized': walletAddress,
+        ...windowFilter,
+      }, { maxTimeMS: 2_000, projection: { _id: 1 } });
+      if (!laterUnstake) disqualifiedWallets.delete(walletAddress);
+    }
+    return disqualifiedWallets;
   }
 }
