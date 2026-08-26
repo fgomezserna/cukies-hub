@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Archive, Clock3 } from 'lucide-react';
 
 import {
@@ -167,9 +167,9 @@ export default function TreasureHuntHistoryView() {
   const {
     archives,
     selectedCampaignId,
-    archive,
-    entries,
-    pagination,
+    archive: loadedArchive,
+    entries: loadedEntries,
+    pagination: loadedPagination,
     isListLoading,
     isDetailLoading,
     listError,
@@ -179,9 +179,24 @@ export default function TreasureHuntHistoryView() {
     reloadDetail,
   } = useTreasureHuntCompetitionHistory({ page, pageSize: PAGE_SIZE });
 
-  useEffect(() => {
+  const detailIsCurrent = Boolean(
+    loadedArchive
+    && loadedPagination
+    && loadedArchive.campaignId === selectedCampaignId
+    && loadedPagination.page === page
+    && loadedPagination.pageSize === PAGE_SIZE,
+  );
+  const archive = detailIsCurrent ? loadedArchive : null;
+  const entries = detailIsCurrent ? loadedEntries : [];
+  const pagination = detailIsCurrent ? loadedPagination : null;
+  const showDetailLoading = selectedCampaignId !== null
+    && !detailError
+    && (isDetailLoading || !detailIsCurrent);
+
+  const handleCampaignChange = (campaignId: string) => {
     setPage(1);
-  }, [selectedCampaignId]);
+    selectCampaign(campaignId);
+  };
 
   if (isListLoading) return <ArchiveLoading />;
 
@@ -221,7 +236,7 @@ export default function TreasureHuntHistoryView() {
         <select
           id="competition-archive"
           value={selectedCampaignId ?? ''}
-          onChange={(event) => selectCampaign(event.target.value)}
+          onChange={(event) => handleCampaignChange(event.target.value)}
           className="mt-2 min-h-11 w-full rounded-[6px] border border-white/20 bg-[#071312] px-3 text-sm font-bold text-[#f2eee7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
         >
           {archives.map((item) => (
@@ -232,9 +247,9 @@ export default function TreasureHuntHistoryView() {
         </select>
       </div>
 
-      {isDetailLoading ? <ArchiveLoading /> : null}
+      {showDetailLoading ? <ArchiveLoading /> : null}
 
-      {!isDetailLoading && detailError ? (
+      {!showDetailLoading && detailError ? (
         <div role="alert" className="m-4 flex flex-wrap items-center justify-between gap-4 rounded-[7px] border border-red-300/30 bg-red-950/25 px-4 py-3 text-sm text-red-100 sm:m-5">
           <span>{detailError}</span>
           <button
@@ -247,7 +262,7 @@ export default function TreasureHuntHistoryView() {
         </div>
       ) : null}
 
-      {!isDetailLoading && !detailError && archive ? (
+      {!showDetailLoading && !detailError && archive ? (
         <>
           <header className="border-b border-white/15 px-4 py-5 sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">

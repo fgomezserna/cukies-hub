@@ -406,8 +406,14 @@ export function useTreasureHuntCompetitionHistory(options?: {
   }, [detailRefreshToken, page, pageSize, selectedCampaignId]);
 
   const selectCampaign = useCallback((campaignId: string) => {
+    if (campaignId === selectedCampaignId) return;
+    setArchive(null);
+    setEntries([]);
+    setPagination(null);
+    setDetailError(null);
+    setIsDetailLoading(true);
     setSelectedCampaignId(campaignId);
-  }, []);
+  }, [selectedCampaignId]);
   const reloadList = useCallback(() => setListRefreshToken((current) => current + 1), []);
   const reloadDetail = useCallback(() => setDetailRefreshToken((current) => current + 1), []);
 

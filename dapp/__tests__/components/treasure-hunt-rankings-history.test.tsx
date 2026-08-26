@@ -306,6 +306,133 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     );
   });
 
+  it('cambia desde página 2 sin pedir la página antigua ni mostrar el detalle previo', async () => {
+    let resolveStaking!: (response: Response) => void;
+    let resolvePresalePageTwo!: (response: Response) => void;
+    let presalePageTwoSignal: AbortSignal | undefined;
+    const pendingStaking = new Promise<Response>((resolve) => {
+      resolveStaking = resolve;
+    });
+    const pendingPresalePageTwo = new Promise<Response>((resolve) => {
+      resolvePresalePageTwo = resolve;
+    });
+    const fetchMock = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/history?page=1&pageSize=100')) {
+        return jsonResponse({
+          success: true,
+          archives: [manifest, stakingManifest],
+          pagination: { page: 1, pageSize: 100, total: 2, totalPages: 1 },
+        });
+      }
+      if (url.includes(stakingManifest.campaignId)) return pendingStaking;
+      const page = Number(new URL(url, 'https://cukies.test').searchParams.get('page'));
+      if (page === 2) {
+        presalePageTwoSignal = init?.signal ?? undefined;
+        return pendingPresalePageTwo;
+      }
+      return jsonResponse({
+        success: true,
+        archive: manifest,
+        entries: pageEntries(page),
+        pagination: { page, pageSize: 20, total: 952, totalPages: 48 },
+      });
+    });
+    global.fetch = fetchMock as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    expect(await screen.findAllByText('CukieLegend')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
+    await waitFor(() => expect(presalePageTwoSignal).toBeDefined());
+    expect(screen.queryByText('CukieLegend')).not.toBeInTheDocument();
+    const selector = screen.getByRole('combobox', { name: 'Edición finalizada' });
+    fireEvent.change(selector, { target: { value: stakingManifest.campaignId } });
+
+    expect(presalePageTwoSignal?.aborted).toBe(true);
+    expect(selector).toHaveValue(stakingManifest.campaignId);
+    expect(screen.queryByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Player21')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Cargando histórico de clasificaciones' })).toBeInTheDocument();
+    await waitFor(() => expect(
+      fetchMock.mock.calls
+        .map(([input]) => String(input))
+        .filter((url) => url.includes(stakingManifest.campaignId)),
+    ).toEqual([
+      `/api/games/treasure-hunt/competition/history/${stakingManifest.campaignId}?page=1&pageSize=20`,
+    ]));
+
+    await act(async () => {
+      resolveStaking(new Response(JSON.stringify({
+        success: true,
+        archive: stakingManifest,
+        entries: [{ ...entry, rewardStatus: 'draw_pending', tickets: 25 }],
+        pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
+    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Staking UKI' })).toBeInTheDocument();
+
+    await act(async () => {
+      resolvePresalePageTwo(new Response(JSON.stringify({
+        success: true,
+        archive: manifest,
+        entries: pageEntries(2),
+        pagination: { page: 2, pageSize: 20, total: 952, totalPages: 48 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
+    expect(screen.getByRole('heading', { name: 'Treasure Hunt · Staking UKI' })).toBeInTheDocument();
+    expect(screen.queryByText('Player21')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).not.toBeInTheDocument();
+  });
+
+  it('oculta inmediatamente las filas anteriores mientras carga otra página', async () => {
+    let resolvePageTwo!: (response: Response) => void;
+    const pendingPageTwo = new Promise<Response>((resolve) => {
+      resolvePageTwo = resolve;
+    });
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/history?page=1&pageSize=100')) {
+        return jsonResponse({
+          success: true,
+          archives: [manifest],
+          pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        });
+      }
+      const page = Number(new URL(url, 'https://cukies.test').searchParams.get('page'));
+      if (page === 2) return pendingPageTwo;
+      return jsonResponse({
+        success: true,
+        archive: manifest,
+        entries: pageEntries(1),
+        pagination: { page: 1, pageSize: 20, total: 952, totalPages: 48 },
+      });
+    });
+    global.fetch = fetchMock as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    expect(await screen.findAllByText('CukieLegend')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
+
+    expect(screen.queryByText('CukieLegend')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Cargando histórico de clasificaciones' })).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      `/api/games/treasure-hunt/competition/history/${manifest.campaignId}?page=2&pageSize=20`,
+      expect.any(Object),
+    ));
+
+    await act(async () => {
+      resolvePageTwo(new Response(JSON.stringify({
+        success: true,
+        archive: manifest,
+        entries: pageEntries(2),
+        pagination: { page: 2, pageSize: 20, total: 952, totalPages: 48 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
+    expect(await screen.findAllByText('Player21')).toHaveLength(2);
+  });
+
   it('distingue resultados finales de una clasificación provisional', async () => {
     const finalManifest = {
       ...manifest,
