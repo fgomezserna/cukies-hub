@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { formatArchiveReward } from '@/components/games/treasure-hunt-history-view';
 import TreasureHuntRankingsView, {
@@ -190,6 +190,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     expect(screen.getAllByText('CukieLegend')).toHaveLength(2);
     expect(screen.queryByText('private-attempt-1')).not.toBeInTheDocument();
     expect(screen.queryByText('private-audit-source')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mi resultado')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/\bganadores?\b/i);
 
     const table = screen.getByRole('table');
@@ -237,6 +238,30 @@ describe('histórico de Rankings de Treasure Hunt', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
 
+    expect(await screen.findByText('Aún no hay ediciones publicadas')).toBeInTheDocument();
+  });
+
+  it('anuncia visual y semánticamente la carga del histórico', async () => {
+    let resolveList!: (response: Response) => void;
+    const pendingList = new Promise<Response>((resolve) => {
+      resolveList = resolve;
+    });
+    global.fetch = jest.fn(() => pendingList) as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+
+    expect(screen.getByRole('status', {
+      name: 'Cargando histórico de clasificaciones',
+    })).toBeInTheDocument();
+
+    await act(async () => {
+      resolveList(new Response(JSON.stringify({
+        success: true,
+        archives: [],
+        pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
     expect(await screen.findByText('Aún no hay ediciones publicadas')).toBeInTheDocument();
   });
 
@@ -378,6 +403,39 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     fireEvent.click(within(alert).getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByText('Provisional')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('muestra el error de detalle y Reintentar recupera la clasificación', async () => {
+    let detailCalls = 0;
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/history?page=1&pageSize=100')) {
+        return jsonResponse({
+          success: true,
+          archives: [manifest],
+          pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        });
+      }
+      detailCalls += 1;
+      if (detailCalls === 1) return jsonResponse({ success: false }, 500);
+      return jsonResponse({
+        success: true,
+        archive: manifest,
+        entries: pageEntries(1),
+        pagination: { page: 1, pageSize: 20, total: 952, totalPages: 48 },
+      });
+    });
+    global.fetch = fetchMock as typeof fetch;
+    render(<TreasureHuntRankingsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('No se pudo cargar la clasificación de esta edición.');
+    fireEvent.click(within(alert).getByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findByText('Provisional')).toBeInTheDocument();
+    expect(screen.getAllByText('CukieLegend')).toHaveLength(2);
+    expect(detailCalls).toBe(2);
   });
 
   it('conserva las etiquetas de recompensa de archivos legacy', () => {
