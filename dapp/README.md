@@ -108,6 +108,27 @@ wallet. El sorteo de staking usa 1 ticket por cada 100 puntos completos, pool de
 premio por wallet. El seed de cierre debe proceder de una fuente pública e
 impredecible posterior al cierre y queda incluido en el resultado auditable.
 
+#### Archivo histórico de rankings
+
+Los rankings cerrados se publican desde snapshots inmutables; los `GET` públicos
+`/api/games/treasure-hunt/competition/history` y
+`/api/games/treasure-hunt/competition/history/:campaignId` nunca recalculan partidas.
+El importador interno sólo admite staging y JSON ya sanitizado:
+
+```bash
+pnpm dapp competition:archive:import -- --file /ruta/archive.json --dry-run
+pnpm dapp competition:archive:import -- --file /ruta/archive.json --apply \
+  --confirm IMPORT_COMPETITION_RANKING_ARCHIVE_STAGING
+```
+
+El documento usa `schemaVersion: 1` y contiene la cabecera (`campaignId`,
+`rulesVersion`, `eligibilityKind`, ventana, `stage`, pool, metadatos, totales y
+source), `entries` públicas ordenadas con ranks contiguos y, para aplicar,
+`hashes: { input, output }` obtenidos del dry-run. Una entrada sólo acepta
+`publicEntryId`, `attemptId` opcional, alias, score, tiempo, revisión, rewards y
+tickets opcionales; el esquema estricto rechaza wallets, user IDs, sesiones y
+evidencias. `final` se rechaza mientras haya revisión pendiente o rewards sin fijar.
+
 ### Getting Discord Guild ID
 
 To get your Discord server ID:
