@@ -11,11 +11,14 @@ import {
 import { formatTreasureHuntDuration } from '@/hooks/use-treasure-hunt-competition-overview';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { cn } from '@/lib/utils';
+import { TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME } from '@/lib/treasure-hunt-competition/presentation';
 
 const PAGE_SIZE = 20;
 
 function editionLabel(archive: TreasureHuntCompetitionArchiveManifest) {
-  return archive.eligibilityKind === 'presale' ? 'Torneo de preventa' : 'Staking UKI';
+  return archive.eligibilityKind === 'presale'
+    ? 'Torneo de preventa'
+    : TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME;
 }
 
 function formatArchiveWindow(archive: TreasureHuntCompetitionArchiveManifest) {

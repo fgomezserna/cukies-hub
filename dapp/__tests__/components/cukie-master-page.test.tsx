@@ -66,8 +66,11 @@ describe('CukieMasterPage', () => {
     expect(screen.getByText('Workspace personal')).toBeInTheDocument();
     expect(screen.getByText('Workspace personal')).toHaveAttribute('data-testnet-only', 'true');
     expect(screen.getByText(/Área de pruebas · BNB Smart Chain Testnet/i)).toBeInTheDocument();
-    expect(screen.getByText('Cómo desbloqueas partidas')).toBeInTheDocument();
-    expect(screen.getByText(/Cada 2.000 UKI completos en staking/i)).toBeInTheDocument();
+    expect(screen.getByText('Cómo funciona la ruta UKI')).toBeInTheDocument();
+    expect(screen.getByText(/Cada 20.000 UKI computables/i)).toBeInTheDocument();
+    expect(screen.getByText(/ruta UKI empieza con 500 plazas.*2.500/i)).toBeInTheDocument();
+    expect(screen.getByText(/ruta NFT dispone de otras 2.500/i)).toBeInTheDocument();
+    expect(screen.getByText(/cada 2.000 UKI completos en staking conceden una partida/i)).toBeInTheDocument();
     expect(screen.queryByText('Panel de créditos activo')).not.toBeInTheDocument();
     expect(container).not.toHaveTextContent('La UI debe');
   });

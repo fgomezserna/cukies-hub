@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock3, Medal } from 'lucide-react';
 
+import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
 import TreasureHuntHistoryView from '@/components/games/treasure-hunt-history-view';
 import {
   formatTreasureHuntDuration,
@@ -11,26 +12,17 @@ import {
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
+import {
+  calculateAvailablePrizeSlots,
+  TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME,
+} from '@/lib/treasure-hunt-competition/presentation';
 import { cn } from '@/lib/utils';
 
 type RankingFilter = 'general' | 'mine';
 type RankingPeriod = 'active' | 'finished';
 const PAGE_SIZE = 20;
 
-export function calculateAvailablePrizeSlots(
-  poolUkiRaw: string | null | undefined,
-  prizePerWinnerUkiRaw: string | null | undefined,
-) {
-  if (!poolUkiRaw || !prizePerWinnerUkiRaw) return null;
-  try {
-    const pool = BigInt(poolUkiRaw);
-    const prizePerWinner = BigInt(prizePerWinnerUkiRaw);
-    if (pool < BigInt(0) || prizePerWinner <= BigInt(0)) return null;
-    return pool / prizePerWinner;
-  } catch {
-    return null;
-  }
-}
+export { calculateAvailablePrizeSlots } from '@/lib/treasure-hunt-competition/presentation';
 
 function rewardLabel(entry: TreasureHuntLeaderboardEntry) {
   if (entry.rewardStatus === 'draw_pending') return `${entry.tickets.toLocaleString('es-ES')} tickets`;
@@ -80,11 +72,10 @@ function ActiveTreasureHuntRankingsView() {
 
   const metrics: readonly (readonly [string, string])[] = isUkiStaking
     ? [
-      ['Tus tickets', isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0)],
-      ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
-      ['Bote provisional', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
+      ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
+      ['Premio acumulado', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
       [
-        'Premios disponibles',
+        'N.º de ganadores',
         isLoading && !leaderboardMeta
           ? '···'
           : availablePrizeSlots?.toLocaleString('es-ES') ?? '—',
@@ -117,8 +108,19 @@ function ActiveTreasureHuntRankingsView() {
               Competición oficial
             </p>
             <h3 className="mt-1 font-headline text-2xl font-black tracking-[-0.02em] text-[#f1eee8]">
-              Treasure Hunt · {isUkiStaking ? 'Staking UKI' : isPresale ? 'Torneo de preventa' : 'Competición'}
+              {isUkiStaking
+                ? TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME
+                : isPresale
+                  ? 'Treasure Hunt · Torneo de preventa'
+                  : 'Competición Treasure Hunt'}
             </h3>
+            {isUkiStaking ? (
+              <TreasureHuntCompetitionCountdown
+                phase={status?.phase}
+                campaign={campaign}
+                className="mt-2"
+              />
+            ) : null}
           </div>
           <Link
             href="/games/treasure-hunt"
@@ -130,7 +132,7 @@ function ActiveTreasureHuntRankingsView() {
 
         <dl className={cn(
           'grid grid-cols-2 gap-px border-b border-white/15 bg-white/15',
-          isUkiStaking && 'sm:grid-cols-4',
+          isUkiStaking && 'sm:grid-cols-3',
         )}>
           {metrics.map(([label, value]) => (
             <div
@@ -148,7 +150,7 @@ function ActiveTreasureHuntRankingsView() {
         </dl>
         {isUkiStaking ? (
           <p className="border-b border-white/15 px-4 py-2 text-[11px] leading-relaxed text-[#969994] sm:px-5">
-            Premios disponibles es una estimación provisional de slots según el bote actual; no son ganadores confirmados.
+            El número de ganadores es provisional: se calcula dividiendo el premio acumulado actual entre 10.000 UKI. Los ganadores se confirman tras el cierre y la revisión.
           </p>
         ) : null}
 

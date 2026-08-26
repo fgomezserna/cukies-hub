@@ -18,12 +18,14 @@ import {
 } from 'lucide-react';
 
 import TreasureHuntCompetitionPanel from '@/components/games/treasure-hunt-competition-panel';
+import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
 import {
   formatTreasureHuntCampaignWindow,
   TREASURE_HUNT_FALLBACK_RULES,
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { cn } from '@/lib/utils';
+import { TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME } from '@/lib/treasure-hunt-competition/presentation';
 
 const inactiveCompetitions = [
   {
@@ -139,7 +141,7 @@ export default function TreasureHuntCompetitionsView() {
               <div className="relative min-h-[170px] overflow-hidden border-b border-[#be8c2d]/45 sm:min-h-0 sm:border-b-0 sm:border-r">
                 <Image
                   src="/brand/official/uki-token-cukies-world-coin.png"
-                  alt="Emblema de la Competición Staking UKI"
+                  alt={`Emblema del ${TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}`}
                   fill
                   sizes="220px"
                   className="object-contain p-6 drop-shadow-[0_12px_22px_rgba(197,137,24,0.35)]"
@@ -151,7 +153,7 @@ export default function TreasureHuntCompetitionsView() {
               <div className="p-5 sm:p-6">
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="font-headline text-2xl font-black tracking-[-0.02em] text-[#f0e4ce]">
-                    Competición Staking UKI
+                    {TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}
                   </h3>
                   <span className={cn(
                     'rounded-[4px] border px-2 py-1 text-[10px] font-bold tracking-[0.12em]',
@@ -168,6 +170,11 @@ export default function TreasureHuntCompetitionsView() {
                 {campaignWindow ? (
                   <p className="mt-2 text-xs text-[#8e918d]">{campaignWindow}</p>
                 ) : null}
+                <TreasureHuntCompetitionCountdown
+                  phase={status?.phase}
+                  campaign={status?.campaign}
+                  className="mt-2"
+                />
 
                 <dl className="mt-6 grid grid-cols-2 divide-x divide-white/15 sm:grid-cols-5">
                   {[
@@ -227,7 +234,7 @@ export default function TreasureHuntCompetitionsView() {
             <Link href="/games/treasure-hunt/rankings" className="grid grid-cols-[54px_1fr_auto] items-center gap-3 rounded-[7px] border border-[#d09a36]/45 bg-[#0b1816] p-3 transition hover:border-[#d09a36]/75">
               <Image src="/brand/official/uki-token-cukies-world-coin.png" alt="" width={54} height={54} className="h-[54px] w-[54px] object-contain" />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-[#f0eee8]">Competición Staking UKI</span>
+                <span className="block truncate text-sm font-semibold text-[#f0eee8]">{TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}</span>
                 <span className="mt-1 block text-xs text-[#aaa8a2]">{myAttempts ? 'Clasificado' : 'Sin clasificar'}</span>
                 <span className="block text-xs text-[#aaa8a2]">{eligibility?.attemptsRemaining ?? 0} intentos disponibles</span>
               </span>

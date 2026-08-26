@@ -124,8 +124,10 @@ function slotCounts(route: PublicRoute) {
 
 export function CukieMasterStatusPanel({
   onUkiRouteData,
+  ukiOnly = false,
 }: {
   onUkiRouteData?: (preview: UkiRoutePreview | null) => void;
+  ukiOnly?: boolean;
 } = {}) {
   const { user, isLoading: authLoading } = useAuth();
   const [status, setStatus] = useState<PublicStatus | null>(null);
@@ -212,9 +214,11 @@ export function CukieMasterStatusPanel({
   useEffect(() => {
     const needsSynchronization = state === 'ready' && Boolean(status) && (
       status!.routes.uki.synchronizing
-      || status!.routes.nft.synchronizing
       || !status!.routes.uki.source.complete
-      || !status!.routes.nft.source.complete
+      || (!ukiOnly && (
+        status!.routes.nft.synchronizing
+        || !status!.routes.nft.source.complete
+      ))
     );
     if (!needsSynchronization) {
       synchronizationStartedAtRef.current = null;
@@ -228,7 +232,7 @@ export function CukieMasterStatusPanel({
       SYNCHRONIZATION_POLL_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [state, status]);
+  }, [state, status, ukiOnly]);
 
   useEffect(() => {
     const route = status?.routes.uki;
@@ -309,7 +313,9 @@ export function CukieMasterStatusPanel({
               Tus cupos Cukie Master
             </h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Revisamos vesting, staking e inventario antes de recomendarte ninguna acción.
+              {ukiOnly
+                ? 'Sumamos tus UKI en vesting sin reclamar y tus UKI depositados para calcular esta ruta.'
+                : 'Revisamos vesting, staking e inventario antes de recomendarte ninguna acción.'}
             </p>
           </div>
           {status ? (
@@ -365,7 +371,10 @@ export function CukieMasterStatusPanel({
         ) : null}
 
         {state === 'ready' && status && totalCounts ? (
-          <>
+          ukiOnly ? (
+            <UkiOnlyStatus route={status.routes.uki} />
+          ) : (
+            <>
             <div className="mt-6 grid min-w-0 gap-3 sm:grid-cols-3">
               <StatusMetric
                 label="Cupos activos"
@@ -433,10 +442,72 @@ export function CukieMasterStatusPanel({
                 )}
               </TabsContent>
             </Tabs>
-          </>
+            </>
+          )
         ) : null}
       </Panel>
     </section>
+  );
+}
+
+function UkiOnlyStatus({ route }: { route: PublicRoute }) {
+  const breakdown = getUkiBreakdown(route);
+  const counts = slotCounts(route);
+  const displayedSlots = route.synchronizing
+    ? route.previewSlots ?? 0
+    : route.position?.allocatedSlots ?? 0;
+
+  return (
+    <div className="mt-6 min-w-0">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatusMetric
+          label="UKI en vesting"
+          value={breakdown?.locked ?? 'No disponible'}
+          helper="Asignación de preventa aún no reclamada"
+        />
+        <StatusMetric
+          label="UKI en staking"
+          value={breakdown?.staked ?? 'No disponible'}
+          helper="Depositados en el contrato UKIStaking"
+        />
+        <StatusMetric
+          label="Total computable"
+          value={breakdown?.total ?? 'No disponible'}
+          helper="Vesting sin reclamar + staking confirmado"
+          tone="cyan"
+        />
+        <StatusMetric
+          label="Cukie Masters actuales"
+          value={`${displayedSlots}/${MAX_ROUTE_SLOTS}`}
+          helper={`${counts.active} activos · ${counts.qualifying} en validación`}
+          tone="cyan"
+        />
+      </div>
+
+      <div className="mt-4 rounded-[8px] border border-white/10 bg-black/20 p-4">
+        <div className="flex items-center justify-between gap-4 text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+          <span>Progreso de la ruta UKI</span>
+          <span>{displayedSlots} de {MAX_ROUTE_SLOTS}</span>
+        </div>
+        <span
+          role="progressbar"
+          aria-label="Progreso Cukie Master por UKI"
+          aria-valuemin={0}
+          aria-valuemax={MAX_ROUTE_SLOTS}
+          aria-valuenow={displayedSlots}
+          className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
+        >
+          <span
+            className="block h-full rounded-full bg-[var(--uki-cyan)]"
+            style={{ width: `${Math.min(100, displayedSlots * 20)}%` }}
+          />
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <RouteDetail label="Tu ruta UKI" route={route} />
+      </div>
+    </div>
   );
 }
 

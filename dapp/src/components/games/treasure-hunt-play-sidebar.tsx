@@ -9,11 +9,13 @@ import {
   Trophy,
 } from 'lucide-react';
 
+import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
 import {
   TREASURE_HUNT_FALLBACK_RULES,
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
+import { TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME } from '@/lib/treasure-hunt-competition/presentation';
 
 export default function TreasureHuntPlaySidebar({
   onStartSinglePlayer,
@@ -41,6 +43,8 @@ export default function TreasureHuntPlaySidebar({
       ? 'Sincronizando staking'
       : eligibility?.attemptsRemaining === 0
         ? 'Sin intentos disponibles'
+        : status?.phase === 'scheduled'
+          ? 'El torneo aún no ha comenzado'
         : 'Iniciar partida 1P';
   const statusLabel = isLoading
     ? 'Comprobando'
@@ -54,12 +58,17 @@ export default function TreasureHuntPlaySidebar({
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-white/20 bg-[#071312]/94 p-5">
-      <h2 className="font-headline text-xl font-black text-[#f2eee7]">Competición Staking UKI</h2>
+      <h2 className="font-headline text-xl font-black text-[#f2eee7]">{TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}</h2>
+      <TreasureHuntCompetitionCountdown
+        phase={status?.phase}
+        campaign={status?.campaign}
+        className="mt-2"
+      />
 
       <dl className="mt-4 overflow-hidden rounded-[8px] border border-white/20 bg-[#091513]">
         {[
           { label: 'Modo', value: '1P', Icon: Gamepad2, tone: 'text-[#ffc240]' },
-          { label: 'Competición', value: 'Staking UKI', Icon: Trophy, tone: 'text-[#ffc240]' },
+          { label: 'Competición', value: TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME, Icon: Trophy, tone: 'text-[#ffc240]' },
           { label: 'Intentos', value: `${attemptsUsed} usados · ${attemptsGranted} concedidos`, Icon: Medal, tone: 'text-[#f2eee7]' },
           { label: 'UKI en staking', value: eligibility ? formatTreasureHuntUkiRaw(eligibility.stakedUkiRaw) : 'Conecta tu wallet', Icon: Medal, tone: 'text-[#f2eee7]' },
           { label: 'Estado', value: statusLabel, Icon: CheckCircle2, tone: eligibility?.disqualified ? 'text-red-300' : 'text-[#61e598]' },

@@ -299,7 +299,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).toBeInTheDocument();
 
     fireEvent.change(selector, { target: { value: stakingManifest.campaignId } });
-    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Staking UKI' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Torneo Lanzamiento UKI' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/games/treasure-hunt/competition/history/${stakingManifest.campaignId}?page=1&pageSize=20`,
       expect.any(Object),
@@ -370,7 +370,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
         pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     });
-    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Staking UKI' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Treasure Hunt · Torneo Lanzamiento UKI' })).toBeInTheDocument();
 
     await act(async () => {
       resolvePresalePageTwo(new Response(JSON.stringify({
@@ -380,7 +380,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
         pagination: { page: 2, pageSize: 20, total: 952, totalPages: 48 },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     });
-    expect(screen.getByRole('heading', { name: 'Treasure Hunt · Staking UKI' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Treasure Hunt · Torneo Lanzamiento UKI' })).toBeInTheDocument();
     expect(screen.queryByText('Player21')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).not.toBeInTheDocument();
   });

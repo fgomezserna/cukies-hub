@@ -59,6 +59,68 @@ describe('CukieMasterStatusPanel', () => {
     expect(screen.getByText(/Conecta una wallet EVM/i)).toBeInTheDocument();
   });
 
+  it('simplifica la vista a vesting, staking y cinco plazas de la ruta UKI', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    const onUkiRouteData = jest.fn();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'ok',
+        data: {
+          walletNormalized: walletAddress,
+          totals: { desiredSlots: 2, allocatedSlots: 2, maxPotentialSlots: 10 },
+          routes: {
+            uki: {
+              position: { status: 'active', desiredSlots: 2, allocatedSlots: 2, protectedSlots: 0, graceEndsAt: null },
+              currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
+              pendingRequirement: null,
+              requirementGraceEndsAt: null,
+              deficitToNextSlot: { route: 'uki', ukiRaw: '15000000000000000000000' },
+              deficitToPreserveSlots: null,
+              slots: [],
+              source: {
+                complete: true,
+                status: 'available',
+                route: 'uki',
+                totalUkiRaw: '45000000000000000000000',
+                presaleLockedRaw: '40000000000000000000000',
+                stakedUkiRaw: '5000000000000000000000',
+              },
+            },
+            nft: {
+              position: null,
+              currentRequirement: { route: 'nft', nftPoints: 3 },
+              pendingRequirement: null,
+              requirementGraceEndsAt: null,
+              deficitToNextSlot: { route: 'nft', nftPoints: 3 },
+              deficitToPreserveSlots: null,
+              slots: [],
+              source: { complete: false, status: 'unavailable' },
+            },
+          },
+          nftInventory: [],
+        },
+      }),
+    });
+
+    render(<CukieMasterStatusPanel ukiOnly onUkiRouteData={onUkiRouteData} />);
+
+    expect(await screen.findByText('UKI en vesting')).toBeInTheDocument();
+    expect(screen.getByText('UKI en staking')).toBeInTheDocument();
+    expect(screen.getByText('Total computable')).toBeInTheDocument();
+    expect(screen.getByText('Cukie Masters actuales').parentElement).toHaveTextContent('2/5');
+    expect(screen.getByRole('progressbar', { name: 'Progreso Cukie Master por UKI' }))
+      .toHaveAttribute('aria-valuenow', '2');
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ruta Cukies/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(onUkiRouteData).toHaveBeenCalledWith({
+      currentRequirementRaw: '20000000000000000000000',
+      presaleLockedRaw: '40000000000000000000000',
+      indexedStakedRaw: '5000000000000000000000',
+      allocatedSlots: 2,
+    }));
+  });
+
   it('renders only the persisted public slot status returned by the API', async () => {
     mockUseAuth.mockReturnValue(authValue(user));
     fetchMock.mockResolvedValue({

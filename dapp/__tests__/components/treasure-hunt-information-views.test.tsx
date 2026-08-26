@@ -157,8 +157,9 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByRole('button', { name: 'Finalizadas' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Mis partidas')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
-    expect(screen.getByText('Bote provisional')).toBeInTheDocument();
-    expect(screen.getByText('Premios disponibles')).toBeInTheDocument();
+    expect(screen.getByText('Partidas computables')).toBeInTheDocument();
+    expect(screen.getByText('Premio acumulado')).toBeInTheDocument();
+    expect(screen.getByText('N.º de ganadores')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
 
@@ -170,9 +171,9 @@ describe('vistas UX de Treasure Hunt', () => {
 
     const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
     expect(playLink).toHaveClass('hidden', 'sm:inline-flex');
-    expect(screen.getByText('Mejores partidas').closest('dl')).toHaveClass(
+    expect(screen.getByText('Partidas computables').closest('dl')).toHaveClass(
       'grid-cols-2',
-      'sm:grid-cols-4',
+      'sm:grid-cols-3',
     );
     expect(screen.getByRole('navigation', { name: 'Paginación del ranking' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
@@ -198,7 +199,7 @@ describe('vistas UX de Treasure Hunt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar partida 1P' }));
 
     expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Competición Staking UKI')).toBeInTheDocument();
+    expect(screen.getAllByText('Torneo Lanzamiento UKI').length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: /Gestionar staking UKI/ })).toHaveAttribute('href', '/cukie-master');
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toBeInTheDocument();
     expect(screen.queryByText(/Si clasificas/)).not.toBeInTheDocument();

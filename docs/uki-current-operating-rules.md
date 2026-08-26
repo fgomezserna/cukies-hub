@@ -178,6 +178,7 @@ Hay dos rutas independientes para obtener cupos de Cukie Master. Cada ruta tiene
 ### Ruta 1: staking de Cukies Originales
 
 - Cupos iniciales disponibles: 500.
+- Capacidad maxima de esta ruta: 2,500 cupos.
 - Requisito inicial: 3 puntos en Cukies Originales por cupo.
 - Solo participan Cukies Originales en BSC.
 - El NFT entra fisicamente en un contrato dedicado `CukieMasterNftVault`; Mongo es una proyeccion indexada, no la autoridad de custodia.
@@ -199,6 +200,7 @@ Puntos por rareza:
 ### Ruta 2: staking de UKI
 
 - Cupos iniciales disponibles: 500.
+- Capacidad maxima de esta ruta: 2,500 cupos.
 - Requisito inicial: 20,000 UKI por cupo.
 - Los UKI comprados en preventa con vesting cuentan directamente para los cupos.
 - Para evitar doble conteo, el saldo elegible es
@@ -224,7 +226,8 @@ Puntos por rareza:
 - Maximo por wallet en la ruta UKI: 5 cupos de Cukie Master.
 - Maximo por wallet en la ruta NFT/Cukies Originales: 5 cupos de Cukie Master.
 - Las rutas no comparten limite: una wallet puede alcanzar 10 cupos potenciales si cumple 5 por UKI y 5 por NFT/Cukies Originales.
-- Maximo global de cupos previsto: 5,000.
+- Maximo global de cupos previsto: 5,000, repartidos en 2,500 para la ruta UKI
+  y 2,500 para la ruta NFT/Cukies Originales.
 - Si una ruta llena sus 500 cupos iniciales y se decide no abrir mas cupos en ese momento, el requisito sube.
 - Cuando el requisito de una ruta sube, se abre inicialmente una ventana de gracia de 48 horas para que sus Cukie Masters ajusten el staking.
 - Las 48 horas son una regla backend versionada y configurable para cambios futuros; no quedan fijadas de forma inmutable en los contratos.

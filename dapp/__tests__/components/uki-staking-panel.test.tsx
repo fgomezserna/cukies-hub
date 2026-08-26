@@ -72,6 +72,12 @@ const writeContract = jest.fn();
 const switchChain = jest.fn();
 const reset = jest.fn();
 const toast = jest.fn();
+const routePreview = {
+  currentRequirementRaw: parseUnits('20000', 18).toString(),
+  presaleLockedRaw: parseUnits('40000', 18).toString(),
+  indexedStakedRaw: parseUnits('25000', 18).toString(),
+  allocatedSlots: 3,
+};
 
 let allowance = BigInt(0);
 let stakingToken = tokenAddress;
@@ -145,15 +151,26 @@ describe('UkiStakingPanel', () => {
     expect(writeContract).not.toHaveBeenCalled();
   });
 
-  it('offers quick amounts and previews the staking-based attempt capacity', () => {
-    render(<UkiStakingPanel />);
+  it('offers Cukie Master amounts and previews vesting plus staking without showing attempts', () => {
+    render(<UkiStakingPanel routePreview={routePreview} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '10.000' }));
-    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('10000');
-    expect(screen.getByText(/Saldo proyectado: 17 partidas concedidas por staking/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '20.000' }));
+    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('20000');
+    expect(screen.getByText(/Total computable: 85\.000 UKI · 4\/5 Cukie Masters/i)).toBeInTheDocument();
+    expect(screen.getByText(/Faltarían 15\.000 UKI computables/i)).toBeInTheDocument();
+    expect(screen.queryByText(/partidas concedidas/i)).not.toBeInTheDocument();
     expect(screen.getByText('Conectar')).toBeInTheDocument();
     expect(screen.getByText('Autorizar')).toBeInTheDocument();
     expect(screen.getAllByText('Depositar')).toHaveLength(2);
+  });
+
+  it('calcula el depósito exacto necesario para la siguiente plaza', () => {
+    render(<UkiStakingPanel routePreview={routePreview} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lo necesario' }));
+
+    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('15000');
+    expect(screen.getByText(/Total computable: 80\.000 UKI · 4\/5 Cukie Masters/i)).toBeInTheDocument();
   });
 
   it('switches explicitly to BSC Testnet when the wallet is on another chain', () => {

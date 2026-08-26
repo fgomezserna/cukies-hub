@@ -1351,7 +1351,7 @@ describe('Cukie Master transactional allocation', () => {
     expect(state.events.size).toBe(eventCount);
   });
 
-  it('expands route capacity with CAS, idempotency and a hard 5000 ceiling', async () => {
+  it('expands route capacity with CAS, idempotency and a hard 2500 ceiling per route', async () => {
     const { repo, state } = memoryRepository();
     const service = createCukieMasterService((work) => work(repo));
     const round = createInitialRouteRound('nft', now);
@@ -1380,7 +1380,7 @@ describe('Cukie Master transactional allocation', () => {
     });
     await expect(service.expandRouteCapacity('nft', 1_000, now, 'capacity-reduce'))
       .rejects.toThrow('solo puede ampliarse');
-    expect(() => service.expandRouteCapacity('nft', 5_001, now, 'capacity-overflow'))
-      .toThrow('entre 1 y 5000');
+    expect(() => service.expandRouteCapacity('nft', 2_501, now, 'capacity-overflow'))
+      .toThrow('entre 1 y 2500');
   });
 });

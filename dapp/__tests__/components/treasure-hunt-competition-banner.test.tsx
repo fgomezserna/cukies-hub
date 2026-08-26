@@ -23,8 +23,16 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   },
   useTreasureHuntCompetitionOverview: () => ({
     status: {
+      phase: 'active',
+      campaign: {
+        startsAt: '2026-08-27T00:00:00.000Z',
+        endsAt: '2026-09-15T15:00:00.000Z',
+        topAttemptsPerWallet: 10,
+        prizePerWinnerUkiRaw: '10000000000000000000000',
+      },
       eligibility: {
         attemptsRemaining: 3,
+        topAttemptsCount: 4,
         provisionalTickets: 125,
       },
     },
@@ -49,11 +57,12 @@ describe('TreasureHuntCompetitionBanner', () => {
   it('mantiene visibles las tres métricas y enlaza a reglas y rankings', () => {
     render(<TreasureHuntCompetitionBanner />);
 
-    expect(screen.getByText('Treasure Hunt · Staking UKI')).toBeInTheDocument();
-    expect(screen.getByText('125')).toBeInTheDocument();
-    expect(screen.getByText('Tickets').parentElement).toHaveClass('hidden', 'sm:block');
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('Torneo Lanzamiento UKI')).toBeInTheDocument();
+    expect(screen.getByText('4/10')).toBeInTheDocument();
+    expect(screen.getByText('Partidas computables')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.getByText('N.º de ganadores').parentElement).toHaveClass('hidden', 'sm:block');
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toHaveAttribute(
       'href',
       '/games/treasure-hunt/rules',

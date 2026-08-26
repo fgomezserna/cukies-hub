@@ -3,26 +3,43 @@
 import Link from 'next/link';
 import { BookOpenText, Medal } from 'lucide-react';
 
+import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
 import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
+import {
+  calculateAvailablePrizeSlots,
+  TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME,
+} from '@/lib/treasure-hunt-competition/presentation';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 
 export default function TreasureHuntCompetitionBanner() {
   const { status, leaderboardMeta, isLoading } = useTreasureHuntCompetitionOverview();
   const eligibility = status?.eligibility;
+  const campaign = status?.campaign;
   const prizePoolValue = leaderboardMeta
     ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw)
     : 'Actualizando…';
   const metrics = [
-    { label: 'Tickets', value: isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0), mobileHidden: true },
     {
-      label: 'Intentos disponibles',
-      value: isLoading ? '···' : String(eligibility?.attemptsRemaining ?? 0),
+      label: 'Partidas computables',
+      value: isLoading
+        ? '···'
+        : `${eligibility?.topAttemptsCount ?? 0}/${campaign?.topAttemptsPerWallet ?? 10}`,
       mobileHidden: false,
     },
     {
       label: 'Premio acumulado',
       value: isLoading && !leaderboardMeta ? '···' : prizePoolValue,
       mobileHidden: false,
+    },
+    {
+      label: 'N.º de ganadores',
+      value: isLoading && !leaderboardMeta
+        ? '···'
+        : calculateAvailablePrizeSlots(
+          leaderboardMeta?.poolUkiRaw,
+          campaign?.prizePerWinnerUkiRaw,
+        )?.toLocaleString('es-ES') ?? '—',
+      mobileHidden: true,
     },
   ];
 
@@ -37,14 +54,19 @@ export default function TreasureHuntCompetitionBanner() {
           className="min-w-0 border-l-2 border-[#35eee2] pl-3 sm:pl-4"
         >
           <p className="font-mono text-[0.66rem] font-black uppercase tracking-[0.2em] text-[#35eee2]">
-            Competición oficial · Staking UKI
+            Competición oficial · Lanzamiento UKI
           </p>
           <h2
             id="treasure-hunt-competition-banner-title"
             className="mt-1 font-headline text-lg font-black tracking-tight text-[#f2eee7] sm:text-xl"
           >
-            Treasure Hunt · Staking UKI
+            {TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}
           </h2>
+          <TreasureHuntCompetitionCountdown
+            phase={status?.phase}
+            campaign={campaign}
+            className="mt-1"
+          />
         </div>
 
         <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">

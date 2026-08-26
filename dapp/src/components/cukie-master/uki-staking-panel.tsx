@@ -14,6 +14,7 @@ import {
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Panel } from '@/components/landing/primitives';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from '@/components/landing/sale-config';
+import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -26,7 +27,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '2000';
-const UKI_PER_ATTEMPT = parseUnits('2000', TOKEN_DECIMALS);
+const MAX_UKI_ROUTE_SLOTS = BigInt(5);
 
 type StakingOperation = 'stake' | 'unstake';
 type TransactionAction = 'approve' | 'stake' | 'unstake' | null;
@@ -51,14 +52,25 @@ function formatTokenAmount(value?: bigint, maximumFractionDigits = 4) {
   return numeric.toLocaleString('es-ES', { maximumFractionDigits });
 }
 
+function formatRawTokenAmount(value?: string) {
+  if (value === undefined || !/^(0|[1-9][0-9]*)$/.test(value)) return '--';
+  try {
+    return formatTokenAmount(BigInt(value));
+  } catch {
+    return '--';
+  }
+}
+
 function sameAddress(left?: string, right?: string) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
 export function UkiStakingPanel({
   testnetOnly = false,
+  routePreview = null,
 }: {
   testnetOnly?: boolean;
+  routePreview?: UkiRoutePreview | null;
 }) {
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
@@ -152,23 +164,11 @@ export function UkiStakingPanel({
     args: address ? [address] : undefined,
     query: { enabled: walletReadsEnabled, staleTime: 0 },
   });
-  const {
-    data: totalStaked,
-    isError: isTotalStakedError,
-    refetch: refetchTotalStaked,
-  } = useReadContract({
-    chainId: UKI_PRESALE_CHAIN_ID,
-    address: stakingAddress,
-    abi: ukiStakingAbi,
-    functionName: 'totalStaked',
-    query: { enabled: publicReadsEnabled, staleTime: 0 },
-  });
-
   const protocolReadsReady = stakingToken !== undefined && (
     operation === 'unstake' || isPaused !== undefined
   );
   const tokenMatches = sameAddress(stakingToken, tokenAddress);
-  const protocolReadFailed = isStakingTokenError || isTotalStakedError ||
+  const protocolReadFailed = isStakingTokenError ||
     (operation === 'stake' && isPausedError) ||
     (stakingToken !== undefined && !tokenMatches);
   const walletReadFailed = operation === 'stake'
@@ -210,7 +210,8 @@ export function UkiStakingPanel({
     operation,
     parsedAmount,
     stakedBalance,
-  }), [operation, parsedAmount, stakedBalance]);
+    routePreview,
+  }), [operation, parsedAmount, routePreview, stakedBalance]);
   const workflowSteps = buildWorkflowSteps({
     operation,
     isConnected,
@@ -234,7 +235,6 @@ export function UkiStakingPanel({
     void refetchAllowance();
     void refetchLiquidBalance();
     void refetchStakedBalance();
-    void refetchTotalStaked();
     void refetchPaused();
     void refetchStakingToken();
 
@@ -275,7 +275,6 @@ export function UkiStakingPanel({
     refetchPaused,
     refetchStakedBalance,
     refetchStakingToken,
-    refetchTotalStaked,
     toast,
     txHash,
   ]);
@@ -306,6 +305,27 @@ export function UkiStakingPanel({
   function selectQuickAmount(value: string) {
     setAmount(value);
     setLastCompletedAction(null);
+  }
+
+  function selectRequiredAmount() {
+    if (!routePreview || stakedBalance === undefined) return;
+    try {
+      const requirement = BigInt(routePreview.currentRequirementRaw);
+      const total = BigInt(routePreview.presaleLockedRaw) + stakedBalance;
+      if (requirement <= BigInt(0)) return;
+      const currentSlots = total / requirement > MAX_UKI_ROUTE_SLOTS
+        ? MAX_UKI_ROUTE_SLOTS
+        : total / requirement;
+      if (currentSlots >= MAX_UKI_ROUTE_SLOTS) {
+        return;
+      }
+      const deficit = ((currentSlots + BigInt(1)) * requirement) - total;
+      setAmount(formatUnits(deficit, TOKEN_DECIMALS));
+      setLastCompletedAction(null);
+    } catch {
+      // The authenticated status API is the source of this preview. A malformed
+      // response simply disables the shortcut and never authorizes a write.
+    }
   }
 
   function switchToStagingNetwork() {
@@ -373,21 +393,24 @@ export function UkiStakingPanel({
               Staking de UKI
             </h2>
             <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Cada 2.000 UKI confirmados en staking desbloquean una partida de Treasure Hunt.
-              El intento se consume al iniciar la partida.
+              Deposita UKI para completar el requisito vigente de tus plazas Cukie Master.
+              Cada plaza requiere inicialmente 20.000 UKI computables y esta vía admite hasta 5.
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               <BalanceCard label="UKI en wallet" value={formatTokenAmount(liquidBalance)} />
               <BalanceCard label="UKI en staking" value={formatTokenAmount(stakedBalance)} />
-              <BalanceCard label="Staking global" value={formatTokenAmount(totalStaked)} />
+              <BalanceCard
+                label="Requisito por plaza"
+                value={formatRawTokenAmount(routePreview?.currentRequirementRaw)}
+              />
             </div>
 
             <div className="mt-4 flex items-start gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 p-4">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" />
               <p className="text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                Red: {UKI_PRESALE_CHAIN_LABEL}. Necesitas tBNB para el gas. Los UKI líquidos o en
-                vesting no conceden partidas: solo cuenta el saldo del contrato de staking.
+                Red: {UKI_PRESALE_CHAIN_LABEL}. Para Cukie Master cuentan el vesting de preventa
+                sin reclamar y el staking. Para el Torneo Lanzamiento UKI solo cuenta el staking.
               </p>
             </div>
           </div>
@@ -431,8 +454,8 @@ export function UkiStakingPanel({
               <span className="flex shrink-0 items-center border-l border-white/10 px-4 text-xs font-black uppercase text-[var(--uki-muted)]">UKI</span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Cantidades rápidas">
-              <QuickAmountButton label="2.000" onClick={() => selectQuickAmount('2000')} disabled={isBusy} />
-              <QuickAmountButton label="10.000" onClick={() => selectQuickAmount('10000')} disabled={isBusy} />
+              <QuickAmountButton label="Lo necesario" onClick={selectRequiredAmount} disabled={!routePreview || stakedBalance === undefined || isBusy} />
+              <QuickAmountButton label="20.000" onClick={() => selectQuickAmount('20000')} disabled={isBusy} />
               <QuickAmountButton label="Máximo" onClick={useMaximumBalance} disabled={availableBalance === undefined || isBusy} />
             </div>
             <p id="uki-staking-available" className="mt-2 text-right text-xs font-semibold text-[var(--uki-muted)]">
@@ -688,29 +711,39 @@ function buildOutcomePreview({
   operation,
   parsedAmount,
   stakedBalance,
+  routePreview,
 }: {
   operation: StakingOperation;
   parsedAmount: bigint | null;
   stakedBalance?: bigint;
+  routePreview: UkiRoutePreview | null;
 }) {
-  if (!parsedAmount || stakedBalance === undefined) return null;
+  if (!parsedAmount || stakedBalance === undefined || !routePreview) return null;
   if (operation === 'unstake' && parsedAmount > stakedBalance) return null;
-  const projectedStaked = operation === 'stake'
-    ? stakedBalance + parsedAmount
-    : stakedBalance - parsedAmount;
-  const attempts = projectedStaked / UKI_PER_ATTEMPT;
-  const remainder = projectedStaked % UKI_PER_ATTEMPT;
-  const missingForNextAttempt = remainder === BigInt(0)
-    ? UKI_PER_ATTEMPT
-    : UKI_PER_ATTEMPT - remainder;
-  return {
-    summary: `Saldo proyectado: ${attempts.toString()} partidas concedidas por staking.`,
-    detail: `${formatTokenAmount(projectedStaked)} UKI en staking.${
-      operation === 'unstake'
-        ? ' La retirada descalifica la wallet si la campaña ya ha empezado.'
-        : ` Faltarían ${formatTokenAmount(missingForNextAttempt)} UKI para conceder una partida adicional.`
-    }`,
-  };
+  try {
+    const requirement = BigInt(routePreview.currentRequirementRaw);
+    const presaleLocked = BigInt(routePreview.presaleLockedRaw);
+    if (requirement <= BigInt(0)) return null;
+    const projectedStaked = operation === 'stake'
+      ? stakedBalance + parsedAmount
+      : stakedBalance - parsedAmount;
+    const totalComputable = presaleLocked + projectedStaked;
+    const rawSlots = totalComputable / requirement;
+    const slots = rawSlots > MAX_UKI_ROUTE_SLOTS ? MAX_UKI_ROUTE_SLOTS : rawSlots;
+    const missingForNextSlot = slots >= MAX_UKI_ROUTE_SLOTS
+      ? BigInt(0)
+      : ((slots + BigInt(1)) * requirement) - totalComputable;
+    return {
+      summary: `Total computable: ${formatTokenAmount(totalComputable)} UKI · ${slots.toString()}/5 Cukie Masters.`,
+      detail: operation === 'unstake'
+        ? `${formatTokenAmount(projectedStaked)} UKI quedarían en staking. La retirada descalifica la wallet del torneo si la campaña ya ha empezado.`
+        : missingForNextSlot === BigInt(0)
+          ? 'Has alcanzado el máximo de 5 Cukie Masters por la vía UKI.'
+          : `Faltarían ${formatTokenAmount(missingForNextSlot)} UKI computables para la siguiente plaza.`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function InlineWarning({ text }: { text: string }) {

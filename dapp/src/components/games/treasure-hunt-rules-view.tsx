@@ -4,10 +4,14 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Gamepad2 } from 'lucide-react';
 
+import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
 import {
+  formatTreasureHuntPercentage,
   TREASURE_HUNT_FALLBACK_RULES,
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
+import { TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME } from '@/lib/treasure-hunt-competition/presentation';
+import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 
 function RuleSection({
   number,
@@ -43,7 +47,7 @@ export default function TreasureHuntRulesView() {
     <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
       <div className="mb-4">
         <h2 className="font-headline text-2xl font-black tracking-[-0.025em] text-[#f2eee7]">
-          Reglas de la Competición Staking UKI
+          Reglas del {TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}
         </h2>
         <p className="mt-1 text-sm text-[#aaa8a2]">
           Cómo participar, clasificarse y recibir los premios.
@@ -63,11 +67,16 @@ export default function TreasureHuntRulesView() {
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/15 px-5 py-5">
           <div>
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.15em] text-[#35eee2]">
-              Reglamento oficial · Staking UKI
+              Reglamento oficial · Lanzamiento UKI
             </p>
             <h3 className="mt-1 font-headline text-2xl font-black tracking-[-0.02em] text-[#f1eee8]">
-              Competición individual 1P
+              {TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME} · 1P
             </h3>
+            <TreasureHuntCompetitionCountdown
+              phase={status?.phase}
+              campaign={status?.campaign}
+              className="mt-2"
+            />
           </div>
           <Link
             href="/games/treasure-hunt"
@@ -85,6 +94,7 @@ export default function TreasureHuntRulesView() {
               Deposita UKI en Cukie Master. Cada 2.000 UKI completos en staking conceden
               un intento. Si aumentas el staking, puedes desbloquear intentos adicionales.
             </p>
+            <p>Solo cuenta el staking personal de esta wallet; el staking global no concede partidas.</p>
             <p>El intento se consume al iniciar la partida, incluso si la abandonas o resulta inválida.</p>
             <Link href="/cukie-master" className="inline-flex items-center gap-2 font-bold text-[#35eee2] hover:text-white">
               Gestionar staking <ArrowRight className="h-4 w-4" />
@@ -122,8 +132,10 @@ export default function TreasureHuntRulesView() {
 
           <RuleSection number={5} title="Pool y premios">
             <p>
-              El pool parte de 50.000 UKI y suma el 10% del total de UKI en staking al cierre.
-              Cada ganador recibe 10.000 UKI y una misma wallet solo puede ganar una vez.
+              El pool parte de {formatTreasureHuntUkiRaw(rules.basePrizeUkiRaw)} y suma el{' '}
+              {formatTreasureHuntPercentage(rules.stakePrizeBps)} del total de UKI en staking al cierre.
+              Cada ganador recibe {formatTreasureHuntUkiRaw(rules.prizePerWinnerUkiRaw)} y una misma
+              wallet solo puede ganar {rules.maxWinsPerWallet === 1 ? 'una vez' : `${rules.maxWinsPerWallet} veces`}.
             </p>
           </RuleSection>
 
