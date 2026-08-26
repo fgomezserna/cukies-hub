@@ -7,6 +7,7 @@ import {
   COMPETITION_RANKING_ARCHIVE_INDEXES,
   CompetitionRankingArchiveBuildInProgressError,
   CompetitionRankingArchiveConflictError,
+  CompetitionRankingArchiveCorruptError,
   MongoCompetitionRankingArchiveRepository,
 } from '@/lib/treasure-hunt-competition/server/archive-repository';
 
@@ -52,8 +53,8 @@ function input(overrides: Record<string, unknown> = {}) {
         elapsedMs: 20_000,
         finishedAt: '2026-08-20T00:00:20.000Z',
         reviewStatus: 'review',
-        estimatedRewardUkiRaw: '1000',
-        finalRewardUkiRaw: null,
+        estimatedRewardUkiRaw: '1000' as string | null,
+        finalRewardUkiRaw: null as string | null,
         rewardStatus: 'estimated',
       },
       {
@@ -66,8 +67,8 @@ function input(overrides: Record<string, unknown> = {}) {
         elapsedMs: 21_000,
         finishedAt: '2026-08-20T00:00:21.000Z',
         reviewStatus: 'pending',
-        estimatedRewardUkiRaw: '500',
-        finalRewardUkiRaw: null,
+        estimatedRewardUkiRaw: '500' as string | null,
+        finalRewardUkiRaw: null as string | null,
         rewardStatus: 'pending',
       },
     ],
@@ -77,6 +78,20 @@ function input(overrides: Record<string, unknown> = {}) {
 
 function prepared(value = input()) {
   return prepareCompetitionRankingArchiveImport(value, { now: NOW });
+}
+
+function finalInput() {
+  const value = input();
+  value.stage = 'final';
+  value.pool.status = 'final';
+  value.entries = value.entries.map((entry, index) => ({
+    ...entry,
+    reviewStatus: 'valid',
+    estimatedRewardUkiRaw: null,
+    finalRewardUkiRaw: index === 0 ? '1000' : null,
+    rewardStatus: index === 0 ? 'final' : 'not_applicable',
+  }));
+  return value;
 }
 
 function fakeDb() {
@@ -189,6 +204,139 @@ describe('Competition ranking archive integrity', () => {
       pool: { ...input().pool, status: 'final' },
     });
     expect(() => prepared(value)).toThrow(/pending review/);
+  });
+
+  it('accepts a final no-prize row as resolved with not_applicable and no amount', () => {
+    expect(() => prepared(finalInput())).not.toThrow();
+  });
+
+  it('rejects final reward status without a fixed amount independently of review', () => {
+    const value = finalInput();
+    value.entries[0].finalRewardUkiRaw = null;
+    expect(() => prepared(value)).toThrow(/requires a fixed reward/);
+  });
+
+  it.each(['pending', 'estimated', 'partial', 'draw_pending'] as const)(
+    'rejects unresolved %s reward status in a final archive',
+    (rewardStatus) => {
+      const value = finalInput();
+      value.entries[1].rewardStatus = rewardStatus;
+      expect(() => prepared(value)).toThrow(/unresolved reward/);
+    },
+  );
+
+  it.each(['no_purchase', 'pool_exhausted', 'reward_rounds_to_zero', 'not_applicable'] as const)(
+    'accepts resolved no-prize status %s in a final archive',
+    (rewardStatus) => {
+      const value = finalInput();
+      value.entries[1].rewardStatus = rewardStatus;
+      value.entries[1].finalRewardUkiRaw = '0';
+      expect(() => prepared(value)).not.toThrow();
+    },
+  );
+
+  it.each([
+    ['export before close', () => input({
+      source: { ...input().source, exportedAt: '2026-08-24T22:59:59.999Z' },
+    }), /export cannot predate/],
+    ['creation before close', () => input({
+      createdAt: '2026-08-24T22:59:59.999Z',
+      source: { ...input().source, exportedAt: '2026-08-24T23:00:00.000Z' },
+    }), /creation cannot predate/],
+    ['creation before export', () => input({
+      createdAt: '2026-08-26T08:59:59.999Z',
+    }), /creation cannot predate/],
+  ])('rejects incoherent snapshot chronology: %s', (_label, build, expected) => {
+    expect(() => prepared(build())).toThrow(expected);
+  });
+
+  it.each([
+    ['pool sum', () => input({
+      pool: { ...input().pool, totalUkiRaw: '1' },
+    }), /must sum/],
+    ['metadata player pool', () => input({
+      rewardMetadata: { ...input().rewardMetadata, playerPoolUkiRaw: '1' },
+    }), /metadata player pool differs/],
+    ['incomplete presale pools', () => input({
+      pool: { ...input().pool, playerUkiRaw: null },
+      rewardMetadata: { ...input().rewardMetadata, playerPoolUkiRaw: null },
+    }), /requires complete/],
+    ['staking sponsor pool', () => input({
+      eligibilityKind: 'uki_staking',
+      pool: {
+        status: 'provisional',
+        totalUkiRaw: '100',
+        playerUkiRaw: '90',
+        sponsorUkiRaw: '10',
+      },
+      rewardMetadata: {
+        model: 'staking_draw',
+        playerPoolUkiRaw: '90',
+        sponsorPoolUkiRaw: '10',
+        prizePerWinnerUkiRaw: '5',
+      },
+    }), /non-zero sponsor/],
+  ])('rejects contradictory archive header: %s', (_label, build, expected) => {
+    expect(() => prepared(build())).toThrow(expected);
+  });
+
+  it('reconciles ranked wallets with aliases while allowing more campaign participants', () => {
+    const value = input({ totalParticipants: 2, totalWallets: 1 });
+    expect(() => prepared(value)).not.toThrow();
+    expect(() => prepared(input({ totalParticipants: 1, totalWallets: 2 })))
+      .toThrow(/ranked-wallet total/);
+  });
+
+  it('accepts a legitimate empty final archive only with zero participant totals', () => {
+    const value = finalInput();
+    value.entries = [];
+    value.totalRankedEntries = 0;
+    value.totalParticipants = 0;
+    value.totalWallets = 0;
+    expect(() => prepared(value)).not.toThrow();
+
+    value.totalParticipants = 1;
+    expect(() => prepared(value)).toThrow(/cannot exceed ranked entries/);
+  });
+
+  it('represents the real presale shape with 952 rows, 214 ranked aliases and 241 participants', () => {
+    const walletRanks = new Map<string, number>();
+    const statuses = [
+      ...Array(208).fill('estimated'),
+      ...Array(390).fill('no_purchase'),
+      'partial',
+      ...Array(353).fill('pool_exhausted'),
+    ];
+    const entries = statuses.map((rewardStatus, index) => {
+      const playerAlias = `Player-${String(index % 214).padStart(3, '0')}`;
+      const walletRank = (walletRanks.get(playerAlias) ?? 0) + 1;
+      walletRanks.set(playerAlias, walletRank);
+      return {
+        rank: index + 1,
+        walletRank,
+        publicEntryId: `entry-${index + 1}`,
+        attemptId: `attempt-${index + 1}`,
+        playerAlias,
+        score: 2_000 - index,
+        elapsedMs: 20_000 + index,
+        finishedAt: '2026-08-20T00:00:20.000Z',
+        reviewStatus: 'review',
+        estimatedRewardUkiRaw: rewardStatus === 'estimated' || rewardStatus === 'partial'
+          ? '1000'
+          : '0',
+        finalRewardUkiRaw: null,
+        rewardStatus,
+      };
+    });
+
+    const archive = prepared(input({
+      totalRankedEntries: 952,
+      totalParticipants: 241,
+      totalWallets: 214,
+      entries,
+    }));
+    expect(archive.entries).toHaveLength(952);
+    expect(archive.manifest).toMatchObject({ totalParticipants: 241, totalWallets: 214 });
   });
 
   it('computes deterministic hashes and validates declared hashes before apply', () => {
@@ -334,5 +482,42 @@ describe('Competition ranking archive integrity', () => {
       playerAlias: 1,
       rewardStatus: 1,
     }) });
+  });
+
+  it('defaults only a missing legacy eligibility kind to presale when reading Mongo', async () => {
+    const archive = prepared();
+    const { eligibilityKind: _omitted, ...legacyManifest } = archive.manifest;
+    const cursor = {
+      sort: jest.fn(),
+      toArray: jest.fn(async () => [{ ...legacyManifest, publicationStatus: 'ready' }]),
+    };
+    cursor.sort.mockReturnValue(cursor);
+    const repository = new MongoCompetitionRankingArchiveRepository(async () => ({
+      collection: jest.fn(() => ({ find: jest.fn(() => cursor) })),
+    }) as never);
+
+    await expect(repository.listReadyManifests()).resolves.toEqual([
+      expect.objectContaining({ eligibilityKind: 'presale' }),
+    ]);
+  });
+
+  it('fails closed instead of publishing an unknown stored eligibility kind', async () => {
+    const archive = prepared();
+    const cursor = {
+      sort: jest.fn(),
+      toArray: jest.fn(async () => [{
+        ...archive.manifest,
+        eligibilityKind: 'mystery_formula',
+        publicationStatus: 'ready',
+      }]),
+    };
+    cursor.sort.mockReturnValue(cursor);
+    const repository = new MongoCompetitionRankingArchiveRepository(async () => ({
+      collection: jest.fn(() => ({ find: jest.fn(() => cursor) })),
+    }) as never);
+
+    await expect(repository.listReadyManifests()).rejects.toBeInstanceOf(
+      CompetitionRankingArchiveCorruptError,
+    );
   });
 });

@@ -128,6 +128,20 @@ source), `entries` públicas ordenadas con ranks contiguos y, para aplicar,
 `publicEntryId`, `attemptId` opcional, alias, score, tiempo, revisión, rewards y
 tickets opcionales; el esquema estricto rechaza wallets, user IDs, sesiones y
 evidencias. `final` se rechaza mientras haya revisión pendiente o rewards sin fijar.
+El provisional conserva los estados públicos legacy (`estimated`, `partial`,
+`no_purchase`, `pool_exhausted` y `reward_rounds_to_zero`). En un final, los estados
+sin premio quedan resueltos con importe nulo o `0`; una fila premiada usa `final`
+con un importe fijado.
+`totalParticipants` cuenta participantes de campaña (incluidos los que no lograron
+fila clasificatoria); `totalWallets` cuenta wallets clasificadas y debe coincidir
+con los aliases públicos únicos. Ambos deben ser `0` en un archivo vacío. El payload
+real de preventa, por ejemplo, representa 952 filas, 214 aliases clasificados y 241
+participantes. `createdAt` es la creación del snapshot y no puede
+preceder a `source.exportedAt`; la exportación tampoco puede preceder al cierre.
+La completitud se valida contra `totalRankedEntries`, ranks contiguos, IDs únicos y
+hashes del export sanitizado. Sin consultar la base de origen no es posible probar
+que el exportador omitió una fila; por eso el total del export debe obtenerse de la
+fuente auditada y verificarse antes de añadir sus hashes al archivo de importación.
 
 ### Getting Discord Guild ID
 

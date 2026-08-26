@@ -19,6 +19,11 @@ export type CompetitionRankingArchiveReviewStatus =
 export type CompetitionRankingArchiveRewardStatus =
   | 'pending'
   | 'estimated'
+  | 'partial'
+  | 'no_purchase'
+  | 'pool_exhausted'
+  | 'reward_rounds_to_zero'
+  | 'draw_pending'
   | 'final'
   | 'not_applicable';
 
@@ -130,7 +135,17 @@ const archiveEntrySchema = z.object({
   reviewStatus: z.enum(['pending', 'review', 'valid', 'invalid']),
   estimatedRewardUkiRaw: nullableRawUki,
   finalRewardUkiRaw: nullableRawUki,
-  rewardStatus: z.enum(['pending', 'estimated', 'final', 'not_applicable']),
+  rewardStatus: z.enum([
+    'pending',
+    'estimated',
+    'partial',
+    'no_purchase',
+    'pool_exhausted',
+    'reward_rounds_to_zero',
+    'draw_pending',
+    'final',
+    'not_applicable',
+  ]),
   tickets: z.number().int().safe().nonnegative().nullable().optional()
     .transform((value) => value ?? null),
 }).strict();
@@ -183,12 +198,48 @@ function normalizedHashInput(input: ParsedArchiveImport) {
   return withoutHashes;
 }
 
+function assertPoolMetadataIntegrity(input: ParsedArchiveImport) {
+  const playerPool = input.pool.playerUkiRaw;
+  const sponsorPool = input.pool.sponsorUkiRaw;
+  if (
+    playerPool !== null
+    && sponsorPool !== null
+    && BigInt(playerPool) + BigInt(sponsorPool) !== BigInt(input.pool.totalUkiRaw)
+  ) {
+    throw new Error('Archive player and sponsor pools must sum to total pool');
+  }
+
+  const metadata = input.rewardMetadata;
+  if (!metadata) return;
+  if (metadata.playerPoolUkiRaw !== playerPool) {
+    throw new Error('Archive reward metadata player pool differs from pool header');
+  }
+  if (metadata.sponsorPoolUkiRaw !== sponsorPool) {
+    throw new Error('Archive reward metadata sponsor pool differs from pool header');
+  }
+  if (metadata.model === 'presale_pool' && (playerPool === null || sponsorPool === null)) {
+    throw new Error('Presale reward metadata requires complete player and sponsor pools');
+  }
+  if (
+    metadata.model === 'staking_draw'
+    && (sponsorPool !== null && sponsorPool !== '0')
+  ) {
+    throw new Error('Staking reward metadata cannot define a non-zero sponsor pool');
+  }
+}
+
 function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
   if (Date.parse(input.startsAt) >= Date.parse(input.endsAt)) {
     throw new Error('Archive campaign startsAt must be before endsAt');
   }
   if (Date.parse(input.endsAt) >= now.getTime()) {
     throw new Error('Archive campaign must be closed before it can be imported');
+  }
+  if (Date.parse(input.source.exportedAt) < Date.parse(input.endsAt)) {
+    throw new Error('Archive source export cannot predate campaign end');
+  }
+  if (Date.parse(input.createdAt) < Date.parse(input.source.exportedAt)) {
+    throw new Error('Archive creation cannot predate source export');
   }
   if (input.pool.status !== input.stage) {
     throw new Error('Archive pool status must match snapshot stage');
@@ -202,10 +253,12 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
   if (input.rewardMetadata?.model === 'staking_draw' && input.eligibilityKind !== 'uki_staking') {
     throw new Error('Staking reward metadata cannot be applied to a presale archive');
   }
+  assertPoolMetadataIntegrity(input);
 
   const publicIds = new Set<string>();
   const attemptIds = new Set<string>();
   const walletRanksByAlias = new Map<string, number>();
+  const representedAliases = new Set<string>();
   for (const [index, entry] of input.entries.entries()) {
     if (entry.rank !== index + 1) {
       throw new Error(`Archive ranks must be contiguous from 1 (invalid rank at index ${index})`);
@@ -214,6 +267,7 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
       throw new Error(`Duplicate archive publicEntryId at rank ${entry.rank}`);
     }
     publicIds.add(entry.publicEntryId);
+    representedAliases.add(entry.playerAlias);
     if (entry.attemptId) {
       if (attemptIds.has(entry.attemptId)) {
         throw new Error(`Duplicate archive attemptId at rank ${entry.rank}`);
@@ -227,6 +281,17 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
     if (input.eligibilityKind === 'presale' && entry.tickets !== null) {
       throw new Error('Presale archive entries cannot contain staking tickets');
     }
+    if (entry.rewardStatus === 'final' && entry.finalRewardUkiRaw === null) {
+      throw new Error(`Final reward status requires a fixed reward at rank ${entry.rank}`);
+    }
+    if (
+      ['no_purchase', 'pool_exhausted', 'reward_rounds_to_zero', 'not_applicable']
+        .includes(entry.rewardStatus)
+      && entry.finalRewardUkiRaw !== null
+      && entry.finalRewardUkiRaw !== '0'
+    ) {
+      throw new Error(`No-prize reward status cannot contain a positive final amount at rank ${entry.rank}`);
+    }
     if (entry.walletRank !== null) {
       const expectedWalletRank = (walletRanksByAlias.get(entry.playerAlias) ?? 0) + 1;
       if (entry.walletRank !== expectedWalletRank) {
@@ -236,6 +301,29 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
     }
   }
 
+  const representedParticipants = representedAliases.size;
+  if (input.totalParticipants === null || input.totalWallets === null) {
+    throw new Error('Archive participant and ranked-wallet totals are required');
+  }
+  if (
+    input.totalParticipants > input.entries.length
+    || input.totalWallets > input.entries.length
+  ) {
+    throw new Error('Archive participant totals cannot exceed ranked entries');
+  }
+  if (input.totalWallets !== representedParticipants) {
+    throw new Error('Archive ranked-wallet total must match unique public aliases');
+  }
+  if (input.totalParticipants < input.totalWallets) {
+    throw new Error('Archive participant total cannot be lower than ranked wallets');
+  }
+  if (
+    input.entries.length === 0
+    && (input.totalParticipants !== 0 || input.totalWallets !== 0)
+  ) {
+    throw new Error('An empty archive cannot declare represented participants or wallets');
+  }
+
   if (input.stage === 'final') {
     const unresolved = input.entries.find((entry) => (
       entry.reviewStatus === 'pending' || entry.reviewStatus === 'review'
@@ -243,11 +331,17 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
     if (unresolved) {
       throw new Error(`Final archive cannot contain pending review at rank ${unresolved.rank}`);
     }
-    const unfixedReward = input.entries.find((entry) => (
-      entry.rewardStatus !== 'final' || entry.finalRewardUkiRaw === null
+    const unresolvedRewardStatuses: readonly CompetitionRankingArchiveRewardStatus[] = [
+      'pending',
+      'estimated',
+      'partial',
+      'draw_pending',
+    ];
+    const unresolvedReward = input.entries.find((entry) => (
+      unresolvedRewardStatuses.includes(entry.rewardStatus)
     ));
-    if (unfixedReward) {
-      throw new Error(`Final archive requires fixed final rewards at rank ${unfixedReward.rank}`);
+    if (unresolvedReward) {
+      throw new Error(`Final archive contains an unresolved reward at rank ${unresolvedReward.rank}`);
     }
   }
 }

@@ -46,7 +46,9 @@ type ArchiveIdentity = Pick<
   'campaignId' | 'rulesVersion' | 'stage'
 >;
 
-interface CompetitionRankingArchiveManifestDocument extends CompetitionRankingArchiveManifest {
+interface CompetitionRankingArchiveManifestDocument
+extends Omit<CompetitionRankingArchiveManifest, 'eligibilityKind'> {
+  readonly eligibilityKind?: unknown;
   readonly buildId: string;
   readonly writerToken: string;
   readonly leaseExpiresAt: string;
@@ -92,6 +94,13 @@ export class CompetitionRankingArchiveBuildInProgressError extends Error {
   }
 }
 
+export class CompetitionRankingArchiveCorruptError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CompetitionRankingArchiveCorruptError';
+  }
+}
+
 function identity(manifest: ArchiveIdentity) {
   return {
     campaignId: manifest.campaignId,
@@ -108,11 +117,19 @@ function publicManifest(
   document: (CompetitionRankingArchiveManifestDocument & { _id?: unknown }) | null,
 ): CompetitionRankingArchiveManifest | null {
   if (!document) return null;
+  const eligibilityKind = document.eligibilityKind == null
+    ? 'presale'
+    : document.eligibilityKind;
+  if (eligibilityKind !== 'presale' && eligibilityKind !== 'uki_staking') {
+    throw new CompetitionRankingArchiveCorruptError(
+      `Archive ${document.campaignId} has an unknown eligibility kind`,
+    );
+  }
   return {
     schemaVersion: document.schemaVersion,
     campaignId: document.campaignId,
     rulesVersion: document.rulesVersion,
-    eligibilityKind: document.eligibilityKind === 'uki_staking' ? 'uki_staking' : 'presale',
+    eligibilityKind,
     startsAt: document.startsAt,
     endsAt: document.endsAt,
     stage: document.stage,
