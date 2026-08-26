@@ -16,7 +16,8 @@ type RankingFilter = 'general' | 'mine';
 const PAGE_SIZE = 20;
 
 function rewardLabel(entry: TreasureHuntLeaderboardEntry) {
-  if (entry.rewardStatus === 'no_purchase') return 'Sin compra UKI';
+  if (entry.rewardStatus === 'draw_pending') return `${entry.tickets.toLocaleString('es-ES')} tickets`;
+  if (entry.rewardStatus === 'no_purchase') return 'No elegible';
   if (entry.rewardStatus === 'pool_exhausted') return 'Fuera de premios';
   if (entry.rewardStatus === 'reward_rounds_to_zero') return 'Sin premio';
   return formatTreasureHuntUkiRaw(entry.estimatedRewardUkiRaw);
@@ -38,8 +39,9 @@ export default function TreasureHuntRankingsView() {
       leaderboardMineOnly: filter === 'mine',
     });
   const campaign = status?.campaign;
-  const maxAttempts = campaign?.maxWinningAttemptsPerWallet ?? 5;
-  const myAttempts = leaderboardMeta?.myAttempts ?? 0;
+  const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
+  const eligibility = status?.eligibility;
+  const myAttempts = eligibility?.topAttemptsCount ?? leaderboardMeta?.myAttempts ?? 0;
   const prizePoolValue = leaderboardMeta
     ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw)
     : 'Actualizando…';
@@ -54,8 +56,8 @@ export default function TreasureHuntRankingsView() {
   }, [filter]);
 
   const metrics = [
-    ['Modo activo', '1P', true],
-    ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`, false],
+    ['Tus tickets', isLoading ? '···' : String(eligibility?.provisionalTickets ?? 0), true],
+    ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`, false],
     [
       'Premio acumulado',
       isLoading && !leaderboardMeta ? '···' : prizePoolValue,
@@ -70,7 +72,7 @@ export default function TreasureHuntRankingsView() {
           Rankings de Treasure Hunt
         </h2>
         <p className="mt-1 text-sm text-[#aaa8a2]">
-          Las cinco mejores partidas de cada jugador, ordenadas por puntuación.
+          Las diez mejores partidas válidas por wallet, ordenadas por puntuación.
         </p>
       </div>
 
@@ -90,7 +92,7 @@ export default function TreasureHuntRankingsView() {
               Competición oficial
             </p>
             <h3 className="mt-1 font-headline text-2xl font-black tracking-[-0.02em] text-[#f1eee8]">
-              Torneo Preventa UKI
+              Treasure Hunt · Staking UKI
             </h3>
           </div>
           <Link
@@ -146,7 +148,7 @@ export default function TreasureHuntRankingsView() {
             ))}
           </div>
           <p className="text-xs text-[#969994]">
-            Cada partida clasificada suma el 10% de tus UKI comprados, hasta {maxAttempts}.
+            Cada {campaign?.pointsPerTicket ?? 100} puntos completos genera un ticket; cuentan hasta {maxAttempts} partidas.
           </p>
         </div>
 
@@ -183,7 +185,7 @@ export default function TreasureHuntRankingsView() {
                     {formatTreasureHuntDuration(entry.gameTimeMs)}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                    <span className="text-[#969994]">Premio estimado</span>
+                    <span className="text-[#969994]">Tickets</span>
                     <strong className={cn(
                       'font-mono text-sm',
                       entry.rewardStatus === 'pool_exhausted'
@@ -206,7 +208,7 @@ export default function TreasureHuntRankingsView() {
                     <th className="px-5 py-3">Jugador</th>
                     <th className="px-5 py-3 text-right">Puntuación</th>
                     <th className="px-5 py-3 text-right">Tiempo</th>
-                    <th className="px-5 py-3 text-right">Premio estimado</th>
+                    <th className="px-5 py-3 text-right">Tickets</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">

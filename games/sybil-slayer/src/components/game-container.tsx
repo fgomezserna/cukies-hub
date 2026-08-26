@@ -1711,6 +1711,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             'La sesión cambió mientras confirmábamos el acceso. La partida no se inició; vuelve a intentarlo.',
           ATTEMPT_ALREADY_ACTIVE:
             'Esta wallet ya tiene una partida activa en otra pestaña. Vuelve a esa partida o espera un momento para iniciar una nueva.',
+          NO_ATTEMPTS_REMAINING:
+            'No te quedan intentos. Cada 2.000 UKI completos en staking conceden una partida nueva.',
+          PARTICIPANT_DISQUALIFIED:
+            'Esta wallet retiró UKI durante la campaña y ha quedado descalificada.',
+          ELIGIBILITY_UNAVAILABLE:
+            'Estamos sincronizando tu staking confirmado. Espera unos segundos y vuelve a intentarlo.',
         };
         setCompetitionStartError(accessErrorCopy[access.reason ?? ''] ??
           'No pudimos confirmar si el intento quedó creado. La partida no se inició; vuelve a intentarlo.');
@@ -1893,7 +1899,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       const queued = sendGameEnd({
         finalScore: gameState.score,
         gameTime,
-        economyRunId: resultAuthority.economyRunId,
+        ...(resultAuthority.economyRunId
+          ? { economyRunId: resultAuthority.economyRunId }
+          : {}),
         ...(resultAuthority.competitionAttemptId
           ? { competitionAttemptId: resultAuthority.competitionAttemptId }
           : {}),
@@ -1931,7 +1939,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       const queued = sendGameEnd({
         finalScore: 0,
         gameTime: getActiveGameTimeMs(),
-        economyRunId: resultAuthority.economyRunId,
+        ...(resultAuthority.economyRunId
+          ? { economyRunId: resultAuthority.economyRunId }
+          : {}),
         ...(resultAuthority.competitionAttemptId
           ? { competitionAttemptId: resultAuthority.competitionAttemptId }
           : {}),

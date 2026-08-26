@@ -14,7 +14,6 @@ import {
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Panel } from '@/components/landing/primitives';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from '@/components/landing/sale-config';
-import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -26,7 +25,8 @@ import {
 import { useAuth } from '@/providers/auth-provider';
 
 const TOKEN_DECIMALS = 18;
-const DEFAULT_AMOUNT = '20000';
+const DEFAULT_AMOUNT = '2000';
+const UKI_PER_ATTEMPT = parseUnits('2000', TOKEN_DECIMALS);
 
 type StakingOperation = 'stake' | 'unstake';
 type TransactionAction = 'approve' | 'stake' | 'unstake' | null;
@@ -56,10 +56,8 @@ function sameAddress(left?: string, right?: string) {
 }
 
 export function UkiStakingPanel({
-  routePreview = null,
   testnetOnly = false,
 }: {
-  routePreview?: UkiRoutePreview | null;
   testnetOnly?: boolean;
 }) {
   const { address, chainId, isConnected } = useAccount();
@@ -154,12 +152,23 @@ export function UkiStakingPanel({
     args: address ? [address] : undefined,
     query: { enabled: walletReadsEnabled, staleTime: 0 },
   });
+  const {
+    data: totalStaked,
+    isError: isTotalStakedError,
+    refetch: refetchTotalStaked,
+  } = useReadContract({
+    chainId: UKI_PRESALE_CHAIN_ID,
+    address: stakingAddress,
+    abi: ukiStakingAbi,
+    functionName: 'totalStaked',
+    query: { enabled: publicReadsEnabled, staleTime: 0 },
+  });
 
   const protocolReadsReady = stakingToken !== undefined && (
     operation === 'unstake' || isPaused !== undefined
   );
   const tokenMatches = sameAddress(stakingToken, tokenAddress);
-  const protocolReadFailed = isStakingTokenError ||
+  const protocolReadFailed = isStakingTokenError || isTotalStakedError ||
     (operation === 'stake' && isPausedError) ||
     (stakingToken !== undefined && !tokenMatches);
   const walletReadFailed = operation === 'stake'
@@ -201,8 +210,7 @@ export function UkiStakingPanel({
     operation,
     parsedAmount,
     stakedBalance,
-    routePreview,
-  }), [operation, parsedAmount, routePreview, stakedBalance]);
+  }), [operation, parsedAmount, stakedBalance]);
   const workflowSteps = buildWorkflowSteps({
     operation,
     isConnected,
@@ -226,6 +234,7 @@ export function UkiStakingPanel({
     void refetchAllowance();
     void refetchLiquidBalance();
     void refetchStakedBalance();
+    void refetchTotalStaked();
     void refetchPaused();
     void refetchStakingToken();
 
@@ -241,6 +250,7 @@ export function UkiStakingPanel({
       setApprovedAmount(null);
       setLastCompletedAction('stake');
       window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+      window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Staking confirmado',
         description: 'Tus UKI ya constan en el contrato de Cukie Master.',
@@ -249,6 +259,7 @@ export function UkiStakingPanel({
       setAmount(DEFAULT_AMOUNT);
       setLastCompletedAction('unstake');
       window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+      window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Retirada confirmada',
         description: 'Los UKI retirados han vuelto a tu wallet.',
@@ -264,6 +275,7 @@ export function UkiStakingPanel({
     refetchPaused,
     refetchStakedBalance,
     refetchStakingToken,
+    refetchTotalStaked,
     toast,
     txHash,
   ]);
@@ -361,20 +373,21 @@ export function UkiStakingPanel({
               Staking de UKI
             </h2>
             <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Deposita solo los UKI que te falten o retíralos cuando quieras. El vesting ya cuenta
-              por separado y la operación no implica una rentabilidad garantizada.
+              Cada 2.000 UKI confirmados en staking desbloquean una partida de Treasure Hunt.
+              El intento se consume al iniciar la partida.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               <BalanceCard label="UKI en wallet" value={formatTokenAmount(liquidBalance)} />
               <BalanceCard label="UKI en staking" value={formatTokenAmount(stakedBalance)} />
+              <BalanceCard label="Staking global" value={formatTokenAmount(totalStaked)} />
             </div>
 
             <div className="mt-4 flex items-start gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 p-4">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" />
               <p className="text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                Red: {UKI_PRESALE_CHAIN_LABEL}. Necesitas tBNB para el gas. El requisito oficial,
-                los UKI en vesting y tus cupos aparecen en “Tus cupos Cukie Master”.
+                Red: {UKI_PRESALE_CHAIN_LABEL}. Necesitas tBNB para el gas. Los UKI líquidos o en
+                vesting no conceden partidas: solo cuenta el saldo del contrato de staking.
               </p>
             </div>
           </div>
@@ -418,8 +431,8 @@ export function UkiStakingPanel({
               <span className="flex shrink-0 items-center border-l border-white/10 px-4 text-xs font-black uppercase text-[var(--uki-muted)]">UKI</span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Cantidades rápidas">
-              <QuickAmountButton label="20.000" onClick={() => selectQuickAmount('20000')} disabled={isBusy} />
-              <QuickAmountButton label="40.000" onClick={() => selectQuickAmount('40000')} disabled={isBusy} />
+              <QuickAmountButton label="2.000" onClick={() => selectQuickAmount('2000')} disabled={isBusy} />
+              <QuickAmountButton label="10.000" onClick={() => selectQuickAmount('10000')} disabled={isBusy} />
               <QuickAmountButton label="Máximo" onClick={useMaximumBalance} disabled={availableBalance === undefined || isBusy} />
             </div>
             <p id="uki-staking-available" className="mt-2 text-right text-xs font-semibold text-[var(--uki-muted)]">
@@ -432,6 +445,10 @@ export function UkiStakingPanel({
                 <p className="mt-2 text-sm font-black leading-relaxed text-[var(--uki-cream)]">{outcomePreview.summary}</p>
                 <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{outcomePreview.detail}</p>
               </div>
+            ) : null}
+
+            {operation === 'unstake' ? (
+              <InlineWarning text="Una retirada confirmada durante la campaña descalifica esta wallet, aunque vuelvas a depositar después." />
             ) : null}
 
             {isUnsafeStagingChain ? (
@@ -671,38 +688,29 @@ function buildOutcomePreview({
   operation,
   parsedAmount,
   stakedBalance,
-  routePreview,
 }: {
   operation: StakingOperation;
   parsedAmount: bigint | null;
   stakedBalance?: bigint;
-  routePreview: UkiRoutePreview | null;
 }) {
-  if (!parsedAmount || !routePreview) return null;
-  try {
-    const requirement = BigInt(routePreview.currentRequirementRaw);
-    const locked = BigInt(routePreview.presaleLockedRaw);
-    const currentStaked = stakedBalance ?? BigInt(routePreview.indexedStakedRaw);
-    if (requirement <= BigInt(0) || locked < BigInt(0) || currentStaked < BigInt(0)) return null;
-    if (operation === 'unstake' && parsedAmount > currentStaked) return null;
-    const projectedStaked = operation === 'stake'
-      ? currentStaked + parsedAmount
-      : currentStaked - parsedAmount;
-    const total = locked + projectedStaked;
-    const theoreticalSlots = Math.min(5, Number(total / requirement));
-    const remainder = total % requirement;
-    const deficit = theoreticalSlots >= 5
-      ? BigInt(0)
-      : remainder === BigInt(0) ? requirement : requirement - remainder;
-    return {
-      summary: `Capacidad teórica tras confirmar: ${theoreticalSlots}/5 cupos por UKI.`,
-      detail: `${formatTokenAmount(total)} UKI computables = ${formatTokenAmount(locked)} en vesting + ${formatTokenAmount(projectedStaked)} en staking.${
-        deficit > BigInt(0) ? ` Faltarían ${formatTokenAmount(deficit)} UKI para el siguiente cupo.` : ' Máximo de la ruta alcanzado.'
-      } La asignación final se actualiza cuando el indexador confirma la operación.`,
-    };
-  } catch {
-    return null;
-  }
+  if (!parsedAmount || stakedBalance === undefined) return null;
+  if (operation === 'unstake' && parsedAmount > stakedBalance) return null;
+  const projectedStaked = operation === 'stake'
+    ? stakedBalance + parsedAmount
+    : stakedBalance - parsedAmount;
+  const attempts = projectedStaked / UKI_PER_ATTEMPT;
+  const remainder = projectedStaked % UKI_PER_ATTEMPT;
+  const missingForNextAttempt = remainder === BigInt(0)
+    ? UKI_PER_ATTEMPT
+    : UKI_PER_ATTEMPT - remainder;
+  return {
+    summary: `Saldo proyectado: ${attempts.toString()} partidas concedidas por staking.`,
+    detail: `${formatTokenAmount(projectedStaked)} UKI en staking.${
+      operation === 'unstake'
+        ? ' La retirada descalifica la wallet si la campaña ya ha empezado.'
+        : ` Faltarían ${formatTokenAmount(missingForNextAttempt)} UKI para conceder una partida adicional.`
+    }`,
+  };
 }
 
 function InlineWarning({ text }: { text: string }) {

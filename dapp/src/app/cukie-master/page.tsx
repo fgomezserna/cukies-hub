@@ -1,83 +1,64 @@
 import type { Metadata } from 'next';
-import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
 import { CukieMasterWorkspace } from '@/components/cukie-master/workspace';
 import { LaunchInfoPage } from '@/components/launch/info-page';
 import { UKI_PRESALE_CHAIN_LABEL } from '@/components/landing/sale-config';
 
 export const metadata: Metadata = {
-  title: 'Cukie Master | Cukies World',
-  description: 'Requisitos, cupos y créditos de competición para Cukie Master.',
+  title: 'Staking UKI | Cukies World',
+  description: 'Deposita UKI en BNB Smart Chain y desbloquea partidas de Treasure Hunt.',
 };
 
 export const dynamic = 'force-dynamic';
 
 export default function CukieMasterPage() {
-  const creditsEnabled = process.env.COMPETITION_CREDITS_RUNTIME_ENABLED?.trim().toLowerCase() === 'true';
   const isStaging = process.env.APP_ENV?.trim().toLowerCase() === 'staging';
 
   return (
     <LaunchInfoPage
       variant="workspace"
       eyebrow={`${isStaging ? 'Área de pruebas' : 'Red configurada'} · ${UKI_PRESALE_CHAIN_LABEL}`}
-      title="Cukie Master"
-      subtitle="Comprueba primero qué activos ya te cuentan. Después completa lo que te falte con UKI o Cukies Originales, sin hacer staking innecesario."
+      title="Staking de UKI"
+      subtitle="Deposita UKI para desbloquear partidas en la nueva competición de Treasure Hunt. Esta versión de Cukie Master muestra únicamente el staking necesario para probar el lanzamiento."
       heroImage="/brand/generated/uki-cukie-master-scene-v2.png"
       heroAlt="Escena Cukie Master con token UKI y bóveda"
-      primaryCta={{ label: 'Ver mi estado', href: '#mi-estado' }}
-      secondaryCta={{ label: 'Cómo funciona', href: '#como-funciona' }}
+      primaryCta={{ label: 'Gestionar staking', href: '#uki-staking' }}
+      secondaryCta={{ label: 'Ver competición', href: '/games/treasure-hunt/competitions' }}
       metrics={[
-        { label: 'Ruta UKI', value: '20.000 UKI', helper: 'Requisito inicial por cupo' },
-        { label: 'Ruta Cukies', value: '3 puntos', helper: 'Requisito inicial por cupo' },
-        { label: 'Límite por wallet', value: '10 cupos', helper: 'Máximo 5 por cada ruta' },
-        { label: 'Validación inicial', value: '24 horas', helper: 'Antes de que un cupo pase a activo' },
+        { label: 'Partida', value: '2.000 UKI', helper: 'En staking por cada intento' },
+        { label: 'Resultados', value: 'Top 10', helper: 'Mejores puntuaciones por wallet' },
+        { label: 'Tickets', value: '1 / 100 pts', helper: 'Redondeo siempre hacia abajo' },
+        { label: 'Retirada', value: 'Inmediata', helper: 'Descalifica durante la campaña' },
       ]}
       beforeSections={<CukieMasterWorkspace testnetOnly={isStaging} />}
-      afterSections={creditsEnabled ? <CompetitionCreditPanel /> : undefined}
       sections={[
         {
-          title: 'Ruta UKI',
-          text: 'Los UKI de preventa que siguen en vesting ya cuentan. Solo necesitas añadir staking si aún te falta cantidad para el siguiente cupo.',
+          title: 'Cómo desbloqueas partidas',
+          text: 'Solo cuenta el saldo confirmado dentro del contrato UKIStaking. Los UKI líquidos de la wallet o bloqueados en vesting no conceden intentos.',
           bullets: [
-            'Se suman los UKI en vesting y los UKI depositados en staking.',
-            'El panel muestra la suma completa y el déficit exacto para el siguiente cupo.',
-            'Puedes retirar UKI, pero tus cupos se recalcularán con la nueva cantidad.',
+            'Cada 2.000 UKI completos en staking conceden una partida durante la campaña.',
+            'El intento se consume cuando el servidor inicia la partida, aunque se cierre antes de terminar.',
+            'Aumentar el staking puede conceder nuevos intentos; las fracciones inferiores a 2.000 UKI no conceden uno adicional.',
           ],
         },
         {
-          title: 'Ruta Cukies Originales',
-          text: 'La ruta NFT usa puntos de Cukies Originales según rareza.',
-          table: {
-            headers: ['Rareza', 'Puntos'],
-            rows: [
-              ['Común', '1'],
-              ['No Común', '2'],
-              ['Raro', '4'],
-              ['Épico', '7'],
-              ['Legendario', '10'],
-              ['Goat', '15'],
-            ],
-          },
-        },
-        {
-          title: 'Requisito dinámico',
+          title: 'Retirar durante la competición',
+          text: 'El contrato permite retirar inmediatamente, pero la competición conserva el historial on-chain.',
           bullets: [
-            'Si una ruta completa su capacidad, el requisito de entrada puede actualizarse.',
-            'Verás el requisito vigente, cualquier cambio pendiente y los cupos que conservas.',
-            'Si cambia el requisito, tendrás una ventana de 48 horas para ajustar tus activos.',
+            'Cualquier retirada confirmada entre el inicio y el cierre descalifica la wallet de esa campaña.',
+            'Volver a depositar después no elimina la descalificación.',
+            'Después del cierre publicado puedes retirar sin depender de cuándo se ejecute el sorteo.',
           ],
         },
         {
-          title: 'Créditos de competición',
+          title: 'Puntuaciones y tickets',
           bullets: [
-            creditsEnabled
-              ? 'La asignación de créditos está activa en este entorno y aparecerá debajo de las reglas.'
-              : 'La asignación de créditos todavía no está activa en este entorno de pruebas.',
-            'Cuando se habilite, solo contarán los cupos que ya hayan pasado a estado activo.',
-            'No mostramos saldos ni recompensas estimadas mientras el servicio no está habilitado.',
+            'Solo se conservan las 10 mejores puntuaciones válidas de cada wallet.',
+            'Cada resultado genera floor(puntuación / 100) tickets.',
+            'Una wallet puede resultar ganadora como máximo una vez.',
           ],
         },
       ]}
-      note="Cukie Master da acceso a cupos y utilidades dentro del ecosistema. No implica una rentabilidad garantizada. Comprueba siempre el estado y los requisitos vigentes antes de confirmar una operación."
+      note="Staking no implica rentabilidad garantizada. En staging se utilizan UKI y tBNB de BSC Testnet sin valor real. Comprueba la red y el contrato antes de confirmar cada operación."
     />
   );
 }

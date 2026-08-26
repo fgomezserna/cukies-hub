@@ -89,6 +89,15 @@ export class IndexerStore {
       this.events().createIndex({
         chain: 1,
         contractAlias: 1,
+        contractAddress: 1,
+        eventName: 1,
+        status: 1,
+        'normalized.accountNormalized': 1,
+        timestampMs: 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
         status: 1,
         'normalized.accountNormalized': 1,
       }),

@@ -28,6 +28,22 @@ function coordinator(overrides: Partial<CompetitionAttemptCoordinator> = {}) {
       score: 999,
       gameTimeMs: 30_000,
     })),
+    abandon: jest.fn(async () => ({
+      accepted: true,
+      status: 'abandoned' as const,
+      nextSequence: 1,
+      receipt: null,
+      score: 500,
+      gameTimeMs: 5_000,
+    })),
+    abandonDeclared: jest.fn(async () => ({
+      accepted: true,
+      status: 'abandoned' as const,
+      nextSequence: 1,
+      receipt: null,
+      score: 500,
+      gameTimeMs: 5_000,
+    })),
     ...overrides,
   } as unknown as CompetitionAttemptCoordinator;
 }
@@ -68,6 +84,31 @@ describe('Treasure Hunt competition game event router', () => {
       fetchImpl: fetchImpl as typeof fetch,
       gameEnd: { finalScore: 999, gameTime: 30_000 },
     })).rejects.toThrow('authority conflict');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('routes manual exits to authoritative abandon without regressing the score', async () => {
+    const competitionCoordinator = coordinator();
+    const fetchImpl = jest.fn();
+
+    await expect(routeGameEnd({
+      gameSessionId: 'session-1',
+      sessionToken: 'legacy-bearer',
+      competitionCoordinator,
+      fetchImpl: fetchImpl as typeof fetch,
+      gameEnd: {
+        finalScore: 500,
+        gameTime: 5_000,
+        metadata: { gameOverReason: 'manual' },
+      },
+    })).resolves.toMatchObject({
+      source: 'competition',
+      success: true,
+      finalScore: 0,
+      result: { status: 'abandoned', score: 500 },
+    });
+    expect(competitionCoordinator.abandon).toHaveBeenCalledWith('session-1');
+    expect(competitionCoordinator.finish).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

@@ -36,12 +36,14 @@ export default function TreasureHuntRulesView() {
     includeLeaderboard: false,
   });
   const rules = status?.campaign ?? TREASURE_HUNT_FALLBACK_RULES;
+  const topAttempts = rules.topAttemptsPerWallet;
+  const pointsPerTicket = rules.pointsPerTicket;
 
   return (
     <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
       <div className="mb-4">
         <h2 className="font-headline text-2xl font-black tracking-[-0.025em] text-[#f2eee7]">
-          Reglas del Torneo Preventa UKI
+          Reglas de la Competición Staking UKI
         </h2>
         <p className="mt-1 text-sm text-[#aaa8a2]">
           Cómo participar, clasificarse y recibir los premios.
@@ -61,7 +63,7 @@ export default function TreasureHuntRulesView() {
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/15 px-5 py-5">
           <div>
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.15em] text-[#35eee2]">
-              Reglamento oficial · Preventa UKI
+              Reglamento oficial · Staking UKI
             </p>
             <h3 className="mt-1 font-headline text-2xl font-black tracking-[-0.02em] text-[#f1eee8]">
               Competición individual 1P
@@ -79,61 +81,57 @@ export default function TreasureHuntRulesView() {
 
         <ol className="divide-y divide-white/15">
           <RuleSection number={1} title="Cómo participar">
-            <p>Juega partidas 1P. Puedes participar sin comprar UKI.</p>
+            <p>
+              Deposita UKI en Cukie Master. Cada 2.000 UKI completos en staking conceden
+              un intento. Si aumentas el staking, puedes desbloquear intentos adicionales.
+            </p>
+            <p>El intento se consume al iniciar la partida, incluso si la abandonas o resulta inválida.</p>
+            <Link href="/cukie-master" className="inline-flex items-center gap-2 font-bold text-[#35eee2] hover:text-white">
+              Gestionar staking <ArrowRight className="h-4 w-4" />
+            </Link>
           </RuleSection>
 
           <RuleSection number={2} title="Clasificación">
             <p>
-              Solo cuentan partidas completadas. Máximo {rules.maxWinningAttemptsPerWallet} partidas por jugador.
+              Solo cuentan partidas 1P completadas y validadas. Se conservan como máximo
+              tus {topAttempts} mejores puntuaciones.
             </p>
           </RuleSection>
 
-          <RuleSection number={3} title="Pool de Premios">
+          <RuleSection number={3} title="Mantener el staking">
             <p>
-              Durante la preventa se destinará un 25% de todos los UKI comprados desde que se
-              alcance una recaudación de 3500 ASM en adelante, para crear un gran pool de
-              recompensas.
+              Puedes retirar en cualquier momento, pero cualquier retirada durante la campaña
+              descalifica la wallet completa. Volver a depositar no elimina la descalificación.
             </p>
           </RuleSection>
 
-          <RuleSection number={4} title="¿Cuánto puedes ganar?">
+          <RuleSection number={4} title="Tickets para el sorteo">
             <p>
-              Cada partida que logre entrar en la zona de premios generará una recompensa
-              equivalente al 10% del total de UKI que hayas comprado durante la preventa.
+              Cada una de tus {topAttempts} mejores partidas válidas genera
+              1 ticket por cada {pointsPerTicket} puntos completos. Los tickets se suman
+              para aumentar tu probabilidad en el sorteo final.
             </p>
-            <p>Cada usuario podrá obtener premio en hasta 5 partidas.</p>
             <div className="rounded-[8px] border border-[#ffc240]/25 bg-[#ffc240]/5 p-4 text-[#f2eee7]">
               <p className="font-black text-[#ffc240]">Ejemplo</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>Compraste 20,000 UKI durante la preventa.</li>
-                <li>Dos de tus partidas clasifican en premios.</li>
+                <li>Una partida obtiene 1.250 puntos.</li>
+                <li>Genera 12 tickets; los 50 puntos restantes no forman otro ticket.</li>
               </ul>
-              <p className="mt-3 font-black text-[#ffc240]">Recibirás</p>
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>2,000 UKI por la primera partida.</li>
-                <li>2,000 UKI por la segunda.</li>
-              </ul>
-              <p className="mt-3 font-black text-[#ffc240]">
-                Premio total: 4,000 UKI adicionales.
-              </p>
             </div>
           </RuleSection>
 
-          <RuleSection number={5} title="¿Cómo se eligen los ganadores?">
-            <p>Al finalizar la competencia se tomará el ranking general.</p>
+          <RuleSection number={5} title="Pool y premios">
             <p>
-              Los premios se asignarán desde el primer puesto hacia abajo, respetando el
-              porcentaje correspondiente a cada jugador, hasta agotar completamente el pool
-              de recompensas.
+              El pool parte de 50.000 UKI y suma el 10% del total de UKI en staking al cierre.
+              Cada ganador recibe 10.000 UKI y una misma wallet solo puede ganar una vez.
             </p>
           </RuleSection>
 
-          <RuleSection number={6} title="Reparto del Pool">
-            <p>El pool total se distribuirá de la siguiente manera:</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>80% para los jugadores que clasifiquen.</li>
-              <li>20% para los patrocinadores que hayan invitado a esos jugadores.</li>
-            </ul>
+          <RuleSection number={6} title="Selección de ganadores">
+            <p>
+              El sorteo es ponderado por tickets y se realiza únicamente entre wallets elegibles.
+              Cuando una wallet resulta ganadora, se elimina de las rondas siguientes.
+            </p>
           </RuleSection>
 
           <RuleSection number={7} title="Entrega de los Premios">

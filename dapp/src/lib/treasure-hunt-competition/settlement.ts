@@ -75,6 +75,9 @@ export function settleCompetition(input: {
   /** Exact externally-audited pool. Omit only for legacy callers. */
   readonly poolUkiRaw?: string;
 }): CompetitionSettlement {
+  if (input.campaign.eligibilityKind !== 'presale') {
+    throw new Error('Presale settlement cannot settle a staking competition');
+  }
   const { byWallet, totalPurchased } = aggregatePurchases(input.purchases);
   const pool = input.poolUkiRaw === undefined
     ? multiplyByBps(totalPurchased, input.campaign.poolBps)

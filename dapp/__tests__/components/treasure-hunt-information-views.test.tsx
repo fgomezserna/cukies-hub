@@ -56,6 +56,14 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   formatTreasureHuntDuration: (gameTimeMs: number) => `${gameTimeMs / 1_000} s`,
   formatTreasureHuntPercentage: (bps: number) => `${bps / 100}%`,
   TREASURE_HUNT_FALLBACK_RULES: {
+    eligibilityKind: 'uki_staking',
+    stakePerAttemptRaw: '2000000000000000000000',
+    topAttemptsPerWallet: 10,
+    pointsPerTicket: 100,
+    basePrizeUkiRaw: '50000000000000000000000',
+    stakePrizeBps: 1_000,
+    prizePerWinnerUkiRaw: '10000000000000000000000',
+    maxWinsPerWallet: 1,
     poolBps: 2_500,
     playerRewardBps: 1_000,
     sponsorRewardBps: 2_500,
@@ -70,12 +78,36 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         alias: 'CukiePlayer',
       },
       campaign: {
+        eligibilityKind: 'uki_staking',
+        stakePerAttemptRaw: '2000000000000000000000',
+        topAttemptsPerWallet: 10,
+        pointsPerTicket: 100,
+        basePrizeUkiRaw: '50000000000000000000000',
+        stakePrizeBps: 1_000,
+        prizePerWinnerUkiRaw: '10000000000000000000000',
+        maxWinsPerWallet: 1,
         poolBps: 2_500,
         playerRewardBps: 1_000,
         sponsorRewardBps: 2_500,
         maxWinningAttemptsPerWallet: 5,
         cliffMonths: 9,
         vestingMonths: 6,
+      },
+      eligibility: {
+        ready: true,
+        stakedUkiRaw: '4000000000000000000000',
+        totalStakedUkiRaw: '214840000000000000000000',
+        indexedThroughBlock: 123_456_789,
+        indexedAt: '2026-08-26T12:00:00.000Z',
+        disqualified: false,
+        disqualificationEvidence: null,
+        issues: [],
+        attemptsGranted: 2,
+        attemptsUsed: 1,
+        attemptsRemaining: 1,
+        topAttemptsCount: 1,
+        totalTickets: 125,
+        provisionalTickets: 125,
       },
     },
     leaderboard: [
@@ -88,9 +120,10 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         gameTimeMs: 42_000,
         finishedAt: '2026-07-23T18:00:00.000Z',
         reviewStatus: 'approved',
+        tickets: 125,
         isMe: true,
-        estimatedRewardUkiRaw: '1250000000000000000000',
-        rewardStatus: 'estimated',
+        estimatedRewardUkiRaw: '0',
+        rewardStatus: 'draw_pending',
       },
     ],
     leaderboardMeta: {
@@ -124,15 +157,15 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
-    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo', 'Premio estimado']);
+    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo', 'Tickets']);
     expect(headers).not.toContain('Partida');
     expect(headers).not.toContain('Score');
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
 
     const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
     expect(playLink).toHaveClass('hidden', 'sm:inline-flex');
-    expect(screen.getByText('Modo activo').parentElement).toHaveClass('hidden', 'sm:block');
-    expect(screen.getByText('Partidas computables').closest('dl')).toHaveClass(
+    expect(screen.getByText('Tus tickets').parentElement).toHaveClass('hidden', 'sm:block');
+    expect(screen.getByText('Mejores partidas').closest('dl')).toHaveClass(
       'grid-cols-2',
       'sm:grid-cols-3',
     );
@@ -145,10 +178,10 @@ describe('vistas UX de Treasure Hunt', () => {
 
     expect(screen.getByText('Cómo participar')).toBeInTheDocument();
     expect(screen.getByText('Clasificación')).toBeInTheDocument();
-    expect(screen.getByText('Pool de Premios')).toBeInTheDocument();
-    expect(screen.getByText('¿Cuánto puedes ganar?')).toBeInTheDocument();
-    expect(screen.getByText('¿Cómo se eligen los ganadores?')).toBeInTheDocument();
-    expect(screen.getByText('Reparto del Pool')).toBeInTheDocument();
+    expect(screen.getByText('Mantener el staking')).toBeInTheDocument();
+    expect(screen.getByText('Tickets para el sorteo')).toBeInTheDocument();
+    expect(screen.getByText('Pool y premios')).toBeInTheDocument();
+    expect(screen.getByText('Selección de ganadores')).toBeInTheDocument();
     expect(screen.getByText('Entrega de los Premios')).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
   });
@@ -160,7 +193,8 @@ describe('vistas UX de Treasure Hunt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar partida 1P' }));
 
     expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
+    expect(screen.getByText('Competición Staking UKI')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Gestionar staking UKI/ })).toHaveAttribute('href', '/cukie-master');
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toBeInTheDocument();
     expect(screen.queryByText(/Si clasificas/)).not.toBeInTheDocument();
   });

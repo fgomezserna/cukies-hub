@@ -22,8 +22,14 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
     vestingMonths: 6,
   },
   useTreasureHuntCompetitionOverview: () => ({
-    status: null,
+    status: {
+      eligibility: {
+        attemptsRemaining: 3,
+        provisionalTickets: 125,
+      },
+    },
     leaderboard: [],
+    leaderboardMeta: { poolUkiRaw: '71484000000000000000000' },
     isLoading: false,
     error: null,
     reload: jest.fn(),
@@ -43,10 +49,10 @@ describe('TreasureHuntCompetitionBanner', () => {
   it('mantiene visibles las tres métricas y enlaza a reglas y rankings', () => {
     render(<TreasureHuntCompetitionBanner />);
 
-    expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
-    expect(screen.getByText('1P')).toBeInTheDocument();
-    expect(screen.getByText('Modo activo').parentElement).toHaveClass('hidden', 'sm:block');
-    expect(screen.getByText('0/5')).toBeInTheDocument();
+    expect(screen.getByText('Treasure Hunt · Staking UKI')).toBeInTheDocument();
+    expect(screen.getByText('125')).toBeInTheDocument();
+    expect(screen.getByText('Tickets').parentElement).toHaveClass('hidden', 'sm:block');
+    expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toHaveAttribute(
       'href',

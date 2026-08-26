@@ -429,18 +429,18 @@ export function usePusherGameConnection(
         
         // Process game end
         try {
-          const voluntaryForfeit = economyRunId !== null &&
-            data.metadata && typeof data.metadata === 'object' &&
+          const voluntaryForfeit = data.metadata && typeof data.metadata === 'object' &&
             !Array.isArray(data.metadata) &&
             data.metadata.gameOverReason === 'manual';
-          const routed = voluntaryForfeit ||
-            (economyRunId !== null && !declaresCompetitionAttempt)
+          const routed = economyRunId !== null && !declaresCompetitionAttempt
             ? null
             : await routeGameEnd({
                 gameSessionId: sessionId,
                 sessionToken,
                 competitionCoordinator,
-                gameEnd: data,
+                gameEnd: {
+                  ...data,
+                },
               });
           if (routed === null || routed.success) {
             const canonicalScore = voluntaryForfeit

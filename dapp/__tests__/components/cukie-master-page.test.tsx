@@ -57,7 +57,7 @@ describe('CukieMasterPage', () => {
     else process.env.APP_ENV = previousAppEnv;
   });
 
-  it('prioriza el workspace y no anuncia créditos activos cuando el runtime está cerrado', () => {
+  it('muestra únicamente el staking y sus reglas en staging', () => {
     process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'false';
     process.env.APP_ENV = 'staging';
     const { container } = render(<CukieMasterPage />);
@@ -66,16 +66,18 @@ describe('CukieMasterPage', () => {
     expect(screen.getByText('Workspace personal')).toBeInTheDocument();
     expect(screen.getByText('Workspace personal')).toHaveAttribute('data-testnet-only', 'true');
     expect(screen.getByText(/Área de pruebas · BNB Smart Chain Testnet/i)).toBeInTheDocument();
-    expect(screen.getByText(/todavía no está activa en este entorno de pruebas/i)).toBeInTheDocument();
+    expect(screen.getByText('Cómo desbloqueas partidas')).toBeInTheDocument();
+    expect(screen.getByText(/Cada 2.000 UKI completos en staking/i)).toBeInTheDocument();
     expect(screen.queryByText('Panel de créditos activo')).not.toBeInTheDocument();
     expect(container).not.toHaveTextContent('La UI debe');
   });
 
-  it('muestra el panel de créditos únicamente cuando el runtime está habilitado', () => {
+  it('no recupera el panel legacy de créditos aunque su runtime siga habilitado', () => {
     process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'true';
     render(<CukieMasterPage />);
 
-    expect(screen.getByText('Panel de créditos activo')).toBeInTheDocument();
-    expect(screen.getByText(/La asignación de créditos está activa en este entorno/i)).toBeInTheDocument();
+    expect(screen.getByText('Workspace personal')).toBeInTheDocument();
+    expect(screen.queryByText('Panel de créditos activo')).not.toBeInTheDocument();
+    expect(screen.queryByText(/La asignación de créditos está activa en este entorno/i)).not.toBeInTheDocument();
   });
 });

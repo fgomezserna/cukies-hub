@@ -23,6 +23,7 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 ## Estado actual observado
 
 - Staging/integracion: Coolify app `game-hub-staging`, application ID `28`, UUID `u4s804o4wwcckowgk0woo4wg`, rama `staging`, URL `https://cukieshub.eurekand.com`.
+- El iframe Treasure Hunt de staging se despliega como recurso Coolify independiente `game-treasurehunt-staging` (application ID `31`, UUID `lc04cw8gs4koo4swwws0c4ss`) desde la misma rama y se publica bajo `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y `NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com`.
 - Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
 - Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
@@ -168,6 +169,19 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `TWITTER_CLIENT_SECRET` | Secret staging | Secret production | Distinto por entorno. |
 | `IFTTT_WEBHOOK_SECRET` | Secret staging | Secret production | Separado por entorno. |
 | `TREASURE_HUNT_MULTIPLAYER_ENABLED` | `true` solo durante QA autorizada | `false` | Gate servidor; el limiter actual exige una unica replica de `dapp`. |
+| `TREASURE_HUNT_COMPETITION_ELIGIBILITY_KIND` | `uki_staking` | `uki_staking` tras aprobar mainnet | No reutilizar `presale` para esta campaña. |
+| `TREASURE_HUNT_COMPETITION_ENABLED` | `true` durante QA | `false` hasta aprobar mainnet | Gate servidor independiente de la UI. |
+| `TREASURE_HUNT_COMPETITION_ID` | `uki-staking-testnet-2026-08` | ID mainnet nuevo | La configuración de campaña es inmutable. |
+| `TREASURE_HUNT_COMPETITION_STARTS_AT` | `2026-08-26T00:00:00.000Z` | Ventana mainnet aprobada | Inicio inmediato de la prueba integrada. |
+| `TREASURE_HUNT_COMPETITION_ENDS_AT` | `2026-09-15T15:00:00.000Z` | Ventana mainnet aprobada | Una retirada confirmada antes de este instante descalifica. |
+| `TREASURE_HUNT_COMPETITION_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet aprobado | Debe coincidir con `NEXT_PUBLIC_*` e indexador. |
+| `TREASURE_HUNT_COMPETITION_STAKE_PER_ATTEMPT_RAW` | `2000000000000000000000` | Igual si se aprueba | 2.000 UKI por intento. |
+| `TREASURE_HUNT_COMPETITION_TOP_ATTEMPTS_PER_WALLET` | `10` | Igual si se aprueba | Top válido que genera tickets. |
+| `TREASURE_HUNT_COMPETITION_POINTS_PER_TICKET` | `100` | Igual si se aprueba | División entera por intento. |
+| `TREASURE_HUNT_COMPETITION_BASE_PRIZE_UKI_RAW` | `50000000000000000000000` | Igual si se aprueba | Base de 50.000 UKI. |
+| `TREASURE_HUNT_COMPETITION_STAKE_PRIZE_BPS` | `1000` | Igual si se aprueba | Suma 10% del staking total al cierre. |
+| `TREASURE_HUNT_COMPETITION_PRIZE_PER_WINNER_UKI_RAW` | `10000000000000000000000` | Igual si se aprueba | 10.000 UKI por ganador. |
+| `TREASURE_HUNT_COMPETITION_MAX_WINS_PER_WALLET` | `1` | Igual si se aprueba | Sin ganadores duplicados. |
 | `NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED` (`sybil-slayer`) | `true` solo durante QA autorizada | `false` | Variable de build del recurso separado; exige rebuild. |
 | `NEXT_PUBLIC_DAPP_ORIGIN` (`sybil-slayer`) | `https://cukieshub.eurekand.com` | Origen dapp production | Variable de build y origen exacto permitido por `frame-ancestors`. |
 | `NEXT_PUBLIC_UKI_CHAIN_ID` | `97` | `56` | BSC testnet vs BSC mainnet. |
@@ -218,7 +232,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 | Variable | Staging | Nota |
 | --- | --- | --- |
-| `CHAIN_INDEXER_CONTRACT_ALIASES` | Aliases previos más `TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT` | Ya persistido en Coolify. `TOKEN_V2` se añade; nunca sustituye ni reinicia `TOKEN`. |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | Aliases previos más `UKI_STAKING,TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT` | `UKI_STAKING` es obligatorio para elegibilidad y descalificación; nunca sustituir ni reiniciar aliases existentes. |
 | `CHAIN_INDEXER_TOKEN_ADDRESS` | Fuente legacy ya verificada | Se conserva sin cambios, con su identidad y cursores existentes. |
 | `CHAIN_INDEXER_TOKEN_V2_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Nueva colección ERC-721 custodiable de chain `97`; sin fallback a `TOKEN`. |
 | `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault custodial independiente para Cukie Master. |

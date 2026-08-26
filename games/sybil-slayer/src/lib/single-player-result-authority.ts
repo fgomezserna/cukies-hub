@@ -9,7 +9,7 @@ interface CompetitionAccessAuthority {
 export interface SinglePlayerResultAuthority {
   readonly runId: number;
   readonly sessionId: string;
-  readonly economyRunId: string;
+  readonly economyRunId?: string;
   readonly competitionAttemptId?: string;
 }
 
@@ -56,7 +56,6 @@ export function createSinglePlayerResultAuthority(
     !Number.isSafeInteger(runId) ||
     runId < 1 ||
     !access.sessionId ||
-    !access.economyRunId ||
     access.sessionId !== currentSessionId
   ) {
     return null;
@@ -66,11 +65,11 @@ export function createSinglePlayerResultAuthority(
     return {
       runId,
       sessionId: access.sessionId,
-      economyRunId: access.economyRunId,
+      ...(access.economyRunId ? { economyRunId: access.economyRunId } : {}),
       competitionAttemptId: access.attemptId,
     };
   }
-  if (!access.practice) return null;
+  if (!access.practice || !access.economyRunId) return null;
   return {
     runId,
     sessionId: access.sessionId,

@@ -145,18 +145,12 @@ describe('UkiStakingPanel', () => {
     expect(writeContract).not.toHaveBeenCalled();
   });
 
-  it('offers quick amounts and previews the resulting route capacity with vesting included', () => {
-    render(<UkiStakingPanel routePreview={{
-      currentRequirementRaw: parseUnits('20000', 18).toString(),
-      presaleLockedRaw: parseUnits('20000', 18).toString(),
-      indexedStakedRaw: parseUnits('25000', 18).toString(),
-      allocatedSlots: 2,
-    }} />);
+  it('offers quick amounts and previews the staking-based attempt capacity', () => {
+    render(<UkiStakingPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: '40.000' }));
-    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('40000');
-    expect(screen.getByText(/Capacidad teórica tras confirmar: 4\/5 cupos por UKI/i)).toBeInTheDocument();
-    expect(screen.getByText(/20\.000 en vesting \+ 65\.000 en staking/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '10.000' }));
+    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('10000');
+    expect(screen.getByText(/Saldo proyectado: 17 partidas concedidas por staking/i)).toBeInTheDocument();
     expect(screen.getByText('Conectar')).toBeInTheDocument();
     expect(screen.getByText('Autorizar')).toBeInTheDocument();
     expect(screen.getAllByText('Depositar')).toHaveLength(2);
@@ -239,7 +233,7 @@ describe('UkiStakingPanel', () => {
       chainId: 97,
       address: stakingAddress,
       functionName: 'stake',
-      args: [parseUnits('20000', 18)],
+      args: [parseUnits('2000', 18)],
     }));
   });
 
@@ -252,7 +246,7 @@ describe('UkiStakingPanel', () => {
       chainId: 97,
       address: stakingAddress,
       functionName: 'unstake',
-      args: [parseUnits('20000', 18)],
+      args: [parseUnits('2000', 18)],
     }));
 
     fireEvent.change(screen.getByLabelText('Cantidad de UKI'), { target: { value: '30000' } });

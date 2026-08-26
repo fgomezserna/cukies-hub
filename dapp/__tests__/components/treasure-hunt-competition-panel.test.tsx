@@ -21,6 +21,22 @@ const campaign = {
   maxWinningAttemptsPerWallet: 5,
   cliffMonths: 9,
   vestingMonths: 6,
+  stakePerAttemptRaw: '2000000000000000000000',
+  topAttemptsPerWallet: 10,
+  pointsPerTicket: 100,
+  basePrizeUkiRaw: '50000000000000000000000',
+  stakePrizeBps: 1_000,
+  prizePerWinnerUkiRaw: '10000000000000000000000',
+};
+
+const eligibility = {
+  ready: true,
+  stakedUkiRaw: '4000000000000000000000',
+  disqualified: false,
+  attemptsGranted: 2,
+  attemptsUsed: 1,
+  attemptsRemaining: 1,
+  provisionalTickets: 123,
 };
 
 const participant = {
@@ -68,6 +84,7 @@ function mockConfiguredCompetition() {
       phase: 'active',
       campaign,
       participant,
+      eligibility,
     });
   });
 }
@@ -90,9 +107,10 @@ describe('TreasureHuntCompetitionPanel', () => {
     render(<TreasureHuntCompetitionPanel />);
 
     expect(await screen.findByText('En curso')).toBeInTheDocument();
-    expect(screen.getByText('Pool de recompensas')).toBeInTheDocument();
-    expect(screen.getByText('Premio por partida')).toBeInTheDocument();
-    expect(screen.getByText('Recompensa del sponsor')).toBeInTheDocument();
+    expect(screen.getByText('Por intento')).toBeInTheDocument();
+    expect(screen.getByText('Mejores partidas')).toBeInTheDocument();
+    expect(screen.getByText('Por ticket')).toBeInTheDocument();
+    expect(screen.getByText('Intentos disponibles')).toBeInTheDocument();
     expect(screen.getByText('9 meses de cliff y 6 meses de vesting lineal')).toBeInTheDocument();
     expect(screen.getByLabelText('Nombre en el ranking')).toHaveValue('Hunter-A1B2C3');
     expect(screen.getByText('Wallet firmada')).toBeInTheDocument();

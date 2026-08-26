@@ -20,6 +20,7 @@ describe('Treasure Hunt competition client coordinator', () => {
           seed: 'seed-1',
           alias: 'Hunter-ABC123',
           status: 'active',
+          eligibilityKind: 'presale',
           nextSequence: 0,
           receipt: 'receipt-0',
         },
@@ -67,7 +68,7 @@ describe('Treasure Hunt competition client coordinator', () => {
         success: true,
         attempt: {
           attemptId: 'attempt-2', seed: 'seed-2', alias: 'Hunter-DEF456',
-          status: 'active', nextSequence: 0, receipt: 'receipt-0',
+          status: 'active', eligibilityKind: 'presale', nextSequence: 0, receipt: 'receipt-0',
         },
       }, 201))
       .mockResolvedValueOnce(jsonResponse({
@@ -117,7 +118,7 @@ describe('Treasure Hunt competition client coordinator', () => {
         success: true,
         attempt: {
           attemptId: 'attempt-4', seed: 'seed-4', alias: 'Hunter-GHI789',
-          status: 'active', nextSequence: 0, receipt: 'receipt-0',
+          status: 'active', eligibilityKind: 'presale', nextSequence: 0, receipt: 'receipt-0',
         },
       }, 201))
       .mockRejectedValueOnce(new TypeError('connection reset after write'))
@@ -151,7 +152,7 @@ describe('Treasure Hunt competition client coordinator', () => {
       success: true,
       attempt: {
         attemptId: 'attempt-5', seed: 'seed-5', alias: 'Hunter-JKL012',
-        status: 'active', nextSequence: 0, receipt: 'receipt-0',
+        status: 'active', eligibilityKind: 'presale', nextSequence: 0, receipt: 'receipt-0',
       },
     }, 201));
 
@@ -169,6 +170,7 @@ describe('Treasure Hunt competition client coordinator', () => {
           seed: 'seed-reloaded',
           alias: 'Hunter-RELOAD',
           status: 'active',
+          eligibilityKind: 'presale',
           nextSequence: 4,
           receipt: 'receipt-reloaded',
           score: 400,
@@ -223,6 +225,7 @@ describe('Treasure Hunt competition client coordinator', () => {
         seed: 'seed-review',
         alias: 'Hunter-REVIEW',
         status: 'review',
+        eligibilityKind: 'presale',
         nextSequence: 5,
         receipt: null,
         score: 777,
@@ -252,7 +255,8 @@ describe('Treasure Hunt competition client coordinator', () => {
         attempts: [{
           attemptId: 'attempt-mismatch', gameSessionId: 'game-session-mismatch',
           seed: 'seed', alias: 'Hunter-MISMATCH',
-          status: 'review', nextSequence: 2, receipt: null, score: 10, gameTimeMs: 100,
+          status: 'review', eligibilityKind: 'presale', nextSequence: 2,
+          receipt: null, score: 10, gameTimeMs: 100,
         }],
       })),
     });
@@ -273,6 +277,7 @@ describe('Treasure Hunt competition client coordinator', () => {
           seed: 'seed',
           alias: 'Hunter-REPLAY',
           status: 'review',
+          eligibilityKind: 'presale',
           nextSequence: 2,
           receipt: null,
           score: 10,
@@ -292,6 +297,40 @@ describe('Treasure Hunt competition client coordinator', () => {
       score: 10,
       gameTimeMs: 30_063,
     });
+  });
+
+  it('abandons an active attempt without sending score evidence', async () => {
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        attempt: {
+          attemptId: 'attempt-abandon', seed: 'seed-abandon', alias: 'Hunter-ABANDON',
+          status: 'active', eligibilityKind: 'uki_staking', nextSequence: 1,
+          receipt: 'receipt-1',
+        },
+      }, 201))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        result: {
+          accepted: true, status: 'abandoned', nextSequence: 1,
+          receipt: null, score: 500, gameTimeMs: 5_000,
+        },
+      }));
+    const coordinator = createCompetitionAttemptCoordinator({ fetchImpl });
+    const attempt = await coordinator.start('game-session-abandon');
+
+    await expect(coordinator.abandon('game-session-abandon')).resolves.toMatchObject({
+      status: 'abandoned', score: 500,
+    });
+    expect(attempt.eligibilityKind).toBe('uki_staking');
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/attempt-abandon/abandon'),
+      expect.objectContaining({
+        body: JSON.stringify({ receipt: 'receipt-1', sequence: 1 }),
+      }),
+    );
+    expect(coordinator.hasActiveAttempt('game-session-abandon')).toBe(false);
   });
 });
 

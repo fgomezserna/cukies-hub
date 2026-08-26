@@ -1023,15 +1023,18 @@ export function usePusherConnection() {
           typeof event.data.attemptId === 'string' && event.data.attemptId.length > 0 &&
           typeof event.data.seed === 'string' && event.data.seed.length > 0 &&
           typeof event.data.alias === 'string' && event.data.alias.length > 0 &&
-          typeof event.data.economyRunId === 'string' &&
-          event.data.economyRunId.length > 0 &&
-          event.data.economyRunId.length <= 160 &&
-          (event.data.creditSource === 'own' || event.data.creditSource === 'pool') &&
-          (event.data.cukieSource === 'own' || event.data.cukieSource === 'pool') &&
           event.data.status === 'active' &&
           responseSessionId
         ) {
-          activeEconomyRunIdRef.current = event.data.economyRunId;
+          const hasEconomyAuthority =
+            typeof event.data.economyRunId === 'string' &&
+            event.data.economyRunId.length > 0 &&
+            event.data.economyRunId.length <= 160 &&
+            (event.data.creditSource === 'own' || event.data.creditSource === 'pool') &&
+            (event.data.cukieSource === 'own' || event.data.cukieSource === 'pool');
+          activeEconomyRunIdRef.current = hasEconomyAuthority
+            ? event.data.economyRunId
+            : null;
           settle({
             eligible: true,
             practice: false,
@@ -1040,9 +1043,13 @@ export function usePusherConnection() {
             seed: event.data.seed,
             alias: event.data.alias,
             status: 'active',
-            economyRunId: event.data.economyRunId,
-            creditSource: event.data.creditSource,
-            cukieSource: event.data.cukieSource,
+            ...(hasEconomyAuthority
+              ? {
+                  economyRunId: event.data.economyRunId,
+                  creditSource: event.data.creditSource,
+                  cukieSource: event.data.cukieSource,
+                }
+              : {}),
           });
           return;
         }

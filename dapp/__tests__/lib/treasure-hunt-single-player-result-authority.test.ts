@@ -74,6 +74,19 @@ describe('Treasure Hunt single-player result authority', () => {
     }, 'game-session-without-economy')).toBeNull();
   });
 
+  it('accepts staking competition authority without a legacy economy run', () => {
+    expect(createSinglePlayerResultAuthority(3, {
+      eligible: true,
+      practice: false,
+      sessionId: 'game-session-staking',
+      attemptId: 'competition-attempt-staking',
+    }, 'game-session-staking')).toEqual({
+      runId: 3,
+      sessionId: 'game-session-staking',
+      competitionAttemptId: 'competition-attempt-staking',
+    });
+  });
+
   it('solo permite salir del resultado después de observar guardado y confirmación', () => {
     const initial = emptySinglePlayerResultSaveState();
 

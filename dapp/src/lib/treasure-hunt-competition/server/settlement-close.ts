@@ -191,7 +191,7 @@ function sourceNotReady(message: string): never {
   throw new CompetitionSettlementCloseError('settlement_source_not_ready', message);
 }
 
-function canonicalAttempts(
+export function canonicalSettlementAttempts(
   attempts: readonly SettlementAttemptRecord[],
   campaign: CompetitionConfig,
 ) {
@@ -563,7 +563,7 @@ export async function closeTreasureHuntCompetition(input: {
       endsAt: campaign.endsAt,
     }),
   ]);
-  const allAttempts = canonicalAttempts(attemptRows, campaign);
+  const allAttempts = canonicalSettlementAttempts(attemptRows, campaign);
   const purchases = canonicalPurchases(purchaseRows, campaign);
   const purchasedWallets = [...new Set(purchases.map((purchase) => purchase.walletAddress))]
     .sort((left, right) => left.localeCompare(right, 'en'));
