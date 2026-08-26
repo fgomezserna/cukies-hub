@@ -104,4 +104,36 @@ describe('Competition ranking archive read service', () => {
     expect(source.listReadyEntries).toHaveBeenCalledTimes(1);
     expect(Object.keys(source)).not.toContain('listAttempts');
   });
+
+  it('returns empty extreme pages without computing a skip or querying archive entries', async () => {
+    const source = repository([manifest('provisional')]);
+    const service = createCompetitionRankingArchiveService(source);
+
+    await expect(service.getHistory({
+      campaignId: 'campaign-1',
+      page: Number.MAX_SAFE_INTEGER,
+      pageSize: 100,
+    })).resolves.toMatchObject({
+      entries: [],
+      pagination: {
+        page: Number.MAX_SAFE_INTEGER,
+        pageSize: 100,
+        total: 45,
+        totalPages: 1,
+      },
+    });
+    expect(source.listReadyEntries).not.toHaveBeenCalled();
+
+    await expect(service.listHistory({
+      page: Number.MAX_SAFE_INTEGER,
+      pageSize: 100,
+    })).resolves.toMatchObject({
+      archives: [],
+      pagination: {
+        page: Number.MAX_SAFE_INTEGER,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+  });
 });

@@ -2,11 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import type { Db, Document, IndexDescription } from 'mongodb';
 
-import type {
-  CompetitionRankingArchiveEntry,
-  CompetitionRankingArchiveManifest,
-  CompetitionRankingArchiveStage,
-  PreparedCompetitionRankingArchive,
+import {
+  MAX_COMPETITION_RANKING_ARCHIVE_ENTRIES,
+  type CompetitionRankingArchiveEntry,
+  type CompetitionRankingArchiveManifest,
+  type CompetitionRankingArchiveStage,
+  type PreparedCompetitionRankingArchive,
 } from '../archive';
 
 export const COMPETITION_RANKING_ARCHIVES_COLLECTION = 'competition_ranking_archives';
@@ -30,9 +31,11 @@ export const COMPETITION_RANKING_ARCHIVE_INDEXES: readonly IndexDescription[] = 
 ];
 
 export const COMPETITION_RANKING_ARCHIVE_ENTRY_INDEXES: readonly IndexDescription[] = [
+  // Replaces the pre-release `competition_ranking_archive_entry_rank` shape.
+  // No online drop/migration is needed because archives have not been deployed.
   {
-    key: { campaignId: 1, rulesVersion: 1, stage: 1, rank: 1 },
-    name: 'competition_ranking_archive_entry_rank',
+    key: { campaignId: 1, rulesVersion: 1, stage: 1, buildId: 1, rank: 1 },
+    name: 'competition_ranking_archive_entry_build_rank',
     unique: true,
   },
   {
@@ -52,6 +55,7 @@ extends Omit<CompetitionRankingArchiveManifest, 'eligibilityKind'> {
   readonly buildId: string;
   readonly writerToken: string;
   readonly leaseExpiresAt: string;
+  readonly publishedBuildId?: string;
   readonly readyAt?: string;
 }
 
@@ -269,7 +273,9 @@ implements CompetitionRankingArchiveRepository {
       COMPETITION_RANKING_ARCHIVE_ENTRIES_COLLECTION,
     );
     const archiveIdentity = identity(archive.manifest);
-    const buildId = archive.manifest.outputHash;
+    // Every writer gets an isolated row namespace. outputHash identifies
+    // content; buildId identifies one physical publication attempt.
+    const buildId = randomUUID();
     const writerToken = randomUUID();
     const leaseStartedAt = new Date();
     const leaseExpiresAt = new Date(leaseStartedAt.getTime() + this.buildLeaseMs).toISOString();
@@ -295,7 +301,6 @@ implements CompetitionRankingArchiveRepository {
       if (
         stored.inputHash !== archive.manifest.inputHash
         || stored.outputHash !== archive.manifest.outputHash
-        || stored.buildId !== buildId
       ) {
         throw new CompetitionRankingArchiveConflictError();
       }
@@ -309,7 +314,8 @@ implements CompetitionRankingArchiveRepository {
         {
           ...archiveIdentity,
           publicationStatus: 'building',
-          buildId,
+          buildId: stored.buildId,
+          writerToken: stored.writerToken,
           inputHash: archive.manifest.inputHash,
           outputHash: archive.manifest.outputHash,
           $or: [
@@ -317,7 +323,7 @@ implements CompetitionRankingArchiveRepository {
             { leaseExpiresAt: { $exists: false } },
           ],
         },
-        { $set: { writerToken, leaseExpiresAt } },
+        { $set: { buildId, writerToken, leaseExpiresAt } },
       );
       if (claim.modifiedCount !== 1) {
         throw new CompetitionRankingArchiveBuildInProgressError();
@@ -326,7 +332,8 @@ implements CompetitionRankingArchiveRepository {
 
     let publication;
     try {
-      // A retry may only remove rows carrying its own deterministic output hash/build id.
+      // A writer can only touch its unique build namespace. If its lease expires,
+      // a successor writes another namespace and stale work becomes harmless garbage.
       await entries.deleteMany({ ...archiveIdentity, buildId });
       if (archive.entries.length > 0) {
         await entries.insertMany(archive.entries.map((entry) => ({
@@ -347,7 +354,7 @@ implements CompetitionRankingArchiveRepository {
           inputHash: archive.manifest.inputHash,
           outputHash: archive.manifest.outputHash,
         },
-        { $set: { publicationStatus: 'ready', readyAt } },
+        { $set: { publicationStatus: 'ready', publishedBuildId: buildId, readyAt } },
       );
     } catch (error) {
       try {
@@ -409,13 +416,51 @@ implements CompetitionRankingArchiveRepository {
     limit: number;
   }) {
     if (input.manifest.publicationStatus !== 'ready') return [];
-    const documents = await (await this.getDb())
+    if (!Number.isSafeInteger(input.offset) || input.offset < 0) {
+      throw new RangeError('Archive entry offset must be a non-negative safe integer');
+    }
+    if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 100) {
+      throw new RangeError('Archive entry limit must be between 1 and 100');
+    }
+    if (
+      !Number.isSafeInteger(input.manifest.totalRankedEntries)
+      || input.manifest.totalRankedEntries < 0
+      || input.manifest.totalRankedEntries > MAX_COMPETITION_RANKING_ARCHIVE_ENTRIES
+    ) {
+      throw new RangeError('Archive total ranked entries is outside the supported range');
+    }
+    if (input.offset > input.manifest.totalRankedEntries) {
+      throw new RangeError('Archive entry offset cannot exceed total ranked entries');
+    }
+    if (input.offset === input.manifest.totalRankedEntries) return [];
+
+    const db = await this.getDb();
+    const storedManifest = await db
+      .collection<CompetitionRankingArchiveManifestDocument>(
+        COMPETITION_RANKING_ARCHIVES_COLLECTION,
+      )
+      .findOne(
+        {
+          ...identity(input.manifest),
+          publicationStatus: 'ready',
+          outputHash: input.manifest.outputHash,
+        },
+        { projection: { _id: 0, publishedBuildId: 1 } },
+      );
+    if (!storedManifest?.publishedBuildId) {
+      throw new CompetitionRankingArchiveCorruptError(
+        `Ready archive ${input.manifest.campaignId} has no published build`,
+      );
+    }
+
+    const documents = await db
       .collection<CompetitionRankingArchiveEntryDocument>(
         COMPETITION_RANKING_ARCHIVE_ENTRIES_COLLECTION,
       )
       .find(
         {
           ...identity(input.manifest),
+          buildId: storedManifest.publishedBuildId,
           outputHash: input.manifest.outputHash,
         },
         { projection: entryProjection },

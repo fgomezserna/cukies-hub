@@ -1,4 +1,7 @@
-import type { CompetitionRankingArchiveStage } from '../archive';
+import {
+  MAX_COMPETITION_RANKING_ARCHIVE_ENTRIES,
+  type CompetitionRankingArchiveStage,
+} from '../archive';
 import { getIndexerDb } from '@/lib/indexer-db/mongodb';
 import {
   MongoCompetitionRankingArchiveRepository,
@@ -24,7 +27,27 @@ function pagination(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
   if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
     throw new RangeError(`Archive pageSize must be between 1 and ${MAX_PAGE_SIZE}`);
   }
-  return { page, pageSize, offset: (page - 1) * pageSize };
+  return { page, pageSize };
+}
+
+function pageOffset(input: {
+  page: number;
+  pageSize: number;
+  total: number;
+  maximumTotal?: number;
+}) {
+  const maximumTotal = input.maximumTotal ?? Number.MAX_SAFE_INTEGER;
+  if (!Number.isSafeInteger(input.total) || input.total < 0 || input.total > maximumTotal) {
+    throw new RangeError('Archive total is outside the supported range');
+  }
+  if (input.total === 0 || input.page > Math.ceil(input.total / input.pageSize)) {
+    return null;
+  }
+  const offset = (input.page - 1) * input.pageSize;
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset >= input.total) {
+    throw new RangeError('Archive page offset is outside the safe range');
+  }
+  return offset;
 }
 
 function preferredForCampaign(
@@ -51,10 +74,10 @@ export function createCompetitionRankingArchiveService(
           ? allReady.filter((manifest) => manifest.stage === input.stage)
           : allReady,
       );
-      const manifests = eligible.slice(
-        selectedPage.offset,
-        selectedPage.offset + selectedPage.pageSize,
-      );
+      const offset = pageOffset({ ...selectedPage, total: eligible.length });
+      const manifests = offset === null
+        ? []
+        : eligible.slice(offset, offset + selectedPage.pageSize);
       return {
         archives: manifests,
         pagination: {
@@ -79,11 +102,18 @@ export function createCompetitionRankingArchiveService(
       const candidates = await repository.findReadyManifests(input.campaignId, input.stage);
       const manifest = preferredForCampaign(candidates, input.stage);
       if (!manifest) throw new CompetitionRankingArchiveNotFoundError();
-      const entries = await repository.listReadyEntries({
-        manifest,
-        offset: selectedPage.offset,
-        limit: selectedPage.pageSize,
+      const offset = pageOffset({
+        ...selectedPage,
+        total: manifest.totalRankedEntries,
+        maximumTotal: MAX_COMPETITION_RANKING_ARCHIVE_ENTRIES,
       });
+      const entries = offset === null
+        ? []
+        : await repository.listReadyEntries({
+          manifest,
+          offset,
+          limit: selectedPage.pageSize,
+        });
       return {
         archive: manifest,
         entries,

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 export const COMPETITION_RANKING_ARCHIVE_SCHEMA_VERSION = 1 as const;
+export const MAX_COMPETITION_RANKING_ARCHIVE_ENTRIES = 1_000_000;
 export const COMPETITION_RANKING_ARCHIVE_STAGES = ['provisional', 'final'] as const;
 export const COMPETITION_RANKING_ARCHIVE_PUBLICATION_STATUSES = ['building', 'ready'] as const;
 
@@ -173,7 +174,7 @@ const archiveImportSchema = z.object({
     input: z.string().regex(SHA256_PATTERN),
     output: z.string().regex(SHA256_PATTERN),
   }).strict().optional(),
-  entries: z.array(archiveEntrySchema).max(1_000_000),
+  entries: z.array(archiveEntrySchema).max(MAX_COMPETITION_RANKING_ARCHIVE_ENTRIES),
 }).strict();
 
 type ParsedArchiveImport = z.infer<typeof archiveImportSchema>;
@@ -318,11 +319,9 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
     throw new Error('Archive participant total cannot be lower than ranked wallets');
   }
   if (input.stage === 'final') {
-    const unresolved = input.entries.find((entry) => (
-      entry.reviewStatus === 'pending' || entry.reviewStatus === 'review'
-    ));
-    if (unresolved) {
-      throw new Error(`Final archive cannot contain pending review at rank ${unresolved.rank}`);
+    const nonValidEntry = input.entries.find((entry) => entry.reviewStatus !== 'valid');
+    if (nonValidEntry) {
+      throw new Error(`Final archive can only rank valid entries (rank ${nonValidEntry.rank})`);
     }
     const unresolvedRewardStatuses: readonly CompetitionRankingArchiveRewardStatus[] = [
       'pending',
@@ -335,6 +334,15 @@ function assertArchiveIntegrity(input: ParsedArchiveImport, now: Date) {
     ));
     if (unresolvedReward) {
       throw new Error(`Final archive contains an unresolved reward at rank ${unresolvedReward.rank}`);
+    }
+    const awardedUkiRaw = input.entries.reduce((total, entry) => (
+      entry.rewardStatus === 'final'
+        ? total + BigInt(entry.finalRewardUkiRaw as string)
+        : total
+    ), BigInt(0));
+    const playerPoolUkiRaw = BigInt(input.pool.playerUkiRaw ?? input.pool.totalUkiRaw);
+    if (awardedUkiRaw > playerPoolUkiRaw) {
+      throw new Error('Final archive rewards exceed the available player pool');
     }
   }
 }

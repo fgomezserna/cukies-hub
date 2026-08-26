@@ -152,6 +152,34 @@ function fakeDb(initialManifest: Record<string, unknown> | null = null) {
       entries.push(...clone(documents));
       return { acknowledged: true };
     }),
+    find: jest.fn((filter: Record<string, unknown>) => {
+      let offset = 0;
+      let limit = Number.MAX_SAFE_INTEGER;
+      let cursor: {
+        sort: jest.Mock;
+        skip: jest.Mock;
+        limit: jest.Mock;
+        toArray: jest.Mock;
+      };
+      cursor = {
+        sort: jest.fn(),
+        skip: jest.fn((value: number) => {
+          offset = value;
+          return cursor;
+        }),
+        limit: jest.fn((value: number) => {
+          limit = value;
+          return cursor;
+        }),
+        toArray: jest.fn(async () => entries
+          .filter((entry) => matchesMongoFilter(entry, filter))
+          .sort((left, right) => Number(left.rank) - Number(right.rank))
+          .slice(offset, offset + limit)
+          .map(clone)),
+      };
+      cursor.sort.mockReturnValue(cursor);
+      return cursor;
+    }),
   };
   const db = {
     collection: jest.fn((name: string) => (
@@ -171,7 +199,7 @@ describe('Competition ranking archive integrity', () => {
     ]));
     expect(COMPETITION_RANKING_ARCHIVE_ENTRY_INDEXES).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        key: { campaignId: 1, rulesVersion: 1, stage: 1, rank: 1 },
+        key: { campaignId: 1, rulesVersion: 1, stage: 1, buildId: 1, rank: 1 },
         unique: true,
       }),
     ]));
@@ -231,7 +259,7 @@ describe('Competition ranking archive integrity', () => {
       stage: 'final',
       pool: { ...input().pool, status: 'final' },
     });
-    expect(() => prepared(value)).toThrow(/pending review/);
+    expect(() => prepared(value)).toThrow(/only rank valid/);
   });
 
   it('accepts a final no-prize row as resolved with not_applicable and no amount', () => {
@@ -242,6 +270,20 @@ describe('Competition ranking archive integrity', () => {
     const value = finalInput();
     value.entries[0].finalRewardUkiRaw = null;
     expect(() => prepared(value)).toThrow(/requires a fixed reward/);
+  });
+
+  it('rejects an invalid entry from the final ranking even when it has a fixed prize', () => {
+    const value = finalInput();
+    value.entries[0].reviewStatus = 'invalid';
+    expect(() => prepared(value)).toThrow(/only rank valid/);
+  });
+
+  it('rejects final awarded rewards above the player pool', () => {
+    const value = finalInput();
+    value.entries[0].finalRewardUkiRaw = (
+      BigInt(value.pool.playerUkiRaw as string) + BigInt(1)
+    ).toString();
+    expect(() => prepared(value)).toThrow(/exceed the available player pool/);
   });
 
   it.each(['pending', 'estimated', 'partial', 'draw_pending'] as const)(
@@ -501,6 +543,77 @@ describe('Competition ranking archive integrity', () => {
     expect(database.getEntries()).toHaveLength(2);
   });
 
+  it('keeps build B visible when expired writer A resumes after B publishes', async () => {
+    const archive = prepared();
+    const database = fakeDb();
+    const baseDelete = database.entryCollection.deleteMany.getMockImplementation();
+    if (!baseDelete) throw new Error('Expected fake delete implementation');
+    let reachedDelete: (() => void) | undefined;
+    let resumeWriterA: (() => void) | undefined;
+    const writerAReachedDelete = new Promise<void>((resolve) => {
+      reachedDelete = resolve;
+    });
+    const writerACanResume = new Promise<void>((resolve) => {
+      resumeWriterA = resolve;
+    });
+    database.entryCollection.deleteMany.mockImplementationOnce(async (filter) => {
+      reachedDelete?.();
+      await writerACanResume;
+      return baseDelete(filter);
+    });
+
+    const repositoryA = new MongoCompetitionRankingArchiveRepository(
+      async () => database.db as never,
+      -1,
+    );
+    const repositoryB = new MongoCompetitionRankingArchiveRepository(
+      async () => database.db as never,
+      -1,
+    );
+    const writerAResult = repositoryA.writeSnapshot(archive);
+    await writerAReachedDelete;
+
+    const writerBResult = await repositoryB.writeSnapshot(archive);
+    const publishedBuildId = database.getManifest()?.publishedBuildId;
+    expect(writerBResult).toMatchObject({ created: true });
+    expect(publishedBuildId).toEqual(expect.any(String));
+
+    resumeWriterA?.();
+    await expect(writerAResult).resolves.toMatchObject({ created: false });
+
+    const visibleEntries = await repositoryB.listReadyEntries({
+      manifest: writerBResult.manifest,
+      offset: 0,
+      limit: 20,
+    });
+    expect(visibleEntries).toEqual(archive.entries);
+    expect(database.getManifest()).toMatchObject({
+      publicationStatus: 'ready',
+      publishedBuildId,
+    });
+    expect(database.getEntries().filter((entry) => entry.buildId === publishedBuildId))
+      .toHaveLength(2);
+    expect(database.getEntries()).toHaveLength(4);
+  });
+
+  it('rejects unsafe repository offsets before accessing Mongo', async () => {
+    const getDb = jest.fn();
+    const repository = new MongoCompetitionRankingArchiveRepository(getDb as never);
+    const manifest = { ...prepared().manifest, publicationStatus: 'ready' as const };
+
+    await expect(repository.listReadyEntries({
+      manifest,
+      offset: Number.MAX_SAFE_INTEGER,
+      limit: 20,
+    })).rejects.toThrow(/cannot exceed total/);
+    await expect(repository.listReadyEntries({
+      manifest,
+      offset: manifest.totalRankedEntries,
+      limit: 20,
+    })).resolves.toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
   it('uses an allowlist projection and strips unexpected private Mongo fields on reads', async () => {
     const archive = prepared();
     const row = {
@@ -526,7 +639,11 @@ describe('Competition ranking archive integrity', () => {
     cursor.limit.mockReturnValue(cursor);
     const find = jest.fn((_filter: unknown, _options: unknown) => cursor);
     const repository = new MongoCompetitionRankingArchiveRepository(async () => ({
-      collection: jest.fn(() => ({ find })),
+      collection: jest.fn((name: string) => (
+        name === 'competition_ranking_archives'
+          ? { findOne: jest.fn(async () => ({ publishedBuildId: row.buildId })) }
+          : { find }
+      )),
     }) as never);
 
     const result = await repository.listReadyEntries({
