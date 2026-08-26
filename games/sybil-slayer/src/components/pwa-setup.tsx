@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import InstallPrompt from './install-prompt';
+import { gamePublicPath, gameServiceWorkerScope } from '@/lib/public-path';
 
 /**
  * Componente que registra el Service Worker y muestra el prompt de instalación
@@ -17,7 +18,9 @@ export default function PWASetup() {
       );
       const registerServiceWorker = () => {
         void navigator.serviceWorker
-          .register(`/sw.js?v=${cacheVersion}`)
+          .register(`${gamePublicPath('/sw.js')}?v=${cacheVersion}`, {
+            scope: gameServiceWorkerScope(),
+          })
           .then((registration) => {
             console.log('Service Worker registrado:', registration.scope);
           })

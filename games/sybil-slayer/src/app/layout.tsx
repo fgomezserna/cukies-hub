@@ -4,6 +4,7 @@ import localFont from 'next/font/local';
 import Script from 'next/script';
 import './globals.css';
 import PWASetup from '@/components/pwa-setup';
+import { gamePublicPath } from '@/lib/public-path';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,7 +28,7 @@ export const metadata: Metadata = {
   title: 'Treasure Hunt',
   description: '¡Esquiva duendes y recolecta puntos!',
   metadataBase: new URL('https://treasure-hunt.cukies.world'),
-  manifest: '/manifest.json',
+  manifest: gamePublicPath('/manifest.json'),
   themeColor: '#0f172a',
   viewport: {
     width: 'device-width',
@@ -69,13 +70,13 @@ export default function RootLayout({
         <link
           rel="preload"
           as="image"
-          href="/assets/ui/game-container/treasure-vault-background.webp"
+          href={gamePublicPath('/assets/ui/game-container/treasure-vault-background.webp')}
           type="image/webp"
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${alumniSans.variable} antialiased`}>
         <Script 
-          src="/joy.js" 
+          src={gamePublicPath('/joy.js')}
           strategy="afterInteractive"
         />
         <PWASetup />

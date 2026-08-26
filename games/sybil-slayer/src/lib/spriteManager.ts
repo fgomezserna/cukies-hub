@@ -1,5 +1,7 @@
 // SpriteManager: precarga centralizada y reutilizable de los sprites del juego.
 
+import { gamePublicPath } from './public-path';
+
 export interface SpriteSheet {
   frames: HTMLImageElement[];
   frameCount: number;
@@ -273,7 +275,7 @@ export class SpriteManager {
         }
       };
       image.onerror = () => reject(new Error(`Failed to load sprite: ${path}`));
-      image.src = path;
+      image.src = gamePublicPath(path);
     });
   }
 
