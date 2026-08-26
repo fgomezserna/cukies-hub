@@ -1,6 +1,5 @@
 export * from './evidence';
 export * from './archive-repository';
-export * from './archive-service';
 export * from './internal-auth';
 export * from './internal-api';
 export * from './models';
