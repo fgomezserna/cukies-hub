@@ -252,7 +252,12 @@ async function readCukieMasterUkiSource(
   ].filter(
     (item): item is string => Boolean(item),
   );
-  if (presale && !presaleEvidence) warnings.push('presale_participants no conserva evidencia de bloque proyectada.');
+  // Legacy/referral participant rows can legitimately contribute zero UKI and may
+  // predate block evidence. They must not hide an independently evidenced staking
+  // balance. Positive direct-purchase rows still fail closed without evidence.
+  if (requiresVesting && presale && !presaleEvidence) {
+    warnings.push('presale_participants no conserva evidencia de bloque proyectada.');
+  }
   if (staking && !stakingEvidence) warnings.push('uki_staking_positions no conserva evidencia de bloque proyectada.');
   if (vesting && !vestingEvidence) warnings.push('uki_vesting_positions no conserva evidencia de bloque proyectada.');
   const vestingComplete = vestingAllocated.complete && vestingReleased.complete;

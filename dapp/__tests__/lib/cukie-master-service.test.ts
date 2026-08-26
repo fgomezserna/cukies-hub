@@ -498,6 +498,31 @@ describe('Cukie Master canonical sources', () => {
     expect(buyer.uki.totalUkiRaw).toBe('0');
   });
 
+  it('keeps evidenced staking visible for a legacy zero-purchase presale row without block evidence', async () => {
+    const { repo, state } = memoryRepository();
+    state.presale.set('0xlegacy', {
+      _id: 'legacy-zero-row',
+      totalUkiPurchasedRaw: '0',
+      lastPurchaseEventId: '',
+    });
+    state.staking.set('0xlegacy', {
+      _id: 'staking',
+      accountBalanceRaw: rawUki(19_999),
+    });
+
+    const sources = await readCukieMasterSources(repo, '0xLegacy', '0xlegacy', now);
+
+    expect(sources.uki).toMatchObject({
+      totalUkiRaw: rawUki(19_999),
+      presaleLockedRaw: '0',
+      stakedUkiRaw: rawUki(19_999),
+      completeness: { complete: true },
+    });
+    expect(sources.uki.completeness.warnings).not.toContain(
+      'presale_participants no conserva evidencia de bloque proyectada.',
+    );
+  });
+
   it('uses zero and records incompleteness when a present canonical raw field is invalid', async () => {
     const { repo, state } = memoryRepository();
     state.presale.set('0xabc', { _id: 'presale', totalUkiPurchasedRaw: rawUki(20_000) });
