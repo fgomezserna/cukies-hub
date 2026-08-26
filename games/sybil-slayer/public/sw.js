@@ -4,10 +4,26 @@ const ASSET_CACHE_NAME = 'treasure-hunt-assets-v1';
 const CACHE_VERSION =
   new URL(self.location.href).searchParams.get('v') || 'dev';
 const SHELL_CACHE_NAME = `${SHELL_CACHE_PREFIX}-${CACHE_VERSION}`;
+const SCOPE_PATHNAME = new URL(self.registration.scope).pathname.replace(/\/$/, '');
+
+function scopedPathname(pathname) {
+  const normalizedPathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `${SCOPE_PATHNAME}${normalizedPathname}` || '/';
+}
+
+function pathWithinScope(pathname) {
+  if (!SCOPE_PATHNAME) return pathname;
+  if (pathname === SCOPE_PATHNAME) return '/';
+  return pathname.startsWith(`${SCOPE_PATHNAME}/`)
+    ? pathname.slice(SCOPE_PATHNAME.length)
+    : pathname;
+}
+
+const SCOPE_ROOT_PATHNAME = scopedPathname('/');
 const URLS_TO_CACHE = [
-  '/',
-  '/icon.png',
-  '/manifest.json'
+  SCOPE_ROOT_PATHNAME,
+  scopedPathname('/icon.png'),
+  scopedPathname('/manifest.json')
 ];
 
 self.addEventListener('install', (event) => {
@@ -39,7 +55,7 @@ self.addEventListener('activate', (event) => {
           const requestUrl = new URL(request.url);
           if (
             requestUrl.origin !== self.location.origin ||
-            !requestUrl.pathname.startsWith('/assets/')
+            !pathWithinScope(requestUrl.pathname).startsWith('/assets/')
           ) {
             continue;
           }
@@ -75,14 +91,14 @@ self.addEventListener('activate', (event) => {
 function isStaticAsset(requestUrl) {
   return (
     requestUrl.origin === self.location.origin &&
-    requestUrl.pathname.startsWith('/assets/')
+    pathWithinScope(requestUrl.pathname).startsWith('/assets/')
   );
 }
 
 function isVersionedAppAsset(requestUrl) {
   return (
     requestUrl.origin === self.location.origin &&
-    requestUrl.pathname.startsWith('/_next/static/')
+    pathWithinScope(requestUrl.pathname).startsWith('/_next/static/')
   );
 }
 
@@ -119,14 +135,14 @@ async function networkFirstNavigation(request) {
     if (response.ok) {
       const cache = await caches.open(SHELL_CACHE_NAME);
       try {
-        await cache.put('/', response.clone());
+        await cache.put(SCOPE_ROOT_PATHNAME, response.clone());
       } catch {
         // La navegación de red sigue siendo válida aunque la caché esté llena.
       }
     }
     return response;
   } catch {
-    return (await caches.match('/')) || Response.error();
+    return (await caches.match(SCOPE_ROOT_PATHNAME)) || Response.error();
   }
 }
 

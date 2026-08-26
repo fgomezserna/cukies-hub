@@ -30,6 +30,8 @@ export default function TreasureHuntPlaySidebar({
     ?? rules.topAttemptsPerWallet
     ?? rules.maxWinningAttemptsPerWallet
     ?? 10;
+  const attemptsRemaining = eligibility?.attemptsRemaining
+    ?? Math.max(0, attemptsGranted - attemptsUsed);
   const canStart = status?.phase === 'active' && (
     eligibility == null || (
       eligibility.ready &&
@@ -69,7 +71,8 @@ export default function TreasureHuntPlaySidebar({
         {[
           { label: 'Modo', value: '1P', Icon: Gamepad2, tone: 'text-[#ffc240]' },
           { label: 'Competición', value: TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME, Icon: Trophy, tone: 'text-[#ffc240]' },
-          { label: 'Intentos', value: `${attemptsUsed} usados · ${attemptsGranted} concedidos`, Icon: Medal, tone: 'text-[#f2eee7]' },
+          { label: 'Intentos disponibles', value: String(attemptsRemaining), Icon: Medal, tone: eligibility?.disqualified ? 'text-red-300' : 'text-[#35eee2]' },
+          { label: 'Uso de intentos', value: `${attemptsUsed} usado${attemptsUsed === 1 ? '' : 's'} · ${attemptsGranted} concedidos`, Icon: Medal, tone: 'text-[#f2eee7]' },
           { label: 'UKI en staking', value: eligibility ? formatTreasureHuntUkiRaw(eligibility.stakedUkiRaw) : 'Conecta tu wallet', Icon: Medal, tone: 'text-[#f2eee7]' },
           { label: 'Estado', value: statusLabel, Icon: CheckCircle2, tone: eligibility?.disqualified ? 'text-red-300' : 'text-[#61e598]' },
         ].map(({ label, value, Icon, tone }) => (

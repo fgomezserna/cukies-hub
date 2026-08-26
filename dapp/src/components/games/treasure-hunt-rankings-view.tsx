@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Clock3, Medal } from 'lucide-react';
 
 import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
+import TreasureHuntDisqualificationNotice from '@/components/games/treasure-hunt-disqualification-notice';
 import TreasureHuntHistoryView from '@/components/games/treasure-hunt-history-view';
 import {
   formatTreasureHuntDuration,
@@ -53,6 +54,7 @@ function ActiveTreasureHuntRankingsView() {
   const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
   const eligibility = status?.eligibility;
   const myAttempts = eligibility?.topAttemptsCount ?? leaderboardMeta?.myAttempts ?? 0;
+  const countedAttempts = eligibility?.disqualified ? 0 : myAttempts;
   const prizePoolValue = leaderboardMeta
     ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw)
     : 'Actualizando…';
@@ -72,7 +74,11 @@ function ActiveTreasureHuntRankingsView() {
 
   const metrics: readonly (readonly [string, string])[] = isUkiStaking
     ? [
-      ['Partidas computables', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
+      [
+        'Intentos disponibles',
+        isLoading ? '···' : eligibility ? String(eligibility.attemptsRemaining) : '—',
+      ],
+      ['Resultados que cuentan', isLoading ? '···' : `${countedAttempts}/${maxAttempts}`],
       ['Premio acumulado', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
       [
         'N.º de ganadores',
@@ -132,7 +138,7 @@ function ActiveTreasureHuntRankingsView() {
 
         <dl className={cn(
           'grid grid-cols-2 gap-px border-b border-white/15 bg-white/15',
-          isUkiStaking && 'sm:grid-cols-3',
+          isUkiStaking && 'sm:grid-cols-4',
         )}>
           {metrics.map(([label, value]) => (
             <div
@@ -152,6 +158,12 @@ function ActiveTreasureHuntRankingsView() {
           <p className="border-b border-white/15 px-4 py-2 text-[11px] leading-relaxed text-[#969994] sm:px-5">
             El número de ganadores es provisional: se calcula dividiendo el premio acumulado actual entre 10.000 UKI. Los ganadores se confirman tras el cierre y la revisión.
           </p>
+        ) : null}
+
+        {isUkiStaking && eligibility?.disqualified ? (
+          <div className="border-b border-white/15 p-4 sm:p-5">
+            <TreasureHuntDisqualificationNotice eligibility={eligibility} />
+          </div>
         ) : null}
 
         <div
@@ -196,10 +208,16 @@ function ActiveTreasureHuntRankingsView() {
           <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
             <Medal className="h-8 w-8 text-[#35eee2]" aria-hidden="true" />
             <h3 className="mt-4 font-headline text-lg font-black text-[#f2eee7]">
-              {filter === 'mine' ? 'Aún no tienes partidas clasificadas' : 'Todavía no hay partidas clasificadas'}
+              {filter === 'mine' && eligibility?.disqualified
+                ? 'Tus partidas han quedado fuera de clasificación'
+                : filter === 'mine'
+                  ? 'Aún no tienes partidas clasificadas'
+                  : 'Todavía no hay partidas clasificadas'}
             </h3>
             <p className="mt-2 max-w-md text-sm text-[#969994]">
-              Termina una partida 1P computable para aparecer en el ranking.
+              {filter === 'mine' && eligibility?.disqualified
+                ? 'La retirada mantiene la wallet descalificada durante todo el torneo, aunque vuelvas a depositar.'
+                : 'Termina una partida 1P computable para aparecer en el ranking.'}
             </p>
           </div>
         ) : (

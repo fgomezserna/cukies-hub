@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { BookOpenText, Medal } from 'lucide-react';
 
 import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
+import TreasureHuntDisqualificationNotice from '@/components/games/treasure-hunt-disqualification-notice';
 import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
 import {
   calculateAvailablePrizeSlots,
@@ -20,16 +21,22 @@ export default function TreasureHuntCompetitionBanner() {
     : 'Actualizando…';
   const metrics = [
     {
-      label: 'Partidas computables',
+      label: 'Intentos disponibles',
       value: isLoading
         ? '···'
-        : `${eligibility?.topAttemptsCount ?? 0}/${campaign?.topAttemptsPerWallet ?? 10}`,
-      mobileHidden: false,
+        : eligibility
+          ? eligibility.attemptsRemaining.toLocaleString('es-ES')
+          : '—',
+    },
+    {
+      label: 'Resultados que cuentan',
+      value: isLoading
+        ? '···'
+        : `${eligibility?.disqualified ? 0 : eligibility?.topAttemptsCount ?? 0}/${campaign?.topAttemptsPerWallet ?? 10}`,
     },
     {
       label: 'Premio acumulado',
       value: isLoading && !leaderboardMeta ? '···' : prizePoolValue,
-      mobileHidden: false,
     },
     {
       label: 'N.º de ganadores',
@@ -39,7 +46,6 @@ export default function TreasureHuntCompetitionBanner() {
           leaderboardMeta?.poolUkiRaw,
           campaign?.prizePerWinnerUkiRaw,
         )?.toLocaleString('es-ES') ?? '—',
-      mobileHidden: true,
     },
   ];
 
@@ -69,17 +75,21 @@ export default function TreasureHuntCompetitionBanner() {
           />
         </div>
 
+        {eligibility?.disqualified ? (
+          <div className="mt-3">
+            <TreasureHuntDisqualificationNotice eligibility={eligibility} compact />
+          </div>
+        ) : null}
+
         <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
           <dl
             data-competition-metrics
-            className="grid min-w-0 grid-cols-2 divide-x divide-white/15 rounded-[8px] border border-white/20 bg-[#091513] sm:grid-cols-3"
+            className="grid min-w-0 grid-cols-2 gap-px overflow-hidden rounded-[8px] border border-white/20 bg-white/15 sm:grid-cols-4"
           >
-            {metrics.map(({ label, value, mobileHidden }) => (
+            {metrics.map(({ label, value }) => (
               <div
                 key={label}
-                className={mobileHidden
-                  ? 'hidden min-w-0 px-2 py-2 text-center sm:block sm:px-3'
-                  : 'min-w-0 px-2 py-2 text-center sm:px-3'}
+                className="min-w-0 bg-[#091513] px-2 py-2 text-center sm:px-3"
               >
                 <dt className="text-[0.52rem] font-bold uppercase tracking-[0.05em] text-[#969994] sm:text-[0.62rem] sm:tracking-[0.08em]">
                   {label}

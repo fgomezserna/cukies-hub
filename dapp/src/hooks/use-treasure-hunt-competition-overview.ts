@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+const DEFAULT_AUTO_REFRESH_MS = 15_000;
 
 export const TREASURE_HUNT_COMPETITION_API = '/api/games/treasure-hunt/competition';
 
@@ -328,23 +330,35 @@ export function useTreasureHuntCompetitionOverview(options?: {
   readonly leaderboardPage?: number;
   readonly leaderboardPageSize?: number;
   readonly leaderboardMineOnly?: boolean;
+  readonly autoRefreshMs?: number;
 }) {
   const includeLeaderboard = options?.includeLeaderboard ?? true;
   const leaderboardPage = options?.leaderboardPage ?? 1;
   const leaderboardPageSize = options?.leaderboardPageSize ?? 100;
   const leaderboardMineOnly = options?.leaderboardMineOnly ?? false;
+  const autoRefreshMs = options?.autoRefreshMs ?? DEFAULT_AUTO_REFRESH_MS;
   const [status, setStatus] = useState<TreasureHuntCompetitionStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly TreasureHuntLeaderboardEntry[]>([]);
   const [leaderboardMeta, setLeaderboardMeta] = useState<TreasureHuntLeaderboardMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const hasLoadedRef = useRef(false);
+  const queryKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
+    const queryKey = [
+      includeLeaderboard,
+      leaderboardMineOnly,
+      leaderboardPage,
+      leaderboardPageSize,
+    ].join(':');
+    const isBackgroundRefresh = hasLoadedRef.current && queryKeyRef.current === queryKey;
+    queryKeyRef.current = queryKey;
 
     async function load() {
-      setIsLoading(true);
+      if (!isBackgroundRefresh) setIsLoading(true);
       setError(null);
       try {
         const statusResponse = await fetch(TREASURE_HUNT_COMPETITION_API, {
@@ -397,16 +411,21 @@ export function useTreasureHuntCompetitionOverview(options?: {
         }
       } catch (cause) {
         if (controller.signal.aborted) return;
-        setStatus(null);
-        setLeaderboard([]);
-        setLeaderboardMeta(null);
+        if (!isBackgroundRefresh) {
+          setStatus(null);
+          setLeaderboard([]);
+          setLeaderboardMeta(null);
+        }
         setError(
           cause instanceof Error
             ? cause.message
             : 'No se pudo consultar la competición.',
         );
       } finally {
-        if (!controller.signal.aborted) setIsLoading(false);
+        if (!controller.signal.aborted) {
+          hasLoadedRef.current = true;
+          setIsLoading(false);
+        }
       }
     }
 
@@ -422,9 +441,22 @@ export function useTreasureHuntCompetitionOverview(options?: {
 
   useEffect(() => {
     const refresh = () => setRefreshToken((current) => current + 1);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const intervalId = autoRefreshMs > 0
+      ? window.setInterval(refreshWhenVisible, autoRefreshMs)
+      : null;
     window.addEventListener('cukies:treasure-hunt:competition:refresh', refresh);
-    return () => window.removeEventListener('cukies:treasure-hunt:competition:refresh', refresh);
-  }, []);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      if (intervalId !== null) window.clearInterval(intervalId);
+      window.removeEventListener('cukies:treasure-hunt:competition:refresh', refresh);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [autoRefreshMs]);
 
   const reload = useCallback(() => setRefreshToken((current) => current + 1), []);
 

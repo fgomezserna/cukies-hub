@@ -210,9 +210,13 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
 
   it('conserva los assets entre despliegues y versiona solo el shell', () => {
     expect(pwaSetupSource).toContain('NEXT_PUBLIC_GAME_CACHE_VERSION');
-    expect(pwaSetupSource).toContain('`/sw.js?v=${cacheVersion}`');
+    expect(pwaSetupSource).toContain("`${gamePublicPath('/sw.js')}?v=${cacheVersion}`");
+    expect(pwaSetupSource).toContain('scope: gameServiceWorkerScope()');
     expect(serviceWorkerSource).toContain(
       "new URL(self.location.href).searchParams.get('v')",
+    );
+    expect(serviceWorkerSource).toContain(
+      'new URL(self.registration.scope).pathname',
     );
     expect(serviceWorkerSource).toContain(
       "const ASSET_CACHE_NAME = 'treasure-hunt-assets-v1'",
@@ -227,9 +231,11 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
       'await assetCache.put(request, response)',
     );
     expect(serviceWorkerSource).toContain('staleWhileRevalidate');
-    expect(serviceWorkerSource).toContain("requestUrl.pathname.startsWith('/assets/')");
     expect(serviceWorkerSource).toContain(
-      "requestUrl.pathname.startsWith('/_next/static/')",
+      "pathWithinScope(requestUrl.pathname).startsWith('/assets/')",
+    );
+    expect(serviceWorkerSource).toContain(
+      "pathWithinScope(requestUrl.pathname).startsWith('/_next/static/')",
     );
     expect(serviceWorkerSource).toContain(
       'staleWhileRevalidate(event, ASSET_CACHE_NAME)',
