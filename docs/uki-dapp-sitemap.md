@@ -93,7 +93,7 @@ Contenido minimo:
 - Allowance ASM.
 - Compra UKI.
 - Vesting personal.
-- Resumen de liquidez ASM -> UKI y bloqueo/quema minimo 9 meses.
+- Resumen de la liquidez intermedia: 50% ASM -> UKI a `0,012 USD/UKI` y locker LP de 180 días.
 - Links a BscScan.
 
 No debe:

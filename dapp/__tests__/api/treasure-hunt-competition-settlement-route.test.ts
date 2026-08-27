@@ -4,6 +4,9 @@ jest.mock('@/lib/treasure-hunt-competition/server/runtime', () => ({
 jest.mock('@/lib/treasure-hunt-competition/server/default-service', () => ({
   getCompetitionService: jest.fn(),
 }));
+jest.mock('@/lib/treasure-hunt-competition/server/draw-seed-source', () => ({
+  resolveCompetitionDrawSeed: jest.fn(),
+}));
 jest.mock('@/lib/treasure-hunt-competition/server/settlement-mongo', () => ({
   MongoCompetitionSettlementSource: jest.fn(),
   MongoCompetitionSettlementRepository: jest.fn(),
@@ -22,6 +25,7 @@ jest.mock('@/lib/treasure-hunt-competition/server/settlement-close', () => {
 
 import { POST } from '@/app/api/internal/games/treasure-hunt/competition/settle/route';
 import { getCompetitionService } from '@/lib/treasure-hunt-competition/server/default-service';
+import { resolveCompetitionDrawSeed } from '@/lib/treasure-hunt-competition/server/draw-seed-source';
 import { resolveCompetitionRuntime } from '@/lib/treasure-hunt-competition/server/runtime';
 import {
   closeTreasureHuntCompetition,
@@ -43,6 +47,9 @@ const mockResolveRuntime = resolveCompetitionRuntime as jest.MockedFunction<
 >;
 const mockGetCompetitionService = getCompetitionService as jest.MockedFunction<
   typeof getCompetitionService
+>;
+const mockResolveDrawSeed = resolveCompetitionDrawSeed as jest.MockedFunction<
+  typeof resolveCompetitionDrawSeed
 >;
 const mockClose = closeTreasureHuntCompetition as jest.MockedFunction<
   typeof closeTreasureHuntCompetition
@@ -79,6 +86,7 @@ describe('POST internal Treasure Hunt settlement', () => {
     jest.clearAllMocks();
     process.env.TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET = SECRET;
     process.env.TREASURE_HUNT_COMPETITION_DRAW_SEED = `0x${'d4'.repeat(32)}`;
+    mockResolveDrawSeed.mockResolvedValue(`0x${'d4'.repeat(32)}`);
     mockResolveRuntime.mockReturnValue({
       configured: true,
       enabled: true,
@@ -188,6 +196,9 @@ describe('POST internal Treasure Hunt settlement', () => {
     expect(mockClose).not.toHaveBeenCalled();
     expect(mockStakingSource).toHaveBeenCalledTimes(1);
     expect(mockStakingRepository).toHaveBeenCalledTimes(1);
+    expect(mockResolveDrawSeed).toHaveBeenCalledWith({
+      campaign: expect.objectContaining({ eligibilityKind: 'uki_staking' }),
+    });
     expect(mockCloseStaking).toHaveBeenCalledWith(expect.objectContaining({
       drawSeed: `0x${'d4'.repeat(32)}`,
       runtime: expect.objectContaining({ phase: 'closed' }),

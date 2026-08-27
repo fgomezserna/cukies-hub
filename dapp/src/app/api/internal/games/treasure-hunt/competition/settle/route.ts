@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getCompetitionService } from '@/lib/treasure-hunt-competition/server/default-service';
+import { resolveCompetitionDrawSeed } from '@/lib/treasure-hunt-competition/server/draw-seed-source';
 import {
   getCompetitionSettlementSecret,
   hasValidCompetitionInternalAuthorization,
@@ -91,7 +92,9 @@ export async function POST(request: Request) {
         runtime: competitionRuntime,
         source: new MongoCompetitionStakingSettlementSource(),
         repository: new MongoCompetitionStakingSettlementRepository(),
-        drawSeed: process.env.TREASURE_HUNT_COMPETITION_DRAW_SEED?.trim() ?? '',
+        drawSeed: await resolveCompetitionDrawSeed({
+          campaign: competitionRuntime.campaign,
+        }),
         prepareSource,
         now,
       })

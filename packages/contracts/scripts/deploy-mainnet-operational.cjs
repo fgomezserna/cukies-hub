@@ -1,7 +1,7 @@
 const hre = require('hardhat');
 
 const BSC_MAINNET_CHAIN_ID = 56;
-const APPROVED_MAINNET_ASM_TOKEN = '0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c';
+const APPROVED_MAINNET_ASM_TOKEN = '0x707F0f4a39a4a26239F7D00463B15AB5656861f9';
 const MAINNET_SALE_START = 1781535600n; // 2026-06-15T17:00:00+02:00 Europe/Madrid / 15:00 UTC.
 
 function requireEnv(name) {
@@ -106,7 +106,7 @@ async function main() {
 
   const asmTokenAddress = requireAddress('ASM_TOKEN_ADDRESS');
   if (asmTokenAddress !== normalizeAddress(APPROVED_MAINNET_ASM_TOKEN, 'APPROVED_MAINNET_ASM_TOKEN')) {
-    throw new Error(`ASM_TOKEN_ADDRESS must be mainnet CONCILIUM ${APPROVED_MAINNET_ASM_TOKEN}. Received ${asmTokenAddress}`);
+    throw new Error(`ASM_TOKEN_ADDRESS must be approved mainnet ASM ${APPROVED_MAINNET_ASM_TOKEN}. Received ${asmTokenAddress}`);
   }
 
   const owner = deployerAddress;

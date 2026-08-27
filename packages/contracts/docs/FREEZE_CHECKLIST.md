@@ -67,7 +67,7 @@ Do not mix dev, testnet and production addresses. Each freeze or deploy review m
 | --- | --- | --- | --- |
 | Local dev | `31337` | `MockERC20` from Hardhat tests/simulations only. | Local deployment address, never reused outside local. |
 | BSC testnet | `97` | Test ASM / `tASM`. | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` |
-| BSC mainnet | `56` | Production ASM / `CONCILIUM`. | `0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c` |
+| BSC mainnet | `56` | Production Ascensum token / `ASM`. | `0x707F0f4a39a4a26239F7D00463B15AB5656861f9` |
 
 The deploy script rejects non-local deploys when `ASM_TOKEN_ADDRESS` does not match the approved address for the target chain id. The approved ASM token is confirmed as standard ERC-20 with no fee-on-transfer/rebase behavior.
 

@@ -79,9 +79,9 @@ estos puntos, cerrados posteriormente en la conversacion:
 - Maximo por compra o por wallet: no hay limite especifico aprobado.
 - Maximo total vendible: 250,000,000 UKI, correspondiente al pool de ecosistema asignado como techo de venta.
 - BNB/USDT: opcion pendiente. Si se permite, debe convertirse automaticamente a ASM o guardarse para conversion posterior a ASM.
-- ASM recaudado: debe usarse para aportar liquidez contra UKI.
-- Liquidez inicial: se quema o se bloquea durante al menos 9 meses.
-- Compradores de preventa: vesting lineal de 9 meses, sin cliff. El inicio del vesting se fija en TGE, cuando se aporte liquidez en Pancake, y debe congelarse antes de permitir claims.
+- El listing intermedio usa el 50% exacto del ASM recaudado para aportar liquidez contra UKI a `0,012 USD/UKI`; la segunda aportación queda para la fase posterior aprobada.
+- Liquidez inicial intermedia: los LP propios se bloquean exactamente 180 días en el locker sin comisión; una segunda aportación de liquidez queda fuera de esta fase.
+- Compradores de preventa: vesting lineal de 9 meses, sin cliff. El inicio aprobado es el 15 de septiembre de 2026; la hora UTC se cerrará en la fase de vesting y la configuración debe congelarse antes de permitir claims.
 - Incentivos Concilium/Ascensum: la cantidad vendida en preventa a esa comunidad se iguala con UKI para Marcel, destinada a incentivos de Concilium/Ascensum.
 - Vesting de incentivos Concilium/Ascensum: mismas condiciones que team, 9 meses de cliff y 24 meses de vesting.
 - Incentivo por compra y referral: pendiente de definir, posiblemente sorteo o regalo de Cukies.
@@ -103,13 +103,13 @@ Esta matriz es la referencia para configurar `VestingVault` y cualquier contrato
 
 | Pool | % supply | UKI | Regla actual | Representacion tecnica |
 | --- | ---: | ---: | --- | --- |
-| Compradores preventa | Sale desde ecosistema | Hasta 250,000,000 | 9 meses lineal, sin cliff, inicio en TGE/Pancake liquidity. | `PRESALE_SCHEDULE_ID`; `presaleVestingStart = TGE`, `presaleVestingDuration = 9 meses`, congelar con `freezePresaleVestingConfig()` antes de claims. |
+| Compradores preventa | Sale desde ecosistema | Hasta 250,000,000 | 9 meses lineal, sin cliff, inicio el 15 de septiembre de 2026 (hora UTC pendiente de cierre operativo). | `PRESALE_SCHEDULE_ID`; configurar `presaleVestingStart` en la fase posterior, mantener `presaleVestingDuration = 9 meses` y congelar con `freezePresaleVestingConfig()` antes de claims. |
 | Ecosistema - desbloqueo 40 dias | 3% supply total | 30,000,000 | Cliff de 40 dias desde TGE y desbloqueo inmediato, sin vesting lineal. | Schedule dedicada tipo `ECOSYSTEM_40D` con `duration = 0`, que desbloquea el 100% en el cliff. |
 | Ecosistema - resto | Resto del 25% no vendido ni asignado al desbloqueo 40d | TBD segun venta real | 9 meses cliff + 12 meses vesting lineal. | Schedule dedicada tipo `ECOSYSTEM_REMAINDER`; amount final depende de UKI vendido en preventa y subasignaciones aprobadas. |
 | Equipo | 12% | 120,000,000 | 9 meses cliff + 24 meses vesting. | Schedules por beneficiario o grupo; ids versionados tipo `TEAM_*`. |
 | Incentivos Concilium/Ascensum para Marcel | Variable dentro de equipo | Igual a cantidad vendida a esa comunidad | Mismas condiciones que team: 9 meses cliff + 24 meses vesting. | Schedule separada tipo `CONCILIUM_INCENTIVES`; amount final depende de ventas atribuidas. |
 | Programa de recompensas Cukie Masters | 45% | 450,000,000 | Entrega durante 6 anos segun programa de recompensas. La documentacion actual no concreta cliff/start/duration unico. | No congelar como schedule unica hasta definir calendario; probablemente requiere `RewardsDistributor` por periodos o vesting por tramos. |
-| Liquidez | 18% | 180,000,000 | Liquidez inicial en Pancake; ASM recaudado se usa para liquidez UKI. Bloqueo o quema LP minimo 9 meses. | No es vesting de usuario; registrar tx de liquidez y bloqueo/quema LP. |
+| Liquidez | 18% | 180,000,000 | La fase intermedia usa sólo los UKI necesarios para emparejar el 50% de ASM recaudado a `0,012 USD/UKI` en PancakeSwap V2. | Los LP de esta aportación se bloquean exactamente 180 días; registrar pool, cantidades, locker, beneficiario y transacciones. |
 
 Puntos pendientes antes de mainnet:
 

@@ -536,7 +536,7 @@ Campos minimos:
 - duracion: 1 mes,
 - listing minimo: $0.012,
 - vesting comprador: 9 meses lineal sin cliff,
-- liquidez: ASM recaudado a liquidez UKI con bloqueo/quema minimo 9 meses,
+- liquidez intermedia: 50% del ASM recaudado contra UKI a `0,012 USD/UKI`, con LP bloqueado exactamente 180 días,
 - estado wallet,
 - CTA.
 
