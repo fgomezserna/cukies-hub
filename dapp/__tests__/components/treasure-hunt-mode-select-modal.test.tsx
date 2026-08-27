@@ -110,4 +110,27 @@ describe('Treasure Hunt mode selector', () => {
     fireEvent.click(readyButton);
     expect(onSelectMode).toHaveBeenCalledWith('single');
   });
+
+  it('muestra un aviso simple sin tarjetas de modo cuando no quedan partidas', () => {
+    const onManageStaking = jest.fn();
+    render(
+      <ModeSelectModal
+        open
+        onClose={jest.fn()}
+        onSelectMode={jest.fn()}
+        singlePlayerEntryState="ready"
+        multiplayerEntryState="disabled"
+        competitionBlockReason="no_attempts"
+        onManageStaking={onManageStaking}
+      />,
+    );
+
+    expect(screen.getByRole('dialog', { name: 'No tienes partidas disponibles' })).toBeInTheDocument();
+    expect(screen.getByText(/Cada 2.000 UKI completos en staking/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('treasure-hunt-single-player-mode')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('treasure-hunt-multiplayer-mode')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('treasure-hunt-manage-staking'));
+    expect(onManageStaking).toHaveBeenCalledTimes(1);
+  });
 });

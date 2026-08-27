@@ -77,7 +77,7 @@ describe('TreasureHuntCompetitionBanner', () => {
     expect(screen.getByText('Intentos disponibles')).toBeInTheDocument();
     expect(screen.getByText('Resultados que cuentan')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
-    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.queryByText('N.º de ganadores')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toHaveAttribute(
       'href',
       '/games/treasure-hunt/rules',
@@ -97,7 +97,7 @@ describe('TreasureHuntCompetitionBanner', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(actions).toHaveClass('hidden', 'sm:flex');
-    expect(metrics).toHaveClass('grid-cols-2', 'sm:grid-cols-4');
+    expect(metrics).toHaveClass('grid-cols-3');
   });
 
   it('bloquea los resultados y explica la retirada cuando la wallet está descalificada', () => {

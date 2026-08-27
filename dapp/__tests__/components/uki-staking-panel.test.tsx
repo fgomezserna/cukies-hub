@@ -156,21 +156,22 @@ describe('UkiStakingPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '20.000' }));
     expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('20000');
-    expect(screen.getByText(/Total computable: 85\.000 UKI · 4\/5 Cukie Masters/i)).toBeInTheDocument();
-    expect(screen.getByText(/Faltarían 15\.000 UKI computables/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tendrías 45\.000 UKI en staking y 4\/5 Cukie Masters/i)).toBeInTheDocument();
+    expect(screen.getByText(/Te faltarían 15\.000 UKI para el siguiente Cukie Master/i)).toBeInTheDocument();
     expect(screen.queryByText(/partidas concedidas/i)).not.toBeInTheDocument();
-    expect(screen.getByText('Conectar')).toBeInTheDocument();
-    expect(screen.getByText('Autorizar')).toBeInTheDocument();
-    expect(screen.getAllByText('Depositar')).toHaveLength(2);
+    expect(screen.queryByText('Pasos de la operación')).not.toBeInTheDocument();
+    expect(screen.getByText(/2.000 UKI en staking = 1 partida/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Depositar')).toHaveLength(1);
   });
 
-  it('calcula el depósito exacto necesario para la siguiente plaza', () => {
+  it('ofrece cantidades simples sin exponer cálculos internos de la plaza', () => {
     render(<UkiStakingPanel routePreview={routePreview} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Lo necesario' }));
+    fireEvent.click(screen.getByRole('button', { name: '2.000' }));
 
-    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('15000');
-    expect(screen.getByText(/Total computable: 80\.000 UKI · 4\/5 Cukie Masters/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('2000');
+    expect(screen.queryByRole('button', { name: 'Lo necesario' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Total computable:/i)).not.toBeInTheDocument();
   });
 
   it('switches explicitly to BSC Testnet when the wallet is on another chain', () => {
