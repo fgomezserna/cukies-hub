@@ -8,6 +8,15 @@ import {
 
 let mockLocale: 'es' | 'en' = 'es';
 let mockCompetitionError: string | null = null;
+let mockWalletConnected = true;
+let mockWalletDisqualified = false;
+
+jest.mock('wagmi', () => ({
+  useAccount: () => ({
+    address: mockWalletConnected ? '0x0000000000000000000000000000000000000001' : undefined,
+    isConnected: mockWalletConnected,
+  }),
+}));
 
 jest.mock('lucide-react', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -77,7 +86,7 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         totalStakedUkiRaw: '520000000000000000000000',
         indexedThroughBlock: 123,
         indexedAt: '2026-08-27T15:00:00.000Z',
-        disqualified: false,
+        disqualified: mockWalletDisqualified,
         disqualificationEvidence: null,
         issues: [],
         attemptsGranted: 10,
@@ -108,6 +117,8 @@ describe('home post-listing de UKI', () => {
   beforeEach(() => {
     mockLocale = 'es';
     mockCompetitionError = null;
+    mockWalletConnected = true;
+    mockWalletDisqualified = false;
   });
 
   afterEach(() => {
@@ -186,5 +197,29 @@ describe('home post-listing de UKI', () => {
       'href',
       '/games/treasure-hunt/rankings',
     );
+  });
+
+  it('no muestra un estado personal ni una descalificación sin wallet conectada', () => {
+    mockWalletConnected = false;
+    mockWalletDisqualified = true;
+
+    render(<CukiesLanding />);
+
+    expect(screen.getByText('Conecta wallet', { selector: 'dd' })).toBeInTheDocument();
+    expect(screen.getByText('—/10')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Esta wallet está descalificada para la edición actual.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mantiene visible la descalificación cuando la wallet afectada está conectada', () => {
+    mockWalletDisqualified = true;
+
+    render(<CukiesLanding />);
+
+    expect(
+      screen.getByText('Esta wallet está descalificada para la edición actual.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('0/10')).toBeInTheDocument();
   });
 });

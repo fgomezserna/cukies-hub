@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
+import { useAccount } from 'wagmi';
 import {
   ArrowRight,
   Check,
@@ -115,7 +116,7 @@ function HeroSection() {
           </a>
         </ScrollReveal>
 
-        <ScrollReveal animation="right" duration={900} className="w-full">
+        <ScrollReveal animation="right" duration={900} className="uki-hero-overview-wrap w-full">
           <LaunchOverview />
         </ScrollReveal>
       </div>
@@ -219,7 +220,7 @@ function ParticipationFlow() {
   const steps = participationStepsByLocale[locale];
 
   return (
-    <section id="comprar" className="uki-container py-12 sm:py-16">
+    <section id="comprar" className="uki-container uki-home-section">
       <ScrollReveal animation="fade">
         <SectionHeading
           eyebrow={copy.eyebrow}
@@ -270,13 +271,15 @@ function ParticipationFlow() {
 
 function CompetitionSpotlight() {
   const { locale } = usePublicLocale();
+  const { isConnected } = useAccount();
   const copy = landingCopyByLocale[locale].competition;
   const { status, leaderboardMeta, isLoading, error } = useTreasureHuntCompetitionOverview({
     includeLeaderboard: true,
     leaderboardPageSize: 1,
   });
   const campaign = status?.campaign;
-  const eligibility = status?.eligibility;
+  const eligibility = isConnected ? status?.eligibility : null;
+  const isPersonalStatusLoading = isConnected && isLoading;
   const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
   const phase = status?.phase ?? 'unconfigured';
   const prizePool = leaderboardMeta?.poolUkiRaw
@@ -290,7 +293,7 @@ function CompetitionSpotlight() {
     : `—/${maxAttempts}`;
 
   return (
-    <section id="torneo" className="uki-container py-12 sm:py-16">
+    <section id="torneo" className="uki-container uki-home-section">
       <ScrollReveal animation="up" duration={900}>
         <div className="relative overflow-hidden rounded-[18px] border border-[var(--uki-cyan-border)] bg-[#071312]">
           <Image
@@ -341,8 +344,8 @@ function CompetitionSpotlight() {
             <dl className="grid gap-px overflow-hidden rounded-[12px] border border-white/15 bg-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.32)]">
               {[
                 [copy.prize, isLoading && !leaderboardMeta ? copy.loading : prizePool],
-                [copy.attempts, isLoading ? copy.loading : attempts],
-                [copy.counted, isLoading ? copy.loading : counted],
+                [copy.attempts, isPersonalStatusLoading ? copy.loading : attempts],
+                [copy.counted, isPersonalStatusLoading ? copy.loading : counted],
               ].map(([label, value]) => (
                 <div key={label} className="bg-[#081614]/95 px-5 py-5 sm:px-6">
                   <dt className="uki-label">{label}</dt>
@@ -417,7 +420,7 @@ function UtilitySection() {
   const cards = utilityCardsByLocale[locale];
 
   return (
-    <section id="utilidad" className="uki-container py-12 sm:py-16">
+    <section id="utilidad" className="uki-container uki-home-section">
       <ScrollReveal animation="fade">
         <SectionHeading
           eyebrow={copy.eyebrow}
@@ -449,7 +452,7 @@ function StakingSection() {
   const copy = landingCopyByLocale[locale].staking;
 
   return (
-    <section id="staking" className="uki-container py-12 sm:py-16">
+    <section id="staking" className="uki-container uki-home-section">
       <ScrollReveal animation="up">
         <div className="grid overflow-hidden rounded-[18px] border border-[#e45cff]/25 bg-[#15091e]/88 lg:grid-cols-[0.82fr_1.18fr]">
           <div className="relative min-h-[18rem] overflow-hidden lg:min-h-[33rem]">
@@ -499,7 +502,7 @@ function CommunityOwnership() {
   const copy = landingCopyByLocale[locale].community;
 
   return (
-    <section className="uki-container py-12 sm:py-16">
+    <section className="uki-container uki-home-section">
       <ScrollReveal animation="scale" duration={1000}>
         <div className="uki-community-panel">
           <div className="uki-community-copy">
@@ -547,7 +550,7 @@ function PresaleParticipants() {
   const copy = landingCopyByLocale[locale].presale;
 
   return (
-    <section id="preventa-finalizada" className="uki-container py-12 sm:py-16">
+    <section id="preventa-finalizada" className="uki-container uki-home-section">
       <ScrollReveal animation="up">
         <Panel innerClassName="grid gap-7 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-10">
           <div>
@@ -576,7 +579,7 @@ function TransparencySection() {
   const items = transparencyItemsByLocale[locale];
 
   return (
-    <section id="transparencia" className="uki-container py-12 sm:py-16">
+    <section id="transparencia" className="uki-container uki-home-section">
       <ScrollReveal animation="fade">
         <SectionHeading
           eyebrow={copy.eyebrow}
@@ -619,7 +622,7 @@ function FaqAndCta() {
   const faqs = faqsByLocale[locale];
 
   return (
-    <section id="faq" className="uki-container py-12 sm:py-16">
+    <section id="faq" className="uki-container uki-home-section">
       <ScrollReveal animation="fade">
         <SectionHeading eyebrow={copy.eyebrow} title={copy.title} tone="cyan" withRule />
       </ScrollReveal>
