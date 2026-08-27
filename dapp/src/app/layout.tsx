@@ -25,14 +25,14 @@ const lilita = Lilita_One({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://cukies.world'),
-  title: 'Cukies World | Preventa UKI',
+  title: 'Cukies World | UKI, staking y Treasure Hunt',
   description:
-    'UKI es el token que conecta la nueva economía de juegos de Cukies World en BNB Smart Chain.',
+    'Compra UKI, haz staking y participa en las competiciones de Treasure Hunt en BNB Smart Chain.',
   openGraph: {
-    title: 'Cukies World | Preventa UKI',
+    title: 'Cukies World | UKI, staking y Treasure Hunt',
     description:
-      'Entra en la preventa UKI y sigue la nueva economía de juegos de Cukies World en BNB Smart Chain.',
-    images: ['/brand/uki-sale-landing-reference.png'],
+      'UKI ya está activo: staking, Treasure Hunt y competiciones en BNB Smart Chain.',
+    images: ['/brand/generated/uki-hero-stage-generated.png'],
   },
   icons: {
     icon: '/Powered_up_2.png',
