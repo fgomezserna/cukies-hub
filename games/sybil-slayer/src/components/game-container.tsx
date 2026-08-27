@@ -9,6 +9,7 @@ import {
 import GameCanvas from './game-canvas';
 import InfoModal from './info-modal';
 import ModeSelectModal, {
+  type CompetitionBlockReason,
   GameMode,
   resolveTreasureHuntSinglePlayerEntry,
 } from './mode-select-modal';
@@ -793,6 +794,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   const [competitionStartPending, setCompetitionStartPending] = useState(false);
   const [competitionAccess, setCompetitionAccess] = useState<TreasureHuntCompetitionAccess | null>(null);
   const [competitionStartError, setCompetitionStartError] = useState<string | null>(null);
+  const [competitionBlockReason, setCompetitionBlockReason] = useState<CompetitionBlockReason | null>(null);
   const requestHubWalletConnection = useCallback(() => {
     if (typeof window === 'undefined') return;
 
@@ -818,6 +820,33 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       );
     } catch {
       setCompetitionStartError('No se pudo abrir la conexión de wallet del Hub.');
+    }
+  }, [multiplayerHubEntryUrl]);
+  const requestHubStaking = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    if (window.parent === window) {
+      if (multiplayerHubEntryUrl) {
+        window.location.assign(new URL('/cukie-master', multiplayerHubEntryUrl).toString());
+      } else {
+        setCompetitionStartError('Abre Treasure Hunt desde el Hub para gestionar tu staking.');
+      }
+      return;
+    }
+
+    try {
+      const parentOrigin = resolveConfiguredParentOrigin(
+        document.referrer,
+        process.env.NEXT_PUBLIC_DAPP_ORIGIN,
+        process.env.NEXT_PUBLIC_PARENT_URL,
+        process.env.NODE_ENV,
+      );
+      window.parent.postMessage(
+        { type: 'TREASURE_HUNT_MANAGE_STAKING_REQUEST' },
+        parentOrigin,
+      );
+    } catch {
+      setCompetitionStartError('No se pudo abrir el staking del Hub.');
     }
   }, [multiplayerHubEntryUrl]);
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -1674,6 +1703,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     competitionStartPendingRef.current = true;
     setCompetitionStartPending(true);
     setCompetitionStartError(null);
+    setCompetitionBlockReason(null);
     setModeSelectOpen(false);
     try {
       await multiplayer.reset();
@@ -1718,6 +1748,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           ELIGIBILITY_UNAVAILABLE:
             'Estamos sincronizando tu staking confirmado. Espera unos segundos y vuelve a intentarlo.',
         };
+        setCompetitionBlockReason(
+          access.reason === 'NO_ATTEMPTS_REMAINING' ? 'no_attempts' : null,
+        );
         setCompetitionStartError(accessErrorCopy[access.reason ?? ''] ??
           'No pudimos confirmar si el intento quedó creado. La partida no se inició; vuelve a intentarlo.');
         setModeSelectOpen(true);
@@ -2326,6 +2359,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     console.log('🎮 [MODE] Mode selected:', mode);
     if (multiplayerStartPendingRef.current || !canChangeGameMode) return;
     setCompetitionStartError(null);
+    setCompetitionBlockReason(null);
     setModeSelectOpen(false);
 
     if (mode === 'single') {
@@ -3523,6 +3557,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             multiplayerEntryState="disabled"
             singlePlayerEntryState={singlePlayerEntryState}
             competitionNotice={competitionStartError}
+            competitionBlockReason={competitionBlockReason}
+            onManageStaking={requestHubStaking}
           />
           <InfoModal
             isOpen={isInfoModalOpen && !localControlsLocked}
@@ -3758,6 +3794,8 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         multiplayerEntryState="disabled"
         singlePlayerEntryState={singlePlayerEntryState}
         competitionNotice={competitionStartError}
+        competitionBlockReason={competitionBlockReason}
+        onManageStaking={requestHubStaking}
       />
       {waitingOverlay}
       {countdownOverlay}

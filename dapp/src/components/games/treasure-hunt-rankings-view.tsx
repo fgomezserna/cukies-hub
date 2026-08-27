@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock3, Medal } from 'lucide-react';
 
-import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
-import TreasureHuntDisqualificationNotice from '@/components/games/treasure-hunt-disqualification-notice';
+import { TreasureHuntCompetitionSummary } from '@/components/games/treasure-hunt-competition-summary';
 import TreasureHuntHistoryView from '@/components/games/treasure-hunt-history-view';
 import {
   formatTreasureHuntDuration,
@@ -13,10 +12,6 @@ import {
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
-import {
-  calculateAvailablePrizeSlots,
-  TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME,
-} from '@/lib/treasure-hunt-competition/presentation';
 import { cn } from '@/lib/utils';
 
 type RankingFilter = 'general' | 'mine';
@@ -50,19 +45,9 @@ function ActiveTreasureHuntRankingsView() {
     });
   const campaign = status?.campaign;
   const isUkiStaking = campaign?.eligibilityKind === 'uki_staking';
-  const isPresale = campaign?.eligibilityKind === 'presale';
   const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
   const eligibility = status?.eligibility;
-  const myAttempts = eligibility?.topAttemptsCount ?? leaderboardMeta?.myAttempts ?? 0;
-  const countedAttempts = eligibility?.disqualified ? 0 : myAttempts;
-  const prizePoolValue = leaderboardMeta
-    ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw)
-    : 'Actualizando…';
   const pagination = leaderboardMeta?.pagination;
-  const availablePrizeSlots = calculateAvailablePrizeSlots(
-    leaderboardMeta?.poolUkiRaw,
-    campaign?.prizePerWinnerUkiRaw,
-  );
 
   useEffect(() => {
     if (window.location.hash === '#mi-participacion') setFilter('mine');
@@ -71,26 +56,6 @@ function ActiveTreasureHuntRankingsView() {
   useEffect(() => {
     setPage(1);
   }, [filter]);
-
-  const metrics: readonly (readonly [string, string])[] = isUkiStaking
-    ? [
-      [
-        'Intentos disponibles',
-        isLoading ? '···' : eligibility ? String(eligibility.attemptsRemaining) : '—',
-      ],
-      ['Resultados que cuentan', isLoading ? '···' : `${countedAttempts}/${maxAttempts}`],
-      ['Premio acumulado', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
-      [
-        'N.º de ganadores',
-        isLoading && !leaderboardMeta
-          ? '···'
-          : availablePrizeSlots?.toLocaleString('es-ES') ?? '—',
-      ],
-    ]
-    : [
-      ['Mejores partidas', isLoading ? '···' : `${myAttempts}/${maxAttempts}`],
-      ['Premio acumulado', isLoading && !leaderboardMeta ? '···' : prizePoolValue],
-    ];
 
   return (
     <>
@@ -107,64 +72,33 @@ function ActiveTreasureHuntRankingsView() {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94">
-        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/15 px-5 py-5">
-          <div>
-            <p className="font-mono text-[10px] font-black uppercase tracking-[0.15em] text-[#35eee2]">
-              Competición oficial
-            </p>
-            <h3 className="mt-1 font-headline text-2xl font-black tracking-[-0.02em] text-[#f1eee8]">
-              {isUkiStaking
-                ? TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME
-                : isPresale
-                  ? 'Treasure Hunt · Torneo de preventa'
-                  : 'Competición Treasure Hunt'}
-            </h3>
-            {isUkiStaking ? (
-              <TreasureHuntCompetitionCountdown
-                phase={status?.phase}
-                campaign={campaign}
-                className="mt-2"
-              />
-            ) : null}
-          </div>
+      <TreasureHuntCompetitionSummary
+        id="treasure-hunt-rankings-competition-title"
+        phase={status?.phase}
+        campaign={campaign}
+        eligibility={eligibility}
+        poolUkiRaw={leaderboardMeta?.poolUkiRaw}
+        isLoading={isLoading}
+        className="mb-3 border-[#b68b3c]/55 bg-[#061110]/94"
+        actions={(
+          <>
+            <Link
+              href="/games/treasure-hunt/rules"
+              className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-white/20 px-3 py-2 text-xs font-black text-[#f2eee7] transition hover:border-[#35eee2]/55"
+            >
+              Ver reglas
+            </Link>
           <Link
             href="/games/treasure-hunt"
-            className="hidden min-h-11 items-center gap-2 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d5d57] px-5 text-sm font-bold text-white hover:bg-[#137069] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] sm:inline-flex"
+              className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-[#35eee2]/45 bg-[#35eee2]/10 px-3 py-2 text-xs font-black text-[#35eee2] transition hover:bg-[#35eee2]/15"
           >
             Jugar 1P <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
-        </header>
+          </>
+        )}
+      />
 
-        <dl className={cn(
-          'grid grid-cols-2 gap-px border-b border-white/15 bg-white/15',
-          isUkiStaking && 'sm:grid-cols-4',
-        )}>
-          {metrics.map(([label, value]) => (
-            <div
-              key={label}
-              className="min-w-0 bg-[#071312] px-3 py-3 sm:px-5 sm:py-4"
-            >
-              <dt className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#969994]">
-                {label}
-              </dt>
-              <dd className="mt-1 truncate font-mono text-base font-black text-[#35eee2] sm:text-xl" title={value}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        {isUkiStaking ? (
-          <p className="border-b border-white/15 px-4 py-2 text-[11px] leading-relaxed text-[#969994] sm:px-5">
-            El número de ganadores es provisional: se calcula dividiendo el premio acumulado actual entre 10.000 UKI. Los ganadores se confirman tras el cierre y la revisión.
-          </p>
-        ) : null}
-
-        {isUkiStaking && eligibility?.disqualified ? (
-          <div className="border-b border-white/15 p-4 sm:p-5">
-            <TreasureHuntDisqualificationNotice eligibility={eligibility} />
-          </div>
-        ) : null}
+      <section className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94">
 
         <div
           id="mi-participacion"

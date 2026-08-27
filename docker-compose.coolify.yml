@@ -1,5 +1,7 @@
 services:
   staging-mongo:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -181,6 +183,7 @@ services:
       TREASURE_HUNT_COMPETITION_REVIEW_SECRET: ${TREASURE_HUNT_COMPETITION_REVIEW_SECRET:-}
       TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET: ${TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET:-}
       TREASURE_HUNT_COMPETITION_DRAW_SEED: ${TREASURE_HUNT_COMPETITION_DRAW_SEED:-}
+      TREASURE_HUNT_COMPETITION_DRAW_SOURCE_BLOCK: ${TREASURE_HUNT_COMPETITION_DRAW_SOURCE_BLOCK:-}
       NEXT_PUBLIC_PUSHER_KEY: ${NEXT_PUBLIC_PUSHER_KEY:-}
       NEXT_PUBLIC_PUSHER_CLUSTER: ${NEXT_PUBLIC_PUSHER_CLUSTER:-}
       PUSHER_APP_ID: ${PUSHER_APP_ID:-}
@@ -300,6 +303,8 @@ services:
       - coolify
 
   cukie-master-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -358,6 +363,8 @@ services:
       - coolify
 
   competition-credit-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -415,6 +422,8 @@ services:
       - coolify
 
   game-economy-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -472,6 +481,8 @@ services:
       - coolify
 
   cukie-pool-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -529,6 +540,8 @@ services:
       - coolify
 
   weekly-ranking-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -586,6 +599,8 @@ services:
       - coolify
 
   reward-accounting-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -647,6 +662,8 @@ services:
       - coolify
 
   reward-batch-publisher:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile

@@ -40,8 +40,6 @@ export default function TreasureHuntRulesView() {
     includeLeaderboard: false,
   });
   const rules = status?.campaign ?? TREASURE_HUNT_FALLBACK_RULES;
-  const topAttempts = rules.topAttemptsPerWallet;
-  const pointsPerTicket = rules.pointsPerTicket;
 
   return (
     <div className="mx-auto min-h-full w-full max-w-[68rem] pb-8">
@@ -91,62 +89,56 @@ export default function TreasureHuntRulesView() {
         <ol className="divide-y divide-white/15">
           <RuleSection number={1} title="Cómo participar">
             <p>
-              Deposita UKI en Cukie Master. Cada 2.000 UKI completos en staking conceden
-              un intento. Si aumentas el staking, puedes desbloquear intentos adicionales.
+              Cada 2.000 UKI que deposites en staking te permitirá jugar 1 partida.
             </p>
-            <p>Solo cuenta el staking personal de esta wallet; el staking global no concede partidas.</p>
-            <p>El intento se consume al iniciar la partida, incluso si la abandonas o resulta inválida.</p>
+            <p>Consigue la mayor puntuación posible y acumula tickets:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Cada {rules.pointsPerTicket} puntos = 1 ticket.</li>
+              <li>
+                Puedes jugar tantas partidas como quieras, pero solo se tendrán en cuenta para
+                generar tickets tus {rules.topAttemptsPerWallet} mejores puntuaciones.
+              </li>
+            </ul>
+            <p>
+              Cuantos mejores sean tus resultados, más tickets acumularás y más posibilidades
+              tendrás de ganar.
+            </p>
             <Link href="/cukie-master" className="inline-flex items-center gap-2 font-bold text-[#35eee2] hover:text-white">
               Gestionar staking <ArrowRight className="h-4 w-4" />
             </Link>
           </RuleSection>
 
-          <RuleSection number={2} title="Clasificación">
+          <RuleSection number={2} title="Pool de premios">
             <p>
-              Solo cuentan partidas 1P completadas y validadas. Se conservan como máximo
-              tus {topAttempts} mejores puntuaciones.
+              El bote de premios comienza con {formatTreasureHuntUkiRaw(rules.basePrizeUkiRaw)}.
             </p>
+            <p>
+              Además, al finalizar la competición se añadirá al bote el equivalente al{' '}
+              {formatTreasureHuntPercentage(rules.stakePrizeBps)} de todos los UKI que estén en
+              staking en ese momento.
+            </p>
+            <p><strong className="text-[#f2eee7]">Fin de la competición:</strong> 15 de septiembre a las 15:00 UTC.</p>
+            <p>Esto significa que cuantos más UKI haya en staking, mayor será el bote de premios.</p>
           </RuleSection>
 
-          <RuleSection number={3} title="Mantener el staking">
+          <RuleSection number={3} title="¿Cómo se eligen los ganadores?">
             <p>
-              Puedes retirar en cualquier momento, pero cualquier retirada durante la campaña
-              descalifica la wallet completa. Volver a depositar no elimina la descalificación.
-            </p>
-          </RuleSection>
-
-          <RuleSection number={4} title="Tickets para el sorteo">
-            <p>
-              Cada una de tus {topAttempts} mejores partidas válidas genera
-              1 ticket por cada {pointsPerTicket} puntos completos. Los tickets se suman
-              para aumentar tu probabilidad en el sorteo final.
+              Por cada {formatTreasureHuntUkiRaw(rules.prizePerWinnerUkiRaw)} del bote,
+              se seleccionará 1 ganador.
             </p>
             <div className="rounded-[8px] border border-[#ffc240]/25 bg-[#ffc240]/5 p-4 text-[#f2eee7]">
-              <p className="font-black text-[#ffc240]">Ejemplo</p>
+              <p className="font-black text-[#ffc240]">Ejemplo: 2.000.000 UKI en staking</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>Una partida obtiene 1.250 puntos.</li>
-                <li>Genera 12 tickets; los 50 puntos restantes no forman otro ticket.</li>
+                <li>50.000 UKI iniciales.</li>
+                <li>200.000 UKI procedentes del 10% del staking.</li>
+                <li>250.000 UKI de bote = 25 ganadores de 10.000 UKI.</li>
               </ul>
             </div>
+            <p>Cuantos más tickets tengas, más posibilidades tendrás de ganar.</p>
+            <p>Cada wallet podrá resultar ganadora una sola vez.</p>
           </RuleSection>
 
-          <RuleSection number={5} title="Pool y premios">
-            <p>
-              El pool parte de {formatTreasureHuntUkiRaw(rules.basePrizeUkiRaw)} y suma el{' '}
-              {formatTreasureHuntPercentage(rules.stakePrizeBps)} del total de UKI en staking al cierre.
-              Cada ganador recibe {formatTreasureHuntUkiRaw(rules.prizePerWinnerUkiRaw)} y una misma
-              wallet solo puede ganar {rules.maxWinsPerWallet === 1 ? 'una vez' : `${rules.maxWinsPerWallet} veces`}.
-            </p>
-          </RuleSection>
-
-          <RuleSection number={6} title="Selección de ganadores">
-            <p>
-              El sorteo es ponderado por tickets y se realiza únicamente entre wallets elegibles.
-              Cuando una wallet resulta ganadora, se elimina de las rondas siguientes.
-            </p>
-          </RuleSection>
-
-          <RuleSection number={7} title="Entrega de los Premios">
+          <RuleSection number={4} title="Entrega de los Premios">
             <p>Todos los premios se entregarán en UKI.</p>
             <p>Los tokens tendrán:</p>
             <ul className="list-disc space-y-1 pl-5">
@@ -156,6 +148,17 @@ export default function TreasureHuntRulesView() {
                 liberándose gradualmente.
               </li>
             </ul>
+          </RuleSection>
+
+          <RuleSection number={5} title="Descalificación">
+            <p>
+              Para mantener tu participación activa, deberás conservar en staking los UKI
+              depositados durante toda la competición.
+            </p>
+            <p>
+              Si realizas un unstake parcial o total antes de que finalice la competición,
+              quedarás descalificado y perderás la posibilidad de recibir cualquier premio.
+            </p>
           </RuleSection>
         </ol>
       </main>

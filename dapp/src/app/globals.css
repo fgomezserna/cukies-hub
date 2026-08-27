@@ -14,6 +14,18 @@ body {
 [data-game-layout='mobile-focus'] [data-game-viewport] {
   height: auto;
   min-height: 0;
+  contain: paint;
+  isolation: isolate;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+[data-game-layout='mobile-focus'] [data-game-viewport] > [data-game-landscape-surface],
+[data-game-layout='mobile-focus'] [data-game-viewport] iframe {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 @media (min-width: 1024px) {

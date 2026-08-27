@@ -108,11 +108,13 @@ describe('CukieMasterStatusPanel', () => {
     expect(await screen.findByText('UKI en vesting')).toBeInTheDocument();
     expect(screen.getByText('UKI en staking')).toBeInTheDocument();
     expect(screen.getByText('Total computable')).toBeInTheDocument();
-    expect(screen.getByText('Cukie Masters actuales').parentElement).toHaveTextContent('2/5');
+    expect(screen.getByText('Tus Cukie Masters').parentElement).toHaveTextContent('2/5');
     expect(screen.getByRole('progressbar', { name: 'Progreso Cukie Master por UKI' }))
       .toHaveAttribute('aria-valuenow', '2');
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.queryByText(/Ruta Cukies/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/en gracia/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/requisito vigente/i)).not.toBeInTheDocument();
     await waitFor(() => expect(onUkiRouteData).toHaveBeenCalledWith({
       currentRequirementRaw: '20000000000000000000000',
       presaleLockedRaw: '40000000000000000000000',
