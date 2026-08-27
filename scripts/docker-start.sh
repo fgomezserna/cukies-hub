@@ -1,12 +1,26 @@
 #!/bin/sh
 set -eu
 
-if [ "${STAGING_ONLY_GUARD:-}" != "true" ]; then
-  echo "STAGING-ONLY guard is mandatory for this deployment branch"
-  exit 1
-fi
-
-node scripts/assert-staging-only.mjs --scope "${CUKIES_SERVICE:-dapp}"
+case "${APP_ENV:-}" in
+  staging)
+    if [ "${STAGING_ONLY_GUARD:-}" != "true" ]; then
+      echo "STAGING-ONLY guard is mandatory for the staging deployment"
+      exit 1
+    fi
+    node scripts/assert-staging-only.mjs --scope "${CUKIES_SERVICE:-dapp}"
+    ;;
+  production)
+    if [ "${STAGING_ONLY_GUARD:-}" != "false" ]; then
+      echo "STAGING-ONLY guard must be disabled for the production deployment"
+      exit 1
+    fi
+    node scripts/assert-production.mjs --scope "${CUKIES_SERVICE:-dapp}"
+    ;;
+  *)
+    echo "APP_ENV must be staging or production"
+    exit 1
+    ;;
+esac
 
 case "${CUKIES_SERVICE:-dapp}" in
   dapp)

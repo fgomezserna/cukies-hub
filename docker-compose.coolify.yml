@@ -1,5 +1,7 @@
 services:
   staging-mongo:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -301,6 +303,8 @@ services:
       - coolify
 
   cukie-master-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -359,6 +363,8 @@ services:
       - coolify
 
   competition-credit-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -416,6 +422,8 @@ services:
       - coolify
 
   game-economy-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -473,6 +481,8 @@ services:
       - coolify
 
   cukie-pool-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -530,6 +540,8 @@ services:
       - coolify
 
   weekly-ranking-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -587,6 +599,8 @@ services:
       - coolify
 
   reward-accounting-scheduler:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -648,6 +662,8 @@ services:
       - coolify
 
   reward-batch-publisher:
+    profiles:
+      - staging-runtime
     build:
       context: .
       dockerfile: Dockerfile
