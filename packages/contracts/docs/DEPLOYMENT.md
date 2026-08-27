@@ -20,7 +20,8 @@ pnpm --filter @cukies/contracts deploy:testnet:nft-source
 pnpm --filter @cukies/contracts rehearse:testnet:liquidity-locker
 pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
 pnpm --filter @cukies/contracts preflight:mainnet:uki-launch
-pnpm --filter @cukies/contracts deploy:mainnet:staking-locker
+pnpm --filter @cukies/contracts deploy:mainnet:staking
+pnpm --filter @cukies/contracts deploy:mainnet:liquidity-locker
 pnpm --filter @cukies/contracts prepare:mainnet:liquidity-safe-batch
 pnpm --filter @cukies/contracts verify:mainnet:uki-launch
 pnpm --filter @cukies/contracts derive:mainnet:competition-draw-seed

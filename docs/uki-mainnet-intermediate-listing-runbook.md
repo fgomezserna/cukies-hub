@@ -101,15 +101,14 @@ El resultado debe acreditar:
 
 El resultado imprime `MAINNET_LIQUIDITY_SNAPSHOT_BLOCK`. Ese bloque fija conjuntamente `totalAsmRaised`, reservas ASM/USDT y precio usado. Debe conservarse sin editar durante financiación, generación del lote y verificación; así las compras posteriores de preventa no alteran el 50% ya aprobado.
 
-## 3. Wallet de despliegue sin custodia
+## 3. Despliegue de staking mainnet
 
-Crear una wallet nueva que no tenga activos salvo el BNB estimado para dos despliegues. Su clave se almacena sólo en un archivo local ignorado; nunca se pega en chat, commits o logs.
+La wallet de despliegue puede ser la misma que desplegó UKI y la preventa si su clave ya está almacenada en un archivo local ignorado y no hace falta volver a exportarla. Nunca se pega en chat, commits o logs.
 
 La wallet no recibe ASM, UKI ni LP y no obtiene permisos:
 
 - `UKIStaking` nace con owner = Safe.
-- El locker nace con beneficiary = Safe.
-- El LP esperado se calcula antes de que exista el par.
+- No recibe LP ni obtiene permisos nuevos sobre el staking.
 
 Despliegue:
 
@@ -119,17 +118,17 @@ export DEPLOYER_PRIVATE_KEY=...
 export DEPLOYER_ADDRESS=0x...
 export MAINNET_LAUNCH_SAFE_ADDRESS=0x...
 export MAINNET_LAUNCH_SAFE_OWNER_ADDRESS=0x...
-export MAINNET_LAUNCH_DEPLOY_CONFIRM=DEPLOY_UKI_STAKING_AND_180_DAY_LOCKER_ON_BSC_MAINNET
-export MAINNET_LAUNCH_MANIFEST_PATH=/ruta/privada/uki-mainnet-infrastructure.json
-pnpm --filter @cukies/contracts deploy:mainnet:staking-locker
+export MAINNET_STAKING_DEPLOY_CONFIRM=DEPLOY_UKI_STAKING_ON_BSC_MAINNET
+export MAINNET_STAKING_MANIFEST_PATH=/ruta/privada/uki-mainnet-staking.json
+pnpm --filter @cukies/contracts deploy:mainnet:staking
 ```
 
 El archivo se crea con modo `0600` y el script no sobrescribe un archivo existente. El output contiene:
 
 - dirección, tx, bloque y runtime hash de `UKIStaking`;
-- dirección, tx, bloque, runtime hash y unlock UTC del locker;
-- dirección predicha del par PancakeSwap V2;
 - Safe owner/threshold observado.
+
+El locker no se despliega en esta fase para que sus 180 días no empiecen antes de crear el pool.
 
 ## 4. Verificar source en BscScan
 
@@ -141,15 +140,35 @@ pnpm --filter @cukies/contracts exec hardhat verify --network bsc \
   0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA \
   <SAFE_ADDRESS>
 
+```
+
+No financiar ni firmar el lote de liquidez hasta comprobar que el código publicado coincide exactamente.
+
+## 5. Desplegar el locker inmediatamente antes del pool
+
+Repetir las comprobaciones de Safe, deployer, tokens y Factory. El script acepta que el par no exista o exista vacío, calcula la dirección V2 correcta y fija 180 días desde el bloque del locker:
+
+```bash
+export BSC_RPC_URL=https://...
+export DEPLOYER_PRIVATE_KEY=...
+export DEPLOYER_ADDRESS=0x...
+export MAINNET_LAUNCH_SAFE_ADDRESS=0x...
+export MAINNET_LAUNCH_SAFE_OWNER_ADDRESS=0x...
+export MAINNET_LOCKER_DEPLOY_CONFIRM=DEPLOY_180_DAY_LIQUIDITY_LOCKER_ON_BSC_MAINNET
+export MAINNET_LOCKER_MANIFEST_PATH=/ruta/privada/uki-mainnet-locker.json
+pnpm --filter @cukies/contracts deploy:mainnet:liquidity-locker
+```
+
+Esperar 12 confirmaciones y verificar en BscScan:
+
+```bash
 pnpm --filter @cukies/contracts exec hardhat verify --network bsc \
   <LIQUIDITY_LOCKER_ADDRESS> \
   <PREDICTED_PAIR_ADDRESS> \
   <SAFE_ADDRESS>
 ```
 
-No financiar ni firmar el lote de liquidez hasta comprobar que el código publicado coincide exactamente.
-
-## 5. Financiar el Safe
+## 6. Financiar el Safe
 
 Las cantidades salen del preflight inmediatamente anterior:
 
@@ -160,7 +179,7 @@ Las cantidades salen del preflight inmediatamente anterior:
 
 No redondear manualmente la cantidad UKI y no usar un approval ilimitado.
 
-## 6. Generar y firmar el lote Safe
+## 7. Generar y firmar el lote Safe
 
 Generar el JSON sólo cuando los fondos estén confirmados y se pueda firmar dentro de los siguientes 30 minutos:
 
@@ -191,7 +210,7 @@ El lote contiene, en este orden:
 
 Importar el JSON en Safe Transaction Builder. Antes de firmar, comparar cada dirección y cantidad con el resumen que imprime el script. Si el deadline ha vencido, regenerar el lote; nunca ampliarlo editando el JSON a mano.
 
-## 7. Verificación post-listing
+## 8. Verificación post-listing
 
 ```bash
 export MAINNET_LAUNCH_SAFE_ADDRESS=0x...
@@ -220,7 +239,7 @@ El verificador exige:
 
 También genera las variables públicas e identidades del indexador. No contiene secretos.
 
-## 8. Configuración producción con competición apagada
+## 9. Configuración producción con competición apagada
 
 Auditoría read-only de Coolify realizada el 27 de agosto de 2026:
 
@@ -281,7 +300,7 @@ NEXT_PUBLIC_DAPP_ORIGIN=https://cukies.world,https://www.cukies.world
 
 No incluir `https://cukieshub.eurekand.com` ni `https://cukies-hub.eurekand.com`: pertenecen a staging y no deben ser padres confiables del iframe de producción.
 
-## 9. Smoke antes de habilitar la competición
+## 10. Smoke antes de habilitar la competición
 
 Con `TREASURE_HUNT_COMPETITION_ENABLED=false`:
 
@@ -295,7 +314,7 @@ Con `TREASURE_HUNT_COMPETITION_ENABLED=false`:
 8. Abrir Treasure Hunt y comprobar que el modo práctica funciona mientras la competición está apagada.
 9. Confirmar que el iframe no exige créditos/Cukie en el flujo staking cuando la competición quede activa.
 
-## 10. Activación de la competición
+## 11. Activación de la competición
 
 Antes de activarla deben estar cerradas la hora UTC de inicio y fin. Desplegar ambas primero con `TREASURE_HUNT_COMPETITION_ENABLED=false`; una vez el indexador esté al día y el smoke sea verde, cambiar solamente:
 
@@ -315,7 +334,7 @@ Pruebas inmediatas:
 
 No reutilizar el reset de wallet de staging: su guard impide producción deliberadamente.
 
-## 11. Sorteo y snapshot al cierre
+## 12. Sorteo y snapshot al cierre
 
 El seed no se elige manualmente. La regla pública es: hash del primer bloque BSC Mainnet cuyo timestamp sea estrictamente posterior a `TREASURE_HUNT_COMPETITION_ENDS_AT`, una vez tenga al menos 12 confirmaciones.
 
@@ -326,7 +345,7 @@ pnpm --filter @cukies/contracts derive:mainnet:competition-draw-seed
 
 Guardar el bloque/hash emitido y cargar exactamente las dos variables impresas: `TREASURE_HUNT_COMPETITION_DRAW_SEED` y `TREASURE_HUNT_COMPETITION_DRAW_SOURCE_BLOCK`. El endpoint de cierre vuelve a consultar BSC y rechaza un hash sustituido, un bloque posterior elegido por el operador o un bloque con menos de 12 confirmaciones. Después se revisan los intentos pendientes y se ejecuta el settlement una sola vez. El snapshot final conserva inputs, ranking, tickets, sorteo y hashes de salida; la sección `Finalizadas` lee ese snapshot sin recalcular.
 
-## 12. Fase posterior
+## 13. Fase posterior
 
 Fuera de este lanzamiento:
 
