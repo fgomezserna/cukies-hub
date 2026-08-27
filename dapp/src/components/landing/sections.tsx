@@ -2,80 +2,73 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
 import {
   ArrowRight,
-  CalendarDays,
   Check,
+  CircleAlert,
   Coins,
   Crown,
-  Database,
   ExternalLink,
   Gamepad2,
-  Gem,
-  Gift,
-  KeyRound,
-  type LucideIcon,
-  MessageCircle,
-  Star,
-  Timer,
+  LockKeyhole,
+  ShieldCheck,
   Trophy,
   Users,
-  WalletCards,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
 } from 'lucide-react';
+
 import {
   faqsByLocale,
   landingCopyByLocale,
-  pancakeSwapAsmUrl,
-  purchaseStepsByLocale,
-  saleFactsByLocale,
-  utilityNodesByLocale,
+  PANCAKESWAP_UKI_URL,
+  participationStepsByLocale,
+  transparencyItemsByLocale,
+  utilityCardsByLocale,
 } from './data';
-import { PresaleCountdown, PresaleCountdownHeading, PresaleGateLink } from './presale-countdown';
-import { HeroBackgroundVideo } from './hero-background-video';
-import { LandingButton, MetricTile, Panel, SectionHeading } from './primitives';
-import { SaleConsole } from './sale-console';
-import { PresaleFinalCtaText, PresaleQuoteAmount, PresaleStatusProvider } from './presale-status';
-import { UKI_TOKEN_ICON_SRC } from './sale-config';
-import { VestingAccessButton } from './vesting-access-button';
-import { LandingWalletConnectButton } from './wallet-connect-dynamic';
-import { LandingHeader } from './header';
 import { LandingFooter } from './footer';
+import { LandingHeader } from './header';
+import { HeroBackgroundVideo } from './hero-background-video';
+import { LandingButton, Panel, SectionHeading } from './primitives';
 import { ScrollReveal } from './scroll-reveal';
+import { UKI_TOKEN_ICON_SRC } from './sale-config';
+import {
+  type TreasureHuntCompetitionCampaign,
+  type TreasureHuntCompetitionPhase,
+  useTreasureHuntCompetitionOverview,
+} from '@/hooks/use-treasure-hunt-competition-overview';
 import { TOKENOMICS_URL_BY_LOCALE } from '@/lib/public-locale';
+import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { usePublicLocale } from '@/providers/public-locale-provider';
-
-type HowToBuyCopy = (typeof landingCopyByLocale)[keyof typeof landingCopyByLocale]['howToBuy'];
 
 export function CukiesLanding() {
   return (
-    <PresaleStatusProvider>
-      <main className="uki-landing min-h-screen overflow-hidden bg-[var(--uki-bg)] text-[var(--uki-cream)]">
-        <div className="uki-noise" />
-        <div className="uki-grid-bg" />
-        <LandingHeader />
-        <HeroSection />
-        <SaleFacts />
-        <div className="uki-section-divider" />
-        <HowToBuy />
-        <div className="uki-section-divider" />
-        <CommunityOwnership />
-        <div className="uki-section-divider" />
-        <UtilityMap />
-        <div className="uki-section-divider" />
-        <AfterPresale />
-        <div className="uki-section-divider" />
-        <Games />
-        <div className="uki-section-divider" />
-        <PrizesPreview />
-        <div className="uki-section-divider" />
-        <FaqAndCta />
-        <LandingFooter />
-      </main>
-    </PresaleStatusProvider>
+    <main
+      id="contenido-principal"
+      tabIndex={-1}
+      className="uki-landing min-h-screen overflow-hidden bg-[var(--uki-bg)] text-[var(--uki-cream)]"
+    >
+      <div className="uki-noise" />
+      <div className="uki-grid-bg" />
+      <LandingHeader />
+      <HeroSection />
+      <LaunchStatusStrip />
+      <div className="uki-section-divider" />
+      <ParticipationFlow />
+      <div className="uki-section-divider" />
+      <CompetitionSpotlight />
+      <div className="uki-section-divider" />
+      <UtilitySection />
+      <div className="uki-section-divider" />
+      <StakingSection />
+      <div className="uki-section-divider" />
+      <CommunityOwnership />
+      <div className="uki-section-divider" />
+      <PresaleParticipants />
+      <div className="uki-section-divider" />
+      <TransparencySection />
+      <div className="uki-section-divider" />
+      <FaqAndCta />
+      <LandingFooter />
+    </main>
   );
 }
 
@@ -84,7 +77,7 @@ function HeroSection() {
   const copy = landingCopyByLocale[locale].hero;
 
   return (
-    <section id="presale" className="uki-hero-section">
+    <section id="inicio" className="uki-hero-section">
       <HeroBackgroundVideo />
       <Image
         src="/brand/generated/uki-hero-stage-generated.png"
@@ -98,56 +91,121 @@ function HeroSection() {
       <div className="uki-container uki-hero-layout">
         <ScrollReveal animation="left" duration={900} className="uki-hero-content">
           <p className="uki-launch-badge">{copy.badge}</p>
-          <h1 className="uki-hero-title">
+          <h1 className="uki-hero-title max-w-[13ch] text-balance">
             <span className="uki-hero-title-line">{copy.title}</span>
           </h1>
-          <div className="uki-hero-countdown mt-5 max-w-[30rem]">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-headline text-xl font-black uppercase text-[var(--uki-gold)]">
-                <PresaleCountdownHeading />
-              </p>
-              <div className="uki-token-pair" aria-label="Compra con ASM y recibe UKI">
-                <span className="uki-token-logo uki-token-logo-official" title="ASM">
-                  <Image src="/brand/official/asm-token-coingecko.png" alt="ASM oficial" fill sizes="42px" className="object-contain" />
-                </span>
-                <span className="uki-token-logo uki-token-logo-official" title="UKI">
-                  <Image src={UKI_TOKEN_ICON_SRC} alt="UKI oficial" fill sizes="42px" className="object-contain" />
-                </span>
-              </div>
-            </div>
-            <PresaleCountdown />
-          </div>
-          <p className="mt-4 max-w-[28rem] text-lg leading-snug text-[var(--uki-text)] sm:text-xl">
-            {copy.lead}{' '}
-            <span className="font-black text-[var(--uki-gold)]">{copy.network}</span>
+          <p className="mt-5 max-w-[34rem] text-lg font-semibold leading-relaxed text-[var(--uki-text)] sm:text-xl">
+            {copy.lead}
           </p>
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <PresaleGateLink href="#presale-console">{copy.buy}</PresaleGateLink>
-            <LandingButton href="#token" variant="secondary">
-              {copy.details}
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+            <LandingButton href="/cukie-master" variant="secondary">
+              {copy.stake}
             </LandingButton>
           </div>
+          <a
+            href={PANCAKESWAP_UKI_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+          >
+            {copy.buy}
+            <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
+          </a>
         </ScrollReveal>
 
         <ScrollReveal animation="right" duration={900} className="w-full">
-          <SaleConsole />
+          <LaunchOverview />
         </ScrollReveal>
       </div>
     </section>
   );
 }
 
-function SaleFacts() {
+function LaunchOverview() {
   const { locale } = usePublicLocale();
-  const saleFacts = saleFactsByLocale[locale];
+  const copy = landingCopyByLocale[locale].hero;
+
+  const rows = [
+    { icon: ShieldCheck, label: copy.pool, value: 'ASM / UKI', tone: 'text-[var(--uki-cyan)]' },
+    { icon: Crown, label: copy.staking, value: copy.network, tone: 'text-[var(--uki-gold)]' },
+    { icon: LockKeyhole, label: copy.lock, value: copy.lockValue, tone: 'text-[#f19bff]' },
+  ];
 
   return (
-    <section className="uki-container uki-facts-section">
+    <Panel
+      className="uki-launch-overview"
+      innerClassName="relative overflow-hidden p-5 sm:p-6 lg:p-7"
+    >
+      <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--uki-cyan)]/10 blur-3xl" />
+      <div className="relative">
+        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
+          <div>
+            <p className="uki-label">{copy.live}</p>
+            <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-cream)]">
+              ASM / UKI
+            </p>
+          </div>
+          <div className="flex items-center -space-x-2" aria-label="Par oficial ASM y UKI">
+            <span className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#0d0b24] bg-white">
+              <Image src="/brand/official/asm-token-coingecko.png" alt="ASM" fill sizes="48px" className="object-contain" />
+            </span>
+            <span className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#0d0b24] bg-white">
+              <Image src={UKI_TOKEN_ICON_SRC} alt="UKI" fill sizes="48px" className="object-contain" />
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-3 divide-y divide-white/10">
+          {rows.map(({ icon: Icon, label, value, tone }) => (
+            <div key={label} className="flex items-center justify-between gap-4 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Icon className={`h-5 w-5 shrink-0 ${tone}`} strokeWidth={1.8} />
+                <span className="text-sm font-semibold text-[var(--uki-muted)]">{label}</span>
+              </div>
+              <span className="text-right font-mono text-xs font-black text-[var(--uki-cream)] sm:text-sm">
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <a
+          href={PANCAKESWAP_UKI_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)] transition hover:bg-[var(--uki-cyan)]/15 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+        >
+          <span>{copy.buy}</span>
+          <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
+        </a>
+      </div>
+    </Panel>
+  );
+}
+
+function LaunchStatusStrip() {
+  const { locale } = usePublicLocale();
+  const copy = landingCopyByLocale[locale].hero;
+  const items = [
+    [copy.pool, 'PancakeSwap V2'],
+    [copy.staking, copy.network],
+    [copy.lock, copy.lockValue],
+  ];
+
+  return (
+    <section aria-label={copy.live} className="uki-container uki-facts-section">
       <ScrollReveal animation="fade" duration={700}>
-        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#0d0b24]/82 sm:grid-cols-2 lg:grid-cols-6">
-          {saleFacts.map((fact) => (
-            <MetricTile key={fact.label} {...fact} />
+        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#0d0b24]/82 sm:grid-cols-3">
+          {items.map(([label, value]) => (
+            <article key={label} className="flex items-center gap-3 border-b border-white/10 px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#65e2a2] shadow-[0_0_14px_rgba(101,226,162,0.55)]" />
+              <div>
+                <p className="uki-label">{label}</p>
+                <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">{value}</p>
+              </div>
+            </article>
           ))}
         </div>
       </ScrollReveal>
@@ -155,50 +213,230 @@ function SaleFacts() {
   );
 }
 
-function HowToBuy() {
+function ParticipationFlow() {
   const { locale } = usePublicLocale();
-  const purchaseSteps = purchaseStepsByLocale[locale];
-  const copy = landingCopyByLocale[locale].howToBuy;
+  const copy = landingCopyByLocale[locale].flow;
+  const steps = participationStepsByLocale[locale];
 
   return (
-    <section id="token" className="uki-container pb-9 pt-12">
+    <section id="comprar" className="uki-container py-12 sm:py-16">
       <ScrollReveal animation="fade">
-        <SectionHeading title={copy.title} tone="cyan" withRule />
+        <SectionHeading
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          subtitle={copy.subtitle}
+          tone="cyan"
+          withRule
+        />
       </ScrollReveal>
-      <ScrollReveal animation="up" delay={80}>
-        <Panel className="uki-buy-asm-card mt-5" innerClassName="grid gap-4 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:p-5">
-          <span className="uki-step-number uki-step-number-featured">0</span>
-          <div>
-            <h3 className="font-headline text-lg font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">
-              {copy.preAsmTitle}
-            </h3>
-            <p className="mt-1.5 max-w-3xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              {copy.preAsmText}
-            </p>
+
+      <div className="mt-7 grid gap-4 lg:grid-cols-3">
+        {steps.map(({ icon: Icon, ...step }, index) => (
+          <ScrollReveal key={step.number} animation="up" delay={index * 120} className="h-full">
+            <article className="group flex h-full min-h-[19rem] flex-col overflow-hidden rounded-[14px] border border-white/10 bg-[#0c0b20]/88 p-5 transition duration-300 hover:-translate-y-1 hover:border-[var(--uki-cyan-border)] sm:p-6">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-black tracking-[0.2em] text-[var(--uki-muted)]">{step.number}</span>
+                <Icon className="h-10 w-10 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+              </div>
+              <h3 className="mt-8 max-w-[13ch] text-balance font-headline text-3xl font-black leading-none text-[var(--uki-cream)]">
+                {step.title}
+              </h3>
+              <p className="mt-4 max-w-[34rem] text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                {step.text}
+              </p>
+              <a
+                href={step.href}
+                target={step.external ? '_blank' : undefined}
+                rel={step.external ? 'noreferrer' : undefined}
+                className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+              >
+                {step.action}
+                {step.external ? <ExternalLink className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+              </a>
+            </article>
+          </ScrollReveal>
+        ))}
+      </div>
+
+      <ScrollReveal animation="fade" delay={180}>
+        <div className="mt-4 flex items-start gap-3 rounded-[10px] border border-[#ffb04a]/25 bg-[#ffb04a]/[0.07] px-4 py-3 text-sm font-semibold leading-relaxed text-[#f4c77e]">
+          <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.8} />
+          <p>{copy.warning}</p>
+        </div>
+      </ScrollReveal>
+    </section>
+  );
+}
+
+function CompetitionSpotlight() {
+  const { locale } = usePublicLocale();
+  const copy = landingCopyByLocale[locale].competition;
+  const { status, leaderboardMeta, isLoading, error } = useTreasureHuntCompetitionOverview({
+    includeLeaderboard: true,
+    leaderboardPageSize: 1,
+  });
+  const campaign = status?.campaign;
+  const eligibility = status?.eligibility;
+  const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
+  const phase = status?.phase ?? 'unconfigured';
+  const prizePool = leaderboardMeta?.poolUkiRaw
+    ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw, 1)
+    : copy.loading;
+  const attempts = eligibility
+    ? eligibility.attemptsRemaining.toLocaleString(locale === 'es' ? 'es-ES' : 'en-GB')
+    : copy.connect;
+  const counted = eligibility
+    ? `${eligibility.disqualified ? 0 : eligibility.topAttemptsCount}/${maxAttempts}`
+    : `—/${maxAttempts}`;
+
+  return (
+    <section id="torneo" className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="up" duration={900}>
+        <div className="relative overflow-hidden rounded-[18px] border border-[var(--uki-cyan-border)] bg-[#071312]">
+          <Image
+            src="/brand/generated/uki-treasure-hunt-cukie-scene-v1.png"
+            alt=""
+            fill
+            className="object-cover opacity-25"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,14,14,0.99)_0%,rgba(5,14,14,0.94)_54%,rgba(5,14,14,0.42)_100%)]" />
+          <div className="relative grid min-h-[31rem] gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)] lg:items-end lg:p-10">
+            <div className="self-center">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="uki-launch-badge">{copy.eyebrow}</p>
+                <span className="inline-flex items-center gap-2 rounded-[5px] border border-[#65e2a2]/25 bg-[#65e2a2]/10 px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.12em] text-[#65e2a2]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {copy[phase]}
+                </span>
+              </div>
+              <h2 className="mt-5 max-w-[13ch] text-balance font-headline text-4xl font-black leading-[0.98] text-[var(--uki-cream)] sm:text-5xl">
+                {copy.title}
+              </h2>
+              <p className="mt-5 max-w-[38rem] text-base font-semibold leading-relaxed text-[var(--uki-text)]">
+                {copy.text}
+              </p>
+              <CompetitionCountdown locale={locale} phase={phase} campaign={campaign} />
+
+              {eligibility?.disqualified ? (
+                <p className="mt-5 flex max-w-xl items-center gap-3 rounded-[8px] border border-[#ff7d7d]/30 bg-[#ff7d7d]/10 px-4 py-3 text-sm font-bold text-[#ff9b9b]">
+                  <CircleAlert className="h-5 w-5 shrink-0" />
+                  {copy.disqualified}
+                </p>
+              ) : null}
+              {error ? (
+                <p className="mt-5 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                  {copy.unavailable}
+                </p>
+              ) : null}
+
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+                <LandingButton href="/games/treasure-hunt/rankings" variant="secondary">
+                  {copy.rankings}
+                </LandingButton>
+              </div>
+            </div>
+
+            <dl className="grid gap-px overflow-hidden rounded-[12px] border border-white/15 bg-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.32)]">
+              {[
+                [copy.prize, isLoading && !leaderboardMeta ? copy.loading : prizePool],
+                [copy.attempts, isLoading ? copy.loading : attempts],
+                [copy.counted, isLoading ? copy.loading : counted],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-[#081614]/95 px-5 py-5 sm:px-6">
+                  <dt className="uki-label">{label}</dt>
+                  <dd className="mt-2 truncate font-mono text-xl font-black text-[var(--uki-cyan)] sm:text-2xl" title={value}>
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <a
-            href={pancakeSwapAsmUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="uki-button uki-button-primary justify-center"
-          >
-            <span>{copy.preAsmButton}</span>
-            <span className="uki-button-icon" aria-hidden="true">
-              <ExternalLink className="h-4 w-4" />
-            </span>
-          </a>
-        </Panel>
+        </div>
       </ScrollReveal>
-      <div className="uki-buy-steps mt-5 grid gap-4 lg:grid-cols-4">
-        {purchaseSteps.map((step, index) => (
-          <ScrollReveal
-            key={step.number}
-            animation="up"
-            delay={index * 150}
-            className="relative h-full"
-          >
-            <StepCard step={step} copy={copy} />
-            {index < purchaseSteps.length - 1 ? <ArrowRight className="uki-step-arrow" strokeWidth={1.8} /> : null}
+    </section>
+  );
+}
+
+function CompetitionCountdown({
+  locale,
+  phase,
+  campaign,
+}: {
+  locale: 'es' | 'en';
+  phase: TreasureHuntCompetitionPhase;
+  campaign: TreasureHuntCompetitionCampaign | null | undefined;
+}) {
+  const copy = landingCopyByLocale[locale].competition;
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  const target = phase === 'scheduled' ? campaign?.startsAt : campaign?.endsAt;
+  const targetMs = target ? new Date(target).getTime() : Number.NaN;
+
+  useEffect(() => {
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (!Number.isFinite(targetMs)) return null;
+  const isFinished = phase === 'closed' || (nowMs !== null && nowMs >= targetMs);
+  const prefix = phase === 'scheduled' ? copy.starts : copy.ends;
+  const date = new Intl.DateTimeFormat(locale === 'es' ? 'es-ES' : 'en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'UTC',
+  }).format(new Date(targetMs));
+
+  return (
+    <p className="mt-5 font-mono text-sm font-black text-[var(--uki-gold)]" aria-live="polite">
+      {isFinished
+        ? copy.finished
+        : `${prefix}: ${nowMs === null ? copy.loading : formatRemaining(targetMs - nowMs)}`}
+      <span className="ml-2 font-sans font-semibold text-[var(--uki-muted)]">· {date} UTC</span>
+    </p>
+  );
+}
+
+function formatRemaining(remainingMs: number) {
+  const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1_000));
+  const days = Math.floor(remainingSeconds / 86_400);
+  const hours = Math.floor((remainingSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((remainingSeconds % 3_600) / 60);
+  const seconds = remainingSeconds % 60;
+  return `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+}
+
+function UtilitySection() {
+  const { locale } = usePublicLocale();
+  const copy = landingCopyByLocale[locale].utility;
+  const cards = utilityCardsByLocale[locale];
+
+  return (
+    <section id="utilidad" className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="fade">
+        <SectionHeading
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          subtitle={copy.subtitle}
+          tone="cyan"
+          withRule
+        />
+      </ScrollReveal>
+      <div className="mt-7 grid gap-4 md:grid-cols-2">
+        {cards.map(({ icon: Icon, title, text, tone }, index) => (
+          <ScrollReveal key={title} animation={index % 2 === 0 ? 'left' : 'right'} delay={(index % 2) * 80}>
+            <article className="grid min-h-[12rem] grid-cols-[auto_1fr] gap-4 rounded-[14px] border border-white/10 bg-[#0c0b20]/82 p-5 transition duration-300 hover:border-white/20 sm:p-6">
+              <Icon className={`h-11 w-11 rounded-[10px] border border-current/20 bg-current/5 p-2.5 ${tone}`} strokeWidth={1.8} />
+              <div>
+                <h3 className="text-balance font-headline text-2xl font-black text-[var(--uki-cream)]">{title}</h3>
+                <p className="mt-3 max-w-[34rem] text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{text}</p>
+              </div>
+            </article>
           </ScrollReveal>
         ))}
       </div>
@@ -206,93 +444,53 @@ function HowToBuy() {
   );
 }
 
-function StepCard({
-  step,
-  copy,
-}: {
-  step: { number: string; title: string; text: string; icon: LucideIcon };
-  copy: HowToBuyCopy;
-}) {
-  const Icon = step.icon;
+function StakingSection() {
+  const { locale } = usePublicLocale();
+  const copy = landingCopyByLocale[locale].staking;
 
   return (
-    <Panel className="uki-step-card h-full" innerClassName="flex h-full min-h-[250px] flex-col p-4 lg:min-h-[365px]">
-      <div className="flex items-start gap-3">
-        <span className="uki-step-number">{step.number}</span>
-        <div>
-          <h3 className="font-headline text-base font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">{step.title}</h3>
-          <p className="mt-1.5 text-xs font-semibold leading-snug text-[var(--uki-text)]">{step.text}</p>
-        </div>
-      </div>
-      <div className="uki-step-action mt-auto rounded-[9px] border border-white/10 bg-[#04030a]/66 p-3">
-        {step.number === '1' ? (
-          <div className="space-y-2.5">
-            <LandingWalletConnectButton className="h-9 w-full justify-center rounded-[5px]" showCompactText={false} />
-            <MiniRow label={copy.walletCompatible} />
-            <MiniRow label={copy.chain} />
+    <section id="staking" className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="up">
+        <div className="grid overflow-hidden rounded-[18px] border border-[#e45cff]/25 bg-[#15091e]/88 lg:grid-cols-[0.82fr_1.18fr]">
+          <div className="relative min-h-[18rem] overflow-hidden lg:min-h-[33rem]">
+            <Image
+              src="/brand/generated/cukie-master-stake-landing.png"
+              alt="Cukie Master custodiando UKI"
+              fill
+              className="object-cover"
+              sizes="(max-width: 1023px) 100vw, 42vw"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#15091e] via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-[#15091e]" />
           </div>
-        ) : null}
-        {step.number === '2' ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 text-xs font-semibold text-[var(--uki-text)]">
-              <Check className="h-4 w-4 rounded-full bg-[#91d867] p-0.5 text-[#04030a]" strokeWidth={2} />
-              {copy.approve} ASM
-            </div>
-            <div>
-              <p className="uki-label">{copy.spendLimit}</p>
-              <p className="mt-1 font-headline text-lg font-black text-[var(--uki-cream)]">5,000 ASM</p>
-            </div>
-            <button type="button" className="h-9 w-full rounded-[5px] bg-[var(--uki-cyan)] text-[0.68rem] font-black uppercase tracking-[0.1em] text-[#04030a]">
-              {copy.approve}
-            </button>
-          </div>
-        ) : null}
-        {step.number === '3' ? (
-          <div className="space-y-2">
-            <Amount label={copy.pay} value="100" token="ASM" />
-            <div className="flex justify-center">
-              <ArrowRight className="h-4 w-4 rotate-90 rounded-full border border-[var(--uki-cyan-border)] p-0.5 text-[var(--uki-cyan)]" />
-            </div>
-            <Amount label={copy.receive} value={<PresaleQuoteAmount asmAmount={100} />} token="UKI" />
-            <p className="text-center text-[0.62rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-              {copy.contractRatio}
+          <div className="flex flex-col justify-center p-5 sm:p-8 lg:p-12">
+            <p className="uki-launch-badge inline-flex w-fit items-center gap-2">
+              <Crown className="h-4 w-4" strokeWidth={1.8} />
+              {copy.badge}
             </p>
-          </div>
-        ) : null}
-        {step.number === '4' ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Icon className="h-8 w-8 rounded-full border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2 text-[var(--uki-cyan)]" strokeWidth={1.8} />
-              <p className="text-xs font-semibold leading-snug text-[var(--uki-muted)]">
-                {copy.vestingAccess}
-              </p>
+            <h2 className="mt-5 max-w-[14ch] text-balance font-headline text-4xl font-black leading-[1.02] text-[var(--uki-cream)] sm:text-5xl">
+              {copy.title}
+            </h2>
+            <p className="mt-5 max-w-xl text-base font-semibold leading-relaxed text-[var(--uki-text)]">
+              {copy.text}
+            </p>
+            <ul className="mt-6 space-y-3">
+              {copy.bullets.map((bullet) => (
+                <li key={bullet} className="flex items-center gap-3 text-sm font-bold text-[var(--uki-muted)]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#65e2a2]/12 text-[#65e2a2]">
+                    <Check className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                  {bullet}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-7">
+              <LandingButton href="/cukie-master">{copy.action}</LandingButton>
             </div>
-            <VestingAccessButton />
+            <p className="mt-4 text-xs font-semibold text-[var(--uki-muted)]">{copy.helper}</p>
           </div>
-        ) : null}
-      </div>
-    </Panel>
-  );
-}
-
-function MiniRow({ label }: { label: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-[5px] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-[var(--uki-muted)]">
-      <span>{label}</span>
-      <Check className="h-3.5 w-3.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
-    </div>
-  );
-}
-
-function Amount({ label, value, token }: { label: string; value: ReactNode; token: string }) {
-  return (
-    <div className="uki-amount-card rounded-[7px] border border-white/10 bg-[#04141a] p-2.5">
-      <p className="text-[0.66rem] font-semibold text-[var(--uki-muted)]">{label}</p>
-      <div className="mt-1 flex items-center justify-between">
-        <span className="font-headline text-xl font-black text-[var(--uki-cream)]">{value}</span>
-        <span className="rounded-full border border-[var(--uki-cyan-border)] px-2 py-1 text-[0.66rem] font-black text-[var(--uki-cyan)]">{token}</span>
-      </div>
-    </div>
+        </div>
+      </ScrollReveal>
+    </section>
   );
 }
 
@@ -301,8 +499,8 @@ function CommunityOwnership() {
   const copy = landingCopyByLocale[locale].community;
 
   return (
-    <section className="uki-container pb-10">
-      <ScrollReveal animation="scale" duration={1000} className="w-full">
+    <section className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="scale" duration={1000}>
         <div className="uki-community-panel">
           <div className="uki-community-copy">
             <p className="uki-launch-badge inline-flex items-center gap-2">
@@ -316,9 +514,7 @@ function CommunityOwnership() {
             <p className="uki-community-lead">
               {copy.leadPrefix} <strong>{copy.leadStrong}</strong>
             </p>
-            <p className="uki-community-principle">
-              {copy.principle}
-            </p>
+            <p className="uki-community-principle">{copy.principle}</p>
             <div className="uki-community-actions">
               <LandingButton href={TOKENOMICS_URL_BY_LOCALE[locale]} variant="secondary" external>
                 {copy.tokenomicsButton}
@@ -331,7 +527,7 @@ function CommunityOwnership() {
               <small>{copy.ringLabel}</small>
             </div>
             <div className="uki-community-years">
-              <CalendarDays className="h-9 w-9" strokeWidth={1.8} />
+              <Trophy className="h-9 w-9" strokeWidth={1.8} />
               <span>{copy.years}</span>
               <small>{copy.yearsLabel}</small>
             </div>
@@ -346,188 +542,27 @@ function CommunityOwnership() {
   );
 }
 
-function UtilityMap() {
+function PresaleParticipants() {
   const { locale } = usePublicLocale();
-  const copy = landingCopyByLocale[locale].utility;
-  const utilityNodes = utilityNodesByLocale[locale];
+  const copy = landingCopyByLocale[locale].presale;
 
   return (
-    <section id="utility" className="uki-container relative pb-9">
-      <ScrollReveal animation="fade">
-        <SectionHeading title={copy.title} subtitle={copy.subtitle} tone="cyan" withRule />
-      </ScrollReveal>
-      <ScrollReveal animation="fade" duration={900} className="w-full">
-        <div className="uki-utility-map">
-          <svg className="uki-utility-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M50 53 L31 21" />
-            <path d="M50 53 L70 22" />
-            <path d="M50 53 L23 51" />
-            <path d="M50 53 L78 51" />
-            <path d="M50 53 L30 80" />
-            <path d="M50 53 L72 80" />
-          </svg>
-          <div className="uki-orbit" />
-          {utilityNodes.map((node) => {
-            const Icon = node.icon;
-            return (
-              <article key={node.title} className={`uki-utility-node ${node.className} ${node.positionClassName}`}>
-                <Icon className="h-8 w-8 rounded-full border border-current/25 bg-black/20 p-2" strokeWidth={1.8} />
-                <div>
-                  <h3 className="font-headline text-base font-black uppercase tracking-[0.08em]">{node.title}</h3>
-                  <p className="mt-1 text-xs font-semibold leading-tight text-[var(--uki-text)]">{node.text}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </ScrollReveal>
-    </section>
-  );
-}
-
-function AfterPresale() {
-  const { locale } = usePublicLocale();
-  const copy = landingCopyByLocale[locale].master;
-
-  return (
-    <section className="uki-container pb-8">
-      <ScrollReveal animation="up" className="w-full">
-        <div className="uki-master-panel">
-          <div className="uki-master-hero">
-            <div>
-              <p className="uki-launch-badge inline-flex items-center gap-2">
-                <Crown className="h-4 w-4" strokeWidth={1.8} />
-                {copy.badge}
-              </p>
-              <h2 className="mt-5 max-w-2xl font-headline text-4xl font-black uppercase leading-tight text-[var(--uki-cream)] sm:text-5xl">
-                {copy.title} <span className="text-[var(--uki-gold)]">{copy.highlight}</span>
-              </h2>
-              <p className="mt-5 max-w-xl text-base font-semibold leading-relaxed text-[var(--uki-text)]">
-                {copy.text}
-              </p>
-            </div>
-            <div className="uki-master-badge">
-              <KeyRound className="h-12 w-12 text-[var(--uki-gold)]" strokeWidth={1.6} />
-              <span>{copy.badgeLabel}</span>
-              <small>{copy.badgeHelper}</small>
-            </div>
+    <section id="preventa-finalizada" className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="up">
+        <Panel innerClassName="grid gap-7 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-10">
+          <div>
+            <p className="uki-launch-badge">{copy.badge}</p>
+            <h2 className="mt-5 max-w-[18ch] text-balance font-headline text-3xl font-black leading-tight text-[var(--uki-cream)] sm:text-4xl">
+              {copy.title}
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)] sm:text-base">
+              {copy.text}
+            </p>
           </div>
-
-          <div className="uki-master-requirements">
-            <MasterRequirement icon={Users} {...copy.requirements[0]} />
-            <MasterRequirement icon={Coins} {...copy.requirements[1]} />
-            <MasterRequirement icon={WalletCards} {...copy.requirements[2]} />
-          </div>
-
-          <div className="uki-master-presale">
-            <Gift className="h-10 w-10 text-[var(--uki-gold)]" strokeWidth={1.7} />
-            <div>
-              <h3>{copy.presaleTitle}</h3>
-              <p>{copy.presaleText}</p>
-            </div>
-          </div>
-
-          <div className="uki-master-benefits">
-            <div className="text-center">
-              <h3>{copy.benefitsTitle}</h3>
-              <p>{copy.benefitsText}</p>
-            </div>
-            <div className="uki-master-flow">
-              <FlowStep icon={Crown} {...copy.flow[0]} />
-              <ArrowRight className="uki-master-flow-arrow" strokeWidth={1.8} />
-              <FlowStep icon={Star} {...copy.flow[1]} />
-              <ArrowRight className="uki-master-flow-arrow" strokeWidth={1.8} />
-              <FlowStep icon={Coins} {...copy.flow[2]} />
-            </div>
-          </div>
-
-          <div className="uki-master-uses">
-            <h3>{copy.usesTitle}</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <UseCard number="1" icon={Gamepad2} {...copy.uses[0]} />
-              <UseCard number="2" icon={Database} {...copy.uses[1]} />
-            </div>
-          </div>
-
-          <div className="uki-master-final">
-            {copy.finalPrefix} <strong>{copy.finalStrong}</strong>
-          </div>
-        </div>
-      </ScrollReveal>
-    </section>
-  );
-}
-
-function MasterRequirement({ icon: Icon, value, label, helper }: { icon: LucideIcon; value: string; label: string; helper: string }) {
-  return (
-    <article className="uki-master-requirement">
-      <Icon className="h-9 w-9 text-[var(--uki-gold)]" strokeWidth={1.8} />
-      <div>
-        <p className="font-headline text-3xl font-black leading-none text-[var(--uki-cream)]">{value}</p>
-        <p className="mt-1 font-headline text-lg font-black uppercase text-[var(--uki-cyan)]">{label}</p>
-        <p className="mt-2 text-xs font-semibold leading-snug text-[var(--uki-muted)]">{helper}</p>
-      </div>
-    </article>
-  );
-}
-
-function FlowStep({ icon: Icon, value, label }: { icon: LucideIcon; value: string; label: string }) {
-  return (
-    <article className="uki-master-flow-step">
-      <Icon className="h-8 w-8 text-[var(--uki-gold)]" strokeWidth={1.8} />
-      <div>
-        <p>{value}</p>
-        <span>{label}</span>
-      </div>
-    </article>
-  );
-}
-
-function UseCard({ number, icon: Icon, title, text }: { number: string; icon: LucideIcon; title: string; text: string }) {
-  return (
-    <article className="uki-master-use-card">
-      <span>{number}</span>
-      <Icon className="h-8 w-8 text-[var(--uki-gold)]" strokeWidth={1.8} />
-      <div>
-        <h4>{title}</h4>
-        <p>{text}</p>
-      </div>
-    </article>
-  );
-}
-
-function Games() {
-  const { locale } = usePublicLocale();
-  const copy = landingCopyByLocale[locale].games;
-
-  return (
-    <section id="games" className="uki-container pb-6">
-      <ScrollReveal animation="up" duration={900} className="w-full">
-        <Panel innerClassName="uki-games-panel p-0">
-          <div className="uki-treasure-hero">
-            <Image src="/brand/generated/uki-treasure-hunt-cukie-scene-v1.png" alt="Treasure Hunt" fill className="object-cover" sizes="100vw" />
-            <div className="uki-treasure-scrim" />
-            <div className="uki-treasure-top">
-              <span>{copy.top}</span>
-              <div className="uki-treasure-hud">
-                <span>05:00</span>
-                <span>♥ ♥ ♥</span>
-              </div>
-            </div>
-            <div className="uki-treasure-copy">
-              <h2>{copy.titlePrefix} <span className="text-[var(--uki-gold)]">{copy.titleHighlight}</span></h2>
-              <p>{copy.text}</p>
-              <div className="uki-treasure-badge">
-                <Trophy className="h-5 w-5 text-[var(--uki-gold)]" strokeWidth={1.8} />
-                {copy.badge}
-              </div>
-            </div>
-            <div className="uki-treasure-metrics">
-              <TreasureMetric icon={Timer} {...copy.metrics[0]} />
-              <TreasureMetric icon={Star} {...copy.metrics[1]} />
-              <TreasureMetric icon={Coins} {...copy.metrics[2]} />
-              <TreasureMetric icon={Trophy} {...copy.metrics[3]} />
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+            <LandingButton href="/vesting">{copy.vesting}</LandingButton>
+            <LandingButton href="/premios" variant="secondary">{copy.rewards}</LandingButton>
+            <LandingButton href="/games/treasure-hunt/rankings" variant="ghost">{copy.history}</LandingButton>
           </div>
         </Panel>
       </ScrollReveal>
@@ -535,99 +570,46 @@ function Games() {
   );
 }
 
-const carouselSlideChrome = [
-  {
-    icon: Crown,
-    color: 'text-[#ffe08a]',
-    bg: 'from-[#8b0000]/20 to-[#09091a]/90 border-[#ff4d4d]/30',
-  },
-  {
-    icon: Trophy,
-    color: 'text-[#f2c34b]',
-    bg: 'from-[#b8860b]/20 to-[#09091a]/90 border-[#f2c34b]/30',
-  },
-  {
-    icon: Star,
-    color: 'text-[#f19bff]',
-    bg: 'from-[#7c3cff]/20 to-[#09091a]/90 border-[#e45cff]/30',
-  },
-];
-
-function PrizesPreview() {
+function TransparencySection() {
   const { locale } = usePublicLocale();
-  const copy = landingCopyByLocale[locale].prizes;
-  const carouselSlides = useMemo(
-    () => copy.slides.map((slide, index) => ({
-      ...slide,
-      ...carouselSlideChrome[index],
-    })),
-    [copy.slides],
-  );
-  const [activeSlide, setActiveSlide] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % carouselSlides.length);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [carouselSlides.length]);
-
-  const slide = carouselSlides[activeSlide];
-  const IconComponent = slide.icon;
+  const copy = landingCopyByLocale[locale].transparency;
+  const items = transparencyItemsByLocale[locale];
 
   return (
-    <section id="premios" className="uki-container pb-6">
-      <ScrollReveal animation="up" duration={900} className="w-full">
-        <div className="uki-prizes-hero">
-          <div className="uki-prizes-bg" aria-hidden="true" />
-          <div className="uki-prizes-copy">
-            <p className="uki-launch-badge inline-flex items-center gap-2">
-              <Gem className="h-4 w-4" strokeWidth={1.8} />
-              {copy.badge}
-            </p>
-            <h2>{copy.titlePrefix} <span className="text-[var(--uki-gold)]">{copy.titleHighlight}</span></h2>
-            <p>{copy.text}</p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <LandingButton href="/premios">{copy.view}</LandingButton>
-              <LandingButton href="/premios#progreso-referidos" variant="secondary">{copy.invite}</LandingButton>
-            </div>
-          </div>
-          <div className={`uki-prizes-side-card relative bg-gradient-to-br ${slide.bg} border p-5 flex flex-col justify-between min-h-[220px] transition-all duration-500 rounded-[12px]`}>
-            <div className="flex justify-between items-start">
-              <IconComponent className={`h-10 w-10 ${slide.color}`} strokeWidth={1.8} />
-              <div className="flex gap-1.5">
-                {carouselSlides.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveSlide(i)}
-                    className={`h-2 w-2 rounded-full transition-all ${
-                      i === activeSlide ? 'bg-[var(--uki-cyan)] w-4' : 'bg-white/20'
-                    }`}
-                    aria-label={`${copy.slideLabel} ${i + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="mt-4">
-              <h3 className={`font-headline text-lg font-black uppercase tracking-wider ${slide.color}`}>{slide.title}</h3>
-              <p className="text-xs font-semibold leading-snug text-[var(--uki-text)] mt-1.5">{slide.desc}</p>
-            </div>
-          </div>
-        </div>
+    <section id="transparencia" className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="fade">
+        <SectionHeading
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          subtitle={copy.subtitle}
+          tone="cyan"
+          withRule
+        />
       </ScrollReveal>
-    </section>
-  );
-}
-
-function TreasureMetric({ icon: Icon, value, label }: { icon: LucideIcon; value: string; label: string }) {
-  return (
-    <article className="uki-treasure-metric">
-      <Icon className="h-9 w-9 text-[var(--uki-gold)]" strokeWidth={1.8} />
-      <div>
-        <p>{value}</p>
-        <span>{label}</span>
+      <div className="mt-7 grid gap-3 sm:grid-cols-2">
+        {items.map(({ icon: Icon, ...item }, index) => (
+          <ScrollReveal key={item.label} animation="up" delay={(index % 2) * 80}>
+            <a
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              className="group grid min-h-[9rem] grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[12px] border border-white/10 bg-[#0b0a1c]/82 p-5 transition duration-300 hover:border-[var(--uki-cyan-border)] hover:bg-[#100e29] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+              aria-label={`${item.label}: ${copy.open}`}
+            >
+              <Icon className="h-10 w-10 rounded-[9px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+              <div className="min-w-0">
+                <p className="uki-label">{item.label}</p>
+                <p className="mt-2 truncate font-mono text-sm font-black text-[var(--uki-cream)] sm:text-base" title={item.value}>
+                  {item.value}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{item.helper}</p>
+              </div>
+              <ExternalLink className="h-4 w-4 text-[var(--uki-gold)] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </a>
+          </ScrollReveal>
+        ))}
       </div>
-    </article>
+    </section>
   );
 }
 
@@ -637,50 +619,38 @@ function FaqAndCta() {
   const faqs = faqsByLocale[locale];
 
   return (
-    <section id="faq" className="uki-faq-cta-row uki-container grid gap-4 pb-6 lg:grid-cols-[0.415fr_0.585fr]">
-      <ScrollReveal animation="left" duration={900} className="w-full h-full">
-        <Panel className="uki-faq-panel h-full" innerClassName="p-3 sm:p-4 h-full flex flex-col justify-between">
-          <div>
-            <h2 className="font-headline text-2xl font-black uppercase text-[var(--uki-cyan)]">{copy.title}</h2>
-            <div className="uki-faq-list mt-3 divide-y divide-white/10">
-              {faqs.map((faq) => (
-                <details key={faq.question} className="group py-2.5 border-l-2 border-transparent open:border-[var(--uki-cyan)] open:bg-[#e45cff]/[0.02] pl-3.5 transition-all duration-300 rounded-r-[6px]">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-bold text-[var(--uki-text)] transition group-open:text-[var(--uki-cyan)] hover:text-[var(--uki-cyan)]">
-                    {faq.question}
-                    <ChevronDown className="h-4 w-4 text-[var(--uki-cyan)] transition-transform duration-300 group-open:rotate-180" />
-                  </summary>
-                  <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-in-out group-open:grid-rows-[1fr]">
-                    <div className="overflow-hidden">
-                      <p className="whitespace-pre-line pt-3 pb-1 px-1 text-xs leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
-                    </div>
-                  </div>
-                </details>
-              ))}
-            </div>
-          </div>
-        </Panel>
+    <section id="faq" className="uki-container py-12 sm:py-16">
+      <ScrollReveal animation="fade">
+        <SectionHeading eyebrow={copy.eyebrow} title={copy.title} tone="cyan" withRule />
       </ScrollReveal>
+      <div className="mt-7 grid gap-4 md:grid-cols-2">
+        {faqs.map((faq, index) => (
+          <ScrollReveal key={faq.question} animation="up" delay={(index % 2) * 70}>
+            <article className="h-full rounded-[12px] border border-white/10 bg-[#0b0a1c]/78 p-5 sm:p-6">
+              <h3 className="text-balance font-headline text-lg font-black leading-snug text-[var(--uki-cream)]">
+                {faq.question}
+              </h3>
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{faq.answer}</p>
+            </article>
+          </ScrollReveal>
+        ))}
+      </div>
 
-      <ScrollReveal animation="right" duration={900} className="w-full">
-        <Panel className="uki-final-cta-panel" innerClassName="relative overflow-hidden p-0">
-          <div className="uki-final-cta-bg" aria-hidden="true" />
-          <div className="uki-final-cta-content">
-            <div className="uki-final-cta-copy">
-              <h2 className="font-headline text-3xl font-black uppercase leading-[0.98] text-[var(--uki-cream)] sm:text-4xl">
-                {copy.ctaTitle}
-              </h2>
-              <p className="mt-3 max-w-sm text-sm font-semibold leading-snug text-[var(--uki-text)]">
-                <PresaleFinalCtaText />
-              </p>
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <PresaleGateLink href="#presale-console">{copy.participate}</PresaleGateLink>
-                <LandingButton href="#token" variant="secondary">
-                  {copy.conditions}
-                </LandingButton>
-              </div>
-            </div>
+      <ScrollReveal animation="up" delay={100}>
+        <div className="mt-5 grid gap-6 overflow-hidden rounded-[16px] border border-[var(--uki-cyan-border)] bg-[radial-gradient(circle_at_80%_20%,rgba(56,239,226,0.12),transparent_34%),#0c0b20] p-5 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:p-10">
+          <div>
+            <h2 className="max-w-[18ch] text-balance font-headline text-3xl font-black leading-tight text-[var(--uki-cream)] sm:text-4xl">
+              {copy.ctaTitle}
+            </h2>
+            <p className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)] sm:text-base">
+              {copy.ctaText}
+            </p>
           </div>
-        </Panel>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+            <LandingButton href="/cukie-master" variant="secondary">{copy.stake}</LandingButton>
+          </div>
+        </div>
       </ScrollReveal>
     </section>
   );
