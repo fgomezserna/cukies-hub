@@ -115,7 +115,7 @@ Estos parametros no deben entenderse como hardcodeados si el contrato los recibe
 | Compra minima | 5 ASM. |
 | Maximo por compra/wallet | No hay limite aprobado. |
 | Maximo total vendible | 250,000,000 UKI del pool de ecosistema. |
-| Liquidez | ASM recaudado se usa para liquidez UKI; liquidez inicial bloqueada o quemada al menos 9 meses. |
+| Liquidez | La fase intermedia usa el 50% del ASM recaudado para liquidez UKI a `0,012 USD/UKI`; los LP propios se bloquean exactamente 180 días. |
 | BNB/USDT | Extension opcional pendiente; si se acepta, debe convertirse a ASM o reservarse para conversion posterior. |
 | Incentivos Concilium/Ascensum | Se iguala cantidad vendida a esa comunidad para Marcel; 9 meses cliff + 24 meses vesting. |
 | Ecosistema | 30,000,000 UKI, equivalente al 3% del suministro total, liberados 40 dias tras TGE; resto 9 meses cliff + 12 meses lineal. |

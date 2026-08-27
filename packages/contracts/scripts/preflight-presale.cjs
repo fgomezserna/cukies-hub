@@ -1,7 +1,7 @@
 const hre = require('hardhat');
 
 const APPROVED_ASM_TOKEN_BY_CHAIN_ID = {
-  56: '0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c',
+  56: '0x707F0f4a39a4a26239F7D00463B15AB5656861f9',
   97: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
 };
 

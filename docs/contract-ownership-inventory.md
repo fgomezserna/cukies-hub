@@ -58,4 +58,4 @@ Chain id: `56`.
 
 | Alias | Address | Owner/admin observado | Nota |
 | --- | --- | --- | --- |
-| `ASM_MAINNET` / `CONCILIUM` | `0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c` | No comprobado en este inventario | Direccion aprobada en docs de deployment para produccion. |
+| `ASM_MAINNET` / `ASM` | `0x707F0f4a39a4a26239F7D00463B15AB5656861f9` | Owner renunciado (`0x0`), comprobado on-chain el 2026-08-27 | `Ascensum token`, símbolo `ASM`, 18 decimales; coincide con el contrato usado por la preventa mainnet. |

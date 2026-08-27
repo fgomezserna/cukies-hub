@@ -106,3 +106,22 @@ describe('LiquidityLocker', function () {
       .to.be.revertedWithCustomError(locker, 'UnlockTimeNotFuture');
   });
 });
+
+describe('SixMonthLiquidityLocker', function () {
+  it('derives an immutable 180-day unlock from the deployment block', async function () {
+    const [, beneficiary] = await ethers.getSigners();
+    const MockERC20 = await ethers.getContractFactory('MockERC20');
+    const lpToken = await MockERC20.deploy('Pancake LPs', 'Cake-LP');
+    const Locker = await ethers.getContractFactory('SixMonthLiquidityLocker');
+    const locker = await Locker.deploy(await lpToken.getAddress(), beneficiary.address);
+    const receipt = await locker.deploymentTransaction().wait();
+    const deploymentBlock = await ethers.provider.getBlock(receipt.blockNumber);
+    const duration = 180n * 24n * 60n * 60n;
+
+    expect(await locker.LOCK_DURATION()).to.equal(duration);
+    expect(await locker.unlockTime()).to.equal(BigInt(deploymentBlock.timestamp) + duration);
+    expect(await locker.start()).to.equal(await locker.unlockTime());
+    expect(await locker.owner()).to.equal(beneficiary.address);
+    expect(await locker.lpToken()).to.equal(await lpToken.getAddress());
+  });
+});

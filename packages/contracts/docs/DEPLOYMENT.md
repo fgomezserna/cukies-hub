@@ -19,6 +19,11 @@ pnpm --filter @cukies/contracts deploy:testnet:operational
 pnpm --filter @cukies/contracts deploy:testnet:nft-source
 pnpm --filter @cukies/contracts rehearse:testnet:liquidity-locker
 pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
+pnpm --filter @cukies/contracts preflight:mainnet:uki-launch
+pnpm --filter @cukies/contracts deploy:mainnet:staking-locker
+pnpm --filter @cukies/contracts prepare:mainnet:liquidity-safe-batch
+pnpm --filter @cukies/contracts verify:mainnet:uki-launch
+pnpm --filter @cukies/contracts derive:mainnet:competition-draw-seed
 pnpm --filter @cukies/contracts deploy:mainnet:operational
 pnpm --filter @cukies/contracts handover:mainnet:safe
 pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
@@ -58,7 +63,7 @@ Use `deploy:mainnet:operational` for the planned mainnet launch flow where one d
 This dedicated script is mainnet-only and enforces:
 
 - network `bsc` / chain id `56`,
-- `ASM_TOKEN_ADDRESS=0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c`,
+- `ASM_TOKEN_ADDRESS=0x707F0f4a39a4a26239F7D00463B15AB5656861f9`,
 - `DEPLOYER_ADDRESS` matches `DEPLOYER_PRIVATE_KEY`,
 - fresh deploy only; `UKI_TOKEN_ADDRESS`, `UKI_VESTING_VAULT_ADDRESS` and `UKI_PRESALE_ADDRESS` must be empty,
 - `UKIToken.owner()`, `Presale.owner()` and `VestingVault.DEFAULT_ADMIN_ROLE` are the deployer wallet,
@@ -75,7 +80,7 @@ Required mainnet env for the operational deploy:
 ```bash
 DEPLOYER_PRIVATE_KEY=...
 DEPLOYER_ADDRESS=0x...
-ASM_TOKEN_ADDRESS=0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c
+ASM_TOKEN_ADDRESS=0x707F0f4a39a4a26239F7D00463B15AB5656861f9
 SALE_TREASURY_ADDRESS=0x...
 UKI_INITIAL_SUPPLY_RECEIVER=0x...
 # Required only if receiver is not the deployer.
@@ -177,7 +182,7 @@ Do not reuse addresses across environments:
 | --- | --- | --- | --- |
 | Dev | Hardhat/local | `31337` | `MockERC20` deployed by tests or local simulations. |
 | Test | BSC testnet | `97` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` (`tASM`) |
-| Prod | BSC mainnet | `56` | `0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c` (`CONCILIUM`) |
+| Prod | BSC mainnet | `56` | `0x707F0f4a39a4a26239F7D00463B15AB5656861f9` (`Ascensum token`, `ASM`) |
 
 The deploy script validates `ASM_TOKEN_ADDRESS` against the approved address for BSC testnet and BSC mainnet. Hardhat/local deployments are exempt so dev simulations can use local mocks.
 
@@ -217,7 +222,9 @@ pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
 
 The completion command refuses to broadcast before maturity. After maturity it waits for 12 confirmations, validates both release events from the receipt, verifies that the locker balance becomes zero and proves that the exact locked amount reaches the immutable beneficiary. This short delay is exclusively a testnet release rehearsal and must not be copied into a production deployment.
 
-Do not derive the mainnet timestamp from this rehearsal. The current repository policy still states a minimum nine-month liquidity lock, while the intermediate-listing proposal requests six months. That policy conflict must be resolved explicitly before a mainnet deployment script is authorized; the contract itself records whichever immutable UTC timestamp is approved.
+Do not derive the mainnet timestamp from this rehearsal. The approved intermediate listing uses `SixMonthLiquidityLocker`, whose bytecode fixes the duration to exactly `180 days` from its deployment block. The generic short-delay rehearsal remains testnet-only.
+
+The complete mainnet workflow, Safe batch review and production gates live in `docs/uki-mainnet-intermediate-listing-runbook.md`.
 
 ## Deployment order
 
@@ -254,13 +261,13 @@ Use this matrix before creating any `ALLOCATION_MANAGER_ROLE` schedule. The sour
 
 | Pool | Amount | Schedule id suggestion | Timing |
 | --- | ---: | --- | --- |
-| Presale buyers | Up to `250,000,000 UKI` | `PRESALE` | Global vault config: `presaleVestingStart = TGE`, `presaleVestingDuration = 9 months`; freeze before claims. |
+| Presale buyers | Up to `250,000,000 UKI` | `PRESALE` | Global vault config: approved start date `2026-09-15` (exact UTC time pending the later vesting phase), `presaleVestingDuration = 9 months`; freeze before claims. |
 | Ecosystem 40-day unlock | `30,000,000 UKI` | `ECOSYSTEM_40D` | Cliff `TGE + 40 days`, no linear vesting. Use `duration = 0` to unlock 100% at the cliff. |
 | Ecosystem remainder | TBD after sale | `ECOSYSTEM_REMAINDER` | 9 months cliff + 12 months linear vesting. |
 | Team | `120,000,000 UKI` total | `TEAM_*` | 9 months cliff + 24 months linear vesting. |
 | Concilium/Ascensum incentives | Variable | `CONCILIUM_INCENTIVES` | Same as team: 9 months cliff + 24 months linear vesting. |
 | Rewards program | `450,000,000 UKI` | TBD | Documented as 6-year distribution, but final cliff/start/duration model is not yet specified. Do not create a single vault schedule until product approves the exact rewards distribution model. |
-| Liquidity | `180,000,000 UKI` | Not a vesting schedule | Pancake liquidity plus LP lock/burn evidence for at least 9 months. |
+| Liquidity | Amount calculated from 50% of ASM raised at `0.012 USD/UKI` | Not a vesting schedule | Initial PancakeSwap V2 listing; every LP minted by the launch Safe is sent directly to the immutable 180-day locker. |
 
 ## Preflight
 

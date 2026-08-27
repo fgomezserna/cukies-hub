@@ -291,7 +291,7 @@ Issues hijas:
   - Acceptance criteria:
     - Reglas versionadas.
     - Casos de borde definidos: preventa agotada, compra fuera de ventana, ASM ratio, refund si aplica.
-    - Liquidez ASM -> UKI, bloqueo/quema minimo 9 meses y vesting comprador 9 meses sin cliff documentados.
+    - Listing intermedio con 50% ASM -> UKI a `0,012 USD/UKI`, LP bloqueado 180 días y vesting comprador de 9 meses desde el 15 de septiembre de 2026 documentados.
 
 - UKI-012.2 Task - Implementar contrato `Presale`
   - Acceptance criteria:
