@@ -13,6 +13,7 @@ This threat model covers the currently implemented contracts:
 - `VestingVault`
 - `UKIStaking`
 - `RewardsDistributor`
+- `LiquidityLocker`
 
 The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an indexed/cache layer only, and wallets as the transaction authorizers.
 
@@ -27,6 +28,7 @@ The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an i
 | Admin permissions | Owner/admin roles | Hot wallet compromise or accidental role assignment. |
 | Reward claims | `RewardsDistributor` | Double claim, malicious root, invalid proof domain or unfunded batch. |
 | UKI staking state | `UKIStaking` | Stake accounting mismatch or snapshot/indexer manipulation. |
+| Pancake V2 LP tokens | `LiquidityLocker` | Early withdrawal, wrong LP token/beneficiary/timestamp or incomplete deposit. |
 
 ## Trust boundaries
 
@@ -61,6 +63,7 @@ The model assumes BNB Smart Chain as the settlement layer, Mongo/backend as an i
 | T18 | Double claim or unfunded rewards | A wallet repeats a claim, changes amount/domain, or a batch overcommits distributor funds. | `claimed[batchId][account]`, chain/distributor/batch domain-separated double-hash leaves, `totalReserved`, `freeBalance`, pre-funding and tests for repeat/wrong proof/wrong batch/wrong amount/cross-domain. | Rehearse publish, claim, expiry and close through the final Safe and monitor the BSC projection. |
 | T19 | Staking accounting or snapshot bypass | An unstake could leave a stale Cukie Master position or the indexer could credit the wrong cutoff. | `UKIStaking` is custodial and withdrawals are immediate by approved product decision; events expose absolute balances; credit snapshots use canonical cutoff blocks and fail closed on incomplete history. | Freeze the no-lock/no-cooldown rule, complete testnet stake/unstake/cutoff evidence and audit indexer recovery. |
 | T20 | Backend overrides on-chain truth | UI/support marks purchase, vesting or claim state incorrectly. | ADR assigns BSC as source of truth for transferable value. | Indexer must treat Mongo as cache; support actions need tx hash/event evidence. |
+| T21 | Liquidity lock is bypassed or misconfigured | LP tokens can be removed before the public deadline, sent to the wrong beneficiary or only partially locked. | `LiquidityLocker` binds one immutable LP token and timestamp; beneficiary mutation/renunciation is disabled; zero-duration `VestingWallet` releases only at maturity; focused tests cover both inherited and explicit release paths. | Independently verify the V2 pair, beneficiary, exact UTC timestamp, locker runtime bytecode and locker LP balance; prove deployer LP balance is zero; use an approved production-duration policy and verify source on BscScan before announcement. |
 
 ## Acceptance-criteria threats
 

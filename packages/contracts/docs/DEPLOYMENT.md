@@ -17,6 +17,8 @@ pnpm --filter @cukies/contracts deploy:local
 pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts deploy:testnet:operational
 pnpm --filter @cukies/contracts deploy:testnet:nft-source
+pnpm --filter @cukies/contracts rehearse:testnet:liquidity-locker
+pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
 pnpm --filter @cukies/contracts deploy:mainnet:operational
 pnpm --filter @cukies/contracts handover:mainnet:safe
 pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
@@ -194,6 +196,28 @@ STAGING_NFT_DEPLOYMENT_CONFIRM=BSC_TESTNET_97_ONLY
 ```
 
 It mints six original-generation fixtures to the testnet deployer, one for each stable rarity value `1..6`. Their expected Cukie Master points are `1, 2, 4, 7, 10, 15` (39 total), which must produce the route maximum of five slots. The output includes only public evidence: contract addresses, deployment receipts/blocks, runtime bytecode hashes and fixture mint transactions. Never reuse these contracts or fixtures in mainnet/production.
+
+## BSC Testnet Pancake V2 liquidity-lock rehearsal
+
+`LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.
+
+The rehearsal is chain-97-only and creates the initial tASM/tUKI PancakeSwap V2 pair with `0.1 tASM + 60 tUKI`, preserving the target ratio `1 ASM = 600 UKI`. It transfers every LP token minted to a short-lived test locker, proves that early release reverts and prints the public receipt/code-hash evidence needed for the completion step.
+
+```bash
+set -a
+source /path/to/ignored-testnet-operational.env
+set +a
+export LIQUIDITY_LOCK_TESTNET_CONFIRM=CREATE_PANCAKE_V2_TEST_LP_AND_LOCK
+export LIQUIDITY_LOCK_TEST_DELAY_SECONDS=180
+pnpm --filter @cukies/contracts rehearse:testnet:liquidity-locker
+
+export LIQUIDITY_LOCKER_ADDRESS=0x...
+pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
+```
+
+The completion command refuses to broadcast before maturity. After maturity it waits for 12 confirmations, validates both release events from the receipt, verifies that the locker balance becomes zero and proves that the exact locked amount reaches the immutable beneficiary. This short delay is exclusively a testnet release rehearsal and must not be copied into a production deployment.
+
+Do not derive the mainnet timestamp from this rehearsal. The current repository policy still states a minimum nine-month liquidity lock, while the intermediate-listing proposal requests six months. That policy conflict must be resolved explicitly before a mainnet deployment script is authorized; the contract itself records whichever immutable UTC timestamp is approved.
 
 ## Deployment order
 

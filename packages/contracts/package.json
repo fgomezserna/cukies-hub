@@ -15,6 +15,8 @@
     "deploy:testnet:nft-v2": "hardhat run scripts/deploy-nft-v2-testnet.cjs --network bscTestnet",
     "deploy:testnet:nft-vaults": "hardhat run scripts/deploy-nft-vaults-testnet.cjs --network bscTestnet",
     "deploy:testnet:staking-rewards": "hardhat run scripts/deploy-staking-rewards.testnet.cjs --network bscTestnet",
+    "rehearse:testnet:liquidity-locker": "hardhat run scripts/rehearse-liquidity-locker.testnet.cjs --network bscTestnet",
+    "complete:testnet:liquidity-locker": "hardhat run scripts/complete-liquidity-locker-rehearsal.testnet.cjs --network bscTestnet",
     "canary:testnet:reward-publisher": "hardhat run scripts/deploy-reward-publisher-canary.testnet.cjs --network bscTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy-presale.production.cjs --network bsc",
     "deploy:mainnet:operational": "hardhat run scripts/deploy-mainnet-operational.cjs --network bsc",
