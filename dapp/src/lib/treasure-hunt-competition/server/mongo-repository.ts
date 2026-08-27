@@ -13,6 +13,7 @@ import type {
   CompetitionParticipantRecord,
   CompetitionRepository,
 } from './models';
+import { CompetitionEntitlementConflictError } from './models';
 import {
   COMPETITION_ATTEMPT_INDEXES,
   COMPETITION_CAMPAIGN_INDEXES,
@@ -25,7 +26,7 @@ const PARTICIPANTS_COLLECTION = 'presale_game_participants';
 const ATTEMPTS_COLLECTION = 'presale_game_attempts';
 const DEFAULT_LOCAL_ALIAS_SECRET = 'cukies-treasure-hunt-local-alias-secret';
 const MAX_ALIAS_COLLISION_RETRIES = 16;
-const MAX_RANKED_ATTEMPTS_PER_WALLET = 5;
+const DEFAULT_RANKED_ATTEMPTS_PER_WALLET = 5;
 
 const indexesByDatabase = new WeakMap<Db, Promise<void>>();
 
@@ -40,7 +41,17 @@ const CAMPAIGN_CONFIG_KEYS = exhaustiveKeys<CompetitionConfig>()([
   'gameId',
   'mode',
   'rulesVersion',
+  'eligibilityKind',
   'presaleContractAddress',
+  'stakingContractAddress',
+  'stakingChainId',
+  'stakePerAttemptRaw',
+  'topAttemptsPerWallet',
+  'pointsPerTicket',
+  'basePrizeUkiRaw',
+  'stakePrizeBps',
+  'prizePerWinnerUkiRaw',
+  'maxWinsPerWallet',
   'startsAt',
   'endsAt',
   'poolBps',
@@ -109,9 +120,13 @@ function withoutMongoId<T>(document: (T & { _id?: unknown }) | null): T | null {
 export async function selectTopCompetitionAttempts(
   rows: AsyncIterable<CompetitionAttemptRecord>,
   limit?: number,
+  perWalletLimit = DEFAULT_RANKED_ATTEMPTS_PER_WALLET,
 ) {
   if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) {
     throw new RangeError('Competition attempt limit must be a positive safe integer');
+  }
+  if (!Number.isSafeInteger(perWalletLimit) || perWalletLimit < 1) {
+    throw new RangeError('Competition per-wallet attempt limit must be a positive safe integer');
   }
 
   const selected: CompetitionAttemptRecord[] = [];
@@ -119,7 +134,7 @@ export async function selectTopCompetitionAttempts(
   for await (const row of rows) {
     const walletAddress = row.walletAddress.toLowerCase();
     const walletAttempts = attemptsByWallet.get(walletAddress) ?? 0;
-    if (walletAttempts >= MAX_RANKED_ATTEMPTS_PER_WALLET) continue;
+    if (walletAttempts >= perWalletLimit) continue;
 
     attemptsByWallet.set(walletAddress, walletAttempts + 1);
     selected.push(row);
@@ -332,6 +347,29 @@ export class MongoCompetitionRepository implements CompetitionRepository {
     );
   }
 
+  async abandonAttempt(input: Parameters<CompetitionRepository['abandonAttempt']>[0]) {
+    const updated = await (await this.attempts()).findOneAndUpdate(
+      {
+        attemptId: input.attemptId,
+        walletAddress: input.walletAddress,
+        status: 'active',
+        finishPendingAuthority: { $ne: true },
+        nextSequence: input.expectedSequence,
+        lastDigest: input.expectedPreviousDigest,
+      },
+      {
+        $set: {
+          status: 'abandoned',
+          finishPendingAuthority: false,
+          finishedAt: input.now,
+          updatedAt: input.now,
+        },
+      },
+      { returnDocument: 'after', includeResultMetadata: false },
+    );
+    return withoutMongoId(updated);
+  }
+
   async listPendingFinishAttempts(campaignId: string, limit: number) {
     const rows = await (await this.attempts())
       .find({ campaignId, status: 'active', finishPendingAuthority: true })
@@ -342,7 +380,22 @@ export class MongoCompetitionRepository implements CompetitionRepository {
   }
 
   async createAttempt(attempt: CompetitionAttemptRecord) {
-    await (await this.attempts()).insertOne(attempt);
+    try {
+      await (await this.attempts()).insertOne(attempt);
+    } catch (error) {
+      const duplicateFields = error && typeof error === 'object'
+        ? ('keyPattern' in error ? error.keyPattern : 'keyValue' in error ? error.keyValue : null)
+        : null;
+      if (
+        isDuplicateKeyError(error) &&
+        duplicateFields &&
+        typeof duplicateFields === 'object' &&
+        'entitlementSlot' in duplicateFields
+      ) {
+        throw new CompetitionEntitlementConflictError();
+      }
+      throw error;
+    }
     return attempt;
   }
 
@@ -460,7 +513,15 @@ export class MongoCompetitionRepository implements CompetitionRepository {
     return rows.map((row) => withoutMongoId(row) as CompetitionAttemptRecord);
   }
 
-  async listValidAttempts(campaignId: string, limit?: number) {
+  async countAttempts(campaignId: string, walletAddress: string) {
+    return (await this.attempts()).countDocuments({ campaignId, walletAddress });
+  }
+
+  async listValidAttempts(
+    campaignId: string,
+    limit?: number,
+    perWalletLimit = DEFAULT_RANKED_ATTEMPTS_PER_WALLET,
+  ) {
     if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) {
       throw new RangeError('Competition attempt limit must be a positive safe integer');
     }
@@ -471,7 +532,7 @@ export class MongoCompetitionRepository implements CompetitionRepository {
 
     let rows: CompetitionAttemptRecord[];
     try {
-      rows = await selectTopCompetitionAttempts(cursor, limit);
+      rows = await selectTopCompetitionAttempts(cursor, limit, perWalletLimit);
     } finally {
       await cursor.close();
     }

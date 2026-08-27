@@ -18,6 +18,35 @@ interface TronLinkState {
   error: string | null;
 }
 
+const TRONLINK_DISCONNECTED_STORAGE_KEY = 'cukies:tronlink:disconnected';
+let tronLinkManuallyDisconnected = false;
+
+function isManualDisconnectActive() {
+  if (tronLinkManuallyDisconnected) return true;
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return window.localStorage.getItem(TRONLINK_DISCONNECTED_STORAGE_KEY) === '1';
+  } catch {
+    return tronLinkManuallyDisconnected;
+  }
+}
+
+function setManualDisconnect(active: boolean) {
+  tronLinkManuallyDisconnected = active;
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (active) {
+      window.localStorage.setItem(TRONLINK_DISCONNECTED_STORAGE_KEY, '1');
+    } else {
+      window.localStorage.removeItem(TRONLINK_DISCONNECTED_STORAGE_KEY);
+    }
+  } catch {
+    // The in-memory flag still keeps every hook instance disconnected in this page.
+  }
+}
+
 function getTronWeb() {
   if (typeof window === 'undefined') return null;
   return window.tronWeb ?? window.tronLink?.tronWeb ?? window.tron?.tronWeb ?? null;
@@ -73,10 +102,22 @@ export function useTronLink() {
     if (typeof window === 'undefined') return;
 
     try {
+      const isInstalled = Boolean(window.tron || window.tronWeb || window.tronLink);
+      if (isManualDisconnectActive()) {
+        setState((prev) => ({
+          ...prev,
+          isInstalled,
+          isConnected: false,
+          address: null,
+          isLoading: false,
+        }));
+        return;
+      }
+
       const address = getTronAddress();
       setState((prev) => ({
         ...prev,
-        isInstalled: Boolean(window.tron || window.tronWeb || window.tronLink),
+        isInstalled,
         isConnected: Boolean(address),
         address,
         error: address ? null : prev.error,
@@ -88,33 +129,17 @@ export function useTronLink() {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const checkTronLink = () => {
-        const isInstalled = !!(window.tron || window.tronWeb || window.tronLink);
-        const address = getTronAddress();
-        setState((prev) => ({
-          ...prev,
-          isInstalled,
-          isConnected: Boolean(address),
-          address,
-          isLoading: false,
-        }));
-      };
-
-      checkTronLink();
-
-      const interval = setInterval(checkTronLink, 1000);
-      return () => clearInterval(interval);
-    }
-  }, []);
-
-  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleMessage = (event: MessageEvent) => {
       const action = event.data?.message?.action ?? event.data?.action;
       const address = event.data?.message?.data?.address;
       if (typeof address === 'string') {
+        if (isManualDisconnectActive()) {
+          syncConnection();
+          return;
+        }
+
         setState((prev) => ({
           ...prev,
           isInstalled: true,
@@ -142,6 +167,11 @@ export function useTronLink() {
 
     const tron = window.tron;
     const handleAccountsChanged = (accounts: unknown) => {
+      if (isManualDisconnectActive()) {
+        syncConnection();
+        return;
+      }
+
       const [address] = Array.isArray(accounts) ? accounts : [];
       setState((prev) => ({
         ...prev,
@@ -152,21 +182,26 @@ export function useTronLink() {
         isLoading: false,
       }));
     };
+    const handleManualDisconnect = () => syncConnection();
 
     tron?.on?.('accountsChanged', handleAccountsChanged);
     window.addEventListener('message', handleMessage);
     window.addEventListener('focus', syncConnection);
     window.addEventListener('tronlink:connected', syncConnection);
+    window.addEventListener('tronlink:disconnected', handleManualDisconnect);
+    window.addEventListener('storage', syncConnection);
 
     const interval = setInterval(syncConnection, 1000);
     return () => {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('focus', syncConnection);
       window.removeEventListener('tronlink:connected', syncConnection);
+      window.removeEventListener('tronlink:disconnected', handleManualDisconnect);
+      window.removeEventListener('storage', syncConnection);
       tron?.removeListener?.('accountsChanged', handleAccountsChanged);
       clearInterval(interval);
     };
-  }, [state.isInstalled, syncConnection]);
+  }, [syncConnection]);
 
   const connect = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -177,6 +212,7 @@ export function useTronLink() {
       return null;
     }
 
+    setManualDisconnect(false);
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -285,11 +321,14 @@ export function useTronLink() {
   }, []);
 
   const disconnect = useCallback(() => {
+    setManualDisconnect(true);
     setState((prev) => ({
       ...prev,
       isConnected: false,
       address: null,
+      isLoading: false,
     }));
+    window.dispatchEvent(new Event('tronlink:disconnected'));
   }, []);
 
   return {

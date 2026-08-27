@@ -1,6 +1,6 @@
 # Coolify deployment
 
-El despliegue de produccion debe usar `docker-compose.coolify.yml` como compose del proyecto.
+Los despliegues de staging y produccion deben usar `docker-compose.coolify.yml` como compose del proyecto.
 
 ## Servicios
 
@@ -16,9 +16,9 @@ En Coolify:
 
 1. Crear o editar el recurso como Docker Compose.
 2. Repo: `fgomezserna/cukies-hub`.
-3. Branch: `main`.
+3. Branch: `staging` para integracion y `main` para el live actual.
 4. Compose file: `docker-compose.coolify.yml`.
-5. Activar webhook/auto deploy para que cada push o merge a `main` reconstruya los tres servicios.
+5. Activar webhook/auto deploy solo para la rama asignada al recurso.
 6. Configurar dominio solo en `dapp`.
 
 ## Variables obligatorias
@@ -37,10 +37,10 @@ Dapp presale testnet:
 NEXT_PUBLIC_UKI_CHAIN_ID=97
 NEXT_PUBLIC_ASM_TOKEN_ADDRESS=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C
 NEXT_PUBLIC_UKI_TOKEN_ADDRESS=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c
-NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS=0x02E854eeF861B517d996D676C27B1be62665035B
-NEXT_PUBLIC_UKI_PRESALE_ADDRESS=0xb6aB8eaB37061AffCD415950C051a2EBD61Bb2C8
+NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS=0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154
+NEXT_PUBLIC_UKI_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
 NEXT_PUBLIC_BSCSCAN_BASE_URL=https://testnet.bscscan.com
-NEXT_PUBLIC_UKI_PRESALE_START_ISO=2026-06-11T10:59:10.000Z
+NEXT_PUBLIC_UKI_PRESALE_START_ISO=2026-08-05T10:59:20.000Z
 NEXT_PUBLIC_UKI_PRESALE_START_LABEL=testnet abierta
 NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL=abierta
 ```
@@ -101,16 +101,28 @@ Indexer:
 ```bash
 CHAIN_INDEXER_CHAINS=BSC
 CHAIN_INDEXER_CONTRACT_ALIASES=PRESALE
+CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID=97
+CHAIN_INDEXER_BSC_RPC_URLS=https://bsc-testnet-rpc.publicnode.com,https://data-seed-prebsc-1-s1.bnbchain.org:8545,https://data-seed-prebsc-2-s1.bnbchain.org:8545
 CHAIN_INDEXER_BSC_RPC_URL=https://bsc-testnet-rpc.publicnode.com
 CHAIN_INDEXER_TRON_API_BASE_URL=https://api.trongrid.io/v1
-CHAIN_INDEXER_PRESALE_ADDRESS=0xb6aB8eaB37061AffCD415950C051a2EBD61Bb2C8
-CHAIN_INDEXER_START_BSC_BLOCK=112739000
-CHAIN_INDEXER_BSC_CONFIRMATIONS=3
+CHAIN_INDEXER_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
+CHAIN_INDEXER_START_BSC_BLOCK=123291898
+CHAIN_INDEXER_BSC_CONFIRMATIONS=12
 ```
 
 `CHAIN_INDEXER_PRESALE_ADDRESS` debe ser el contrato `Presale` real del entorno. Si no se define, el worker seguira indexando Cukies legacy, marketplace y bridge, pero no leera compras de preventa ni generara `presale_purchases`, `presale_participants` o `presale_referral_contributions`.
 
 `CHAIN_INDEXER_START_BSC_BLOCK` debe apuntar al bloque de despliegue del contrato de preventa o a un bloque anterior cercano. Para backfill historico amplio, usar un RPC que soporte rangos de logs suficientemente antiguos.
+
+### Escenario de preventa staging 2026-08-05
+
+- Vault: `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154`; deploy tx `0x14292fc576ddff260572c4d7de7a7538d8f0aed8f3147d20f65d2cb77a0fa00b`.
+- Presale: `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`; deploy tx `0x846987138438bc3e77bfa8a957011b7cf6bbfc7b8fae59a548949102a0abc80e`.
+- Parametros: `100 UKI/ASM`, minimo `5 ASM`, cap `250,000,000 UKI`, ventana de 30 dias y vesting lineal de 9 meses.
+- Vault financiado: tx `0xaafce634b0221268ced2d9e64a1ab8438365072e09cd11aa016dafadf3e65444`.
+- Rol y apertura: tx `0x51117e37bf957a911626d797c7045c03e6ab27d9e98a21a9632d81a74e7a7b1a` y `0x4e8c4ec8ca66c7b2c449a68f60eec23b4a27b7ccbf8d8204ad1f901015cf3ed8`.
+- Compra smoke: `5 tASM -> 500 UKI` en tx `0x9b5f3a5724028f464fa582be7d3178dbf872964b6161123cd0987daf3010f9bd`.
+- Source verificado mediante Etherscan API V2: [VestingVault](https://testnet.bscscan.com/address/0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154#code) y [Presale](https://testnet.bscscan.com/address/0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA#code).
 
 Config inicial en Mongo para referidos de preventa:
 
@@ -141,7 +153,7 @@ Card worker:
 ```bash
 CARD_WORKER_MONGO_URL=...
 CARD_WORKER_DB_NAME=cukieshub-new
-CARD_WORKER_UPLOAD=true
+CARD_WORKER_UPLOAD=false
 CARD_WORKER_PUBLIC_BASE_URL=...
 CARD_WORKER_S3_BUCKET=...
 CARD_WORKER_S3_REGION=...
@@ -150,7 +162,7 @@ AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
 
-No activar `CARD_WORKER_UPLOAD=true` sin bucket, region, credenciales y base publica configurados. El worker esta protegido y no procesa en modo continuo sin upload real.
+En staging, el destino exclusivo es el bucket MinIO `cukies-cards-staging`. Las URLs inmutables de #216 y el smoke real quedaron validados, por lo que `CARD_WORKER_UPLOAD=true` y `COMPOSE_PROFILES=card-worker` estan activos solo en la app Coolify 28 desde el despliegue 1109. El valor `false` del ejemplo sigue siendo el default seguro para cualquier recurso nuevo. No usar nunca el destino compartido de produccion ni copiar las credenciales de app 28.
 
 ## Validacion post deploy
 

@@ -18,18 +18,19 @@ import {
 } from 'lucide-react';
 
 import TreasureHuntCompetitionPanel from '@/components/games/treasure-hunt-competition-panel';
+import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
 import {
   formatTreasureHuntCampaignWindow,
-  formatTreasureHuntPercentage,
   TREASURE_HUNT_FALLBACK_RULES,
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { cn } from '@/lib/utils';
+import { TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME } from '@/lib/treasure-hunt-competition/presentation';
 
 const inactiveCompetitions = [
   {
     title: 'Liga semanal UKI',
-    description: 'Se activará después de la preventa',
+    description: 'Se activará en una fase posterior',
     state: 'INACTIVA',
     Icon: Medal,
   },
@@ -116,7 +117,9 @@ export default function TreasureHuntCompetitionsView() {
   const { status, leaderboard, isLoading } = useTreasureHuntCompetitionOverview();
   const phase = status?.phase ?? 'unconfigured';
   const rules = status?.campaign ?? TREASURE_HUNT_FALLBACK_RULES;
-  const myAttempts = leaderboard.filter((entry) => entry.isMe).length;
+  const eligibility = status?.eligibility;
+  const myAttempts = eligibility?.attemptsUsed ?? leaderboard.filter((entry) => entry.isMe).length;
+  const grantedAttempts = eligibility?.attemptsGranted ?? 0;
   const isActive = phase === 'active';
   const campaignWindow = formatTreasureHuntCampaignWindow(status?.campaign ?? null);
 
@@ -138,7 +141,7 @@ export default function TreasureHuntCompetitionsView() {
               <div className="relative min-h-[170px] overflow-hidden border-b border-[#be8c2d]/45 sm:min-h-0 sm:border-b-0 sm:border-r">
                 <Image
                   src="/brand/official/uki-token-cukies-world-coin.png"
-                  alt="Emblema del Torneo de Preventa UKI"
+                  alt={`Emblema del ${TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}`}
                   fill
                   sizes="220px"
                   className="object-contain p-6 drop-shadow-[0_12px_22px_rgba(197,137,24,0.35)]"
@@ -150,7 +153,7 @@ export default function TreasureHuntCompetitionsView() {
               <div className="p-5 sm:p-6">
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="font-headline text-2xl font-black tracking-[-0.02em] text-[#f0e4ce]">
-                    Torneo de Preventa UKI
+                    {TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}
                   </h3>
                   <span className={cn(
                     'rounded-[4px] border px-2 py-1 text-[10px] font-bold tracking-[0.12em]',
@@ -167,14 +170,19 @@ export default function TreasureHuntCompetitionsView() {
                 {campaignWindow ? (
                   <p className="mt-2 text-xs text-[#8e918d]">{campaignWindow}</p>
                 ) : null}
+                <TreasureHuntCompetitionCountdown
+                  phase={status?.phase}
+                  campaign={status?.campaign}
+                  className="mt-2"
+                />
 
                 <dl className="mt-6 grid grid-cols-2 divide-x divide-white/15 sm:grid-cols-5">
                   {[
                     ['Modo', '1P', UserRound],
-                    ['Pool', formatTreasureHuntPercentage(rules.poolBps), Medal],
-                    ['Por partida', formatTreasureHuntPercentage(rules.playerRewardBps), Trophy],
-                    ['Partidas máx.', String(rules.maxWinningAttemptsPerWallet), Flag],
-                    ['Sponsor', formatTreasureHuntPercentage(rules.sponsorRewardBps), Swords],
+                    ['Por intento', '2.000 UKI', Medal],
+                    ['Intentos', `${myAttempts}/${grantedAttempts}`, Trophy],
+                    ['Mejores', String(rules.topAttemptsPerWallet), Flag],
+                    ['Tickets', String(eligibility?.provisionalTickets ?? 0), Swords],
                   ].map(([label, value, Icon], index) => (
                     <div key={String(label)} className={cn('px-3 first:pl-0', index > 1 && 'mt-4 sm:mt-0')}>
                       <dt className="inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.08em] text-[#979994]">
@@ -190,7 +198,9 @@ export default function TreasureHuntCompetitionsView() {
             <div className="flex flex-col gap-3 border-t border-[#be8c2d]/45 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#37eee2]">Tu participación</p>
-                <p className="mt-0.5 text-sm text-[#f0eee7]">{myAttempts}/{rules.maxWinningAttemptsPerWallet} partidas</p>
+                <p className="mt-0.5 text-sm text-[#f0eee7]">
+                  {eligibility?.attemptsRemaining ?? 0} intentos disponibles · {eligibility?.provisionalTickets ?? 0} tickets
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <Link
@@ -198,6 +208,9 @@ export default function TreasureHuntCompetitionsView() {
                   className="inline-flex min-h-11 items-center gap-3 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d4d49] px-8 text-sm font-bold text-white transition hover:bg-[#11625d]"
                 >
                   <Gamepad2 className="h-4 w-4" /> Jugar torneo <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href="/cukie-master" className="inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-[#ffc240] hover:text-white">
+                  Gestionar staking <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link href="/games/treasure-hunt/rules" className="inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-[#35eee2] hover:text-white">
                   Ver reglas y ranking <ArrowRight className="h-4 w-4" />
@@ -221,9 +234,9 @@ export default function TreasureHuntCompetitionsView() {
             <Link href="/games/treasure-hunt/rankings" className="grid grid-cols-[54px_1fr_auto] items-center gap-3 rounded-[7px] border border-[#d09a36]/45 bg-[#0b1816] p-3 transition hover:border-[#d09a36]/75">
               <Image src="/brand/official/uki-token-cukies-world-coin.png" alt="" width={54} height={54} className="h-[54px] w-[54px] object-contain" />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-[#f0eee8]">Torneo de Preventa UKI</span>
+                <span className="block truncate text-sm font-semibold text-[#f0eee8]">{TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}</span>
                 <span className="mt-1 block text-xs text-[#aaa8a2]">{myAttempts ? 'Clasificado' : 'Sin clasificar'}</span>
-                <span className="block text-xs text-[#aaa8a2]">{myAttempts}/{rules.maxWinningAttemptsPerWallet} partidas</span>
+                <span className="block text-xs text-[#aaa8a2]">{eligibility?.attemptsRemaining ?? 0} intentos disponibles</span>
               </span>
               <ArrowRight className="h-5 w-5 text-[#ffc240]" />
             </Link>

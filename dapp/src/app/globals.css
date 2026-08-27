@@ -331,6 +331,11 @@ body {
       linear-gradient(180deg, #04111a 0%, #04030a 48%, #010608 100%);
   }
 
+  .uki-landing :where(a, button, input, select, summary):focus-visible {
+    outline: 2px solid var(--uki-cyan);
+    outline-offset: 3px;
+  }
+
   .uki-container {
     width: min(100% - 5rem, 1440px);
     margin-inline: auto;
@@ -385,8 +390,13 @@ body {
   }
 
   .uki-nav-link {
+    display: inline-flex;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    align-items: center;
+    justify-content: center;
     border-bottom: 1px solid transparent;
-    padding-bottom: 0.5rem;
+    padding-inline: 0.15rem;
     font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0.18em;
@@ -422,7 +432,8 @@ body {
   }
 
   .uki-language-switcher button {
-    min-width: 2.35rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     border: 0;
     border-radius: 999px;
     background: transparent;

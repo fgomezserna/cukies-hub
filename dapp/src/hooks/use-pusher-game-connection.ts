@@ -5,6 +5,10 @@ import {
   routeGameEnd,
   type CompetitionAttemptCoordinator,
 } from '@/lib/treasure-hunt-competition/client';
+import {
+  appendTreasureHuntEconomyCheckpoint,
+  finishTreasureHuntEconomyRun,
+} from '@/lib/treasure-hunt-economy-client';
 
 function isTerminalCheckpointRace(error: unknown) {
   return Boolean(
@@ -22,6 +26,7 @@ interface GameCheckpoint {
   nonce?: string;
   hash?: string;
   events?: any[];
+  economyRunId?: unknown;
 }
 
 interface GameEndData {
@@ -30,6 +35,7 @@ interface GameEndData {
   gameTime: number;
   metadata?: any;
   competitionAttemptId?: unknown;
+  economyRunId?: unknown;
 }
 
 interface CompletedGameEnd {
@@ -266,12 +272,49 @@ export function usePusherGameConnection(
         
         // Process checkpoint (validate and save to DB)
         try {
-          const routed = await routeGameCheckpoint({
-            gameSessionId: sessionId,
-            sessionToken,
-            competitionCoordinator,
-            checkpoint: data,
-          });
+          const declaresEconomyRun = Object.prototype.hasOwnProperty.call(
+            data,
+            'economyRunId',
+          );
+          const economyRunId = typeof data.economyRunId === 'string'
+            && data.economyRunId.length > 0
+            && data.economyRunId.length <= 160
+            ? data.economyRunId
+            : null;
+          if (declaresEconomyRun && !economyRunId) {
+            throw new Error('Invalid Treasure Hunt economy run authority');
+          }
+          if (economyRunId) {
+            const explicitCheckpointId =
+              typeof data.nonce === 'string' && data.nonce.length > 0
+                ? data.nonce
+                : typeof data.hash === 'string' && data.hash.length > 0
+                  ? data.hash
+                  : null;
+            await appendTreasureHuntEconomyCheckpoint({
+              runId: economyRunId,
+              checkpointId:
+                explicitCheckpointId?.slice(0, 160)
+                ?? `checkpoint-${data.timestamp}-${data.gameTime}-${data.score}`.slice(0, 160),
+              score: data.score,
+              gameTimeMs: data.gameTime,
+            });
+          }
+          const routed = economyRunId &&
+            !competitionCoordinator?.hasActiveAttempt(sessionId)
+            ? {
+                source: 'economy' as const,
+                success: true,
+                result: { sequence: 'persisted' },
+                sessionValid: true,
+                honeypotDetected: false,
+              }
+            : await routeGameCheckpoint({
+                gameSessionId: sessionId,
+                sessionToken,
+                competitionCoordinator,
+                checkpoint: data,
+              });
           if (routed.success) {
             setGameStats(prev => ({
               ...prev,
@@ -328,6 +371,12 @@ export function usePusherGameConnection(
         const isPayload = Boolean(data) && typeof data === 'object' && !Array.isArray(data);
         const declaresCompetitionAttempt = isPayload &&
           Object.prototype.hasOwnProperty.call(data, 'competitionAttemptId');
+        const declaresEconomyRun = isPayload &&
+          Object.prototype.hasOwnProperty.call(data, 'economyRunId');
+        const economyRunId = typeof data?.economyRunId === 'string' &&
+          data.economyRunId.length > 0 && data.economyRunId.length <= 160
+          ? data.economyRunId
+          : null;
         const declaresResultId = isPayload &&
           Object.prototype.hasOwnProperty.call(data, 'resultId');
         const hasValidResultId = typeof data?.resultId === 'string' &&
@@ -337,9 +386,13 @@ export function usePusherGameConnection(
         // ACKs. A declared competition attempt is never allowed through this
         // compatibility path, even when malformed.
         const isLegacyIframePayload = isPayload &&
-          !declaresCompetitionAttempt && !declaresResultId;
+          !declaresCompetitionAttempt && !declaresEconomyRun && !declaresResultId;
         if (!hasValidResultId && !isLegacyIframePayload) {
           console.error('❌ [PUSHER] Ignoring game end without a valid result id');
+          return;
+        }
+        if (declaresEconomyRun && !economyRunId) {
+          console.error('❌ [PUSHER] Ignoring game end with invalid economy authority');
           return;
         }
         const resultId = hasValidResultId
@@ -376,29 +429,58 @@ export function usePusherGameConnection(
         
         // Process game end
         try {
-          const routed = await routeGameEnd({
-            gameSessionId: sessionId,
-            sessionToken,
-            competitionCoordinator,
-            gameEnd: data,
-          });
-          if (routed.success) {
+          const voluntaryForfeit = data.metadata && typeof data.metadata === 'object' &&
+            !Array.isArray(data.metadata) &&
+            data.metadata.gameOverReason === 'manual';
+          const routed = economyRunId !== null && !declaresCompetitionAttempt
+            ? null
+            : await routeGameEnd({
+                gameSessionId: sessionId,
+                sessionToken,
+                competitionCoordinator,
+                gameEnd: {
+                  ...data,
+                },
+              });
+          if (routed === null || routed.success) {
+            const canonicalScore = voluntaryForfeit
+              ? 0
+              : routed?.finalScore ?? data.finalScore;
+            const economyResult = economyRunId
+              ? await finishTreasureHuntEconomyRun({
+                  runId: economyRunId,
+                  resultId,
+                  score: canonicalScore,
+                  gameTimeMs: data.gameTime,
+                  outcome: voluntaryForfeit ? 'voluntary_forfeit' : 'completed',
+                  authoritySource: !voluntaryForfeit && declaresCompetitionAttempt
+                    ? 'competition'
+                    : 'economy',
+                  ...(typeof data.competitionAttemptId === 'string'
+                    ? { authorityReference: data.competitionAttemptId }
+                    : {}),
+                })
+              : null;
             console.log('✅ [PUSHER] Game session ended successfully:', {
-              finalScore: routed.finalScore,
-              isValid: routed.isValid,
-              source: routed.source,
+              finalScore: canonicalScore,
+              isValid: economyResult
+                ? economyResult.rewardEligible
+                : routed?.isValid ?? false,
+              source: routed?.source ?? 'economy',
             });
 
             const completed: CompletedGameEnd = {
               resultId,
-              finalScore: routed.finalScore,
-              isValid: routed.isValid,
-              source: routed.source,
-              status: routed.source === 'competition' &&
+              finalScore: canonicalScore,
+              isValid: economyResult
+                ? economyResult.rewardEligible
+                : routed?.isValid ?? false,
+              source: routed?.source ?? 'legacy',
+              status: economyResult?.status ?? (routed?.source === 'competition' &&
                 routed.result && typeof routed.result === 'object' &&
                 'status' in routed.result && typeof routed.result.status === 'string'
                 ? routed.result.status
-                : null,
+                : null),
               clearConfirmationRequired: !isLegacyIframePayload,
               sessionNotified: false,
             };

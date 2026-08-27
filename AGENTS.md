@@ -140,21 +140,26 @@ Required environment variables in `dapp/.env.local`:
 
 The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through Traefik/Cloudflare.
 
-- Live integration app:
+- Staging/integration app:
+  - Coolify resource: `game-hub-staging`
+  - Application ID: `28`
+  - UUID: `u4s804o4wwcckowgk0woo4wg`
+  - Branch: `staging`
+  - Public URL: `https://cukieshub.eurekand.com`
+  - Chain/data: BSC Testnet (`97`), `cukies-hub-staging`, `cukies-legacy-staging`, `cukieshub-new-staging`.
+- Production app:
   - Coolify resource: `game-hub`
+  - Application ID: `12`
   - UUID: `jookw8ow8woks088s44404ok`
   - Branch: `main`
-  - Public URL: `https://cukieshub.eurekand.com`
-- Production placeholder:
-  - Coolify resource: `game-hub-production`
-  - UUID: `u4s804o4wwcckowgk0woo4wg`
-  - Branch: `production`
+  - Public URL: `https://cukies.world`
 
 Use `docker-compose.coolify.yml` for the new hub deployment. It defines:
 
 - `dapp`: public Next.js app on port `3000`.
 - `chain-indexer`: internal blockchain indexer worker.
-- `cuki-card-worker`: internal NFT card renderer/uploader worker.
+- `cukie-master-scheduler`, `competition-credit-scheduler`, `game-economy-scheduler`, `cukie-pool-scheduler`, `weekly-ranking-scheduler`: internal economy schedulers, disabled until their runtime gates and HMAC credentials are approved.
+- `cuki-card-worker`: internal NFT card renderer/uploader worker. It is active in app 28 against the isolated staging Mongo/MinIO destination; generated URLs are content-addressed and immutable.
 
 Operational rules:
 
@@ -162,7 +167,8 @@ Operational rules:
 - Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
 - Before saying a worker is deployed, verify the actual Coolify resource is using `docker-compose.coolify.yml`, not a single Nixpacks app.
 - Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
-- Required shared variables for Coolify include `DATABASE_URL`, `CUKIES_DATABASE_URL`, `CHAIN_INDEXER_MONGO_URL`, `CHAIN_INDEXER_DB_NAME=cukieshub-new`, `CARD_WORKER_MONGO_URL`, `CARD_WORKER_DB_NAME=cukieshub-new`, `CARD_WORKER_UPLOAD=true`, S3 bucket/region/prefix/public base URL and AWS credentials.
+- Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
+- In app 28, `CARD_WORKER_UPLOAD=true` and `COMPOSE_PROFILES=card-worker` are allowed only with the exclusive `cukies-cards-staging` bucket, staging-only credentials and the guard validated. Do not copy those values or credentials to another resource.
 - Validate post-deploy with `/api/health`, `/indexer?collection=chain_indexer_runs`, `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`.
 - Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
 

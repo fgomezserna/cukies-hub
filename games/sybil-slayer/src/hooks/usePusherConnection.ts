@@ -15,6 +15,7 @@ interface GameCheckpoint {
   nonce?: string;
   hash?: string;
   events?: any[];
+  economyRunId?: string;
 }
 
 interface GameEndData {
@@ -23,6 +24,7 @@ interface GameEndData {
   gameTime: number;
   metadata?: any;
   competitionAttemptId?: string;
+  economyRunId?: string;
 }
 
 interface PendingGameEndResult extends GameEndData {
@@ -75,6 +77,11 @@ function storedPendingGameEndResult(value: unknown): PendingGameEndResult | null
       typeof value.competitionAttemptId !== 'string' ||
       value.competitionAttemptId.length === 0 ||
       value.competitionAttemptId.length > 128
+    )) ||
+    (value.economyRunId !== undefined && (
+      typeof value.economyRunId !== 'string' ||
+      value.economyRunId.length === 0 ||
+      value.economyRunId.length > 160
     ))
   ) {
     return null;
@@ -90,6 +97,9 @@ function storedPendingGameEndResult(value: unknown): PendingGameEndResult | null
     ...(metadata ? { metadata } : {}),
     ...(typeof value.competitionAttemptId === 'string'
       ? { competitionAttemptId: value.competitionAttemptId }
+      : {}),
+    ...(typeof value.economyRunId === 'string'
+      ? { economyRunId: value.economyRunId }
       : {}),
   };
 }
@@ -132,6 +142,7 @@ function writePendingGameEndResults(results: readonly PendingGameEndResult[]) {
         ...(result.competitionAttemptId
           ? { competitionAttemptId: result.competitionAttemptId }
           : {}),
+        ...(result.economyRunId ? { economyRunId: result.economyRunId } : {}),
       }))));
     }
     return true;
@@ -183,6 +194,9 @@ export interface TreasureHuntCompetitionAccess {
   readonly alias?: string;
   readonly status?: 'active';
   readonly reason?: string;
+  readonly economyRunId?: string;
+  readonly creditSource?: 'own' | 'pool';
+  readonly cukieSource?: 'own' | 'pool';
 }
 
 interface PendingCompetitionAccessRequest {
@@ -220,6 +234,7 @@ export function usePusherConnection() {
   const acknowledgedGameEndIdsRef = useRef(new Set<string>());
   const competitionAccessRequestRef = useRef<PendingCompetitionAccessRequest | null>(null);
   const unpersistedGameEndRef = useRef<PendingGameEndResult | null>(null);
+  const activeEconomyRunIdRef = useRef<string | null>(null);
 
   const clearGameEndRetries = useCallback(() => {
     for (const timeout of gameEndRetryTimeoutsRef.current) clearTimeout(timeout);
@@ -256,6 +271,7 @@ export function usePusherConnection() {
             ...(pending.competitionAttemptId
               ? { competitionAttemptId: pending.competitionAttemptId }
               : {}),
+            ...(pending.economyRunId ? { economyRunId: pending.economyRunId } : {}),
           });
           console.log('📤 [GAME-PUSHER] Game end dispatched; awaiting dapp ACK', {
             resultId: pending.resultId,
@@ -266,16 +282,20 @@ export function usePusherConnection() {
         }
       }
 
-      if (pending.competitionAttemptId) {
+      if (pending.competitionAttemptId || pending.economyRunId) {
         const parentOrigin = getParentOrigin();
         if (parentOrigin) {
           window.parent?.postMessage({
             type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
             sessionId: pending.sessionId,
             resultId: pending.resultId,
-            competitionAttemptId: pending.competitionAttemptId,
+            ...(pending.competitionAttemptId
+              ? { competitionAttemptId: pending.competitionAttemptId }
+              : {}),
+            ...(pending.economyRunId ? { economyRunId: pending.economyRunId } : {}),
             finalScore: pending.finalScore,
             gameTime: pending.gameTime,
+            ...('metadata' in pending ? { metadata: pending.metadata } : {}),
           }, parentOrigin);
         }
       }
@@ -318,7 +338,7 @@ export function usePusherConnection() {
       const pending = readPendingGameEndResults().find((candidate) => (
         candidate.sessionId === sessionId &&
         candidate.resultId === resultId &&
-        Boolean(candidate.competitionAttemptId)
+        Boolean(candidate.competitionAttemptId || candidate.economyRunId)
       ));
       const parentOrigin = getParentOrigin();
       if (pending && parentOrigin) {
@@ -328,9 +348,13 @@ export function usePusherConnection() {
           type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
           sessionId,
           resultId,
-          competitionAttemptId: pending.competitionAttemptId,
+          ...(pending.competitionAttemptId
+            ? { competitionAttemptId: pending.competitionAttemptId }
+            : {}),
+          ...(pending.economyRunId ? { economyRunId: pending.economyRunId } : {}),
           finalScore: pending.finalScore,
           gameTime: pending.gameTime,
+          ...('metadata' in pending ? { metadata: pending.metadata } : {}),
         }, parentOrigin);
         window.parent?.postMessage({
           type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY_ACK_CONFIRMED',
@@ -363,6 +387,7 @@ export function usePusherConnection() {
     sessionGenerationRef.current += 1;
     acknowledgedGameEndIdsRef.current.clear();
     unpersistedGameEndRef.current = null;
+    activeEconomyRunIdRef.current = null;
     setHasPendingGameEnd(false);
     setGameEndPersistenceError(null);
     competitionAccessRequestRef.current?.cancel('SESSION_CHANGED');
@@ -409,6 +434,7 @@ export function usePusherConnection() {
       sessionGenerationRef.current += 1;
       acknowledgedGameEndIdsRef.current.clear();
       unpersistedGameEndRef.current = null;
+      activeEconomyRunIdRef.current = null;
       setHasPendingGameEnd(false);
       setGameEndPersistenceError(null);
       competitionAccessRequestRef.current?.cancel('SESSION_CHANGED');
@@ -522,7 +548,7 @@ export function usePusherConnection() {
           !readPendingGameEndResults().some((candidate) => (
             candidate.sessionId === sessionId &&
             candidate.resultId === resultId &&
-            Boolean(candidate.competitionAttemptId)
+            Boolean(candidate.competitionAttemptId || candidate.economyRunId)
           ))
         ) {
           return;
@@ -909,6 +935,9 @@ export function usePusherConnection() {
 
     const checkpoint: GameCheckpoint = {
       ...checkpointData,
+      ...(activeEconomyRunIdRef.current
+        ? { economyRunId: activeEconomyRunIdRef.current }
+        : {}),
       timestamp: Date.now()
     };
 
@@ -997,6 +1026,15 @@ export function usePusherConnection() {
           event.data.status === 'active' &&
           responseSessionId
         ) {
+          const hasEconomyAuthority =
+            typeof event.data.economyRunId === 'string' &&
+            event.data.economyRunId.length > 0 &&
+            event.data.economyRunId.length <= 160 &&
+            (event.data.creditSource === 'own' || event.data.creditSource === 'pool') &&
+            (event.data.cukieSource === 'own' || event.data.cukieSource === 'pool');
+          activeEconomyRunIdRef.current = hasEconomyAuthority
+            ? event.data.economyRunId
+            : null;
           settle({
             eligible: true,
             practice: false,
@@ -1005,6 +1043,13 @@ export function usePusherConnection() {
             seed: event.data.seed,
             alias: event.data.alias,
             status: 'active',
+            ...(hasEconomyAuthority
+              ? {
+                  economyRunId: event.data.economyRunId,
+                  creditSource: event.data.creditSource,
+                  cukieSource: event.data.cukieSource,
+                }
+              : {}),
           });
           return;
         }
@@ -1012,10 +1057,35 @@ export function usePusherConnection() {
           event.data.eligible === false &&
           typeof event.data.practice === 'boolean'
         ) {
+          const hasEconomyAuthority =
+            typeof event.data.economyRunId === 'string' &&
+            event.data.economyRunId.length > 0 &&
+            event.data.economyRunId.length <= 160 &&
+            (event.data.creditSource === 'own' || event.data.creditSource === 'pool') &&
+            (event.data.cukieSource === 'own' || event.data.cukieSource === 'pool');
+          if (event.data.practice && !hasEconomyAuthority) {
+            settle({
+              eligible: false,
+              practice: false,
+              sessionId: responseSessionId,
+              reason: 'ECONOMY_AUTHORITY_REQUIRED',
+            });
+            return;
+          }
+          if (hasEconomyAuthority) {
+            activeEconomyRunIdRef.current = event.data.economyRunId;
+          }
           settle({
             eligible: false,
             practice: event.data.practice,
             sessionId: responseSessionId,
+            ...(hasEconomyAuthority
+              ? {
+                  economyRunId: event.data.economyRunId,
+                  creditSource: event.data.creditSource,
+                  cukieSource: event.data.cukieSource,
+                }
+              : {}),
             reason: typeof event.data.reason === 'string'
               ? event.data.reason.slice(0, 80)
               : 'COMPETITION_UNAVAILABLE',
@@ -1075,6 +1145,7 @@ export function usePusherConnection() {
       ...(endData.competitionAttemptId
         ? { competitionAttemptId: endData.competitionAttemptId }
         : {}),
+      ...(endData.economyRunId ? { economyRunId: endData.economyRunId } : {}),
     };
 
     if (!persistPendingGameEndResult(pending)) {

@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+const DEFAULT_AUTO_REFRESH_MS = 15_000;
 
 export const TREASURE_HUNT_COMPETITION_API = '/api/games/treasure-hunt/competition';
 
@@ -13,14 +15,44 @@ export type TreasureHuntCompetitionPhase =
 
 export interface TreasureHuntCompetitionCampaign {
   readonly campaignId: string;
+  readonly eligibilityKind: 'presale' | 'uki_staking';
   readonly startsAt: string;
   readonly endsAt: string;
+  readonly stakePerAttemptRaw: string;
+  readonly topAttemptsPerWallet: number;
+  readonly pointsPerTicket: number;
+  readonly basePrizeUkiRaw: string;
+  readonly stakePrizeBps: number;
+  readonly prizePerWinnerUkiRaw: string;
+  readonly maxWinsPerWallet: number;
   readonly poolBps: number;
   readonly playerRewardBps: number;
   readonly sponsorRewardBps: number;
   readonly maxWinningAttemptsPerWallet: number;
   readonly cliffMonths: number;
   readonly vestingMonths: number;
+}
+export interface TreasureHuntCompetitionEligibility {
+  readonly ready: boolean;
+  readonly stakedUkiRaw: string;
+  readonly totalStakedUkiRaw: string;
+  readonly indexedThroughBlock: number | null;
+  readonly indexedAt: string | null;
+  readonly disqualified: boolean;
+  readonly disqualificationEvidence: {
+    readonly eventId: string;
+    readonly txHash: string;
+    readonly blockNumber: number;
+    readonly timestamp: string;
+    readonly amountRaw: string;
+  } | null;
+  readonly issues: readonly string[];
+  readonly attemptsGranted: number;
+  readonly attemptsUsed: number;
+  readonly attemptsRemaining: number;
+  readonly topAttemptsCount: number;
+  readonly totalTickets: number;
+  readonly provisionalTickets: number;
 }
 export interface TreasureHuntCompetitionParticipant {
   readonly alias: string;
@@ -36,6 +68,7 @@ export interface TreasureHuntCompetitionStatus {
   readonly phase: TreasureHuntCompetitionPhase;
   readonly campaign: TreasureHuntCompetitionCampaign | null;
   readonly participant: TreasureHuntCompetitionParticipant | null;
+  readonly eligibility: TreasureHuntCompetitionEligibility | null;
 }
 
 export interface TreasureHuntLeaderboardEntry {
@@ -47,6 +80,7 @@ export interface TreasureHuntLeaderboardEntry {
   readonly gameTimeMs: number;
   readonly finishedAt: string;
   readonly reviewStatus: 'pending' | 'approved';
+  readonly tickets: number;
   readonly isMe: boolean;
   readonly estimatedRewardUkiRaw: string;
   readonly rewardStatus:
@@ -54,7 +88,8 @@ export interface TreasureHuntLeaderboardEntry {
     | 'partial'
     | 'no_purchase'
     | 'pool_exhausted'
-    | 'reward_rounds_to_zero';
+    | 'reward_rounds_to_zero'
+    | 'draw_pending';
 }
 
 export interface TreasureHuntLeaderboardMeta {
@@ -80,10 +115,18 @@ interface CompetitionLeaderboardResponse extends TreasureHuntLeaderboardMeta {
 }
 
 export const TREASURE_HUNT_FALLBACK_RULES = Object.freeze({
+  eligibilityKind: 'uki_staking' as const,
+  stakePerAttemptRaw: '2000000000000000000000',
+  topAttemptsPerWallet: 10,
+  pointsPerTicket: 100,
+  basePrizeUkiRaw: '50000000000000000000000',
+  stakePrizeBps: 1_000,
+  prizePerWinnerUkiRaw: '10000000000000000000000',
+  maxWinsPerWallet: 1,
   poolBps: 2_500,
   playerRewardBps: 1_000,
   sponsorRewardBps: 2_500,
-  maxWinningAttemptsPerWallet: 5,
+  maxWinningAttemptsPerWallet: 10,
   cliffMonths: 9,
   vestingMonths: 6,
 });
@@ -130,14 +173,50 @@ function isCampaign(value: unknown): value is TreasureHuntCompetitionCampaign {
   if (!isObject(value)) return false;
   return (
     typeof value.campaignId === 'string' &&
+    (value.eligibilityKind === 'presale' || value.eligibilityKind === 'uki_staking') &&
     typeof value.startsAt === 'string' &&
     typeof value.endsAt === 'string' &&
+    isRawTokenAmount(value.stakePerAttemptRaw) &&
+    isFiniteNumber(value.topAttemptsPerWallet) &&
+    isFiniteNumber(value.pointsPerTicket) &&
+    isRawTokenAmount(value.basePrizeUkiRaw) &&
+    isFiniteNumber(value.stakePrizeBps) &&
+    isRawTokenAmount(value.prizePerWinnerUkiRaw) &&
+    isFiniteNumber(value.maxWinsPerWallet) &&
     isFiniteNumber(value.poolBps) &&
     isFiniteNumber(value.playerRewardBps) &&
     isFiniteNumber(value.sponsorRewardBps) &&
     isFiniteNumber(value.maxWinningAttemptsPerWallet) &&
     isFiniteNumber(value.cliffMonths) &&
     isFiniteNumber(value.vestingMonths)
+  );
+}
+
+function isEligibility(value: unknown): value is TreasureHuntCompetitionEligibility {
+  if (!isObject(value)) return false;
+  const evidence = value.disqualificationEvidence;
+  return (
+    typeof value.ready === 'boolean' &&
+    isRawTokenAmount(value.stakedUkiRaw) &&
+    isRawTokenAmount(value.totalStakedUkiRaw) &&
+    (value.indexedThroughBlock === null || isFiniteNumber(value.indexedThroughBlock)) &&
+    (value.indexedAt === null || typeof value.indexedAt === 'string') &&
+    typeof value.disqualified === 'boolean' &&
+    (evidence === null || (
+      isObject(evidence) &&
+      typeof evidence.eventId === 'string' &&
+      typeof evidence.txHash === 'string' &&
+      isFiniteNumber(evidence.blockNumber) &&
+      typeof evidence.timestamp === 'string' &&
+      isRawTokenAmount(evidence.amountRaw)
+    )) &&
+    Array.isArray(value.issues) && value.issues.every((issue) => typeof issue === 'string') &&
+    isFiniteNumber(value.attemptsGranted) &&
+    isFiniteNumber(value.attemptsUsed) &&
+    isFiniteNumber(value.attemptsRemaining) &&
+    isFiniteNumber(value.topAttemptsCount) &&
+    isFiniteNumber(value.totalTickets) &&
+    isFiniteNumber(value.provisionalTickets)
   );
 }
 
@@ -160,7 +239,8 @@ function isStatus(value: unknown): value is TreasureHuntCompetitionStatus {
     typeof value.phase === 'string' &&
     ['unconfigured', 'disabled', 'scheduled', 'active', 'closed'].includes(value.phase) &&
     (value.campaign === null || isCampaign(value.campaign)) &&
-    (value.participant === null || isParticipant(value.participant))
+    (value.participant === null || isParticipant(value.participant)) &&
+    (value.eligibility === null || isEligibility(value.eligibility))
   );
 }
 
@@ -175,6 +255,7 @@ function isLeaderboardEntry(value: unknown): value is TreasureHuntLeaderboardEnt
     isFiniteNumber(value.gameTimeMs) &&
     typeof value.finishedAt === 'string' &&
     (value.reviewStatus === 'pending' || value.reviewStatus === 'approved') &&
+    isFiniteNumber(value.tickets) &&
     typeof value.isMe === 'boolean' &&
     isRawTokenAmount(value.estimatedRewardUkiRaw) &&
     [
@@ -183,6 +264,7 @@ function isLeaderboardEntry(value: unknown): value is TreasureHuntLeaderboardEnt
       'no_purchase',
       'pool_exhausted',
       'reward_rounds_to_zero',
+      'draw_pending',
     ].includes(String(value.rewardStatus))
   );
 }
@@ -248,23 +330,35 @@ export function useTreasureHuntCompetitionOverview(options?: {
   readonly leaderboardPage?: number;
   readonly leaderboardPageSize?: number;
   readonly leaderboardMineOnly?: boolean;
+  readonly autoRefreshMs?: number;
 }) {
   const includeLeaderboard = options?.includeLeaderboard ?? true;
   const leaderboardPage = options?.leaderboardPage ?? 1;
   const leaderboardPageSize = options?.leaderboardPageSize ?? 100;
   const leaderboardMineOnly = options?.leaderboardMineOnly ?? false;
+  const autoRefreshMs = options?.autoRefreshMs ?? DEFAULT_AUTO_REFRESH_MS;
   const [status, setStatus] = useState<TreasureHuntCompetitionStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly TreasureHuntLeaderboardEntry[]>([]);
   const [leaderboardMeta, setLeaderboardMeta] = useState<TreasureHuntLeaderboardMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const hasLoadedRef = useRef(false);
+  const queryKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
+    const queryKey = [
+      includeLeaderboard,
+      leaderboardMineOnly,
+      leaderboardPage,
+      leaderboardPageSize,
+    ].join(':');
+    const isBackgroundRefresh = hasLoadedRef.current && queryKeyRef.current === queryKey;
+    queryKeyRef.current = queryKey;
 
     async function load() {
-      setIsLoading(true);
+      if (!isBackgroundRefresh) setIsLoading(true);
       setError(null);
       try {
         const statusResponse = await fetch(TREASURE_HUNT_COMPETITION_API, {
@@ -317,16 +411,21 @@ export function useTreasureHuntCompetitionOverview(options?: {
         }
       } catch (cause) {
         if (controller.signal.aborted) return;
-        setStatus(null);
-        setLeaderboard([]);
-        setLeaderboardMeta(null);
+        if (!isBackgroundRefresh) {
+          setStatus(null);
+          setLeaderboard([]);
+          setLeaderboardMeta(null);
+        }
         setError(
           cause instanceof Error
             ? cause.message
             : 'No se pudo consultar la competición.',
         );
       } finally {
-        if (!controller.signal.aborted) setIsLoading(false);
+        if (!controller.signal.aborted) {
+          hasLoadedRef.current = true;
+          setIsLoading(false);
+        }
       }
     }
 
@@ -339,6 +438,25 @@ export function useTreasureHuntCompetitionOverview(options?: {
     leaderboardPageSize,
     refreshToken,
   ]);
+
+  useEffect(() => {
+    const refresh = () => setRefreshToken((current) => current + 1);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const intervalId = autoRefreshMs > 0
+      ? window.setInterval(refreshWhenVisible, autoRefreshMs)
+      : null;
+    window.addEventListener('cukies:treasure-hunt:competition:refresh', refresh);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      if (intervalId !== null) window.clearInterval(intervalId);
+      window.removeEventListener('cukies:treasure-hunt:competition:refresh', refresh);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [autoRefreshMs]);
 
   const reload = useCallback(() => setRefreshToken((current) => current + 1), []);
 

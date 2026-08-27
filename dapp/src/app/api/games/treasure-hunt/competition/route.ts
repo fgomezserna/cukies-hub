@@ -18,6 +18,9 @@ export async function GET(request: Request) {
     const participant = identity && runtime.campaign
       ? await service.getParticipant(identity.walletAddress)
       : null;
+    const eligibility = identity && runtime.campaign?.eligibilityKind === 'uki_staking'
+      ? await service.getStakingEligibility(identity.walletAddress)
+      : null;
 
     return competitionJson({
       success: true,
@@ -26,6 +29,7 @@ export async function GET(request: Request) {
       phase: runtime.phase,
       campaign: runtime.campaign,
       participant,
+      eligibility,
     });
   } catch (error) {
     return competitionErrorResponse(error);

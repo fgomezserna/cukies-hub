@@ -1,12 +1,74 @@
-import { formatUnits } from 'viem';
+import { formatUnits, isAddress } from 'viem';
+import type { ClientSession } from 'mongodb';
 
-import { monitoredContractAddresses } from '../config/contracts.js';
-import type { ChainEvent, JsonValue } from '../types.js';
+import { getMonitoredContractAddresses } from '../config/contracts.js';
+import type {
+  ChainEvent,
+  JsonValue,
+  VerifiedBscContractAlias,
+} from '../types.js';
 import { getNumber, getString, normalizeAddress, now } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
+import { enqueueCukieMasterRecalculation } from './cukie-master-outbox.js';
+import { projectNftVaultEvent } from './nft-vaults.js';
 
 function collection(store: IndexerStore, name: string) {
   return store.db.collection<any>(name);
+}
+
+function isMongoDuplicateKey(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 11000);
+}
+
+type MonotonicTuple = { blockNumber: number; logIndex: number };
+type MonotonicCollection = {
+  updateOne(
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<{ matchedCount: number }>;
+  insertOne(document: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+};
+
+function monotonicTupleFilter(id: string, tuple: MonotonicTuple) {
+  return {
+    _id: id,
+    $or: [
+      { lastBlockNumber: { $exists: false } },
+      { lastBlockNumber: { $lt: tuple.blockNumber } },
+      { lastBlockNumber: tuple.blockNumber, lastLogIndex: { $lte: tuple.logIndex } },
+    ],
+  };
+}
+
+export async function monotonicAbsoluteUpdate(
+  target: MonotonicCollection,
+  id: string,
+  tuple: MonotonicTuple,
+  values: Record<string, unknown>,
+  createdAt: Date,
+  session?: ClientSession,
+) {
+  const set = {
+    ...values,
+    lastBlockNumber: tuple.blockNumber,
+    lastLogIndex: tuple.logIndex,
+  };
+  const updateExisting = () => target.updateOne(
+    monotonicTupleFilter(id, tuple),
+    { $set: set },
+    { upsert: false, session },
+  );
+  const updated = await updateExisting();
+  if (updated.matchedCount > 0) return true;
+
+  try {
+    await target.insertOne({ _id: id, ...set, createdAt }, { session });
+    return true;
+  } catch (error) {
+    if (!isMongoDuplicateKey(error)) throw error;
+    return (await updateExisting()).matchedCount > 0;
+  }
 }
 
 function field(event: ChainEvent, key: string) {
@@ -33,6 +95,26 @@ function tokenId(event: ChainEvent) {
   return stringField(event, 'tokenId');
 }
 
+function bscNftMaterializationIdentity(event: ChainEvent) {
+  if (event.chain !== 'BSC') return null;
+  if (event.chainId !== 56 && event.chainId !== 97) {
+    throw new Error(`${event.eventName} no tiene chainId BSC 56/97 en la evidencia canonica.`);
+  }
+  if (!isAddress(event.contractAddress) || /^0x0{40}$/i.test(event.contractAddress)) {
+    throw new Error(`${event.eventName} no tiene collection address BSC valida.`);
+  }
+  return {
+    chainId: event.chainId,
+    collectionAddressNormalized: event.contractAddress.toLowerCase(),
+  };
+}
+
+function nftDocumentId(event: ChainEvent, id: string) {
+  if (event.chain !== 'BSC' || event.contractAlias !== 'TOKEN_V2') return id;
+  const identity = bscNftMaterializationIdentity(event)!;
+  return `${identity.chainId}:${identity.collectionAddressNormalized}:${id}`;
+}
+
 function eventDate(event: ChainEvent) {
   return new Date(event.timestampMs);
 }
@@ -49,7 +131,18 @@ function tokenAmount(event: ChainEvent, key: string) {
 
 function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
   if (!value) return false;
-  const addresses = monitoredContractAddresses[event.chain];
+  const addresses = getMonitoredContractAddresses({
+    tokenAddress: process.env.CHAIN_INDEXER_TOKEN_ADDRESS,
+    tokenV2Address: process.env.CHAIN_INDEXER_TOKEN_V2_ADDRESS,
+    marketplaceAddress: process.env.CHAIN_INDEXER_MARKETPLACE_ADDRESS,
+    bridgeAddress: process.env.CHAIN_INDEXER_BRIDGE_ADDRESS,
+    presaleAddress: process.env.CHAIN_INDEXER_PRESALE_ADDRESS,
+    ukiStakingAddress: process.env.CHAIN_INDEXER_UKI_STAKING_ADDRESS,
+    vestingVaultAddress: process.env.CHAIN_INDEXER_VESTING_VAULT_ADDRESS,
+    rewardsDistributorAddress: process.env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS,
+    cukieMasterNftVaultAddress: process.env.CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS,
+    cukiePoolNftVaultAddress: process.env.CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS,
+  })[event.chain];
   const normalized = normalizeAddress(event.chain, value);
 
   return Object.values(addresses).some(
@@ -97,15 +190,23 @@ async function insertNftTx(store: IndexerStore, event: ChainEvent, extra: Record
 }
 
 async function projectTransfer(store: IndexerStore, event: ChainEvent) {
+  if (event.chain === 'BSC') {
+    if (event.contractAlias !== 'TOKEN' && event.contractAlias !== 'TOKEN_V2') {
+      return `Transfer BSC fuera de una coleccion NFT soportada: ${event.contractAlias}`;
+    }
+    await verifiedContractCursor(store, event, event.contractAlias);
+  }
   const id = tokenId(event);
   if (!id) return 'Transfer sin tokenId';
+  const documentId = nftDocumentId(event, id);
+  const bscIdentity = bscNftMaterializationIdentity(event);
 
   const from = stringField(event, 'from');
   const to = stringField(event, 'to');
   const isMint = field(event, 'isMint') === true;
 
-  if (event.chain === 'BSC' && (isZeroAddress(event, from) || isZeroAddress(event, to))) {
-    return 'Transfer BSC mint/burn interno; lo resuelve bridge/marketplace/staking';
+  if (event.chain === 'BSC' && isZeroAddress(event, to)) {
+    return 'Transfer BSC burn interno; lo resuelve bridge/marketplace/staking';
   }
 
   if (event.chain === 'TRON' && isZeroAddress(event, to)) {
@@ -117,10 +218,11 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   }
 
   await collection(store, 'cukies').updateOne(
-    { _id: id },
+    { _id: documentId },
     {
       $set: {
         tokenId: id,
+        ...(bscIdentity ?? {}),
         user: to,
         owner: to,
         ownerNormalized: normalizeAddress(event.chain, to),
@@ -129,10 +231,19 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
         updatedAt: now(),
         timeStamp: event.timestampMs,
         lastEventId: event._id,
+        ...(isMint ? {
+          origin: 'mint',
+          mintEventId: event._id,
+          mintTransactionHash: event.txHash.toLowerCase(),
+          mintBlockNumber: event.blockNumber,
+          mintLogIndex: event.logIndex,
+          mintTimestampMs: event.timestampMs,
+          ...(event.blockHash ? { mintBlockHash: event.blockHash.toLowerCase() } : {}),
+        } : {}),
       },
       $setOnInsert: {
-        _id: id,
-        origin: isMint ? 'mint' : 'transfer',
+        _id: documentId,
+        ...(!isMint ? { origin: 'transfer' } : {}),
         birthNetwork: event.chain,
         price: 0,
         children: [],
@@ -156,7 +267,71 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   return null;
 }
 
+async function projectCukieMetadata(store: IndexerStore, event: ChainEvent) {
+  if (
+    event.chain !== 'BSC'
+    || (event.contractAlias !== 'TOKEN' && event.contractAlias !== 'TOKEN_V2')
+  ) {
+    return 'CukieMetadataConfigured solo se soporta para TOKEN/TOKEN_V2 en BSC';
+  }
+  await verifiedContractCursor(store, event, event.contractAlias);
+  const id = tokenId(event);
+  const rarity = numberField(event, 'rarity');
+  const generation = numberField(event, 'generation');
+  if (!id) return 'CukieMetadataConfigured sin tokenId';
+  if (rarity === null || !Number.isInteger(rarity) || rarity < 1 || rarity > 6) {
+    return 'CukieMetadataConfigured con rareza invalida';
+  }
+  if (generation !== 1 && generation !== 2) {
+    return 'CukieMetadataConfigured con generacion invalida';
+  }
+  const documentId = nftDocumentId(event, id);
+  const identity = bscNftMaterializationIdentity(event)!;
+  const cukies = collection(store, 'cukies');
+  if (event.contractAlias === 'TOKEN_V2') {
+    const projectedMint = await cukies.findOne({
+      _id: documentId,
+      ...identity,
+      mintTransactionHash: event.txHash.toLowerCase(),
+    });
+    if (
+      typeof projectedMint?.mintEventId !== 'string'
+      || projectedMint.mintBlockNumber !== event.blockNumber
+      || !Number.isSafeInteger(projectedMint.mintLogIndex)
+      || Number(projectedMint.mintLogIndex) >= event.logIndex
+    ) {
+      throw new Error(
+        `CukieMetadataConfigured ${documentId} no tiene Transfer mint predecessor en la misma transaccion.`,
+      );
+    }
+  }
+  const updated = await cukies.updateOne(
+    { _id: documentId, ...identity },
+    {
+      $set: {
+        tokenId: id,
+        ...identity,
+        rarity,
+        generation,
+        metadataEventId: event._id,
+        metadataTransactionHash: event.txHash.toLowerCase(),
+        metadataBlockNumber: event.blockNumber,
+        metadataLogIndex: event.logIndex,
+        metadataTimestampMs: event.timestampMs,
+        metadataContractAddressNormalized: identity.collectionAddressNormalized,
+        ...(event.blockHash ? { metadataBlockHash: event.blockHash.toLowerCase() } : {}),
+        updatedAt: now(),
+      },
+    },
+  );
+  if (updated.matchedCount === 0) {
+    throw new Error(`CukieMetadataConfigured ${id} no tiene Transfer mint proyectado.`);
+  }
+  return null;
+}
+
 async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
+  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'MARKETPLACE');
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
 
@@ -496,6 +671,7 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
 }
 
 async function projectBridge(store: IndexerStore, event: ChainEvent) {
+  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'BRIDGE');
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
 
@@ -814,8 +990,428 @@ async function projectPresalePurchase(store: IndexerStore, event: ChainEvent) {
   return null;
 }
 
+async function verifiedContractCursor(
+  store: IndexerStore,
+  event: ChainEvent,
+  alias: VerifiedBscContractAlias,
+) {
+  const cursor = await store.cursors().findOne({
+    chain: event.chain,
+    contractAlias: alias,
+    eventName: event.eventName,
+    contractAddress: event.contractAddress,
+    bootstrapStatus: 'verified',
+  });
+  if (
+    !cursor
+    || !(cursor.bootstrapVerifiedAt instanceof Date)
+    || event.chain !== 'BSC'
+    || (cursor.verifiedChainId !== 56 && cursor.verifiedChainId !== 97)
+    || typeof cursor.contractAddress !== 'string'
+    || cursor.contractAddress.toLowerCase() !== event.contractAddress.toLowerCase()
+    || typeof cursor.contractCodeHash !== 'string'
+    || !/^0x[0-9a-f]{64}$/.test(cursor.contractCodeHash)
+    || typeof cursor.contractConfigHash !== 'string'
+    || !/^0x[0-9a-f]{64}$/.test(cursor.contractConfigHash)
+    || typeof cursor.contractDeploymentTxHash !== 'string'
+    || !/^0x[0-9a-f]{64}$/.test(cursor.contractDeploymentTxHash)
+    || !Number.isSafeInteger(cursor.contractDeploymentBlock)
+    || !Number.isSafeInteger(cursor.bootstrapStartBlock)
+    || cursor.bootstrapStartBlock !== cursor.contractDeploymentBlock
+  ) {
+    throw new Error(`${event.eventName} no tiene cursor contractual verificado.`);
+  }
+  return cursor;
+}
+
+export async function projectUkiStakingPosition(
+  store: IndexerStore,
+  event: ChainEvent,
+  session?: ClientSession,
+) {
+  const account = stringField(event, 'account');
+  const accountNormalized = stringField(event, 'accountNormalized');
+  const amountRaw = stringField(event, 'amountRaw');
+  const accountBalanceRaw = stringField(event, 'accountBalanceRaw');
+  const totalStakedRaw = stringField(event, 'totalStakedRaw');
+
+  if (!account || !accountNormalized) return `${event.eventName} sin account`;
+  if (
+    !amountRaw
+    || !accountBalanceRaw
+    || !totalStakedRaw
+    || ![amountRaw, accountBalanceRaw, totalStakedRaw].every((value) => /^\d+$/.test(value))
+  ) {
+    return `${event.eventName} con montos raw invalidos`;
+  }
+
+  const observedAt = eventDate(event);
+  const cursor = await verifiedContractCursor(store, event, 'UKI_STAKING');
+  const tuple = { blockNumber: event.blockNumber, logIndex: event.logIndex };
+  await monotonicAbsoluteUpdate(
+    collection(store, 'uki_staking_positions'),
+    accountNormalized,
+    tuple,
+    {
+      walletAddress: account,
+      walletNormalized: accountNormalized,
+      accountBalanceRaw,
+      lastAmountRaw: amountRaw,
+      lastEventName: event.eventName,
+      lastEventId: event._id,
+      lastTxHash: event.txHash,
+      observedAt,
+      bootstrapStatus: cursor.bootstrapStatus,
+      bootstrapStartBlock: cursor.bootstrapStartBlock,
+      bootstrapVerifiedAt: cursor.bootstrapVerifiedAt,
+      verifiedChainId: cursor.verifiedChainId,
+      contractCodeHash: cursor.contractCodeHash,
+      contractDeploymentBlock: cursor.contractDeploymentBlock,
+      contractDeploymentTxHash: cursor.contractDeploymentTxHash,
+      contractConfigHash: cursor.contractConfigHash,
+      updatedAt: observedAt,
+    },
+    observedAt,
+    session,
+  );
+
+  await monotonicAbsoluteUpdate(
+    collection(store, 'uki_staking_state'),
+    event.contractAddress.toLowerCase(),
+    tuple,
+    {
+      chain: event.chain,
+      contractAddress: event.contractAddress,
+      contractAddressNormalized: event.contractAddress.toLowerCase(),
+      totalStakedRaw,
+      lastEventName: event.eventName,
+      lastEventId: event._id,
+      lastTxHash: event.txHash,
+      observedAt,
+      bootstrapStatus: cursor.bootstrapStatus,
+      bootstrapStartBlock: cursor.bootstrapStartBlock,
+      bootstrapVerifiedAt: cursor.bootstrapVerifiedAt,
+      verifiedChainId: cursor.verifiedChainId,
+      contractCodeHash: cursor.contractCodeHash,
+      contractDeploymentBlock: cursor.contractDeploymentBlock,
+      contractDeploymentTxHash: cursor.contractDeploymentTxHash,
+      contractConfigHash: cursor.contractConfigHash,
+      materializationStatus: 'consistent',
+      materializedTotalRaw: totalStakedRaw,
+      materializedThroughEventId: event._id,
+      materializedThroughBlockNumber: event.blockNumber,
+      materializedThroughLogIndex: event.logIndex,
+      updatedAt: observedAt,
+    },
+    observedAt,
+    session,
+  );
+
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: accountNormalized,
+    route: 'uki',
+    session,
+  });
+
+  return null;
+}
+
+type VestingLedgerProjection = {
+  _id: string;
+  eventId: string;
+  eventName: 'VestingCreated' | 'TokensReleased';
+  beneficiary: string;
+  beneficiaryNormalized: string;
+  scheduleId: string;
+  allocatedAmountRaw: string;
+  releasedAmountRaw: string;
+  startRaw: string | null;
+  cliffRaw: string | null;
+  durationRaw: string | null;
+  transactionHash: string;
+  blockNumber: number;
+  logIndex: number;
+  observedAt: Date;
+  createdAt: Date;
+};
+
+function sameVestingLedgerProjection(
+  left: Record<string, unknown>,
+  right: VestingLedgerProjection,
+) {
+  return Object.entries(right).every(([key, value]) => {
+    const current = left[key];
+    return current instanceof Date && value instanceof Date
+      ? current.getTime() === value.getTime()
+      : current === value;
+  });
+}
+
+export async function projectUkiVestingPosition(
+  store: IndexerStore,
+  event: ChainEvent,
+) {
+  await verifiedContractCursor(store, event, 'VESTING_VAULT');
+  const beneficiary = stringField(event, 'beneficiary');
+  const beneficiaryNormalized = stringField(event, 'beneficiaryNormalized');
+  const scheduleId = canonicalBytes32(event, 'scheduleId');
+  const allocatedAmountRaw = stringField(event, 'allocatedAmountRaw');
+  const releasedAmountRaw = stringField(event, 'releasedAmountRaw');
+  if (!beneficiary || !beneficiaryNormalized) {
+    return `${event.eventName} sin beneficiary`;
+  }
+  if (!scheduleId) return `${event.eventName} sin scheduleId valido`;
+  if (
+    !allocatedAmountRaw
+    || !releasedAmountRaw
+    || !/^\d+$/.test(allocatedAmountRaw)
+    || !/^\d+$/.test(releasedAmountRaw)
+  ) {
+    return `${event.eventName} con montos raw invalidos`;
+  }
+  const optionalRaw = (key: string) => {
+    const value = stringField(event, key);
+    return value && /^\d+$/.test(value) ? value : null;
+  };
+  const observedAt = eventDate(event);
+  const ledgerEntry: VestingLedgerProjection = {
+    _id: event._id,
+    eventId: event._id,
+    eventName: event.eventName as VestingLedgerProjection['eventName'],
+    beneficiary,
+    beneficiaryNormalized,
+    scheduleId,
+    allocatedAmountRaw,
+    releasedAmountRaw,
+    startRaw: optionalRaw('startRaw'),
+    cliffRaw: optionalRaw('cliffRaw'),
+    durationRaw: optionalRaw('durationRaw'),
+    transactionHash: event.txHash,
+    blockNumber: event.blockNumber,
+    logIndex: event.logIndex,
+    observedAt,
+    createdAt: observedAt,
+  };
+  const ledger = collection(store, 'uki_vesting_events');
+  const existing = await ledger.findOne({ _id: event._id });
+  if (existing && !sameVestingLedgerProjection(existing, ledgerEntry)) {
+    throw new Error(`El evento vesting ${event._id} contradice el ledger.`);
+  }
+  if (!existing) {
+    try {
+      await ledger.insertOne(ledgerEntry);
+    } catch (error) {
+      if (!isMongoDuplicateKey(error)) throw error;
+      const replay = await ledger.findOne({ _id: event._id });
+      if (!replay || !sameVestingLedgerProjection(replay, ledgerEntry)) {
+        throw new Error(`El replay vesting ${event._id} no coincide con el ledger.`);
+      }
+    }
+  }
+
+  const entries = await ledger.find({ beneficiaryNormalized, scheduleId })
+    .sort({ blockNumber: 1, logIndex: 1, _id: 1 })
+    .toArray() as VestingLedgerProjection[];
+  let allocated = BigInt(0);
+  let released = BigInt(0);
+  for (const item of entries) {
+    allocated += BigInt(item.allocatedAmountRaw);
+    released += BigInt(item.releasedAmountRaw);
+  }
+  if (released > allocated) {
+    throw new Error(`El schedule ${scheduleId} libera mas UKI del asignado.`);
+  }
+  const latest = entries.at(-1);
+  if (!latest) throw new Error(`El ledger vesting ${scheduleId} no se pudo releer.`);
+  const positionId = `${beneficiaryNormalized}:${scheduleId}`;
+  await monotonicAbsoluteUpdate(
+    collection(store, 'uki_vesting_positions'),
+    positionId,
+    { blockNumber: latest.blockNumber, logIndex: latest.logIndex },
+    {
+      walletAddress: beneficiary,
+      walletNormalized: beneficiaryNormalized,
+      scheduleId,
+      totalAllocatedRaw: allocated.toString(10),
+      releasedRaw: released.toString(10),
+      lockedRaw: (allocated - released).toString(10),
+      ledgerEventCount: entries.length,
+      lastEventId: latest.eventId,
+      lastEventName: latest.eventName,
+      lastTxHash: latest.transactionHash,
+      observedAt: latest.observedAt,
+      updatedAt: latest.observedAt,
+    },
+    entries[0].observedAt,
+  );
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: beneficiaryNormalized,
+    route: 'uki',
+  });
+  return null;
+}
+
+function canonicalBytes32(event: ChainEvent, key: string) {
+  const value = stringField(event, key)?.toLowerCase();
+  return value && /^0x[0-9a-f]{64}$/.test(value) ? value : null;
+}
+
+export async function projectRewardsDistributorEvent(store: IndexerStore, event: ChainEvent) {
+  const batchId = canonicalBytes32(event, 'batchId');
+  if (!batchId) return `${event.eventName} sin batchId valido`;
+  const observedAt = eventDate(event);
+
+  if (event.eventName === 'BatchPublished') {
+    const immutable = {
+      merkleRoot: canonicalBytes32(event, 'merkleRoot'),
+      inputHash: canonicalBytes32(event, 'inputHash'),
+      metadataHash: canonicalBytes32(event, 'metadataHash'),
+      totalAllocatedRaw: stringField(event, 'totalAllocatedRaw'),
+      startsAtRaw: stringField(event, 'startsAtRaw'),
+      expiresAtRaw: stringField(event, 'expiresAtRaw'),
+    };
+    if (
+      !immutable.merkleRoot
+      || !immutable.inputHash
+      || !immutable.metadataHash
+      || ![immutable.totalAllocatedRaw, immutable.startsAtRaw, immutable.expiresAtRaw]
+        .every((value) => value && /^\d+$/.test(value))
+    ) return 'BatchPublished con campos invalidos';
+
+    const existing = await collection(store, 'reward_claim_batches').findOne({ batchId });
+    if (!existing) {
+      throw new Error(`BatchPublished ${batchId} no tiene draft autorizado en Mongo.`);
+    }
+    if (
+      existing.publishAuthorized !== true
+      || existing.previewOnly !== false
+      || existing.publishedProofSetHash !== existing.proofSetHash
+      || existing.publishedPeriodSealId !== existing.periodSealId
+      || existing.merkleRoot !== immutable.merkleRoot
+      || existing.canonicalInputHash !== immutable.inputHash
+      || existing.metadataHash !== immutable.metadataHash
+      || existing.totalAllocatedRaw !== immutable.totalAllocatedRaw
+      || existing.startsAtRaw !== immutable.startsAtRaw
+      || existing.expiresAtRaw !== immutable.expiresAtRaw
+    ) {
+      throw new Error(`BatchPublished ${batchId} contradice el lote ya indexado.`);
+    }
+    const publication = {
+      status: existing.status === 'closed' ? 'closed' : 'published',
+      previewOnly: false,
+      publishAuthorized: true,
+      signature: null,
+      transactionHash: event.txHash,
+      publicationEventId: event._id,
+      publicationTransactionHash: event.txHash,
+      publicationBlockNumber: event.blockNumber,
+      publicationBlockHash: event.blockHash,
+      publicationLogIndex: event.logIndex,
+      publishedAt: observedAt,
+      publishedBatchId: batchId,
+      publishedMerkleRoot: immutable.merkleRoot,
+      publishedInputHash: immutable.inputHash,
+      publishedMetadataHash: immutable.metadataHash,
+      publishedTotalAllocatedRaw: immutable.totalAllocatedRaw,
+      startsAtRaw: immutable.startsAtRaw,
+      expiresAtRaw: immutable.expiresAtRaw,
+      startsAt: new Date(Number(immutable.startsAtRaw) * 1_000),
+      expiresAt: new Date(Number(immutable.expiresAtRaw) * 1_000),
+      totalClaimedRaw: existing?.totalClaimedRaw ?? '0',
+      claimedCount: existing?.claimedCount ?? 0,
+      closed: existing.status === 'closed' ? true : false,
+      updatedAt: now(),
+    };
+    await collection(store, 'reward_claim_batches').updateOne(
+      { batchId },
+      {
+        $set: publication,
+      },
+    );
+    return null;
+  }
+
+  if (event.eventName === 'RewardClaimed') {
+    const account = stringField(event, 'account');
+    const accountNormalized = stringField(event, 'accountNormalized');
+    const amountRaw = stringField(event, 'amountRaw');
+    if (!account || !accountNormalized || !amountRaw || !/^\d+$/.test(amountRaw)) {
+      return 'RewardClaimed con campos invalidos';
+    }
+    if (!await collection(store, 'reward_claim_batches').findOne({ batchId })) {
+      throw new Error(`RewardClaimed ${batchId} no tiene BatchPublished proyectado.`);
+    }
+    await collection(store, 'reward_claims').updateOne(
+      { _id: event._id },
+      {
+        $setOnInsert: {
+          _id: event._id,
+          eventId: event._id,
+          chain: event.chain,
+          contractAddress: event.contractAddress,
+          batchId,
+          walletAddress: account,
+          walletNormalized: accountNormalized,
+          amountRaw,
+          transactionHash: event.txHash,
+          logIndex: event.logIndex,
+          blockNumber: event.blockNumber,
+          blockHash: event.blockHash,
+          indexedAt: observedAt,
+          createdAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+    return null;
+  }
+
+  if (event.eventName === 'BatchClosed') {
+    const unclaimedAmountRaw = stringField(event, 'unclaimedAmountRaw');
+    if (!unclaimedAmountRaw || !/^\d+$/.test(unclaimedAmountRaw)) {
+      return 'BatchClosed sin unclaimedAmount valido';
+    }
+    const updated = await collection(store, 'reward_claim_batches').updateOne(
+      { batchId },
+      {
+        $set: {
+          status: 'closed',
+          unclaimedAmountRaw,
+          closeEventId: event._id,
+          closeTransactionHash: event.txHash,
+          closeBlockNumber: event.blockNumber,
+          closedAt: observedAt,
+          updatedAt: now(),
+        },
+      },
+    );
+    if (updated.matchedCount === 0) {
+      throw new Error(`BatchClosed ${batchId} no tiene BatchPublished proyectado.`);
+    }
+    return null;
+  }
+
+  return `Evento RewardsDistributor no soportado: ${event.eventName}`;
+}
+
 export async function projectEvent(store: IndexerStore, event: ChainEvent) {
+  if (
+    event.contractAlias === 'CUKIE_MASTER_NFT_VAULT'
+    || event.contractAlias === 'CUKIE_POOL_NFT_VAULT'
+  ) {
+    await verifiedContractCursor(store, event, event.contractAlias);
+    return projectNftVaultEvent(store, event);
+  }
+
   if (event.eventName === 'Transfer') return projectTransfer(store, event);
+
+  if (event.eventName === 'CukieMetadataConfigured') {
+    return projectCukieMetadata(store, event);
+  }
 
   if (
     event.eventName === 'TokenOnSale' ||
@@ -844,6 +1440,22 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'Purchased') {
     return projectPresalePurchase(store, event);
+  }
+
+  if (event.eventName === 'Staked' || event.eventName === 'Unstaked') {
+    return projectUkiStakingPosition(store, event);
+  }
+
+  if (event.eventName === 'VestingCreated' || event.eventName === 'TokensReleased') {
+    return projectUkiVestingPosition(store, event);
+  }
+
+  if (
+    event.eventName === 'BatchPublished'
+    || event.eventName === 'RewardClaimed'
+    || event.eventName === 'BatchClosed'
+  ) {
+    return projectRewardsDistributorEvent(store, event);
   }
 
   return `Evento sin projector: ${event.eventName}`;

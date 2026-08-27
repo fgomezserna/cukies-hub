@@ -552,7 +552,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
     {
       question: '¿Los UKI en vesting cuentan para ser Cukie Master?',
       answer:
-        'Sí. Los UKI comprados en preventa y sujetos a vesting cuentan de forma automática para obtener hasta 5 cupos de Cukie Master por wallet (1 cupo por cada 20,000 UKI comprados).',
+        'Sí. Los UKI comprados en preventa y sujetos a vesting cuentan de forma automática para obtener hasta 5 cupos por la ruta UKI (1 por cada 20,000 UKI comprados), además de los hasta 5 cupos de la ruta NFT.',
     },
     {
       question: '¿Los Cukies tendrán utilidad?',
@@ -580,7 +580,7 @@ De forma pasiva, puedes stakear tus tokens UKI para ser Cukie Master y ceder los
     {
       question: 'Do vested UKI count toward Cukie Master?',
       answer:
-        'Yes. UKI bought in the presale and subject to vesting automatically counts toward up to 5 Cukie Master slots per wallet (1 slot for every 20,000 UKI bought).',
+        'Yes. UKI bought in the presale and subject to vesting automatically counts toward up to 5 UKI-route slots (1 for every 20,000 UKI bought), in addition to up to 5 NFT-route slots.',
     },
     {
       question: 'Will Cukies have utility?',

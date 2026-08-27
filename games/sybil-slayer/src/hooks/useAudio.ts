@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
+import { gamePublicPath } from '@/lib/public-path';
 
 // Tipos de sonidos disponibles
 export type SoundType = 
@@ -101,7 +102,7 @@ export const useAudio = () => {
       
       for (const [soundType, config] of Object.entries(SOUND_CONFIG)) {
         try {
-          const audio = new Audio(config.path);
+          const audio = new Audio(gamePublicPath(config.path));
           audio.volume = config.volume * volumeSettingsRef.current[config.category] * volumeSettingsRef.current.master;
           audio.loop = config.loop || false;
           

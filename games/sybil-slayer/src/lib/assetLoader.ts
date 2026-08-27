@@ -1,5 +1,7 @@
 // AssetLoader: Sistema optimizado de carga y gestión de assets para el juego
 
+import { gamePublicPath } from './public-path';
+
 // Prioridades de carga
 export enum AssetPriority {
   CRITICAL = 0,    // Assets necesarios para iniciar el juego
@@ -289,7 +291,7 @@ export class AssetLoader {
   private loadAssetWithRetry(key: AssetKey): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const config = assetConfigs[key];
-      const path = config.path;
+      const path = gamePublicPath(config.path);
       
       // Verificar cache primero
       if (this.cache.has(path)) {

@@ -3,6 +3,7 @@ import { getIndexerConfig, getLegacyImportConfig } from './config/env.js';
 import { importLegacyCukiesMetadata, importLegacyProcessedEvents } from './legacy/importer.js';
 import { projectOnce } from './projectors/index.js';
 import { IndexerStore } from './storage/index.js';
+import { ECONOMY_SCHEMA_VERSION } from './storage/economy-schema.js';
 import { now } from './utils/json.js';
 
 function log(message: string, context?: Record<string, unknown>) {
@@ -25,6 +26,39 @@ async function setup() {
   await withStore(async (store) => {
     await store.ensureIndexes();
     log('setup ok');
+  });
+}
+
+async function setupEconomy() {
+  await withStore(async (store) => {
+    const metadata = await store.ensureEconomySetup();
+    log('economy setup ok', {
+      dbName: store.db.databaseName,
+      schemaVersion: ECONOMY_SCHEMA_VERSION,
+      transactionVerified: Boolean(metadata.transactionVerifiedAt),
+    });
+  });
+}
+
+async function migrateEconomyV2() {
+  await withStore(async (store) => {
+    const metadata = await store.migrateEconomySchemaV2();
+    log('economy schema v2 migration ok', {
+      dbName: store.db.databaseName,
+      schemaVersion: metadata.schemaVersion,
+      migrationId: metadata.migrationId,
+    });
+  });
+}
+
+async function migrateEconomyV3() {
+  await withStore(async (store) => {
+    const metadata = await store.migrateEconomySchemaV3();
+    log('economy schema v3 migration ok', {
+      dbName: store.db.databaseName,
+      schemaVersion: metadata.schemaVersion,
+      migrationId: metadata.migrationId,
+    });
   });
 }
 
@@ -93,6 +127,7 @@ async function importLegacy() {
       legacyConfig.legacyMongoUrl,
       legacyConfig.limit,
       legacyConfig.networks,
+      legacyConfig.legacyDbName,
     );
     const endedAt = now();
 
@@ -123,6 +158,7 @@ async function importLegacyMetadata() {
       store,
       legacyConfig.legacyMongoUrl,
       legacyConfig.limit,
+      legacyConfig.legacyDbName,
     );
     const endedAt = now();
 
@@ -198,6 +234,11 @@ async function runForever() {
         startedAt,
         endedAt: now(),
         error: message,
+        // Conservador por diseno: mientras el loop no pueda atribuir el fallo
+        // a una unica fuente, todas las fuentes BSC seleccionadas quedan
+        // marcadas como afectadas. Los consumidores fail-closed ya consultan
+        // este campo y no deben aceptar el ultimo run bueno tras un error nuevo.
+        failedContractAliases: config.contractAliases,
       });
     }
 
@@ -209,6 +250,12 @@ const command = process.argv[2] ?? 'status';
 
 if (command === 'setup') {
   await setup();
+} else if (command === 'setup-economy' || command === 'setup:economy') {
+  await setupEconomy();
+} else if (command === 'migrate-economy-v2' || command === 'migrate:economy:v2') {
+  await migrateEconomyV2();
+} else if (command === 'migrate-economy-v3' || command === 'migrate:economy:v3') {
+  await migrateEconomyV3();
 } else if (command === 'ingest-once') {
   await ingestOnce();
 } else if (command === 'import-legacy') {

@@ -3,11 +3,13 @@ interface CompetitionAccessAuthority {
   readonly practice: boolean;
   readonly sessionId: string | null;
   readonly attemptId?: string;
+  readonly economyRunId?: string;
 }
 
 export interface SinglePlayerResultAuthority {
   readonly runId: number;
   readonly sessionId: string;
+  readonly economyRunId?: string;
   readonly competitionAttemptId?: string;
 }
 
@@ -63,11 +65,16 @@ export function createSinglePlayerResultAuthority(
     return {
       runId,
       sessionId: access.sessionId,
+      ...(access.economyRunId ? { economyRunId: access.economyRunId } : {}),
       competitionAttemptId: access.attemptId,
     };
   }
-  if (!access.practice) return null;
-  return { runId, sessionId: access.sessionId };
+  if (!access.practice || !access.economyRunId) return null;
+  return {
+    runId,
+    sessionId: access.sessionId,
+    economyRunId: access.economyRunId,
+  };
 }
 
 export function resolveSinglePlayerResultDispatch(

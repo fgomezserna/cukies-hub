@@ -3,6 +3,7 @@ import 'server-only';
 import type { Document } from 'mongodb';
 
 import { getIndexerDb } from '@/lib/indexer-db/mongodb';
+import { readTotalStakedAt } from './staking-eligibility';
 
 import type {
   CompetitionRewardPurchase,
@@ -29,6 +30,21 @@ function purchaseFromDocument(row: Document): CompetitionRewardPurchase {
 }
 
 export class MongoCompetitionRewardSource implements CompetitionRewardSource {
+  async getTotalStakedUkiRaw(input: {
+    stakingContractAddress: string;
+    stakingChainId: number;
+    through: string;
+  }) {
+    const through = new Date(input.through);
+    const total = await readTotalStakedAt({
+      db: await getIndexerDb(),
+      stakingContractAddress: input.stakingContractAddress,
+      stakingChainId: input.stakingChainId,
+      through,
+    });
+    return total.totalStakedUkiRaw;
+  }
+
   async listPurchases(input: {
     presaleContractAddress: string;
     through: string;

@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 
 import { HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import type { ObjectCannedACL } from '@aws-sdk/client-s3';
+import type { ObjectCannedACL, PutObjectCommandInput } from '@aws-sdk/client-s3';
 
 import type { CardWorkerConfig, GenerationResult, RenderResult } from './types.js';
+
+export const IMMUTABLE_CARD_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 export function assertS3UploadConfig(config: CardWorkerConfig) {
   if (!config.s3Bucket) {
@@ -34,8 +37,50 @@ export async function verifyS3UploadAccess(config: CardWorkerConfig) {
   await client.send(new HeadBucketCommand({ Bucket: config.s3Bucket ?? undefined }));
 }
 
-export function cardS3Key(config: CardWorkerConfig, tokenId: string) {
-  return `${config.s3Prefix}/${tokenId}.png`;
+export function cardContentSha256(body: Uint8Array) {
+  return createHash('sha256').update(body).digest('hex');
+}
+
+function cardTokenPathSegment(tokenId: string) {
+  if (!tokenId) {
+    throw new Error('El tokenId de la card no puede estar vacio.');
+  }
+
+  return Buffer.from(tokenId, 'utf8').toString('base64url');
+}
+
+export function cardS3Key(config: CardWorkerConfig, tokenId: string, contentSha256: string) {
+  if (!/^[a-f0-9]{64}$/.test(contentSha256)) {
+    throw new Error('El SHA-256 de la card debe ser hexadecimal en minusculas y tener 64 caracteres.');
+  }
+
+  return `${config.s3Prefix}/${cardTokenPathSegment(tokenId)}/${contentSha256}.png`;
+}
+
+export function buildCardObjectUpload(
+  config: CardWorkerConfig,
+  renderResult: RenderResult,
+  body: Uint8Array,
+) {
+  assertS3UploadConfig(config);
+
+  const contentSha256 = cardContentSha256(body);
+  const key = cardS3Key(config, renderResult.tokenId, contentSha256);
+  const putObjectInput: PutObjectCommandInput = {
+    Bucket: config.s3Bucket ?? undefined,
+    Key: key,
+    Body: body,
+    ContentType: 'image/png',
+    CacheControl: IMMUTABLE_CARD_CACHE_CONTROL,
+    ACL: (config.s3Acl as ObjectCannedACL | null) ?? undefined,
+  };
+
+  return {
+    contentSha256,
+    imageUrl: `${config.publicBaseUrl}/${key}`,
+    key,
+    putObjectInput,
+  };
 }
 
 export async function uploadRenderedCard(
@@ -45,22 +90,14 @@ export async function uploadRenderedCard(
   assertS3UploadConfig(config);
 
   const client = createS3Client(config);
-  const key = cardS3Key(config, renderResult.tokenId);
   const body = await fs.readFile(renderResult.outputPath);
+  const upload = buildCardObjectUpload(config, renderResult, body);
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: config.s3Bucket ?? undefined,
-      Key: key,
-      Body: body,
-      ContentType: 'image/png',
-      ACL: (config.s3Acl as ObjectCannedACL | null) ?? undefined,
-    }),
-  );
+  await client.send(new PutObjectCommand(upload.putObjectInput));
 
   return {
     ...renderResult,
-    imageUrl: `${config.publicBaseUrl}/${key}`,
-    s3Key: key,
+    imageUrl: upload.imageUrl,
+    s3Key: upload.key,
   };
 }

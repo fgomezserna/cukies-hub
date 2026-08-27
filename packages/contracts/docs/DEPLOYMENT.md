@@ -16,9 +16,18 @@ pnpm --filter @cukies/contracts simulate:deploy
 pnpm --filter @cukies/contracts deploy:local
 pnpm --filter @cukies/contracts deploy:testnet
 pnpm --filter @cukies/contracts deploy:testnet:operational
+pnpm --filter @cukies/contracts deploy:testnet:nft-source
+pnpm --filter @cukies/contracts rehearse:testnet:liquidity-locker
+pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
+pnpm --filter @cukies/contracts preflight:mainnet:uki-launch
+pnpm --filter @cukies/contracts deploy:mainnet:staking
+pnpm --filter @cukies/contracts deploy:mainnet:liquidity-locker
+pnpm --filter @cukies/contracts prepare:mainnet:liquidity-safe-batch
+pnpm --filter @cukies/contracts verify:mainnet:uki-launch
+pnpm --filter @cukies/contracts derive:mainnet:competition-draw-seed
 pnpm --filter @cukies/contracts deploy:mainnet:operational
 pnpm --filter @cukies/contracts handover:mainnet:safe
-pnpm --filter @cukies/contracts preflight:presale -- --network bscTestnet
+pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
 pnpm --filter @cukies/contracts export:abi
 pnpm --filter @cukies/contracts freeze:manifest
 ```
@@ -36,7 +45,7 @@ Required for deploy:
 - `SALE_OWNER_ADDRESS` for BSC testnet/mainnet. Use the launch Safe multisig/admin owner.
 - `SALE_START`, `SALE_END`, `VESTING_START`, `VESTING_DURATION`.
 - `UKI_PER_ASM`, `MIN_ASM_PER_PURCHASE`, `TOTAL_UKI_FOR_SALE`.
-- `BSCSCAN_API_KEY` for verification
+- `ETHERSCAN_API_KEY` for Etherscan API V2 verification. `BSCSCAN_API_KEY` remains a temporary fallback for existing local operator envs.
 
 Optional:
 
@@ -55,7 +64,7 @@ Use `deploy:mainnet:operational` for the planned mainnet launch flow where one d
 This dedicated script is mainnet-only and enforces:
 
 - network `bsc` / chain id `56`,
-- `ASM_TOKEN_ADDRESS=0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c`,
+- `ASM_TOKEN_ADDRESS=0x707F0f4a39a4a26239F7D00463B15AB5656861f9`,
 - `DEPLOYER_ADDRESS` matches `DEPLOYER_PRIVATE_KEY`,
 - fresh deploy only; `UKI_TOKEN_ADDRESS`, `UKI_VESTING_VAULT_ADDRESS` and `UKI_PRESALE_ADDRESS` must be empty,
 - `UKIToken.owner()`, `Presale.owner()` and `VestingVault.DEFAULT_ADMIN_ROLE` are the deployer wallet,
@@ -72,7 +81,7 @@ Required mainnet env for the operational deploy:
 ```bash
 DEPLOYER_PRIVATE_KEY=...
 DEPLOYER_ADDRESS=0x...
-ASM_TOKEN_ADDRESS=0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c
+ASM_TOKEN_ADDRESS=0x707F0f4a39a4a26239F7D00463B15AB5656861f9
 SALE_TREASURY_ADDRESS=0x...
 UKI_INITIAL_SUPPLY_RECEIVER=0x...
 # Required only if receiver is not the deployer.
@@ -174,9 +183,49 @@ Do not reuse addresses across environments:
 | --- | --- | --- | --- |
 | Dev | Hardhat/local | `31337` | `MockERC20` deployed by tests or local simulations. |
 | Test | BSC testnet | `97` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` (`tASM`) |
-| Prod | BSC mainnet | `56` | `0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c` (`CONCILIUM`) |
+| Prod | BSC mainnet | `56` | `0x707F0f4a39a4a26239F7D00463B15AB5656861f9` (`Ascensum token`, `ASM`) |
 
 The deploy script validates `ASM_TOKEN_ADDRESS` against the approved address for BSC testnet and BSC mainnet. Hardhat/local deployments are exempt so dev simulations can use local mocks.
+
+## BSC Testnet NFT source for Cukie Master
+
+`deploy:testnet:nft-source` is a separate, testnet-only harness. It deploys:
+
+- `StagingCukiesNft`, an intentionally minimal ownership/event source with immutable mint metadata;
+- `StagingCukiesMarketplaceSource`, matching the historical marketplace events without custody or value movement;
+- `StagingCukiesBridgeSource`, matching the historical bridge events without bridging or custody.
+
+The script rejects every network except `bscTestnet` / chain `97`, requires the configured private key to resolve to `DEPLOYER_ADDRESS`, and additionally requires:
+
+```bash
+STAGING_NFT_DEPLOYMENT_CONFIRM=BSC_TESTNET_97_ONLY
+```
+
+It mints six original-generation fixtures to the testnet deployer, one for each stable rarity value `1..6`. Their expected Cukie Master points are `1, 2, 4, 7, 10, 15` (39 total), which must produce the route maximum of five slots. The output includes only public evidence: contract addresses, deployment receipts/blocks, runtime bytecode hashes and fixture mint transactions. Never reuse these contracts or fixtures in mainnet/production.
+
+## BSC Testnet Pancake V2 liquidity-lock rehearsal
+
+`LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.
+
+The rehearsal is chain-97-only and creates the initial tASM/tUKI PancakeSwap V2 pair with `0.1 tASM + 60 tUKI`, preserving the target ratio `1 ASM = 600 UKI`. It transfers every LP token minted to a short-lived test locker, proves that early release reverts and prints the public receipt/code-hash evidence needed for the completion step.
+
+```bash
+set -a
+source /path/to/ignored-testnet-operational.env
+set +a
+export LIQUIDITY_LOCK_TESTNET_CONFIRM=CREATE_PANCAKE_V2_TEST_LP_AND_LOCK
+export LIQUIDITY_LOCK_TEST_DELAY_SECONDS=180
+pnpm --filter @cukies/contracts rehearse:testnet:liquidity-locker
+
+export LIQUIDITY_LOCKER_ADDRESS=0x...
+pnpm --filter @cukies/contracts complete:testnet:liquidity-locker
+```
+
+The completion command refuses to broadcast before maturity. After maturity it waits for 12 confirmations, validates both release events from the receipt, verifies that the locker balance becomes zero and proves that the exact locked amount reaches the immutable beneficiary. This short delay is exclusively a testnet release rehearsal and must not be copied into a production deployment.
+
+Do not derive the mainnet timestamp from this rehearsal. The approved intermediate listing uses `SixMonthLiquidityLocker`, whose bytecode fixes the duration to exactly `180 days` from its deployment block. The generic short-delay rehearsal remains testnet-only.
+
+The complete mainnet workflow, Safe batch review and production gates live in `docs/uki-mainnet-intermediate-listing-runbook.md`.
 
 ## Deployment order
 
@@ -213,13 +262,13 @@ Use this matrix before creating any `ALLOCATION_MANAGER_ROLE` schedule. The sour
 
 | Pool | Amount | Schedule id suggestion | Timing |
 | --- | ---: | --- | --- |
-| Presale buyers | Up to `250,000,000 UKI` | `PRESALE` | Global vault config: `presaleVestingStart = TGE`, `presaleVestingDuration = 9 months`; freeze before claims. |
+| Presale buyers | Up to `250,000,000 UKI` | `PRESALE` | Global vault config: approved start date `2026-09-15` (exact UTC time pending the later vesting phase), `presaleVestingDuration = 9 months`; freeze before claims. |
 | Ecosystem 40-day unlock | `30,000,000 UKI` | `ECOSYSTEM_40D` | Cliff `TGE + 40 days`, no linear vesting. Use `duration = 0` to unlock 100% at the cliff. |
 | Ecosystem remainder | TBD after sale | `ECOSYSTEM_REMAINDER` | 9 months cliff + 12 months linear vesting. |
 | Team | `120,000,000 UKI` total | `TEAM_*` | 9 months cliff + 24 months linear vesting. |
 | Concilium/Ascensum incentives | Variable | `CONCILIUM_INCENTIVES` | Same as team: 9 months cliff + 24 months linear vesting. |
 | Rewards program | `450,000,000 UKI` | TBD | Documented as 6-year distribution, but final cliff/start/duration model is not yet specified. Do not create a single vault schedule until product approves the exact rewards distribution model. |
-| Liquidity | `180,000,000 UKI` | Not a vesting schedule | Pancake liquidity plus LP lock/burn evidence for at least 9 months. |
+| Liquidity | Amount calculated from 50% of ASM raised at `0.012 USD/UKI` | Not a vesting schedule | Initial PancakeSwap V2 listing; every LP minted by the launch Safe is sent directly to the immutable 180-day locker. |
 
 ## Preflight
 
@@ -242,7 +291,7 @@ TOTAL_UKI_FOR_SALE=... \
 SALE_ENABLED=false \
 VESTING_CONFIG_FROZEN=false \
 DEPLOYER_ADDRESS=0x... \
-pnpm --filter @cukies/contracts preflight:presale -- --network bscTestnet
+pnpm --filter @cukies/contracts preflight:presale --network bscTestnet
 ```
 
 The preflight fails unless:
@@ -256,7 +305,8 @@ The preflight fails unless:
 - `Presale` and `UKIToken` are not paused,
 - `Presale` points to the expected vault,
 - `Presale` has `PRESALE_VESTING_ROLE` and is the only holder of that role,
-- deployer has no owner/admin/manager powers when `DEPLOYER_ADDRESS` is provided,
+- en BSC mainnet, el deployer no conserva ownership ni permisos admin/manager cuando se proporciona `DEPLOYER_ADDRESS`,
+- en BSC testnet el deployer puede conservar ownership/admin para operar el ensayo, pero no puede tener `PRESALE_VESTING_ROLE` ni `ALLOCATION_MANAGER_ROLE`,
 - `DEFAULT_ADMIN_ROLE`, `PRESALE_VESTING_ROLE` and `ALLOCATION_MANAGER_ROLE` holder sets exactly match the approved matrix,
 - vault unallocated UKI covers `totalUkiForSale`,
 - `VestingVault.unallocatedWithdrawalUnlockTime()` equals `SALE_END`,

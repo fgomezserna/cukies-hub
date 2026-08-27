@@ -1,7 +1,14 @@
 import type {NextConfig} from 'next';
 import { buildFrameAncestorsPolicy } from './src/lib/parent-origin';
 
+const configuredBasePath = process.env.NEXT_PUBLIC_GAME_BASE_PATH?.trim() ?? '';
+if (configuredBasePath && !/^\/[a-z0-9][a-z0-9/_-]*$/i.test(configuredBasePath)) {
+  throw new Error('NEXT_PUBLIC_GAME_BASE_PATH must be empty or an absolute URL path');
+}
+
 const nextConfig: NextConfig = {
+
+  basePath: configuredBasePath,
 
   /* config options here */
   env: {

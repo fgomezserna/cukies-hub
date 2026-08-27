@@ -1,5 +1,23 @@
 import type {NextConfig} from 'next';
 
+function treasureHuntPublicBaseUrl() {
+  const configured = process.env.GAME_SYBILSLASH?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password) {
+      return null;
+    }
+    url.hash = '';
+    url.search = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+const treasureHuntBaseUrl = treasureHuntPublicBaseUrl();
+
 const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
@@ -39,6 +57,23 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_GAME_SYBILSLASH: process.env.GAME_SYBILSLASH,
     NEXT_PUBLIC_GAME_HYPPIE_ROAD: process.env.GAME_HYPPIE_ROAD,
     NEXT_PUBLIC_GAME_TOWER_BUILDER: process.env.GAME_TOWER_BUILDER,
+  },
+  async rewrites() {
+    if (!treasureHuntBaseUrl) return [];
+    return {
+      beforeFiles: [
+        {
+          source: '/assets/:path*',
+          destination: `${treasureHuntBaseUrl}/assets/:path*`,
+        },
+        {
+          source: '/joy.js',
+          destination: `${treasureHuntBaseUrl}/joy.js`,
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 

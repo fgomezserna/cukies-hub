@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getCompetitionService } from '@/lib/treasure-hunt-competition/server/default-service';
+import { resolveCompetitionDrawSeed } from '@/lib/treasure-hunt-competition/server/draw-seed-source';
 import {
   getCompetitionSettlementSecret,
   hasValidCompetitionInternalAuthorization,
@@ -14,6 +15,11 @@ import {
   MongoCompetitionSettlementRepository,
   MongoCompetitionSettlementSource,
 } from '@/lib/treasure-hunt-competition/server/settlement-mongo';
+import { closeTreasureHuntStakingCompetition } from '@/lib/treasure-hunt-competition/server/staking-settlement-close';
+import {
+  MongoCompetitionStakingSettlementRepository,
+  MongoCompetitionStakingSettlementSource,
+} from '@/lib/treasure-hunt-competition/server/staking-settlement-mongo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,24 +78,33 @@ export async function POST(request: Request) {
   const now = new Date();
   try {
     const competitionRuntime = resolveCompetitionRuntime(process.env, now);
-    const source = new MongoCompetitionSettlementSource();
-    const repository = new MongoCompetitionSettlementRepository();
-
-    const result = await closeTreasureHuntCompetition({
-      runtime: competitionRuntime,
-      source,
-      repository,
-      prepareSource: async () => {
-        const recovery = await getCompetitionService().recoverPendingFinishes();
-        if (!recovery.complete) {
-          throw new CompetitionSettlementCloseError(
-            'settlement_source_not_ready',
-            'Competition finish recovery is incomplete',
-          );
-        }
-      },
-      now,
-    });
+    const prepareSource = async () => {
+      const recovery = await getCompetitionService().recoverPendingFinishes();
+      if (!recovery.complete) {
+        throw new CompetitionSettlementCloseError(
+          'settlement_source_not_ready',
+          'Competition finish recovery is incomplete',
+        );
+      }
+    };
+    const result = competitionRuntime.campaign?.eligibilityKind === 'uki_staking'
+      ? await closeTreasureHuntStakingCompetition({
+        runtime: competitionRuntime,
+        source: new MongoCompetitionStakingSettlementSource(),
+        repository: new MongoCompetitionStakingSettlementRepository(),
+        drawSeed: await resolveCompetitionDrawSeed({
+          campaign: competitionRuntime.campaign,
+        }),
+        prepareSource,
+        now,
+      })
+      : await closeTreasureHuntCompetition({
+        runtime: competitionRuntime,
+        source: new MongoCompetitionSettlementSource(),
+        repository: new MongoCompetitionSettlementRepository(),
+        prepareSource,
+        now,
+      });
 
     return NextResponse.json(
       {

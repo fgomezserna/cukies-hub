@@ -298,6 +298,9 @@ describe('usePusherConnection session refresh', () => {
           seed: 'server-seed',
           alias: 'Hunter-ABC123',
           status: 'active',
+          economyRunId: 'economy-run-1',
+          creditSource: 'pool',
+          cukieSource: 'own',
         },
       }));
     });
@@ -310,8 +313,83 @@ describe('usePusherConnection session refresh', () => {
       seed: 'server-seed',
       alias: 'Hunter-ABC123',
       status: 'active',
+      economyRunId: 'economy-run-1',
+      creditSource: 'pool',
+      cukieSource: 'own',
     });
     await expect(replay).resolves.toMatchObject({ attemptId: 'attempt-1' });
+    mockChannelTrigger.mockClear();
+    act(() => {
+      expect(result.current.sendCheckpoint({ score: 100, gameTime: 5_000 })).toBe(true);
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledWith(
+      'client-checkpoint',
+      expect.objectContaining({
+        score: 100,
+        gameTime: 5_000,
+        economyRunId: 'economy-run-1',
+      }),
+    );
+    unmount();
+  });
+
+  it('accepts staking competition access without legacy credit or NFT authority', async () => {
+    const { result, unmount } = renderHook(() => usePusherConnection());
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: 'https://hub.example',
+        data: {
+          type: 'GAME_SESSION_START',
+          payload: { gameId: 'sybil-slayer', sessionId: 'session-staking' },
+        },
+      }));
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(150);
+    });
+
+    let access!: Promise<Awaited<ReturnType<typeof result.current.requestCompetitionAccess>>>;
+    act(() => {
+      access = result.current.requestCompetitionAccess();
+    });
+    const request = postMessage.mock.calls.find(
+      ([payload]) => payload?.type === 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+    )?.[0] as Record<string, unknown>;
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: 'https://hub.example',
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_RESPONSE',
+          requestId: request.requestId,
+          sessionId: 'session-staking',
+          eligible: true,
+          attemptId: 'attempt-staking',
+          seed: 'staking-seed',
+          alias: 'Hunter-STAKING',
+          status: 'active',
+        },
+      }));
+    });
+
+    await expect(access).resolves.toEqual({
+      eligible: true,
+      practice: false,
+      sessionId: 'session-staking',
+      attemptId: 'attempt-staking',
+      seed: 'staking-seed',
+      alias: 'Hunter-STAKING',
+      status: 'active',
+    });
+    mockChannelTrigger.mockClear();
+    act(() => {
+      expect(result.current.sendCheckpoint({ score: 200, gameTime: 6_000 })).toBe(true);
+    });
+    expect(mockChannelTrigger).toHaveBeenCalledWith(
+      'client-checkpoint',
+      expect.not.objectContaining({ economyRunId: expect.anything() }),
+    );
     unmount();
   });
 

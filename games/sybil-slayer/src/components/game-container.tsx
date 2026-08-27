@@ -1711,6 +1711,12 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
             'La sesión cambió mientras confirmábamos el acceso. La partida no se inició; vuelve a intentarlo.',
           ATTEMPT_ALREADY_ACTIVE:
             'Esta wallet ya tiene una partida activa en otra pestaña. Vuelve a esa partida o espera un momento para iniciar una nueva.',
+          NO_ATTEMPTS_REMAINING:
+            'No te quedan intentos. Cada 2.000 UKI completos en staking conceden una partida nueva.',
+          PARTICIPANT_DISQUALIFIED:
+            'Esta wallet retiró UKI durante la campaña y ha quedado descalificada.',
+          ELIGIBILITY_UNAVAILABLE:
+            'Estamos sincronizando tu staking confirmado. Espera unos segundos y vuelve a intentarlo.',
         };
         setCompetitionStartError(accessErrorCopy[access.reason ?? ''] ??
           'No pudimos confirmar si el intento quedó creado. La partida no se inició; vuelve a intentarlo.');
@@ -1893,6 +1899,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
       const queued = sendGameEnd({
         finalScore: gameState.score,
         gameTime,
+        ...(resultAuthority.economyRunId
+          ? { economyRunId: resultAuthority.economyRunId }
+          : {}),
         ...(resultAuthority.competitionAttemptId
           ? { competitionAttemptId: resultAuthority.competitionAttemptId }
           : {}),
@@ -1917,6 +1926,38 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   ]);
 
   useEffect(() => {
+    if (isMultiplayerMode || !sessionData) return;
+    const handlePageHide = () => {
+      const state = gameStateRef.current;
+      if (state.status !== 'playing' && state.status !== 'paused') return;
+      const resultAuthority = resolveSinglePlayerResultDispatch(
+        activeSinglePlayerResultAuthorityRef.current,
+        sessionData.sessionId,
+        dispatchedSinglePlayerRunIdRef.current,
+      );
+      if (!resultAuthority) return;
+      const queued = sendGameEnd({
+        finalScore: 0,
+        gameTime: getActiveGameTimeMs(),
+        ...(resultAuthority.economyRunId
+          ? { economyRunId: resultAuthority.economyRunId }
+          : {}),
+        ...(resultAuthority.competitionAttemptId
+          ? { competitionAttemptId: resultAuthority.competitionAttemptId }
+          : {}),
+        metadata: {
+          gameOverReason: 'manual',
+          level: state.level,
+          hearts: state.hearts,
+        },
+      });
+      if (queued) dispatchedSinglePlayerRunIdRef.current = resultAuthority.runId;
+    };
+    window.addEventListener('pagehide', handlePageHide);
+    return () => window.removeEventListener('pagehide', handlePageHide);
+  }, [getActiveGameTimeMs, isMultiplayerMode, sendGameEnd, sessionData]);
+
+  useEffect(() => {
     if (isMultiplayerMode || gameState.status !== 'gameOver') return;
     const runId = activeSinglePlayerResultAuthorityRef.current?.runId ?? null;
     setSinglePlayerResultSaveState((current) => (
@@ -1930,6 +1971,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
     gameState.status === 'gameOver' &&
     activeSinglePlayerRunId !== null &&
     singlePlayerResultSaveState.savedRunId === activeSinglePlayerRunId;
+  const economyOriginCopy = competitionAccess?.economyRunId &&
+    competitionAccess.creditSource && competitionAccess.cukieSource
+    ? `Créditos ${competitionAccess.creditSource === 'pool' ? 'prestados' : 'propios'} · Cukie ${competitionAccess.cukieSource === 'pool' ? 'prestado' : 'propio'}`
+    : null;
 
   // Update the gameState hook's internal input ref whenever useGameInput changes
   useEffect(() => {
@@ -3602,6 +3647,16 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <p className="th-screen-kicker">Expedición completada</p>
                   <h2 id="single-result-title" className="th-overlay-title">Resultado final</h2>
                   <p className="th-dialog-copy">{gameOverCopy}</p>
+                  {economyOriginCopy ? (
+                    <p className="th-dialog-copy" aria-label="Origen económico de la partida">
+                      {economyOriginCopy}
+                    </p>
+                  ) : null}
+                  {singlePlayerResultSaved && gameState.gameOverReason === 'manual' ? (
+                    <p className="th-dialog-copy" role="status">
+                      Salida voluntaria registrada: consume el intento y no entra en clasificación ni recompensas.
+                    </p>
+                  ) : null}
                   {gameEndPersistenceError ? (
                     <p className="th-dialog-copy" role="alert">{gameEndPersistenceError}</p>
                   ) : !singlePlayerResultSaved ? (

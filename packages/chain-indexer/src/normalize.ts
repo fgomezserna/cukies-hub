@@ -64,6 +64,15 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (eventName === 'CukieMetadataConfigured') {
+    return toJsonRecord({
+      ...base,
+      rarity: getNumber(args.rarity),
+      generation: getNumber(args.generation),
+      txType: eventName,
+    });
+  }
+
   if (eventName === 'TokenOnSale') {
     const price = normalizePrice(chain, args.price);
 
@@ -186,6 +195,117 @@ export function normalizeDomainEvent(
       totalBuyerAsmRaw: getString(args.totalBuyerAsm),
       totalBuyerUkiRaw: getString(args.totalBuyerUki),
       txType: 'PresalePurchase',
+    });
+  }
+
+  if (eventName === 'Staked' || eventName === 'Unstaked') {
+    const account = getString(args.account);
+    return toJsonRecord({
+      account,
+      accountNormalized: normalizeAddress(chain, account),
+      amountRaw: getString(args.amount),
+      accountBalanceRaw: getString(args.accountBalance),
+      totalStakedRaw: getString(args.totalStaked),
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'VestingCreated' || eventName === 'TokensReleased') {
+    const beneficiary = getString(args.beneficiary);
+    return toJsonRecord({
+      beneficiary,
+      beneficiaryNormalized: normalizeAddress(chain, beneficiary),
+      scheduleId: getString(args.scheduleId),
+      amountRaw: getString(args.amount),
+      allocatedAmountRaw: eventName === 'VestingCreated' ? getString(args.amount) : '0',
+      releasedAmountRaw: eventName === 'TokensReleased' ? getString(args.amount) : '0',
+      startRaw: eventName === 'VestingCreated' ? getString(args.start) : null,
+      cliffRaw: eventName === 'VestingCreated' ? getString(args.cliff) : null,
+      durationRaw: eventName === 'VestingCreated' ? getString(args.duration) : null,
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'BatchPublished') {
+    return toJsonRecord({
+      batchId: getString(args.batchId),
+      merkleRoot: getString(args.merkleRoot),
+      inputHash: getString(args.inputHash),
+      metadataHash: getString(args.metadataHash),
+      totalAllocatedRaw: getString(args.totalAllocated),
+      startsAtRaw: getString(args.startsAt),
+      expiresAtRaw: getString(args.expiresAt),
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'RewardClaimed') {
+    const account = getString(args.account);
+    return toJsonRecord({
+      batchId: getString(args.batchId),
+      account,
+      accountNormalized: normalizeAddress(chain, account),
+      amountRaw: getString(args.amount),
+      txType: eventName,
+    });
+  }
+
+  if (eventName === 'BatchClosed') {
+    return toJsonRecord({
+      batchId: getString(args.batchId),
+      unclaimedAmountRaw: getString(args.unclaimedAmount),
+      txType: eventName,
+    });
+  }
+
+  if (
+    contractAlias === 'CUKIE_MASTER_NFT_VAULT'
+    || contractAlias === 'CUKIE_POOL_NFT_VAULT'
+  ) {
+    const collection = getString(args.collection);
+    const beneficiary = getString(args.beneficiary);
+    const recipient = getString(args.recipient);
+    const lifecycle = eventName === 'CukieMasterDeposited'
+      ? 'custodied'
+      : eventName === 'CukieMasterWithdrawn'
+        ? 'withdrawn'
+        : eventName === 'CukiePoolDeposited'
+          ? 'pending_activation'
+          : eventName === 'CukiePoolExitRequested'
+            ? 'exit_requested'
+            : eventName === 'CukiePoolWithdrawn'
+              ? 'withdrawn'
+              : null;
+
+    return toJsonRecord({
+      ...base,
+      collection,
+      collectionNormalized: normalizeAddress(chain, collection),
+      beneficiary,
+      beneficiaryNormalized: normalizeAddress(chain, beneficiary),
+      recipient,
+      recipientNormalized: normalizeAddress(chain, recipient),
+      allowed: typeof args.allowed === 'boolean' ? args.allowed : null,
+      depositEpochRaw: getString(args.depositEpoch),
+      depositedAtRaw: getString(args.depositedAt),
+      withdrawnAtRaw: getString(args.withdrawnAt),
+      recoveredAtRaw: getString(args.recoveredAt),
+      requestedAtRaw: getString(args.requestedAt),
+      depositPeriodIdRaw: getString(args.depositPeriodId),
+      activationAtRaw: getString(args.activationAt),
+      activationPeriodIdRaw: getString(args.activationPeriodId),
+      exitPeriodIdRaw: getString(args.exitPeriodId),
+      withdrawableAtRaw: getString(args.withdrawableAt),
+      previousWithdrawableAtRaw: getString(args.previousWithdrawableAt),
+      newWithdrawableAtRaw: getString(args.newWithdrawableAt),
+      calendarVersionRaw: getString(args.calendarVersion),
+      versionRaw: getString(args.version),
+      effectiveAtRaw: getString(args.effectiveAt),
+      firstCutoffAtRaw: getString(args.firstCutoffAt),
+      firstPeriodIdRaw: getString(args.firstPeriodId),
+      periodAnchorSecondsRaw: getString(args.periodAnchorSeconds),
+      lifecycle,
+      txType: eventName,
     });
   }
 

@@ -5,7 +5,10 @@ import TreasureHuntRankingsView from '@/components/games/treasure-hunt-rankings-
 import TreasureHuntRulesView from '@/components/games/treasure-hunt-rules-view';
 import TreasureHuntProfile from '@/components/profile/treasure-hunt-profile';
 
+let mockDisqualified = false;
+
 jest.mock('lucide-react', () => ({
+  Archive: () => null,
   ArrowRight: () => null,
   BarChart3: () => null,
   CalendarDays: () => null,
@@ -56,6 +59,14 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   formatTreasureHuntDuration: (gameTimeMs: number) => `${gameTimeMs / 1_000} s`,
   formatTreasureHuntPercentage: (bps: number) => `${bps / 100}%`,
   TREASURE_HUNT_FALLBACK_RULES: {
+    eligibilityKind: 'uki_staking',
+    stakePerAttemptRaw: '2000000000000000000000',
+    topAttemptsPerWallet: 10,
+    pointsPerTicket: 100,
+    basePrizeUkiRaw: '50000000000000000000000',
+    stakePrizeBps: 1_000,
+    prizePerWinnerUkiRaw: '10000000000000000000000',
+    maxWinsPerWallet: 1,
     poolBps: 2_500,
     playerRewardBps: 1_000,
     sponsorRewardBps: 2_500,
@@ -70,6 +81,14 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         alias: 'CukiePlayer',
       },
       campaign: {
+        eligibilityKind: 'uki_staking',
+        stakePerAttemptRaw: '2000000000000000000000',
+        topAttemptsPerWallet: 10,
+        pointsPerTicket: 100,
+        basePrizeUkiRaw: '50000000000000000000000',
+        stakePrizeBps: 1_000,
+        prizePerWinnerUkiRaw: '10000000000000000000000',
+        maxWinsPerWallet: 1,
         poolBps: 2_500,
         playerRewardBps: 1_000,
         sponsorRewardBps: 2_500,
@@ -77,8 +96,30 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         cliffMonths: 9,
         vestingMonths: 6,
       },
+      eligibility: {
+        ready: true,
+        stakedUkiRaw: '4000000000000000000000',
+        totalStakedUkiRaw: '214840000000000000000000',
+        indexedThroughBlock: 123_456_789,
+        indexedAt: '2026-08-26T12:00:00.000Z',
+        disqualified: mockDisqualified,
+        disqualificationEvidence: mockDisqualified ? {
+          eventId: 'unstake-1',
+          txHash: `0x${'a'.repeat(64)}`,
+          blockNumber: 127_368_347,
+          timestamp: '2026-08-26T16:36:42.000Z',
+          amountRaw: '20000000000000000000000',
+        } : null,
+        issues: [],
+        attemptsGranted: 2,
+        attemptsUsed: 1,
+        attemptsRemaining: mockDisqualified ? 0 : 1,
+        topAttemptsCount: 1,
+        totalTickets: 125,
+        provisionalTickets: 125,
+      },
     },
-    leaderboard: [
+    leaderboard: mockDisqualified ? [] : [
       {
         rank: 1,
         walletRank: 1,
@@ -88,9 +129,10 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
         gameTimeMs: 42_000,
         finishedAt: '2026-07-23T18:00:00.000Z',
         reviewStatus: 'approved',
+        tickets: 125,
         isMe: true,
-        estimatedRewardUkiRaw: '1250000000000000000000',
-        rewardStatus: 'estimated',
+        estimatedRewardUkiRaw: '0',
+        rewardStatus: 'draw_pending',
       },
     ],
     leaderboardMeta: {
@@ -115,26 +157,36 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 }));
 
 describe('vistas UX de Treasure Hunt', () => {
-  it('muestra una única clasificación con las métricas del torneo', () => {
+  beforeEach(() => {
+    mockDisqualified = false;
+  });
+
+  it('muestra por defecto la clasificación activa con las métricas del torneo', () => {
     const { container } = render(<TreasureHuntRankingsView />);
 
     expect(screen.getByText('Rankings de Treasure Hunt')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'En curso' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Finalizadas' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Mis partidas')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
+    expect(screen.getByText('Intentos disponibles')).toBeInTheDocument();
+    expect(screen.getByText('Resultados que cuentan')).toBeInTheDocument();
+    expect(screen.getByText('Premio acumulado')).toBeInTheDocument();
+    expect(screen.getByText('N.º de ganadores')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
-    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo', 'Premio estimado']);
+    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo', 'Tickets']);
     expect(headers).not.toContain('Partida');
     expect(headers).not.toContain('Score');
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
 
     const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
     expect(playLink).toHaveClass('hidden', 'sm:inline-flex');
-    expect(screen.getByText('Modo activo').parentElement).toHaveClass('hidden', 'sm:block');
-    expect(screen.getByText('Partidas computables').closest('dl')).toHaveClass(
+    expect(screen.getByText('Intentos disponibles').closest('dl')).toHaveClass(
       'grid-cols-2',
-      'sm:grid-cols-3',
+      'sm:grid-cols-4',
     );
     expect(screen.getByRole('navigation', { name: 'Paginación del ranking' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
@@ -145,10 +197,10 @@ describe('vistas UX de Treasure Hunt', () => {
 
     expect(screen.getByText('Cómo participar')).toBeInTheDocument();
     expect(screen.getByText('Clasificación')).toBeInTheDocument();
-    expect(screen.getByText('Pool de Premios')).toBeInTheDocument();
-    expect(screen.getByText('¿Cuánto puedes ganar?')).toBeInTheDocument();
-    expect(screen.getByText('¿Cómo se eligen los ganadores?')).toBeInTheDocument();
-    expect(screen.getByText('Reparto del Pool')).toBeInTheDocument();
+    expect(screen.getByText('Mantener el staking')).toBeInTheDocument();
+    expect(screen.getByText('Tickets para el sorteo')).toBeInTheDocument();
+    expect(screen.getByText('Pool y premios')).toBeInTheDocument();
+    expect(screen.getByText('Selección de ganadores')).toBeInTheDocument();
     expect(screen.getByText('Entrega de los Premios')).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
   });
@@ -160,9 +212,33 @@ describe('vistas UX de Treasure Hunt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar partida 1P' }));
 
     expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
+    expect(screen.getAllByText('Torneo Lanzamiento UKI').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /Gestionar staking UKI/ })).toHaveAttribute('href', '/cukie-master');
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toBeInTheDocument();
     expect(screen.queryByText(/Si clasificas/)).not.toBeInTheDocument();
+  });
+
+  it('muestra intentos disponibles y bloquea el juego de una wallet descalificada', () => {
+    mockDisqualified = true;
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByText('Intentos disponibles').parentElement).toHaveTextContent('0');
+    expect(screen.getByText('Uso de intentos').parentElement).toHaveTextContent('1 usado · 2 concedidos');
+    expect(screen.getByText('Estado').parentElement).toHaveTextContent('Descalificado');
+    expect(screen.getByRole('button', { name: 'Wallet descalificada' })).toBeDisabled();
+  });
+
+  it('explica la descalificación en rankings y no presenta la partida como computable', () => {
+    mockDisqualified = true;
+    render(<TreasureHuntRankingsView />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Wallet descalificada');
+    expect(screen.getByRole('alert')).toHaveTextContent('20.000 UKI');
+    expect(screen.getByText('0/10')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mis partidas' }));
+    expect(screen.getByText('Tus partidas han quedado fuera de clasificación')).toBeInTheDocument();
   });
 
   it('reduce el perfil al alias público y la wallet', () => {

@@ -10,6 +10,7 @@ import {
 
 import { MongoCompetitionRepository } from './mongo-repository';
 import { createCompetitionService } from './service';
+import { MongoCompetitionStakingSource } from './staking-eligibility';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -21,6 +22,7 @@ declare global {
 function buildCompetitionService() {
   return createCompetitionService({
     repository: new MongoCompetitionRepository(),
+    stakingSource: new MongoCompetitionStakingSource(),
     findGameSession: async (gameSessionId) => {
       const session = await prisma.gameSession.findUnique({
         where: { sessionId: gameSessionId },

@@ -1,7 +1,7 @@
 const hre = require('hardhat');
 
 const APPROVED_ASM_TOKEN_BY_CHAIN_ID = {
-  56: '0x40af8fd127dcd302d7ffa6f37cf5a002e54ac68c',
+  56: '0x707F0f4a39a4a26239F7D00463B15AB5656861f9',
   97: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
 };
 
@@ -179,9 +179,17 @@ async function main() {
   );
   if (deployerAddress) {
     const deployer = normalizeAddress(deployerAddress, 'DEPLOYER_ADDRESS');
-    record('deployer is not UKI owner', ukiOwner !== deployer, deployer);
-    record('deployer is not Presale owner', presaleOwner !== deployer, deployer);
-    record('deployer does not have DEFAULT_ADMIN_ROLE', !(await vault.hasRole(defaultAdminRole, deployer)), deployer);
+    if (hre.network.config.chainId === 56) {
+      record('deployer is not UKI owner', ukiOwner !== deployer, deployer);
+      record('deployer is not Presale owner', presaleOwner !== deployer, deployer);
+      record('deployer does not have DEFAULT_ADMIN_ROLE', !(await vault.hasRole(defaultAdminRole, deployer)), deployer);
+    } else {
+      record(
+        'deployer ownership cleanup is mainnet-only',
+        true,
+        `chain id ${hre.network.config.chainId}; testnet may retain deployer ownership for the rehearsal`,
+      );
+    }
     record('deployer does not have PRESALE_VESTING_ROLE', !(await vault.hasRole(presaleRole, deployer)), deployer);
     record('deployer does not have ALLOCATION_MANAGER_ROLE', !(await vault.hasRole(allocationRole, deployer)), deployer);
   }

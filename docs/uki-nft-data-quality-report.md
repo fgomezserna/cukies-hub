@@ -73,7 +73,7 @@ Sin ejecutar muestreo live, el repo confirma:
 
 - `dapp/src/lib/mongodb-cukies.ts` expone helpers para `cukies`, `originals`, `wallets`, `tx_nfts` y `txMarketplace`.
 - `dapp/src/lib/user-sync.ts` confirma que existen wallets TRON (`T...`) y BSC/EVM (`0x...`) y que la normalizacion difiere por red.
-- `dapp/scripts/inspect-databases.mjs` demuestra que ya existia una inspeccion manual de bases, pero imprime muestras de documentos; no debe usarse para reportes compartidos sin sanitizar.
+- `dapp/scripts/inspect-databases.mjs` permite una inspeccion manual, exige `DATABASE_URL` y `CUKIES_DATABASE_URL` explicitas y limita la salida a nombres y tipos de campos; no incluye valores de documentos ni credenciales embebidas.
 - `cukies-hub` no contiene modelos NFT actuales en Prisma; los nuevos modelos deben depender de una capa normalizada y no copiar ownership completo sin motivo.
 
 ## Riesgos detectados antes del muestreo live
@@ -126,4 +126,3 @@ No publicar:
 - #22 debe diseñar `NftInventoryService` asumiendo que owner/listing/bridge pueden venir de varias colecciones.
 - #21 queda listo para cerrarse cuando el muestreo live sanitizado confirme porcentajes reales o documente que el acceso a Mongo queda pendiente de ops.
 - Si el muestreo descubre colecciones no inventariadas, actualizar `docs/uki-nft-data-inventory.md` antes de implementar.
-

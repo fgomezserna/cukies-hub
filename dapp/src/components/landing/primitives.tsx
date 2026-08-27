@@ -72,8 +72,8 @@ export function Panel({
   id?: string;
 }) {
   return (
-    <div id={id} className={`uki-panel-shell ${className}`}>
-      <div className={`uki-panel-core ${innerClassName}`}>{children}</div>
+    <div id={id} className={`uki-panel-shell min-w-0 ${className}`}>
+      <div className={`uki-panel-core min-w-0 ${innerClassName}`}>{children}</div>
     </div>
   );
 }

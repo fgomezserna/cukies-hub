@@ -1,146 +1,95 @@
-# Mongo staging refresh
+# Mongo staging aislado
 
-Estado: propuesta operativa lista para ejecutar con confirmacion.
-Fecha: 2026-05-13.
+Estado: operativo en Coolify `game-hub-staging`.
+Ultima validacion: 2026-08-06.
 
-## Inventario observado
+## Objetivo
 
-Mongo activo: `192.168.1.221:27017`.
+Staging funciona con una instancia Mongo propia y no usa las bases logicas de produccion durante el runtime normal. La copia inicial se hizo una sola vez para disponer de datos representativos; desde el corte, la dapp y los workers apuntan exclusivamente al servicio Mongo del recurso de staging.
 
-Conexiones usadas por Coolify production `game-hub`:
+## Topologia activa
 
-| Env var | DB |
+| Elemento | Valor |
 | --- | --- |
-| `DATABASE_URL` | `cukies-hub` |
-| `CUKIES_DATABASE_URL` | `cukies` |
+| Recurso Coolify | `game-hub-staging`, application ID `28`, UUID `u4s804o4wwcckowgk0woo4wg` |
+| Servicio | `staging-mongo` en `docker-compose.coolify.yml` |
+| Alias interno | `cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg:27017` |
+| Replica set | `cukies-staging-rs0`, un nodo `PRIMARY` |
+| Red | Docker `coolify`, sin dominio ni puerto publicado |
+| Persistencia | Volumenes dedicados `staging-mongo-data` y `staging-mongo-config` |
+| Limites | 2 GB de memoria y 1.5 CPU |
 
-Bases relevantes observadas:
+Bases logicas y consumidores:
 
-| DB | Tamano aprox. | Uso |
-| --- | ---: | --- |
-| `cukies-hub` | 0.07 MB | Dapp Prisma actual. |
-| `cukies` | 74.98 MB | Legacy Cukies/marketplace/NFTs. |
-| `cukies-staging` | 88.14 MB | Staging legacy existente, no alineado con produccion. |
-| `cukies-game` | 4.09 MB | Juego legacy/operativo. |
-| `cukies-game-staging` | 6.02 MB | Staging juego existente. |
+| Base | Consumidor | Usuario de minimo privilegio |
+| --- | --- | --- |
+| `cukies-hub-staging` | Dapp Prisma y acceso Mongo del hub | `cukies_hub_staging_app` |
+| `cukies-legacy-staging` | Lecturas legacy de Cukies/NFT/wallets | `cukies_legacy_staging_app` |
+| `cukieshub-new-staging` | Indexer y economia v3 | `cukies_economy_staging_app` |
+| `cukieshub-new-staging` | Card worker, cuando tenga destino S3 propio | `cukies_card_staging_worker` |
 
-No se observo `cukies-hub-staging`.
+Cada usuario esta limitado a `readWrite` y `dbAdmin` sobre su base. Las credenciales viven en Coolify y no se documentan ni se guardan en Git.
 
-## Colecciones clave
+## Invariantes de seguridad
 
-`cukies-hub`:
+El arranque de `infrastructure/staging-mongo/entrypoint.sh` falla cerrado salvo que se cumpla todo lo siguiente:
 
-| Coleccion | Docs |
-| --- | ---: |
-| `User` | 4 |
+- `APP_ENV=staging`.
+- `STAGING_ONLY_GUARD=true`.
+- `COOLIFY_RESOURCE_UUID=u4s804o4wwcckowgk0woo4wg`.
+- Replica set y hostname internos coinciden con los valores de staging.
+- Usuario root esperado y secretos con longitud/formato validos.
+- Existe exactamente un marcador `_id=logical-staging-v1` en `cukies_staging_mongo_admin.bootstrap_state` tras el bootstrap.
 
-`cukies`:
+El compose no publica `27017`. `dapp`, `chain-indexer` y los schedulers comparten la red `coolify`; solo la dapp tiene proxy publico.
 
-| Coleccion | Docs |
-| --- | ---: |
-| `processedEvents` | 191495 |
-| `completedEvents` | 119441 |
-| `tx_nfts` | 25603 |
-| `tx_points` | 23516 |
-| `points` | 23502 |
-| `cukies` | 17464 |
-| `blockTimestamps` | 15781 |
-| `originals` | 12100 |
-| `buysComissions` | 9422 |
-| `txMarketplace` | 9240 |
-| `wallets` | 4293 |
-| `referrals` | 3364 |
-| `users` | 1337 |
+Las URLs runtime deben contener explicitamente estos nombres:
 
-## Estado de `cukies-staging`
-
-`cukies-staging` no debe considerarse replica fiable de `cukies`.
-
-Diferencias relevantes:
-
-| Coleccion | Produccion | Staging | Delta |
-| --- | ---: | ---: | ---: |
-| `processedEvents` | 191495 | 0 | -191495 |
-| `blockTimestamps` | 15781 | 0 | -15781 |
-| `points` | 23502 | 15309 | -8193 |
-| `tx_nfts` | 25603 | 22886 | -2717 |
-| `wallets` | 4293 | 3661 | -632 |
-| `users` | 1337 | 1292 | -45 |
-| `cukies` | 17464 | 17459 | -5 |
-| `settings` | 36 | 0 | -36 |
-| `tx` | 0 | 10092 | +10092 |
-| `txPoints` | 0 | 37844 | +37844 |
-
-## Decision recomendada
-
-Staging debe poder refrescarse desde production bajo demanda, pero no con una copia ciega.
-
-Reglas:
-
-- Crear o usar `cukies-hub-staging` para la dapp Prisma.
-- Usar `cukies-staging` como destino legacy, pero solo tras backup previo.
-- Hacer `mongodump` de produccion.
-- Hacer `mongodump` del staging actual antes de sobrescribirlo.
-- Restaurar con `mongorestore --drop` y remapeo de namespace.
-- Sanitizar datos de sesion, OAuth, verificacion y passwords/tokens.
-- Mantener wallets, inventario NFT, marketplace, puntos y transacciones para QA fiel.
-- Registrar cada refresh en `__staging_refresh`.
-
-## Tooling
-
-Script:
-
-```bash
-scripts/refresh-staging-mongo.sh
+```text
+DATABASE_URL             -> cukies-hub-staging
+CUKIES_DATABASE_URL      -> cukies-legacy-staging
+CHAIN_INDEXER_MONGO_URL  -> cukieshub-new-staging
+CHAIN_INDEXER_DB_NAME    -> cukieshub-new-staging
+CARD_WORKER_MONGO_URL    -> cukieshub-new-staging
+CARD_WORKER_DB_NAME      -> cukieshub-new-staging
 ```
 
-Ejecucion dry-run:
+Los clientes Mongo de la dapp y el importador legacy derivan la base de la URL. No tienen fallbacks a `cukies-hub`, `cukies` ni a `192.168.1.221`.
 
-```bash
-DRY_RUN=1 \
-PROD_DATABASE_URL="mongodb://..." \
-PROD_CUKIES_DATABASE_URL="mongodb://..." \
-STAGING_DATABASE_URL="mongodb://.../cukies-hub-staging?authSource=admin" \
-STAGING_CUKIES_DATABASE_URL="mongodb://.../cukies-staging?authSource=admin" \
-bash scripts/refresh-staging-mongo.sh
-```
+## Estado validado tras el corte
 
-Ejecucion real:
+- Mongo staging: `PRIMARY` y health check correcto.
+- Dapp: usa `cukies-hub-staging` y `cukies-legacy-staging`.
+- Indexer y economia: usan `cukieshub-new-staging`; la migracion operativa actual es schema version `3` y conserva la verificacion transaccional.
+- Segunda wallet firmada: un `User` y un `UserWallet` creados en `cukies-hub-staging`; cero registros para esa dirección en `cukies-hub` de produccion.
+- Seis schedulers: contenedores independientes para Cukie Master, creditos, Game Economy, Cukie Pool, ranking semanal y contabilidad de rewards. Cada uno conserva su gate explicito.
+- Card worker: desactivado hasta disponer de bucket/prefijo S3 exclusivo de staging.
 
-```bash
-CONFIRM_REFRESH_STAGING=1 \
-PROD_DATABASE_URL="mongodb://..." \
-PROD_CUKIES_DATABASE_URL="mongodb://..." \
-STAGING_DATABASE_URL="mongodb://.../cukies-hub-staging?authSource=admin" \
-STAGING_CUKIES_DATABASE_URL="mongodb://.../cukies-staging?authSource=admin" \
-bash scripts/refresh-staging-mongo.sh
-```
+## Refresh futuro
 
-El script no imprime credenciales. Exige que los destinos parezcan staging y rechaza source/target iguales.
+`infrastructure/staging-mongo/resync.sh` existe para una resincronizacion controlada, pero no forma parte del arranque normal. Su ejecucion hace `--drop` solamente sobre las tres bases con sufijo `-staging` del Mongo dedicado y exige las guardas de recurso anteriores.
 
-## Sanitizacion aplicada
+Antes de cualquier refresh:
 
-Hub:
+1. Abrir una ventana de mantenimiento solo para staging.
+2. Registrar SHA, health y fingerprints de produccion sin cambiar su configuracion.
+3. Crear snapshot recuperable de los volumenes Mongo de staging.
+4. Detener exclusivamente los writers del recurso `28`.
+5. Proporcionar al proceso, de forma temporal, URLs fuente acotadas a las bases logicas de staging del Mongo compartido; no reutilizar las URLs runtime de la dapp.
+6. Ejecutar `resync.sh` dentro de `staging-mongo` y comprobar que el marcador incrementa `resyncCount` una sola vez.
+7. Reaplicar el schema de economia v3 y verificar una transaccion abortada sin residuos.
+8. Arrancar los servicios de staging y validar `/api/health`, indexer, card jobs y logs.
+9. Confirmar de nuevo que SHA, variables y health de produccion no han cambiado.
 
-- elimina `Session`,
-- elimina `VerificationToken`,
-- elimina `EmailVerification`,
-- elimina tokens OAuth de `Account`,
-- limpia `User.email`,
-- elimina `TwitterFollower.webhookData`.
+No ejecutar un refresh mientras haya escrituras manuales de QA sin inventariar. No usar `mongorestore --drop` contra el host, las URLs o los nombres de BBDD de produccion.
 
-Legacy:
+## Recuperacion y limites actuales
 
-- elimina `blacklistedtokens`,
-- limpia `users.email`,
-- elimina campos tipo password/token en `users`,
-- conserva wallets, NFTs, marketplace, puntos y transacciones.
+Los volumenes dedicados son la fuente de recuperacion normal. Si se pierden, el contenedor no puede recrear silenciosamente staging desde las URLs runtime ya aisladas: el bootstrap falla cerrado y exige una intervencion operativa explicita.
 
-## Pendiente antes de ejecutar
+Pendiente antes de automatizar disaster recovery:
 
-- Confirmar que no hay datos manuales valiosos en `cukies-staging`.
-- Definir si staging debe refrescarse manualmente por release candidate o con job programado.
-- Cargar en Coolify staging:
-  - `DATABASE_URL` apuntando a `cukies-hub-staging`,
-  - `CUKIES_DATABASE_URL` apuntando a `cukies-staging`,
-  - resto de secrets no DB separados por entorno.
+- separar en Coolify las variables fuente de bootstrap de las URLs runtime;
+- definir backup cifrado y retencion de los volumenes de staging;
+- documentar un restore probado sin acceso de escritura a produccion;
+- decidir la cadencia de refresh y la sanitizacion adicional de datos personales.

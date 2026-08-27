@@ -80,22 +80,36 @@ export async function routeGameEnd(
     ) {
       throw new Error('Invalid declared competition result authority');
     }
+    const voluntaryForfeit = Boolean(
+      input.gameEnd.metadata &&
+      typeof input.gameEnd.metadata === 'object' &&
+      !Array.isArray(input.gameEnd.metadata) &&
+      'gameOverReason' in input.gameEnd.metadata &&
+      input.gameEnd.metadata.gameOverReason === 'manual'
+    );
     const evidence = {
       score: input.gameEnd.finalScore,
       gameTimeMs: input.gameEnd.gameTime,
       clientTimestampMs: Date.now(),
     };
-    const result = declaresCompetitionAuthority
-      ? await input.competitionCoordinator.finishDeclared(
-        input.gameSessionId,
-        input.gameEnd.competitionAttemptId as string,
-        evidence,
-      )
-      : await input.competitionCoordinator.finish(input.gameSessionId, evidence);
+    const result = voluntaryForfeit
+      ? declaresCompetitionAuthority
+        ? await input.competitionCoordinator.abandonDeclared(
+          input.gameSessionId,
+          input.gameEnd.competitionAttemptId as string,
+        )
+        : await input.competitionCoordinator.abandon(input.gameSessionId)
+      : declaresCompetitionAuthority
+        ? await input.competitionCoordinator.finishDeclared(
+          input.gameSessionId,
+          input.gameEnd.competitionAttemptId as string,
+          evidence,
+        )
+        : await input.competitionCoordinator.finish(input.gameSessionId, evidence);
     return {
       source: 'competition' as const,
       success: true,
-      finalScore: result.score ?? input.gameEnd.finalScore,
+      finalScore: voluntaryForfeit ? 0 : result.score ?? input.gameEnd.finalScore,
       isValid: result.status === 'valid',
       result,
     };
