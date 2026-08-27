@@ -310,11 +310,11 @@ export function CukieMasterStatusPanel({
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tu estado personal</p>
             <h2 className="mt-2 break-words font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
-              Tus cupos Cukie Master
+              Tu posición Cukie Master
             </h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
               {ukiOnly
-                ? 'Sumamos tus UKI en vesting sin reclamar y tus UKI depositados para calcular esta ruta.'
+                ? 'Tus UKI de preventa pendientes y tus UKI en staking se suman automáticamente.'
                 : 'Revisamos vesting, staking e inventario antes de recomendarte ninguna acción.'}
             </p>
           </div>
@@ -339,7 +339,7 @@ export function CukieMasterStatusPanel({
         {authLoading || state === 'loading' ? (
           <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
             <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
-            Verificando tus activos y cupos…
+            Verificando tus UKI…
           </div>
         ) : null}
 
@@ -348,7 +348,7 @@ export function CukieMasterStatusPanel({
             <div className="min-w-0">
               <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Conecta una wallet EVM</p>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                Firma el acceso para consultar datos personales. No calculamos cupos con información incompleta.
+                Firma el acceso para consultar tu posición y tus saldos.
               </p>
             </div>
             <LandingWalletConnectButton
@@ -452,10 +452,15 @@ export function CukieMasterStatusPanel({
 
 function UkiOnlyStatus({ route }: { route: PublicRoute }) {
   const breakdown = getUkiBreakdown(route);
-  const counts = slotCounts(route);
   const displayedSlots = route.synchronizing
     ? route.previewSlots ?? 0
     : route.position?.allocatedSlots ?? 0;
+  const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
+  const nextStep = displayedSlots >= MAX_ROUTE_SLOTS
+    ? 'Has alcanzado el máximo de 5 Cukie Masters mediante UKI.'
+    : deficit
+      ? `Te faltan ${requirementLabel(deficit)} para desbloquear tu próximo Cukie Master.`
+      : 'Deposita UKI para avanzar hacia tu próximo Cukie Master.';
 
   return (
     <div className="mt-6 min-w-0">
@@ -473,20 +478,20 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
         <StatusMetric
           label="Total computable"
           value={breakdown?.total ?? 'No disponible'}
-          helper="Vesting sin reclamar + staking confirmado"
+          helper="Vesting y staking"
           tone="cyan"
         />
         <StatusMetric
-          label="Cukie Masters actuales"
+          label="Tus Cukie Masters"
           value={`${displayedSlots}/${MAX_ROUTE_SLOTS}`}
-          helper={`${counts.active} activos · ${counts.qualifying} en validación`}
+          helper="Máximo 5 mediante UKI"
           tone="cyan"
         />
       </div>
 
       <div className="mt-4 rounded-[8px] border border-white/10 bg-black/20 p-4">
         <div className="flex items-center justify-between gap-4 text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
-          <span>Progreso de la ruta UKI</span>
+          <span>Tu progreso</span>
           <span>{displayedSlots} de {MAX_ROUTE_SLOTS}</span>
         </div>
         <span
@@ -502,10 +507,7 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
             style={{ width: `${Math.min(100, displayedSlots * 20)}%` }}
           />
         </span>
-      </div>
-
-      <div className="mt-4">
-        <RouteDetail label="Tu ruta UKI" route={route} />
+        <p className="mt-3 text-sm font-semibold text-[var(--uki-text)]">{nextStep}</p>
       </div>
     </div>
   );

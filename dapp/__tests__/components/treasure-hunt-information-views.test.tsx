@@ -11,6 +11,7 @@ jest.mock('lucide-react', () => ({
   Archive: () => null,
   ArrowRight: () => null,
   BarChart3: () => null,
+  BookOpenText: () => null,
   CalendarDays: () => null,
   CheckCircle2: () => null,
   CircleDollarSign: () => null,
@@ -172,8 +173,8 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('Intentos disponibles')).toBeInTheDocument();
     expect(screen.getByText('Resultados que cuentan')).toBeInTheDocument();
     expect(screen.getByText('Premio acumulado')).toBeInTheDocument();
-    expect(screen.getByText('N.º de ganadores')).toBeInTheDocument();
-    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.queryByText('N.º de ganadores')).not.toBeInTheDocument();
+    expect(screen.queryByText(/El número de ganadores es provisional/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
@@ -183,25 +184,24 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
 
     const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
-    expect(playLink).toHaveClass('hidden', 'sm:inline-flex');
+    expect(playLink).toHaveAttribute('href', '/games/treasure-hunt');
     expect(screen.getByText('Intentos disponibles').closest('dl')).toHaveClass(
-      'grid-cols-2',
-      'sm:grid-cols-4',
+      'grid-cols-3',
     );
     expect(screen.getByRole('navigation', { name: 'Paginación del ranking' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
   });
 
-  it('presenta las siete secciones del reglamento aprobado', () => {
+  it('presenta las cinco secciones del reglamento aprobado en el PDF', () => {
     const { container } = render(<TreasureHuntRulesView />);
 
     expect(screen.getByText('Cómo participar')).toBeInTheDocument();
-    expect(screen.getByText('Clasificación')).toBeInTheDocument();
-    expect(screen.getByText('Mantener el staking')).toBeInTheDocument();
-    expect(screen.getByText('Tickets para el sorteo')).toBeInTheDocument();
-    expect(screen.getByText('Pool y premios')).toBeInTheDocument();
-    expect(screen.getByText('Selección de ganadores')).toBeInTheDocument();
+    expect(screen.getByText('Pool de premios')).toBeInTheDocument();
+    expect(screen.getByText('¿Cómo se eligen los ganadores?')).toBeInTheDocument();
     expect(screen.getByText('Entrega de los Premios')).toBeInTheDocument();
+    expect(screen.getByText('Descalificación')).toBeInTheDocument();
+    expect(screen.getByText(/Cada 2\.000 UKI que deposites en staking/i)).toBeInTheDocument();
+    expect(screen.getByText(/250.000 UKI de bote = 25 ganadores/i)).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
   });
 

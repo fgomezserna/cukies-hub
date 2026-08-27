@@ -445,6 +445,10 @@ export default function TreasureHuntGameView() {
         window.dispatchEvent(new CustomEvent('cukies:open-wallet-dialog'));
         return;
       }
+      if (event.data?.type === 'TREASURE_HUNT_MANAGE_STAKING_REQUEST') {
+        window.location.assign('/cukie-master');
+        return;
+      }
       if (event.data?.type === 'TREASURE_HUNT_RETURN_TO_MENU') {
         window.location.assign('/games/treasure-hunt');
         return;
