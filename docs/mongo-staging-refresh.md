@@ -25,7 +25,7 @@ Bases logicas y consumidores:
 | --- | --- | --- |
 | `cukies-hub-staging` | Dapp Prisma y acceso Mongo del hub | `cukies_hub_staging_app` |
 | `cukies-legacy-staging` | Lecturas legacy de Cukies/NFT/wallets | `cukies_legacy_staging_app` |
-| `cukieshub-new-staging` | Indexer y economia v2 | `cukies_economy_staging_app` |
+| `cukieshub-new-staging` | Indexer y economia v3 | `cukies_economy_staging_app` |
 | `cukieshub-new-staging` | Card worker, cuando tenga destino S3 propio | `cukies_card_staging_worker` |
 
 Cada usuario esta limitado a `readWrite` y `dbAdmin` sobre su base. Las credenciales viven en Coolify y no se documentan ni se guardan en Git.
@@ -60,9 +60,9 @@ Los clientes Mongo de la dapp y el importador legacy derivan la base de la URL. 
 
 - Mongo staging: `PRIMARY` y health check correcto.
 - Dapp: usa `cukies-hub-staging` y `cukies-legacy-staging`.
-- Indexer y economia: usan `cukieshub-new-staging` con schema version `2` y transacciones verificadas.
+- Indexer y economia: usan `cukieshub-new-staging`; la migracion operativa actual es schema version `3` y conserva la verificacion transaccional.
 - Segunda wallet firmada: un `User` y un `UserWallet` creados en `cukies-hub-staging`; cero registros para esa dirección en `cukies-hub` de produccion.
-- Cinco schedulers: contenedores sanos; sus gates economicos permanecen desactivados hasta aprobar reglas de producto.
+- Seis schedulers: contenedores independientes para Cukie Master, creditos, Game Economy, Cukie Pool, ranking semanal y contabilidad de rewards. Cada uno conserva su gate explicito.
 - Card worker: desactivado hasta disponer de bucket/prefijo S3 exclusivo de staging.
 
 ## Refresh futuro
@@ -77,7 +77,7 @@ Antes de cualquier refresh:
 4. Detener exclusivamente los writers del recurso `28`.
 5. Proporcionar al proceso, de forma temporal, URLs fuente acotadas a las bases logicas de staging del Mongo compartido; no reutilizar las URLs runtime de la dapp.
 6. Ejecutar `resync.sh` dentro de `staging-mongo` y comprobar que el marcador incrementa `resyncCount` una sola vez.
-7. Reaplicar el schema de economia v2 y verificar una transaccion abortada sin residuos.
+7. Reaplicar el schema de economia v3 y verificar una transaccion abortada sin residuos.
 8. Arrancar los servicios de staging y validar `/api/health`, indexer, card jobs y logs.
 9. Confirmar de nuevo que SHA, variables y health de produccion no han cambiado.
 

@@ -92,6 +92,13 @@ export function calculateUndistributedRewardAllocations(
           weight: BigInt(rule.undistributedBps.development),
         },
         {
+          key: "marketing_development",
+          walletNormalized:
+            rule.destinations.marketingDevelopment ?? rule.destinations.marketing,
+          category: "marketing_development" as const,
+          weight: BigInt(rule.undistributedBps.marketingDevelopment ?? 0),
+        },
+        {
           key: "supply_reduction",
           walletNormalized: rule.destinations.supplyReduction,
           category: "supply_reduction" as const,
@@ -115,8 +122,9 @@ export function calculateUndistributedRewardAllocations(
 
 /**
  * Materializa todas las obligaciones de una partida: la reserva fija semanal
- * (2.5 UKI) como accrual no claimable y el convertible (0..7.5 UKI) como
- * claims finales y/o accruals intermedios de pools.
+ * (2 UKI), la reserva de embajadores (0.4 ordinario + 0.1 semanal en V3)
+ * como accruals no claimables y
+ * el convertible (0..7.5 UKI) como claims finales y/o accruals de pools.
  */
 export function calculateSettlementRewardAllocations(
   rule: RewardRule,
@@ -135,7 +143,8 @@ export function calculateSettlementRewardAllocations(
   if (
     input.cukieSource !== "own" &&
     input.cukieSource !== "pool_original" &&
-    input.cukieSource !== "pool_second_plus"
+    input.cukieSource !== "pool_second_plus" &&
+    input.cukieSource !== "seiku"
   ) {
     throw new DomainValidationError("cukieSource no es valido.");
   }
@@ -144,18 +153,38 @@ export function calculateSettlementRewardAllocations(
       "grossConvertedRaw excede el maximo convertible ligado a GameEconomy.",
     );
   }
-  const reserveNumerator =
+  const weeklyReserveNumerator =
     maxConvertibleRaw * BigInt(rule.runCredits.weeklyReserveUnits);
+  const ambassadorReserveNumerator =
+    maxConvertibleRaw * BigInt(rule.runCredits.ambassadorReserveUnits);
+  const ambassadorOrdinaryNumerator = rule.runCredits.ambassadorOrdinaryUnits === undefined
+    ? null
+    : maxConvertibleRaw * BigInt(rule.runCredits.ambassadorOrdinaryUnits);
+  const ambassadorWeeklyNumerator = rule.runCredits.ambassadorWeeklyUnits === undefined
+    ? null
+    : maxConvertibleRaw * BigInt(rule.runCredits.ambassadorWeeklyUnits);
   const reserveDenominator = BigInt(rule.runCredits.convertibleUnits);
   if (
     reserveDenominator === BigInt(0)
-    || reserveNumerator % reserveDenominator !== BigInt(0)
+    || weeklyReserveNumerator % reserveDenominator !== BigInt(0)
+    || ambassadorReserveNumerator % reserveDenominator !== BigInt(0)
+    || (ambassadorOrdinaryNumerator !== null
+      && ambassadorOrdinaryNumerator % reserveDenominator !== BigInt(0))
+    || (ambassadorWeeklyNumerator !== null
+      && ambassadorWeeklyNumerator % reserveDenominator !== BigInt(0))
   ) {
     throw new DomainValidationError(
       "La reserva fija no se puede derivar exactamente del maximo convertible.",
     );
   }
-  const weeklyPrizePoolRaw = reserveNumerator / reserveDenominator;
+  const weeklyPrizePoolRaw = weeklyReserveNumerator / reserveDenominator;
+  const ambassadorProgramRaw = ambassadorReserveNumerator / reserveDenominator;
+  const ambassadorOrdinaryRaw = ambassadorOrdinaryNumerator === null
+    ? null
+    : ambassadorOrdinaryNumerator / reserveDenominator;
+  const ambassadorWeeklyRaw = ambassadorWeeklyNumerator === null
+    ? null
+    : ambassadorWeeklyNumerator / reserveDenominator;
   if (
     input.creditCostUnits !== rule.runCredits.totalUnits ||
     input.weeklyReserveUnits !== rule.runCredits.weeklyReserveUnits
@@ -177,6 +206,23 @@ export function calculateSettlementRewardAllocations(
     category: "weekly_prize_pool",
     amountRaw: formatRawAmount(weeklyPrizePoolRaw),
   }];
+  if (ambassadorOrdinaryRaw !== null && ambassadorWeeklyRaw !== null) {
+    accruals.push(
+      {
+        category: "ambassador_ordinary_pending",
+        amountRaw: formatRawAmount(ambassadorOrdinaryRaw),
+      },
+      {
+        category: "ambassador_weekly_pending",
+        amountRaw: formatRawAmount(ambassadorWeeklyRaw),
+      },
+    );
+  } else {
+    accruals.push({
+      category: "ambassador_program_pending",
+      amountRaw: formatRawAmount(ambassadorProgramRaw),
+    });
+  }
   const creditPoolRaw =
     input.creditSource === "pool"
       ? rawByBps(grossRaw, rule.settlementBps.poolCredits)
@@ -188,13 +234,16 @@ export function calculateSettlementRewardAllocations(
     });
   }
 
-  const borrowedCukie = input.cukieSource !== "own";
-  const cukiePoolBps = borrowedCukie
+  const usesPoolSlot = input.cukieSource !== "own";
+  const reservedCukieShareBps = usesPoolSlot
     ? input.creditSource === "pool"
       ? rule.settlementBps.poolCukieWithPoolCredits
       : rule.settlementBps.poolCukieWithOwnCredits
     : 0;
-  const cukiePoolRaw = rawByBps(grossRaw, cukiePoolBps);
+  const reservedCukieShareRaw = rawByBps(grossRaw, reservedCukieShareBps);
+  const cukiePoolRaw = input.cukieSource === "seiku"
+    ? BigInt(0)
+    : reservedCukieShareRaw;
   if (cukiePoolRaw > BigInt(0)) {
     const original = input.cukieSource === "pool_original";
     accruals.push({
@@ -205,7 +254,9 @@ export function calculateSettlementRewardAllocations(
     });
   }
 
-  const playerBaseRaw = grossRaw - creditPoolRaw - cukiePoolRaw;
+  // Seiku conserva la misma porcion economica que un Cukie prestado, pero
+  // esa parte del pool queda sin repartir y nunca aumenta el premio del jugador.
+  const playerBaseRaw = grossRaw - creditPoolRaw - reservedCukieShareRaw;
   const rankingBps =
     input.creditSource === "pool"
       ? rule.rankingPlayerBps[String(input.ranking)]
@@ -218,7 +269,8 @@ export function calculateSettlementRewardAllocations(
       amountRaw: formatRawAmount(playerRaw),
     });
   }
-  const undistributedRaw = grossRaw - creditPoolRaw - cukiePoolRaw - playerRaw;
+  const unconvertedRaw = maxConvertibleRaw - grossRaw;
+  const undistributedRaw = maxConvertibleRaw - creditPoolRaw - cukiePoolRaw - playerRaw;
   if (undistributedRaw > BigInt(0)) {
     accruals.push({
       category: "undistributed_pending",
@@ -230,10 +282,18 @@ export function calculateSettlementRewardAllocations(
     allocations: combineDrafts(drafts),
     accruals,
     totals: {
-      sourceTotalRaw: formatRawAmount(weeklyPrizePoolRaw + grossRaw),
+      sourceTotalRaw: formatRawAmount(
+        weeklyPrizePoolRaw + ambassadorProgramRaw + maxConvertibleRaw,
+      ),
       weeklyPrizePoolRaw: formatRawAmount(weeklyPrizePoolRaw),
+      ambassadorProgramRaw: formatRawAmount(ambassadorProgramRaw),
+      ambassadorOrdinaryRaw:
+        ambassadorOrdinaryRaw === null ? null : formatRawAmount(ambassadorOrdinaryRaw),
+      ambassadorWeeklyRaw:
+        ambassadorWeeklyRaw === null ? null : formatRawAmount(ambassadorWeeklyRaw),
       grossConvertedRaw: formatRawAmount(grossRaw),
       maxConvertibleRaw: formatRawAmount(maxConvertibleRaw),
+      unconvertedRaw: formatRawAmount(unconvertedRaw),
       creditPoolRaw: formatRawAmount(creditPoolRaw),
       cukiePoolRaw: formatRawAmount(cukiePoolRaw),
       playerBaseRaw: formatRawAmount(playerBaseRaw),
@@ -321,7 +381,6 @@ export function calculateCukiePoolDistribution(
 ) {
   assertRewardRule(rule);
   const sourcePoolRaw = positiveRaw(input.sourcePoolRaw, "sourcePoolRaw");
-  const carryWallet = validRewardWallet(input.carryWallet, "carryWallet");
   if (input.generation !== "original" && input.generation !== "second_plus") {
     throw new DomainValidationError("generation debe ser original o second_plus.");
   }
@@ -359,20 +418,16 @@ export function calculateCukiePoolDistribution(
   }
   const tierAmounts = apportionRaw(
     sourcePoolRaw,
-    Array.from({ length: rule.cukiePool.cumulativeTierCount }, (_, tier) => ({
+    rule.cukiePool.cumulativeTierBps.map((weightBps, tier) => ({
       key: `tier:${tier}`,
       tier,
-      weight: BigInt(1),
+      weight: BigInt(weightBps),
     }))
   );
   const category: RewardCategory =
     input.generation === "original"
       ? "cukie_pool_original_distribution"
       : "cukie_pool_second_plus_distribution";
-  const carryCategory: RewardCategory =
-    input.generation === "original"
-      ? "cukie_pool_original_carry"
-      : "cukie_pool_second_plus_carry";
   const drafts: RewardAllocationDraft[] = [];
   let carriedRaw = BigInt(0);
   for (const tranche of tierAmounts) {
@@ -395,15 +450,14 @@ export function calculateCukiePoolDistribution(
       }))
     );
   }
-  if (carriedRaw > BigInt(0)) {
-    drafts.push({
-      walletNormalized: carryWallet,
-      category: carryCategory,
-      amountRaw: formatRawAmount(carriedRaw),
-    });
-  }
   return {
     allocations: combineDrafts(drafts),
+    accruals: carriedRaw === BigInt(0)
+      ? [] as RewardAccrualDraft[]
+      : [{
+          category: "undistributed_pending" as const,
+          amountRaw: formatRawAmount(carriedRaw),
+        }],
     totals: {
       sourcePoolRaw: formatRawAmount(sourcePoolRaw),
       distributedRaw: formatRawAmount(sourcePoolRaw - carriedRaw),

@@ -223,7 +223,11 @@ export function createMongoCukiePoolRepository(
       );
     },
     listExpiredAssignments: (now, limit) => assignments
-      .find({ status: 'active', expiresAt: { $lte: now } }, options)
+      .find({
+        status: 'active',
+        expiresAt: { $lte: now },
+        custodyMode: { $ne: 'custodial' },
+      }, options)
       .sort({ expiresAt: 1, _id: 1 })
       .limit(limit)
       .toArray(),

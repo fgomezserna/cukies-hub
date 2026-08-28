@@ -46,6 +46,7 @@ export type WeeklyRankingSource = {
   reservationId: string;
   gameId: string;
   walletNormalized: string;
+  periodAnchorAt: Date;
   settledAt: Date;
   cappedScoreRaw: string;
   scoreCapRaw: string;

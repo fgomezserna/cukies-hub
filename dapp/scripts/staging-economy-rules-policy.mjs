@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 
 export const STAGING_ECONOMY_RULESET = Object.freeze({
-  id: 'staging-test-v1',
+  id: 'staging-test-v4',
   activeFrom: '2026-08-10T00:00:00.000Z',
-  rewardVersion: 'rewards-staging-test-v1',
-  creditVersion: 'credits-staging-test-v1',
+  rewardVersion: 'rewards-staging-test-v4',
+  creditVersion: 'credits-staging-test-v4',
   gameId: 'treasure-hunt',
-  gameVersion: 'staging-test-v1',
+  gameVersion: 'staging-test-v4',
   rankingVersion: 'weekly-ranking-staging-test-v1',
 });
 
-export const STAGING_ECONOMY_CONFIRMATION = 'APPLY_STAGING_TESTNET_97_RULES_V1';
+export const STAGING_ECONOMY_CONFIRMATION = 'APPLY_STAGING_TESTNET_97_RULES_V4';
 
 const STAGING_RESOURCE_UUID = 'u4s804o4wwcckowgk0woo4wg';
 const STAGING_DATABASE = 'cukieshub-new-staging';
@@ -20,20 +20,29 @@ const FALSE_RUNTIME_GATES = [
   'GAME_ECONOMY_RUNTIME_ENABLED',
   'CUKIE_POOL_RUNTIME_ENABLED',
   'WEEKLY_RANKING_RUNTIME_ENABLED',
+  'REWARD_ACCOUNTING_RUNTIME_ENABLED',
+  'REWARD_DAILY_ACCOUNTING_ENABLED',
+  'REWARD_WEEKLY_PAYOUT_ENABLED',
+  'REWARD_POOL_TRANCHES_ENABLED',
+  'REWARD_BATCH_PUBLISHER_ENABLED',
 ];
 
 const SOURCE_ENVIRONMENT_KEYS = Object.freeze({
   UKI_STAKING: 'CHAIN_INDEXER_UKI_STAKING_ADDRESS',
   VESTING_VAULT: 'CHAIN_INDEXER_VESTING_VAULT_ADDRESS',
   TOKEN: 'CHAIN_INDEXER_TOKEN_ADDRESS',
+  TOKEN_V2: 'CHAIN_INDEXER_TOKEN_V2_ADDRESS',
   MARKETPLACE: 'CHAIN_INDEXER_MARKETPLACE_ADDRESS',
   BRIDGE: 'CHAIN_INDEXER_BRIDGE_ADDRESS',
+  CUKIE_MASTER_NFT_VAULT: 'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS',
+  CUKIE_POOL_NFT_VAULT: 'CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS',
 });
 
 export const STAGING_ECONOMY_CURSOR_EVENTS = Object.freeze({
   UKI_STAKING: ['Staked', 'Unstaked'],
   VESTING_VAULT: ['VestingCreated', 'TokensReleased'],
   TOKEN: ['Transfer', 'CukieMetadataConfigured'],
+  TOKEN_V2: ['Transfer', 'CukieMetadataConfigured'],
   MARKETPLACE: [
     'TokenOnSale',
     'TokenBought',
@@ -41,6 +50,21 @@ export const STAGING_ECONOMY_CURSOR_EVENTS = Object.freeze({
     'MarketTokenPriceChanged',
   ],
   BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
+  CUKIE_MASTER_NFT_VAULT: [
+    'CukieMasterCollectionAllowedUpdated',
+    'CukieMasterDeposited',
+    'CukieMasterWithdrawn',
+    'CukieMasterUntrackedERC721Recovered',
+  ],
+  CUKIE_POOL_NFT_VAULT: [
+    'CukiePoolCollectionAllowedUpdated',
+    'CukiePoolCalendarVersionScheduled',
+    'CukiePoolDeposited',
+    'CukiePoolExitRequested',
+    'CukiePoolWithdrawableAtAdvanced',
+    'CukiePoolWithdrawn',
+    'CukiePoolUntrackedERC721Recovered',
+  ],
 });
 
 const TEST_ONLY_DESTINATIONS = Object.freeze({
@@ -50,6 +74,7 @@ const TEST_ONLY_DESTINATIONS = Object.freeze({
   treasury: '0x9700000000000000000000000000000000000004',
   marketing: '0x9700000000000000000000000000000000000005',
   development: '0x9700000000000000000000000000000000000006',
+  marketingDevelopment: '0x9700000000000000000000000000000000000005',
   supplyReduction: '0x9700000000000000000000000000000000000007',
 });
 
@@ -217,6 +242,11 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
       `${alias}.contractConfigHash`,
       blockers,
     );
+    const deploymentTxHash = canonicalHash(
+      first?.contractDeploymentTxHash,
+      `${alias}.contractDeploymentTxHash`,
+      blockers,
+    );
     const deploymentBlock = first?.contractDeploymentBlock;
     if (!Number.isSafeInteger(deploymentBlock) || deploymentBlock < 0) {
       blockers.push(`${alias}.contractDeploymentBlock must be a non-negative integer`);
@@ -234,6 +264,7 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
         || cursor.verifiedChainId !== 97
         || cursor.contractCodeHash?.toLowerCase() !== runtimeCodeHash
         || cursor.contractConfigHash?.toLowerCase() !== configHash
+        || cursor.contractDeploymentTxHash?.toLowerCase() !== deploymentTxHash
         || cursor.contractDeploymentBlock !== deploymentBlock
         || cursor.bootstrapStartBlock !== deploymentBlock
         || !(cursor.bootstrapVerifiedAt instanceof Date)
@@ -247,8 +278,8 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
       }
     }
 
-    if (runtimeCodeHash && configHash && Number.isSafeInteger(deploymentBlock)) {
-      identities[alias] = { runtimeCodeHash, configHash, deploymentBlock };
+    if (runtimeCodeHash && configHash && deploymentTxHash && Number.isSafeInteger(deploymentBlock)) {
+      identities[alias] = { runtimeCodeHash, configHash, deploymentTxHash, deploymentBlock };
     }
   }
 
@@ -256,7 +287,7 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
   return identities;
 }
 
-function buildRewardRule(activeFrom, now) {
+function buildRewardRule(activeFrom, programStartsAt, now) {
   const base = {
     _id: `reward_allocations:${STAGING_ECONOMY_RULESET.rewardVersion}`,
     scope: 'reward_allocations',
@@ -267,7 +298,10 @@ function buildRewardRule(activeFrom, now) {
     runCredits: {
       unitScale: 10,
       totalUnits: 100,
-      weeklyReserveUnits: 25,
+      weeklyReserveUnits: 20,
+      ambassadorReserveUnits: 5,
+      ambassadorOrdinaryUnits: 4,
+      ambassadorWeeklyUnits: 1,
       convertibleUnits: 75,
     },
     settlementBps: {
@@ -287,25 +321,31 @@ function buildRewardRule(activeFrom, now) {
       '9': 2_000,
     },
     creditPoolDaily: {
-      sourceShareBps: 2_000,
+      sourceShareBps: 10_000,
       floorEnabled: true,
       floorCreditsStep: 10,
       floorAmountRaw: '750000000000000000',
     },
     emissionBudget: {
-      programStartsAt: activeFrom,
-      dayBoundarySecondUtc: 0,
+      programStartsAt,
+      dayBoundarySecondUtc: 14 * 60 * 60,
       lateReservationGraceSeconds: 86_400,
       dailyCapRaw: '500000000000000000000000',
       lifetimeCapRaw: '450000000000000000000000000',
-      unusedDailyCapacity: 'expires',
+      unusedDailyCapacity: 'materialize_undistributed',
       overflowPolicy: 'block',
     },
-    cukiePool: { cumulativeTierCount: 6 },
+    cukiePool: {
+      cumulativeTierCount: 6,
+      cumulativeTierBps: /** @type {[number, number, number, number, number, number]} */ (
+        [4_500, 2_000, 1_500, 1_200, 700, 100]
+      ),
+    },
     undistributedBps: {
       treasury: 8_000,
-      marketing: 500,
-      development: 500,
+      marketing: 0,
+      development: 0,
+      marketingDevelopment: 1_000,
       supplyReduction: 1_000,
     },
     destinations: { ...TEST_ONLY_DESTINATIONS },
@@ -339,8 +379,12 @@ function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
     version: STAGING_ECONOMY_RULESET.creditVersion,
     active: true,
     activeFrom,
-    cutoffHourUtc: 12,
+    cutoffHourUtc: 14,
     cutoffMinuteUtc: 0,
+    // Competition credits become spendable at the 14:00 UTC boundary. UKI,
+    // pool and accounting settlement remains a separate 16:00 UTC process.
+    settlementHourUtc: 14,
+    settlementMinuteUtc: 0,
     maxSnapshotLatenessMs: 30 * 60 * 1000,
     sourceFreshnessMs: 15 * 60 * 1000,
     expectedBscChainId: 97,
@@ -365,6 +409,8 @@ function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
       activeFrom: base.activeFrom,
       cutoffHourUtc: base.cutoffHourUtc,
       cutoffMinuteUtc: base.cutoffMinuteUtc,
+      settlementHourUtc: base.settlementHourUtc,
+      settlementMinuteUtc: base.settlementMinuteUtc,
       maxSnapshotLatenessMs: base.maxSnapshotLatenessMs,
       sourceFreshnessMs: base.sourceFreshnessMs,
       expectedBscChainId: base.expectedBscChainId,
@@ -402,7 +448,7 @@ function buildGameRule(activeFrom, now, rewardRule, creditRule) {
     },
     cukie: {
       required: true,
-      consumeOnSettle: false,
+      consumeOnSettle: true,
       minAssets: 0,
       maxAssets: 0,
       role: 'own_or_pool',
@@ -462,16 +508,35 @@ function buildRankingRule(activeFrom, now) {
   };
 }
 
-export function buildStagingEconomyRuleSet({ environment = process.env, cursors, now = new Date() }) {
+export function buildStagingEconomyRuleSet({
+  environment = process.env,
+  cursors,
+  now = new Date(),
+  creditBaselineAt = now,
+}) {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new StagingEconomyRulesError(['now must be a valid Date']);
   }
   const { sourceContractAddresses } = validateStagingEconomyEnvironment(environment);
   const identities = buildVerifiedSources(cursors, sourceContractAddresses, now);
   const activeFrom = new Date(STAGING_ECONOMY_RULESET.activeFrom);
-  const reward = buildRewardRule(activeFrom, now);
-  const credit = buildCreditRule(activeFrom, now, sourceContractAddresses, identities);
-  const game = buildGameRule(activeFrom, now, reward, credit);
+  if (!(creditBaselineAt instanceof Date) || Number.isNaN(creditBaselineAt.getTime())) {
+    throw new StagingEconomyRulesError(['creditBaselineAt must be a valid Date']);
+  }
+  const creditBaseline = new Date(Math.max(activeFrom.getTime(), creditBaselineAt.getTime()));
+  let creditActiveFrom = new Date(Date.UTC(
+    creditBaseline.getUTCFullYear(),
+    creditBaseline.getUTCMonth(),
+    creditBaseline.getUTCDate(),
+    14,
+    0,
+  ));
+  if (creditActiveFrom < creditBaseline) {
+    creditActiveFrom = new Date(creditActiveFrom.getTime() + 86_400_000);
+  }
+  const reward = buildRewardRule(creditActiveFrom, activeFrom, now);
+  const credit = buildCreditRule(creditActiveFrom, now, sourceContractAddresses, identities);
+  const game = buildGameRule(creditActiveFrom, now, reward, credit);
   const ranking = buildRankingRule(activeFrom, now);
   return { reward, credit, game, ranking };
 }

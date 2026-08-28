@@ -1,10 +1,12 @@
 import {
   CompetitionServiceError,
+  CompetitionEntitlementConflictError,
   createCompetitionService,
   verifyCheckpointReceipt,
   type CompetitionAttemptRecord,
   type CompetitionParticipantRecord,
   type CompetitionRepository,
+  type CompetitionStakingSource,
   type CompetitionStoredEvidencePoint,
 } from '@/lib/treasure-hunt-competition/server';
 
@@ -15,6 +17,17 @@ const campaignEnv = {
   TREASURE_HUNT_COMPETITION_PRESALE_ADDRESS: `0x${'9'.repeat(40)}`,
   TREASURE_HUNT_COMPETITION_STARTS_AT: '2026-07-10T00:00:00.000Z',
   TREASURE_HUNT_COMPETITION_ENDS_AT: '2026-07-20T00:00:00.000Z',
+};
+
+const stakingCampaignEnv = {
+  ...campaignEnv,
+  TREASURE_HUNT_COMPETITION_ID: 'uki-staking-testnet-2026-08',
+  TREASURE_HUNT_COMPETITION_ELIGIBILITY_KIND: 'uki_staking',
+  TREASURE_HUNT_COMPETITION_STAKING_ADDRESS: `0x${'8'.repeat(40)}`,
+  CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
+  TREASURE_HUNT_COMPETITION_STAKE_PER_ATTEMPT_RAW: '2000000000000000000000',
+  TREASURE_HUNT_COMPETITION_TOP_ATTEMPTS_PER_WALLET: '10',
+  TREASURE_HUNT_COMPETITION_POINTS_PER_TICKET: '100',
 };
 
 class MemoryCompetitionRepository implements CompetitionRepository {
@@ -115,6 +128,33 @@ class MemoryCompetitionRepository implements CompetitionRepository {
         this.attempts.set(attemptId, { ...attempt, status: 'abandoned', finishedAt: now });
       }
     }
+  }
+
+  async abandonAttempt(input: {
+    attemptId: string;
+    walletAddress: string;
+    expectedSequence: number;
+    expectedPreviousDigest: string;
+    now: string;
+  }) {
+    const attempt = this.attempts.get(input.attemptId);
+    if (
+      !attempt ||
+      attempt.status !== 'active' ||
+      attempt.finishPendingAuthority === true ||
+      attempt.walletAddress !== input.walletAddress ||
+      attempt.nextSequence !== input.expectedSequence ||
+      attempt.lastDigest !== input.expectedPreviousDigest
+    ) return null;
+    const abandoned: CompetitionAttemptRecord = {
+      ...attempt,
+      status: 'abandoned',
+      finishPendingAuthority: false,
+      finishedAt: input.now,
+      updatedAt: input.now,
+    };
+    this.attempts.set(input.attemptId, abandoned);
+    return abandoned;
   }
 
   async listPendingFinishAttempts(campaignId: string, limit: number) {
@@ -239,6 +279,11 @@ class MemoryCompetitionRepository implements CompetitionRepository {
       .slice(0, limit);
   }
 
+  async countAttempts(campaignId: string, walletAddress: string) {
+    return [...this.attempts.values()].filter((attempt) =>
+      attempt.campaignId === campaignId && attempt.walletAddress === walletAddress).length;
+  }
+
   async listValidAttempts(campaignId: string, limit?: number) {
     const attempts = [...this.attempts.values()]
       .filter((attempt) =>
@@ -255,6 +300,8 @@ function createHarness(options: {
   releaseGameSession?: jest.Mock;
   createId?: () => string;
   activeAttemptStaleMs?: number;
+  environment?: typeof campaignEnv;
+  stakingSource?: CompetitionStakingSource;
 } = {}) {
   const repository = options.repository ?? new MemoryCompetitionRepository();
   let now = new Date('2026-07-12T12:00:00.000Z');
@@ -265,7 +312,8 @@ function createHarness(options: {
   const releaseGameSession = options.releaseGameSession ?? jest.fn(async () => true);
   const service = createCompetitionService({
     repository,
-    environment: campaignEnv,
+    environment: options.environment ?? campaignEnv,
+    stakingSource: options.stakingSource,
     proofSecret,
     now: () => now,
     createId: options.createId ?? (() => 'attempt-1'),
@@ -300,6 +348,154 @@ function createHarness(options: {
 const wallet = '0x1111111111111111111111111111111111111111';
 
 describe('Treasure Hunt competition service', () => {
+  function stakingSource(input: {
+    stakedUkiRaw: string;
+    ready?: boolean;
+    disqualified?: boolean;
+  }): CompetitionStakingSource {
+    return {
+      getSnapshot: jest.fn(async () => ({
+        ready: input.ready ?? true,
+        stakedUkiRaw: input.stakedUkiRaw,
+        totalStakedUkiRaw: '40000000000000000000000',
+        indexedThroughBlock: 123_456_789,
+        indexedAt: '2026-07-12T11:59:59.000Z',
+        disqualified: input.disqualified ?? false,
+        disqualificationEvidence: input.disqualified ? {
+          eventId: 'unstake-event-1',
+          txHash: `0x${'a'.repeat(64)}`,
+          blockNumber: 123_456_700,
+          timestamp: '2026-07-11T12:00:00.000Z',
+          amountRaw: '1',
+        } : null,
+        issues: input.ready === false ? ['STAKING_INDEXER_STALE'] : [],
+      })),
+      listDisqualifiedWallets: jest.fn(async () => new Set<string>()),
+    };
+  }
+
+  it.each([
+    ['1999.999', '1999999000000000000000', 0],
+    ['2000', '2000000000000000000000', 1],
+    ['4000', '4000000000000000000000', 2],
+  ])('grants attempts by confirmed staking floor for %s UKI', async (
+    _label,
+    stakedUkiRaw,
+    attemptsGranted,
+  ) => {
+    const harness = createHarness({
+      environment: stakingCampaignEnv,
+      stakingSource: stakingSource({ stakedUkiRaw }),
+    });
+
+    await expect(harness.service.getStakingEligibility(wallet)).resolves.toMatchObject({
+      ready: true,
+      attemptsGranted,
+      attemptsUsed: 0,
+      attemptsRemaining: attemptsGranted,
+    });
+  });
+
+  it('consumes a staking entitlement when an attempt starts, including abandoned attempts', async () => {
+    let id = 0;
+    const harness = createHarness({
+      environment: stakingCampaignEnv,
+      stakingSource: stakingSource({ stakedUkiRaw: '4000000000000000000000' }),
+      createId: () => `attempt-${++id}`,
+    });
+
+    const first = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1',
+    });
+    const firstStored = harness.repository.attempts.get(first.attemptId)!;
+    harness.repository.attempts.set(first.attemptId, {
+      ...firstStored,
+      status: 'abandoned',
+      finishedAt: '2026-07-12T12:00:01.000Z',
+    });
+    const second = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-2',
+    });
+    const secondStored = harness.repository.attempts.get(second.attemptId)!;
+    harness.repository.attempts.set(second.attemptId, {
+      ...secondStored,
+      status: 'abandoned',
+      finishedAt: '2026-07-12T12:00:02.000Z',
+    });
+
+    await expect(harness.service.getStakingEligibility(wallet)).resolves.toMatchObject({
+      attemptsGranted: 2,
+      attemptsUsed: 2,
+      attemptsRemaining: 0,
+    });
+    await expect(harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-3',
+    })).rejects.toMatchObject({ code: 'NO_ATTEMPTS_REMAINING', status: 409 });
+  });
+
+  it('keeps a replayed start idempotent without consuming a second staking entitlement', async () => {
+    const source = stakingSource({ stakedUkiRaw: '2000000000000000000000' });
+    const harness = createHarness({ environment: stakingCampaignEnv, stakingSource: source });
+    const input = { userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1' };
+
+    const first = await harness.service.startAttempt(input);
+    const replay = await harness.service.startAttempt(input);
+
+    expect(replay.attemptId).toBe(first.attemptId);
+    expect(harness.repository.attempts.size).toBe(1);
+    await expect(harness.service.getStakingEligibility(wallet)).resolves.toMatchObject({
+      attemptsUsed: 1,
+      attemptsRemaining: 0,
+    });
+  });
+
+  it('fails closed for stale staking data and permanently disqualified wallets', async () => {
+    const staleHarness = createHarness({
+      environment: stakingCampaignEnv,
+      stakingSource: stakingSource({
+        stakedUkiRaw: '2000000000000000000000',
+        ready: false,
+      }),
+    });
+    await expect(staleHarness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-stale',
+    })).rejects.toMatchObject({ code: 'ELIGIBILITY_UNAVAILABLE', status: 503 });
+
+    const disqualifiedHarness = createHarness({
+      environment: stakingCampaignEnv,
+      stakingSource: stakingSource({
+        stakedUkiRaw: '4000000000000000000000',
+        disqualified: true,
+      }),
+    });
+    await expect(disqualifiedHarness.service.getStakingEligibility(wallet)).resolves.toMatchObject({
+      disqualified: true,
+      attemptsRemaining: 0,
+    });
+    await expect(disqualifiedHarness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-disqualified',
+    })).rejects.toMatchObject({ code: 'PARTICIPANT_DISQUALIFIED', status: 403 });
+  });
+
+  it('maps a concurrent staking entitlement race to a safe exhausted response', async () => {
+    const repository = new MemoryCompetitionRepository();
+    jest.spyOn(repository, 'createAttempt').mockRejectedValueOnce(
+      new CompetitionEntitlementConflictError(),
+    );
+    const harness = createHarness({
+      repository,
+      environment: stakingCampaignEnv,
+      stakingSource: stakingSource({ stakedUkiRaw: '2000000000000000000000' }),
+    });
+
+    await expect(harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-race',
+    })).rejects.toMatchObject({ code: 'NO_ATTEMPTS_REMAINING', status: 409 });
+    expect(harness.releaseGameSession).toHaveBeenCalledWith(expect.objectContaining({
+      gameSessionId: 'game-session-race',
+    }));
+  });
+
   it('keeps the public runtime fail-closed without requiring a proof secret', () => {
     const service = createCompetitionService({
       repository: new MemoryCompetitionRepository(),
@@ -602,6 +798,65 @@ describe('Treasure Hunt competition service', () => {
         expect.objectContaining({ kind: 'checkpoint', sequence: 0 }),
         expect.objectContaining({ kind: 'finish', sequence: 1 }),
       ],
+    });
+  });
+
+  it('abandons authoritatively before the first checkpoint and closes the GameSession', async () => {
+    const harness = createHarness();
+    const started = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-abandon-early',
+    });
+
+    await expect(harness.service.abandonAttempt({
+      walletAddress: wallet,
+      attemptId: started.attemptId,
+      receipt: started.receipt,
+      sequence: 0,
+    })).resolves.toMatchObject({
+      accepted: true,
+      replayed: false,
+      status: 'abandoned',
+      nextSequence: 0,
+      receipt: null,
+    });
+    expect(harness.finishGameSession).toHaveBeenCalledWith({
+      userId: 'user-1',
+      gameSessionId: 'game-session-abandon-early',
+      attemptId: started.attemptId,
+    });
+    expect(harness.repository.attempts.get(started.attemptId)?.status).toBe('abandoned');
+  });
+
+  it('abandons after a scored checkpoint without producing a score regression', async () => {
+    const harness = createHarness();
+    const started = await harness.service.startAttempt({
+      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-abandon-scored',
+    });
+    harness.setNow('2026-07-12T12:00:05.000Z');
+    const checkpoint = await harness.service.recordCheckpoint({
+      walletAddress: wallet,
+      attemptId: started.attemptId,
+      receipt: started.receipt,
+      sequence: 0,
+      score: 500,
+      gameTimeMs: 5_000,
+    });
+
+    await expect(harness.service.abandonAttempt({
+      walletAddress: wallet,
+      attemptId: started.attemptId,
+      receipt: checkpoint.receipt,
+      sequence: 1,
+    })).resolves.toMatchObject({
+      accepted: true,
+      status: 'abandoned',
+      score: 500,
+      nextSequence: 1,
+    });
+    expect(harness.repository.attempts.get(started.attemptId)).toMatchObject({
+      status: 'abandoned',
+      score: 500,
+      nextSequence: 1,
     });
   });
 
@@ -1007,12 +1262,12 @@ describe('Treasure Hunt competition service', () => {
         isMe: true,
       })],
     });
-    expect(listSpy).toHaveBeenLastCalledWith('uki-presale-2026', 7);
+    expect(listSpy).toHaveBeenLastCalledWith('uki-presale-2026', 7, 5);
 
     await expect(harness.service.getLeaderboardAllocationInput()).resolves.toMatchObject({
       entries: [expect.objectContaining({ attemptId: started.attemptId })],
     });
-    expect(listSpy).toHaveBeenLastCalledWith('uki-presale-2026');
+    expect(listSpy).toHaveBeenLastCalledWith('uki-presale-2026', undefined, 5);
 
     await harness.service.adjudicateAttempt({
       attemptId: started.attemptId,

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 import {
   depositCukiePoolPosition,
+  getCukiePoolNftVaultMode,
   listCukiePoolWalletPositions,
   requestCukiePoolWithdrawal,
   type CukiePoolPosition,
@@ -107,6 +108,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const vaultMode = getCukiePoolNftVaultMode();
+  if (vaultMode === 'invalid') {
+    return response({ status: 'error', code: 'CUKIE_POOL_UNAVAILABLE' }, 503);
+  }
+  if (vaultMode === 'custodial') {
+    return response({
+      status: 'error',
+      code: 'CUKIE_POOL_LEGACY_MUTATIONS_DISABLED',
+      mode: 'custodial_vault',
+    }, 410);
+  }
+
   try {
     const payload = await boundedJson(request);
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {

@@ -13,6 +13,7 @@ import {
 
 type GameMode = 'single' | 'multiplayer';
 type SinglePlayerEntryState = 'ready' | 'practice' | 'connecting';
+type CompetitionBlockReason = 'no_attempts';
 
 interface SinglePlayerEntryPresentation {
   readonly interactive: boolean;
@@ -53,6 +54,8 @@ interface ModeSelectModalProps {
   singlePlayerEntryState: SinglePlayerEntryState;
   multiplayerEntryState: TreasureHuntMultiplayerEntryState;
   competitionNotice?: string | null;
+  competitionBlockReason?: CompetitionBlockReason | null;
+  onManageStaking?: () => void;
 }
 
 const modeCopy: Record<GameMode, { title: string; description: string }> = {
@@ -92,6 +95,8 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   singlePlayerEntryState,
   multiplayerEntryState,
   competitionNotice,
+  competitionBlockReason,
+  onManageStaking,
 }) => {
   const [hoveredMode, setHoveredMode] = React.useState<GameMode | null>(null);
   const singlePlayerEntry = resolveTreasureHuntSinglePlayerEntry(singlePlayerEntryState);
@@ -120,6 +125,75 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   }, [open]);
 
   if (!open) return null;
+
+  if (competitionBlockReason === 'no_attempts') {
+    return (
+      <div className="th-modal-layer" onClick={onClose} role="presentation">
+        <TreasurePanel
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="treasure-no-attempts-title"
+          data-testid="treasure-hunt-no-attempts"
+          onClick={event => event.stopPropagation()}
+          style={{
+            display: 'flex',
+            width: 680,
+            minHeight: 430,
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '38px 48px',
+            textAlign: 'center',
+          }}
+        >
+          <p className="th-screen-kicker">Torneo Lanzamiento UKI</p>
+          <h2
+            id="treasure-no-attempts-title"
+            className="th-screen-title"
+            style={{ marginTop: 8, fontSize: 42, lineHeight: '48px' }}
+          >
+            No tienes partidas disponibles
+          </h2>
+          <p
+            style={{
+              maxWidth: 520,
+              margin: '18px auto 0',
+              color: 'var(--th-cream-muted)',
+              font: '650 18px/28px var(--th-font-ui)',
+            }}
+          >
+            Cada 2.000 UKI completos en staking te permiten jugar una partida.
+            Deposita más UKI para conseguir un nuevo intento.
+          </p>
+          <div style={{ width: '100%', margin: '28px auto 0' }}>
+            <OrnamentalDivider />
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              width: '100%',
+              maxWidth: 500,
+              gridTemplateColumns: '1fr 1fr',
+              gap: 14,
+              margin: '28px auto 0',
+            }}
+          >
+            <TreasureButton variant="secondary" size="medium" fullWidth onClick={onClose}>
+              CERRAR
+            </TreasureButton>
+            <TreasureButton
+              data-testid="treasure-hunt-manage-staking"
+              variant="primary"
+              size="medium"
+              fullWidth
+              onClick={onManageStaking}
+            >
+              GESTIONAR STAKING UKI
+            </TreasureButton>
+          </div>
+        </TreasurePanel>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -499,5 +573,5 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
   );
 };
 
-export type { GameMode, SinglePlayerEntryState };
+export type { CompetitionBlockReason, GameMode, SinglePlayerEntryState };
 export default ModeSelectModal;

@@ -5,6 +5,7 @@ import type { ClientSession, Db } from "mongodb";
 import { withEconomyTransaction } from "@/lib/indexer-db/mongodb";
 import type { CreditReservation } from "../credits/types";
 import type { GameEconomySession } from "../game-economy/types";
+import { TREASURE_HUNT_ECONOMY_POLICY } from "../game-economy/treasure-hunt-policy";
 import {
   WEEKLY_RANKING_RULE_SCOPE,
   type WeeklyRankingAuditEvent,
@@ -105,7 +106,23 @@ export function createMongoWeeklyRankingRepository(db: Db, session: ClientSessio
     async insertRule(rule) { await rules.insertOne(rule, options); },
     listSettledSessionsPage: ({ start, endExclusive, afterId, limit }) => sessions.find({
       status: "settled",
-      settledAt: { $gte: start, $lt: endExclusive },
+      $or: [
+        {
+          gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
+          "rule.version": TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
+          createdAt: {
+            $gte: new Date(start.getTime() + 14 * 60 * 60_000),
+            $lt: new Date(endExclusive.getTime() + 14 * 60 * 60_000),
+          },
+        },
+        {
+          $nor: [{
+            gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
+            "rule.version": TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
+          }],
+          settledAt: { $gte: start, $lt: endExclusive },
+        },
+      ],
       ...(afterId ? { _id: { $gt: afterId } } : {}),
     }, options).sort({ _id: 1 }).limit(limit).toArray(),
     listReservations: (reservationIds) => reservationIds.length === 0

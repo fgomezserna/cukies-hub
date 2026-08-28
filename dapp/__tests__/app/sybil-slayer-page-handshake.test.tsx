@@ -658,8 +658,21 @@ describe('SybilSlayerPage game-session handshake', () => {
           seed: 'server-seed',
           alias: 'Hunter-ABC123',
           status: 'active',
+          eligibilityKind: 'presale',
           nextSequence: 0,
           receipt: 'parent-only-receipt',
+        },
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        status: 'ok',
+        result: {
+          runId: 'economy-run-1',
+          gameEconomySessionId: 'economy-session-1',
+          creditSource: 'pool',
+          cukieSource: 'own',
+          cukieAssetId: 'cukie-1',
+          dailyPeriodId: 'th-day:2026-08-17T14:00:00.000Z',
+          dailyPeriodEndsAt: '2026-08-18T14:00:00.000Z',
         },
       }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
     global.fetch = fetchMock as typeof fetch;
@@ -694,13 +707,16 @@ describe('SybilSlayerPage game-session handshake', () => {
         },
       }));
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[1]).toEqual([
       '/api/games/treasure-hunt/competition/attempts',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ gameSessionId: 'competition-session' }),
       }),
+    ]);
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      '/api/games/treasure-hunt/economy/sessions',
     );
     await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
       {
@@ -713,6 +729,9 @@ describe('SybilSlayerPage game-session handshake', () => {
         seed: 'server-seed',
         alias: 'Hunter-ABC123',
         status: 'active',
+        economyRunId: 'economy-run-1',
+        creditSource: 'pool',
+        cukieSource: 'own',
       },
       GAME_ORIGIN,
     ));
@@ -727,6 +746,64 @@ describe('SybilSlayerPage game-session handshake', () => {
         }),
       }),
     );
+  });
+
+  it('uses the server-created staking attempt as authority and never opens legacy economy', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        sessionId: 'staking-session',
+        sessionToken: 'parent-staking-token',
+        gameId: 'sybil-slayer',
+        gameVersion: '1.0.0',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        attempt: {
+          attemptId: 'staking-attempt-1',
+          seed: 'staking-seed',
+          alias: 'Hunter-STAKING',
+          status: 'active',
+          eligibilityKind: 'uki_staking',
+          nextSequence: 0,
+          receipt: 'parent-only-staking-receipt',
+        },
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('staking-session'));
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+          requestId: 'staking-request-id',
+          sessionId: 'staking-session',
+        },
+      }));
+    });
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'TREASURE_HUNT_COMPETITION_START_RESPONSE',
+      requestId: 'staking-request-id',
+      sessionId: 'staking-session',
+      eligible: true,
+      practice: false,
+      attemptId: 'staking-attempt-1',
+      seed: 'staking-seed',
+      alias: 'Hunter-STAKING',
+      status: 'active',
+    }, GAME_ORIGIN));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.some(([url]) => (
+      url === '/api/games/treasure-hunt/economy/sessions'
+    ))).toBe(false);
   });
 
   it('fails an expired resumed session closed and rotates it before the next play', async () => {
@@ -1067,11 +1144,23 @@ describe('SybilSlayerPage game-session handshake', () => {
           seed: 'seed-reload',
           alias: 'Hunter-RELOAD',
           status: 'review',
+          eligibilityKind: 'presale',
           nextSequence: 3,
           receipt: null,
           score: 808,
           gameTimeMs: 30_000,
         }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        status: 'ok',
+        result: {
+          runId: 'economy-run-reload',
+          status: 'settled',
+          scoreRaw: '808',
+          leaderboardEligible: true,
+          rewardEligible: true,
+          jackpotEligible: true,
+        },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     global.fetch = fetchMock as typeof fetch;
     render(<SybilSlayerPage />);
@@ -1091,13 +1180,14 @@ describe('SybilSlayerPage game-session handshake', () => {
           type: 'TREASURE_HUNT_COMPETITION_RESULT_RECOVERY',
           sessionId,
           resultId: 'result-after-reload',
+          economyRunId: 'economy-run-reload',
           competitionAttemptId: 'attempt-reload-review',
           finalScore: 808,
           gameTime: 30_000,
         },
       }));
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(fetchMock.mock.calls[1][0]).toContain(
       '/api/games/treasure-hunt/competition/attempts?limit=500',
     );

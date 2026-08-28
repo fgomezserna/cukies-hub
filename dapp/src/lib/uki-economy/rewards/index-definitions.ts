@@ -16,6 +16,7 @@ export const REWARD_ECONOMY_COLLECTIONS = [
   "reward_claim_batches",
   "reward_claim_proofs",
   "reward_claims",
+  "reward_publication_plans",
   "reward_integrity_incidents",
 ] as const;
 
@@ -194,6 +195,21 @@ export const REWARD_ECONOMY_INDEX_DEFINITIONS = [
     collection: "reward_claim_batches",
     keys: { periodId: 1, status: 1, createdAt: -1 },
     options: { name: "reward_claim_batch_period_status" },
+  },
+  {
+    collection: "reward_publication_plans",
+    keys: { accountingId: 1 },
+    options: { unique: true, name: "reward_publication_plan_accounting" },
+  },
+  {
+    collection: "reward_publication_plans",
+    keys: { status: 1, leaseExpiresAt: 1, createdAt: 1, _id: 1 },
+    options: { name: "reward_publication_plan_runtime" },
+  },
+  {
+    collection: "reward_publication_plans",
+    keys: { "operations.transactionHash": 1 },
+    options: { name: "reward_publication_plan_transaction" },
   },
   {
     collection: "reward_claims",

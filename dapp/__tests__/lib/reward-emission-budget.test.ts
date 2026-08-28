@@ -150,30 +150,29 @@ describe("reward emission budget", () => {
     expect(repository.state.accruals).toHaveLength(0);
   });
 
-  it("reinicia solo el saldo diario en el rollover UTC", async () => {
+  it("reinicia solo el saldo diario en el corte configurado a las 14:00 UTC", async () => {
     const rule = ruleWithBudget({ dailyCapRaw: "100", lifetimeCapRaw: "1000" });
     const { repository, service } = subject(rule);
 
     await service.persistAllocationSet(allocationInput({
       rule,
-      sourceId: "game-a:before-midnight",
+      sourceId: "game-a:before-boundary",
       amountRaw: "75",
-      ruleEffectiveAt: new Date("2026-07-10T23:59:59.000Z"),
+      ruleEffectiveAt: new Date("2026-07-10T13:59:59.000Z"),
     }));
     await service.persistAllocationSet(allocationInput({
       rule,
-      sourceId: "game-b:after-midnight",
+      sourceId: "game-b:at-boundary",
       amountRaw: "75",
-      ruleEffectiveAt: new Date("2026-07-11T00:00:00.000Z"),
-      periodId: "2026-W29",
+      ruleEffectiveAt: new Date("2026-07-10T14:00:00.000Z"),
     }));
 
     expect(repository.state.emissionBudgetDays.map((day) => ({
       dayId: day.dayId,
       reservedRaw: day.reservedRaw,
     }))).toEqual([
-      { dayId: "2026-07-10T00:00:00.000Z", reservedRaw: "75" },
-      { dayId: "2026-07-11T00:00:00.000Z", reservedRaw: "75" },
+      { dayId: "2026-07-09T14:00:00.000Z", reservedRaw: "75" },
+      { dayId: "2026-07-10T14:00:00.000Z", reservedRaw: "75" },
     ]);
     expect(repository.state.emissionBudgetStates[0].reservedLifetimeRaw).toBe("150");
   });

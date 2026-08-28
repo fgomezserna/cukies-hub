@@ -4,9 +4,19 @@ jest.mock('@/lib/treasure-hunt-competition/server/runtime', () => ({
 jest.mock('@/lib/treasure-hunt-competition/server/default-service', () => ({
   getCompetitionService: jest.fn(),
 }));
+jest.mock('@/lib/treasure-hunt-competition/server/draw-seed-source', () => ({
+  resolveCompetitionDrawSeed: jest.fn(),
+}));
 jest.mock('@/lib/treasure-hunt-competition/server/settlement-mongo', () => ({
   MongoCompetitionSettlementSource: jest.fn(),
   MongoCompetitionSettlementRepository: jest.fn(),
+}));
+jest.mock('@/lib/treasure-hunt-competition/server/staking-settlement-mongo', () => ({
+  MongoCompetitionStakingSettlementSource: jest.fn(),
+  MongoCompetitionStakingSettlementRepository: jest.fn(),
+}));
+jest.mock('@/lib/treasure-hunt-competition/server/staking-settlement-close', () => ({
+  closeTreasureHuntStakingCompetition: jest.fn(),
 }));
 jest.mock('@/lib/treasure-hunt-competition/server/settlement-close', () => {
   const actual = jest.requireActual('@/lib/treasure-hunt-competition/server/settlement-close');
@@ -15,6 +25,7 @@ jest.mock('@/lib/treasure-hunt-competition/server/settlement-close', () => {
 
 import { POST } from '@/app/api/internal/games/treasure-hunt/competition/settle/route';
 import { getCompetitionService } from '@/lib/treasure-hunt-competition/server/default-service';
+import { resolveCompetitionDrawSeed } from '@/lib/treasure-hunt-competition/server/draw-seed-source';
 import { resolveCompetitionRuntime } from '@/lib/treasure-hunt-competition/server/runtime';
 import {
   closeTreasureHuntCompetition,
@@ -24,6 +35,11 @@ import {
   MongoCompetitionSettlementRepository,
   MongoCompetitionSettlementSource,
 } from '@/lib/treasure-hunt-competition/server/settlement-mongo';
+import { closeTreasureHuntStakingCompetition } from '@/lib/treasure-hunt-competition/server/staking-settlement-close';
+import {
+  MongoCompetitionStakingSettlementRepository,
+  MongoCompetitionStakingSettlementSource,
+} from '@/lib/treasure-hunt-competition/server/staking-settlement-mongo';
 
 const SECRET = 'treasure-hunt-settlement-secret-123456789';
 const mockResolveRuntime = resolveCompetitionRuntime as jest.MockedFunction<
@@ -31,6 +47,9 @@ const mockResolveRuntime = resolveCompetitionRuntime as jest.MockedFunction<
 >;
 const mockGetCompetitionService = getCompetitionService as jest.MockedFunction<
   typeof getCompetitionService
+>;
+const mockResolveDrawSeed = resolveCompetitionDrawSeed as jest.MockedFunction<
+  typeof resolveCompetitionDrawSeed
 >;
 const mockClose = closeTreasureHuntCompetition as jest.MockedFunction<
   typeof closeTreasureHuntCompetition
@@ -40,6 +59,15 @@ const mockSource = MongoCompetitionSettlementSource as jest.MockedClass<
 >;
 const mockRepository = MongoCompetitionSettlementRepository as jest.MockedClass<
   typeof MongoCompetitionSettlementRepository
+>;
+const mockCloseStaking = closeTreasureHuntStakingCompetition as jest.MockedFunction<
+  typeof closeTreasureHuntStakingCompetition
+>;
+const mockStakingSource = MongoCompetitionStakingSettlementSource as jest.MockedClass<
+  typeof MongoCompetitionStakingSettlementSource
+>;
+const mockStakingRepository = MongoCompetitionStakingSettlementRepository as jest.MockedClass<
+  typeof MongoCompetitionStakingSettlementRepository
 >;
 
 function request(token?: string) {
@@ -51,11 +79,14 @@ function request(token?: string) {
 
 describe('POST internal Treasure Hunt settlement', () => {
   const previousSecret = process.env.TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET;
+  const previousDrawSeed = process.env.TREASURE_HUNT_COMPETITION_DRAW_SEED;
   const recoverPendingFinishes = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET = SECRET;
+    process.env.TREASURE_HUNT_COMPETITION_DRAW_SEED = `0x${'d4'.repeat(32)}`;
+    mockResolveDrawSeed.mockResolvedValue(`0x${'d4'.repeat(32)}`);
     mockResolveRuntime.mockReturnValue({
       configured: true,
       enabled: true,
@@ -81,6 +112,10 @@ describe('POST internal Treasure Hunt settlement', () => {
         snapshot: { campaignId: 'uki-presale-2026', manifest: { inputHash: 'sha256:abc' } },
       } as never;
     });
+    mockCloseStaking.mockResolvedValue({
+      created: true,
+      snapshot: { campaignId: 'uki-staking-testnet-2026-08' },
+    } as never);
   });
 
   afterAll(() => {
@@ -89,6 +124,8 @@ describe('POST internal Treasure Hunt settlement', () => {
     } else {
       process.env.TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET = previousSecret;
     }
+    if (previousDrawSeed === undefined) delete process.env.TREASURE_HUNT_COMPETITION_DRAW_SEED;
+    else process.env.TREASURE_HUNT_COMPETITION_DRAW_SEED = previousDrawSeed;
   });
 
   it.each([undefined, 'short-secret'])('fails closed with 503 when the dedicated secret is %s', async (secret) => {
@@ -141,6 +178,32 @@ describe('POST internal Treasure Hunt settlement', () => {
       source: expect.anything(),
       repository: expect.anything(),
       now: expect.any(Date),
+    }));
+  });
+
+  it('routes a staking campaign through the weighted draw close with the configured seed', async () => {
+    mockResolveRuntime.mockReturnValueOnce({
+      configured: true,
+      enabled: true,
+      phase: 'closed',
+      campaign: { eligibilityKind: 'uki_staking' },
+      issues: [],
+    } as never);
+
+    const response = await POST(request(SECRET));
+
+    expect(response.status).toBe(201);
+    expect(mockClose).not.toHaveBeenCalled();
+    expect(mockStakingSource).toHaveBeenCalledTimes(1);
+    expect(mockStakingRepository).toHaveBeenCalledTimes(1);
+    expect(mockResolveDrawSeed).toHaveBeenCalledWith({
+      campaign: expect.objectContaining({ eligibilityKind: 'uki_staking' }),
+    });
+    expect(mockCloseStaking).toHaveBeenCalledWith(expect.objectContaining({
+      drawSeed: `0x${'d4'.repeat(32)}`,
+      runtime: expect.objectContaining({ phase: 'closed' }),
+      source: expect.anything(),
+      repository: expect.anything(),
     }));
   });
 

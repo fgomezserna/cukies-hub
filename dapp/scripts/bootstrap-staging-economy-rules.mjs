@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 
 import {
   STAGING_ECONOMY_CONFIRMATION,
+  STAGING_ECONOMY_CURSOR_EVENTS,
   STAGING_ECONOMY_RULESET,
   StagingEconomyRulesError,
   buildStagingEconomyRuleSet,
@@ -92,7 +93,29 @@ async function inspectRules(db, rules, session) {
     const existing = await collection.findOne(spec.query(rule), options);
     const overlap = await collection.findOne(spec.overlap(rule), options);
     if (overlap) {
-      blockers.push(`${spec.kind} rule ${rule.version} overlaps active ${String(overlap.version)}`);
+      if (
+        (spec.kind === 'reward' || spec.kind === 'credit' || spec.kind === 'game')
+        && rule.version === (
+          spec.kind === 'reward'
+            ? STAGING_ECONOMY_RULESET.rewardVersion
+            : spec.kind === 'credit'
+              ? STAGING_ECONOMY_RULESET.creditVersion
+              : STAGING_ECONOMY_RULESET.gameVersion
+        )
+        && typeof overlap._id === 'string'
+        && overlap.activeFrom instanceof Date
+        && rule.createdAt instanceof Date
+        && rule.createdAt < rule.activeFrom
+        // A not-yet-effective staging rule can be superseded at the exact
+        // same boundary. Its active interval becomes empty and no runtime can
+        // ever select it. Once effective, the strict earlier-boundary path is
+        // still required so historical semantics remain immutable.
+        && overlap.activeFrom <= rule.activeFrom
+      ) {
+        actions.push({ ...spec, rule, action: 'insert', supersedesId: overlap._id });
+      } else {
+        blockers.push(`${spec.kind} rule ${rule.version} overlaps active ${String(overlap.version)}`);
+      }
       continue;
     }
     if (existing) {
@@ -175,10 +198,21 @@ async function main() {
     await client.connect();
     const db = client.db(process.env.CHAIN_INDEXER_DB_NAME);
     const cursors = await db.collection('chain_cursors').find({
-      contractAlias: { $in: ['UKI_STAKING', 'VESTING_VAULT', 'TOKEN', 'MARKETPLACE', 'BRIDGE'] },
+      contractAlias: { $in: Object.keys(STAGING_ECONOMY_CURSOR_EVENTS) },
     }).toArray();
+    const schema = await db.collection('economy_schema_metadata').findOne({ _id: 'uki-economy' });
+    if (schema?.schemaVersion !== 3 || !(schema.migratedAt instanceof Date)) {
+      throw new StagingEconomyRulesError([
+        'credit v3 requires an economy schema v3 sentinel with migratedAt baseline',
+      ]);
+    }
     const now = new Date();
-    const rules = buildStagingEconomyRuleSet({ environment: process.env, cursors, now });
+    const rules = buildStagingEconomyRuleSet({
+      environment: process.env,
+      cursors,
+      now,
+      creditBaselineAt: schema.migratedAt,
+    });
     const inspection = await inspectRules(db, rules);
     if (mode === 'plan') {
       console.log(JSON.stringify(publicSummary(mode, rules, inspection), null, 2));
@@ -200,6 +234,33 @@ async function main() {
           throw new StagingEconomyRulesError(appliedInspection.blockers);
         }
         for (const action of appliedInspection.actions.filter((item) => item.action === 'insert')) {
+          if (action.supersedesId) {
+            const retired = await db.collection(action.collection).updateOne(
+              {
+                _id: action.supersedesId,
+                active: true,
+                $or: [
+                  { activeUntil: { $exists: false } },
+                  { activeUntil: { $gt: action.rule.activeFrom } },
+                ],
+              },
+              {
+                $set: {
+                  active: true,
+                  activeUntil: action.rule.activeFrom,
+                  supersededByVersion: action.rule.version,
+                  supersededReason: 'unrecoverable_pre_migration',
+                  updatedAt: now,
+                },
+              },
+              { session },
+            );
+            if (retired.matchedCount !== 1) {
+              throw new StagingEconomyRulesError([
+                `${action.kind} ${action.rule.version} lost its supersession fence`,
+              ]);
+            }
+          }
           await advanceRuleState(db, action, now, session);
           await db.collection(action.collection).insertOne(action.rule, { session });
         }

@@ -10,6 +10,7 @@ import {
   buildCreditSourceSlotsHash,
   compareCreditText,
   safeCompetitionCreditPeriodScopeId,
+  safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
 } from "./rules";
 import {
@@ -19,6 +20,7 @@ import {
   type CompetitionCreditRule,
   type CompetitionCreditRun,
   type CreditAccountPeriod,
+  type CreditCanonicalBlockEvidence,
   type CreditIntegrityIncident,
   type CreditLot,
   type CreditLotFifoCursor,
@@ -28,6 +30,7 @@ import {
   type CreditReconciliationSnapshot,
   type CreditReservation,
   type CreditRunItem,
+  type CreditRunHold,
   type CreditSnapshotGate,
   type CreditSnapshotSlot,
   type CreditSourceHealth,
@@ -48,12 +51,12 @@ function clone<T>(value: T): T {
   return value;
 }
 
-function accountId(walletNormalized: string, periodId: string) {
-  return `${walletNormalized}:${periodId}`;
+function accountId(walletNormalized: string, periodId: string, route: "uki" | "nft") {
+  return `${walletNormalized}:${periodId}:${route}`;
 }
 
-function poolPeriodId(periodId: string) {
-  return `pool:${periodId}`;
+function poolPeriodId(periodId: string, route: "uki" | "nft") {
+  return `pool:${periodId}:${route}`;
 }
 
 function lotIsAfterCursor(lot: CreditLot, after?: CreditLotFifoCursor) {
@@ -79,15 +82,16 @@ export function testCompetitionCreditRule(
     activeFrom: now,
     cutoffHourUtc: 12,
     cutoffMinuteUtc: 0,
+    settlementHourUtc: 16,
+    settlementMinuteUtc: 0,
     maxSnapshotLatenessMs: 30 * 60 * 1000,
     sourceFreshnessMs: 15 * 60 * 1000,
     expectedBscChainId: 56,
     sourceContractAddresses: {
       UKI_STAKING: `0x${"1".repeat(40)}`,
       VESTING_VAULT: `0x${"2".repeat(40)}`,
-      TOKEN: `0x${"3".repeat(40)}`,
-      MARKETPLACE: `0x${"4".repeat(40)}`,
-      BRIDGE: `0x${"5".repeat(40)}`,
+      TOKEN_V2: `0x${"3".repeat(40)}`,
+      CUKIE_MASTER_NFT_VAULT: `0x${"4".repeat(40)}`,
     },
     verifiedSourceIdentities: {
       UKI_STAKING: {
@@ -122,13 +126,16 @@ export function testCreditSourceWatermark(
 ): CreditSourceWatermark {
   const observedThrough = new Date("2026-07-10T12:00:00.000Z");
   return {
-    _id: CREDIT_SOURCE_WATERMARK_ID,
+    _id: `${CREDIT_SOURCE_WATERMARK_ID}:uki`,
+    route: "uki",
     status: "healthy",
     observedThrough,
     sourceRuleVersions: { uki: "cukie-master-v1", nft: "cukie-master-v1" },
     sourceHash: "b".repeat(64),
     slotCount: 0,
     healthEvidenceHash: "e".repeat(64),
+    canonicalSafeBlock: 1_000,
+    canonicalSafeBlockHash: `0x${"f".repeat(64)}`,
     updatedAt: observedThrough,
     ...overrides,
   };
@@ -141,9 +148,21 @@ type MemoryCreditState = {
   activeRuleMatches: boolean;
   openIntegrityIncidents: number;
   slots: CreditSnapshotSlot[];
+  slotVersions: Array<{
+    _id: string;
+    slotId: string;
+    route: "uki" | "nft";
+    effectiveBlockNumber: number;
+    effectiveBlockHash: string;
+    effectiveBlockTimestamp: Date;
+    observedAt: Date;
+    slot: CreditSnapshotSlot;
+  }>;
+  historyCompleteFromBlock: Record<"uki" | "nft", number>;
   configs: CreditPoolConfiguration[];
   runs: CompetitionCreditRun[];
   items: CreditRunItem[];
+  holds: CreditRunHold[];
   ledger: CompetitionCreditLedgerEntry[];
   ownLots: CreditLot[];
   poolLots: CreditLot[];
@@ -166,12 +185,20 @@ export class MemoryCompetitionCreditRepository
       rule?: CompetitionCreditRule;
       watermark?: CreditSourceWatermark | null;
       slots?: CreditSnapshotSlot[];
+      slotVersions?: MemoryCreditState["slotVersions"];
     } = {}
   ) {
-    const slots = clone(input.slots ?? []);
+    const slots = clone(input.slots ?? []).map((slot) => ({
+      ...slot,
+      sourceBlockNumber: slot.sourceBlockNumber ?? 998,
+      sourceBlockHash: slot.sourceBlockHash ?? `0x${"d".repeat(64)}`,
+      sourceBlockTimestamp: slot.sourceBlockTimestamp ?? slot.updatedAt,
+    }));
     const defaultWatermark = testCreditSourceWatermark({
-      sourceHash: buildCreditSourceSlotsHash(slots),
-      slotCount: slots.length,
+      sourceHash: buildCreditSourceSlotsHash(
+        slots.filter((slot) => slot.route === "uki")
+      ),
+      slotCount: slots.filter((slot) => slot.route === "uki").length,
     });
     const watermark =
       input.watermark === undefined ? defaultWatermark : input.watermark;
@@ -182,9 +209,24 @@ export class MemoryCompetitionCreditRepository
       activeRuleMatches: true,
       openIntegrityIncidents: 0,
       slots,
+      slotVersions: clone(input.slotVersions ?? slots.map((slot) => ({
+        _id: `${slot._id}:${slot.revision}`,
+        slotId: slot._id,
+        route: slot.route,
+        effectiveBlockNumber: slot.sourceBlockNumber!,
+        effectiveBlockHash: slot.sourceBlockHash!,
+        effectiveBlockTimestamp: slot.sourceBlockTimestamp!,
+        observedAt: slot.updatedAt,
+        slot,
+      }))),
+      historyCompleteFromBlock: {
+        uki: 0,
+        nft: 0,
+      },
       configs: [],
       runs: [],
       items: [],
+      holds: [],
       ledger: [],
       ownLots: [],
       poolLots: [],
@@ -204,6 +246,9 @@ export class MemoryCompetitionCreditRepository
           }
         ),
         evidenceHash: watermark?.healthEvidenceHash ?? "e".repeat(64),
+        canonicalSafeBlock: watermark?.canonicalSafeBlock ?? 1_000,
+        canonicalSafeBlockHash:
+          watermark?.canonicalSafeBlockHash ?? `0x${"f".repeat(64)}`,
         checkedAt: new Date("2026-07-10T12:00:00.000Z"),
       },
     };
@@ -221,7 +266,6 @@ export class MemoryCompetitionCreditRepository
     const found = this.state.rules
       .filter(
         (rule) =>
-          rule.active &&
           rule.activeFrom.getTime() <= at.getTime() &&
           (!rule.activeUntil || rule.activeUntil.getTime() > at.getTime())
       )
@@ -234,35 +278,94 @@ export class MemoryCompetitionCreditRepository
     return found[0] ? clone(found[0]) : null;
   }
 
+  async findRuleByVersion(version: string) {
+    return clone(this.state.rules.find((rule) => rule.version === version) ?? null);
+  }
+
+  async findOldestRule() {
+    return clone(
+      this.state.rules
+        .filter((rule) => rule.supersededReason !== "unrecoverable_pre_migration")
+        .sort((left, right) => left.activeFrom.getTime() - right.activeFrom.getTime())[0] ?? null
+    );
+  }
+
   async readSnapshotGate(
     _rule: CompetitionCreditRule,
-    cutoff: Date
+    cutoff: Date,
+    route: "uki" | "nft" = "uki"
   ): Promise<CreditSnapshotGate> {
     return {
       schemaReady: this.state.schemaReady,
       activeRuleMatches: this.state.activeRuleMatches,
-      sourceWatermark: clone(this.state.watermark),
+      sourceWatermark:
+        this.state.watermark?.route === route
+          ? clone(this.state.watermark)
+          : null,
       openIntegrityIncidents:
         this.state.openIntegrityIncidents +
-        this.state.incidents.filter((item) => item.status === "open").length,
+        this.state.incidents.filter(
+          (item) => item.status === "open" && item.route === route
+        ).length,
       maturedQualifyingSlots: this.state.slots.filter(
         (slot) =>
+          slot.route === route &&
           slot.status === "qualifying" &&
           slot.creditEligibleFrom.getTime() <= cutoff.getTime()
       ).length,
     };
   }
 
-  async listSourceSlots(limit: number) {
+  async listSourceSlots(limit: number, route?: "uki" | "nft") {
     return clone(
       this.state.slots
+        .filter((slot) => !route || slot.route === route)
         .sort((left, right) => compareCreditText(left._id, right._id))
         .slice(0, limit)
     );
   }
 
-  async readSourceHealth(now: Date, _rule: CompetitionCreditRule) {
+  async listSourceSlotsAtCutoff(
+    cutoffBlock: CreditCanonicalBlockEvidence,
+    route: "uki" | "nft",
+    limit: number
+  ) {
+    if (this.state.historyCompleteFromBlock[route] > cutoffBlock.blockNumber) {
+      throw new DomainConflictError("historial temporal no cubre el cutoff");
+    }
+    const latest = new Map<string, MemoryCreditState["slotVersions"][number]>();
+    for (const version of this.state.slotVersions) {
+      if (version.route !== route || version.effectiveBlockNumber > cutoffBlock.blockNumber) continue;
+      const current = latest.get(version.slotId);
+      if (
+        !current ||
+        version.effectiveBlockNumber > current.effectiveBlockNumber ||
+        (version.effectiveBlockNumber === current.effectiveBlockNumber &&
+          version.slot.revision > current.slot.revision)
+      ) latest.set(version.slotId, version);
+    }
+    return clone(
+      [...latest.values()]
+        .map((version) => version.slot)
+        .sort((left, right) => compareCreditText(left._id, right._id))
+        .slice(0, limit)
+    );
+  }
+
+  async readSourceHealth(
+    now: Date,
+    _rule: CompetitionCreditRule,
+    _route: "uki" | "nft" = "uki"
+  ) {
     return clone({ ...this.state.sourceHealth, checkedAt: now });
+  }
+
+  async findCanonicalCutoffBlock(cutoff: Date) {
+    return {
+      blockNumber: 999,
+      blockHash: `0x${"e".repeat(64)}`,
+      blockTimestamp: new Date(cutoff.getTime() - 1),
+    };
   }
 
   async upsertSourceWatermark(watermark: CreditSourceWatermark) {
@@ -333,24 +436,44 @@ export class MemoryCompetitionCreditRepository
     );
   }
 
-  async findRunByPeriod(periodId: string) {
+  async findRunByPeriod(periodId: string, route: "uki" | "nft" = "uki") {
     return clone(
       this.state.runs.find(
-        (run) => safeCompetitionCreditPeriodScopeId(run, run._id) === periodId
+        (run) =>
+          safeCompetitionCreditPeriodScopeId(run, run._id) === periodId &&
+          run.route === route
       ) ?? null
     );
   }
 
-  async insertRunAndItems(run: CompetitionCreditRun, items: CreditRunItem[]) {
+  async findLatestRunByRoute(route: "uki" | "nft") {
+    return clone(
+      [...this.state.runs]
+        .filter((run) => run.route === route)
+        .sort(
+          (left, right) =>
+            right.period.cutoff.getTime() - left.period.cutoff.getTime()
+        )[0] ?? null
+    );
+  }
+
+  async insertRunAndItems(
+    run: CompetitionCreditRun,
+    items: CreditRunItem[],
+    holds: CreditRunHold[]
+  ) {
     if (
       this.state.runs.some(
-        (item) => item.period.periodId === run.period.periodId
+        (item) =>
+          item.period.periodId === run.period.periodId &&
+          item.route === run.route
       )
     ) {
       throw Object.assign(new Error("duplicate run"), { code: 11000 });
     }
     this.state.runs.push(clone(run));
     this.state.items.push(...clone(items));
+    this.state.holds.push(...clone(holds));
   }
 
   async claimRunLease(
@@ -391,6 +514,7 @@ export class MemoryCompetitionCreditRepository
   private incrementAccount(
     walletNormalized: string,
     periodId: string,
+    route: "uki" | "nft",
     increments: Partial<
       Record<
         | "grantedCredits"
@@ -404,13 +528,14 @@ export class MemoryCompetitionCreditRepository
     >,
     now: Date
   ) {
-    const id = accountId(walletNormalized, periodId);
+    const id = accountId(walletNormalized, periodId, route);
     let account = this.state.accounts.find((item) => item._id === id);
     if (!account) {
       account = {
         _id: id,
         walletNormalized,
         periodId,
+        route,
         grantedCredits: 0,
         poolDepositedCredits: 0,
         availableCredits: 0,
@@ -433,6 +558,7 @@ export class MemoryCompetitionCreditRepository
 
   private incrementPoolPeriod(
     periodId: string,
+    route: "uki" | "nft",
     increments: Partial<
       Record<
         | "contributedCredits"
@@ -445,12 +571,13 @@ export class MemoryCompetitionCreditRepository
     >,
     now: Date
   ) {
-    const id = poolPeriodId(periodId);
+    const id = poolPeriodId(periodId, route);
     let pool = this.state.poolPeriods.find((item) => item._id === id);
     if (!pool) {
       pool = {
         _id: id,
         periodId,
+        route,
         contributedCredits: 0,
         availableCredits: 0,
         reservedCredits: 0,
@@ -518,6 +645,7 @@ export class MemoryCompetitionCreditRepository
       _id: ownLotId,
       lotId: ownLotId,
       bucket: "own",
+      route: run.route,
       walletNormalized: item.walletNormalized,
       periodId: item.periodId,
       runId,
@@ -530,7 +658,7 @@ export class MemoryCompetitionCreditRepository
       reservedCredits: 0,
       spentCredits: 0,
       expiredCredits: 0,
-      expiresAt: clone(run.period.nextCutoff),
+      expiresAt: clone(run.settlementPeriod.nextCutoff),
       revision: 0,
       blocked: false,
       createdAt: clone(now),
@@ -538,11 +666,11 @@ export class MemoryCompetitionCreditRepository
     };
     this.state.ownLots.push(ownLot);
     this.addLedger({
-      idempotencyKey: `daily-credit:${item.walletNormalized}:${item.slotId}:${item.eligibilityEpoch}:${item.periodId}`,
+      idempotencyKey: `daily-credit:${item.itemId}`,
       payloadHash: item.payloadHash,
       operation: "grant",
       bucket: "own",
-      amountCredits: item.grantCredits,
+      amountCredits: item.baseGrantCredits,
       walletNormalized: item.walletNormalized,
       periodId: item.periodId,
       runId,
@@ -552,8 +680,33 @@ export class MemoryCompetitionCreditRepository
       sessionId: null,
       fromState: null,
       toState: "available",
+      effectiveBlockNumber: run.cutoffBlock.blockNumber,
+      effectiveBlockHash: run.cutoffBlock.blockHash,
+      effectiveBlockTimestamp: clone(run.cutoffBlock.blockTimestamp),
       createdAt: clone(now),
     });
+    if (item.compensationCredits > 0) {
+      this.addLedger({
+        idempotencyKey: `late-compensation:${item.earnedPeriodId}:${run.route}:${item.slotId}:${item.eligibilityEpoch}`,
+        payloadHash: item.payloadHash,
+        operation: "late_compensation",
+        bucket: "own",
+        amountCredits: item.compensationCredits,
+        walletNormalized: item.walletNormalized,
+        periodId: item.periodId,
+        runId,
+        runItemId: item.itemId,
+        lotId: ownLotId,
+        reservationId: null,
+        sessionId: null,
+        fromState: null,
+        toState: "available",
+        effectiveBlockNumber: run.cutoffBlock.blockNumber,
+        effectiveBlockHash: run.cutoffBlock.blockHash,
+        effectiveBlockTimestamp: clone(run.cutoffBlock.blockTimestamp),
+        createdAt: clone(now),
+      });
+    }
     if (item.poolCredits > 0) {
       const poolLotId = stableCreditHash({
         kind: "pool-lot",
@@ -563,6 +716,7 @@ export class MemoryCompetitionCreditRepository
         _id: poolLotId,
         lotId: poolLotId,
         bucket: "pool",
+        route: run.route,
         walletNormalized: null,
         periodId: item.periodId,
         runId,
@@ -575,7 +729,7 @@ export class MemoryCompetitionCreditRepository
         reservedCredits: 0,
         spentCredits: 0,
         expiredCredits: 0,
-        expiresAt: clone(run.period.nextCutoff),
+        expiresAt: clone(run.settlementPeriod.nextCutoff),
         revision: 0,
         blocked: false,
         createdAt: clone(now),
@@ -588,6 +742,7 @@ export class MemoryCompetitionCreditRepository
       this.state.poolPositions.push({
         _id: positionId,
         positionId,
+        route: run.route,
         walletNormalized: item.walletNormalized,
         periodId: item.periodId,
         runId,
@@ -614,6 +769,9 @@ export class MemoryCompetitionCreditRepository
         sessionId: null,
         fromState: "available",
         toState: null,
+        effectiveBlockNumber: run.cutoffBlock.blockNumber,
+        effectiveBlockHash: run.cutoffBlock.blockHash,
+        effectiveBlockTimestamp: clone(run.cutoffBlock.blockTimestamp),
         createdAt: clone(now),
       });
       this.addLedger({
@@ -631,10 +789,14 @@ export class MemoryCompetitionCreditRepository
         sessionId: null,
         fromState: null,
         toState: "available",
+        effectiveBlockNumber: run.cutoffBlock.blockNumber,
+        effectiveBlockHash: run.cutoffBlock.blockHash,
+        effectiveBlockTimestamp: clone(run.cutoffBlock.blockTimestamp),
         createdAt: clone(now),
       });
       this.incrementPoolPeriod(
         item.periodId,
+        run.route,
         {
           contributedCredits: item.poolCredits,
           availableCredits: item.poolCredits,
@@ -645,6 +807,7 @@ export class MemoryCompetitionCreditRepository
     this.incrementAccount(
       item.walletNormalized,
       item.periodId,
+      run.route,
       {
         grantedCredits: item.grantCredits,
         poolDepositedCredits: item.poolCredits,
@@ -682,7 +845,11 @@ export class MemoryCompetitionCreditRepository
       )
     )
       return null;
-    run.status = "open";
+    run.status = this.state.holds.some(
+      (hold) => hold.runId === runId && hold.status === "held"
+    )
+      ? "open_with_holds"
+      : "open";
     run.openedAt = clone(now);
     run.updatedAt = clone(now);
     delete run.leaseOwner;
@@ -770,9 +937,9 @@ export class MemoryCompetitionCreditRepository
         .filter(
           (run) =>
             run.status === "open" &&
-            run.period.periodId === periodId &&
-            run.period.cutoff.getTime() <= now.getTime() &&
-            run.period.nextCutoff.getTime() > now.getTime()
+            run.settlementPeriod.periodId === periodId &&
+            run.settlementPeriod.cutoff.getTime() <= now.getTime() &&
+            run.settlementPeriod.nextCutoff.getTime() > now.getTime()
         )
         .map((run) => run.runId)
     );
@@ -880,6 +1047,7 @@ export class MemoryCompetitionCreditRepository
         this.incrementAccount(
           reservation.walletNormalized,
           lot.periodId,
+          lot.route,
           {
             availableCredits: -allocation.amountCredits,
             reservedCredits: allocation.amountCredits,
@@ -889,6 +1057,7 @@ export class MemoryCompetitionCreditRepository
       } else {
         this.incrementPoolPeriod(
           lot.periodId,
+          lot.route,
           {
             availableCredits: -allocation.amountCredits,
             reservedCredits: allocation.amountCredits,
@@ -961,10 +1130,11 @@ export class MemoryCompetitionCreditRepository
         this.incrementAccount(
           reservation.walletNormalized,
           lot.periodId,
+          lot.route,
           increments,
           input.now
         );
-      } else this.incrementPoolPeriod(lot.periodId, increments, input.now);
+      } else this.incrementPoolPeriod(lot.periodId, lot.route, increments, input.now);
       this.addLedger({
         idempotencyKey: `${input.idempotencyKey}:allocation:${index}`,
         payloadHash: input.payloadHash,
@@ -1071,6 +1241,7 @@ export class MemoryCompetitionCreditRepository
       this.incrementAccount(
         lot.walletNormalized,
         lot.periodId,
+        lot.route,
         {
           availableCredits: -amount,
           expiredCredits: amount,
@@ -1080,6 +1251,7 @@ export class MemoryCompetitionCreditRepository
     } else
       this.incrementPoolPeriod(
         lot.periodId,
+        lot.route,
         {
           availableCredits: -amount,
           expiredCredits: amount,
@@ -1094,32 +1266,47 @@ export class MemoryCompetitionCreditRepository
   ): Promise<CreditReconciliationSnapshot | null> {
     const run = this.state.runs.find((item) => item.runId === runId);
     if (!run) return null;
-    const periodId = safeCompetitionCreditPeriodScopeId(run, runId);
+    const periodId = safeCompetitionCreditSettlementPeriodScopeId(run, runId);
     const result = {
       run,
       items: this.state.items.filter((item) => item.runId === runId),
+      holds: this.state.holds.filter((item) => item.runId === runId),
       ownLots: this.state.ownLots.filter((item) => item.runId === runId),
       poolLots: this.state.poolLots.filter((item) => item.runId === runId),
+      accountLots: this.state.ownLots.filter(
+        (item) => item.periodId === periodId && item.route === run.route
+      ),
+      poolPeriodLots: this.state.poolLots.filter(
+        (item) => item.periodId === periodId && item.route === run.route
+      ),
       poolPositions: this.state.poolPositions.filter(
         (item) => item.runId === runId
       ),
       reservations: this.state.reservations.filter(
-        (item) => item.periodId === periodId
+        (item) =>
+          item.periodId === run.settlementPeriod.periodId &&
+          (!Array.isArray(item.allocations) ||
+            item.allocations.some((allocation) => allocation.runId === runId))
       ),
       ledger: this.state.ledger.filter((item) => item.runId === runId),
       accounts: this.state.accounts.filter(
-        (item) => item.periodId === periodId
+        (item) => item.periodId === periodId && item.route === run.route
       ),
       poolPeriod:
-        this.state.poolPeriods.find((item) => item.periodId === periodId) ??
+        this.state.poolPeriods.find(
+          (item) => item.periodId === periodId && item.route === run.route
+        ) ??
         null,
     };
     return clone({
       ...result,
       collectionCounts: {
         items: result.items.length,
+        holds: result.holds.length,
         ownLots: result.ownLots.length,
         poolLots: result.poolLots.length,
+        accountLots: result.accountLots.length,
+        poolPeriodLots: result.poolPeriodLots.length,
         poolPositions: result.poolPositions.length,
         reservations: result.reservations.length,
         ledger: result.ledger.length,
@@ -1147,10 +1334,12 @@ export class MemoryCompetitionCreditRepository
       if (position.runId === incident.runId) position.status = "blocked";
     }
     for (const account of this.state.accounts) {
-      if (account.periodId === incident.periodId) account.blocked = true;
+      if (account.periodId === incident.periodId && account.route === incident.route)
+        account.blocked = true;
     }
     for (const pool of this.state.poolPeriods) {
-      if (pool.periodId === incident.periodId) pool.blocked = true;
+      if (pool.periodId === incident.periodId && pool.route === incident.route)
+        pool.blocked = true;
     }
   }
 }

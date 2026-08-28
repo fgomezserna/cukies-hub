@@ -10,6 +10,7 @@ import { DomainConflictError } from "../errors";
 import { createMongoGameEconomyPorts } from "./resource-ports";
 import { validGameDate, validGameText } from "./rules";
 import { createMongoGameEconomyService } from "./service";
+import { reconcileTreasureHuntEconomyRuns } from "./treasure-hunt";
 
 const STATE_COLLECTION = "game_economy_runtime_state";
 const RUNS_COLLECTION = "game_economy_runtime_runs";
@@ -28,6 +29,8 @@ export type GameEconomyRuntimeResult = {
   recoveryFailures: Array<{ sessionId: string; code: string }>;
   expired: number;
   expiryFailures: Array<{ sessionId: string; code: string }>;
+  treasure: Awaited<ReturnType<typeof reconcileTreasureHuntEconomyRuns>>;
+  rewards: { scanned: number; settled: number; replayed: number };
   completedAt: string;
 };
 
@@ -282,12 +285,21 @@ export async function runGameEconomyRuntimeTick(input: {
   try {
     const recovery = await service.recoverBatch({ now, limit: config.recoveryLimit });
     const expiry = await service.expireBatch({ now, limit: config.expiryLimit });
+    const treasure = input.service
+      ? { scanned: 0, settled: 0, forfeited: 0, released: 0, pending: 0, failures: [] }
+      : await reconcileTreasureHuntEconomyRuns({ now, limit: config.recoveryLimit });
+    const rewards = input.service
+      ? { scanned: 0, settled: 0, replayed: 0 }
+      : await (await import("../rewards/accounting-runtime"))
+        .settlePendingTreasureHuntRewards({ now, limit: config.recoveryLimit });
     const completedAt = validGameDate(clock(), "clock");
     const result: GameEconomyRuntimeResult = {
       recovered: recovery.sessions.length,
       recoveryFailures: recovery.failures,
       expired: expiry.sessions.length,
       expiryFailures: expiry.failures,
+      treasure,
+      rewards,
       completedAt: completedAt.toISOString(),
     };
     await coordinator.finishRun(runId, lease, completedAt, result);

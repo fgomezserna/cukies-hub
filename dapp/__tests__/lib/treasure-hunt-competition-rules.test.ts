@@ -125,6 +125,22 @@ describe('Treasure Hunt presale competition rules', () => {
     expect(ranking.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
+  it('conserva solo los 10 mejores resultados cuando la wallet completa 11 partidas', () => {
+    const walletAddress = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    const launchCampaign = { ...campaign, maxWinningAttemptsPerWallet: 10 };
+    const rows = Array.from({ length: 11 }, (_, index) => (
+      attempt(`attempt-${index + 1}`, walletAddress, (index + 1) * 100)
+    ));
+
+    const ranking = buildCompetitionRanking(rows, launchCampaign);
+
+    expect(ranking).toHaveLength(10);
+    expect(ranking.map((row) => row.score)).toEqual([
+      1_100, 1_000, 900, 800, 700, 600, 500, 400, 300, 200,
+    ]);
+    expect(ranking.some((row) => row.attemptId === 'attempt-1')).toBe(false);
+  });
+
   it('uses deterministic tie breakers and does not require a purchase to rank', () => {
     const wallet = '0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
     const ranking = buildCompetitionRanking([

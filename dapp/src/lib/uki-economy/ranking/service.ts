@@ -5,6 +5,7 @@ import type { CreditReservation } from "../credits/types";
 import { DomainConflictError, DomainValidationError, StaleFenceError } from "../errors";
 import { stableGameEconomyHash, assertGameSessionIntegrity, parseCanonicalRaw } from "../game-economy/rules";
 import type { GameEconomySession } from "../game-economy/types";
+import { TREASURE_HUNT_ECONOMY_POLICY } from "../game-economy/treasure-hunt-policy";
 import { getIsoWeekPeriod, getIsoWeekPeriodId, type UtcPeriod } from "../periods";
 import {
   compareRewardText,
@@ -106,6 +107,7 @@ function sourcePayload(source: Omit<WeeklyRankingSource, "sourceHash" | "created
     reservationId: source.reservationId,
     gameId: source.gameId,
     walletNormalized: source.walletNormalized,
+    periodAnchorAt: source.periodAnchorAt,
     settledAt: source.settledAt,
     cappedScoreRaw: source.cappedScoreRaw,
     scoreCapRaw: source.scoreCapRaw,
@@ -119,7 +121,11 @@ function sourcePayload(source: Omit<WeeklyRankingSource, "sourceHash" | "created
 function buildSource(game: GameEconomySession, credit: CreditReservation, period: UtcPeriod, createdAt: Date) {
   assertGameSessionIntegrity(game);
   assertRankingCreditBinding(game, credit);
-  if (!game.settledAt || getIsoWeekPeriodId(game.settledAt) !== period.id) {
+  const periodAnchorAt = game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
+    && game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
+    ? new Date(game.createdAt.getTime() - 14 * 60 * 60_000)
+    : game.settledAt!;
+  if (!game.settledAt || getIsoWeekPeriodId(periodAnchorAt) !== period.id) {
     throw new DomainConflictError(`La session ${game.sessionId} no pertenece a ${period.id}.`);
   }
   const cappedScore = parseCanonicalRaw(game.validation!.cappedScoreRaw, "cappedScoreRaw");
@@ -140,6 +146,10 @@ function buildSource(game: GameEconomySession, credit: CreditReservation, period
     reservationId: credit.reservationId,
     gameId: game.gameId,
     walletNormalized: game.walletNormalized,
+    periodAnchorAt: game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
+      && game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
+      ? game.createdAt
+      : game.settledAt,
     settledAt: game.settledAt,
     cappedScoreRaw: cappedScore.toString(10),
     scoreCapRaw: scoreCap.toString(10),
@@ -170,7 +180,10 @@ export function assertWeeklyRankingSourceIntegrity(source: WeeklyRankingSource) 
     || !/^[0-9a-f]{64}$/.test(source.creditPayloadHash)
     || !/^[0-9a-f]{64}$/.test(source.gameRuleConfigHash)
     || source.sourceHash !== stableRewardHash(sourcePayload(source))
-    || getIsoWeekPeriodId(source.settledAt) !== source.periodId) {
+    || getIsoWeekPeriodId(new Date(
+      source.periodAnchorAt.getTime()
+        - (source.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId ? 14 * 60 * 60_000 : 0),
+    )) !== source.periodId) {
     throw new DomainConflictError(`Source ${source._id} no supera integridad.`);
   }
   validRewardDate(source.createdAt, "source.createdAt");
@@ -500,6 +513,11 @@ export class WeeklyRankingService {
     }
     if (canonical.endExclusive.getTime() > now.getTime()) {
       throw new DomainConflictError(`El periodo ${canonical.id} aun no ha terminado.`);
+    }
+    if (canonical.endExclusive.getTime() + 14 * 60 * 60_000 > now.getTime()) {
+      throw new DomainConflictError(
+        `El periodo ${canonical.id} de Treasure Hunt no termina hasta las 14:00 UTC.`,
+      );
     }
     return this.runTransaction(async (repository) => {
       const rule = await repository.findRuleCovering(canonical.start, canonical.endExclusive);

@@ -11,10 +11,10 @@ import { usePublicLocale } from '@/providers/public-locale-provider';
 
 const navItems = [
   { label: { es: 'Inicio', en: 'Home' }, href: '/' },
+  { label: { es: 'Comprar UKI', en: 'Buy UKI' }, href: '/#comprar' },
+  { label: { es: 'Staking', en: 'Staking' }, href: '/cukie-master' },
   { label: { es: 'Jugar', en: 'Play' }, href: '/games/treasure-hunt' },
-  { label: { es: 'Premios', en: 'Rewards' }, href: '/premios' },
   { label: { es: 'Vesting', en: 'Vesting' }, href: '/vesting' },
-  { label: { es: 'Cukie Master', en: 'Cukie Master' }, href: '/cukie-master' },
 ];
 
 const localeLabels: Record<PublicLocale, string> = {
@@ -104,6 +104,12 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
 
   return (
     <>
+      <a
+        href="#contenido-principal"
+        className="fixed left-4 top-3 z-[90] -translate-y-20 rounded-[6px] bg-[var(--uki-cyan)] px-4 py-2 text-sm font-black text-[#041010] transition focus:translate-y-0"
+      >
+        {locale === 'es' ? 'Saltar al contenido' : 'Skip to content'}
+      </a>
       <header className={`uki-landing-header ${isScrolled ? 'is-scrolled' : ''}`}>
         <nav className="uki-container flex h-[5.7rem] items-center justify-between">
           <Link href="/" className="uki-header-logo relative block h-[5.1rem] w-48 overflow-hidden" aria-label={copy.homeLabel} onClick={closeMenu}>

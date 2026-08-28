@@ -671,6 +671,8 @@ button,
   overflow: hidden;
   isolation: isolate;
   transform-origin: top left;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   color: var(--th-cream);
   font-family: var(--th-font-ui);
   background: var(--th-ink-900);
@@ -2223,5 +2225,21 @@ button,
   .th-modal-layer > .th-panel,
   .th-button::after {
     animation: none !important;
+  }
+}
+
+/* Android recompone el iframe al desplazar el Hub. Mantener animada una textura
+   del tamaño completo del escenario puede dejar un frame vacío durante ese
+   proceso; en pantallas táctiles conservamos el fondo, pero no su pulso. */
+@media (hover: none) and (pointer: coarse), (max-width: 767px) {
+  .th-backdrop--menu,
+  .th-backdrop--menu::after {
+    animation: none !important;
+  }
+
+  .th-backdrop--menu {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0);
   }
 }

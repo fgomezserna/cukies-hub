@@ -81,7 +81,7 @@ Ruta: `/presale`.
 Prompt propuesto:
 
 ```text
-Pantalla de preventa UKI para una dapp en BNB Smart Chain, estado compra cerrada o prelaunch. Interfaz funcional, no landing generica. Panel principal ASM -> UKI con wallet desconectada y chain status, precio 0.01 USD, ratio ASM/UKI pendiente de fijar al inicio, duracion 1 mes, vesting comprador 9 meses lineal sin cliff, liquidez ASM -> UKI con bloqueo/quema minimo 9 meses. Layout denso pero claro, controles reales de connect wallet, approve ASM deshabilitado, buy UKI deshabilitado hasta apertura, resumen de tokenomics y enlaces BscScan/config. Dark mode teal/gold sobrio, sin promesas de rentabilidad.
+Pantalla de preventa UKI para una dapp en BNB Smart Chain, estado compra cerrada o prelaunch. Interfaz funcional, no landing generica. Panel principal ASM -> UKI con wallet desconectada y chain status, precio 0.01 USD, ratio ASM/UKI pendiente de fijar al inicio, duracion 1 mes, vesting comprador 9 meses lineal sin cliff, liquidez intermedia con 50% del ASM a `0,012 USD/UKI` y LP bloqueado 180 días. Layout denso pero claro, controles reales de connect wallet, approve ASM deshabilitado, buy UKI deshabilitado hasta apertura, resumen de tokenomics y enlaces BscScan/config. Dark mode teal/gold sobrio, sin promesas de rentabilidad.
 ```
 
 Debe mostrar:

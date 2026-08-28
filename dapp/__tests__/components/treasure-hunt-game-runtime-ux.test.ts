@@ -41,6 +41,14 @@ const headerSource = readFileSync(
   resolve(process.cwd(), 'src/components/layout/header.tsx'),
   'utf8',
 );
+const gameStylesSource = readFileSync(
+  resolve(process.cwd(), '../games/sybil-slayer/src/app/globals.css'),
+  'utf8',
+);
+const hubStylesSource = readFileSync(
+  resolve(process.cwd(), 'src/app/globals.css'),
+  'utf8',
+);
 
 describe('contrato UX del runtime de Treasure Hunt', () => {
   it('usa la etiqueta solicitada para el modo 1 vs 1 aún deshabilitado', () => {
@@ -65,6 +73,18 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
   it('permite el runtime en portrait y reduce el coste de render móvil', () => {
     expect(gameContainerSource).not.toContain('<OrientationOverlay');
     expect(gameContainerSource).toContain('isMobile ? MOBILE_FPS : FPS');
+  });
+
+  it('mantiene estable el fondo del menú al desplazar el Hub en móvil', () => {
+    expect(gameStylesSource).toMatch(
+      /@media \(hover: none\) and \(pointer: coarse\), \(max-width: 767px\)[\s\S]*?\.th-backdrop--menu[\s\S]*?animation: none !important/,
+    );
+    expect(hubStylesSource).toMatch(
+      /\[data-game-layout='mobile-focus'\] \[data-game-viewport\][\s\S]*?contain: paint/,
+    );
+    expect(hubStylesSource).toMatch(
+      /\[data-game-layout='mobile-focus'\] \[data-game-viewport\] iframe[\s\S]*?transform: translateZ\(0\)/,
+    );
   });
 
   it('no reproduce la voz de Trump al recoger checkpoint ni Haku', () => {
@@ -210,9 +230,13 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
 
   it('conserva los assets entre despliegues y versiona solo el shell', () => {
     expect(pwaSetupSource).toContain('NEXT_PUBLIC_GAME_CACHE_VERSION');
-    expect(pwaSetupSource).toContain('`/sw.js?v=${cacheVersion}`');
+    expect(pwaSetupSource).toContain("`${gamePublicPath('/sw.js')}?v=${cacheVersion}`");
+    expect(pwaSetupSource).toContain('scope: gameServiceWorkerScope()');
     expect(serviceWorkerSource).toContain(
       "new URL(self.location.href).searchParams.get('v')",
+    );
+    expect(serviceWorkerSource).toContain(
+      'new URL(self.registration.scope).pathname',
     );
     expect(serviceWorkerSource).toContain(
       "const ASSET_CACHE_NAME = 'treasure-hunt-assets-v1'",
@@ -227,9 +251,11 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
       'await assetCache.put(request, response)',
     );
     expect(serviceWorkerSource).toContain('staleWhileRevalidate');
-    expect(serviceWorkerSource).toContain("requestUrl.pathname.startsWith('/assets/')");
     expect(serviceWorkerSource).toContain(
-      "requestUrl.pathname.startsWith('/_next/static/')",
+      "pathWithinScope(requestUrl.pathname).startsWith('/assets/')",
+    );
+    expect(serviceWorkerSource).toContain(
+      "pathWithinScope(requestUrl.pathname).startsWith('/_next/static/')",
     );
     expect(serviceWorkerSource).toContain(
       'staleWhileRevalidate(event, ASSET_CACHE_NAME)',

@@ -14,6 +14,18 @@ body {
 [data-game-layout='mobile-focus'] [data-game-viewport] {
   height: auto;
   min-height: 0;
+  contain: paint;
+  isolation: isolate;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+[data-game-layout='mobile-focus'] [data-game-viewport] > [data-game-landscape-surface],
+[data-game-layout='mobile-focus'] [data-game-viewport] iframe {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 @media (min-width: 1024px) {
@@ -167,13 +179,21 @@ body {
     width: min(100% - 5rem, 1440px);
     margin-inline: auto;
     background: linear-gradient(90deg, transparent, rgba(228, 92, 255, 0.12) 20%, rgba(242, 195, 75, 0.12) 80%, transparent);
-    margin-block: 2.5rem;
+    margin-block: 0.5rem;
+  }
+
+  .uki-home-section {
+    padding-block: clamp(2.5rem, 4vw, 3.5rem);
   }
 
   @media (max-width: 640px) {
     .uki-section-divider {
       width: min(100% - 2rem, 1500px);
-      margin-block: 1.5rem;
+      margin-block: 0;
+    }
+
+    .uki-home-section {
+      padding-block: 2rem;
     }
   }
 
@@ -541,6 +561,10 @@ body {
       0 12px 28px rgba(0, 0, 0, 0.32);
   }
 
+  .uki-eyebrow + .uki-section-title {
+    margin-top: 1rem;
+  }
+
   .uki-section-title-cyan {
     color: var(--uki-cyan);
     font-size: clamp(1.55rem, 2.25vw, 2.35rem);
@@ -705,6 +729,10 @@ body {
     max-width: 34rem;
     padding-top: clamp(2rem, 4vw, 3.5rem);
     animation: uki-rise-in 760ms var(--uki-ease) both;
+  }
+
+  .uki-hero-overview-wrap {
+    padding-top: clamp(2rem, 4vw, 3.5rem);
   }
 
   .uki-button {
@@ -2970,6 +2998,10 @@ body {
     }
 
     .uki-hero-content {
+      padding-top: 0;
+    }
+
+    .uki-hero-overview-wrap {
       padding-top: 0;
     }
 

@@ -17,15 +17,26 @@ export const ECONOMY_COLLECTIONS = [
   'cukie_master_route_capacity',
   'cukie_master_positions',
   'cukie_master_slots',
+  'cukie_master_slot_versions',
+  'cukie_master_slot_history_state',
   'cukie_master_position_events',
   'cukie_master_recalculation_jobs',
   'cukie_master_runtime_runs',
   'cukie_master_runtime_state',
+  'cukie_master_nft_positions',
+  'cukie_pool_nft_vault_positions',
+  'nft_vault_collections',
+  'cukie_pool_calendar_versions',
+  'cukie_pool_vault_asset_leases',
+  'cukie_pool_vault_period_usage',
+  'nft_vault_recovery_audit',
   'uki_staking_positions',
   'uki_staking_state',
   'uki_vesting_events',
   'uki_vesting_positions',
   'chain_bsc_checkpoints',
+  'chain_bsc_canonical_blocks',
+  'competition_credit_cutoff_blocks',
   'chain_integrity_incidents',
   ...CREDIT_ECONOMY_COLLECTIONS,
   'competition_credit_runtime_state',
@@ -44,6 +55,10 @@ export const ECONOMY_COLLECTIONS = [
   'game_owned_cukie_assignments',
   'game_owned_cukie_events',
   'game_result_evidence',
+  'treasure_hunt_economy_runs',
+  'treasure_hunt_pool_daily_usage',
+  'treasure_hunt_pool_quota_reservations',
+  'treasure_hunt_weekly_bests',
   'game_economy_runtime_state',
   'game_economy_runtime_runs',
   'reward_rule_state',
@@ -53,6 +68,14 @@ export const ECONOMY_COLLECTIONS = [
   'reward_source_manifests',
   'reward_allocations',
   'reward_pool_accruals',
+  'reward_daily_capacity_materializations',
+  'reward_accounting_allocations',
+  'reward_daily_accounting',
+  'reward_weekly_prize_accounting',
+  'reward_pool_tranche_accounting',
+  'reward_weekly_game_sources',
+  'reward_accounting_runtime_state',
+  'reward_accounting_runtime_runs',
   'weekly_ranking_rule_state',
   'weekly_ranking_period_states',
   'weekly_ranking_sources',
@@ -67,6 +90,7 @@ export const ECONOMY_COLLECTIONS = [
   'reward_claim_batches',
   'reward_claim_proofs',
   'reward_claims',
+  'reward_publication_plans',
   'reward_integrity_incidents',
 ] as const;
 
@@ -198,6 +222,21 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     options: { unique: true },
   },
   {
+    collection: 'cukie_master_slot_versions',
+    keys: { slotId: 1, route: 1, effectiveBlockNumber: -1, 'slot.revision': -1 },
+    options: { name: 'cukie_master_slot_versions_temporal' },
+  },
+  {
+    collection: 'cukie_master_slot_versions',
+    keys: { route: 1, effectiveBlockNumber: -1, slotId: 1, _id: 1 },
+    options: { name: 'cukie_master_slot_versions_cutoff' },
+  },
+  {
+    collection: 'cukie_master_slot_history_state',
+    keys: { completeFromBlockNumber: 1, completeFrom: 1, observedThrough: 1 },
+    options: { name: 'cukie_master_slot_history_coverage' },
+  },
+  {
     collection: 'cukie_master_slots',
     keys: { status: 1, creditEligibleFrom: 1, _id: 1 },
   },
@@ -305,6 +344,16 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     keys: { safeBlockNumber: -1 },
   },
   {
+    collection: 'chain_bsc_canonical_blocks',
+    keys: { blockTimestamp: -1, blockNumber: -1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'competition_credit_cutoff_blocks',
+    keys: { cutoff: 1, blockNumber: 1 },
+    options: { unique: true },
+  },
+  {
     collection: 'chain_integrity_incidents',
     keys: { status: 1, chain: 1, detectedAt: -1 },
   },
@@ -315,6 +364,97 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
   {
     collection: 'cukie_master_slot_events',
     keys: { walletNormalized: 1, createdAt: -1 },
+  },
+  {
+    collection: 'cukie_master_nft_positions',
+    keys: { assetId: 1, depositEpoch: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_master_nft_positions',
+    keys: { assetId: 1, lifecycleOpen: 1 },
+    options: { unique: true, partialFilterExpression: { lifecycleOpen: true } },
+  },
+  {
+    collection: 'cukie_master_nft_positions',
+    keys: { beneficiaryNormalized: 1, lifecycleOpen: 1, updatedAt: -1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { assetId: 1, depositEpoch: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { assetId: 1, lifecycleOpen: 1 },
+    options: { unique: true, partialFilterExpression: { lifecycleOpen: true } },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { beneficiaryNormalized: 1, lifecycleOpen: 1, updatedAt: -1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { lifecycleOpen: 1, activationAt: 1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: { lifecycleOpen: 1, withdrawableAt: 1 },
+  },
+  {
+    collection: 'cukie_pool_nft_vault_positions',
+    keys: {
+      chainId: 1,
+      vaultAddressNormalized: 1,
+      collectionAddressNormalized: 1,
+      activationAt: 1,
+      exitRequestedAt: 1,
+    },
+    options: { name: 'cukie_pool_reward_census' },
+  },
+  {
+    collection: 'nft_vault_collections',
+    keys: { vaultAlias: 1, vaultAddressNormalized: 1, collectionAddressNormalized: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_pool_calendar_versions',
+    keys: { chainId: 1, vaultAddressNormalized: 1, calendarVersion: 1 },
+    options: { unique: true },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { positionId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_lease_position_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { assignmentId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_lease_assignment_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { sessionId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_lease_session_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_asset_leases',
+    keys: { expiresAt: 1, _id: 1 },
+    options: { name: 'cukie_pool_vault_lease_expiry_audit' },
+  },
+  {
+    collection: 'cukie_pool_vault_period_usage',
+    keys: { assetId: 1, depositEpoch: 1, periodId: 1 },
+    options: { unique: true, name: 'cukie_pool_vault_usage_epoch_period_unique' },
+  },
+  {
+    collection: 'cukie_pool_vault_period_usage',
+    keys: { periodId: 1, _id: 1 },
+    options: { name: 'cukie_pool_vault_usage_period_audit' },
+  },
+  {
+    collection: 'nft_vault_recovery_audit',
+    keys: { assetId: 1, 'evidence.blockNumber': -1 },
   },
   {
     collection: 'cukie_pool_positions',
@@ -512,6 +652,51 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     collection: 'game_economy_sessions',
     keys: { 'operation.leaseExpiresAt': 1, status: 1, _id: 1 },
     options: { name: 'game_session_stale_operation_scan' },
+  },
+  {
+    collection: 'treasure_hunt_economy_runs',
+    keys: { authorityGameSessionId: 1 },
+    options: { unique: true, name: 'treasure_run_authority_session_unique' },
+  },
+  {
+    collection: 'treasure_hunt_economy_runs',
+    keys: { gameEconomySessionId: 1 },
+    options: { unique: true, name: 'treasure_run_economy_session_unique' },
+  },
+  {
+    collection: 'treasure_hunt_economy_runs',
+    keys: { walletNormalized: 1, dailyPeriodId: 1, reservedAt: 1 },
+    options: { name: 'treasure_run_wallet_daily_period' },
+  },
+  {
+    collection: 'treasure_hunt_economy_runs',
+    keys: { status: 1, updatedAt: 1, _id: 1 },
+    options: { name: 'treasure_run_recovery_scan' },
+  },
+  {
+    collection: 'treasure_hunt_pool_daily_usage',
+    keys: { walletNormalized: 1, dailyPeriodId: 1 },
+    options: { unique: true, name: 'treasure_pool_usage_wallet_period_unique' },
+  },
+  {
+    collection: 'treasure_hunt_pool_quota_reservations',
+    keys: { runId: 1 },
+    options: { unique: true, name: 'treasure_pool_quota_run_unique' },
+  },
+  {
+    collection: 'treasure_hunt_pool_quota_reservations',
+    keys: { walletNormalized: 1, dailyPeriodId: 1, status: 1 },
+    options: { name: 'treasure_pool_quota_wallet_period_status' },
+  },
+  {
+    collection: 'treasure_hunt_weekly_bests',
+    keys: { walletNormalized: 1, weeklyPeriodId: 1, gameId: 1 },
+    options: { unique: true, name: 'treasure_weekly_best_wallet_unique' },
+  },
+  {
+    collection: 'treasure_hunt_weekly_bests',
+    keys: { weeklyPeriodId: 1, scoreDigits: -1, scoreRaw: -1, achievedAt: 1 },
+    options: { name: 'treasure_weekly_best_score_order' },
   },
   {
     collection: 'game_economy_events',
@@ -867,6 +1052,106 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     options: { name: 'reward_pool_accrual_global_source_lookup' },
   },
   {
+    collection: 'reward_daily_capacity_materializations',
+    keys: { dayId: 1 },
+    options: { unique: true, name: 'reward_daily_capacity_day' },
+  },
+  {
+    collection: 'reward_daily_capacity_materializations',
+    keys: { status: 1, sealedAt: 1, _id: 1 },
+    options: { name: 'reward_daily_capacity_audit_cursor' },
+  },
+  {
+    collection: 'reward_accounting_allocations',
+    keys: { allocationId: 1 },
+    options: { unique: true, name: 'reward_accounting_allocation_identity' },
+  },
+  {
+    collection: 'reward_accounting_allocations',
+    keys: { accountingId: 1, allocationId: 1 },
+    options: { name: 'reward_accounting_allocation_source' },
+  },
+  {
+    collection: 'reward_accounting_allocations',
+    keys: { status: 1, availableAt: 1, accountingId: 1, _id: 1 },
+    options: { name: 'reward_accounting_allocation_publication_scan' },
+  },
+  {
+    collection: 'reward_accounting_allocations',
+    keys: { walletNormalized: 1, status: 1, availableAt: 1, allocationId: 1 },
+    options: { name: 'reward_accounting_allocation_wallet' },
+  },
+  {
+    collection: 'reward_accounting_allocations',
+    keys: { periodId: 1, category: 1, allocationId: 1 },
+    options: { name: 'reward_accounting_allocation_period' },
+  },
+  {
+    collection: 'reward_daily_accounting',
+    keys: { dayId: 1 },
+    options: { unique: true, name: 'reward_daily_accounting_day' },
+  },
+  {
+    collection: 'reward_daily_accounting',
+    keys: { status: 1, sealedAt: 1, _id: 1 },
+    options: { name: 'reward_daily_accounting_audit_cursor' },
+  },
+  {
+    collection: 'reward_weekly_prize_accounting',
+    keys: { periodId: 1 },
+    options: { unique: true, name: 'reward_weekly_prize_period' },
+  },
+  {
+    collection: 'reward_weekly_prize_accounting',
+    keys: { status: 1, payoutAt: 1, _id: 1 },
+    options: { name: 'reward_weekly_prize_payout_cursor' },
+  },
+  {
+    collection: 'reward_weekly_prize_accounting',
+    keys: { poolTrancheSchedule: 1, status: 1, _id: 1 },
+    options: { name: 'reward_weekly_pool_tranche_lookup' },
+  },
+  {
+    collection: 'reward_weekly_prize_accounting',
+    keys: { 'lotteryEntropy.blockNumber': 1, 'lotteryEntropy.blockHash': 1 },
+    options: { unique: true, name: 'reward_weekly_lottery_entropy_fence' },
+  },
+  {
+    collection: 'reward_pool_tranche_accounting',
+    keys: { periodId: 1, tranche: 1, participantWallet: 1 },
+    options: { unique: true, name: 'reward_pool_tranche_identity' },
+  },
+  {
+    collection: 'reward_weekly_game_sources',
+    keys: { sessionId: 1 },
+    options: { unique: true, name: 'reward_weekly_game_source_session' },
+  },
+  {
+    collection: 'reward_weekly_game_sources',
+    keys: { status: 1, outcome: 1, resultValid: 1, periodAnchorAt: 1, playedAt: 1, _id: 1 },
+    options: { name: 'reward_weekly_game_source_eligible_cursor' },
+  },
+  {
+    collection: 'reward_pool_tranche_accounting',
+    keys: { status: 1, scheduledAt: 1, _id: 1 },
+    options: { name: 'reward_pool_tranche_schedule_cursor' },
+  },
+  {
+    collection: 'reward_accounting_runtime_state',
+    keys: { schedulerId: 1 },
+    options: { unique: true, name: 'reward_accounting_runtime_scheduler' },
+  },
+  {
+    collection: 'reward_accounting_runtime_runs',
+    keys: { status: 1, endedAt: -1 },
+    options: { name: 'reward_accounting_runtime_run_health' },
+  },
+  {
+    collection: 'reward_accounting_runtime_runs',
+    keys: { expiresAt: 1 },
+    options: { expireAfterSeconds: 0, name: 'reward_accounting_runtime_run_expiry' },
+  },
+  {
     collection: 'reward_period_states',
     keys: { periodId: 1 },
     options: { unique: true, name: 'reward_period_state_period' },
@@ -915,6 +1200,21 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     collection: 'reward_claim_batches',
     keys: { periodId: 1, status: 1, createdAt: -1 },
     options: { name: 'reward_claim_batch_period_status' },
+  },
+  {
+    collection: 'reward_publication_plans',
+    keys: { accountingId: 1 },
+    options: { unique: true, name: 'reward_publication_plan_accounting' },
+  },
+  {
+    collection: 'reward_publication_plans',
+    keys: { status: 1, leaseExpiresAt: 1, createdAt: 1, _id: 1 },
+    options: { name: 'reward_publication_plan_runtime' },
+  },
+  {
+    collection: 'reward_publication_plans',
+    keys: { 'operations.transactionHash': 1 },
+    options: { name: 'reward_publication_plan_transaction' },
   },
   {
     collection: 'reward_claims',

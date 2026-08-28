@@ -17,7 +17,7 @@ export type RewardEmissionBudgetConfig = {
   dailyCapRaw: string;
   lifetimeCapRaw: string;
   /** V1 no acumula capacidad diaria no utilizada. */
-  unusedDailyCapacity: "expires";
+  unusedDailyCapacity: "expires" | "materialize_undistributed";
   /** V1 nunca convierte un exceso en un claim o accrual implicito. */
   overflowPolicy: "block";
 };
@@ -27,11 +27,10 @@ export type RewardCategory =
   | "credit_pool_daily"
   | "cukie_pool_original_distribution"
   | "cukie_pool_second_plus_distribution"
-  | "cukie_pool_original_carry"
-  | "cukie_pool_second_plus_carry"
   | "treasury"
   | "marketing"
   | "development"
+  | "marketing_development"
   | "supply_reduction";
 
 /**
@@ -40,6 +39,9 @@ export type RewardCategory =
  */
 export type RewardAccrualCategory =
   | "weekly_prize_pool"
+  | "ambassador_program_pending"
+  | "ambassador_ordinary_pending"
+  | "ambassador_weekly_pending"
   | "credit_pool_weekly"
   | "cukie_pool_original_weekly"
   | "cukie_pool_second_plus_weekly"
@@ -58,6 +60,10 @@ export type RewardRule = {
     unitScale: number;
     totalUnits: number;
     weeklyReserveUnits: number;
+    ambassadorReserveUnits: number;
+    /** V3 divide la reserva ambassador de 0.5 en 0.4 ordinario y 0.1 semanal. */
+    ambassadorOrdinaryUnits?: number;
+    ambassadorWeeklyUnits?: number;
     convertibleUnits: number;
   };
   settlementBps: {
@@ -75,11 +81,15 @@ export type RewardRule = {
   emissionBudget: RewardEmissionBudgetConfig;
   cukiePool: {
     cumulativeTierCount: 6;
+    /** Comun, No Comun+, Raro+, Epico+, Legendario+, Goat. */
+    cumulativeTierBps: [number, number, number, number, number, number];
   };
   undistributedBps: {
     treasury: number;
     marketing: number;
     development: number;
+    /** V3 usa un unico destino contable para marketing y desarrollo. */
+    marketingDevelopment?: number;
     supplyReduction: number;
   };
   destinations: {
@@ -89,6 +99,7 @@ export type RewardRule = {
     treasury: string;
     marketing: string;
     development: string;
+    marketingDevelopment?: string;
     supplyReduction: string;
   };
   configHash: string;
@@ -268,7 +279,7 @@ export type RewardEmissionBudgetEvent = {
 };
 
 export type CreditSourceKind = "own" | "pool";
-export type CukieSourceKind = "own" | "pool_original" | "pool_second_plus";
+export type CukieSourceKind = "own" | "pool_original" | "pool_second_plus" | "seiku";
 
 export type SettlementRewardInput = {
   periodId: string;
@@ -390,7 +401,6 @@ export type CukiePoolParticipant = {
 export type CukiePoolDistributionInput = {
   generation: CukiePoolGeneration;
   sourcePoolRaw: string;
-  carryWallet: string;
   participants: CukiePoolParticipant[];
 };
 

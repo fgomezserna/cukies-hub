@@ -9,4 +9,7 @@ export * from "./rules";
 export * from "./rule-command";
 export * from "./runtime";
 export * from "./service";
+export * from "./treasure-hunt-policy";
+export * from "./treasure-hunt";
+export * from "./treasure-hunt-types";
 export * from "./types";

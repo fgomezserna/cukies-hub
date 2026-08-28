@@ -93,7 +93,7 @@ Contenido minimo:
 - Allowance ASM.
 - Compra UKI.
 - Vesting personal.
-- Resumen de liquidez ASM -> UKI y bloqueo/quema minimo 9 meses.
+- Resumen de la liquidez intermedia: 50% ASM -> UKI a `0,012 USD/UKI` y locker LP de 180 días.
 - Links a BscScan.
 
 No debe:
@@ -195,7 +195,7 @@ Responsabilidad:
 Contenido minimo:
 
 - Coste de entrada.
-- Coste exacto: 10 creditos, con 2.5 destinados al pool semanal y 7.5 en juego.
+- Coste exacto: 10 creditos, con 7.5 ligados al rendimiento, 2 al bote semanal, 0.4 a embajadores ordinarios y 0.1 a embajadores del bote semanal.
 - Credit source: propios o pool.
 - Cukie propio o asignado.
 - Session economy status.

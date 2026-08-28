@@ -33,9 +33,11 @@ import {
 } from "./rules";
 import {
   CREDITS_PER_MATURE_SLOT,
+  CREDIT_SOURCE_WATERMARK_IDS,
   MAX_CREDIT_RESERVATION_ALLOCATIONS,
   type CompetitionCreditRule,
   type CompetitionCreditRun,
+  type CreditRoute,
   type CreditIntegrityIncident,
   type CreditLot,
   type CreditLotFifoCursor,
@@ -43,6 +45,7 @@ import {
   type CreditReservation,
   type CreditReservationAllocation,
   type CreditRunItem,
+  type CreditRunHold,
   type CreditSnapshotSlot,
 } from "./types";
 
@@ -57,13 +60,16 @@ export type ConfigureCreditPoolInput = {
 };
 
 export type CreateCreditRunInput = {
+  route?: CreditRoute;
   cutoff: Date;
   expectedRuleVersion: string;
   now: Date;
 };
 
 export type RefreshCreditSourceWatermarkInput = {
+  route?: CreditRoute;
   expectedRuleVersion: string;
+  ruleAt?: Date;
   now: Date;
 };
 
@@ -156,6 +162,18 @@ function validSourceSlotShape(slot: CreditSnapshotSlot) {
   }
   if (!/^[0-9a-f]{64}$/.test(slot.sourceHash)) {
     throw new DomainConflictError(`sourceHash invalido en ${slot._id}.`);
+  }
+  if (
+    !Number.isSafeInteger(slot.sourceBlockNumber) ||
+    Number(slot.sourceBlockNumber) < 0 ||
+    typeof slot.sourceBlockHash !== "string" ||
+    !/^0x[0-9a-f]{64}$/.test(slot.sourceBlockHash) ||
+    !(slot.sourceBlockTimestamp instanceof Date) ||
+    Number.isNaN(slot.sourceBlockTimestamp.getTime())
+  ) {
+    throw new DomainConflictError(
+      `El slot ${slot._id} no acredita su bloque efectivo.`,
+    );
   }
   if (
     !Number.isSafeInteger(slot.eligibilityEpoch) ||
@@ -414,6 +432,10 @@ export function validateReservationIntegrity(reservation: CreditReservation) {
       allocation.lotExpiresAt,
       `reservation.allocations.${allocation.lotId}.lotExpiresAt`
     );
+    const reservedUntil = validCreditDate(
+      allocation.reservedUntil,
+      `reservation.allocations.${allocation.lotId}.reservedUntil`
+    );
     if (
       !/^[0-9a-f]{64}$/.test(allocation.lotId) ||
       lotIds.has(allocation.lotId) ||
@@ -421,7 +443,8 @@ export function validateReservationIntegrity(reservation: CreditReservation) {
       allocation.amountCredits < 1 ||
       !Number.isSafeInteger(allocation.lotRevision) ||
       allocation.lotRevision < 0 ||
-      lotExpiresAt.getTime() < expiresAt.getTime()
+      reservedUntil.getTime() !== expiresAt.getTime() ||
+      lotExpiresAt.getTime() <= createdAt.getTime()
     ) {
       throw new DomainConflictError(
         `La reserva ${reservation.reservationId} tiene allocations invalidas.`
@@ -546,18 +569,35 @@ export function validateReservationIntegrity(reservation: CreditReservation) {
 
 function validateExistingCreditRun(
   run: CompetitionCreditRun,
-  period: CompetitionCreditRun["period"]
+  period: CompetitionCreditRun["period"],
+  expectedSettlementPeriod: CompetitionCreditRun["settlementPeriod"]
 ) {
   const cutoff = validCreditDate(run.period.cutoff, "run.period.cutoff");
   const nextCutoff = validCreditDate(
     run.period.nextCutoff,
     "run.period.nextCutoff"
   );
+  const settlementTarget = validCreditDate(
+    run.period.settlementTarget,
+    "run.period.settlementTarget"
+  );
+  const settlementCutoff = validCreditDate(
+    run.settlementPeriod.cutoff,
+    "run.settlementPeriod.cutoff"
+  );
+  const settlementNextCutoff = validCreditDate(
+    run.settlementPeriod.nextCutoff,
+    "run.settlementPeriod.nextCutoff"
+  );
   const createdAt = validCreditDate(run.createdAt, "run.createdAt");
   const updatedAt = validCreditDate(run.updatedAt, "run.updatedAt");
   const sourceObservedThrough = validCreditDate(
     run.sourceWatermark.observedThrough,
     "run.sourceWatermark.observedThrough"
+  );
+  const cutoffBlockTimestamp = validCreditDate(
+    run.cutoffBlock?.blockTimestamp,
+    "run.cutoffBlock.blockTimestamp"
   );
   const sourceUpdatedAt = validCreditDate(
     run.sourceWatermark.updatedAt,
@@ -573,8 +613,9 @@ function validateExistingCreditRun(
   );
   const expectedRunId = stableCreditHash({
     kind: "daily-credit-run",
+    route: run.route,
     period: run.period,
-    sourceHash: run.sourceWatermark.sourceHash,
+    sourceHash: run.sourceSnapshotHash,
   });
   if (
     run._id !== expectedRunId ||
@@ -582,14 +623,31 @@ function validateExistingCreditRun(
     run.period.periodId !== period.periodId ||
     cutoff.getTime() !== period.cutoff.getTime() ||
     nextCutoff.getTime() !== period.nextCutoff.getTime() ||
+    settlementTarget.getTime() !== period.settlementTarget.getTime() ||
+    settlementNextCutoff.getTime() !== settlementCutoff.getTime() + 24 * 60 * 60 * 1000 ||
+    run.settlementPeriod.periodId !== expectedSettlementPeriod.periodId ||
+    settlementCutoff.getTime() !== expectedSettlementPeriod.cutoff.getTime() ||
+    settlementNextCutoff.getTime() !== expectedSettlementPeriod.nextCutoff.getTime() ||
+    run.settlementPeriod.ruleVersion !== expectedSettlementPeriod.ruleVersion ||
+    run.settlementPeriod.ruleConfigHash !== expectedSettlementPeriod.ruleConfigHash ||
     run.period.ruleVersion !== period.ruleVersion ||
     run.period.ruleConfigHash !== period.ruleConfigHash ||
-    !["snapshotted", "processing", "open", "blocked"].includes(run.status) ||
+    !["snapshotted", "processing", "open", "open_with_holds", "blocked"].includes(run.status) ||
     !/^[0-9a-f]{64}$/.test(run.snapshotHash) ||
     !/^[0-9a-f]{64}$/.test(run.sourceWatermark.sourceHash) ||
+    !/^[0-9a-f]{64}$/.test(run.sourceSnapshotHash) ||
     !/^[0-9a-f]{64}$/.test(run.sourceWatermark.healthEvidenceHash) ||
     run.sourceWatermark.status !== "healthy" ||
-    run.sourceWatermark._id !== "cukie-master-slots" ||
+    (run.route !== "uki" && run.route !== "nft") ||
+    run.sourceWatermark.route !== run.route ||
+    run.sourceWatermark._id !== CREDIT_SOURCE_WATERMARK_IDS[run.route] ||
+    !Number.isSafeInteger(run.sourceWatermark.canonicalSafeBlock) ||
+    !/^0x[0-9a-f]{64}$/.test(run.sourceWatermark.canonicalSafeBlockHash) ||
+    !Number.isSafeInteger(run.cutoffBlock?.blockNumber) ||
+    run.cutoffBlock.blockNumber < 0 ||
+    !/^0x[0-9a-f]{64}$/.test(run.cutoffBlock.blockHash) ||
+    cutoffBlockTimestamp.getTime() >= cutoff.getTime() ||
+    run.cutoffBlock.blockNumber > run.sourceWatermark.canonicalSafeBlock ||
     !Number.isSafeInteger(run.sourceWatermark.slotCount) ||
     run.sourceWatermark.slotCount < 0 ||
     run.sourceWatermark.slotCount > 5_000 ||
@@ -599,13 +657,18 @@ function validateExistingCreditRun(
     !Number.isSafeInteger(run.expectedItemCount) ||
     run.expectedItemCount < 0 ||
     run.expectedItemCount > 5_000 ||
+    !Number.isSafeInteger(run.expectedHeldCount) ||
+    run.expectedHeldCount < 0 ||
+    run.expectedItemCount + run.expectedHeldCount > 5_000 ||
     !Number.isSafeInteger(run.expectedGrantCredits) ||
     !Number.isSafeInteger(run.expectedOwnCredits) ||
     !Number.isSafeInteger(run.expectedPoolCredits) ||
     run.expectedOwnCredits < 0 ||
     run.expectedPoolCredits < 0 ||
-    run.expectedGrantCredits !==
+    run.expectedGrantCredits <
       run.expectedItemCount * CREDITS_PER_MATURE_SLOT ||
+    run.expectedGrantCredits >
+      run.expectedItemCount * CREDITS_PER_MATURE_SLOT * 2 ||
     run.expectedOwnCredits + run.expectedPoolCredits !==
       run.expectedGrantCredits ||
     !Number.isSafeInteger(run.fenceToken) ||
@@ -619,15 +682,18 @@ function validateExistingCreditRun(
   return run;
 }
 
-function validateRunAgainstRule(
+function validateRunAgainstRules(
   run: CompetitionCreditRun,
-  rule: CompetitionCreditRule
+  earnedRule: CompetitionCreditRule,
+  settlementRule: CompetitionCreditRule
 ) {
   const cutoff = validCreditDate(run.period.cutoff, "run.period.cutoff");
-  assertRuleActiveAt(rule, cutoff);
+  assertRuleActiveAt(earnedRule, cutoff);
+  assertRuleActiveAt(settlementRule, run.settlementPeriod.cutoff);
   return validateExistingCreditRun(
     run,
-    buildCompetitionCreditPeriod(cutoff, rule)
+    buildCompetitionCreditPeriod(cutoff, earnedRule),
+    buildCompetitionCreditPeriod(run.settlementPeriod.cutoff, settlementRule)
   );
 }
 
@@ -638,7 +704,7 @@ function isDuplicateConflict(error: unknown) {
   );
 }
 
-function allocateLots(lots: CreditLot[], amountCredits: number) {
+function allocateLots(lots: CreditLot[], amountCredits: number, reservedUntil: Date) {
   const allocations: CreditReservationAllocation[] = [];
   let remaining = amountCredits;
   for (const lot of lots) {
@@ -647,9 +713,12 @@ function allocateLots(lots: CreditLot[], amountCredits: number) {
     if (amount <= 0) continue;
     allocations.push({
       lotId: lot.lotId,
+      runId: lot.runId,
+      route: lot.route,
       amountCredits: amount,
       lotRevision: lot.revision,
       lotExpiresAt: new Date(lot.expiresAt.getTime()),
+      reservedUntil: new Date(reservedUntil.getTime()),
     });
     remaining -= amount;
   }
@@ -817,9 +886,16 @@ async function blockCreditReconciliationFailure(input: {
     input.snapshot.run,
     input.runId
   );
+  const route =
+    input.snapshot.run &&
+    typeof input.snapshot.run === "object" &&
+    (input.snapshot.run as { route?: unknown }).route === "nft"
+      ? "nft"
+      : "uki";
   const incidentId = stableCreditHash({
     type: "credit_reconciliation_mismatch",
     runId: input.runId,
+    route,
     periodId,
     evidenceHash: input.result.evidenceHash,
   });
@@ -829,6 +905,7 @@ async function blockCreditReconciliationFailure(input: {
     type: "credit_reconciliation_mismatch",
     status: "open",
     runId: input.runId,
+    route,
     periodId,
     walletNormalized: null,
     reasonCodes: input.result.reasonCodes,
@@ -851,16 +928,18 @@ export function createCompetitionCreditService(
       input.expectedRuleVersion,
       "expectedRuleVersion"
     );
+    const route = input.route ?? "uki";
     return mappedTransaction(runner, async (repository) => {
-      const rule = await repository.findRuleAt(now, expectedRuleVersion);
+      const ruleAt = input.ruleAt ? validCreditDate(input.ruleAt, "ruleAt") : now;
+      const rule = await repository.findRuleAt(ruleAt, expectedRuleVersion);
       if (!rule)
         throw new DomainConflictError(
           "La regla esperada de creditos no esta activa."
         );
-      assertRuleActiveAt(rule, now);
+      assertRuleActiveAt(rule, ruleAt);
       const [health, sourceSlots] = await Promise.all([
-        repository.readSourceHealth(now, rule),
-        repository.listSourceSlots(rule.maxSnapshotSlots + 1),
+        repository.readSourceHealth(now, rule, route),
+        repository.listSourceSlots(rule.maxSnapshotSlots + 1, route),
       ]);
       if (sourceSlots.length > rule.maxSnapshotSlots) {
         throw new DomainConflictError(
@@ -876,7 +955,11 @@ export function createCompetitionCreditService(
         Number.isNaN(health.observedThrough.getTime()) ||
         health.observedThrough.getTime() > now.getTime() ||
         !health.sourceRuleVersions ||
-        !/^[0-9a-f]{64}$/.test(health.evidenceHash)
+        !/^[0-9a-f]{64}$/.test(health.evidenceHash) ||
+        !Number.isSafeInteger(health.canonicalSafeBlock) ||
+        health.canonicalSafeBlock! < 0 ||
+        typeof health.canonicalSafeBlockHash !== "string" ||
+        !/^0x[0-9a-f]{64}$/.test(health.canonicalSafeBlockHash)
       ) {
         throw new DomainConflictError(
           "No se puede publicar watermark con fuentes no saludables.",
@@ -908,13 +991,16 @@ export function createCompetitionCreditService(
         }
       }
       const watermark = {
-        _id: "cukie-master-slots" as const,
+        _id: CREDIT_SOURCE_WATERMARK_IDS[route],
+        route,
         status: "healthy" as const,
         observedThrough: health.observedThrough,
         sourceRuleVersions: health.sourceRuleVersions,
         sourceHash: buildCreditSourceSlotsHash(sourceSlots),
         slotCount: sourceSlots.length,
         healthEvidenceHash: health.evidenceHash,
+        canonicalSafeBlock: health.canonicalSafeBlock!,
+        canonicalSafeBlockHash: health.canonicalSafeBlockHash!,
         updatedAt: now,
       };
       return repository.upsertSourceWatermark(watermark);
@@ -1008,6 +1094,7 @@ export function createCompetitionCreditService(
   }
 
   async function createDailyRun(input: CreateCreditRunInput) {
+    const route = input.route ?? "uki";
     const cutoff = validCreditDate(input.cutoff, "cutoff");
     const now = validCreditDate(input.now, "now");
     const expectedRuleVersion = validCreditText(
@@ -1029,21 +1116,33 @@ export function createCompetitionCreditService(
           );
         assertRuleActiveAt(rule, cutoff);
         const period = buildCompetitionCreditPeriod(cutoff, rule);
-        if (now.getTime() >= period.nextCutoff.getTime()) {
-          throw new DomainConflictError(
-            "No se permiten grants retroactivos tras el siguiente cutoff."
-          );
+        const activeSettlementRule = await repository.findRuleAt(now);
+        if (!activeSettlementRule) {
+          throw new DomainConflictError("No existe una regla activa para liquidar compensaciones.");
         }
-        const existing = await repository.findRunByPeriod(period.periodId);
+        const settlementPeriod =
+          now.getTime() >= period.nextCutoff.getTime()
+            ? currentCompetitionCreditPeriod(now, activeSettlementRule)
+            : period;
+        const existing = await repository.findRunByPeriod(period.periodId, route);
         if (existing) {
-          return validateExistingCreditRun(existing, period);
-        }
-        if (now.getTime() - cutoff.getTime() > rule.maxSnapshotLatenessMs) {
-          throw new DomainConflictError(
-            "El job excedio la lateness maxima de la regla."
+          const existingSettlementRule = await repository.findRuleAt(
+            existing.settlementPeriod.cutoff,
+            existing.settlementPeriod.ruleVersion
+          );
+          if (!existingSettlementRule) {
+            throw new DomainConflictError("La regla de liquidacion del run no existe.");
+          }
+          return validateExistingCreditRun(
+            existing,
+            period,
+            buildCompetitionCreditPeriod(
+              existing.settlementPeriod.cutoff,
+              existingSettlementRule
+            )
           );
         }
-        const gate = await repository.readSnapshotGate(rule, cutoff);
+        const gate = await repository.readSnapshotGate(rule, cutoff, route);
         if (!gate.schemaReady)
           throw new DomainConflictError("El schema de economia no esta listo.");
         if (!gate.activeRuleMatches)
@@ -1061,7 +1160,7 @@ export function createCompetitionCreditService(
           );
         }
         const watermark = gate.sourceWatermark;
-        const liveHealth = await repository.readSourceHealth(now, rule);
+        const liveHealth = await repository.readSourceHealth(now, rule, route);
         const watermarkObservedThrough = watermark
           ? validCreditDate(
               watermark.observedThrough,
@@ -1079,6 +1178,8 @@ export function createCompetitionCreditService(
           : null;
         if (
           !watermark ||
+          watermark.route !== route ||
+          watermark._id !== CREDIT_SOURCE_WATERMARK_IDS[route] ||
           watermark.status !== "healthy" ||
           !liveHealth.healthy ||
           liveHealth.warnings.length > 0 ||
@@ -1089,6 +1190,8 @@ export function createCompetitionCreditService(
           watermarkObservedThrough.getTime() < cutoff.getTime() ||
           watermarkUpdatedAt.getTime() < watermarkObservedThrough.getTime() ||
           watermark.healthEvidenceHash !== liveHealth.evidenceHash ||
+          watermark.canonicalSafeBlock !== liveHealth.canonicalSafeBlock ||
+          watermark.canonicalSafeBlockHash !== liveHealth.canonicalSafeBlockHash ||
           watermarkObservedThrough.getTime() !==
             liveObservedThrough.getTime() ||
           watermark.sourceRuleVersions.uki !==
@@ -1116,22 +1219,43 @@ export function createCompetitionCreditService(
           );
         }
 
-        const sourceSlots = await repository.listSourceSlots(
-          rule.maxSnapshotSlots + 1
+        const currentSourceSlots = await repository.listSourceSlots(
+          rule.maxSnapshotSlots + 1,
+          route
         );
-        if (sourceSlots.length > rule.maxSnapshotSlots) {
+        if (currentSourceSlots.length > rule.maxSnapshotSlots) {
           throw new DomainConflictError(
             "El snapshot excede el limite seguro de slots."
           );
         }
-        for (const sourceSlot of sourceSlots) validSourceSlotShape(sourceSlot);
+        for (const sourceSlot of currentSourceSlots) validSourceSlotShape(sourceSlot);
         if (
-          sourceSlots.length !== watermark.slotCount ||
-          buildCreditSourceSlotsHash(sourceSlots) !== watermark.sourceHash
+          currentSourceSlots.length !== watermark.slotCount ||
+          buildCreditSourceSlotsHash(currentSourceSlots) !== watermark.sourceHash
         )
           throw new DomainConflictError(
             "Los slots cambiaron despues de publicar el watermark."
           );
+        const cutoffBlock = await repository.findCanonicalCutoffBlock(cutoff);
+        if (!cutoffBlock) {
+          throw new DomainConflictError(
+            `No existe evidencia de bloque canonico anterior a ${cutoff.toISOString()}.`
+          );
+        }
+        if (cutoffBlock.blockNumber > watermark.canonicalSafeBlock) {
+          throw new DomainConflictError(
+            "El bloque efectivo del cutoff excede el checkpoint canonico saludable."
+          );
+        }
+        const sourceSlots = await repository.listSourceSlotsAtCutoff(
+          cutoffBlock,
+          route,
+          rule.maxSnapshotSlots + 1
+        );
+        if (sourceSlots.length > rule.maxSnapshotSlots) {
+          throw new DomainConflictError("El historial temporal excede 5.000 slots.");
+        }
+        const sourceSnapshotHash = buildCreditSourceSlotsHash(sourceSlots);
         const slots = sourceSlots.filter(
           (slot) =>
             slot.creditEligibleFrom.getTime() <= cutoff.getTime() &&
@@ -1147,16 +1271,47 @@ export function createCompetitionCreditService(
         const walletRouteOrdinals = new Map<string, Set<number>>();
         const runId = stableCreditHash({
           kind: "daily-credit-run",
+          route,
           period,
-          sourceHash: watermark.sourceHash,
+          sourceHash: sourceSnapshotHash,
         });
         const items: CreditRunItem[] = [];
+        const holds: CreditRunHold[] = [];
         for (const slot of slots) {
-          validSnapshotSlot(
-            slot,
-            cutoff,
-            watermark.sourceRuleVersions[slot.route]
-          );
+          try {
+            validSnapshotSlot(
+              slot,
+              cutoff,
+              watermark.sourceRuleVersions[slot.route]
+            );
+          } catch (error) {
+            const evidenceHash = stableCreditHash({
+              route,
+              periodId: period.periodId,
+              slot,
+              errorCode: error instanceof Error ? error.name : "INVALID_SLOT",
+            });
+            const holdId = stableCreditHash({
+              kind: "credit-run-hold",
+              route,
+              periodId: period.periodId,
+              slotId: typeof slot?._id === "string" ? slot._id : evidenceHash,
+            });
+            holds.push({
+              _id: holdId,
+              holdId,
+              runId,
+              route,
+              earnedPeriodId: period.periodId,
+              slotId: typeof slot?._id === "string" ? slot._id : `invalid:${evidenceHash}`,
+              reasonCode: "INVALID_SLOT_PROJECTION",
+              evidenceHash,
+              status: "held",
+              createdAt: now,
+              updatedAt: now,
+            });
+            continue;
+          }
           if (duplicateSlots.has(slot._id)) {
             throw new DomainConflictError(
               `El snapshot contiene el slot duplicado ${slot._id}.`
@@ -1203,11 +1358,16 @@ export function createCompetitionCreditService(
             slotId: slot._id,
             eligibilityEpoch: slot.eligibilityEpoch,
           });
+          const baseOwnCredits = CREDITS_PER_MATURE_SLOT - poolCredits;
+          const isLateCompensation = now.getTime() > period.nextCutoff.getTime();
+          const compensationCredits: 0 | typeof CREDITS_PER_MATURE_SLOT =
+            isLateCompensation ? CREDITS_PER_MATURE_SLOT : 0;
           const immutable = {
             _id: itemId,
             itemId,
             runId,
-            periodId: period.periodId,
+            earnedPeriodId: period.periodId,
+            periodId: settlementPeriod.periodId,
             walletNormalized: slot.walletNormalized,
             slotId: slot._id,
             slotRoute: slot.route,
@@ -1221,9 +1381,18 @@ export function createCompetitionCreditService(
             ...(slot.graceEndsAt
               ? { graceEndsAt: new Date(slot.graceEndsAt.getTime()) }
               : {}),
-            grantCredits: CREDITS_PER_MATURE_SLOT,
-            ownCredits: CREDITS_PER_MATURE_SLOT - poolCredits,
-            poolCredits,
+            baseGrantCredits: CREDITS_PER_MATURE_SLOT,
+            compensationCredits,
+            compensationReason: isLateCompensation
+              ? ("late_gt_24h" as const)
+              : null,
+            baseOwnCredits,
+            basePoolCredits: poolCredits,
+            compensationOwnCredits: isLateCompensation ? baseOwnCredits : 0,
+            compensationPoolCredits: isLateCompensation ? poolCredits : 0,
+            grantCredits: CREDITS_PER_MATURE_SLOT + compensationCredits,
+            ownCredits: baseOwnCredits * (isLateCompensation ? 2 : 1),
+            poolCredits: poolCredits * (isLateCompensation ? 2 : 1),
             poolConfigId: config?.configId ?? null,
           };
           items.push({
@@ -1235,13 +1404,20 @@ export function createCompetitionCreditService(
         }
         const snapshotHash = stableCreditHash({
           period,
+          settlementPeriod,
+          cutoffBlock,
           sourceWatermark: watermark,
+          sourceSnapshotHash,
           items: items.map((item) => item.payloadHash).sort(),
+          holds: holds.map((hold) => hold.evidenceHash).sort(),
         });
         const run: CompetitionCreditRun = {
           _id: runId,
           runId,
+          route,
           period,
+          settlementPeriod,
+          cutoffBlock,
           status: "snapshotted",
           expectedItemCount: items.length,
           expectedGrantCredits: sumExactCredits(
@@ -1253,13 +1429,15 @@ export function createCompetitionCreditService(
           expectedPoolCredits: sumExactCredits(
             items.map((item) => item.poolCredits)
           ),
+          expectedHeldCount: holds.length,
           sourceWatermark: watermark,
+          sourceSnapshotHash,
           snapshotHash,
           fenceToken: 0,
           createdAt: now,
           updatedAt: now,
         };
-        await repository.insertRunAndItems(run, items);
+        await repository.insertRunAndItems(run, items, holds);
         return run;
       })
     );
@@ -1280,7 +1458,13 @@ export function createCompetitionCreditService(
         throw new DomainConflictError(
           "La regla del run ya no esta disponible."
         );
-      validateRunAgainstRule(run, rule);
+      const settlementRule = await repository.findRuleAt(
+        run.settlementPeriod.cutoff,
+        run.settlementPeriod.ruleVersion
+      );
+      if (!settlementRule)
+        throw new DomainConflictError("La regla de liquidacion del run no esta disponible.");
+      validateRunAgainstRules(run, rule, settlementRule);
       const claimed = await repository.claimRunLease(
         runId,
         workerId,
@@ -1317,7 +1501,13 @@ export function createCompetitionCreditService(
       );
       if (!rule)
         throw new DomainConflictError("La regla del run no esta disponible.");
-      validateRunAgainstRule(run, rule);
+      const settlementRule = await repository.findRuleAt(
+        run.settlementPeriod.cutoff,
+        run.settlementPeriod.ruleVersion
+      );
+      if (!settlementRule)
+        throw new DomainConflictError("La regla de liquidacion del run no esta disponible.");
+      validateRunAgainstRules(run, rule, settlementRule);
       const limit = validBatchLimit(
         input.limit ?? rule.maxBatchSize,
         rule.maxBatchSize
@@ -1374,7 +1564,7 @@ export function createCompetitionCreditService(
     return mappedTransaction(runner, async (repository) => {
       const run = await repository.findRun(runId);
       if (!run) throw new DomainNotFoundError(`No existe el run ${runId}.`);
-      const alreadyOpen = run.status === "open";
+      const alreadyOpen = run.status === "open" || run.status === "open_with_holds";
       if (
         !alreadyOpen &&
         (run.status !== "processing" ||
@@ -1411,7 +1601,13 @@ export function createCompetitionCreditService(
       );
       if (!rule)
         throw new DomainConflictError("La regla del run no esta disponible.");
-      validateRunAgainstRule(run, rule);
+      const settlementRule = await repository.findRuleAt(
+        run.settlementPeriod.cutoff,
+        run.settlementPeriod.ruleVersion
+      );
+      if (!settlementRule)
+        throw new DomainConflictError("La regla de liquidacion del run no esta disponible.");
+      validateRunAgainstRules(run, rule, settlementRule);
       if (alreadyOpen) return { run, reconciliation };
       const opened = await repository.openRun(runId, workerId, fenceToken, now);
       if (!opened)
@@ -1480,7 +1676,6 @@ export function createCompetitionCreditService(
         const expiresAt = new Date(
           Math.min(
             now.getTime() + rule.reservationTtlMs,
-            period.nextCutoff.getTime(),
             expiresAtCap?.getTime() ?? Number.MAX_SAFE_INTEGER,
           )
         );
@@ -1536,7 +1731,7 @@ export function createCompetitionCreditService(
         let allocations: CreditReservationAllocation[] | null;
         if (ownTotal >= amountCredits) {
           bucket = "own";
-          allocations = allocateLots(ownScan.lots, amountCredits);
+          allocations = allocateLots(ownScan.lots, amountCredits, expiresAt);
         } else {
           const poolScan = await scanAvailableLots({
             amountCredits,
@@ -1553,7 +1748,7 @@ export function createCompetitionCreditService(
               ),
           });
           bucket = "pool";
-          allocations = allocateLots(poolScan.lots, amountCredits);
+          allocations = allocateLots(poolScan.lots, amountCredits, expiresAt);
         }
         if (
           !allocations ||
@@ -1743,6 +1938,64 @@ export function createCompetitionCreditService(
     return { scanned: candidates.length, expired, skipped };
   }
 
+  async function findOldestPendingRoutePeriod(input: {
+    route: CreditRoute;
+    rule: CompetitionCreditRule;
+    now: Date;
+  }) {
+    const now = validCreditDate(input.now, "now");
+    const current = currentCompetitionCreditPeriod(now, input.rule);
+    const latest = await mappedTransaction(runner, (repository) =>
+      repository.findLatestRunByRoute(input.route)
+    );
+    if (latest && latest.status !== "open" && latest.status !== "open_with_holds") {
+      return latest.period;
+    }
+    let candidateCutoff: Date;
+    if (latest) {
+      candidateCutoff = new Date(
+        latest.period.cutoff.getTime() + 24 * 60 * 60 * 1000
+      );
+    } else {
+      const oldestRule = await mappedTransaction(runner, (repository) =>
+        repository.findOldestRule()
+      );
+      if (!oldestRule) {
+        throw new DomainConflictError("No existe ninguna regla historica de creditos.");
+      }
+      candidateCutoff = new Date(
+        Date.UTC(
+          oldestRule.activeFrom.getUTCFullYear(),
+          oldestRule.activeFrom.getUTCMonth(),
+          oldestRule.activeFrom.getUTCDate(),
+          oldestRule.cutoffHourUtc,
+          oldestRule.cutoffMinuteUtc,
+          0,
+          0
+        )
+      );
+      if (candidateCutoff.getTime() < oldestRule.activeFrom.getTime()) {
+        candidateCutoff = new Date(candidateCutoff.getTime() + 24 * 60 * 60 * 1000);
+      }
+    }
+    const eligibleCutoff =
+      now.getTime() >= current.settlementTarget.getTime()
+        ? current.cutoff
+        : new Date(current.cutoff.getTime() - 24 * 60 * 60 * 1000);
+    if (candidateCutoff.getTime() > eligibleCutoff.getTime()) {
+      return null;
+    }
+    return mappedTransaction(runner, async (repository) => {
+      const historicalRule = await repository.findRuleAt(candidateCutoff);
+      if (!historicalRule) {
+        throw new DomainConflictError(
+          `No existe una regla historica versionada para ${candidateCutoff.toISOString()}.`
+        );
+      }
+      return buildCompetitionCreditPeriod(candidateCutoff, historicalRule);
+    });
+  }
+
   return {
     refreshSourceWatermark,
     configurePool,
@@ -1758,6 +2011,7 @@ export function createCompetitionCreditService(
       finishReservation("release", input),
     expireReservationsBatch,
     expireAvailableLotsBatch,
+    findOldestPendingRoutePeriod,
   };
 }
 

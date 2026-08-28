@@ -20,6 +20,7 @@ import {
   buildGameResourceReservationRequestHash,
   buildGameResourceReservationResultHash,
   buildGameSettlementRequestHash,
+  buildLegacyGameSettlementRequestHash,
   buildGameStartRequestHash,
   buildGameSubmissionRequestHash,
   buildGameTerminalRequestHash,
@@ -45,17 +46,30 @@ import type {
   GameEconomyCommandReceipt,
   GameEconomyOperationKind,
   GameEconomyResource,
+  GameEconomyResourceActions,
   GameEconomyResourceKind,
   GameEconomySession,
   GameEconomySessionStatus,
   GameEconomyTerminal,
 } from "./types";
+import {
+  TREASURE_HUNT_ECONOMY_POLICY,
+  assertTreasureHuntStagingRuntime,
+} from "./treasure-hunt-policy";
 
 const TERMINAL_STATUSES = new Set<GameEconomySessionStatus>([
   "settled",
+  "forfeited",
   "expired",
   "rejected",
 ]);
+
+function rewardGuardPeriodId(session: GameEconomySession) {
+  return session.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId &&
+    session.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
+    ? getIsoWeekPeriodId(new Date(session.createdAt.getTime() - 14 * 60 * 60_000))
+    : getIsoWeekPeriodId(session.createdAt);
+}
 
 export type CreateGameSessionInput = {
   walletAddress: string;
@@ -91,6 +105,8 @@ export type SettleGameSessionInput = ValidateGameResultInput;
 export type RejectGameSessionInput = ValidateGameResultInput & {
   reasonCode: string;
 };
+
+export type ForfeitGameSessionInput = RejectGameSessionInput;
 
 export type ExpireGameSessionInput = {
   sessionId: string;
@@ -295,10 +311,11 @@ export function createGameEconomyService(
           kind: "settle";
           idempotencyKey: string;
           requestHash: string;
+          resourceActions: GameEconomyResourceActions;
         }
       | {
           kind: "terminal";
-          status: "expired" | "rejected";
+          status: "expired" | "rejected" | "forfeited";
           reasonCode: string;
           idempotencyKey: string;
           requestHash: string;
@@ -341,6 +358,7 @@ export function createGameEconomyService(
               idempotencyKey: input.decision.idempotencyKey,
               requestHash: input.decision.requestHash,
               decidedAt: input.now,
+              resourceActions: input.decision.resourceActions,
             },
           };
         }
@@ -424,7 +442,7 @@ export function createGameEconomyService(
       };
       if (input.decision?.kind === "settle") {
         await repository.advanceRewardPeriodGuard(
-          getIsoWeekPeriodId(current.settlementIntent?.decidedAt ?? input.now),
+          rewardGuardPeriodId(current),
           input.now,
         );
       }
@@ -590,6 +608,8 @@ export function createGameEconomyService(
       committedAt:
         input.operationKind === "settle"
           ? input.session.settlementIntent?.decidedAt
+          : input.action === "consume"
+            ? input.session.terminalIntent?.decidedAt
           : undefined,
       now: input.now,
     });
@@ -1219,10 +1239,17 @@ export function createGameEconomyService(
       "idempotencyKey"
     );
     const expectedRevision = validRevision(input.expectedRevision)!;
-    const requestHash = buildGameSettlementRequestHash(sessionId);
     const existing = await runner((repository) =>
       loadBoundSession(repository, sessionId, true)
     );
+    const resourceActions: GameEconomyResourceActions =
+      existing.settlementIntent?.resourceActions ?? {
+        credit: existing.rule.credit.consumeOnSettle ? "consume" : "release",
+        cukie: existing.rule.cukie.consumeOnSettle ? "consume" : "release",
+      };
+    const requestHash = existing.settlementIntent && !existing.settlementIntent.resourceActions
+      ? buildLegacyGameSettlementRequestHash(sessionId)
+      : buildGameSettlementRequestHash({ sessionId, resourceActions });
     if (existing.settlementCommand) {
       assertCommandReplay(
         existing.settlementCommand,
@@ -1261,6 +1288,7 @@ export function createGameEconomyService(
         kind: "settle",
         idempotencyKey,
         requestHash,
+        resourceActions,
       },
       now,
     });
@@ -1269,7 +1297,7 @@ export function createGameEconomyService(
       operationKind: "settle",
       owner,
       kind: "credit",
-      action: current.rule.credit.consumeOnSettle ? "consume" : "release",
+      action: current.settlementIntent?.resourceActions?.credit ?? resourceActions.credit,
       now,
     });
     current = await finishOne({
@@ -1277,7 +1305,7 @@ export function createGameEconomyService(
       operationKind: "settle",
       owner,
       kind: "cukie",
-      action: current.rule.cukie.consumeOnSettle ? "consume" : "release",
+      action: current.settlementIntent?.resourceActions?.cukie ?? resourceActions.cukie,
       now,
     });
     return persistFenced(
@@ -1303,7 +1331,7 @@ export function createGameEconomyService(
       },
       true,
       (repository) => repository.advanceRewardPeriodGuard(
-        getIsoWeekPeriodId(now),
+        rewardGuardPeriodId(current),
         now,
       ),
     );
@@ -1408,6 +1436,109 @@ export function createGameEconomyService(
     );
   }
 
+  async function forfeitSession(input: ForfeitGameSessionInput) {
+    if (process.env.NODE_ENV === "production") {
+      assertTreasureHuntStagingRuntime(process.env);
+    }
+    const now = validGameDate(input.now, "now");
+    const sessionId = validGameText(input.sessionId, "sessionId");
+    const idempotencyKey = validGameText(
+      input.idempotencyKey,
+      "idempotencyKey"
+    );
+    const reasonCode = validGameText(input.reasonCode, "reasonCode");
+    const expectedRevision = validRevision(input.expectedRevision)!;
+    const requestHash = buildGameTerminalRequestHash({
+      sessionId,
+      status: "forfeited",
+      reasonCode,
+    });
+    const existing = await runner((repository) =>
+      loadBoundSession(repository, sessionId, true)
+    );
+    if (existing.terminal) {
+      assertCommandReplay(existing.terminal.command, idempotencyKey, requestHash);
+      return existing;
+    }
+    if (
+      existing.gameId !== TREASURE_HUNT_ECONOMY_POLICY.gameId ||
+      existing.rule.version !== TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
+    ) {
+      throw new DomainConflictError(
+        "El consumo por abandono solo esta autorizado para la politica versionada de Treasure Hunt."
+      );
+    }
+    if (existing.status !== "started" || !existing.startedAt) {
+      throw new DomainConflictError(
+        `No se puede registrar abandono desde ${existing.status}.`
+      );
+    }
+    if (existing.settlementIntent) {
+      throw new DomainConflictError(
+        "La liquidacion ya comenzo y no puede cambiar a abandono."
+      );
+    }
+    const owner = operationOwner("release", idempotencyKey, requestHash);
+    let current = await claimOperation({
+      sessionId,
+      kind: "release",
+      owner,
+      allowedStatuses: ["started"],
+      expectedRevision,
+      allowRuleDriftForCleanup: true,
+      decision: {
+        kind: "terminal",
+        status: "forfeited",
+        reasonCode,
+        idempotencyKey,
+        requestHash,
+      },
+      now,
+    });
+    current = await finishOne({
+      session: current,
+      operationKind: "release",
+      owner,
+      kind: "credit",
+      action: "consume",
+      now,
+    });
+    current = await finishOne({
+      session: current,
+      operationKind: "release",
+      owner,
+      kind: "cukie",
+      action: "consume",
+      now,
+    });
+    return persistFenced(
+      current.sessionId,
+      current.operation!.fenceToken,
+      "release",
+      owner,
+      now,
+      (latest) => {
+        const nextRevision = latest.revision + 1;
+        return {
+          ...latest,
+          status: "forfeited",
+          terminal: {
+            reasonCode,
+            terminalAt: now,
+            command: commandReceipt(
+              idempotencyKey,
+              requestHash,
+              now,
+              nextRevision
+            ),
+          },
+          operation: undefined,
+        };
+      },
+      true
+    );
+  }
+
   async function rejectSession(input: RejectGameSessionInput) {
     const now = validGameDate(input.now, "now");
     const sessionId = validGameText(input.sessionId, "sessionId");
@@ -1495,6 +1626,16 @@ export function createGameEconomyService(
               now,
             })
           );
+        } else if (candidate.terminalIntent?.status === "forfeited") {
+          sessions.push(
+            await forfeitSession({
+              sessionId: candidate.sessionId,
+              idempotencyKey: candidate.terminalIntent.idempotencyKey,
+              reasonCode: candidate.terminalIntent.reasonCode,
+              expectedRevision: candidate.revision,
+              now,
+            })
+          );
         } else if (candidate.terminalIntent?.status === "rejected") {
           sessions.push(
             await rejectSession({
@@ -1550,6 +1691,14 @@ export function createGameEconomyService(
             expectedRevision: candidate.revision,
             now,
           }));
+        } else if (candidate.terminalIntent?.status === "forfeited") {
+          sessions.push(await forfeitSession({
+            sessionId: candidate.sessionId,
+            idempotencyKey: candidate.terminalIntent.idempotencyKey,
+            reasonCode: candidate.terminalIntent.reasonCode,
+            expectedRevision: candidate.revision,
+            now,
+          }));
         } else if (candidate.terminalIntent?.status === "rejected") {
           sessions.push(await rejectSession({
             sessionId: candidate.sessionId,
@@ -1600,6 +1749,7 @@ export function createGameEconomyService(
     submitResult,
     validateResult,
     settleSession,
+    forfeitSession,
     rejectSession,
     expireSession,
     expireBatch,

@@ -276,7 +276,8 @@ export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEve
       && previousLifetime >= BigInt(0)
       && dailyCap > BigInt(0)
       && lifetimeCap >= dailyCap
-      && event.unusedDailyCapacity === "expires"
+      && (event.unusedDailyCapacity === "expires"
+        || event.unusedDailyCapacity === "materialize_undistributed")
       && event.overflowPolicy === "block"
       && (
         (

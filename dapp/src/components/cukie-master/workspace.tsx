@@ -7,15 +7,15 @@ import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { UkiStakingPanel } from '@/components/cukie-master/uki-staking-panel';
 
 export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: boolean }) {
-  const [ukiRoutePreview, setUkiRoutePreview] = useState<UkiRoutePreview | null>(null);
-  const updatePreview = useCallback((preview: UkiRoutePreview | null) => {
-    setUkiRoutePreview(preview);
+  const [routePreview, setRoutePreview] = useState<UkiRoutePreview | null>(null);
+  const handleRoutePreview = useCallback((preview: UkiRoutePreview | null) => {
+    setRoutePreview(preview);
   }, []);
 
   return (
     <>
-      <CukieMasterStatusPanel onUkiRouteData={updatePreview} />
-      <UkiStakingPanel routePreview={ukiRoutePreview} testnetOnly={testnetOnly} />
+      <CukieMasterStatusPanel ukiOnly onUkiRouteData={handleRoutePreview} />
+      <UkiStakingPanel testnetOnly={testnetOnly} routePreview={routePreview} />
     </>
   );
 }

@@ -25,6 +25,10 @@ describe('economy indexes', () => {
         'cukie_pool_assignments:{"sessionId":1}',
         'cukie_pool_assignments:{"assignmentId":1}',
         'cukie_pool_assignments:{"idempotencyKey":1}',
+        'cukie_pool_vault_asset_leases:{"positionId":1}',
+        'cukie_pool_vault_asset_leases:{"assignmentId":1}',
+        'cukie_pool_vault_asset_leases:{"sessionId":1}',
+        'cukie_pool_vault_period_usage:{"assetId":1,"depositEpoch":1,"periodId":1}',
         'cukie_pool_events:{"eventId":1}',
         'cukie_pool_events:{"idempotencyKey":1}',
         'cukie_master_snapshots:{"walletNormalized":1,"periodId":1,"ruleVersion":1}',
@@ -53,6 +57,11 @@ describe('economy indexes', () => {
         'game_owned_cukie_events:{"idempotencyKey":1}',
         'game_result_evidence:{"evidenceReference":1}',
         'game_result_evidence:{"idempotencyKey":1}',
+        'treasure_hunt_economy_runs:{"authorityGameSessionId":1}',
+        'treasure_hunt_economy_runs:{"gameEconomySessionId":1}',
+        'treasure_hunt_pool_daily_usage:{"walletNormalized":1,"dailyPeriodId":1}',
+        'treasure_hunt_pool_quota_reservations:{"runId":1}',
+        'treasure_hunt_weekly_bests:{"walletNormalized":1,"weeklyPeriodId":1,"gameId":1}',
         'nft_asset_locks:{"assetId":1,"status":1}',
         'nft_asset_locks:{"idempotencyKey":1}',
         'nft_asset_locks:{"lockId":1}',
@@ -66,6 +75,12 @@ describe('economy indexes', () => {
         'reward_emission_budget_events:{"sourceId":1}',
         'reward_pool_accruals:{"accrualId":1}',
         'reward_pool_accruals:{"periodId":1,"sourceId":1,"category":1}',
+        'reward_daily_accounting:{"dayId":1}',
+        'reward_weekly_prize_accounting:{"periodId":1}',
+        'reward_weekly_prize_accounting:{"lotteryEntropy.blockNumber":1,"lotteryEntropy.blockHash":1}',
+        'reward_pool_tranche_accounting:{"periodId":1,"tranche":1,"participantWallet":1}',
+        'reward_weekly_game_sources:{"sessionId":1}',
+        'reward_accounting_runtime_state:{"schedulerId":1}',
         'reward_source_manifests:{"sourceId":1}',
         'weekly_ranking_rule_state:{"scope":1,"revision":1}',
         'weekly_ranking_period_states:{"periodId":1}',
@@ -86,6 +101,7 @@ describe('economy indexes', () => {
         'reward_claim_proofs:{"batchId":1,"walletNormalized":1}',
         'reward_claim_batches:{"draftKey":1}',
         'reward_claim_batches:{"batchId":1}',
+        'reward_publication_plans:{"accountingId":1}',
         'reward_claims:{"batchId":1,"walletNormalized":1}',
         'reward_claims:{"transactionHash":1,"logIndex":1}',
         'uki_staking_positions:{"walletNormalized":1}',
@@ -108,6 +124,7 @@ describe('economy indexes', () => {
       keys: JSON.stringify(index.keys),
       unique: index.options?.unique === true,
       partial: index.options?.partialFilterExpression,
+      name: index.options?.name,
     }));
 
     assert.ok(indexes.some((index) => (
@@ -135,6 +152,19 @@ describe('economy indexes', () => {
     assert.ok(indexes.some((index) => (
       index.collection === 'cukie_pool_assignments'
       && index.keys === '{"status":1,"expiresAt":1,"_id":1}'
+    )));
+    assert.ok(indexes.some((index) => (
+      index.collection === 'cukie_pool_vault_asset_leases'
+      && index.keys === '{"expiresAt":1,"_id":1}'
+    )));
+    assert.ok(indexes.some((index) => (
+      index.collection === 'cukie_pool_vault_period_usage'
+      && index.keys === '{"periodId":1,"_id":1}'
+    )));
+    assert.ok(indexes.some((index) => (
+      index.collection === 'cukie_pool_nft_vault_positions'
+      && index.keys === '{"chainId":1,"vaultAddressNormalized":1,"collectionAddressNormalized":1,"activationAt":1,"exitRequestedAt":1}'
+      && index.name === 'cukie_pool_reward_census'
     )));
     assert.ok(indexes.some((index) => (
       index.collection === 'cukie_pool_positions'
@@ -235,5 +265,17 @@ describe('economy indexes', () => {
     assert.deepEqual(completedJobExpiry?.options?.partialFilterExpression, {
       status: 'completed',
     });
+  });
+
+  it('orders uncapped Treasure Hunt raw scores numerically before the earlier tie break', () => {
+    assert.ok(ECONOMY_INDEXES.some((index) => (
+      index.collection === 'treasure_hunt_weekly_bests'
+      && JSON.stringify(index.keys) === JSON.stringify({
+        weeklyPeriodId: 1,
+        scoreDigits: -1,
+        scoreRaw: -1,
+        achievedAt: 1,
+      })
+    )));
   });
 });

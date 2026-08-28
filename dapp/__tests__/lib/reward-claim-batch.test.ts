@@ -44,7 +44,7 @@ async function fixture() {
     cukieSource: "own",
     ranking: 5,
     creditCostUnits: 100,
-    weeklyReserveUnits: 25,
+    weeklyReserveUnits: 20,
   });
   await allocationService.persistAllocationSet({
     periodId: "2026-W28",
@@ -150,7 +150,7 @@ describe("reward claim batch draft", () => {
         cukieSource: "own",
         ranking: 5,
         creditCostUnits: 100,
-        weeklyReserveUnits: 25,
+        weeklyReserveUnits: 20,
       });
       return allocations.persistAllocationSet({
         periodId: "2026-W28",
@@ -344,7 +344,7 @@ describe("reward claim batch draft", () => {
       cukieSource: "own",
       ranking: 6,
       creditCostUnits: 100,
-      weeklyReserveUnits: 25,
+      weeklyReserveUnits: 20,
     });
     await expect(subject.allocationService.persistAllocationSet({
       periodId: "2026-W28",
@@ -398,7 +398,7 @@ describe("reward claim batch draft", () => {
       cukieSource: "own",
       ranking: null,
       creditCostUnits: 100,
-      weeklyReserveUnits: 25,
+      weeklyReserveUnits: 20,
     });
     await allocations.persistAllocationSet({
       periodId: "2026-W28",

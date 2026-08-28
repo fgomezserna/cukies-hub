@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 
 import TreasureHuntCompetitionBanner from '@/components/games/treasure-hunt-competition-banner';
 
+let mockDisqualified = false;
+
 jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
   BookOpenText: () => null,
@@ -22,8 +24,30 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
     vestingMonths: 6,
   },
   useTreasureHuntCompetitionOverview: () => ({
-    status: null,
+    status: {
+      phase: 'active',
+      campaign: {
+        startsAt: '2026-08-27T00:00:00.000Z',
+        endsAt: '2026-09-15T15:00:00.000Z',
+        topAttemptsPerWallet: 10,
+        prizePerWinnerUkiRaw: '10000000000000000000000',
+      },
+      eligibility: {
+        attemptsRemaining: mockDisqualified ? 0 : 3,
+        topAttemptsCount: 4,
+        provisionalTickets: 125,
+        disqualified: mockDisqualified,
+        disqualificationEvidence: mockDisqualified ? {
+          eventId: 'unstake-1',
+          txHash: `0x${'a'.repeat(64)}`,
+          blockNumber: 127_368_347,
+          timestamp: '2026-08-26T16:36:42.000Z',
+          amountRaw: '20000000000000000000000',
+        } : null,
+      },
+    },
     leaderboard: [],
+    leaderboardMeta: { poolUkiRaw: '71484000000000000000000' },
     isLoading: false,
     error: null,
     reload: jest.fn(),
@@ -40,14 +64,20 @@ jest.mock('@/hooks/use-treasure-hunt-prize-pool', () => ({
 }));
 
 describe('TreasureHuntCompetitionBanner', () => {
-  it('mantiene visibles las tres métricas y enlaza a reglas y rankings', () => {
+  beforeEach(() => {
+    mockDisqualified = false;
+  });
+
+  it('separa intentos disponibles de resultados que cuentan y enlaza a reglas y rankings', () => {
     render(<TreasureHuntCompetitionBanner />);
 
-    expect(screen.getByText('Torneo Preventa UKI')).toBeInTheDocument();
-    expect(screen.getByText('1P')).toBeInTheDocument();
-    expect(screen.getByText('Modo activo').parentElement).toHaveClass('hidden', 'sm:block');
-    expect(screen.getByText('0/5')).toBeInTheDocument();
+    expect(screen.getByText('Torneo Lanzamiento UKI')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('4/10')).toBeInTheDocument();
+    expect(screen.getByText('Intentos disponibles')).toBeInTheDocument();
+    expect(screen.getByText('Resultados que cuentan')).toBeInTheDocument();
     expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
+    expect(screen.queryByText('N.º de ganadores')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toHaveAttribute(
       'href',
       '/games/treasure-hunt/rules',
@@ -67,6 +97,15 @@ describe('TreasureHuntCompetitionBanner', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(actions).toHaveClass('hidden', 'sm:flex');
-    expect(metrics).toHaveClass('grid-cols-2', 'sm:grid-cols-3');
+    expect(metrics).toHaveClass('grid-cols-3');
+  });
+
+  it('bloquea los resultados y explica la retirada cuando la wallet está descalificada', () => {
+    mockDisqualified = true;
+    render(<TreasureHuntCompetitionBanner />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Wallet descalificada');
+    expect(screen.getByRole('alert')).toHaveTextContent('20.000 UKI');
+    expect(screen.getByText('0/10')).toBeInTheDocument();
   });
 });

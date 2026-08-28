@@ -7,6 +7,7 @@ export const GAME_ECONOMY_SESSION_STATUSES = [
   "submitted",
   "validated",
   "settled",
+  "forfeited",
   "expired",
   "rejected",
 ] as const;
@@ -100,8 +101,20 @@ export type GameEconomyCommandIntent = {
   decidedAt: Date;
 };
 
+export type GameEconomyResourceAction = "consume" | "release";
+
+export type GameEconomyResourceActions = {
+  credit: GameEconomyResourceAction;
+  cukie: GameEconomyResourceAction;
+};
+
+export type GameEconomySettlementIntent = GameEconomyCommandIntent & {
+  /** Ausente solo en intents v2 historicos, cuyo hash era SHA256({sessionId}). */
+  resourceActions?: GameEconomyResourceActions;
+};
+
 export type GameEconomyTerminalIntent = GameEconomyCommandIntent & {
-  status: "expired" | "rejected";
+  status: "expired" | "rejected" | "forfeited";
   reasonCode: string;
 };
 
@@ -168,7 +181,7 @@ export type GameEconomySession = {
   startCommand?: GameEconomyCommandReceipt;
   submission?: GameEconomySubmission;
   validation?: GameEconomyValidation;
-  settlementIntent?: GameEconomyCommandIntent;
+  settlementIntent?: GameEconomySettlementIntent;
   terminalIntent?: GameEconomyTerminalIntent;
   settlementCommand?: GameEconomyCommandReceipt;
   terminal?: GameEconomyTerminal;

@@ -42,32 +42,42 @@ IFTTT_WEBHOOK_SECRET="super-secret-value"
 # Games
 GAME_SYBILSLASH="https://hyppie-games-sybilslayer.vercel.app/"
 
-# Treasure Hunt · competición de preventa (fechas UTC pendientes de decisión)
-TREASURE_HUNT_COMPETITION_ENABLED="false"
-TREASURE_HUNT_COMPETITION_ID="uki-presale-treasure-hunt-2026"
+# Treasure Hunt · competición por staking UKI
+TREASURE_HUNT_COMPETITION_ENABLED="false" # true sólo durante la ventana QA autorizada
+TREASURE_HUNT_COMPETITION_ID="uki-staking-testnet-2026-08"
 TREASURE_HUNT_COMPETITION_RULES_VERSION="1"
-TREASURE_HUNT_COMPETITION_PRESALE_ADDRESS="0x..."
-TREASURE_HUNT_COMPETITION_STARTS_AT="YYYY-MM-DDTHH:mm:ss.000Z"
-TREASURE_HUNT_COMPETITION_ENDS_AT="YYYY-MM-DDTHH:mm:ss.000Z"
+TREASURE_HUNT_COMPETITION_ELIGIBILITY_KIND="uki_staking"
+TREASURE_HUNT_COMPETITION_STAKING_ADDRESS="0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205"
+TREASURE_HUNT_COMPETITION_STAKE_PER_ATTEMPT_RAW="2000000000000000000000"
+TREASURE_HUNT_COMPETITION_TOP_ATTEMPTS_PER_WALLET="10"
+TREASURE_HUNT_COMPETITION_POINTS_PER_TICKET="100"
+TREASURE_HUNT_COMPETITION_BASE_PRIZE_UKI_RAW="50000000000000000000000"
+TREASURE_HUNT_COMPETITION_STAKE_PRIZE_BPS="1000"
+TREASURE_HUNT_COMPETITION_PRIZE_PER_WINNER_UKI_RAW="10000000000000000000000"
+TREASURE_HUNT_COMPETITION_MAX_WINS_PER_WALLET="1"
+TREASURE_HUNT_COMPETITION_INDEXER_MAX_AGE_MS="300000"
+TREASURE_HUNT_COMPETITION_STARTS_AT="2026-08-26T00:00:00.000Z"
+TREASURE_HUNT_COMPETITION_ENDS_AT="2026-09-15T15:00:00.000Z"
 TREASURE_HUNT_COMPETITION_PROOF_SECRET="generate-a-unique-random-proof-secret-32-plus"
 TREASURE_HUNT_COMPETITION_ALIAS_SECRET="generate-a-different-random-alias-secret-32-plus"
 TREASURE_HUNT_COMPETITION_REVIEW_SECRET="generate-a-third-random-review-secret-32-plus"
 TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET="generate-a-fourth-random-settlement-secret-32-plus"
+TREASURE_HUNT_COMPETITION_DRAW_SEED="0x...32-bytes-from-a-public-post-close-source"
 ```
 
-La competición falla cerrada: mientras falten fechas válidas o
-`TREASURE_HUNT_COMPETITION_ENABLED` no sea `true`, las partidas 1P siguen siendo
-jugables como práctica pero no se guardan en el ranking de preventa. Las fechas de
-inicio y cierre deben coincidir con la ventana de compras usada para formar el pool.
-La dirección de preventa queda persistida como parte inmutable de la campaña y del
-snapshot. Si no se define la variable dedicada, el servidor intenta, por este orden,
-`CHAIN_INDEXER_PRESALE_ADDRESS` y `NEXT_PUBLIC_UKI_PRESALE_ADDRESS`; si ninguna es
-válida, la competición queda desconfigurada. DApp e indexador deben apuntar al mismo
-contrato: cursores, eventos y compras de cualquier otra dirección se excluyen.
-Antes de abrir la campaña, el indexador debe arrancar o retrocederse de forma
-controlada a un `CHAIN_INDEXER_START_BSC_BLOCK` cuya marca temporal sea anterior o
-igual al inicio. Un cursor antiguo sin origen de cobertura, o creado con bloque
-inicial `0` después de empezar la campaña, no habilita el cierre retroactivamente.
+La competición falla cerrada: solo permite iniciar cuando el indexador de staking
+está saludable y confirmado. Cada 2.000 UKI completos concede un intento, consumido
+al iniciar. Cualquier evento `Unstaked` proyectado dentro de la ventana descalifica
+permanentemente la wallet, aunque vuelva a depositar. DApp e indexador deben apuntar
+al mismo contrato, chain, bloque de despliegue y hash de runtime. Usa un ID de campaña
+nuevo para cada prueba: la configuración persistida es inmutable y el servidor
+rechaza drift.
+
+Para staging BSC Testnet se reutiliza `UKIStaking`
+`0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205`; no hay que redesplegarlo. El indexador
+debe incluir `UKI_STAKING`, usar chain `97`, 12 confirmaciones, deployment/start block
+`123359165` y runtime hash
+`0xb4976a78dc9d9792842ce7d6a8fa689bc187661cf7c076753e326fd07e20d732`.
 Los cuatro secretos se configuran sólo en el servidor y no deben reutilizarse entre sí.
 
 Cada partida finalizada queda primero en revisión. Las operaciones internas usan
@@ -92,8 +102,48 @@ crea un snapshot auditable y planes de vesting; no envía transacciones. Falla
 cerrada hasta que el indexador BSC acredite cobertura desde antes del inicio y haya
 recorrido un bloque posterior al fin de campaña para el contrato configurado, no
 queden compras pendientes de proyectar, no haya finales por
-reconciliar y estén adjudicadas las partidas que podrían ocupar el top 5 de una
-wallet con compras durante la ventana.
+reconciliar y estén adjudicadas las partidas que podrían ocupar el top 10 de una
+wallet. El sorteo de staking usa 1 ticket por cada 100 puntos completos, pool de
+50.000 UKI más el 10% del staking total al cierre, premios de 10.000 UKI y máximo un
+premio por wallet. El seed de cierre debe proceder de una fuente pública e
+impredecible posterior al cierre y queda incluido en el resultado auditable.
+
+#### Archivo histórico de rankings
+
+Los rankings cerrados se publican desde snapshots inmutables; los `GET` públicos
+`/api/games/treasure-hunt/competition/history` y
+`/api/games/treasure-hunt/competition/history/:campaignId` nunca recalculan partidas.
+El importador interno sólo admite staging y JSON ya sanitizado:
+
+```bash
+pnpm dapp competition:archive:import -- --file /ruta/archive.json --dry-run
+pnpm dapp competition:archive:import -- --file /ruta/archive.json --apply \
+  --confirm IMPORT_COMPETITION_RANKING_ARCHIVE_STAGING
+```
+
+El documento usa `schemaVersion: 1` y contiene la cabecera (`campaignId`,
+`rulesVersion`, `eligibilityKind`, ventana, `stage`, pool, metadatos, totales y
+source), `entries` públicas ordenadas con ranks contiguos y, para aplicar,
+`hashes: { input, output }` obtenidos del dry-run. Una entrada sólo acepta
+`publicEntryId`, `attemptId` opcional, alias, score, tiempo, revisión, rewards y
+tickets opcionales; el esquema estricto rechaza wallets, user IDs, sesiones y
+evidencias. `final` se rechaza mientras haya revisión pendiente o rewards sin fijar.
+El provisional conserva los estados públicos legacy (`estimated`, `partial`,
+`no_purchase`, `pool_exhausted` y `reward_rounds_to_zero`). En un final, los estados
+sin premio quedan resueltos con importe nulo o `0`; una fila premiada usa `final`
+con un importe fijado.
+`totalParticipants` cuenta participantes de campaña (incluidos los que no lograron
+fila clasificatoria); `totalWallets` cuenta wallets clasificadas y debe coincidir
+con los aliases públicos únicos. El payload
+real de preventa, por ejemplo, representa 952 filas, 214 aliases clasificados y 241
+participantes. En un ranking vacío `totalWallets` es `0`, pero puede haber inscritos
+en `totalParticipants`. `createdAt` es la creación del snapshot y no puede
+preceder a `source.exportedAt`; la exportación tampoco puede preceder al cierre y
+el snapshot no puede estar fechado después del momento de importación.
+La completitud se valida contra `totalRankedEntries`, ranks contiguos, IDs únicos y
+hashes del export sanitizado. Sin consultar la base de origen no es posible probar
+que el exportador omitió una fila; por eso el total del export debe obtenerse de la
+fuente auditada y verificarse antes de añadir sus hashes al archivo de importación.
 
 ### Getting Discord Guild ID
 

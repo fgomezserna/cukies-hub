@@ -19,7 +19,8 @@ export async function GET(request: Request) {
     });
     if (rateLimit) return rateLimit;
     const participant = await getCompetitionService().getParticipant(identity.walletAddress);
-    return competitionJson({ success: true, participant });
+    const eligibility = await getCompetitionService().getStakingEligibility(identity.walletAddress);
+    return competitionJson({ success: true, participant, eligibility });
   } catch (error) {
     return competitionErrorResponse(error);
   }

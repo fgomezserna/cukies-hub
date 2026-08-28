@@ -66,6 +66,20 @@ export type CukiePoolAssignment = {
   generation: CukiePoolGeneration;
   rarity: CukiePoolRarity;
   ownerRewardEligible: boolean;
+  /**
+   * Legacy rows predate this discriminator. An absent value therefore means
+   * `legacy`; new vault-backed assignments always materialize `custodial`.
+   */
+  custodyMode?: 'legacy' | 'custodial';
+  collectionAddressNormalized?: string | null;
+  depositEpoch?: string | null;
+  periodId?: string | null;
+  periodStartsAt?: Date;
+  periodEndsAt?: Date;
+  calendarVersion?: string | null;
+  gamesQuota?: number | null;
+  /** Hash of the caller payload before server-side asset selection. */
+  reservationRequestHash?: string;
   lockId: string | null;
   lockFencingToken: number | null;
   idempotencyKey: string;
@@ -76,6 +90,8 @@ export type CukiePoolAssignment = {
   updatedAt: Date;
   releasedAt?: Date;
   releaseReason?: string;
+  terminalIdempotencyKey?: string;
+  terminalRequestHash?: string;
 };
 
 export type CukiePoolEventOperation =

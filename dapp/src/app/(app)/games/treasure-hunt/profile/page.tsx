@@ -4,7 +4,7 @@ import TreasureHuntProfile from '@/components/profile/treasure-hunt-profile';
 
 export const metadata: Metadata = {
   title: 'Mi perfil de Treasure Hunt | Cukies World',
-  description: 'Perfil y participación en el Torneo Preventa UKI.',
+  description: 'Perfil y participación en la competición de staking UKI.',
 };
 
 export default function TreasureHuntProfilePage() {

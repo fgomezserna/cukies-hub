@@ -8,7 +8,7 @@ import { getIndexerDbName } from './name';
 
 export const ECONOMY_SCHEMA_METADATA_COLLECTION = 'economy_schema_metadata';
 export const ECONOMY_SCHEMA_METADATA_ID = 'uki-economy';
-export const ECONOMY_SCHEMA_VERSION = 2;
+export const ECONOMY_SCHEMA_VERSION = 3;
 
 export type EconomySchemaMetadata = {
   _id: typeof ECONOMY_SCHEMA_METADATA_ID;

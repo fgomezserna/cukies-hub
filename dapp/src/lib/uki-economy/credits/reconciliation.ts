@@ -16,8 +16,8 @@ import type {
 } from "./types";
 import { MAX_CREDIT_RESERVATION_ALLOCATIONS } from "./types";
 
-function accountId(walletNormalized: string, periodId: string) {
-  return `${walletNormalized}:${periodId}`;
+function accountId(walletNormalized: string, periodId: string, route: "uki" | "nft") {
+  return `${walletNormalized}:${periodId}:${route}`;
 }
 
 function uniqueBy<T>(
@@ -207,6 +207,7 @@ function validateReservation(
       lot.bucket !== reservation.bucket ||
       lot.periodId !== reservation.periodId ||
       allocation.lotExpiresAt.getTime() !== lot.expiresAt.getTime() ||
+      allocation.reservedUntil.getTime() !== reservation.expiresAt.getTime() ||
       !Number.isSafeInteger(allocation.lotRevision) ||
       allocation.lotRevision < 0 ||
       !Number.isSafeInteger(allocation.amountCredits) ||
@@ -364,8 +365,11 @@ function runtimeShapeReasons(snapshotInput: unknown) {
   if (!isRecord(snapshotInput)) return ["RUNTIME_SNAPSHOT_NOT_OBJECT"];
   const arrayFields = [
     "items",
+    "holds",
     "ownLots",
     "poolLots",
+    "accountLots",
+    "poolPeriodLots",
     "poolPositions",
     "reservations",
     "ledger",
@@ -389,31 +393,36 @@ function runtimeShapeReasons(snapshotInput: unknown) {
   if (
     !isRecord(run) ||
     !isRecord(run.period) ||
+    !isRecord(run.settlementPeriod) ||
     !isRecord(run.sourceWatermark)
   ) {
     reasons.add("RUNTIME_RUN_INVALID");
   } else {
     if (
       typeof run.runId !== "string" ||
+      !["uki", "nft"].includes(String(run.route)) ||
       typeof run.period.periodId !== "string" ||
       typeof run.period.ruleVersion !== "string" ||
       typeof run.period.ruleConfigHash !== "string" ||
       !/^[0-9a-f]{64}$/.test(run.period.ruleConfigHash) ||
-      !["snapshotted", "processing", "open", "blocked"].includes(
+      !["snapshotted", "processing", "open", "open_with_holds", "blocked"].includes(
         String(run.status)
       )
     ) {
       reasons.add("RUNTIME_RUN_ID_OR_STATUS_INVALID");
     }
-    for (const field of ["cutoff", "nextCutoff"] as const) {
+    for (const field of ["cutoff", "nextCutoff", "settlementTarget"] as const) {
       if (!validRuntimeDate(run.period[field]))
         reasons.add(`RUNTIME_RUN_${field.toUpperCase()}_INVALID`);
+      if (!validRuntimeDate(run.settlementPeriod[field]))
+        reasons.add(`RUNTIME_SETTLEMENT_${field.toUpperCase()}_INVALID`);
     }
     for (const field of [
       "expectedItemCount",
       "expectedGrantCredits",
       "expectedOwnCredits",
       "expectedPoolCredits",
+      "expectedHeldCount",
       "fenceToken",
     ] as const) {
       if (!validRuntimeCredit(run[field]))
@@ -439,6 +448,10 @@ function runtimeShapeReasons(snapshotInput: unknown) {
       !/^[0-9a-f]{64}$/.test(run.sourceWatermark.sourceHash) ||
       typeof run.sourceWatermark.healthEvidenceHash !== "string" ||
       !/^[0-9a-f]{64}$/.test(run.sourceWatermark.healthEvidenceHash)
+      || run.sourceWatermark.route !== run.route
+      || !Number.isSafeInteger(run.sourceWatermark.canonicalSafeBlock)
+      || typeof run.sourceWatermark.canonicalSafeBlockHash !== "string"
+      || !/^0x[0-9a-f]{64}$/.test(run.sourceWatermark.canonicalSafeBlockHash)
     ) {
       reasons.add("RUNTIME_WATERMARK_IDENTITY_INVALID");
     }
@@ -484,6 +497,8 @@ function runtimeShapeReasons(snapshotInput: unknown) {
   const lots = [
     ...(Array.isArray(snapshotInput.ownLots) ? snapshotInput.ownLots : []),
     ...(Array.isArray(snapshotInput.poolLots) ? snapshotInput.poolLots : []),
+    ...(Array.isArray(snapshotInput.accountLots) ? snapshotInput.accountLots : []),
+    ...(Array.isArray(snapshotInput.poolPeriodLots) ? snapshotInput.poolPeriodLots : []),
   ];
   for (const lot of lots) {
     if (!isRecord(lot)) {
@@ -575,7 +590,8 @@ function runtimeShapeReasons(snapshotInput: unknown) {
         !isRecord(allocation) ||
         !validRuntimeCredit(allocation.amountCredits) ||
         !validRuntimeCredit(allocation.lotRevision) ||
-        !validRuntimeDate(allocation.lotExpiresAt)
+        !validRuntimeDate(allocation.lotExpiresAt) ||
+        !validRuntimeDate(allocation.reservedUntil)
       ) {
         reasons.add("RUNTIME_RESERVATION_ALLOCATION_INVALID");
       }
@@ -598,6 +614,7 @@ function runtimeShapeReasons(snapshotInput: unknown) {
       typeof entry.payloadHash !== "string" ||
       ![
         "grant",
+        "late_compensation",
         "pool_deposit",
         "reserve",
         "release",
@@ -734,8 +751,11 @@ function reconcileCompetitionCreditSnapshotUnsafe(
   );
   for (const field of [
     "items",
+    "holds",
     "ownLots",
     "poolLots",
+    "accountLots",
+    "poolPeriodLots",
     "poolPositions",
     "reservations",
     "ledger",
@@ -748,8 +768,9 @@ function reconcileCompetitionCreditSnapshotUnsafe(
 
   const expectedRunId = stableCreditHash({
     kind: "daily-credit-run",
+    route: run.route,
     period: run.period,
-    sourceHash: run.sourceWatermark.sourceHash,
+    sourceHash: run.sourceSnapshotHash,
   });
   if (run._id !== expectedRunId || run.runId !== expectedRunId)
     reasons.add("RUN_ID_MISMATCH");
@@ -822,11 +843,22 @@ function reconcileCompetitionCreditSnapshotUnsafe(
     }
     if (
       entry.runId !== run.runId ||
-      entry.periodId !== run.period.periodId ||
+      entry.periodId !== run.settlementPeriod.periodId ||
       !Number.isSafeInteger(entry.amountCredits) ||
       entry.amountCredits <= 0
     )
       reasons.add("LEDGER_SCOPE_OR_AMOUNT_INVALID");
+    if (
+      (entry.operation === "grant" ||
+        entry.operation === "late_compensation" ||
+        entry.operation === "pool_deposit") &&
+      (
+        entry.effectiveBlockNumber !== run.cutoffBlock.blockNumber ||
+        entry.effectiveBlockHash !== run.cutoffBlock.blockHash ||
+        !(entry.effectiveBlockTimestamp instanceof Date) ||
+        entry.effectiveBlockTimestamp.getTime() !== run.cutoffBlock.blockTimestamp.getTime()
+      )
+    ) reasons.add("LEDGER_EFFECTIVE_BLOCK_MISMATCH");
     if (
       entry.runItemId &&
       !snapshot.items.some((item) => item.itemId === entry.runItemId)
@@ -857,13 +889,15 @@ function reconcileCompetitionCreditSnapshotUnsafe(
       item._id !== expectedItemId ||
       item.itemId !== expectedItemId ||
       item.runId !== run.runId ||
-      item.periodId !== run.period.periodId
+      item.earnedPeriodId !== run.period.periodId ||
+      item.periodId !== run.settlementPeriod.periodId
     )
       reasons.add("RUN_ITEM_ID_OR_SCOPE_MISMATCH");
     const immutable = {
       _id: item._id,
       itemId: item.itemId,
       runId: item.runId,
+      earnedPeriodId: item.earnedPeriodId,
       periodId: item.periodId,
       walletNormalized: item.walletNormalized,
       slotId: item.slotId,
@@ -876,6 +910,13 @@ function reconcileCompetitionCreditSnapshotUnsafe(
       slotRevision: item.slotRevision,
       creditEligibleFrom: item.creditEligibleFrom,
       graceEndsAt: item.graceEndsAt,
+      baseGrantCredits: item.baseGrantCredits,
+      compensationCredits: item.compensationCredits,
+      compensationReason: item.compensationReason,
+      baseOwnCredits: item.baseOwnCredits,
+      basePoolCredits: item.basePoolCredits,
+      compensationOwnCredits: item.compensationOwnCredits,
+      compensationPoolCredits: item.compensationPoolCredits,
       grantCredits: item.grantCredits,
       ownCredits: item.ownCredits,
       poolCredits: item.poolCredits,
@@ -885,10 +926,21 @@ function reconcileCompetitionCreditSnapshotUnsafe(
       reasons.add("RUN_ITEM_PAYLOAD_TAMPERED");
     }
     if (
-      item.grantCredits !== 100 ||
+      item.baseGrantCredits !== 100 ||
+      (item.compensationCredits !== 0 && item.compensationCredits !== 100) ||
+      item.grantCredits !== item.baseGrantCredits + item.compensationCredits ||
+      item.baseOwnCredits + item.basePoolCredits !== item.baseGrantCredits ||
+      item.compensationOwnCredits + item.compensationPoolCredits !== item.compensationCredits ||
+      (item.compensationCredits === 0 && item.compensationReason !== null) ||
+      (item.compensationCredits === 100 && item.compensationReason !== "late_gt_24h") ||
+      (item.compensationCredits === 100 &&
+        (item.compensationOwnCredits !== item.baseOwnCredits ||
+          item.compensationPoolCredits !== item.basePoolCredits)) ||
       item.ownCredits + item.poolCredits !== item.grantCredits ||
+      item.ownCredits !== item.baseOwnCredits + item.compensationOwnCredits ||
+      item.poolCredits !== item.basePoolCredits + item.compensationPoolCredits ||
       item.poolCredits < 0 ||
-      item.poolCredits > 100 ||
+      item.poolCredits > 200 ||
       item.poolCredits % 10 !== 0
     ) {
       reasons.add("RUN_ITEM_CREDIT_SPLIT_INVALID");
@@ -910,12 +962,12 @@ function reconcileCompetitionCreditSnapshotUnsafe(
         ownLot.bucket !== "own" ||
         ownLot.walletNormalized !== item.walletNormalized ||
         ownLot.runId !== run.runId ||
-        ownLot.periodId !== run.period.periodId ||
+        ownLot.periodId !== run.settlementPeriod.periodId ||
         ownLot.sourceSlotId !== item.slotId ||
         ownLot.eligibilityEpoch !== item.eligibilityEpoch ||
         ownLot.totalCredits !== item.grantCredits ||
         ownLot.poolDepositedCredits !== item.poolCredits ||
-        ownLot.expiresAt.getTime() !== run.period.nextCutoff.getTime()
+        ownLot.expiresAt.getTime() !== run.settlementPeriod.nextCutoff.getTime()
       ) {
         reasons.add("OWN_LOT_SOURCE_MISMATCH");
       }
@@ -950,12 +1002,12 @@ function reconcileCompetitionCreditSnapshotUnsafe(
         poolLot.bucket !== "pool" ||
         poolLot.walletNormalized !== null ||
         poolLot.runId !== run.runId ||
-        poolLot.periodId !== run.period.periodId ||
+        poolLot.periodId !== run.settlementPeriod.periodId ||
         position._id !== expectedPositionId ||
         position.positionId !== expectedPositionId ||
         position.walletNormalized !== item.walletNormalized ||
         position.runId !== run.runId ||
-        position.periodId !== run.period.periodId ||
+        position.periodId !== run.settlementPeriod.periodId ||
         poolLot.totalCredits !== item.poolCredits ||
         position.credits !== item.poolCredits ||
         poolLot.sourceSlotId !== item.slotId ||
@@ -977,12 +1029,29 @@ function reconcileCompetitionCreditSnapshotUnsafe(
     const grants = ledgerForItem(snapshot.ledger, item, "grant", "own");
     if (
       grants.length !== 1 ||
-      grants[0].amountCredits !== item.grantCredits ||
+      grants[0].amountCredits !== item.baseGrantCredits ||
       grants[0].payloadHash !== item.payloadHash ||
       grants[0].fromState !== null ||
       grants[0].toState !== "available"
     ) {
       reasons.add("GRANT_LEDGER_MISMATCH");
+    }
+    const compensations = ledgerForItem(
+      snapshot.ledger,
+      item,
+      "late_compensation",
+      "own"
+    );
+    if (
+      (item.compensationCredits === 0 && compensations.length !== 0) ||
+      (item.compensationCredits > 0 &&
+        (compensations.length !== 1 ||
+          compensations[0].amountCredits !== item.compensationCredits ||
+          compensations[0].payloadHash !== item.payloadHash ||
+          compensations[0].fromState !== null ||
+          compensations[0].toState !== "available"))
+    ) {
+      reasons.add("LATE_COMPENSATION_LEDGER_MISMATCH");
     }
     const ownDeposits = ledgerForItem(
       snapshot.ledger,
@@ -1022,7 +1091,7 @@ function reconcileCompetitionCreditSnapshotUnsafe(
       reservation,
       lotsById,
       snapshot.ledger,
-      run.period.periodId,
+      run.settlementPeriod.periodId,
       run.period.ruleVersion,
       run.period.ruleConfigHash,
       reasons
@@ -1066,12 +1135,14 @@ function reconcileCompetitionCreditSnapshotUnsafe(
     reasons.add("POOL_POSITION_COUNT_MISMATCH");
   }
 
-  const wallets = new Set(snapshot.items.map((item) => item.walletNormalized));
+  const wallets = new Set(
+    snapshot.accountLots.flatMap((lot) => lot.walletNormalized ? [lot.walletNormalized] : [])
+  );
   for (const wallet of wallets) {
     const accounts = snapshot.accounts.filter(
-      (account) => account._id === accountId(wallet, run.period.periodId)
+      (account) => account._id === accountId(wallet, run.settlementPeriod.periodId, run.route)
     );
-    const lots = snapshot.ownLots.filter(
+    const lots = snapshot.accountLots.filter(
       (lot) => lot.walletNormalized === wallet
     );
     if (accounts.length !== 1 || !accountMatchesLots(accounts[0], lots)) {
@@ -1081,38 +1152,44 @@ function reconcileCompetitionCreditSnapshotUnsafe(
   if (
     snapshot.accounts.some(
       (account) =>
-        !wallets.has(account.walletNormalized) ||
-        account.periodId !== run.period.periodId ||
-        account._id !== accountId(account.walletNormalized, account.periodId)
+        account.route !== run.route ||
+        account.periodId !== run.settlementPeriod.periodId ||
+        account._id !== accountId(account.walletNormalized, account.periodId, account.route)
     )
   ) {
     reasons.add("UNEXPECTED_ACCOUNT_MATERIALIZATION");
   }
 
-  if (expectedPool === 0) {
+  if (snapshot.poolPeriodLots.length === 0) {
     if (snapshot.poolPeriod && snapshot.poolPeriod.contributedCredits !== 0) {
       reasons.add("UNEXPECTED_POOL_PERIOD");
     }
   } else if (
     !snapshot.poolPeriod ||
-    snapshot.poolPeriod._id !== `pool:${run.period.periodId}` ||
-    snapshot.poolPeriod.periodId !== run.period.periodId ||
-    snapshot.poolPeriod.contributedCredits !== expectedPool ||
+    snapshot.poolPeriod._id !== `pool:${run.settlementPeriod.periodId}:${run.route}` ||
+    snapshot.poolPeriod.route !== run.route ||
+    snapshot.poolPeriod.periodId !== run.settlementPeriod.periodId ||
+    snapshot.poolPeriod.contributedCredits !==
+      sumExactCredits(snapshot.poolPeriodLots.map((lot) => lot.totalCredits)) ||
     snapshot.poolPeriod.availableCredits !==
-      sumExactCredits(snapshot.poolLots.map((lot) => lot.availableCredits)) ||
+      sumExactCredits(snapshot.poolPeriodLots.map((lot) => lot.availableCredits)) ||
     snapshot.poolPeriod.reservedCredits !==
-      sumExactCredits(snapshot.poolLots.map((lot) => lot.reservedCredits)) ||
+      sumExactCredits(snapshot.poolPeriodLots.map((lot) => lot.reservedCredits)) ||
     snapshot.poolPeriod.spentCredits !==
-      sumExactCredits(snapshot.poolLots.map((lot) => lot.spentCredits)) ||
+      sumExactCredits(snapshot.poolPeriodLots.map((lot) => lot.spentCredits)) ||
     snapshot.poolPeriod.expiredCredits !==
-      sumExactCredits(snapshot.poolLots.map((lot) => lot.expiredCredits))
+      sumExactCredits(snapshot.poolPeriodLots.map((lot) => lot.expiredCredits))
   )
     reasons.add("POOL_MATERIALIZATION_MISMATCH");
 
   const snapshotHash = stableCreditHash({
     period: run.period,
+    settlementPeriod: run.settlementPeriod,
+    cutoffBlock: run.cutoffBlock,
     sourceWatermark: run.sourceWatermark,
+    sourceSnapshotHash: run.sourceSnapshotHash,
     items: snapshot.items.map((item) => item.payloadHash).sort(),
+    holds: snapshot.holds.map((hold) => hold.evidenceHash).sort(),
   });
   if (snapshotHash !== run.snapshotHash)
     reasons.add("RUN_SNAPSHOT_HASH_MISMATCH");

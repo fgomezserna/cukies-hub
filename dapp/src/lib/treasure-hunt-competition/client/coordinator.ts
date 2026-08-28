@@ -11,6 +11,7 @@ export interface CompetitionClientAttempt {
   readonly seed: string;
   readonly alias: string;
   readonly status: 'active';
+  readonly eligibilityKind: 'presale' | 'uki_staking';
   readonly nextSequence: number;
   readonly receipt: string;
 }
@@ -29,6 +30,7 @@ interface MutableAttemptState {
   seed: string;
   alias: string;
   status: 'active';
+  eligibilityKind: 'presale' | 'uki_staking';
   nextSequence: number;
   receipt: string;
 }
@@ -39,6 +41,7 @@ interface RecoverableAttemptState {
   readonly seed: string;
   readonly alias: string;
   readonly status: CompetitionClientEvidenceResult['status'];
+  readonly eligibilityKind: 'presale' | 'uki_staking';
   readonly nextSequence: number;
   readonly receipt: string | null;
   readonly score: number;
@@ -81,12 +84,13 @@ function parseAttempt(payload: unknown): MutableAttemptState {
   if (!isRecord(payload)) {
     throw new CompetitionClientError('INVALID_SERVER_RESPONSE', 502, 'Missing competition attempt');
   }
-  const { attemptId, seed, alias, status, receipt } = payload;
+  const { attemptId, seed, alias, status, receipt, eligibilityKind } = payload;
   if (
     typeof attemptId !== 'string' || !attemptId ||
     typeof seed !== 'string' || !seed ||
     typeof alias !== 'string' || !alias ||
     status !== 'active' ||
+    (eligibilityKind !== 'presale' && eligibilityKind !== 'uki_staking') ||
     typeof receipt !== 'string' || !receipt
   ) {
     throw new CompetitionClientError('INVALID_SERVER_RESPONSE', 502, 'Invalid competition attempt response');
@@ -96,6 +100,7 @@ function parseAttempt(payload: unknown): MutableAttemptState {
     seed,
     alias,
     status,
+    eligibilityKind,
     receipt,
     nextSequence: assertSafeNonNegativeInteger(payload.nextSequence, 'nextSequence'),
   };
@@ -136,6 +141,7 @@ function parseRecoverableAttempt(payload: unknown): RecoverableAttemptState | nu
     typeof payload.seed !== 'string' || !payload.seed ||
     typeof payload.alias !== 'string' || !payload.alias ||
     !['active', 'review', 'valid', 'invalid', 'abandoned'].includes(status) ||
+    (payload.eligibilityKind !== 'presale' && payload.eligibilityKind !== 'uki_staking') ||
     (payload.receipt !== null && typeof payload.receipt !== 'string')
   ) {
     return null;
@@ -147,6 +153,7 @@ function parseRecoverableAttempt(payload: unknown): RecoverableAttemptState | nu
       seed: payload.seed,
       alias: payload.alias,
       status: status as RecoverableAttemptState['status'],
+      eligibilityKind: payload.eligibilityKind,
       receipt: payload.receipt as string | null,
       nextSequence: assertSafeNonNegativeInteger(payload.nextSequence, 'nextSequence'),
       score: assertSafeNonNegativeInteger(payload.score, 'score'),
@@ -354,6 +361,24 @@ export function createCompetitionAttemptCoordinator(options: CoordinatorOptions 
     return enqueue(gameSessionId, () => finishUnlocked(gameSessionId, evidence));
   }
 
+  async function abandonUnlocked(gameSessionId: string) {
+    const attempt = attempts.get(gameSessionId);
+    if (!attempt) {
+      throw new CompetitionClientError('ATTEMPT_NOT_ACTIVE', 409, 'No active competition attempt');
+    }
+    const body = await post(`${basePath}/${encodeURIComponent(attempt.attemptId)}/abandon`, {
+      receipt: attempt.receipt,
+      sequence: attempt.nextSequence,
+    });
+    const result = parseEvidenceResult(body.result);
+    attempts.delete(gameSessionId);
+    return result;
+  }
+
+  function abandon(gameSessionId: string) {
+    return enqueue(gameSessionId, () => abandonUnlocked(gameSessionId));
+  }
+
   function finishDeclared(
     gameSessionId: string,
     attemptId: string,
@@ -405,10 +430,11 @@ export function createCompetitionAttemptCoordinator(options: CoordinatorOptions 
             seed: recovered.seed,
             alias: recovered.alias,
             status: 'active',
+            eligibilityKind: recovered.eligibilityKind,
             nextSequence: recovered.nextSequence,
             receipt: recovered.receipt,
           });
-        } else if (['review', 'valid', 'invalid'].includes(recovered.status)) {
+        } else if (['review', 'valid', 'invalid', 'abandoned'].includes(recovered.status)) {
           // A previous client could re-submit a terminal screen after the parent
           // had already rotated to a fresh GameSession. The canonical attempt is
           // already durable, so acknowledge its server result and let the new,
@@ -454,6 +480,69 @@ export function createCompetitionAttemptCoordinator(options: CoordinatorOptions 
     });
   }
 
+  function abandonDeclared(gameSessionId: string, attemptId: string) {
+    return enqueue(gameSessionId, async () => {
+      if (!attemptId || attemptId.length > 128) {
+        throw new CompetitionClientError(
+          'INVALID_COMPETITION_AUTHORITY',
+          400,
+          'Competition abandon authority is invalid',
+        );
+      }
+      const current = attempts.get(gameSessionId);
+      if (current && current.attemptId !== attemptId) {
+        throw new CompetitionClientError(
+          'COMPETITION_AUTHORITY_CONFLICT',
+          409,
+          'Competition abandon does not match the active attempt',
+        );
+      }
+      if (!current) {
+        const body = await get(`${basePath}?limit=500`);
+        const listed = Array.isArray(body.attempts)
+          ? body.attempts.map(parseRecoverableAttempt).filter(
+            (attempt): attempt is RecoverableAttemptState => Boolean(attempt),
+          )
+          : [];
+        const recovered = listed.find((attempt) => attempt.attemptId === attemptId);
+        if (!recovered) {
+          throw new CompetitionClientError(
+            'COMPETITION_ATTEMPT_NOT_FOUND',
+            404,
+            'Declared competition attempt could not be recovered',
+          );
+        }
+        if (recovered.status === 'abandoned') {
+          return {
+            accepted: true,
+            status: 'abandoned' as const,
+            nextSequence: recovered.nextSequence,
+            receipt: null,
+            score: recovered.score,
+            gameTimeMs: recovered.gameTimeMs,
+          };
+        }
+        if (recovered.status !== 'active' || !recovered.receipt) {
+          throw new CompetitionClientError(
+            'COMPETITION_ATTEMPT_NOT_ACTIVE',
+            409,
+            'Declared competition attempt cannot be abandoned',
+          );
+        }
+        attempts.set(gameSessionId, {
+          attemptId: recovered.attemptId,
+          seed: recovered.seed,
+          alias: recovered.alias,
+          status: 'active',
+          eligibilityKind: recovered.eligibilityKind,
+          nextSequence: recovered.nextSequence,
+          receipt: recovered.receipt,
+        });
+      }
+      return abandonUnlocked(gameSessionId);
+    });
+  }
+
   function reset(gameSessionId?: string) {
     if (gameSessionId) {
       generations.set(gameSessionId, (generations.get(gameSessionId) ?? 0) + 1);
@@ -478,6 +567,8 @@ export function createCompetitionAttemptCoordinator(options: CoordinatorOptions 
     checkpoint,
     finish,
     finishDeclared,
+    abandon,
+    abandonDeclared,
     reset,
     hasActiveAttempt: (gameSessionId: string) => attempts.has(gameSessionId),
     getActiveAttempt: (gameSessionId: string) => {

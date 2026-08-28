@@ -143,6 +143,10 @@ export function clonePoolAssignment(assignment: CukiePoolAssignment): CukiePoolA
     assignedAt: new Date(assignment.assignedAt),
     expiresAt: new Date(assignment.expiresAt),
     updatedAt: new Date(assignment.updatedAt),
+    ...(assignment.periodStartsAt
+      ? { periodStartsAt: new Date(assignment.periodStartsAt) }
+      : {}),
+    ...(assignment.periodEndsAt ? { periodEndsAt: new Date(assignment.periodEndsAt) } : {}),
     ...(assignment.releasedAt ? { releasedAt: new Date(assignment.releasedAt) } : {}),
   };
 }

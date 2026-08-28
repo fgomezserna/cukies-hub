@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LaunchInfoPage } from '@/components/launch/info-page';
+import { CukiePoolStatusPanel } from '@/components/cukie-pool/status-panel';
 
 export const metadata: Metadata = {
   title: 'Cukie Hodler | Cukies World',
@@ -17,7 +18,7 @@ export default function CukieHodlerPage() {
       primaryCta={{ label: 'Ver Cukie Master', href: '/cukie-master' }}
       secondaryCta={{ label: 'Cómo jugar', href: '/como-jugar' }}
       metrics={[
-        { label: 'Pools', value: '2 rutas', helper: 'Originales y segunda generación' },
+        { label: 'Custodia', value: '1 vault', helper: 'Originales y segunda generación' },
         { label: 'Espera mínima', value: '24h', helper: 'Antes de primera asignación' },
         { label: 'Prioridad', value: 'Originales', helper: 'Se prestan antes que segunda gen' },
         { label: 'Fallback', value: 'Seiku', helper: 'Si no hay Cukies disponibles' },
@@ -26,17 +27,17 @@ export default function CukieHodlerPage() {
         {
           title: 'Cómo funciona el pool',
           bullets: [
-            'Los usuarios pueden aportar Cukies para que otros jugadores los usen.',
-            'Hay pools separados para Cukies Originales y Cukies de segunda generación.',
+            'Los usuarios depositan físicamente sus Cukies en un vault para que otros jugadores usen sus partidas disponibles.',
+            'Un único contrato custodia Cukies Originales y de segunda generación; el cálculo y reparto se mantienen separados por generación.',
             'Primero se prestan Originales; si se agotan, se prestan de segunda generación.',
-            'Si no hay ningún Cukie disponible, se asigna un Seiku ficticio.',
+            'Si no hay ningún Cukie disponible, se asigna un Seiku; esas partidas no generan recompensa para el Cukie Pool.',
           ],
         },
         {
           title: 'Elegibilidad de NFT',
           bullets: [
-            'No se debe permitir aportar un NFT listado en marketplace.',
-            'No se debe permitir aportar un NFT en bridge, bloqueado, invalidado o con ownership inconsistente.',
+            'El NFT depositado queda bajo custodia del contrato y no puede venderse, transferirse, jugarse por su propietario ni usarse simultáneamente como Cukie Master.',
+            'No se permite depositar un NFT en bridge, bloqueado, invalidado o con ownership inconsistente.',
             'Las nuevas posiciones se orientan a BSC; Tron queda para lectura o migración salvo nueva decisión.',
             'Un Cukie usado para Cukie Master no queda disponible para prestarlo a otros jugadores.',
           ],
@@ -57,10 +58,11 @@ export default function CukieHodlerPage() {
         },
         {
           title: 'Reparto por rareza',
-          text: 'Las asignaciones para propietarios se reparten por tramos de rareza. Cada tramo previsto representa 16.66%: todos, No Común o superior, Raro o superior, Épico o superior, Legendario o superior y Goat.',
+          text: 'Cada generación se liquida por separado con niveles acumulativos: todos 45%, No Común o superior 20%, Raro o superior 15%, Épico o superior 12%, Legendario o superior 7% y Goat 1%.',
         },
       ]}
-      note="El pool debe mostrar estados reales del NFT: available, listed, bridging, soft_staked, in_pool, assigned_to_game, invalidated o unknown. Ocultar estos estados crearía doble uso y confusión."
+      afterSections={<CukiePoolStatusPanel />}
+      note="El depósito se activa al comenzar el siguiente periodo de las 14:00 UTC. Si se solicita la salida, el NFT puede seguir prestándose hasta el corte, pero deja de participar en el reparto de ese periodo y queda retirable al finalizarlo."
     />
   );
 }

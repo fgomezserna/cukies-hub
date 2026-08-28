@@ -10,6 +10,7 @@ import {
   type ProcessCreditRunBatchInput,
 } from './service';
 import {
+  assertCompetitionCreditRule,
   assertRuleActiveAt,
   currentCompetitionCreditPeriod,
   validCreditDate,
@@ -17,6 +18,7 @@ import {
 } from './rules';
 import { mongoCompetitionCreditTransactionRunner } from './repository';
 import type { CompetitionCreditRule, CompetitionCreditRun } from './types';
+import type { CreditRoute } from './types';
 
 const STATE_COLLECTION = 'competition_credit_runtime_state';
 const RUNS_COLLECTION = 'competition_credit_runtime_runs';
@@ -104,10 +106,23 @@ export type CompetitionCreditRuntimeServices = Pick<
   | 'openRun'
   | 'expireReservationsBatch'
   | 'expireAvailableLotsBatch'
+  | 'findOldestPendingRoutePeriod'
 >;
 
+export type CompetitionCreditRouteRuntimeResult = {
+  route: CreditRoute;
+  status: 'waiting' | 'open' | 'processing' | 'blocked';
+  periodId: string;
+  creditRunId: string;
+  batchesProcessed: number;
+  itemsApplied: number;
+  pendingItems: number;
+  warningCode?: 'SNAPSHOT_LATE';
+  errorCode?: string;
+};
+
 export type CompetitionCreditRuntimeResult = {
-  status: 'open' | 'processing' | 'blocked';
+  status: 'waiting' | 'open' | 'processing' | 'blocked';
   periodId: string;
   creditRunId: string;
   batchesProcessed: number;
@@ -115,6 +130,7 @@ export type CompetitionCreditRuntimeResult = {
   pendingItems: number;
   expiredReservations: number;
   expiredLots: number;
+  routeResults: CompetitionCreditRouteRuntimeResult[];
   completedAt: string;
 };
 
@@ -369,13 +385,19 @@ async function loadRule(
   expectedRuleVersion: string,
   runner = mongoCompetitionCreditTransactionRunner,
 ) {
-  const rule = await runner((repository) => repository.findRuleAt(now, expectedRuleVersion));
+  const rule = await runner(async (repository) =>
+    await repository.findRuleAt(now, expectedRuleVersion)
+      ?? await repository.findRuleByVersion(expectedRuleVersion)
+  );
   if (!rule) {
     throw new CompetitionCreditRuntimeConfigurationError(
       `No existe una regla activa de creditos con version ${expectedRuleVersion}.`,
     );
   }
-  return assertRuleActiveAt(rule, now);
+  const validated = assertCompetitionCreditRule(rule);
+  return now.getTime() < validated.activeFrom.getTime()
+    ? validated
+    : assertRuleActiveAt(validated, now);
 }
 
 export async function runCompetitionCreditRuntimeTick(input: {
@@ -408,57 +430,112 @@ export async function runCompetitionCreditRuntimeTick(input: {
       validClockDate(clock),
       config.expectedRuleVersion,
     );
-    const watermarkNow = validClockDate(clock);
-    lease = await coordinator.renew(lease, watermarkNow, config.leaseMs);
-    await services.refreshSourceWatermark({
-      expectedRuleVersion: rule.version,
-      now: watermarkNow,
-    });
+    const routeResults: CompetitionCreditRouteRuntimeResult[] = [];
+    let firstRouteError: unknown = null;
+    for (const route of ['uki', 'nft'] as const) {
+      try {
+        const snapshotNow = validClockDate(clock);
+        lease = await coordinator.renew(lease, snapshotNow, config.leaseMs);
+        const period = await services.findOldestPendingRoutePeriod({
+          route,
+          rule,
+          now: snapshotNow,
+        });
+        if (!period) {
+          const waitingPeriod = currentCompetitionCreditPeriod(snapshotNow, rule);
+          routeResults.push({
+            route,
+            status: 'waiting',
+            periodId: waitingPeriod.periodId,
+            creditRunId: '',
+            batchesProcessed: 0,
+            itemsApplied: 0,
+            pendingItems: 0,
+          });
+          continue;
+        }
+        const watermarkNow = validClockDate(clock);
+        lease = await coordinator.renew(lease, watermarkNow, config.leaseMs);
+        await services.refreshSourceWatermark({
+          route,
+          expectedRuleVersion: period.ruleVersion,
+          ruleAt: period.cutoff,
+          now: watermarkNow,
+        });
+        let run: CompetitionCreditRun = await services.createDailyRun({
+          route,
+          cutoff: period.cutoff,
+          expectedRuleVersion: period.ruleVersion,
+          now: snapshotNow,
+        });
+        let batchesProcessed = 0;
+        let itemsApplied = 0;
+    let pendingItems = run.status === 'open' || run.status === 'open_with_holds'
+      ? 0
+      : run.expectedItemCount;
+        let status: CompetitionCreditRouteRuntimeResult['status'] = run.status === 'blocked'
+          ? 'blocked'
+          : run.status === 'open' || run.status === 'open_with_holds'
+            ? 'open'
+            : 'processing';
 
-    const snapshotNow = validClockDate(clock);
-    lease = await coordinator.renew(lease, snapshotNow, config.leaseMs);
-    const period = currentCompetitionCreditPeriod(snapshotNow, rule);
-    let run: CompetitionCreditRun = await services.createDailyRun({
-      cutoff: period.cutoff,
-      expectedRuleVersion: rule.version,
-      now: snapshotNow,
-    });
-
-    let batchesProcessed = 0;
-    let itemsApplied = 0;
-    let pendingItems = run.status === 'open' ? 0 : run.expectedItemCount;
-    let status: CompetitionCreditRuntimeResult['status'] = run.status === 'blocked'
-      ? 'blocked'
-      : run.status === 'open'
-        ? 'open'
-        : 'processing';
-
-    if (run.status !== 'open' && run.status !== 'blocked') {
-      const claimNow = validClockDate(clock);
-      lease = await coordinator.renew(lease, claimNow, config.leaseMs);
-      run = await services.claimRun({ runId: run.runId, workerId, now: claimNow });
-      for (let index = 0; index < config.maxBatchesPerTick; index += 1) {
-        const batchNow = validClockDate(clock);
-        lease = await coordinator.renew(lease, batchNow, config.leaseMs);
-        const batchInput: ProcessCreditRunBatchInput = {
-          runId: run.runId,
-          workerId,
-          fenceToken: run.fenceToken,
-          now: batchNow,
-          limit: config.batchLimit,
-        };
-        const batch = await services.processRunBatch(batchInput);
-        batchesProcessed += 1;
-        itemsApplied += batch.applied;
-        pendingItems = batch.pending;
-        if (!batch.done) continue;
-        const openNow = validClockDate(clock);
-        lease = await coordinator.renew(lease, openNow, config.leaseMs);
-        const opened = await services.openRun({ ...batchInput, now: openNow });
-        status = opened.reconciliation.ok && opened.run.status === 'open' ? 'open' : 'blocked';
-        break;
+    if (run.status !== 'open' && run.status !== 'open_with_holds' && run.status !== 'blocked') {
+          const claimNow = validClockDate(clock);
+          lease = await coordinator.renew(lease, claimNow, config.leaseMs);
+          run = await services.claimRun({ runId: run.runId, workerId, now: claimNow });
+          for (let index = 0; index < config.maxBatchesPerTick; index += 1) {
+            const batchNow = validClockDate(clock);
+            lease = await coordinator.renew(lease, batchNow, config.leaseMs);
+            const batchInput: ProcessCreditRunBatchInput = {
+              runId: run.runId,
+              workerId,
+              fenceToken: run.fenceToken,
+              now: batchNow,
+              limit: config.batchLimit,
+            };
+            const batch = await services.processRunBatch(batchInput);
+            batchesProcessed += 1;
+            itemsApplied += batch.applied;
+            pendingItems = batch.pending;
+            if (!batch.done) continue;
+            const openNow = validClockDate(clock);
+            lease = await coordinator.renew(lease, openNow, config.leaseMs);
+            const opened = await services.openRun({ ...batchInput, now: openNow });
+            status = opened.reconciliation.ok &&
+              (opened.run.status === 'open' || opened.run.status === 'open_with_holds')
+              ? 'open'
+              : 'blocked';
+            break;
+          }
+        }
+        routeResults.push({
+          route,
+          status,
+          periodId: period.periodId,
+          creditRunId: run.runId,
+          batchesProcessed,
+          itemsApplied,
+          pendingItems,
+          ...(snapshotNow.getTime() - period.cutoff.getTime() > rule.maxSnapshotLatenessMs
+            ? { warningCode: 'SNAPSHOT_LATE' as const }
+            : {}),
+        });
+      } catch (error) {
+        firstRouteError ??= error;
+        routeResults.push({
+          route,
+          status: 'blocked',
+          periodId: currentCompetitionCreditPeriod(validClockDate(clock), rule).periodId,
+          creditRunId: '',
+          batchesProcessed: 0,
+          itemsApplied: 0,
+          pendingItems: 0,
+          errorCode: runtimeErrorCode(error),
+        });
       }
     }
+    const successfulRoutes = routeResults.filter((route) => !route.errorCode);
+    if (successfulRoutes.length === 0 && firstRouteError) throw firstRouteError;
 
     const expiryNow = validClockDate(clock);
     lease = await coordinator.renew(lease, expiryNow, config.leaseMs);
@@ -467,15 +544,23 @@ export async function runCompetitionCreditRuntimeTick(input: {
       services.expireAvailableLotsBatch({ now: expiryNow, limit: config.expiryLimit }),
     ]);
     const completedAt = validClockDate(clock);
+    const primary = successfulRoutes[0]!;
     const result: CompetitionCreditRuntimeResult = {
-      status,
-      periodId: period.periodId,
-      creditRunId: run.runId,
-      batchesProcessed,
-      itemsApplied,
-      pendingItems,
+      status: routeResults.some((route) => route.status === 'blocked')
+        ? 'blocked'
+        : routeResults.some((route) => route.status === 'processing')
+          ? 'processing'
+          : routeResults.every((route) => route.status === 'waiting')
+            ? 'waiting'
+          : 'open',
+      periodId: primary.periodId,
+      creditRunId: primary.creditRunId,
+      batchesProcessed: routeResults.reduce((total, route) => total + route.batchesProcessed, 0),
+      itemsApplied: routeResults.reduce((total, route) => total + route.itemsApplied, 0),
+      pendingItems: routeResults.reduce((total, route) => total + route.pendingItems, 0),
       expiredReservations: reservations.expired,
       expiredLots: lots.expired,
+      routeResults,
       completedAt: completedAt.toISOString(),
     };
     await coordinator.finishRun(runtimeRunId, lease, completedAt, result);

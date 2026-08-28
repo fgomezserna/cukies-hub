@@ -6,6 +6,7 @@ import { useAccount } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -28,6 +29,22 @@ interface CompetitionCampaign {
   readonly maxWinningAttemptsPerWallet: number;
   readonly cliffMonths: number;
   readonly vestingMonths: number;
+  readonly stakePerAttemptRaw?: string;
+  readonly topAttemptsPerWallet?: number;
+  readonly pointsPerTicket?: number;
+  readonly basePrizeUkiRaw?: string;
+  readonly stakePrizeBps?: number;
+  readonly prizePerWinnerUkiRaw?: string;
+}
+
+interface CompetitionEligibility {
+  readonly ready: boolean;
+  readonly stakedUkiRaw: string;
+  readonly disqualified: boolean;
+  readonly attemptsGranted: number;
+  readonly attemptsUsed: number;
+  readonly attemptsRemaining: number;
+  readonly provisionalTickets: number;
 }
 
 interface CompetitionParticipant {
@@ -44,6 +61,7 @@ interface CompetitionStatusResponse {
   readonly phase: CompetitionPhase;
   readonly campaign: CompetitionCampaign | null;
   readonly participant: CompetitionParticipant | null;
+  readonly eligibility?: CompetitionEligibility | null;
 }
 
 interface LeaderboardEntry {
@@ -55,6 +73,7 @@ interface LeaderboardEntry {
   readonly gameTimeMs: number;
   readonly finishedAt: string;
   readonly reviewStatus: 'pending' | 'approved';
+  readonly tickets?: number;
   readonly isMe: boolean;
 }
 
@@ -107,6 +126,8 @@ const FALLBACK_RULES = {
   maxWinningAttemptsPerWallet: 5,
   cliffMonths: 9,
   vestingMonths: 6,
+  topAttemptsPerWallet: 10,
+  pointsPerTicket: 100,
 } as const;
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -142,6 +163,19 @@ function isParticipant(value: unknown): value is CompetitionParticipant {
   );
 }
 
+function isEligibility(value: unknown): value is CompetitionEligibility {
+  if (!isObject(value)) return false;
+  return (
+    typeof value.ready === 'boolean' &&
+    typeof value.stakedUkiRaw === 'string' &&
+    typeof value.disqualified === 'boolean' &&
+    isFiniteNumber(value.attemptsGranted) &&
+    isFiniteNumber(value.attemptsUsed) &&
+    isFiniteNumber(value.attemptsRemaining) &&
+    isFiniteNumber(value.provisionalTickets)
+  );
+}
+
 function isLeaderboardEntry(value: unknown): value is LeaderboardEntry {
   if (!isObject(value)) return false;
   return (
@@ -166,7 +200,8 @@ function isCompetitionStatusResponse(value: unknown): value is CompetitionStatus
     typeof value.phase === 'string' &&
     ['unconfigured', 'disabled', 'scheduled', 'active', 'closed'].includes(value.phase) &&
     (value.campaign === null || isCampaign(value.campaign)) &&
-    (value.participant === null || isParticipant(value.participant))
+    (value.participant === null || isParticipant(value.participant)) &&
+    (value.eligibility === undefined || value.eligibility === null || isEligibility(value.eligibility))
   );
 }
 
@@ -194,10 +229,6 @@ async function readJson(response: Response): Promise<unknown> {
 
 function errorCode(value: unknown) {
   return isObject(value) && typeof value.error === 'string' ? value.error : null;
-}
-
-function formatPercentage(bps: number) {
-  return `${bps / 100}%`;
 }
 
 function formatCampaignWindow(campaign: CompetitionCampaign | null) {
@@ -235,19 +266,19 @@ function RulesSummary({ campaign }: { readonly campaign: CompetitionCampaign | n
   const rules = campaign ?? FALLBACK_RULES;
   const items = [
     {
-      value: formatPercentage(rules.poolBps),
-      label: 'Pool de recompensas',
-      detail: 'de los UKI computables tras alcanzar 3.500 ASM; 80% jugadores y hasta 20% sponsors',
+      value: '2.000 UKI',
+      label: 'Por intento',
+      detail: 'El intento se consume al iniciar, aunque la partida se abandone o resulte inválida.',
     },
     {
-      value: formatPercentage(rules.playerRewardBps),
-      label: 'Premio por partida',
-      detail: `de tus UKI comprados, hasta ${rules.maxWinningAttemptsPerWallet} partidas por wallet`,
+      value: String(rules.topAttemptsPerWallet ?? 10),
+      label: 'Mejores partidas',
+      detail: 'Solo las mejores partidas válidas de cada wallet generan tickets.',
     },
     {
-      value: formatPercentage(rules.sponsorRewardBps),
-      label: 'Recompensa del sponsor',
-      detail: 'del premio que recibe cada jugador referido',
+      value: `${rules.pointsPerTicket ?? 100} puntos`,
+      label: 'Por ticket',
+      detail: 'Los tickets acumulados determinan el peso de la wallet en el sorteo final.',
     },
     {
       value: `${rules.cliffMonths} + ${rules.vestingMonths}`,
@@ -483,8 +514,8 @@ export default function TreasureHuntCompetitionPanel() {
               Reglas, nombre y ranking
             </h2>
             <p className="mt-2 max-w-[64ch] text-sm leading-relaxed text-muted-foreground">
-              Juega en modo 1P, entra en el ranking con tus mejores partidas y desbloquea
-              recompensas según los UKI comprados durante la preventa.
+              Deposita UKI, juega tus intentos 1P y convierte las mejores puntuaciones
+              en tickets para el sorteo final.
             </p>
           </div>
 
@@ -513,6 +544,32 @@ export default function TreasureHuntCompetitionPanel() {
       </header>
 
       <RulesSummary campaign={status?.campaign ?? null} />
+
+      {status?.eligibility ? (
+        <div className={cn(
+          'grid gap-px border-b border-border/70 bg-border/70 sm:grid-cols-4',
+          status.eligibility.disqualified && 'border-red-300/30',
+        )}>
+          {[
+            ['UKI en staking', formatTreasureHuntUkiRaw(status.eligibility.stakedUkiRaw)],
+            ['Intentos concedidos', String(status.eligibility.attemptsGranted)],
+            ['Intentos disponibles', String(status.eligibility.attemptsRemaining)],
+            ['Tickets provisionales', String(status.eligibility.provisionalTickets)],
+          ].map(([label, value]) => (
+            <div key={label} className="bg-card px-4 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+              <p className="mt-1 font-mono text-lg font-black text-primary">{value}</p>
+            </div>
+          ))}
+          {!status.eligibility.ready || status.eligibility.disqualified ? (
+            <div role="alert" className="bg-red-950/25 px-4 py-3 text-sm text-red-100 sm:col-span-4">
+              {status.eligibility.disqualified
+                ? 'Esta wallet retiró UKI durante la campaña y ha quedado descalificada.'
+                : 'Esperando una confirmación saludable del indexador de staking.'}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-px bg-border/70">
         <div className="bg-card p-5">
@@ -623,7 +680,7 @@ export default function TreasureHuntCompetitionPanel() {
                 Ranking general
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Hasta cinco resultados por wallet pueden optar a premio tras su revisión.
+                Hasta diez resultados válidos por wallet generan tickets para el sorteo.
               </p>
             </div>
             <span className="font-mono text-xs font-bold text-muted-foreground">
@@ -691,8 +748,8 @@ export default function TreasureHuntCompetitionPanel() {
       </div>
 
       <footer className="border-t border-border/70 bg-muted/25 px-5 py-4 text-xs leading-relaxed text-muted-foreground">
-        Jugar sin comprar UKI está permitido. Para generar una recompensa, la wallet debe tener
-        una compra válida antes del cierre de la preventa.
+        Cualquier retirada de UKI durante la campaña descalifica la wallet completa, aunque vuelva
+        a depositar después. Los premios tienen 9 meses de cliff y 6 meses de vesting lineal.
       </footer>
     </section>
   );

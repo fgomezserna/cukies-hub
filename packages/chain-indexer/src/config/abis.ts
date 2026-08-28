@@ -44,6 +44,28 @@ export const eventSignatures: Record<EventName, string> = {
     'event RewardClaimed(bytes32 indexed batchId, address indexed account, uint256 amount)',
   BatchClosed:
     'event BatchClosed(bytes32 indexed batchId, uint256 unclaimedAmount)',
+  CukieMasterCollectionAllowedUpdated:
+    'event CollectionAllowedUpdated(address indexed collection, bool allowed)',
+  CukieMasterDeposited:
+    'event Deposited(address indexed collection, uint256 indexed tokenId, address indexed beneficiary, uint256 depositEpoch, uint256 depositedAt)',
+  CukieMasterWithdrawn:
+    'event Withdrawn(address indexed collection, uint256 indexed tokenId, address indexed beneficiary, uint256 depositEpoch, uint256 withdrawnAt)',
+  CukieMasterUntrackedERC721Recovered:
+    'event UntrackedERC721Recovered(address indexed collection, uint256 indexed tokenId, address indexed recipient, uint256 recoveredAt)',
+  CukiePoolCollectionAllowedUpdated:
+    'event CollectionAllowedUpdated(address indexed collection, bool allowed)',
+  CukiePoolCalendarVersionScheduled:
+    'event CalendarVersionScheduled(uint32 indexed version, uint64 effectiveAt, uint64 firstCutoffAt, uint64 firstPeriodId, uint32 periodAnchorSeconds)',
+  CukiePoolDeposited:
+    'event Deposited(address indexed collection, uint256 indexed tokenId, address indexed beneficiary, uint64 depositEpoch, uint64 depositedAt, uint64 depositPeriodId, uint64 activationAt, uint64 activationPeriodId, uint32 calendarVersion)',
+  CukiePoolExitRequested:
+    'event ExitRequested(address indexed collection, uint256 indexed tokenId, address indexed beneficiary, uint64 depositEpoch, uint64 requestedAt, uint64 exitPeriodId, uint64 withdrawableAt, uint32 calendarVersion)',
+  CukiePoolWithdrawableAtAdvanced:
+    'event WithdrawableAtAdvanced(address indexed collection, uint256 indexed tokenId, address indexed beneficiary, uint64 depositEpoch, uint64 previousWithdrawableAt, uint64 newWithdrawableAt)',
+  CukiePoolWithdrawn:
+    'event Withdrawn(address indexed collection, uint256 indexed tokenId, address indexed beneficiary, uint64 depositEpoch, uint64 withdrawnAt)',
+  CukiePoolUntrackedERC721Recovered:
+    'event UntrackedERC721Recovered(address indexed collection, uint256 indexed tokenId, address indexed recipient, uint64 recoveredAt)',
 };
 
 export const bscEventAbis = Object.fromEntries(

@@ -32,16 +32,18 @@ const REWARD_CATEGORIES = new Set<string>([
   "credit_pool_daily",
   "cukie_pool_original_distribution",
   "cukie_pool_second_plus_distribution",
-  "cukie_pool_original_carry",
-  "cukie_pool_second_plus_carry",
   "treasury",
   "marketing",
   "development",
+  "marketing_development",
   "supply_reduction",
 ]);
 
 const REWARD_ACCRUAL_CATEGORIES = new Set<string>([
   "weekly_prize_pool",
+  "ambassador_program_pending",
+  "ambassador_ordinary_pending",
+  "ambassador_weekly_pending",
   "credit_pool_weekly",
   "cukie_pool_original_weekly",
   "cukie_pool_second_plus_weekly",

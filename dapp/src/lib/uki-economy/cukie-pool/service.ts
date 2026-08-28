@@ -7,11 +7,13 @@ import {
   incrementFencingToken,
 } from '@/lib/nft-inventory/lock-types';
 import type { NftAssetLockRepository } from '@/lib/nft-inventory/lock-repository';
+import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 
 import {
   DomainConflictError,
   DomainNotFoundError,
   DomainValidationError,
+  SchemaNotReadyError,
   StaleFenceError,
 } from '../errors';
 import {
@@ -245,17 +247,55 @@ export function assertCukiePoolAssignmentIntegrity(assignment: CukiePoolAssignme
     kind: 'cukie-pool-assignment',
     sessionId: assignment.sessionId,
   });
-  const expectedRequestHash = stableCukiePoolHash({
-    operation: 'assign',
-    sessionId: assignment.sessionId,
-    expiresAt: assignment.expiresAt,
+  const custodyMode = assignment.custodyMode ?? 'legacy';
+  const reservationRequestHash = stableCukiePoolHash({
+    operation: 'assign', sessionId: assignment.sessionId, expiresAt: assignment.expiresAt,
   });
-  const poolAssetValid = assignment.kind === 'pool_asset'
+  const expectedRequestHash = custodyMode === 'custodial'
+    ? stableCukiePoolHash({
+        operation: 'assign_vault',
+        sessionId: assignment.sessionId,
+        expiresAt: assignment.expiresAt,
+        assignmentKind: assignment.kind,
+        assetId: assignment.assetId,
+        positionId: assignment.positionId,
+        depositEpoch: assignment.depositEpoch ?? null,
+        periodId: assignment.periodId ?? null,
+        calendarVersion: assignment.calendarVersion ?? null,
+      })
+    : reservationRequestHash;
+  const legacyPoolAssetValid = custodyMode === 'legacy'
+    && assignment.kind === 'pool_asset'
     && Boolean(assignment.positionId)
     && Boolean(assignment.ownerNormalized)
     && Boolean(assignment.lockId)
     && Number.isSafeInteger(assignment.lockFencingToken)
     && Number(assignment.lockFencingToken) >= 1
+    && typeof assignment.ownerRewardEligible === 'boolean';
+  const custodialPoolAssetValid = custodyMode === 'custodial'
+    && assignment.kind === 'pool_asset'
+    && Boolean(assignment.positionId)
+    && /^0x[0-9a-f]{40}$/.test(assignment.ownerNormalized ?? '')
+    && /^0x[0-9a-f]{40}$/.test(assignment.collectionAddressNormalized ?? '')
+    && /^[1-9][0-9]*$/.test(assignment.depositEpoch ?? '')
+    && /^(0|[1-9][0-9]*)$/.test(assignment.periodId ?? '')
+    && /^[1-9][0-9]*$/.test(assignment.calendarVersion ?? '')
+    && Boolean(validGeneration(assignment.generation))
+    && Boolean(validRarity(assignment.rarity))
+    && Number.isSafeInteger(assignment.gamesQuota)
+    && assignment.gamesQuota === gamesQuota(assignment.generation, assignment.rarity)
+    && /^(56|97):0x[0-9a-f]{40}:(0|[1-9][0-9]*)$/.test(assignment.assetId)
+    && assignment.assetId === `${assignment.assetId.split(':')[0]}:${assignment.collectionAddressNormalized}:${assignment.tokenId}`
+    && assignment.positionId === `${assignment.assetId}:epoch:${assignment.depositEpoch}`
+    && assignment.lockId === null
+    && assignment.lockFencingToken === null
+    && assignment.reservationRequestHash === reservationRequestHash
+    && assignment.periodStartsAt instanceof Date
+    && !Number.isNaN(assignment.periodStartsAt.getTime())
+    && assignment.periodEndsAt instanceof Date
+    && assignment.periodEndsAt.getTime() > assignment.periodStartsAt.getTime()
+    && assignment.assignedAt >= assignment.periodStartsAt
+    && assignment.assignedAt < assignment.periodEndsAt
     && typeof assignment.ownerRewardEligible === 'boolean';
   const seikuValid = assignment.kind === 'seiku'
     && assignment.positionId === null
@@ -265,7 +305,24 @@ export function assertCukiePoolAssignmentIntegrity(assignment: CukiePoolAssignme
     && !assignment.ownerRewardEligible
     && assignment.assetId === deterministicSeikuAssetId(assignment.sessionId)
     && assignment.generation === 'original'
-    && assignment.rarity === 'common';
+    && assignment.rarity === 'common'
+    && (
+      custodyMode === 'legacy'
+      || (
+        assignment.collectionAddressNormalized === null
+        && assignment.depositEpoch === null
+        && assignment.gamesQuota === null
+        && assignment.reservationRequestHash === reservationRequestHash
+        && /^(0|[1-9][0-9]*)$/.test(assignment.periodId ?? '')
+        && /^[1-9][0-9]*$/.test(assignment.calendarVersion ?? '')
+        && assignment.periodStartsAt instanceof Date
+        && !Number.isNaN(assignment.periodStartsAt.getTime())
+        && assignment.periodEndsAt instanceof Date
+        && assignment.periodEndsAt.getTime() > assignment.periodStartsAt.getTime()
+        && assignment.assignedAt >= assignment.periodStartsAt
+        && assignment.assignedAt < assignment.periodEndsAt
+      )
+    );
   if (
     assignment._id !== expectedId
     || assignment.assignmentId !== expectedId
@@ -276,7 +333,7 @@ export function assertCukiePoolAssignmentIntegrity(assignment: CukiePoolAssignme
     || assignment.expiresAt.getTime() <= assignment.assignedAt.getTime()
     || !Number.isSafeInteger(assignment.revision)
     || assignment.revision < 0
-    || (!poolAssetValid && !seikuValid)
+    || (!legacyPoolAssetValid && !custodialPoolAssetValid && !seikuValid)
   ) {
     throw new DomainConflictError(
       `La asignacion ${assignment.assignmentId} no supera integridad.`,
@@ -1151,11 +1208,78 @@ export function createCukiePoolService(runner: CukiePoolTransactionRunner) {
   };
 }
 
-const defaultService = createCukiePoolService(mongoCukiePoolTransactionRunner);
+const legacyDefaultService = createCukiePoolService(mongoCukiePoolTransactionRunner);
 
-export const depositCukiePoolPosition = defaultService.depositCukiePoolPosition;
-export const requestCukiePoolWithdrawal = defaultService.requestCukiePoolWithdrawal;
-export const assignCukiePoolSession = defaultService.assignCukiePoolSession;
-export const releaseCukiePoolAssignment = defaultService.releaseCukiePoolAssignment;
-export const expireCukiePoolAssignments = defaultService.expireCukiePoolAssignments;
-export const reconcileCukiePoolPositions = defaultService.reconcileCukiePoolPositions;
+function configuredPoolMode() {
+  return ukiNftVaults.mode.cukiePool;
+}
+
+function requireLegacyMutationMode() {
+  const mode = configuredPoolMode();
+  if (mode === 'invalid') {
+    throw new SchemaNotReadyError('La configuracion de CukiePoolNftVault es invalida.');
+  }
+  if (mode === 'custodial') {
+    throw new DomainConflictError(
+      'Los depositos y retiradas custodiales se ejecutan directamente contra CukiePoolNftVault.',
+    );
+  }
+}
+
+export async function depositCukiePoolPosition(input: DepositCukiePoolPositionInput) {
+  requireLegacyMutationMode();
+  return legacyDefaultService.depositCukiePoolPosition(input);
+}
+
+export async function requestCukiePoolWithdrawal(input: RequestCukiePoolWithdrawalInput) {
+  requireLegacyMutationMode();
+  return legacyDefaultService.requestCukiePoolWithdrawal(input);
+}
+
+export async function assignCukiePoolSession(input: AssignCukiePoolSessionInput) {
+  const mode = configuredPoolMode();
+  if (mode === 'invalid') {
+    throw new SchemaNotReadyError('La configuracion de CukiePoolNftVault es invalida.');
+  }
+  if (mode === 'custodial') {
+    const { cukiePoolVaultAssignmentService } = await import('./vault-assignment');
+    return cukiePoolVaultAssignmentService.assignCukiePoolSession(input);
+  }
+  return legacyDefaultService.assignCukiePoolSession(input);
+}
+
+async function assignmentUsesCustodialVault(sessionId: string) {
+  const { getEconomyDb } = await import('@/lib/indexer-db/mongodb');
+  const db = await getEconomyDb();
+  const assignment = await db.collection<CukiePoolAssignment>('cukie_pool_assignments')
+    .findOne({ sessionId }, { projection: { custodyMode: 1 } });
+  return assignment?.custodyMode === 'custodial';
+}
+
+export async function releaseCukiePoolAssignment(input: ReleaseCukiePoolAssignmentInput) {
+  if (await assignmentUsesCustodialVault(input.sessionId)) {
+    const { cukiePoolVaultAssignmentService } = await import('./vault-assignment');
+    return cukiePoolVaultAssignmentService.releaseCukiePoolAssignment(input);
+  }
+  return legacyDefaultService.releaseCukiePoolAssignment(input);
+}
+
+export async function expireCukiePoolAssignments(
+  input: ExpireCukiePoolAssignmentsInput = {},
+): Promise<ExpireCukiePoolAssignmentsResult> {
+  const mode = configuredPoolMode();
+  if (mode === 'invalid') {
+    throw new SchemaNotReadyError('La configuracion de CukiePoolNftVault es invalida.');
+  }
+  const legacy = await legacyDefaultService.expireCukiePoolAssignments(input);
+  if (mode !== 'custodial') return legacy;
+  const { cukiePoolVaultAssignmentService } = await import('./vault-assignment');
+  const custodial = await cukiePoolVaultAssignmentService.expireCukiePoolAssignments(input);
+  return {
+    scanned: legacy.scanned + custodial.scanned,
+    expired: legacy.expired + custodial.expired,
+    skipped: legacy.skipped + custodial.skipped,
+  };
+}
+
+export const reconcileCukiePoolPositions = legacyDefaultService.reconcileCukiePoolPositions;

@@ -33,13 +33,22 @@ function creditRun(status: CompetitionCreditRun['status'] = 'snapshotted'): Comp
   return {
     _id: 'credit-run-1',
     runId: 'credit-run-1',
+    route: 'uki',
     period,
+    settlementPeriod: period,
     status,
     expectedItemCount: 2,
     expectedGrantCredits: 200,
     expectedOwnCredits: 200,
     expectedPoolCredits: 0,
+    expectedHeldCount: 0,
     sourceWatermark: testCreditSourceWatermark(),
+    cutoffBlock: {
+      blockNumber: 999,
+      blockHash: `0x${"e".repeat(64)}`,
+      blockTimestamp: new Date("2026-07-10T11:59:59.000Z"),
+    },
+    sourceSnapshotHash: 'b'.repeat(64),
     snapshotHash: 'a'.repeat(64),
     fenceToken: status === 'processing' ? 1 : 0,
     ...(status === 'processing'
@@ -101,7 +110,13 @@ function services(overrides: Partial<CompetitionCreditRuntimeServices> = {}) {
   const processing = creditRun('processing');
   const opened = creditRun('open');
   return {
-    refreshSourceWatermark: jest.fn().mockResolvedValue(testCreditSourceWatermark()),
+    refreshSourceWatermark: jest.fn().mockImplementation(({ route }) =>
+      Promise.resolve(testCreditSourceWatermark({
+        route,
+        _id: `cukie-master-slots:${route}`,
+      }))
+    ),
+    findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(period),
     createDailyRun: jest.fn().mockResolvedValue(snapshotted),
     claimRun: jest.fn().mockResolvedValue(processing),
     processRunBatch: jest.fn().mockResolvedValue({ scanned: 2, applied: 2, pending: 0, done: true }),
@@ -142,15 +157,22 @@ describe('competition credit runtime', () => {
     expect(result).toMatchObject({
       status: 'open',
       creditRunId: 'credit-run-1',
-      batchesProcessed: 1,
-      itemsApplied: 2,
+      batchesProcessed: 2,
+      itemsApplied: 4,
       pendingItems: 0,
       expiredReservations: 1,
       expiredLots: 2,
     });
     expect(runtimeServices.createDailyRun).toHaveBeenCalledWith({
+      route: 'uki',
       cutoff: period.cutoff,
       expectedRuleVersion: rule.version,
+      now,
+    });
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledWith({
+      route: 'uki',
+      expectedRuleVersion: period.ruleVersion,
+      ruleAt: period.cutoff,
       now,
     });
     expect(coordinator.finished).toHaveLength(1);
@@ -160,6 +182,8 @@ describe('competition credit runtime', () => {
 
   it('stops at the configured batch bound and leaves the run processing', async () => {
     const processRunBatch = jest.fn()
+      .mockResolvedValueOnce({ scanned: 50, applied: 50, pending: 50, done: false })
+      .mockResolvedValueOnce({ scanned: 50, applied: 50, pending: 10, done: false })
       .mockResolvedValueOnce({ scanned: 50, applied: 50, pending: 50, done: false })
       .mockResolvedValueOnce({ scanned: 50, applied: 50, pending: 10, done: false });
     const runtimeServices = services({ processRunBatch });
@@ -174,10 +198,36 @@ describe('competition credit runtime', () => {
     });
 
     expect(result.status).toBe('processing');
-    expect(result.batchesProcessed).toBe(2);
-    expect(result.itemsApplied).toBe(100);
-    expect(result.pendingItems).toBe(10);
+    expect(result.batchesProcessed).toBe(4);
+    expect(result.itemsApplied).toBe(200);
+    expect(result.pendingItems).toBe(20);
     expect(runtimeServices.openRun).not.toHaveBeenCalled();
+  });
+
+  it('reports a healthy waiting tick before the first eligible settlement', async () => {
+    const coordinator = new MemoryCoordinator();
+    const runtimeServices = services({
+      findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(null),
+    });
+
+    const result = await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(result.status).toBe('waiting');
+    expect(result.routeResults).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'waiting', creditRunId: '' }),
+      expect.objectContaining({ route: 'nft', status: 'waiting', creditRunId: '' }),
+    ]);
+    expect(runtimeServices.refreshSourceWatermark).not.toHaveBeenCalled();
+    expect(runtimeServices.createDailyRun).not.toHaveBeenCalled();
+    expect(coordinator.failed).toHaveLength(0);
+    expect(coordinator.finished).toHaveLength(1);
   });
 
   it('rejects an overlapping tick before mutating the economy', async () => {

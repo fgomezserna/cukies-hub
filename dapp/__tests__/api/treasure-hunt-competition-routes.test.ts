@@ -6,6 +6,7 @@ import { buildCompetitionLeaderboardWithRewards } from '@/lib/treasure-hunt-comp
 import { getCompetitionRateLimiter } from '@/lib/treasure-hunt-competition/server/rate-limit';
 import { POST as startAttempt } from '@/app/api/games/treasure-hunt/competition/attempts/route';
 import { POST as checkpointAttempt } from '@/app/api/games/treasure-hunt/competition/attempts/[attemptId]/checkpoint/route';
+import { POST as abandonAttempt } from '@/app/api/games/treasure-hunt/competition/attempts/[attemptId]/abandon/route';
 import { GET as getLeaderboard } from '@/app/api/games/treasure-hunt/competition/leaderboard/route';
 
 jest.mock('next/headers', () => ({
@@ -36,6 +37,7 @@ const signedWallet = '0x1111111111111111111111111111111111111111';
 const service = {
   startAttempt: jest.fn(),
   recordCheckpoint: jest.fn(),
+  abandonAttempt: jest.fn(),
   getLeaderboard: jest.fn(),
   getLeaderboardAllocationInput: jest.fn(),
 };
@@ -61,6 +63,7 @@ describe('Treasure Hunt competition API identity boundaries', () => {
     } as never);
     service.startAttempt.mockResolvedValue({ attemptId: 'attempt-1' });
     service.recordCheckpoint.mockResolvedValue({ accepted: true, nextSequence: 1 });
+    service.abandonAttempt.mockResolvedValue({ accepted: true, status: 'abandoned' });
     service.getLeaderboard.mockResolvedValue({ campaignId: 'campaign', entries: [] });
     service.getLeaderboardAllocationInput.mockResolvedValue({
       campaign: { campaignId: 'campaign' },
@@ -158,6 +161,26 @@ describe('Treasure Hunt competition API identity boundaries', () => {
 
     expect(response.status).toBe(400);
     expect(service.recordCheckpoint).not.toHaveBeenCalled();
+  });
+
+  it('binds abandonment to the signed wallet, route attempt and current receipt', async () => {
+    mockReadWalletSession.mockResolvedValue(walletSession());
+    const response = await abandonAttempt(
+      new Request('https://hub.test/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receipt: 'receipt-current', sequence: 3 }),
+      }),
+      { params: Promise.resolve({ attemptId: 'attempt-abandon' }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(service.abandonAttempt).toHaveBeenCalledWith({
+      walletAddress: signedWallet,
+      attemptId: 'attempt-abandon',
+      receipt: 'receipt-current',
+      sequence: 3,
+    });
   });
 
   it('builds the public leaderboard preview with bounded pagination and no unsigned identity', async () => {

@@ -15,6 +15,7 @@ const STAKING = `0x${'1'.repeat(40)}`;
 const REWARDS = `0x${'2'.repeat(40)}`;
 const VESTING = `0x${'3'.repeat(40)}`;
 const TOKEN = `0x${'4'.repeat(40)}`;
+const TOKEN_V2 = `0x${'7'.repeat(40)}`;
 const MARKETPLACE = `0x${'5'.repeat(40)}`;
 const BRIDGE = `0x${'6'.repeat(40)}`;
 const WALLET = `0x${'a'.repeat(40)}`;
@@ -130,6 +131,7 @@ function event(
   return {
     _id: `BSC:test:${eventName}:${blockNumber}`,
     chain: 'BSC',
+    chainId: 97,
     contractAlias: eventName === 'Staked' || eventName === 'Unstaked'
       ? 'UKI_STAKING'
       : eventName === 'VestingCreated' || eventName === 'TokensReleased'
@@ -211,6 +213,54 @@ test('registers the explicit verified BSC NFT sources without mainnet address fa
   assert.throws(
     () => getContractEventConfigs(['BSC'], { contractAliases: ['TOKEN'] }),
     /TOKEN fue solicitado sin una address BSC configurada/,
+  );
+});
+
+test('registers TOKEN and TOKEN_V2 simultaneously without address fallback or TRON leakage', () => {
+  const configs = getContractEventConfigs(['BSC'], {
+    tokenAddress: TOKEN,
+    tokenV2Address: TOKEN_V2,
+    contractAliases: ['TOKEN', 'TOKEN_V2'],
+  });
+  assert.deepEqual(
+    configs.map(({ contractAlias, eventName, contractAddress }) => (
+      `${contractAlias}:${eventName}:${contractAddress.toLowerCase()}`
+    )),
+    [
+      `TOKEN:Transfer:${TOKEN}`,
+      `TOKEN:CukieMetadataConfigured:${TOKEN}`,
+      `TOKEN_V2:Transfer:${TOKEN_V2}`,
+      `TOKEN_V2:CukieMetadataConfigured:${TOKEN_V2}`,
+    ],
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], {
+      tokenAddress: TOKEN,
+      contractAliases: ['TOKEN', 'TOKEN_V2'],
+    }),
+    /TOKEN_V2 fue solicitado sin una address BSC configurada/,
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], {
+      tokenAddress: TOKEN,
+      tokenV2Address: TOKEN,
+      contractAliases: ['TOKEN', 'TOKEN_V2'],
+    }),
+    /TOKEN y TOKEN_V2 deben usar addresses BSC distintas/,
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], {
+      tokenV2Address: `0x${'0'.repeat(40)}`,
+      contractAliases: ['TOKEN_V2'],
+    }),
+    /TOKEN_V2 no tiene una address BSC valida/,
+  );
+  assert.throws(
+    () => getContractEventConfigs(['TRON'], {
+      tokenV2Address: TOKEN_V2,
+      contractAliases: ['TOKEN_V2'],
+    }),
+    /solo se indexan con BSC habilitada/,
   );
 });
 
@@ -302,6 +352,50 @@ test('projects a verified BSC mint and its on-chain rarity metadata', async () =
   assert.equal(projected?.metadataEventId, metadata._id);
 });
 
+test('materializes TOKEN_V2 under collection identity and rejects TOKEN cursor substitution', async () => {
+  const context = fakeStore();
+  const args = {
+    from: `0x${'0'.repeat(40)}`,
+    to: WALLET,
+    tokenId: 97_000_001n,
+  };
+  const mint = {
+    ...event('Transfer', normalizeDomainEvent('BSC', 'Transfer', 'TOKEN_V2', args), 30),
+    contractAlias: 'TOKEN_V2' as const,
+    contractAddress: TOKEN_V2,
+  };
+  const metadata = {
+    ...event('CukieMetadataConfigured', normalizeDomainEvent(
+      'BSC',
+      'CukieMetadataConfigured',
+      'TOKEN_V2',
+      { tokenId: args.tokenId, rarity: 5, generation: 2 },
+    ), 30),
+    _id: 'BSC:TOKEN_V2:CukieMetadataConfigured:30:1',
+    contractAlias: 'TOKEN_V2' as const,
+    contractAddress: TOKEN_V2,
+    logIndex: 1,
+  };
+
+  assert.equal(await projectEvent(context.store as never, mint), null);
+  assert.equal(await projectEvent(context.store as never, metadata), null);
+  const documentId = `97:${TOKEN_V2.toLowerCase()}:97000001`;
+  const projected = context.collections.get('cukies')?.documents.get(documentId);
+  assert.equal(projected?.chainId, 97);
+  assert.equal(projected?.collectionAddressNormalized, TOKEN_V2.toLowerCase());
+  assert.equal(projected?.rarity, 5);
+
+  await assert.rejects(
+    () => projectEvent(context.store as never, {
+      ...metadata,
+      _id: 'BSC:TOKEN:CukieMetadataConfigured:30:2',
+      contractAlias: 'TOKEN',
+      logIndex: 2,
+    }),
+    /no tiene Transfer mint proyectado/,
+  );
+});
+
 test('staking projector keeps absolute latest balances and rejects stale overwrite', async () => {
   const context = fakeStore();
   const latest = event('Staked', {
@@ -322,15 +416,66 @@ test('staking projector keeps absolute latest balances and rejects stale overwri
       ?.accountBalanceRaw,
     '10',
   );
+  const stakingState = context.collections.get('uki_staking_state')?.documents.get(
+    STAKING.toLowerCase(),
+  );
+  assert.deepEqual({
+    totalStakedRaw: stakingState?.totalStakedRaw,
+    materializationStatus: stakingState?.materializationStatus,
+    materializedTotalRaw: stakingState?.materializedTotalRaw,
+    materializedThroughEventId: stakingState?.materializedThroughEventId,
+    materializedThroughBlockNumber: stakingState?.materializedThroughBlockNumber,
+    materializedThroughLogIndex: stakingState?.materializedThroughLogIndex,
+    bootstrapStatus: stakingState?.bootstrapStatus,
+    verifiedChainId: stakingState?.verifiedChainId,
+    contractAddressNormalized: stakingState?.contractAddressNormalized,
+  }, {
+    totalStakedRaw: '10',
+    materializationStatus: 'consistent',
+    materializedTotalRaw: '10',
+    materializedThroughEventId: latest._id,
+    materializedThroughBlockNumber: 20,
+    materializedThroughLogIndex: 0,
+    bootstrapStatus: 'verified',
+    verifiedChainId: 97,
+    contractAddressNormalized: STAKING.toLowerCase(),
+  });
+  const jobs = [...(context.collections.get('cukie_master_recalculation_jobs')?.documents.values() ?? [])];
+  assert.equal(jobs.length, 2);
+  assert.ok(jobs.every((job) => (
+    job.walletNormalized === WALLET.toLowerCase()
+    && job.route === 'uki'
+    && job.status === 'pending'
+  )));
 });
 
 test('rewards projector materializes publish, claim and close idempotently', async () => {
   const context = fakeStore();
+  const merkleRoot = `0x${'c'.repeat(64)}`;
+  const inputHash = `0x${'d'.repeat(64)}`;
+  const metadataHash = `0x${'e'.repeat(64)}`;
+  await context.store.db.collection('reward_claim_batches').insertOne({
+    _id: 'draft:rewards',
+    batchId: BATCH_ID,
+    merkleRoot,
+    canonicalInputHash: inputHash,
+    metadataHash,
+    totalAllocatedRaw: '100',
+    startsAtRaw: '200',
+    expiresAtRaw: '300',
+    proofSetHash: 'proof-set',
+    periodSealId: 'period-seal',
+    publishedProofSetHash: 'proof-set',
+    publishedPeriodSealId: 'period-seal',
+    publishAuthorized: true,
+    previewOnly: false,
+    status: 'draft',
+  });
   const publish = event('BatchPublished', {
     batchId: BATCH_ID,
-    merkleRoot: `0x${'c'.repeat(64)}`,
-    inputHash: `0x${'d'.repeat(64)}`,
-    metadataHash: `0x${'e'.repeat(64)}`,
+    merkleRoot,
+    inputHash,
+    metadataHash,
     totalAllocatedRaw: '100',
     startsAtRaw: '200',
     expiresAtRaw: '300',
@@ -348,12 +493,34 @@ test('rewards projector materializes publish, claim and close idempotently', asy
   await projectRewardsDistributorEvent(context.store as never, claim);
   await projectRewardsDistributorEvent(context.store as never, claim);
   await projectRewardsDistributorEvent(context.store as never, close);
+  await projectRewardsDistributorEvent(context.store as never, publish);
 
   assert.equal(context.collections.get('reward_claim_batches')?.documents.size, 1);
   assert.equal(context.collections.get('reward_claims')?.documents.size, 1);
-  assert.equal(
-    [...context.collections.get('reward_claim_batches')!.documents.values()][0].status,
-    'closed',
+  const batch = [...context.collections.get('reward_claim_batches')!.documents.values()][0];
+  assert.equal(batch.status, 'closed');
+  assert.equal(batch.publicationBlockHash, publish.blockHash);
+  const projectedClaim = [...context.collections.get('reward_claims')!.documents.values()][0];
+  assert.equal(projectedClaim.chain, 'BSC');
+  assert.equal(projectedClaim.contractAddress, REWARDS);
+  assert.equal(projectedClaim.blockHash, claim.blockHash);
+  assert.deepEqual(projectedClaim.indexedAt, new Date(claim.timestampMs));
+});
+
+test('rewards projector rejects an on-chain batch without an authorized draft', async () => {
+  const context = fakeStore();
+  const publish = event('BatchPublished', {
+    batchId: BATCH_ID,
+    merkleRoot: `0x${'c'.repeat(64)}`,
+    inputHash: `0x${'d'.repeat(64)}`,
+    metadataHash: `0x${'e'.repeat(64)}`,
+    totalAllocatedRaw: '100',
+    startsAtRaw: '200',
+    expiresAtRaw: '300',
+  }, 10);
+  await assert.rejects(
+    projectRewardsDistributorEvent(context.store as never, publish),
+    /no tiene draft autorizado/,
   );
 });
 
@@ -389,4 +556,11 @@ test('vesting projector rebuilds an idempotent ledger-backed position', async ()
   assert.equal(position?.lockedRaw, '60');
   assert.equal(position?.ledgerEventCount, 2);
   assert.equal(position?.lastEventId, released._id);
+  const jobs = [...(context.collections.get('cukie_master_recalculation_jobs')?.documents.values() ?? [])];
+  assert.equal(jobs.length, 2);
+  assert.ok(jobs.every((job) => (
+    job.walletNormalized === WALLET.toLowerCase()
+    && job.route === 'uki'
+    && job.status === 'pending'
+  )));
 });

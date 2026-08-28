@@ -4,7 +4,7 @@ import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 import { DomainConflictError, DomainValidationError } from '../errors';
 import { addRawAmounts, formatRawAmount, parseRawAmount } from '../money';
-import type { CukieMasterRoute } from '../rules';
+import { CUKIE_MASTER_RULE_VERSION, type CukieMasterRoute } from '../rules';
 import {
   assertStrictRequirementIncrease,
   calculateRouteSlotTarget,
@@ -26,6 +26,7 @@ import {
 } from './repository';
 import type {
   CukieMasterNftSource,
+  CukieMasterChainEvidence,
   CukieMasterPosition,
   CukieMasterPositionEvent,
   CukieMasterRecalculationResult,
@@ -67,6 +68,13 @@ function validRouteCapacity(value: number) {
     throw new DomainValidationError(
       `capacitySlots debe ser un entero entre 1 y ${CUKIE_MASTER_MAX_CAPACITY}.`,
     );
+  }
+  return value;
+}
+
+function validCukieMasterRoute(value: CukieMasterRoute) {
+  if (value !== 'uki' && value !== 'nft') {
+    throw new DomainValidationError('route no es valida.');
   }
   return value;
 }
@@ -134,9 +142,42 @@ function documentId(value: unknown) {
   return null;
 }
 
+function sourceEventId(value: unknown) {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 function observedAt(value: unknown) {
   const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+}
+
+function evidenceFields(evidence: CukieMasterChainEvidence | null) {
+  return evidence ? {
+    eventId: evidence.eventId,
+    blockNumber: evidence.blockNumber,
+    blockHash: evidence.blockHash,
+    blockTimestamp: evidence.blockTimestamp,
+  } : {};
+}
+
+function latestChainEvidence(refs: CukieMasterSourceRef[]) {
+  const evidenced = refs.flatMap((ref) => (
+    typeof ref.eventId === 'string' &&
+    Number.isSafeInteger(ref.blockNumber) &&
+    typeof ref.blockHash === 'string' &&
+    ref.blockTimestamp instanceof Date
+      ? [{
+          eventId: ref.eventId,
+          blockNumber: Number(ref.blockNumber),
+          blockHash: ref.blockHash,
+          blockTimestamp: ref.blockTimestamp,
+        }]
+      : []
+  ));
+  return evidenced.sort((left, right) => (
+    right.blockNumber - left.blockNumber ||
+    right.eventId.localeCompare(left.eventId)
+  ))[0];
 }
 
 function presalePurchaseRaw(document: PresaleParticipantRawDocument | null) {
@@ -158,19 +199,16 @@ function presalePurchaseRaw(document: PresaleParticipantRawDocument | null) {
   }
 }
 
-export async function readCukieMasterSources(
+async function readCukieMasterUkiSource(
   repository: CukieMasterRepository,
-  walletAddress: string,
   walletNormalized: string,
   now: Date,
-): Promise<{ uki: CukieMasterUkiSource; nft: CukieMasterNftSource }> {
-  const presale = await repository.findPresaleParticipant(walletNormalized);
-  const staking = await repository.findUkiStakingPosition(walletNormalized);
-  const vesting = await repository.findPresaleVestingPosition(walletNormalized);
-  const nft = await repository.getNftEntitlement(walletAddress, now);
-  const [ukiIndexerHealth, nftIndexerHealth] = await Promise.all([
+): Promise<CukieMasterUkiSource> {
+  const [presale, staking, vesting, ukiIndexerHealth] = await Promise.all([
+    repository.findPresaleParticipant(walletNormalized),
+    repository.findUkiStakingPosition(walletNormalized),
+    repository.findPresaleVestingPosition(walletNormalized),
     repository.getUkiIndexerHealth(walletNormalized, now),
-    repository.getNftIndexerHealth(now),
   ]);
   const purchase = presalePurchaseRaw(presale);
   const requiresVesting = purchase.complete && parseRawAmount(purchase.raw) > BigInt(0);
@@ -197,6 +235,14 @@ export async function readCukieMasterSources(
       ? parseRawAmount(vestingAllocated.raw) - parseRawAmount(vestingReleased.raw)
       : BigInt(0),
   );
+  const presaleEventId = sourceEventId(presale?.lastPurchaseEventId);
+  const stakingEventId = sourceEventId(staking?.lastEventId);
+  const vestingEventId = sourceEventId(vesting?.lastEventId);
+  const [presaleEvidence, stakingEvidence, vestingEvidence] = await Promise.all([
+    presaleEventId ? repository.findProjectedChainEvidence(presaleEventId) : null,
+    stakingEventId ? repository.findProjectedChainEvidence(stakingEventId) : null,
+    vestingEventId ? repository.findProjectedChainEvidence(vestingEventId) : null,
+  ]);
   const warnings = [
     purchase.warning,
     vestingAllocated.warning,
@@ -206,6 +252,14 @@ export async function readCukieMasterSources(
   ].filter(
     (item): item is string => Boolean(item),
   );
+  // Legacy/referral participant rows can legitimately contribute zero UKI and may
+  // predate block evidence. They must not hide an independently evidenced staking
+  // balance. Positive direct-purchase rows still fail closed without evidence.
+  if (requiresVesting && presale && !presaleEvidence) {
+    warnings.push('presale_participants no conserva evidencia de bloque proyectada.');
+  }
+  if (staking && !stakingEvidence) warnings.push('uki_staking_positions no conserva evidencia de bloque proyectada.');
+  if (vesting && !vestingEvidence) warnings.push('uki_vesting_positions no conserva evidencia de bloque proyectada.');
   const vestingComplete = vestingAllocated.complete && vestingReleased.complete;
   const completeness: CukieMasterSourceCompleteness = {
     complete: warnings.length === 0 && ukiIndexerHealth.healthy,
@@ -225,6 +279,7 @@ export async function readCukieMasterSources(
       documentId: documentId(presale?._id),
       valueRaw: purchase.complete ? purchase.raw : undefined,
       observedAt: observedAt(presale?.updatedAt),
+      ...evidenceFields(presaleEvidence),
     },
     {
       source: 'vesting',
@@ -232,6 +287,7 @@ export async function readCukieMasterSources(
       documentId: documentId(vesting?._id),
       valueRaw: effectiveLockedRaw,
       observedAt: observedAt(vesting?.updatedAt),
+      ...evidenceFields(vestingEvidence),
     },
     {
       source: 'uki_staking',
@@ -239,6 +295,7 @@ export async function readCukieMasterSources(
       documentId: documentId(staking?._id),
       valueRaw: effectiveStakingRaw,
       observedAt: observedAt(staking?.updatedAt),
+      ...evidenceFields(stakingEvidence),
     },
   ];
   const ukiWithoutHash = {
@@ -251,32 +308,52 @@ export async function readCukieMasterSources(
     stakedUkiRaw: effectiveStakingRaw,
     refs: ukiRefs,
     completeness,
+    effectiveChainEvidence: latestChainEvidence(ukiRefs),
   };
-  const uki: CukieMasterUkiSource = {
+  return {
     ...ukiWithoutHash,
     sourceHash: stableCukieMasterHash(ukiWithoutHash),
   };
+}
 
-  const nftAssets = nft.eligibleAssets.map((asset) => {
+async function readCukieMasterNftSource(
+  repository: CukieMasterRepository,
+  walletAddress: string,
+  walletNormalized: string,
+  now: Date,
+): Promise<CukieMasterNftSource> {
+  const [nft, nftIndexerHealth] = await Promise.all([
+    repository.getNftEntitlement(walletAddress, now),
+    repository.getNftIndexerHealth(now, walletNormalized),
+  ]);
+  const nftAssets = await Promise.all(nft.eligibleAssets.map(async (asset) => {
     const lock = asset.activeLocks.find((item) => (
       (item.reason === 'soft_stake'
         || (item.reason === 'game_assignment' && item.retainsSoftStakeEntitlement === true))
       && item.ownerNormalized?.toLowerCase() === walletNormalized.toLowerCase()
     ));
+    const sourceRefs = await Promise.all(asset.sourceRefs.map(async (ref) => {
+      const eventId = sourceEventId(ref.eventId);
+      const evidence = eventId
+        ? await repository.findProjectedChainEvidence(eventId)
+        : null;
+      return {
+        source: ref.source,
+        collection: ref.collection,
+        documentId: ref.documentId,
+        observedAt: ref.observedAt,
+        ...evidenceFields(evidence),
+      };
+    }));
     return {
       assetId: asset.assetId,
       tokenId: asset.tokenId,
       rarity: asset.rarity,
       rarityPoints: asset.rarityPoints,
       lockId: lock?.lockId ?? null,
-      sourceRefs: asset.sourceRefs.map((ref) => ({
-        source: ref.source,
-        collection: ref.collection,
-        documentId: ref.documentId,
-        observedAt: ref.observedAt,
-      })),
+      sourceRefs,
     };
-  });
+  }));
   const nftRefs = nftAssets.flatMap((asset) => asset.sourceRefs);
   const incompleteNftBlockers = new Set([
     'unknown_owner',
@@ -288,6 +365,9 @@ export async function readCukieMasterSources(
   if (nft.rejectedAssets.some((item) => item.blockers.some((blocker) => (
     incompleteNftBlockers.has(blocker)
   )))) nftInventoryWarnings.push('El inventario NFT contiene atributos canónicos unknown.');
+  if (nftAssets.some((asset) => !latestChainEvidence(asset.sourceRefs))) {
+    nftInventoryWarnings.push('Una posicion NFT elegible no conserva evidencia de bloque proyectada.');
+  }
   const nftWarnings = [...nftInventoryWarnings, ...nftIndexerHealth.warnings];
   const nftCompleteness: CukieMasterSourceCompleteness = {
     complete: nftWarnings.length === 0 && nftIndexerHealth.healthy,
@@ -305,13 +385,37 @@ export async function readCukieMasterSources(
     assets: nftCompleteness.complete ? nftAssets : [],
     refs: nftRefs,
     completeness: nftCompleteness,
+    effectiveChainEvidence: latestChainEvidence(nftRefs),
   };
-  const nftSource: CukieMasterNftSource = {
+  return {
     ...nftWithoutHash,
     sourceHash: stableCukieMasterHash(nftWithoutHash),
   };
+}
 
-  return { uki, nft: nftSource };
+export async function readCukieMasterRouteSource(
+  repository: CukieMasterRepository,
+  walletAddress: string,
+  walletNormalized: string,
+  now: Date,
+  route: CukieMasterRoute,
+): Promise<CukieMasterRouteSource> {
+  return route === 'uki'
+    ? readCukieMasterUkiSource(repository, walletNormalized, now)
+    : readCukieMasterNftSource(repository, walletAddress, walletNormalized, now);
+}
+
+export async function readCukieMasterSources(
+  repository: CukieMasterRepository,
+  walletAddress: string,
+  walletNormalized: string,
+  now: Date,
+): Promise<{ uki: CukieMasterUkiSource; nft: CukieMasterNftSource }> {
+  const [uki, nft] = await Promise.all([
+    readCukieMasterUkiSource(repository, walletNormalized, now),
+    readCukieMasterNftSource(repository, walletAddress, walletNormalized, now),
+  ]);
+  return { uki, nft };
 }
 
 function nextCapacity(
@@ -434,6 +538,22 @@ async function syncPositionSlots(
       nextPosition.route,
     )).map((slot) => [slot.ordinal, slot]),
   );
+  const sourceEvidence = nextPosition.source.effectiveChainEvidence;
+  if (
+    (nextPosition.allocatedSlots > 0 || currentSlots.size > 0) &&
+    (
+      !sourceEvidence ||
+      !Number.isSafeInteger(sourceEvidence.blockNumber) ||
+      sourceEvidence.blockNumber < 0 ||
+      !/^0x[0-9a-f]{64}$/.test(sourceEvidence.blockHash) ||
+      !(sourceEvidence.blockTimestamp instanceof Date) ||
+      Number.isNaN(sourceEvidence.blockTimestamp.getTime())
+    )
+  ) {
+    throw new DomainConflictError(
+      `La fuente ${nextPosition.route} no acredita el bloque efectivo de sus slots.`,
+    );
+  }
   const persisted: CukieMasterSlot[] = [];
   for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
     const previous = currentSlots.get(ordinal) ?? null;
@@ -470,6 +590,9 @@ async function syncPositionSlots(
       roundId: nextPosition.roundId,
       ruleVersion: nextPosition.ruleVersion,
       sourceHash: nextPosition.sourceHash,
+      sourceBlockNumber: sourceEvidence!.blockNumber,
+      sourceBlockHash: sourceEvidence!.blockHash,
+      sourceBlockTimestamp: sourceEvidence!.blockTimestamp,
       revision: (previous?.revision ?? 0) + 1,
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
@@ -521,6 +644,137 @@ function reasonForChange(previous: CukieMasterPosition | null, next: CukieMaster
   return 'recalculated_no_material_change';
 }
 
+export type CukieMasterRouteRecalculationResult = {
+  walletAddress: string;
+  walletNormalized: string;
+  route: CukieMasterRoute;
+  position: CukieMasterPosition;
+};
+
+function recalculationEventKey(requestIdempotencyKey: string, route: CukieMasterRoute) {
+  return `cukie-master:recalculate:${requestIdempotencyKey}:${route}`;
+}
+
+function assertCompleteRouteSource(source: CukieMasterRouteSource) {
+  if (source.completeness.complete) return;
+  const warnings = source.completeness.warnings.map((warning) => `${source.route}: ${warning}`);
+  throw new DomainConflictError(
+    `Recalculo Cukie Master abortado: fuentes incompletas (${warnings.join('; ')}).`,
+  );
+}
+
+async function persistRouteRecalculation(
+  repository: CukieMasterRepository,
+  walletAddress: string,
+  walletNormalized: string,
+  route: CukieMasterRoute,
+  source: CukieMasterRouteSource,
+  now: Date,
+  requestIdempotencyKey: string,
+): Promise<CukieMasterPosition> {
+  const round = await repository.ensureActiveRound(route, now);
+  const fenced = await repository.fenceRound(route, round.revision, round.roundId, now);
+  if (!fenced) throw new DomainConflictError(`La ronda ${route} cambio durante el recalculo.`);
+  const capacity = await repository.ensureCapacity(
+    route,
+    round.roundId,
+    round.capacitySlots,
+    now,
+  );
+  const previous = await repository.findPosition(walletNormalized, route);
+  const firstWaitlisted = await repository.findFirstWaitlisted(route);
+  const allowCapacityIncrease = !firstWaitlisted
+    || firstWaitlisted.walletNormalized === walletNormalized;
+  const built = buildNextPosition({
+    walletAddress,
+    walletNormalized,
+    route,
+    source,
+    round,
+    previous,
+    capacity,
+    now,
+    allowCapacityIncrease,
+  });
+  if (built.nextCapacity !== capacity) {
+    const capacityWinner = await repository.replaceCapacity(
+      route,
+      capacity.revision,
+      built.nextCapacity,
+    );
+    if (!capacityWinner) throw new DomainConflictError(`CAS de capacidad ${route} perdido.`);
+  }
+  const persisted = await repository.replacePosition(previous, built.next);
+  if (!persisted) throw new DomainConflictError(`CAS de posicion ${route} perdido.`);
+  await syncPositionSlots(repository, previous, persisted, now, requestIdempotencyKey);
+  const eventKey = recalculationEventKey(requestIdempotencyKey, route);
+  const payloadHash = stableCukieMasterHash({
+    walletNormalized,
+    route,
+    now,
+    sourceHash: source.sourceHash,
+    roundId: round.roundId,
+    requestIdempotencyKey,
+  });
+  const event: CukieMasterPositionEvent = {
+    _id: eventKey,
+    eventId: eventKey,
+    eventType: 'position_recalculated',
+    idempotencyKey: eventKey,
+    requestIdempotencyKey,
+    payloadHash,
+    walletNormalized,
+    route,
+    reason: reasonForChange(previous, persisted),
+    sourceHash: source.sourceHash,
+    previous,
+    next: persisted,
+    createdAt: now,
+  };
+  await repository.insertEvent(event);
+  return persisted;
+}
+
+async function recalculateRouteInsideTransaction(
+  repository: CukieMasterRepository,
+  walletAddress: string,
+  route: CukieMasterRoute,
+  now: Date,
+  requestIdempotencyKey: string,
+): Promise<CukieMasterRouteRecalculationResult> {
+  const walletNormalized = normalizeWalletAddress(walletAddress);
+  if (!walletNormalized) throw new DomainValidationError('wallet no se pudo normalizar.');
+  const eventKey = recalculationEventKey(requestIdempotencyKey, route);
+  const existing = await repository.findEvent(eventKey);
+  if (existing) {
+    if (
+      existing.walletNormalized !== walletNormalized
+      || existing.route !== route
+      || !existing.next
+    ) throw new DomainConflictError('La idempotencyKey ya pertenece a otra recalculacion.');
+    return { walletAddress, walletNormalized, route, position: existing.next };
+  }
+
+  const source = await readCukieMasterRouteSource(
+    repository,
+    walletAddress,
+    walletNormalized,
+    now,
+    route,
+  );
+  assertCompleteRouteSource(source);
+  const position = await persistRouteRecalculation(
+    repository,
+    walletAddress,
+    walletNormalized,
+    route,
+    source,
+    now,
+    requestIdempotencyKey,
+  );
+  return { walletAddress, walletNormalized, route, position };
+}
+
 async function recalculateInsideTransaction(
   repository: CukieMasterRepository,
   walletAddress: string,
@@ -531,7 +785,7 @@ async function recalculateInsideTransaction(
   if (!walletNormalized) throw new DomainValidationError('wallet no se pudo normalizar.');
   const eventKeys = Object.fromEntries(ROUTES.map((route) => [
     route,
-    `cukie-master:recalculate:${requestIdempotencyKey}:${route}`,
+    recalculationEventKey(requestIdempotencyKey, route),
   ])) as Record<CukieMasterRoute, string>;
   const existingEvents = await Promise.all(ROUTES.map((route) => repository.findEvent(eventKeys[route])));
   if (existingEvents.every(Boolean)) {
@@ -553,78 +807,19 @@ async function recalculateInsideTransaction(
   }
 
   const sources = await readCukieMasterSources(repository, walletAddress, walletNormalized, now);
-  const incompleteRoutes = ROUTES.filter((route) => !sources[route].completeness.complete);
-  if (incompleteRoutes.length > 0) {
-    const warnings = incompleteRoutes.flatMap((route) => (
-      sources[route].completeness.warnings.map((warning) => `${route}: ${warning}`)
-    ));
-    throw new DomainConflictError(
-      `Recalculo Cukie Master abortado: fuentes incompletas (${warnings.join('; ')}).`,
-    );
-  }
+  for (const route of ROUTES) assertCompleteRouteSource(sources[route]);
   const positions = {} as Record<CukieMasterRoute, CukieMasterPosition>;
 
   for (const route of ROUTES) {
-    const round = await repository.ensureActiveRound(route, now);
-    const fenced = await repository.fenceRound(route, round.revision, round.roundId, now);
-    if (!fenced) throw new DomainConflictError(`La ronda ${route} cambio durante el recalculo.`);
-    const capacity = await repository.ensureCapacity(
-      route,
-      round.roundId,
-      round.capacitySlots,
-      now,
-    );
-    const previous = await repository.findPosition(walletNormalized, route);
-    const firstWaitlisted = await repository.findFirstWaitlisted(route);
-    const allowCapacityIncrease = !firstWaitlisted
-      || firstWaitlisted.walletNormalized === walletNormalized;
-    const built = buildNextPosition({
+    positions[route] = await persistRouteRecalculation(
+      repository,
       walletAddress,
       walletNormalized,
       route,
-      source: sources[route],
-      round,
-      previous,
-      capacity,
+      sources[route],
       now,
-      allowCapacityIncrease,
-    });
-    if (built.nextCapacity !== capacity) {
-      const capacityWinner = await repository.replaceCapacity(
-        route,
-        capacity.revision,
-        built.nextCapacity,
-      );
-      if (!capacityWinner) throw new DomainConflictError(`CAS de capacidad ${route} perdido.`);
-    }
-    const persisted = await repository.replacePosition(previous, built.next);
-    if (!persisted) throw new DomainConflictError(`CAS de posicion ${route} perdido.`);
-    await syncPositionSlots(repository, previous, persisted, now, requestIdempotencyKey);
-    const payloadHash = stableCukieMasterHash({
-      walletNormalized,
-      route,
-      now,
-      sourceHash: sources[route].sourceHash,
-      roundId: round.roundId,
       requestIdempotencyKey,
-    });
-    const event: CukieMasterPositionEvent = {
-      _id: eventKeys[route],
-      eventId: eventKeys[route],
-      eventType: 'position_recalculated',
-      idempotencyKey: eventKeys[route],
-      requestIdempotencyKey,
-      payloadHash,
-      walletNormalized,
-      route,
-      reason: reasonForChange(previous, persisted),
-      sourceHash: sources[route].sourceHash,
-      previous,
-      next: persisted,
-      createdAt: now,
-    };
-    await repository.insertEvent(event);
-    positions[route] = persisted;
+    );
   }
 
   return { walletAddress, walletNormalized, positions };
@@ -695,6 +890,23 @@ async function activateMaturedPositionInsideTransaction(
 
 export function createCukieMasterService(runner: CukieMasterTransactionRunner) {
   return {
+    recalculateCukieMasterRoute(
+      wallet: string,
+      route: CukieMasterRoute,
+      now: Date,
+      idempotencyKey: string,
+    ) {
+      const timestamp = validDate(now);
+      const targetRoute = validCukieMasterRoute(route);
+      const key = validIdempotencyKey(idempotencyKey);
+      return retryDuplicateWinner(() => runner((repository) => recalculateRouteInsideTransaction(
+        repository,
+        wallet,
+        targetRoute,
+        timestamp,
+        key,
+      )));
+    },
     recalculateCukieMasterWallet(wallet: string, now: Date, idempotencyKey: string) {
       const timestamp = validDate(now);
       const key = validIdempotencyKey(idempotencyKey);
@@ -1025,6 +1237,7 @@ export function createCukieMasterService(runner: CukieMasterTransactionRunner) {
 const defaultService = createCukieMasterService(mongoCukieMasterTransactionRunner);
 
 export const recalculateCukieMasterWallet = defaultService.recalculateCukieMasterWallet;
+export const recalculateCukieMasterRoute = defaultService.recalculateCukieMasterRoute;
 export const activateMaturedPosition = defaultService.activateMaturedPosition;
 export const proposeRequirementIncrease = defaultService.proposeRequirementIncrease;
 export const expandCukieMasterRouteCapacity = defaultService.expandRouteCapacity;
@@ -1085,6 +1298,14 @@ export async function getCukieMasterWalletStatus(
         .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
       const round = rounds[route];
       const source = sources[route];
+      const sourceCompleteness = round ? source.completeness : {
+        ...source.completeness,
+        complete: false,
+        warnings: [
+          ...source.completeness.warnings,
+          `No existe una ronda activa para la ruta ${route}.`,
+        ],
+      };
       const requirement = round ? candidateRequirement(round) : initialRequirement(route);
       const available = source.route === 'uki'
         ? BigInt(source.totalUkiRaw)
@@ -1105,6 +1326,8 @@ export async function getCukieMasterWalletStatus(
           : { route: 'nft', nftPoints: Number(value) }
       );
       return [route, {
+        roundId: round?.roundId ?? `${route}:${CUKIE_MASTER_RULE_VERSION}`,
+        ruleVersion: round?.ruleVersion ?? CUKIE_MASTER_RULE_VERSION,
         position,
         slots: routeSlots,
         nextSlotRequirement: requirement,
@@ -1119,7 +1342,7 @@ export async function getCukieMasterWalletStatus(
           : requirementDeficit(preserveDeficit),
         countdownEndsAt: nextMaturity,
         source,
-        sourceCompleteness: sources[route].completeness,
+        sourceCompleteness,
       }];
     })) as CukieMasterWalletStatus['routes'],
     totals: {

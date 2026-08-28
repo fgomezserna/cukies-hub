@@ -7,6 +7,7 @@ import {
   getCukieMasterNftEntitlementFromDb,
   type CukieMasterNftRouteSummary,
 } from '@/lib/nft-inventory';
+import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 
 import { DomainConflictError } from '../errors';
 import type { CukieMasterRoute } from '../rules';
@@ -18,10 +19,12 @@ import type {
   CukieMasterPosition,
   CukieMasterPositionEvent,
   CukieMasterIndexerHealth,
+  CukieMasterChainEvidence,
   CukieMasterRouteCapacity,
   CukieMasterRouteRound,
   CukieMasterSlot,
 } from './types';
+import { getCukieMasterNftVaultEntitlementFromDb } from './nft-vault-source';
 
 export type PresaleParticipantRawDocument = {
   _id?: unknown;
@@ -49,6 +52,7 @@ export type UkiStakingStateRawDocument = {
   bootstrapSafeBlockHash?: unknown;
   verifiedChainId?: unknown;
   contractCodeHash?: unknown;
+  contractDeploymentTxHash?: unknown;
   contractConfigHash?: unknown;
   contractDeploymentBlock?: unknown;
   bootstrapStartBlock?: unknown;
@@ -67,6 +71,7 @@ export type ExpectedIndexerContractConfig = {
   bootstrapStartBlock: number;
   contractDeploymentBlock: number;
   contractCodeHash: string;
+  contractDeploymentTxHash: string;
   contractConfigHash: string;
 };
 
@@ -96,6 +101,10 @@ function environmentCodeHash(name: string) {
   return value && /^0x[0-9a-f]{64}$/.test(value) ? value : undefined;
 }
 
+function environmentTransactionHash(name: string) {
+  return environmentCodeHash(name);
+}
+
 function firstEnvironmentValue(...names: string[]) {
   for (const name of names) {
     const value = process.env[name]?.trim();
@@ -110,6 +119,7 @@ function expectedContractConfig(input: {
   startBlock?: number;
   deploymentBlock?: number;
   codeHash?: string;
+  deploymentTxHash?: string;
 }): ExpectedIndexerContractConfig | undefined {
   if (
     !input.address
@@ -119,6 +129,7 @@ function expectedContractConfig(input: {
     || !Number.isSafeInteger(input.deploymentBlock)
     || input.startBlock !== input.deploymentBlock
     || !input.codeHash
+    || !input.deploymentTxHash
   ) return undefined;
   const contractAddress = input.address.toLowerCase();
   const contractCodeHash = input.codeHash.toLowerCase();
@@ -127,6 +138,7 @@ function expectedContractConfig(input: {
     bootstrapStartBlock: input.startBlock!,
     contractDeploymentBlock: input.deploymentBlock!,
     contractCodeHash,
+    contractDeploymentTxHash: input.deploymentTxHash.toLowerCase(),
     contractConfigHash: keccak256(stringToHex(JSON.stringify({
       chainId: input.chainId,
       address: contractAddress,
@@ -152,6 +164,9 @@ function expectedUkiContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_UKI_STAKING_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_TX_HASH',
+      ),
     }),
     VESTING_VAULT: expectedContractConfig({
       chainId,
@@ -163,6 +178,9 @@ function expectedUkiContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH',
+      ),
     }),
   };
 }
@@ -175,6 +193,15 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_TOKEN_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_TOKEN_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_TOKEN_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash('CHAIN_INDEXER_TOKEN_DEPLOYMENT_TX_HASH'),
+    }),
+    TOKEN_V2: expectedContractConfig({
+      chainId,
+      address: firstEnvironmentValue('CHAIN_INDEXER_TOKEN_V2_ADDRESS'),
+      startBlock: environmentInteger('CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK'),
+      deploymentBlock: environmentInteger('CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_BSC_BLOCK'),
+      codeHash: environmentCodeHash('CHAIN_INDEXER_TOKEN_V2_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash('CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_TX_HASH'),
     }),
     MARKETPLACE: expectedContractConfig({
       chainId,
@@ -182,6 +209,9 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_MARKETPLACE_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_TX_HASH',
+      ),
     }),
     BRIDGE: expectedContractConfig({
       chainId,
@@ -189,6 +219,23 @@ function expectedNftContractConfigs(chainId: 56 | 97) {
       startBlock: environmentInteger('CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK'),
       deploymentBlock: environmentInteger('CHAIN_INDEXER_BRIDGE_DEPLOYMENT_BSC_BLOCK'),
       codeHash: environmentCodeHash('CHAIN_INDEXER_BRIDGE_RUNTIME_CODE_HASH'),
+      deploymentTxHash: environmentTransactionHash('CHAIN_INDEXER_BRIDGE_DEPLOYMENT_TX_HASH'),
+    }),
+    CUKIE_MASTER_NFT_VAULT: expectedContractConfig({
+      chainId,
+      address: firstEnvironmentValue('CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS'),
+      startBlock: environmentInteger(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_START_BSC_BLOCK',
+      ),
+      deploymentBlock: environmentInteger(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_BSC_BLOCK',
+      ),
+      codeHash: environmentCodeHash(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_RUNTIME_CODE_HASH',
+      ),
+      deploymentTxHash: environmentTransactionHash(
+        'CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_TX_HASH',
+      ),
     }),
   };
 }
@@ -211,6 +258,7 @@ export function stakingMaterializationMatchesState(
     || state.bootstrapStartBlock !== expected.bootstrapStartBlock
     || state.contractDeploymentBlock !== expected.contractDeploymentBlock
     || state.contractCodeHash !== expected.contractCodeHash
+    || state.contractDeploymentTxHash !== expected.contractDeploymentTxHash
     || state.contractConfigHash !== expected.contractConfigHash
   ) return false;
   if (typeof state.lastEventId === 'string') {
@@ -375,6 +423,71 @@ export function projectionSafetyWarnings(input: {
   return warnings;
 }
 
+const PENDING_CHAIN_EVENT_STATUSES = ['ingested', 'projecting', 'failed'] as const;
+
+export function pendingUkiWalletEventFilter(walletNormalized: string) {
+  return {
+    chain: 'BSC',
+    status: { $in: [...PENDING_CHAIN_EVENT_STATUSES] },
+    $or: [
+      {
+        contractAlias: 'UKI_STAKING',
+        'normalized.accountNormalized': walletNormalized,
+      },
+      {
+        contractAlias: 'VESTING_VAULT',
+        'normalized.beneficiaryNormalized': walletNormalized,
+      },
+    ],
+  };
+}
+
+export function pendingNftEventFilter(input: {
+  aliases: readonly string[];
+  mode: 'legacy' | 'custodial' | 'invalid';
+  walletNormalized?: string;
+}) {
+  const base = {
+    chain: 'BSC',
+    status: { $in: [...PENDING_CHAIN_EVENT_STATUSES] },
+  };
+  if (!input.walletNormalized) {
+    return { ...base, contractAlias: { $in: [...input.aliases] } };
+  }
+  const wallet = input.walletNormalized;
+  if (input.mode === 'custodial') {
+    return {
+      ...base,
+      $or: [
+        {
+          contractAlias: 'TOKEN_V2',
+          $or: [
+            { 'normalized.fromNormalized': wallet },
+            { 'normalized.toNormalized': wallet },
+          ],
+        },
+        {
+          contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+          'normalized.beneficiaryNormalized': wallet,
+        },
+      ],
+    };
+  }
+  return {
+    ...base,
+    contractAlias: { $in: [...input.aliases] },
+    $or: [
+      { 'normalized.userNormalized': wallet },
+      { 'normalized.fromNormalized': wallet },
+      { 'normalized.toNormalized': wallet },
+      { 'normalized.ownerNormalized': wallet },
+      { 'normalized.buyerNormalized': wallet },
+      { 'normalized.originOwnerNormalized': wallet },
+      { 'normalized.destOwnerNormalized': wallet },
+    ],
+  };
+}
+
 export const EXPECTED_UKI_CURSOR_IDS = [
   'UKI_STAKING:Staked',
   'UKI_STAKING:Unstaked',
@@ -392,6 +505,28 @@ export const EXPECTED_NFT_CURSOR_IDS = [
   'BRIDGE:JumpInBridge',
   'BRIDGE:JumpOutBridge',
 ] as const;
+
+export const EXPECTED_CUSTODIAL_NFT_CURSOR_IDS = [
+  'TOKEN_V2:Transfer',
+  'TOKEN_V2:CukieMetadataConfigured',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterCollectionAllowedUpdated',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterDeposited',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterWithdrawn',
+  'CUKIE_MASTER_NFT_VAULT:CukieMasterUntrackedERC721Recovered',
+] as const;
+
+export function cukieMasterNftHealthScope(mode: 'legacy' | 'custodial' | 'invalid') {
+  if (mode === 'custodial') {
+    return {
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'] as const,
+      cursorIds: EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
+    };
+  }
+  return {
+    aliases: ['TOKEN', 'MARKETPLACE', 'BRIDGE'] as const,
+    cursorIds: EXPECTED_NFT_CURSOR_IDS,
+  };
+}
 
 export function operationalIndexerHealthWarnings(input: {
   checkedAt: Date;
@@ -416,6 +551,7 @@ export function operationalIndexerHealthWarnings(input: {
     verifiedChainId?: unknown;
     contractCodeHash?: unknown;
     contractDeploymentBlock?: unknown;
+    contractDeploymentTxHash?: unknown;
     contractConfigHash?: unknown;
   }>;
   expectedChainId: 56 | 97 | undefined;
@@ -446,7 +582,8 @@ export function operationalIndexerHealthWarnings(input: {
         && cursor.chain === 'BSC'
         && cursor.updatedAt instanceof Date
         && cursor.updatedAt >= freshnessCutoff
-        && cursor.safeBlock === input.checkpoint?.safeBlockNumber
+        && Number.isSafeInteger(cursor.safeBlock)
+        && Number(cursor.safeBlock) >= Number(input.checkpoint?.safeBlockNumber)
         && Number.isSafeInteger(cursor.nextBlock)
         && Number(cursor.nextBlock) > Number(input.checkpoint?.safeBlockNumber)
         && cursor.bootstrapStatus === 'verified'
@@ -457,6 +594,7 @@ export function operationalIndexerHealthWarnings(input: {
         && cursor.contractAddress.toLowerCase() === expected!.contractAddress
         && cursor.contractCodeHash === expected!.contractCodeHash
         && cursor.contractDeploymentBlock === expected!.contractDeploymentBlock
+        && cursor.contractDeploymentTxHash === expected!.contractDeploymentTxHash
         && cursor.contractConfigHash === expected!.contractConfigHash
         && checkpointHealthy;
     })
@@ -505,13 +643,14 @@ export interface CukieMasterRepository {
   ): Promise<CukieMasterPosition | null>;
   findEvent(idempotencyKey: string): Promise<CukieMasterPositionEvent | null>;
   insertEvent(event: CukieMasterPositionEvent): Promise<void>;
+  findProjectedChainEvidence(eventId: string): Promise<CukieMasterChainEvidence | null>;
   findPresaleParticipant(walletNormalized: string): Promise<PresaleParticipantRawDocument | null>;
   findUkiStakingPosition(walletNormalized: string): Promise<UkiStakingPositionRawDocument | null>;
   findPresaleVestingPosition(
     walletNormalized: string,
   ): Promise<UkiVestingPositionRawDocument | null>;
   getUkiIndexerHealth(walletNormalized: string, now: Date): Promise<CukieMasterIndexerHealth>;
-  getNftIndexerHealth(now: Date): Promise<CukieMasterIndexerHealth>;
+  getNftIndexerHealth(now: Date, walletNormalized?: string): Promise<CukieMasterIndexerHealth>;
   getNftEntitlement(
     walletAddress: string,
     now: Date,
@@ -558,6 +697,26 @@ export function createMongoCukieMasterRepository(
   const capacities = db.collection<CukieMasterRouteCapacity>('cukie_master_route_capacity');
   const positions = db.collection<CukieMasterPosition>('cukie_master_positions');
   const slots = db.collection<CukieMasterSlot>('cukie_master_slots');
+  const slotVersions = db.collection<{
+    _id: string;
+    slotId: string;
+    route: CukieMasterRoute;
+    validFrom: Date;
+    validUntil?: Date;
+    effectiveBlockNumber: number;
+    effectiveBlockHash: string;
+    effectiveBlockTimestamp: Date;
+    observedAt: Date;
+    slot: CukieMasterSlot;
+    createdAt: Date;
+  }>('cukie_master_slot_versions');
+  const slotHistoryState = db.collection<{
+    _id: CukieMasterRoute;
+    completeFrom: Date;
+    completeFromBlockNumber?: number;
+    observedThrough: Date;
+    updatedAt: Date;
+  }>('cukie_master_slot_history_state');
   const events = db.collection<CukieMasterPositionEvent>('cukie_master_position_events');
   const options = mongoOptions(session);
 
@@ -649,6 +808,33 @@ export function createMongoCukieMasterRepository(
     async insertEvent(event) {
       await events.insertOne(event, options);
     },
+    async findProjectedChainEvidence(eventId) {
+      if (!eventId) return null;
+      const event = await db.collection<{
+        _id: string;
+        status?: unknown;
+        blockNumber?: unknown;
+        blockHash?: unknown;
+        timestampMs?: unknown;
+      }>('chain_events').findOne({ _id: eventId, status: 'projected' }, options);
+      if (
+        !event ||
+        !Number.isSafeInteger(event.blockNumber) ||
+        Number(event.blockNumber) < 0 ||
+        typeof event.blockHash !== 'string' ||
+        !/^0x[0-9a-f]{64}$/i.test(event.blockHash) ||
+        !Number.isSafeInteger(event.timestampMs) ||
+        Number(event.timestampMs) < 0
+      ) return null;
+      const blockTimestamp = new Date(Number(event.timestampMs));
+      if (Number.isNaN(blockTimestamp.getTime())) return null;
+      return {
+        eventId,
+        blockNumber: Number(event.blockNumber),
+        blockHash: event.blockHash.toLowerCase(),
+        blockTimestamp,
+      };
+    },
     findPresaleParticipant: (walletNormalized) => db
       .collection<PresaleParticipantRawDocument>('presale_participants')
       .findOne({ normalizedWalletAddress: walletNormalized }, options),
@@ -689,6 +875,7 @@ export function createMongoCukieMasterRepository(
         verifiedChainId?: unknown;
         contractCodeHash?: unknown;
         contractDeploymentBlock?: unknown;
+        contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
       }>('chain_cursors').find({
           chain: 'BSC',
@@ -697,10 +884,16 @@ export function createMongoCukieMasterRepository(
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
-      const pendingEvent = await db.collection('chain_events').findOne({
-          contractAlias: { $in: aliases },
-          status: { $ne: 'projected' },
-        }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const legacyDeadLetterEvent = deadLetter ? null : await db.collection('chain_events').findOne({
+        chain: 'BSC',
+        contractAlias: { $in: aliases },
+        status: 'failed',
+        attempts: { $gte: 5 },
+      }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const pendingEvent = await db.collection('chain_events').findOne(
+        pendingUkiWalletEventFilter(walletNormalized),
+        { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 },
+      );
       const incident = await db.collection('chain_integrity_incidents')
         .findOne({
           status: 'open',
@@ -759,7 +952,7 @@ export function createMongoCukieMasterRepository(
       if (!expectedConfigs.UKI_STAKING || !expectedConfigs.VESTING_VAULT) {
         warnings.push('La identidad/configuracion historica UKI no esta completa.');
       }
-      if (deadLetter) warnings.push('Existen dead letters de economia UKI.');
+      if (deadLetter || legacyDeadLetterEvent) warnings.push('Existen dead letters de economia UKI.');
       if (incident) warnings.push('Existe un incidente de integridad abierto.');
       if (
         !chainId
@@ -793,8 +986,10 @@ export function createMongoCukieMasterRepository(
       }));
       return { healthy: warnings.length === 0, warnings, checkedAt };
     },
-    async getNftIndexerHealth(checkedAt) {
-      const aliases = ['TOKEN', 'MARKETPLACE', 'BRIDGE'];
+    async getNftIndexerHealth(checkedAt, walletNormalized) {
+      const nftMode = ukiNftVaults.mode.cukieMaster;
+      const scope = cukieMasterNftHealthScope(nftMode);
+      const aliases = [...scope.aliases];
       const chainId = expectedBscChainId();
       const expectedConfigs: Record<string, ExpectedIndexerContractConfig | undefined> = chainId
         ? expectedNftContractConfigs(chainId)
@@ -823,18 +1018,25 @@ export function createMongoCukieMasterRepository(
         verifiedChainId?: unknown;
         contractCodeHash?: unknown;
         contractDeploymentBlock?: unknown;
+        contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
       }>('chain_cursors').find({
         chain: 'BSC',
         contractAlias: { $in: aliases },
-      }, { ...options, maxTimeMS: 2_000 }).limit(EXPECTED_NFT_CURSOR_IDS.length + 1).toArray();
+      }, { ...options, maxTimeMS: 2_000 }).limit(scope.cursorIds.length + 1).toArray();
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
-      const pendingEvent = await db.collection('chain_events').findOne({
+      const legacyDeadLetterEvent = deadLetter ? null : await db.collection('chain_events').findOne({
+        chain: 'BSC',
         contractAlias: { $in: aliases },
-        status: { $in: ['ingested', 'projecting', 'failed'] },
+        status: 'failed',
+        attempts: { $gte: 5 },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const pendingEvent = await db.collection('chain_events').findOne(
+        pendingNftEventFilter({ aliases, mode: nftMode, walletNormalized }),
+        { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 },
+      );
       const commonCanonicalIncident = await db.collection('chain_integrity_incidents')
         .findOne({
           status: 'open',
@@ -868,28 +1070,59 @@ export function createMongoCukieMasterRepository(
         cursors,
         expectedChainId: chainId,
         expectedContractConfigs: expectedConfigs,
-        expectedCursorIds: EXPECTED_NFT_CURSOR_IDS,
+        expectedCursorIds: scope.cursorIds,
       });
       if (!cukieMasterEnabled) {
         warnings.push('CHAIN_INDEXER_CUKIE_MASTER_ENABLED no esta activo.');
       }
       if (!chainId) warnings.push('CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID es invalido.');
-      if (!expectedConfigs.TOKEN || !expectedConfigs.MARKETPLACE || !expectedConfigs.BRIDGE) {
-        warnings.push('La identidad/configuracion historica NFT de Cukie Master no esta completa.');
+      if (nftMode === 'legacy') {
+        if (!expectedConfigs.TOKEN || !expectedConfigs.MARKETPLACE || !expectedConfigs.BRIDGE) {
+          warnings.push('La identidad/configuracion historica NFT legacy de Cukie Master no esta completa.');
+        }
+      } else if (nftMode === 'custodial') {
+        const tokenV2 = expectedConfigs.TOKEN_V2;
+        const masterVault = expectedConfigs.CUKIE_MASTER_NFT_VAULT;
+        const publicCollection = ukiNftVaults.collectionAddresses.length === 1
+          ? ukiNftVaults.collectionAddresses[0].toLowerCase()
+          : null;
+        const publicMasterVault = ukiNftVaults.cukieMasterNftVaultAddress?.toLowerCase() ?? null;
+        if (
+          !tokenV2
+          || !masterVault
+          || chainId !== ukiNftVaults.chainId
+          || tokenV2.contractAddress !== publicCollection
+          || masterVault.contractAddress !== publicMasterVault
+        ) {
+          warnings.push(
+            'La identidad TOKEN_V2/vault NFT custodial no coincide con la configuracion publica.',
+          );
+        }
+      } else {
+        warnings.push('La configuracion publica del vault NFT de Cukie Master es invalida.');
       }
-      if (deadLetter) warnings.push('Existen dead letters del pipeline NFT.');
+      if (deadLetter || legacyDeadLetterEvent) warnings.push('Existen dead letters del pipeline NFT.');
       if (pendingEvent) warnings.push('Existen eventos NFT pendientes de proyeccion.');
       if (commonCanonicalIncident) {
         warnings.push('Existe un incidente canonico BSC que afecta al pipeline NFT.');
       }
       return { healthy: warnings.length === 0, warnings, checkedAt };
     },
-    getNftEntitlement: (walletAddress, now) => getCukieMasterNftEntitlementFromDb({
-      walletAddress,
-      now,
-      db,
-      session,
-    }),
+    getNftEntitlement: (walletAddress, now) => (
+      ukiNftVaults.mode.cukieMaster === 'custodial'
+        ? getCukieMasterNftVaultEntitlementFromDb({
+            walletAddress,
+            now,
+            db,
+            session,
+          })
+        : getCukieMasterNftEntitlementFromDb({
+            walletAddress,
+            now,
+            db,
+            session,
+          })
+    ),
     listWalletPositions: (walletNormalized) => positions
       .find({ walletNormalized }, options)
       .sort({ route: 1 })
@@ -908,16 +1141,97 @@ export function createMongoCukieMasterRepository(
       .toArray(),
     findSlot: (slotId) => slots.findOne({ _id: slotId }, options),
     async replaceSlot(previous, next) {
+      if (
+        !Number.isSafeInteger(next.sourceBlockNumber) ||
+        Number(next.sourceBlockNumber) < 0 ||
+        typeof next.sourceBlockHash !== 'string' ||
+        !/^0x[0-9a-f]{64}$/.test(next.sourceBlockHash) ||
+        !(next.sourceBlockTimestamp instanceof Date) ||
+        Number.isNaN(next.sourceBlockTimestamp.getTime())
+      ) {
+        throw new DomainConflictError(
+          `El slot ${next._id} no acredita un bloque efectivo canonico.`,
+        );
+      }
+      const effectiveBlockNumber = Number(next.sourceBlockNumber);
+      const effectiveBlockHash = next.sourceBlockHash;
+      const effectiveBlockTimestamp = next.sourceBlockTimestamp;
       if (!previous) {
         await slots.insertOne(next, options);
+        await slotVersions.updateOne(
+          { _id: `${next._id}:${next.revision}` },
+          {
+            $setOnInsert: {
+              _id: `${next._id}:${next.revision}`,
+              slotId: next._id,
+              route: next.route,
+              validFrom: effectiveBlockTimestamp,
+              effectiveBlockNumber,
+              effectiveBlockHash,
+              effectiveBlockTimestamp,
+              observedAt: next.updatedAt,
+              slot: next,
+              createdAt: next.updatedAt,
+            },
+          },
+          { ...options, upsert: true },
+        );
+        await slotHistoryState.updateOne(
+          { _id: next.route },
+          {
+            $setOnInsert: {
+              _id: next.route,
+              completeFrom: next.createdAt,
+              completeFromBlockNumber: effectiveBlockNumber,
+            },
+            $max: { observedThrough: next.updatedAt },
+            $set: { updatedAt: next.updatedAt },
+          },
+          { ...options, upsert: true },
+        );
         return next;
       }
       const { _id: _id, ...replacement } = next;
-      return slots.findOneAndReplace(
+      const replaced = await slots.findOneAndReplace(
         { _id: previous._id, revision: previous.revision },
         replacement as OptionalUnlessRequiredId<CukieMasterSlot>,
         { ...options, returnDocument: 'after' },
       );
+      if (!replaced) return null;
+      const closed = await slotVersions.updateOne(
+        {
+          _id: `${previous._id}:${previous.revision}`,
+          validUntil: { $exists: false },
+        },
+        { $set: { validUntil: effectiveBlockTimestamp } },
+        options,
+      );
+      if (closed.matchedCount !== 1) {
+        throw new DomainConflictError(
+          `El historial temporal del slot ${previous._id} no tiene una version abierta unica.`,
+        );
+      }
+      await slotVersions.insertOne({
+        _id: `${next._id}:${next.revision}`,
+        slotId: next._id,
+        route: next.route,
+        validFrom: effectiveBlockTimestamp,
+        effectiveBlockNumber,
+        effectiveBlockHash,
+        effectiveBlockTimestamp,
+        observedAt: next.updatedAt,
+        slot: next,
+        createdAt: next.updatedAt,
+      }, options);
+      await slotHistoryState.updateOne(
+        { _id: next.route },
+        {
+          $max: { observedThrough: next.updatedAt },
+          $set: { updatedAt: next.updatedAt },
+        },
+        options,
+      );
+      return replaced;
     },
     listCreditEligible: (periodStart) => slots.find({
       creditEligibleFrom: { $lte: periodStart },

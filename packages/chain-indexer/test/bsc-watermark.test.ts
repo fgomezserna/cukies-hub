@@ -33,7 +33,10 @@ function config(overrides: Partial<IndexerConfig> = {}): IndexerConfig {
   };
 }
 
-function fakeStore(cursor: Partial<ChainCursor> | null = null) {
+function fakeStore(
+  cursor: Partial<ChainCursor> | null = null,
+  options: { failCursorUpdate?: boolean } = {},
+) {
   const updates: Array<{
     config: ContractEventConfig;
     update: Partial<ChainCursor>;
@@ -41,12 +44,15 @@ function fakeStore(cursor: Partial<ChainCursor> | null = null) {
   const eventBatches: unknown[][] = [];
   const checkpoints: unknown[] = [];
   const stakingBootstraps: unknown[] = [];
+  const operations: string[] = [];
   const store = {
     getCursor: async () => cursor,
     updateCursor: async (
       contractEvent: ContractEventConfig,
       update: Partial<ChainCursor>,
     ) => {
+      operations.push(`cursor:${contractEvent.contractAlias}:${contractEvent.eventName}`);
+      if (options.failCursorUpdate) throw new Error('cursor update failed');
       updates.push({ config: contractEvent, update });
     },
     upsertEvents: async (events: unknown[]) => {
@@ -54,14 +60,16 @@ function fakeStore(cursor: Partial<ChainCursor> | null = null) {
       return { inserted: events.length };
     },
     upsertBscCheckpoint: async (input: unknown) => {
+      operations.push('checkpoint');
       checkpoints.push(input);
     },
     reconcileVerifiedUkiStakingBootstrap: async (input: unknown) => {
+      operations.push('staking-bootstrap');
       stakingBootstraps.push(input);
     },
   } as unknown as IndexerStore;
 
-  return { store, updates, eventBatches, checkpoints, stakingBootstraps };
+  return { store, updates, eventBatches, checkpoints, stakingBootstraps, operations };
 }
 
 function rpc(input: {
@@ -183,7 +191,7 @@ test('persists a safe-head watermark when the cursor is already caught up', asyn
   const blockCalls: bigint[] = [];
   const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
   const client = rpc({ host: 'primary.test', blockCalls, logCalls });
-  const { store, updates, eventBatches } = fakeStore({ nextBlock: 111 });
+  const { store, updates, eventBatches, checkpoints, operations } = fakeStore({ nextBlock: 111 });
 
   const result = await ingestBscOnce(store, config(), { rpcClients: [client] });
 
@@ -197,6 +205,28 @@ test('persists a safe-head watermark when the cursor is already caught up', asyn
     processedThroughBlock: 110,
     processedThroughTimestampMs: 1_100_000,
   }]);
+  assert.equal(checkpoints.length, 1);
+  assert.equal(operations.at(-1), 'checkpoint');
+});
+
+test('keeps the completed checkpoint unchanged while any cursor is still backlogged', async () => {
+  const client = rpc({ host: 'primary.test' });
+  const { store, checkpoints } = fakeStore();
+
+  await ingestBscOnce(store, config(), { rpcClients: [client] });
+
+  assert.deepEqual(checkpoints, []);
+});
+
+test('does not publish a checkpoint when cursor persistence fails', async () => {
+  const client = rpc({ host: 'primary.test' });
+  const { store, checkpoints } = fakeStore({ nextBlock: 111 }, { failCursorUpdate: true });
+
+  await assert.rejects(
+    ingestBscOnce(store, config(), { rpcClients: [client] }),
+    /cursor update failed/,
+  );
+  assert.deepEqual(checkpoints, []);
 });
 
 test('records safe head as explicit coverage origin for a new start-block zero cursor', async () => {
@@ -263,6 +293,52 @@ test('uses the deployment block configured for each UKI economy contract', async
   assert.deepEqual(updates.map(({ update }) => update.processedFromBlock), [105, 105]);
 });
 
+test('uses and seals the independent TOKEN_V2 deployment identity', async () => {
+  const address = `0x${'7'.repeat(40)}` as const;
+  const bytecode = '0x60016000' as const;
+  const deploymentTxHash = `0x${'8'.repeat(64)}`;
+  const identity = {
+    alias: 'TOKEN_V2' as const,
+    chainId: 97 as const,
+    address,
+    startBlock: 106,
+    deploymentBlock: 106,
+    deploymentTxHash,
+    runtimeCodeHash: keccak256(bytecode),
+    configHash: `0x${'9'.repeat(64)}`,
+  };
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({
+    host: 'testnet.test',
+    chainId: 97,
+    bytecode,
+    receipt: { contractAddress: address, blockNumber: 106n, status: 'success' },
+    logCalls,
+  });
+  const { store, updates } = fakeStore();
+
+  await ingestBscOnce(store, config({
+    bscExpectedChainId: 97,
+    contractAliases: ['TOKEN_V2'],
+    tokenV2Address: address,
+    tokenV2StartBlock: 106,
+    verifiedBscContracts: { TOKEN_V2: identity },
+  }), { rpcClients: [client] });
+
+  assert.deepEqual(logCalls, [
+    { fromBlock: 106n, toBlock: 110n },
+    { fromBlock: 106n, toBlock: 110n },
+  ]);
+  assert.deepEqual(updates.map(({ config: eventConfig, update }) => ({
+    alias: eventConfig.contractAlias,
+    start: update.processedFromBlock,
+    txHash: update.contractDeploymentTxHash,
+  })), [
+    { alias: 'TOKEN_V2', start: 106, txHash: deploymentTxHash },
+    { alias: 'TOKEN_V2', start: 106, txHash: deploymentTxHash },
+  ]);
+});
+
 test('verifies UKI contract receipt and runtime before sealing cursor identity', async () => {
   const address = `0x${'3'.repeat(40)}` as const;
   const deploymentTxHash = `0x${'4'.repeat(64)}`;
@@ -283,13 +359,14 @@ test('verifies UKI contract receipt and runtime before sealing cursor identity',
     bytecode,
     receipt: { contractAddress: address, blockNumber: 105n, status: 'success' },
   });
-  const { store, updates, stakingBootstraps } = fakeStore();
+  const { store, updates, stakingBootstraps, checkpoints, operations } = fakeStore();
 
   await ingestBscOnce(store, config({
     bscExpectedChainId: 97,
     contractAliases: ['UKI_STAKING'],
     ukiStakingAddress: address,
     ukiStakingStartBlock: 105,
+    maxBlockRange: 10,
     verifiedBscContracts: { UKI_STAKING: identity },
   }), { rpcClients: [client] });
 
@@ -302,6 +379,8 @@ test('verifies UKI contract receipt and runtime before sealing cursor identity',
     assert.equal(update.contractDeploymentTxHash, deploymentTxHash);
   }
   assert.equal(stakingBootstraps.length, 1);
+  assert.equal(checkpoints.length, 1);
+  assert.deepEqual(operations.slice(-2), ['staking-bootstrap', 'checkpoint']);
 });
 
 test('rejects a UKI contract when its live runtime hash differs from the pinned identity', async () => {

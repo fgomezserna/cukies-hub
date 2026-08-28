@@ -32,6 +32,12 @@ export const COMPETITION_ATTEMPT_INDEXES: readonly IndexDescription[] = [
     partialFilterExpression: { status: 'active' },
   },
   {
+    key: { campaignId: 1, walletAddress: 1, entitlementSlot: 1 },
+    name: 'presale_game_unique_staking_entitlement_slot',
+    unique: true,
+    partialFilterExpression: { entitlementSlot: { $type: 'number' } },
+  },
+  {
     key: { campaignId: 1, status: 1, score: -1, gameTimeMs: 1, finishedAt: 1, attemptId: 1 },
     name: 'presale_game_ranking',
   },

@@ -53,7 +53,8 @@ export function testRewardRule(overrides: Partial<RewardRule> = {}): RewardRule 
     runCredits: {
       unitScale: 10,
       totalUnits: 100,
-      weeklyReserveUnits: 25,
+      weeklyReserveUnits: 20,
+      ambassadorReserveUnits: 5,
       convertibleUnits: 75,
     },
     settlementBps: {
@@ -80,14 +81,17 @@ export function testRewardRule(overrides: Partial<RewardRule> = {}): RewardRule 
     },
     emissionBudget: {
       programStartsAt: now,
-      dayBoundarySecondUtc: 0,
+      dayBoundarySecondUtc: 14 * 60 * 60,
       lateReservationGraceSeconds: 86_400,
       dailyCapRaw: "1000000000000000000000000000000",
       lifetimeCapRaw: "100000000000000000000000000000000",
       unusedDailyCapacity: "expires",
       overflowPolicy: "block",
     },
-    cukiePool: { cumulativeTierCount: 6 },
+    cukiePool: {
+      cumulativeTierCount: 6,
+      cumulativeTierBps: [4_500, 2_000, 1_500, 1_200, 700, 100],
+    },
     undistributedBps: {
       treasury: 8_000,
       marketing: 500,

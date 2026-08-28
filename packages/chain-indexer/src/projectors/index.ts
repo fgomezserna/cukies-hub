@@ -1,4 +1,4 @@
-import { formatUnits } from 'viem';
+import { formatUnits, isAddress } from 'viem';
 import type { ClientSession } from 'mongodb';
 
 import { getMonitoredContractAddresses } from '../config/contracts.js';
@@ -9,6 +9,8 @@ import type {
 } from '../types.js';
 import { getNumber, getString, normalizeAddress, now } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
+import { enqueueCukieMasterRecalculation } from './cukie-master-outbox.js';
+import { projectNftVaultEvent } from './nft-vaults.js';
 
 function collection(store: IndexerStore, name: string) {
   return store.db.collection<any>(name);
@@ -93,6 +95,26 @@ function tokenId(event: ChainEvent) {
   return stringField(event, 'tokenId');
 }
 
+function bscNftMaterializationIdentity(event: ChainEvent) {
+  if (event.chain !== 'BSC') return null;
+  if (event.chainId !== 56 && event.chainId !== 97) {
+    throw new Error(`${event.eventName} no tiene chainId BSC 56/97 en la evidencia canonica.`);
+  }
+  if (!isAddress(event.contractAddress) || /^0x0{40}$/i.test(event.contractAddress)) {
+    throw new Error(`${event.eventName} no tiene collection address BSC valida.`);
+  }
+  return {
+    chainId: event.chainId,
+    collectionAddressNormalized: event.contractAddress.toLowerCase(),
+  };
+}
+
+function nftDocumentId(event: ChainEvent, id: string) {
+  if (event.chain !== 'BSC' || event.contractAlias !== 'TOKEN_V2') return id;
+  const identity = bscNftMaterializationIdentity(event)!;
+  return `${identity.chainId}:${identity.collectionAddressNormalized}:${id}`;
+}
+
 function eventDate(event: ChainEvent) {
   return new Date(event.timestampMs);
 }
@@ -111,12 +133,15 @@ function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
   if (!value) return false;
   const addresses = getMonitoredContractAddresses({
     tokenAddress: process.env.CHAIN_INDEXER_TOKEN_ADDRESS,
+    tokenV2Address: process.env.CHAIN_INDEXER_TOKEN_V2_ADDRESS,
     marketplaceAddress: process.env.CHAIN_INDEXER_MARKETPLACE_ADDRESS,
     bridgeAddress: process.env.CHAIN_INDEXER_BRIDGE_ADDRESS,
     presaleAddress: process.env.CHAIN_INDEXER_PRESALE_ADDRESS,
     ukiStakingAddress: process.env.CHAIN_INDEXER_UKI_STAKING_ADDRESS,
     vestingVaultAddress: process.env.CHAIN_INDEXER_VESTING_VAULT_ADDRESS,
     rewardsDistributorAddress: process.env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS,
+    cukieMasterNftVaultAddress: process.env.CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS,
+    cukiePoolNftVaultAddress: process.env.CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS,
   })[event.chain];
   const normalized = normalizeAddress(event.chain, value);
 
@@ -165,9 +190,16 @@ async function insertNftTx(store: IndexerStore, event: ChainEvent, extra: Record
 }
 
 async function projectTransfer(store: IndexerStore, event: ChainEvent) {
-  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'TOKEN');
+  if (event.chain === 'BSC') {
+    if (event.contractAlias !== 'TOKEN' && event.contractAlias !== 'TOKEN_V2') {
+      return `Transfer BSC fuera de una coleccion NFT soportada: ${event.contractAlias}`;
+    }
+    await verifiedContractCursor(store, event, event.contractAlias);
+  }
   const id = tokenId(event);
   if (!id) return 'Transfer sin tokenId';
+  const documentId = nftDocumentId(event, id);
+  const bscIdentity = bscNftMaterializationIdentity(event);
 
   const from = stringField(event, 'from');
   const to = stringField(event, 'to');
@@ -186,10 +218,11 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   }
 
   await collection(store, 'cukies').updateOne(
-    { _id: id },
+    { _id: documentId },
     {
       $set: {
         tokenId: id,
+        ...(bscIdentity ?? {}),
         user: to,
         owner: to,
         ownerNormalized: normalizeAddress(event.chain, to),
@@ -198,10 +231,19 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
         updatedAt: now(),
         timeStamp: event.timestampMs,
         lastEventId: event._id,
+        ...(isMint ? {
+          origin: 'mint',
+          mintEventId: event._id,
+          mintTransactionHash: event.txHash.toLowerCase(),
+          mintBlockNumber: event.blockNumber,
+          mintLogIndex: event.logIndex,
+          mintTimestampMs: event.timestampMs,
+          ...(event.blockHash ? { mintBlockHash: event.blockHash.toLowerCase() } : {}),
+        } : {}),
       },
       $setOnInsert: {
-        _id: id,
-        origin: isMint ? 'mint' : 'transfer',
+        _id: documentId,
+        ...(!isMint ? { origin: 'transfer' } : {}),
         birthNetwork: event.chain,
         price: 0,
         children: [],
@@ -226,8 +268,13 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
 }
 
 async function projectCukieMetadata(store: IndexerStore, event: ChainEvent) {
-  if (event.chain !== 'BSC') return 'CukieMetadataConfigured solo se soporta en BSC';
-  await verifiedContractCursor(store, event, 'TOKEN');
+  if (
+    event.chain !== 'BSC'
+    || (event.contractAlias !== 'TOKEN' && event.contractAlias !== 'TOKEN_V2')
+  ) {
+    return 'CukieMetadataConfigured solo se soporta para TOKEN/TOKEN_V2 en BSC';
+  }
+  await verifiedContractCursor(store, event, event.contractAlias);
   const id = tokenId(event);
   const rarity = numberField(event, 'rarity');
   const generation = numberField(event, 'generation');
@@ -238,15 +285,41 @@ async function projectCukieMetadata(store: IndexerStore, event: ChainEvent) {
   if (generation !== 1 && generation !== 2) {
     return 'CukieMetadataConfigured con generacion invalida';
   }
-  const updated = await collection(store, 'cukies').updateOne(
-    { _id: id },
+  const documentId = nftDocumentId(event, id);
+  const identity = bscNftMaterializationIdentity(event)!;
+  const cukies = collection(store, 'cukies');
+  if (event.contractAlias === 'TOKEN_V2') {
+    const projectedMint = await cukies.findOne({
+      _id: documentId,
+      ...identity,
+      mintTransactionHash: event.txHash.toLowerCase(),
+    });
+    if (
+      typeof projectedMint?.mintEventId !== 'string'
+      || projectedMint.mintBlockNumber !== event.blockNumber
+      || !Number.isSafeInteger(projectedMint.mintLogIndex)
+      || Number(projectedMint.mintLogIndex) >= event.logIndex
+    ) {
+      throw new Error(
+        `CukieMetadataConfigured ${documentId} no tiene Transfer mint predecessor en la misma transaccion.`,
+      );
+    }
+  }
+  const updated = await cukies.updateOne(
+    { _id: documentId, ...identity },
     {
       $set: {
         tokenId: id,
+        ...identity,
         rarity,
         generation,
         metadataEventId: event._id,
+        metadataTransactionHash: event.txHash.toLowerCase(),
         metadataBlockNumber: event.blockNumber,
+        metadataLogIndex: event.logIndex,
+        metadataTimestampMs: event.timestampMs,
+        metadataContractAddressNormalized: identity.collectionAddressNormalized,
+        ...(event.blockHash ? { metadataBlockHash: event.blockHash.toLowerCase() } : {}),
         updatedAt: now(),
       },
     },
@@ -996,11 +1069,6 @@ export async function projectUkiStakingPosition(
       contractDeploymentBlock: cursor.contractDeploymentBlock,
       contractDeploymentTxHash: cursor.contractDeploymentTxHash,
       contractConfigHash: cursor.contractConfigHash,
-      materializationStatus: 'consistent',
-      materializedTotalRaw: totalStakedRaw,
-      materializedThroughEventId: event._id,
-      materializedThroughBlockNumber: event.blockNumber,
-      materializedThroughLogIndex: event.logIndex,
       updatedAt: observedAt,
     },
     observedAt,
@@ -1020,11 +1088,32 @@ export async function projectUkiStakingPosition(
       lastEventId: event._id,
       lastTxHash: event.txHash,
       observedAt,
+      bootstrapStatus: cursor.bootstrapStatus,
+      bootstrapStartBlock: cursor.bootstrapStartBlock,
+      bootstrapVerifiedAt: cursor.bootstrapVerifiedAt,
+      verifiedChainId: cursor.verifiedChainId,
+      contractCodeHash: cursor.contractCodeHash,
+      contractDeploymentBlock: cursor.contractDeploymentBlock,
+      contractDeploymentTxHash: cursor.contractDeploymentTxHash,
+      contractConfigHash: cursor.contractConfigHash,
+      materializationStatus: 'consistent',
+      materializedTotalRaw: totalStakedRaw,
+      materializedThroughEventId: event._id,
+      materializedThroughBlockNumber: event.blockNumber,
+      materializedThroughLogIndex: event.logIndex,
       updatedAt: observedAt,
     },
     observedAt,
     session,
   );
+
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: accountNormalized,
+    route: 'uki',
+    session,
+  });
 
   return null;
 }
@@ -1157,6 +1246,12 @@ export async function projectUkiVestingPosition(
     },
     entries[0].observedAt,
   );
+  await enqueueCukieMasterRecalculation({
+    store,
+    event,
+    wallet: beneficiaryNormalized,
+    route: 'uki',
+  });
   return null;
 }
 
@@ -1188,27 +1283,54 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
     ) return 'BatchPublished con campos invalidos';
 
     const existing = await collection(store, 'reward_claim_batches').findOne({ batchId });
-    if (existing && Object.entries(immutable).some(([key, value]) => existing[key] !== value)) {
+    if (!existing) {
+      throw new Error(`BatchPublished ${batchId} no tiene draft autorizado en Mongo.`);
+    }
+    if (
+      existing.publishAuthorized !== true
+      || existing.previewOnly !== false
+      || existing.publishedProofSetHash !== existing.proofSetHash
+      || existing.publishedPeriodSealId !== existing.periodSealId
+      || existing.merkleRoot !== immutable.merkleRoot
+      || existing.canonicalInputHash !== immutable.inputHash
+      || existing.metadataHash !== immutable.metadataHash
+      || existing.totalAllocatedRaw !== immutable.totalAllocatedRaw
+      || existing.startsAtRaw !== immutable.startsAtRaw
+      || existing.expiresAtRaw !== immutable.expiresAtRaw
+    ) {
       throw new Error(`BatchPublished ${batchId} contradice el lote ya indexado.`);
     }
+    const publication = {
+      status: existing.status === 'closed' ? 'closed' : 'published',
+      previewOnly: false,
+      publishAuthorized: true,
+      signature: null,
+      transactionHash: event.txHash,
+      publicationEventId: event._id,
+      publicationTransactionHash: event.txHash,
+      publicationBlockNumber: event.blockNumber,
+      publicationBlockHash: event.blockHash,
+      publicationLogIndex: event.logIndex,
+      publishedAt: observedAt,
+      publishedBatchId: batchId,
+      publishedMerkleRoot: immutable.merkleRoot,
+      publishedInputHash: immutable.inputHash,
+      publishedMetadataHash: immutable.metadataHash,
+      publishedTotalAllocatedRaw: immutable.totalAllocatedRaw,
+      startsAtRaw: immutable.startsAtRaw,
+      expiresAtRaw: immutable.expiresAtRaw,
+      startsAt: new Date(Number(immutable.startsAtRaw) * 1_000),
+      expiresAt: new Date(Number(immutable.expiresAtRaw) * 1_000),
+      totalClaimedRaw: existing?.totalClaimedRaw ?? '0',
+      claimedCount: existing?.claimedCount ?? 0,
+      closed: existing.status === 'closed' ? true : false,
+      updatedAt: now(),
+    };
     await collection(store, 'reward_claim_batches').updateOne(
       { batchId },
       {
-        $setOnInsert: {
-          _id: batchId,
-          batchId,
-          chain: event.chain,
-          contractAddress: event.contractAddress,
-          ...immutable,
-          status: 'published',
-          publicationEventId: event._id,
-          publicationTransactionHash: event.txHash,
-          publicationBlockNumber: event.blockNumber,
-          publishedAt: observedAt,
-          createdAt: now(),
-        },
+        $set: publication,
       },
-      { upsert: true },
     );
     return null;
   }
@@ -1229,6 +1351,8 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
         $setOnInsert: {
           _id: event._id,
           eventId: event._id,
+          chain: event.chain,
+          contractAddress: event.contractAddress,
           batchId,
           walletAddress: account,
           walletNormalized: accountNormalized,
@@ -1236,7 +1360,8 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
           transactionHash: event.txHash,
           logIndex: event.logIndex,
           blockNumber: event.blockNumber,
-          claimedAt: observedAt,
+          blockHash: event.blockHash,
+          indexedAt: observedAt,
           createdAt: now(),
         },
       },
@@ -1274,6 +1399,14 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
 }
 
 export async function projectEvent(store: IndexerStore, event: ChainEvent) {
+  if (
+    event.contractAlias === 'CUKIE_MASTER_NFT_VAULT'
+    || event.contractAlias === 'CUKIE_POOL_NFT_VAULT'
+  ) {
+    await verifiedContractCursor(store, event, event.contractAlias);
+    return projectNftVaultEvent(store, event);
+  }
+
   if (event.eventName === 'Transfer') return projectTransfer(store, event);
 
   if (event.eventName === 'CukieMetadataConfigured') {

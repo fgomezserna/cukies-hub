@@ -14,9 +14,13 @@ import {
   createCukieMasterWaitlistJobs,
 } from '@/lib/uki-economy/cukie-master/jobs';
 import {
+  EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
   EXPECTED_NFT_CURSOR_IDS,
+  cukieMasterNftHealthScope,
   expectedBscChainId,
   operationalIndexerHealthWarnings,
+  pendingNftEventFilter,
+  pendingUkiWalletEventFilter,
   projectionSafetyWarnings,
   stakingBalancesMatchState,
   stakingMaterializationMatchesState,
@@ -80,6 +84,31 @@ function emptyNftSummary(walletAddress: string, points: number): CukieMasterNftR
       maxTotalSlots: 10,
     },
   };
+}
+
+function syntheticNftSlots(walletAddress: string, count: number) {
+  const walletNormalized = walletAddress.toLowerCase();
+  return summarizeCukieMasterNftEntitlement({
+    walletAddress,
+    assets: Array.from({ length: count }, (_, index) => normalizeCukiesInventoryDocument({
+      _id: `synthetic-${index}`,
+      owner: walletAddress,
+      ownerNormalized: walletNormalized,
+      tokenId: String(index + 1),
+      network: 'BSC',
+      state: 'available',
+      type: 'rare',
+      skills: { generation: 1 },
+      timeStamp: now,
+    }, [{
+      _id: `synthetic-lock-${index}`,
+      assetId: `cukies:synthetic-${index}`,
+      status: 'active',
+      reason: 'soft_stake',
+      ownerNormalized: walletNormalized,
+      updatedAt: now,
+    }], now)),
+  });
 }
 
 function memoryRepository() {
@@ -170,13 +199,24 @@ function memoryRepository() {
       state.events.set(event.idempotencyKey, event);
     },
     async findPresaleParticipant(wallet) {
-      return state.presale.get(wallet) ?? null;
+      const value = state.presale.get(wallet);
+      return value ? { ...value, lastPurchaseEventId: value.lastPurchaseEventId ?? `test:presale:${wallet}` } : null;
     },
     async findUkiStakingPosition(wallet) {
-      return state.staking.get(wallet) ?? null;
+      const value = state.staking.get(wallet);
+      return value ? { ...value, lastEventId: value.lastEventId ?? `test:staking:${wallet}` } : null;
     },
     async findPresaleVestingPosition(wallet) {
-      return state.vesting.get(wallet) ?? null;
+      const value = state.vesting.get(wallet);
+      return value ? { ...value, lastEventId: value.lastEventId ?? `test:vesting:${wallet}` } : null;
+    },
+    async findProjectedChainEvidence(eventId) {
+      return {
+        eventId,
+        blockNumber: 100,
+        blockHash: `0x${'a'.repeat(64)}`,
+        blockTimestamp: new Date(now.getTime() - 1_000),
+      };
     },
     async getUkiIndexerHealth(_wallet, checkedAt) {
       return {
@@ -193,8 +233,18 @@ function memoryRepository() {
       };
     },
     async getNftEntitlement(walletAddress) {
-      return state.nftSummaries.get(walletAddress.toLowerCase())
+      const summary = state.nftSummaries.get(walletAddress.toLowerCase())
         ?? emptyNftSummary(walletAddress, state.nftPoints.get(walletAddress.toLowerCase()) ?? 0);
+      return {
+        ...summary,
+        eligibleAssets: summary.eligibleAssets.map((asset) => ({
+          ...asset,
+          sourceRefs: asset.sourceRefs.map((ref, index) => ({
+            ...ref,
+            eventId: ref.eventId ?? `test:nft:${asset.assetId}:${index}`,
+          })),
+        })),
+      };
     },
     async listWalletPositions(wallet) {
       return [...state.positions.values()].filter((item) => item.walletNormalized === wallet);
@@ -298,6 +348,40 @@ describe('Cukie Master canonical sources', () => {
       expect.stringContaining('lastEventId'),
       expect.stringContaining('ultimo ledger'),
     ]));
+  });
+
+  it('acota los eventos UKI pendientes a la wallet y excluye ignored', () => {
+    expect(pendingUkiWalletEventFilter('0xabc')).toEqual({
+      chain: 'BSC',
+      status: { $in: ['ingested', 'projecting', 'failed'] },
+      $or: [
+        {
+          contractAlias: 'UKI_STAKING',
+          'normalized.accountNormalized': '0xabc',
+        },
+        {
+          contractAlias: 'VESTING_VAULT',
+          'normalized.beneficiaryNormalized': '0xabc',
+        },
+      ],
+    });
+  });
+
+  it('acota la salud NFT custodial a transferencias y vault de la wallet', () => {
+    expect(pendingNftEventFilter({
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+      mode: 'custodial',
+      walletNormalized: '0xabc',
+    })).toEqual(expect.objectContaining({
+      chain: 'BSC',
+      status: { $in: ['ingested', 'projecting', 'failed'] },
+      $or: expect.arrayContaining([
+        expect.objectContaining({
+          contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+          'normalized.beneficiaryNormalized': '0xabc',
+        }),
+      ]),
+    }));
   });
 
   it('rejects a corrupt vesting aggregate even when lastEventId still matches', () => {
@@ -414,6 +498,31 @@ describe('Cukie Master canonical sources', () => {
     expect(buyer.uki.totalUkiRaw).toBe('0');
   });
 
+  it('keeps evidenced staking visible for a legacy zero-purchase presale row without block evidence', async () => {
+    const { repo, state } = memoryRepository();
+    state.presale.set('0xlegacy', {
+      _id: 'legacy-zero-row',
+      totalUkiPurchasedRaw: '0',
+      lastPurchaseEventId: '',
+    });
+    state.staking.set('0xlegacy', {
+      _id: 'staking',
+      accountBalanceRaw: rawUki(19_999),
+    });
+
+    const sources = await readCukieMasterSources(repo, '0xLegacy', '0xlegacy', now);
+
+    expect(sources.uki).toMatchObject({
+      totalUkiRaw: rawUki(19_999),
+      presaleLockedRaw: '0',
+      stakedUkiRaw: rawUki(19_999),
+      completeness: { complete: true },
+    });
+    expect(sources.uki.completeness.warnings).not.toContain(
+      'presale_participants no conserva evidencia de bloque proyectada.',
+    );
+  });
+
   it('uses zero and records incompleteness when a present canonical raw field is invalid', async () => {
     const { repo, state } = memoryRepository();
     state.presale.set('0xabc', { _id: 'presale', totalUkiPurchasedRaw: rawUki(20_000) });
@@ -464,6 +573,7 @@ describe('Cukie Master canonical sources', () => {
         bootstrapStartBlock: 1,
         contractDeploymentBlock: 1,
         contractCodeHash: `0x${'1'.repeat(64)}`,
+        contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
         contractConfigHash: `0x${'2'.repeat(64)}`,
       }]),
     );
@@ -487,6 +597,7 @@ describe('Cukie Master canonical sources', () => {
       verifiedChainId: 56,
       contractCodeHash: `0x${'1'.repeat(64)}`,
       contractDeploymentBlock: 1,
+      contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
       contractConfigHash: `0x${'2'.repeat(64)}`,
     }));
     expect(operationalIndexerHealthWarnings({
@@ -557,6 +668,16 @@ describe('Cukie Master canonical sources', () => {
       cursors,
       ...expectedIdentity,
     })).toContain('Cursor BSC UKI_STAKING:Staked ausente, stale, sin verificacion o con backlog.');
+    cursors[0].safeBlock = 101;
+    cursors[0].nextBlock = 102;
+    expect(operationalIndexerHealthWarnings({
+      checkedAt: now,
+      latestSuccessEndedAt: now,
+      latestErrorEndedAt: null,
+      checkpoint,
+      cursors,
+      ...expectedIdentity,
+    })).toEqual([]);
   });
 
   it('marks a brand-new NFT database unhealthy until every verified history cursor exists', () => {
@@ -571,6 +692,7 @@ describe('Cukie Master canonical sources', () => {
         bootstrapStartBlock: 1,
         contractDeploymentBlock: 1,
         contractCodeHash: `0x${'1'.repeat(64)}`,
+        contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
         contractConfigHash: `0x${'2'.repeat(64)}`,
       }]),
     );
@@ -589,6 +711,68 @@ describe('Cukie Master canonical sources', () => {
       expect.stringContaining('MARKETPLACE:TokenOnSale'),
       expect.stringContaining('BRIDGE:JumpOutBridge'),
     ]));
+  });
+
+  it('uses TOKEN_V2 for custodial NFT health and never accepts TOKEN as a substitute', () => {
+    expect(cukieMasterNftHealthScope('custodial')).toEqual({
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+      cursorIds: EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
+    });
+    const contractAddress = '0x00000000000000000000000000000000000000cc';
+    const deploymentTxHash = `0x${'4'.repeat(64)}`;
+    const expectedContractConfigs = {
+      TOKEN_V2: {
+        contractAddress,
+        bootstrapStartBlock: 10,
+        contractDeploymentBlock: 10,
+        contractCodeHash: `0x${'1'.repeat(64)}`,
+        contractDeploymentTxHash: deploymentTxHash,
+        contractConfigHash: `0x${'2'.repeat(64)}`,
+      },
+    };
+    const cursor = {
+      chain: 'BSC',
+      contractAlias: 'TOKEN',
+      contractAddress,
+      eventName: 'Transfer',
+      updatedAt: now,
+      safeBlock: 100,
+      nextBlock: 101,
+      bootstrapStatus: 'verified',
+      bootstrapStartBlock: 10,
+      bootstrapVerifiedAt: now,
+      verifiedChainId: 97,
+      contractCodeHash: `0x${'1'.repeat(64)}`,
+      contractDeploymentBlock: 10,
+      contractDeploymentTxHash: deploymentTxHash,
+      contractConfigHash: `0x${'2'.repeat(64)}`,
+    };
+    const input = {
+      checkedAt: now,
+      latestSuccessEndedAt: now,
+      latestErrorEndedAt: null,
+      checkpoint: {
+        checkedAt: now,
+        safeBlockNumber: 100,
+        safeBlockHash: `0x${'a'.repeat(64)}`,
+      },
+      expectedChainId: 97 as const,
+      expectedContractConfigs,
+      expectedCursorIds: ['TOKEN_V2:Transfer'] as const,
+    };
+    expect(operationalIndexerHealthWarnings({ ...input, cursors: [cursor] })).toContain(
+      'Cursor BSC TOKEN_V2:Transfer ausente, stale, sin verificacion o con backlog.',
+    );
+    expect(operationalIndexerHealthWarnings({
+      ...input,
+      cursors: [{ ...cursor, contractAlias: 'TOKEN_V2', contractDeploymentTxHash: `0x${'5'.repeat(64)}` }],
+    })).toContain(
+      'Cursor BSC TOKEN_V2:Transfer ausente, stale, sin verificacion o con backlog.',
+    );
+    expect(operationalIndexerHealthWarnings({
+      ...input,
+      cursors: [{ ...cursor, contractAlias: 'TOKEN_V2' }],
+    })).toEqual([]);
   });
 
   it('marks NFT sources incomplete for unknown attributes but accepts quiet old assets', async () => {
@@ -643,6 +827,7 @@ describe('Cukie Master canonical sources', () => {
       bootstrapSafeBlockHash: `0x${'a'.repeat(64)}`,
       verifiedChainId: 56,
       contractCodeHash: `0x${'1'.repeat(64)}`,
+      contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
       contractConfigHash: `0x${'2'.repeat(64)}`,
     })).toBe(true);
     expect(stakingBalancesMatchState([], { _id: 'staking', totalStakedRaw: '0' })).toBe(false);
@@ -665,6 +850,7 @@ describe('Cukie Master canonical sources', () => {
       bootstrapStartBlock: 10,
       contractDeploymentBlock: 10,
       contractCodeHash: `0x${'1'.repeat(64)}`,
+      contractDeploymentTxHash: `0x${'4'.repeat(64)}`,
       contractConfigHash: `0x${'2'.repeat(64)}`,
     };
     const state = {
@@ -681,6 +867,7 @@ describe('Cukie Master canonical sources', () => {
       bootstrapStartBlock: 10,
       contractDeploymentBlock: 10,
       contractCodeHash: expected.contractCodeHash,
+      contractDeploymentTxHash: expected.contractDeploymentTxHash,
       contractConfigHash: expected.contractConfigHash,
     };
     expect(stakingMaterializationMatchesState(state, expected, 56)).toBe(true);
@@ -695,7 +882,7 @@ describe('Cukie Master transactional allocation', () => {
   it('aborts before touching an active position, slots, or capacity when a source is unhealthy', async () => {
     const { repo, state } = memoryRepository();
     state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(20_000), releasedRaw: '0' });
-    state.nftPoints.set('0xabc', 3);
+    state.nftSummaries.set('0xabc', syntheticNftSlots('0xABC', 1));
     const service = createCukieMasterService((work) => work(repo));
     await service.recalculateCukieMasterWallet('0xABC', now, 'healthy-initial');
     await service.recalculateCukieMasterWallet('0xABC', new Date(now.getTime() + DAY), 'active');
@@ -760,7 +947,7 @@ describe('Cukie Master transactional allocation', () => {
   it('allocates up to 5 per route and serializes concurrent idempotent retries', async () => {
     const { repo, state } = memoryRepository();
     state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(100_000), releasedRaw: '0' });
-    state.nftPoints.set('0xabc', 15);
+    state.nftSummaries.set('0xabc', syntheticNftSlots('0xABC', 5));
     let transactions = 0;
     let transactionQueue = Promise.resolve();
     const service = createCukieMasterService(<T>(work: (repository: CukieMasterRepository) => Promise<T>) => {
@@ -1014,6 +1201,22 @@ describe('Cukie Master transactional allocation', () => {
     expect(await listCreditEligibleCukieMasterPositions(maturedAt, repo)).toHaveLength(1);
   });
 
+  it('fails closed when a persisted position has no active route round', async () => {
+    const { repo, state } = memoryRepository();
+    state.vesting.set('0xabc', { totalAllocatedRaw: rawUki(20_000), releasedRaw: '0' });
+    const service = createCukieMasterService((work) => work(repo));
+    await service.recalculateCukieMasterWallet('0xABC', now, 'round-required');
+    state.rounds.delete('uki');
+
+    const status = await getCukieMasterWalletStatus('0xABC', now, repo);
+
+    expect(status.routes.uki.position).not.toBeNull();
+    expect(status.routes.uki.sourceCompleteness.complete).toBe(false);
+    expect(status.routes.uki.sourceCompleteness.warnings).toContain(
+      'No existe una ronda activa para la ruta uki.',
+    );
+  });
+
   it('protects existing slots for a fixed 48h strict requirement grace', async () => {
     const { repo, state } = memoryRepository();
     const service = createCukieMasterService((work) => work(repo));
@@ -1173,7 +1376,7 @@ describe('Cukie Master transactional allocation', () => {
     expect(state.events.size).toBe(eventCount);
   });
 
-  it('expands route capacity with CAS, idempotency and a hard 5000 ceiling', async () => {
+  it('expands route capacity with CAS, idempotency and a hard 2500 ceiling per route', async () => {
     const { repo, state } = memoryRepository();
     const service = createCukieMasterService((work) => work(repo));
     const round = createInitialRouteRound('nft', now);
@@ -1202,7 +1405,7 @@ describe('Cukie Master transactional allocation', () => {
     });
     await expect(service.expandRouteCapacity('nft', 1_000, now, 'capacity-reduce'))
       .rejects.toThrow('solo puede ampliarse');
-    expect(() => service.expandRouteCapacity('nft', 5_001, now, 'capacity-overflow'))
-      .toThrow('entre 1 y 5000');
+    expect(() => service.expandRouteCapacity('nft', 2_501, now, 'capacity-overflow'))
+      .toThrow('entre 1 y 2500');
   });
 });

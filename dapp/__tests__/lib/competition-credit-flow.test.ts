@@ -147,6 +147,159 @@ function replaceWithFragmentedLots(input: {
 }
 
 describe("competition credit grant -> pool -> reservation flow", () => {
+  it("does not replay a rule marked unrecoverable by the schema migration", async () => {
+    const legacyRule = testCompetitionCreditRule({
+      _id: "competition-credits:legacy",
+      version: "credits-legacy",
+      activeFrom: new Date("2026-08-10T00:00:00.000Z"),
+      activeUntil: new Date("2026-08-21T14:00:00.000Z"),
+      supersededByVersion: "credits-v3",
+      supersededReason: "unrecoverable_pre_migration",
+    });
+    const currentRule = testCompetitionCreditRule({
+      _id: "competition-credits:v3",
+      version: "credits-v3",
+      activeFrom: new Date("2026-08-21T14:00:00.000Z"),
+      cutoffHourUtc: 14,
+      settlementHourUtc: 16,
+    });
+    const repository = new MemoryCompetitionCreditRepository({ rule: currentRule });
+    repository.state.rules = [legacyRule, currentRule];
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+
+    await expect(service.findOldestPendingRoutePeriod({
+      route: "uki",
+      rule: currentRule,
+      now: new Date("2026-08-20T18:00:00.000Z"),
+    })).resolves.toBeNull();
+  });
+
+  it("includes a pre-cutoff chain event even when its slot projection is processed afterwards", async () => {
+    const delayedSlot = slot({
+      sourceBlockNumber: 998,
+      sourceBlockHash: `0x${"a".repeat(64)}`,
+      sourceBlockTimestamp: new Date("2026-07-10T11:59:59.000Z"),
+      createdAt: new Date("2026-07-10T12:03:00.000Z"),
+      updatedAt: new Date("2026-07-10T12:03:00.000Z"),
+    });
+    const repository = new MemoryCompetitionCreditRepository({
+      slots: [delayedSlot],
+      watermark: testCreditSourceWatermark({
+        observedThrough: new Date("2026-07-10T12:05:00.000Z"),
+        updatedAt: new Date("2026-07-10T12:05:00.000Z"),
+        sourceHash: buildCreditSourceSlotsHash([delayedSlot]),
+        slotCount: 1,
+      }),
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+
+    const run = await service.createDailyRun({
+      cutoff: CUTOFF,
+      expectedRuleVersion: "credits-v1",
+      now: new Date("2026-07-10T12:05:00.000Z"),
+    });
+
+    expect(run.expectedItemCount).toBe(1);
+    expect(repository.state.items[0]?.slotId).toBe(delayedSlot._id);
+  });
+
+  it("excludes a slot whose effective chain event is after the cutoff", async () => {
+    const laterSlot = slot({
+      sourceBlockNumber: 1_000,
+      sourceBlockHash: `0x${"b".repeat(64)}`,
+      sourceBlockTimestamp: new Date("2026-07-10T12:00:01.000Z"),
+      createdAt: new Date("2026-07-10T12:01:00.000Z"),
+      updatedAt: new Date("2026-07-10T12:01:00.000Z"),
+    });
+    const repository = new MemoryCompetitionCreditRepository({
+      slots: [laterSlot],
+      watermark: testCreditSourceWatermark({
+        observedThrough: new Date("2026-07-10T12:05:00.000Z"),
+        updatedAt: new Date("2026-07-10T12:05:00.000Z"),
+        sourceHash: buildCreditSourceSlotsHash([laterSlot]),
+        slotCount: 1,
+      }),
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+
+    const run = await service.createDailyRun({
+      cutoff: CUTOFF,
+      expectedRuleVersion: "credits-v1",
+      now: new Date("2026-07-10T12:05:00.000Z"),
+    });
+
+    expect(run.expectedItemCount).toBe(0);
+    expect(repository.state.items).toHaveLength(0);
+  });
+
+  it("keeps the original period on a game reserved just before cutoff and lets its TTL cross it", async () => {
+    const cutoff = new Date("2026-07-10T14:00:00.000Z");
+    const rule = testCompetitionCreditRule({
+      cutoffHourUtc: 14,
+      settlementHourUtc: 16,
+    });
+    const sourceSlot = slot({ creditEligibleFrom: cutoff, updatedAt: cutoff });
+    const repository = new MemoryCompetitionCreditRepository({
+      rule,
+      slots: [sourceSlot],
+      watermark: testCreditSourceWatermark({
+        observedThrough: cutoff,
+        updatedAt: cutoff,
+        sourceHash: buildCreditSourceSlotsHash([sourceSlot]),
+        slotCount: 1,
+      }),
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    const run = await openDailyRun({
+      repository,
+      service,
+      cutoff,
+      now: new Date("2026-07-10T16:01:00.000Z"),
+    });
+    const reservedAt = new Date("2026-07-11T13:59:00.000Z");
+    const reservation = await service.reserve({
+      walletAddress: WALLET,
+      sessionId: "cross-cutoff-session",
+      costCode: "treasure-hunt:start",
+      idempotencyKey: "cross-cutoff-reserve",
+      now: reservedAt,
+    });
+    expect(reservation.periodId).toBe(run.period.periodId);
+    expect(reservation.expiresAt).toEqual(
+      new Date("2026-07-11T14:09:00.000Z")
+    );
+    await service.expireAvailableLotsBatch({
+      now: new Date("2026-07-11T14:00:00.000Z"),
+    });
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 0,
+      reservedCredits: 10,
+      expiredCredits: 90,
+    });
+    const consumed = await service.consumeReservation({
+      reservationId: reservation.reservationId,
+      idempotencyKey: "cross-cutoff-consume",
+      committedAt: new Date("2026-07-11T14:04:00.000Z"),
+      now: new Date("2026-07-11T14:05:00.000Z"),
+    });
+    expect(consumed.status).toBe("consumed");
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 0,
+      reservedCredits: 0,
+      spentCredits: 10,
+      expiredCredits: 90,
+      expiresAt: new Date("2026-07-11T14:00:00.000Z"),
+    });
+  });
+
   it("keeps grants unusable until the immutable run is complete and open", async () => {
     const repository = new MemoryCompetitionCreditRepository({
       slots: [slot()],
@@ -523,7 +676,7 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     expect(repository.state.ownLots).toHaveLength(1);
   });
 
-  it("rejects matured qualifying slots and any retroactive run at nextCutoff", async () => {
+  it("rejects matured qualifying slots but keeps a late period eligible for catch-up", async () => {
     const repository = new MemoryCompetitionCreditRepository({
       slots: [slot({ status: "qualifying" })],
     });
@@ -538,13 +691,213 @@ describe("competition credit grant -> pool -> reservation flow", () => {
       })
     ).rejects.toThrow(/qualifying ya maduros/);
     repository.state.slots = [];
+    repository.state.sourceHealth.observedThrough = new Date("2026-07-11T12:00:00.000Z");
+    repository.state.watermark = testCreditSourceWatermark({
+      observedThrough: new Date("2026-07-11T12:00:00.000Z"),
+      updatedAt: new Date("2026-07-11T12:00:00.000Z"),
+      sourceHash: buildCreditSourceSlotsHash([]),
+      slotCount: 0,
+    });
     await expect(
       service.createDailyRun({
         cutoff: CUTOFF,
         expectedRuleVersion: "credits-v1",
         now: new Date("2026-07-11T12:00:00.000Z"),
       })
-    ).rejects.toThrow(/retroactivos/);
+    ).resolves.toMatchObject({ route: "uki", status: "snapshotted" });
+  });
+
+  it("adds one idempotent late compensation after 24h and preserves the original own/pool split", async () => {
+    const repository = new MemoryCompetitionCreditRepository({
+      slots: [slot()],
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    await service.configurePool({
+      walletAddress: WALLET,
+      slotId: "uki-slot-1",
+      poolCreditsPerSlot: 20,
+      idempotencyKey: "late-compensation-pool-split",
+      now: new Date("2026-07-10T11:00:00.000Z"),
+    });
+    const lateNow = new Date("2026-07-11T12:00:00.001Z");
+    repository.state.sourceHealth.observedThrough = lateNow;
+    repository.state.watermark = testCreditSourceWatermark({
+      observedThrough: lateNow,
+      updatedAt: lateNow,
+      sourceHash: buildCreditSourceSlotsHash(repository.state.slots),
+      slotCount: repository.state.slots.length,
+    });
+
+    const run = await service.createDailyRun({
+      cutoff: CUTOFF,
+      expectedRuleVersion: "credits-v1",
+      now: lateNow,
+    });
+    const claimed = await service.claimRun({
+      runId: run.runId,
+      workerId: "late-worker",
+      now: new Date(lateNow.getTime() + 1_000),
+    });
+    await service.processRunBatch({
+      runId: run.runId,
+      workerId: "late-worker",
+      fenceToken: claimed.fenceToken,
+      now: new Date(lateNow.getTime() + 2_000),
+    });
+    const opened = await service.openRun({
+      runId: run.runId,
+      workerId: "late-worker",
+      fenceToken: claimed.fenceToken,
+      now: new Date(lateNow.getTime() + 3_000),
+    });
+    expect(repository.state.incidents).toEqual([]);
+    expect(opened.run.status).toBe("open");
+    const item = repository.state.items.find(
+      (candidate) => candidate.runId === run.runId
+    )!;
+    expect(item).toMatchObject({
+      baseGrantCredits: 100,
+      compensationCredits: 100,
+      compensationReason: "late_gt_24h",
+      baseOwnCredits: 80,
+      basePoolCredits: 20,
+      compensationOwnCredits: 80,
+      compensationPoolCredits: 20,
+      grantCredits: 200,
+      ownCredits: 160,
+      poolCredits: 40,
+    });
+    expect(
+      repository.state.ledger.filter(
+        (entry) => entry.runItemId === item.itemId && entry.operation === "grant"
+      )
+    ).toHaveLength(1);
+    expect(
+      repository.state.ledger.filter(
+        (entry) =>
+          entry.runItemId === item.itemId &&
+          entry.operation === "late_compensation"
+      )
+    ).toEqual([
+      expect.objectContaining({
+        amountCredits: 100,
+        periodId: item.periodId,
+      }),
+    ]);
+    expect(repository.state.accounts).toContainEqual(
+      expect.objectContaining({
+        periodId: item.periodId,
+        grantedCredits: 200,
+        poolDepositedCredits: 40,
+        availableCredits: 160,
+      })
+    );
+    expect(repository.state.poolPeriods).toContainEqual(
+      expect.objectContaining({
+        periodId: item.periodId,
+        contributedCredits: 40,
+        availableCredits: 40,
+      })
+    );
+
+    await expect(
+      service.createDailyRun({
+        cutoff: CUTOFF,
+        expectedRuleVersion: "credits-v1",
+        now: new Date(lateNow.getTime() + 10_000),
+      })
+    ).resolves.toMatchObject({ runId: run.runId });
+    expect(
+      repository.state.ledger.filter(
+        (entry) =>
+          entry.runItemId === item.itemId &&
+          entry.operation === "late_compensation"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("opens and re-reconciles two delayed runs settled into the same route period", async () => {
+    const historicalSlot = slot({
+      qualifiedSince: new Date("2026-07-01T12:00:00.000Z"),
+      creditEligibleFrom: new Date("2026-07-02T12:00:00.000Z"),
+      createdAt: new Date("2026-07-01T12:00:00.000Z"),
+      updatedAt: new Date("2026-07-01T12:00:00.000Z"),
+      sourceBlockTimestamp: new Date("2026-07-01T11:59:00.000Z"),
+    });
+    const repository = new MemoryCompetitionCreditRepository({ slots: [historicalSlot] });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    await service.configurePool({
+      walletAddress: WALLET,
+      slotId: historicalSlot._id,
+      poolCreditsPerSlot: 20,
+      idempotencyKey: "multi-late-pool-config",
+      now: new Date("2026-07-08T11:00:00.000Z"),
+    });
+    const lateNow = new Date("2026-07-11T12:00:00.001Z");
+    repository.state.sourceHealth.observedThrough = lateNow;
+    repository.state.watermark = testCreditSourceWatermark({
+      observedThrough: lateNow,
+      updatedAt: lateNow,
+      sourceHash: buildCreditSourceSlotsHash(repository.state.slots),
+      slotCount: 1,
+    });
+    const openedRuns: CompetitionCreditRun[] = [];
+    for (const [index, cutoff] of [
+      new Date("2026-07-09T12:00:00.000Z"),
+      new Date("2026-07-10T12:00:00.000Z"),
+    ].entries()) {
+      const run = await service.createDailyRun({
+        cutoff,
+        expectedRuleVersion: "credits-v1",
+        now: new Date(lateNow.getTime() + index * 10_000),
+      });
+      const claimed = await service.claimRun({
+        runId: run.runId,
+        workerId: `multi-late-${index}`,
+        now: new Date(lateNow.getTime() + index * 10_000 + 1_000),
+      });
+      await service.processRunBatch({
+        runId: run.runId,
+        workerId: `multi-late-${index}`,
+        fenceToken: claimed.fenceToken,
+        now: new Date(lateNow.getTime() + index * 10_000 + 2_000),
+      });
+      const opened = await service.openRun({
+        runId: run.runId,
+        workerId: `multi-late-${index}`,
+        fenceToken: claimed.fenceToken,
+        now: new Date(lateNow.getTime() + index * 10_000 + 3_000),
+      });
+      expect(opened.reconciliation.ok).toBe(true);
+      expect(opened.run.status).toBe("open");
+      openedRuns.push(opened.run);
+    }
+    expect(openedRuns[0].settlementPeriod.periodId).toBe(
+      openedRuns[1].settlementPeriod.periodId
+    );
+    expect(repository.state.accounts).toContainEqual(expect.objectContaining({
+      periodId: openedRuns[0].settlementPeriod.periodId,
+      grantedCredits: 400,
+      poolDepositedCredits: 80,
+      availableCredits: 320,
+    }));
+    expect(repository.state.poolPeriods).toContainEqual(expect.objectContaining({
+      periodId: openedRuns[0].settlementPeriod.periodId,
+      contributedCredits: 80,
+      availableCredits: 80,
+    }));
+    await expect(
+      service.openRun({
+        runId: openedRuns[0].runId,
+        workerId: "multi-late-0",
+        fenceToken: openedRuns[0].fenceToken,
+        now: new Date(lateNow.getTime() + 30_000),
+      })
+    ).resolves.toMatchObject({ reconciliation: { ok: true } });
   });
 
   it("grants only active or still-valid grace slots, with exact cutoff maturity", async () => {
@@ -582,7 +935,19 @@ describe("competition credit grant -> pool -> reservation flow", () => {
       expectedRuleVersion: "credits-v1",
       now: new Date("2026-07-10T12:01:00.000Z"),
     });
-    expect(run.expectedItemCount).toBe(2);
+    expect(run.expectedItemCount).toBe(1);
+    await service.refreshSourceWatermark({
+      route: "nft",
+      expectedRuleVersion: "credits-v1",
+      now: new Date("2026-07-10T12:01:01.000Z"),
+    });
+    const nftRun = await service.createDailyRun({
+      route: "nft",
+      cutoff: CUTOFF,
+      expectedRuleVersion: "credits-v1",
+      now: new Date("2026-07-10T12:01:02.000Z"),
+    });
+    expect(nftRun.expectedItemCount).toBe(1);
     expect(repository.state.items.map((item) => item.slotId).sort()).toEqual([
       "active-exact",
       "grace-valid",
@@ -607,6 +972,13 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     repository.state.slots[0].creditEligibleFrom = new Date(
       "2026-07-11T12:00:00.000Z"
     );
+    repository.state.slotVersions[0].slot = {
+      ...repository.state.slots[0],
+      qualifiedSince: new Date(repository.state.slots[0].qualifiedSince),
+      creditEligibleFrom: new Date(repository.state.slots[0].creditEligibleFrom),
+      createdAt: new Date(repository.state.slots[0].createdAt),
+      updatedAt: new Date(repository.state.slots[0].updatedAt),
+    };
     repository.state.sourceHealth.observedThrough = new Date(
       "2026-07-11T12:00:00.000Z"
     );
@@ -905,6 +1277,32 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     });
   });
 
+  it("keeps a retired rule queryable for historical catch-up after a version rotation", async () => {
+    const retired = testCompetitionCreditRule({
+      active: false,
+      activeFrom: new Date("2026-07-01T12:00:00.000Z"),
+      activeUntil: new Date("2026-07-11T12:00:00.000Z"),
+    });
+    const repository = new MemoryCompetitionCreditRepository({ rule: retired });
+    repository.state.rules.push(
+      testCompetitionCreditRule({
+        _id: "competition-credits:v2",
+        version: "credits-v2",
+        activeFrom: new Date("2026-07-11T12:00:00.000Z"),
+      })
+    );
+
+    await expect(
+      repository.findRuleAt(new Date("2026-07-10T12:00:00.000Z"))
+    ).resolves.toMatchObject({ version: "credits-v1", active: false });
+    await expect(repository.findOldestRule()).resolves.toMatchObject({
+      version: "credits-v1",
+    });
+    await expect(
+      repository.findRuleAt(new Date("2026-07-11T12:00:00.000Z"))
+    ).resolves.toMatchObject({ version: "credits-v2" });
+  });
+
   it("refreshes a source-bound watermark, detects slot races and supports route rule divergence", async () => {
     const nftSlot = slot({
       _id: "nft-slot-1",
@@ -931,7 +1329,9 @@ describe("competition credit grant -> pool -> reservation flow", () => {
       nft: "nft-route-v3",
     });
     expect(watermark.sourceHash).toBe(
-      buildCreditSourceSlotsHash(repository.state.slots)
+      buildCreditSourceSlotsHash(
+        repository.state.slots.filter((candidate) => candidate.route === "uki")
+      )
     );
     repository.state.slots[0].revision += 1;
     await expect(
@@ -950,7 +1350,19 @@ describe("competition credit grant -> pool -> reservation flow", () => {
       expectedRuleVersion: "credits-v1",
       now: new Date("2026-07-10T12:02:00.000Z"),
     });
-    expect(run.expectedItemCount).toBe(2);
+    expect(run.expectedItemCount).toBe(1);
+    await service.refreshSourceWatermark({
+      route: "nft",
+      expectedRuleVersion: "credits-v1",
+      now: new Date("2026-07-10T12:02:01.000Z"),
+    });
+    const nftRun = await service.createDailyRun({
+      route: "nft",
+      cutoff: CUTOFF,
+      expectedRuleVersion: "credits-v1",
+      now: new Date("2026-07-10T12:02:02.000Z"),
+    });
+    expect(nftRun.expectedItemCount).toBe(1);
   });
 
   it("fails closed on unhealthy source refresh and overlapping active credit rules", async () => {

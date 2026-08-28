@@ -70,7 +70,15 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
   ], "payload");
   const runCredits = nested(
     item.runCredits,
-    ["unitScale", "totalUnits", "weeklyReserveUnits", "convertibleUnits"],
+    [
+      "unitScale",
+      "totalUnits",
+      "weeklyReserveUnits",
+      "ambassadorReserveUnits",
+      "ambassadorOrdinaryUnits",
+      "ambassadorWeeklyUnits",
+      "convertibleUnits",
+    ],
     "runCredits",
   );
   const settlementBps = nested(
@@ -101,10 +109,14 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
     ],
     "emissionBudget",
   );
-  const cukiePool = nested(item.cukiePool, ["cumulativeTierCount"], "cukiePool");
+  const cukiePool = nested(
+    item.cukiePool,
+    ["cumulativeTierCount", "cumulativeTierBps"],
+    "cukiePool",
+  );
   const undistributedBps = nested(
     item.undistributedBps,
-    ["treasury", "marketing", "development", "supplyReduction"],
+    ["treasury", "marketing", "development", "marketingDevelopment", "supplyReduction"],
     "undistributedBps",
   );
   const destinations = nested(
@@ -116,6 +128,7 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
       "treasury",
       "marketing",
       "development",
+      "marketingDevelopment",
       "supplyReduction",
     ],
     "destinations",

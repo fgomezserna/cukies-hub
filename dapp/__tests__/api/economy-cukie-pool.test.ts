@@ -1,6 +1,7 @@
 jest.mock('@/lib/auth-utils', () => ({ verifyWalletAuth: jest.fn() }));
 jest.mock('@/lib/uki-economy/cukie-pool', () => ({
   depositCukiePoolPosition: jest.fn(),
+  getCukiePoolNftVaultMode: jest.fn(),
   listCukiePoolWalletPositions: jest.fn(),
   requestCukiePoolWithdrawal: jest.fn(),
 }));
@@ -11,6 +12,7 @@ import { GET, POST } from '@/app/api/economy/v1/cukie-pool/route';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 import {
   depositCukiePoolPosition,
+  getCukiePoolNftVaultMode,
   listCukiePoolWalletPositions,
   requestCukiePoolWithdrawal,
 } from '@/lib/uki-economy/cukie-pool';
@@ -46,6 +48,7 @@ function post(body: unknown) {
 describe('/api/economy/v1/cukie-pool', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (getCukiePoolNftVaultMode as jest.Mock).mockReturnValue('legacy');
     (verifyWalletAuth as jest.Mock).mockResolvedValue({ id: 'user-1' });
     (listCukiePoolWalletPositions as jest.Mock).mockResolvedValue({
       walletNormalized: wallet,
@@ -117,5 +120,48 @@ describe('/api/economy/v1/cukie-pool', () => {
     }));
     expect(invalid.status).toBe(400);
     expect(depositCukiePoolPosition).toHaveBeenCalledTimes(0);
+  });
+
+  it('retires both legacy Mongo mutations while the custodial vault is active', async () => {
+    (getCukiePoolNftVaultMode as jest.Mock).mockReturnValue('custodial');
+
+    const deposit = await POST(post({
+      action: 'deposit',
+      walletAddress: wallet,
+      assetId: publicPosition.assetId,
+    }));
+    const withdraw = await POST(post({
+      action: 'withdraw',
+      walletAddress: wallet,
+      positionId: 'position-1',
+      expectedRevision: 0,
+    }));
+
+    expect(deposit.status).toBe(410);
+    await expect(deposit.json()).resolves.toEqual({
+      status: 'error',
+      code: 'CUKIE_POOL_LEGACY_MUTATIONS_DISABLED',
+      mode: 'custodial_vault',
+    });
+    expect(withdraw.status).toBe(410);
+    expect(depositCukiePoolPosition).not.toHaveBeenCalled();
+    expect(requestCukiePoolWithdrawal).not.toHaveBeenCalled();
+    expect(verifyWalletAuth).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 instead of falling back to legacy when vault config is invalid', async () => {
+    (getCukiePoolNftVaultMode as jest.Mock).mockReturnValue('invalid');
+    const response = await POST(post({
+      action: 'deposit',
+      walletAddress: wallet,
+      assetId: publicPosition.assetId,
+    }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      status: 'error',
+      code: 'CUKIE_POOL_UNAVAILABLE',
+    });
+    expect(depositCukiePoolPosition).not.toHaveBeenCalled();
   });
 });

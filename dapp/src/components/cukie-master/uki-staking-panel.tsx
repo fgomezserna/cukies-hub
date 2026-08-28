@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Check, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ExternalLink, Loader2 } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import {
   useAccount,
@@ -26,11 +26,11 @@ import {
 import { useAuth } from '@/providers/auth-provider';
 
 const TOKEN_DECIMALS = 18;
-const DEFAULT_AMOUNT = '20000';
+const DEFAULT_AMOUNT = '2000';
+const MAX_UKI_ROUTE_SLOTS = BigInt(5);
 
 type StakingOperation = 'stake' | 'unstake';
 type TransactionAction = 'approve' | 'stake' | 'unstake' | null;
-type WorkflowStepState = 'done' | 'current' | 'upcoming';
 
 function parseTokenAmount(value: string) {
   const trimmed = value.trim();
@@ -51,16 +51,25 @@ function formatTokenAmount(value?: bigint, maximumFractionDigits = 4) {
   return numeric.toLocaleString('es-ES', { maximumFractionDigits });
 }
 
+function formatRawTokenAmount(value?: string) {
+  if (value === undefined || !/^(0|[1-9][0-9]*)$/.test(value)) return '--';
+  try {
+    return formatTokenAmount(BigInt(value));
+  } catch {
+    return '--';
+  }
+}
+
 function sameAddress(left?: string, right?: string) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
 export function UkiStakingPanel({
-  routePreview = null,
   testnetOnly = false,
+  routePreview = null,
 }: {
-  routePreview?: UkiRoutePreview | null;
   testnetOnly?: boolean;
+  routePreview?: UkiRoutePreview | null;
 }) {
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
@@ -154,7 +163,6 @@ export function UkiStakingPanel({
     args: address ? [address] : undefined,
     query: { enabled: walletReadsEnabled, staleTime: 0 },
   });
-
   const protocolReadsReady = stakingToken !== undefined && (
     operation === 'unstake' || isPaused !== undefined
   );
@@ -203,14 +211,6 @@ export function UkiStakingPanel({
     stakedBalance,
     routePreview,
   }), [operation, parsedAmount, routePreview, stakedBalance]);
-  const workflowSteps = buildWorkflowSteps({
-    operation,
-    isConnected,
-    isWrongChain,
-    isAuthenticatedEvm,
-    needsApproval,
-    lastCompletedAction,
-  });
 
   useEffect(() => {
     setApprovedAmount(null);
@@ -241,6 +241,7 @@ export function UkiStakingPanel({
       setApprovedAmount(null);
       setLastCompletedAction('stake');
       window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+      window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Staking confirmado',
         description: 'Tus UKI ya constan en el contrato de Cukie Master.',
@@ -249,6 +250,7 @@ export function UkiStakingPanel({
       setAmount(DEFAULT_AMOUNT);
       setLastCompletedAction('unstake');
       window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+      window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Retirada confirmada',
         description: 'Los UKI retirados han vuelto a tu wallet.',
@@ -356,32 +358,35 @@ export function UkiStakingPanel({
       <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
         <div className="grid min-w-0 gap-8 lg:grid-cols-[0.78fr_1.22fr]">
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Contrato configurado · {UKI_PRESALE_CHAIN_LABEL}</p>
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Gestiona tus UKI · {UKI_PRESALE_CHAIN_LABEL}</p>
             <h2 className="mt-2 font-headline text-3xl font-black uppercase leading-tight text-[var(--uki-cream)]">
               Staking de UKI
             </h2>
             <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Deposita solo los UKI que te falten o retíralos cuando quieras. El vesting ya cuenta
-              por separado y la operación no implica una rentabilidad garantizada.
+              Deposita tus UKI para desbloquear partidas y avanzar hacia tu próximo Cukie Master.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               <BalanceCard label="UKI en wallet" value={formatTokenAmount(liquidBalance)} />
               <BalanceCard label="UKI en staking" value={formatTokenAmount(stakedBalance)} />
+              <BalanceCard
+                label="Requisito por plaza"
+                value={formatRawTokenAmount(routePreview?.currentRequirementRaw)}
+              />
             </div>
 
-            <div className="mt-4 flex items-start gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 p-4">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" />
-              <p className="text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                Red: {UKI_PRESALE_CHAIN_LABEL}. Necesitas tBNB para el gas. El requisito oficial,
-                los UKI en vesting y tus cupos aparecen en “Tus cupos Cukie Master”.
+            <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 p-4">
+              <p className="text-sm font-black leading-relaxed text-[var(--uki-cream)]">
+                2.000 UKI en staking = 1 partida
+              </p>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
+                Para el torneo solo cuentan los UKI depositados aquí. Tus UKI de preventa
+                pendientes también cuentan para ser Cukie Master.
               </p>
             </div>
           </div>
 
           <div className="min-w-0 rounded-[10px] border border-white/10 bg-black/25 p-4 sm:p-5">
-            <StakingWorkflow steps={workflowSteps} />
-
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="Operación de staking">
               <OperationButton
                 active={operation === 'stake'}
@@ -418,8 +423,8 @@ export function UkiStakingPanel({
               <span className="flex shrink-0 items-center border-l border-white/10 px-4 text-xs font-black uppercase text-[var(--uki-muted)]">UKI</span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Cantidades rápidas">
+              <QuickAmountButton label="2.000" onClick={() => selectQuickAmount('2000')} disabled={isBusy} />
               <QuickAmountButton label="20.000" onClick={() => selectQuickAmount('20000')} disabled={isBusy} />
-              <QuickAmountButton label="40.000" onClick={() => selectQuickAmount('40000')} disabled={isBusy} />
               <QuickAmountButton label="Máximo" onClick={useMaximumBalance} disabled={availableBalance === undefined || isBusy} />
             </div>
             <p id="uki-staking-available" className="mt-2 text-right text-xs font-semibold text-[var(--uki-muted)]">
@@ -432,6 +437,10 @@ export function UkiStakingPanel({
                 <p className="mt-2 text-sm font-black leading-relaxed text-[var(--uki-cream)]">{outcomePreview.summary}</p>
                 <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{outcomePreview.detail}</p>
               </div>
+            ) : null}
+
+            {operation === 'unstake' ? (
+              <InlineWarning text="Una retirada confirmada durante la campaña descalifica esta wallet, aunque vuelvas a depositar después." />
             ) : null}
 
             {isUnsafeStagingChain ? (
@@ -514,9 +523,9 @@ export function UkiStakingPanel({
                   : lastCompletedAction === 'approve'
                     ? 'Autorización confirmada. Ya puedes depositar.'
                     : lastCompletedAction === 'stake'
-                      ? 'Depósito confirmado. Actualizando tus cupos.'
+                      ? 'Depósito confirmado. Actualizando tu saldo.'
                       : lastCompletedAction === 'unstake'
-                        ? 'Retirada confirmada. Actualizando tus cupos.'
+                        ? 'Retirada confirmada. Actualizando tu saldo.'
                         : 'Abre tu wallet y confirma la operación.'}
               </p>
             ) : null}
@@ -596,77 +605,6 @@ function QuickAmountButton({
   );
 }
 
-function StakingWorkflow({
-  steps,
-}: {
-  steps: Array<{ label: string; state: WorkflowStepState }>;
-}) {
-  return (
-    <div className="mb-5 min-w-0 border-b border-white/10 pb-5">
-      <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Pasos de la operación</p>
-      <ol className={`mt-3 grid min-w-0 gap-2 ${steps.length === 5 ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
-        {steps.map((step, index) => (
-          <li
-            key={step.label}
-            aria-current={step.state === 'current' ? 'step' : undefined}
-            className={`min-w-0 rounded-[7px] border p-2.5 ${
-              step.state === 'done'
-                ? 'border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] text-[var(--uki-cyan)]'
-                : step.state === 'current'
-                  ? 'border-[var(--uki-gold)]/45 bg-[var(--uki-gold)]/10 text-[var(--uki-gold)]'
-                  : 'border-white/10 text-[var(--uki-muted)]'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-current text-xs font-black">
-                {step.state === 'done' ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : index + 1}
-              </span>
-              <span className="min-w-0 break-words text-xs font-black uppercase leading-tight">{step.label}</span>
-            </span>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function buildWorkflowSteps({
-  operation,
-  isConnected,
-  isWrongChain,
-  isAuthenticatedEvm,
-  needsApproval,
-  lastCompletedAction,
-}: {
-  operation: StakingOperation;
-  isConnected: boolean;
-  isWrongChain: boolean;
-  isAuthenticatedEvm: boolean;
-  needsApproval: boolean;
-  lastCompletedAction: TransactionAction;
-}) {
-  const networkStepLabel = UKI_PRESALE_CHAIN_ID === 97 ? 'BSC Testnet' : 'BSC Mainnet';
-  const labels = operation === 'stake'
-    ? ['Conectar', networkStepLabel, 'Firmar', 'Autorizar', 'Depositar']
-    : ['Conectar', networkStepLabel, 'Firmar', 'Retirar'];
-  let completedSteps = 0;
-  if (isConnected) completedSteps = 1;
-  if (isConnected && !isWrongChain) completedSteps = 2;
-  if (isConnected && !isWrongChain && isAuthenticatedEvm) completedSteps = 3;
-  if (operation === 'stake' && isAuthenticatedEvm && !needsApproval) completedSteps = 4;
-  if (operation === 'stake' && lastCompletedAction === 'stake') completedSteps = 5;
-  if (operation === 'unstake' && lastCompletedAction === 'unstake') completedSteps = 4;
-
-  return labels.map((label, index) => ({
-    label,
-    state: (index < completedSteps
-      ? 'done'
-      : index === completedSteps
-        ? 'current'
-        : 'upcoming') as WorkflowStepState,
-  }));
-}
-
 function buildOutcomePreview({
   operation,
   parsedAmount,
@@ -678,27 +616,28 @@ function buildOutcomePreview({
   stakedBalance?: bigint;
   routePreview: UkiRoutePreview | null;
 }) {
-  if (!parsedAmount || !routePreview) return null;
+  if (!parsedAmount || stakedBalance === undefined || !routePreview) return null;
+  if (operation === 'unstake' && parsedAmount > stakedBalance) return null;
   try {
     const requirement = BigInt(routePreview.currentRequirementRaw);
-    const locked = BigInt(routePreview.presaleLockedRaw);
-    const currentStaked = stakedBalance ?? BigInt(routePreview.indexedStakedRaw);
-    if (requirement <= BigInt(0) || locked < BigInt(0) || currentStaked < BigInt(0)) return null;
-    if (operation === 'unstake' && parsedAmount > currentStaked) return null;
+    const presaleLocked = BigInt(routePreview.presaleLockedRaw);
+    if (requirement <= BigInt(0)) return null;
     const projectedStaked = operation === 'stake'
-      ? currentStaked + parsedAmount
-      : currentStaked - parsedAmount;
-    const total = locked + projectedStaked;
-    const theoreticalSlots = Math.min(5, Number(total / requirement));
-    const remainder = total % requirement;
-    const deficit = theoreticalSlots >= 5
+      ? stakedBalance + parsedAmount
+      : stakedBalance - parsedAmount;
+    const totalComputable = presaleLocked + projectedStaked;
+    const rawSlots = totalComputable / requirement;
+    const slots = rawSlots > MAX_UKI_ROUTE_SLOTS ? MAX_UKI_ROUTE_SLOTS : rawSlots;
+    const missingForNextSlot = slots >= MAX_UKI_ROUTE_SLOTS
       ? BigInt(0)
-      : remainder === BigInt(0) ? requirement : requirement - remainder;
+      : ((slots + BigInt(1)) * requirement) - totalComputable;
     return {
-      summary: `Capacidad teórica tras confirmar: ${theoreticalSlots}/5 cupos por UKI.`,
-      detail: `${formatTokenAmount(total)} UKI computables = ${formatTokenAmount(locked)} en vesting + ${formatTokenAmount(projectedStaked)} en staking.${
-        deficit > BigInt(0) ? ` Faltarían ${formatTokenAmount(deficit)} UKI para el siguiente cupo.` : ' Máximo de la ruta alcanzado.'
-      } La asignación final se actualiza cuando el indexador confirma la operación.`,
+      summary: `Tendrías ${formatTokenAmount(projectedStaked)} UKI en staking y ${slots.toString()}/5 Cukie Masters.`,
+      detail: operation === 'unstake'
+        ? 'Si el torneo ya ha empezado, esta retirada descalificará la wallet.'
+        : missingForNextSlot === BigInt(0)
+          ? 'Has alcanzado el máximo de 5 Cukie Masters mediante UKI.'
+          : `Te faltarían ${formatTokenAmount(missingForNextSlot)} UKI para el siguiente Cukie Master.`,
     };
   } catch {
     return null;

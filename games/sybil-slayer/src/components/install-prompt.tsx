@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useIsMobile } from '../hooks/use-mobile';
+import { gamePublicPath } from '../lib/public-path';
 import { TreasureButton, TreasurePanel } from './treasure-hunt-ui';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -213,7 +214,7 @@ export default function InstallPrompt() {
     // Verificar Manifest
     const checkManifest = async () => {
       try {
-        const response = await fetch('/manifest.json');
+        const response = await fetch(gamePublicPath('/manifest.json'));
         if (response.ok) {
           const manifest = await response.json();
           const manifestInfo = {

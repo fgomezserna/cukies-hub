@@ -25,7 +25,12 @@ const MIN_LEASE_MS = 1_000;
 const MAX_LEASE_MS = 15 * 60 * 1000;
 const MAX_CUKIE_ASSETS = 100;
 const UINT256_MAX = (BigInt(1) << BigInt(256)) - BigInt(1);
-const TERMINAL_SESSION_STATUS = new Set(["settled", "expired", "rejected"]);
+const TERMINAL_SESSION_STATUS = new Set([
+  "settled",
+  "forfeited",
+  "expired",
+  "rejected",
+]);
 export const GAME_ECONOMY_MAX_CONVERTIBLE_RAW = "7500000000000000000" as const;
 
 function stableValue(value: unknown): unknown {
@@ -390,11 +395,23 @@ export function buildGameValidationRequestHash(sessionId: string) {
   return stableGameEconomyHash({ sessionId });
 }
 
-export const buildGameSettlementRequestHash = buildGameValidationRequestHash;
+export function buildGameSettlementRequestHash(input: {
+  sessionId: string;
+  resourceActions: {
+    credit: "consume" | "release";
+    cukie: "consume" | "release";
+  };
+}) {
+  return stableGameEconomyHash(input);
+}
+
+export function buildLegacyGameSettlementRequestHash(sessionId: string) {
+  return stableGameEconomyHash({ sessionId: validGameText(sessionId, "sessionId") });
+}
 
 export function buildGameTerminalRequestHash(input: {
   sessionId: string;
-  status: "expired" | "rejected";
+  status: "expired" | "rejected" | "forfeited";
   reasonCode: string;
 }) {
   return stableGameEconomyHash(input);
@@ -681,7 +698,15 @@ export function assertGameSessionIntegrity(session: GameEconomySession) {
     assertCommand(session.settlementCommand, "settlementCommand");
     if (
       session.settlementCommand.requestHash !==
-      buildGameSettlementRequestHash(session.sessionId)
+      (session.settlementIntent && !session.settlementIntent.resourceActions
+        ? buildLegacyGameSettlementRequestHash(session.sessionId)
+        : buildGameSettlementRequestHash({
+            sessionId: session.sessionId,
+            resourceActions: session.settlementIntent?.resourceActions ?? {
+              credit: session.rule.credit.consumeOnSettle ? "consume" : "release",
+              cukie: session.rule.cukie.consumeOnSettle ? "consume" : "release",
+            },
+          }))
     ) {
       throw new DomainConflictError("settlementCommand no liga su payload.");
     }
@@ -707,9 +732,16 @@ export function assertGameSessionIntegrity(session: GameEconomySession) {
   }
   if (session.settlementIntent) {
     assertIntent(session.settlementIntent, "settlementIntent");
+    const actions = session.settlementIntent.resourceActions;
+    const expectedHash = actions
+      ? buildGameSettlementRequestHash({ sessionId: session.sessionId, resourceActions: actions })
+      : buildLegacyGameSettlementRequestHash(session.sessionId);
     if (
-      session.settlementIntent.requestHash !==
-      buildGameSettlementRequestHash(session.sessionId)
+      (actions && (
+        !["consume", "release"].includes(actions.credit) ||
+        !["consume", "release"].includes(actions.cukie)
+      )) ||
+      session.settlementIntent.requestHash !== expectedHash
     ) {
       throw new DomainConflictError("settlementIntent no liga su payload.");
     }
@@ -825,10 +857,14 @@ export function assertGameSessionIntegrity(session: GameEconomySession) {
     "validated",
     "settled",
   ].includes(session.status);
-  const settledCreditState = session.rule.credit.consumeOnSettle
+  const settledActions = session.settlementIntent?.resourceActions ?? {
+    credit: session.rule.credit.consumeOnSettle ? "consume" as const : "release" as const,
+    cukie: session.rule.cukie.consumeOnSettle ? "consume" as const : "release" as const,
+  };
+  const settledCreditState = settledActions.credit === "consume"
     ? "consumed"
     : "released";
-  const settledCukieState = session.rule.cukie.consumeOnSettle
+  const settledCukieState = settledActions.cukie === "consume"
     ? "consumed"
     : "released";
   if (session.operation) {
@@ -861,16 +897,21 @@ export function assertGameSessionIntegrity(session: GameEconomySession) {
         session.credit.state !== settledCreditState) ||
         (session.rule.cukie.required &&
           session.cukie.state !== settledCukieState))) ||
-    (["expired", "rejected"].includes(session.status) &&
+    (["expired", "rejected", "forfeited"].includes(session.status) &&
       (!session.terminal || !session.terminalIntent)) ||
     (["expired", "rejected"].includes(session.status) &&
       ((session.rule.credit.required && session.credit.state !== "released") ||
         (session.rule.cukie.required && session.cukie.state !== "released"))) ||
+    (session.status === "forfeited" &&
+      ((session.rule.credit.required && session.credit.state !== "consumed") ||
+        (session.rule.cukie.required && session.cukie.state !== "consumed"))) ||
     (TERMINAL_SESSION_STATUS.has(session.status) && session.operation) ||
     (session.settlementIntent !== undefined &&
       session.terminalIntent !== undefined) ||
     (session.terminalIntent &&
-      !["expired", "rejected"].includes(session.terminalIntent.status)) ||
+      !["expired", "rejected", "forfeited"].includes(
+        session.terminalIntent.status,
+      )) ||
     (session.terminal &&
       session.terminalIntent?.status !== session.status) ||
     (session.settlementCommand &&

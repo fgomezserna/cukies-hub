@@ -18,23 +18,12 @@ import { buildGameOwnCukieAssignmentEvidence } from "@/lib/uki-economy/game-econ
 import type { GameEconomySession } from "@/lib/uki-economy/game-economy/types";
 import { getIsoWeekPeriodId } from "@/lib/uki-economy/periods";
 import {
-  assertWeeklyRankingRule,
-  assertWeeklyRankingSnapshotIntegrity,
-} from "@/lib/uki-economy/ranking/rules";
-import {
-  assertWeeklyRankingManifestIntegrity,
-  assertWeeklyRankingSourceIntegrity,
-} from "@/lib/uki-economy/ranking/service";
-import {
-  WEEKLY_RANKING_RULE_SCOPE,
-  type WeeklyRankingRule,
-  type WeeklyRankingManifest,
-  type WeeklyRankingSnapshot,
-  type WeeklyRankingSource,
-} from "@/lib/uki-economy/ranking/types";
+  TREASURE_HUNT_ECONOMY_POLICY,
+} from "@/lib/uki-economy/game-economy/treasure-hunt-policy";
 
 import { DomainConflictError, DomainNotFoundError } from "../errors";
 import { calculateSettlementRewardAllocations } from "./calculation";
+import { resolveAppliedArenaRanking } from "./arena-ranking";
 import type { RewardAllocationService } from "./service";
 import { rewardAllocationService } from "./service";
 import {
@@ -60,6 +49,19 @@ export function assertSettlementRewardPeriod(periodId: string, settledAt: Date) 
     );
   }
   return canonicalPeriodId;
+}
+
+function settlementRewardAnchor(game: GameEconomySession) {
+  return game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId &&
+    game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
+    ? {
+        effectiveAt: game.createdAt,
+        periodId: getIsoWeekPeriodId(new Date(game.createdAt.getTime() - 14 * 60 * 60_000)),
+      }
+    : {
+        effectiveAt: game.settledAt!,
+        periodId: getIsoWeekPeriodId(game.settledAt!),
+      };
 }
 
 function expectedCreditEvidenceHash(reservation: CreditReservation) {
@@ -162,6 +164,7 @@ export function assertSettlementResourceBindings(
         `La asignacion del pool no liga exactamente la session ${game.sessionId}.`,
       );
     }
+    if (assignment.kind === "seiku") return "seiku" as const;
     return assignment.generation === "original"
       ? "pool_original" as const
       : "pool_second_plus" as const;
@@ -200,20 +203,25 @@ export async function loadSettlementRewardSnapshot(input: SettleGameRewardsInput
     ) {
       throw new DomainConflictError(`La session ${sessionId} no esta liquidada.`);
     }
-    assertSettlementRewardPeriod(periodId, game.settledAt);
+    const rewardAnchor = settlementRewardAnchor(game);
+    if (periodId !== rewardAnchor.periodId) {
+      throw new DomainConflictError(
+        `El settlement pertenece a ${rewardAnchor.periodId}, no a ${periodId}.`,
+      );
+    }
     const rule = await db.collection<RewardRule>("economy_rule_versions").findOne({
       scope: "reward_allocations",
       version: expectedRuleVersion,
       active: true,
-      activeFrom: { $lte: game.settledAt },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: game.settledAt } }],
+      activeFrom: { $lte: rewardAnchor.effectiveAt },
+      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: rewardAnchor.effectiveAt } }],
     }, { session: mongoSession });
     if (!rule) {
       throw new DomainConflictError(
         `La regla ${expectedRuleVersion} no cubre el settlement de ${sessionId}.`,
       );
     }
-    assertRewardRule(rule, game.settledAt);
+    assertRewardRule(rule, rewardAnchor.effectiveAt);
     const gameReward = assertProductiveGameRewardBinding(game.rule);
     if (
       gameReward.rewardRuleVersion !== rule.version
@@ -260,82 +268,15 @@ export async function loadSettlementRewardSnapshot(input: SettleGameRewardsInput
       ownAssignment,
     );
 
-    let ranking: WeeklyRankingSnapshot | null = null;
-    if (credit.bucket === "pool") {
-      // Rewards nunca recalcula ni aproxima ranking: consume el snapshot
-      // semanal sellado por el productor canonico y exige tambien que esta
-      // session figure en su source set inmutable.
-      ranking = await db.collection<WeeklyRankingSnapshot>("game_weekly_rankings").findOne({
-        periodId,
-        gameId: game.gameId,
-        walletNormalized: game.walletNormalized,
-        status: "sealed",
-      }, { session: mongoSession });
-      if (!ranking) {
-        throw new DomainConflictError("Falta ranking semanal sellado para creditos del pool.");
-      }
-      assertWeeklyRankingSnapshotIntegrity(ranking);
-      const rankingRule = await db.collection<WeeklyRankingRule>("economy_rule_versions")
-        .findOne({
-          scope: WEEKLY_RANKING_RULE_SCOPE,
-          version: ranking.ruleVersion,
-          configHash: ranking.ruleConfigHash,
-          active: true,
-          activeFrom: { $lte: ranking.periodStart },
-          $or: [
-            { activeUntil: { $exists: false } },
-            { activeUntil: { $gte: ranking.periodEndExclusive } },
-          ],
-        }, { session: mongoSession });
-      if (
-        !rankingRule
-        || ranking.rewardBps !== rule.rankingPlayerBps[String(ranking.rank)]
-      ) {
-        throw new DomainConflictError(
-          `El ranking ${ranking.rankingId} no liga la tabla de rewards activa.`,
-        );
-      }
-      assertWeeklyRankingRule(rankingRule, ranking.periodStart);
-      const rankingManifest = await db.collection<WeeklyRankingManifest>("weekly_ranking_manifests")
-        .findOne({ manifestId: ranking.manifestId, periodId }, { session: mongoSession });
-      if (!rankingManifest) {
-        throw new DomainConflictError(`Falta manifest semanal para ${ranking.rankingId}.`);
-      }
-      assertWeeklyRankingManifestIntegrity(rankingManifest);
-      if (
-        rankingManifest.sourceSetHash !== ranking.sourceSetHash
-        || rankingManifest.runId !== ranking.runId
-        || rankingManifest.ruleVersion !== ranking.ruleVersion
-        || rankingManifest.ruleConfigHash !== ranking.ruleConfigHash
-      ) {
-        throw new DomainConflictError(
-          `El ranking ${ranking.rankingId} no liga su manifest sellado.`,
-        );
-      }
-      const rankingSource = await db.collection<WeeklyRankingSource>("weekly_ranking_sources")
-        .findOne({ periodId, sessionId: game.sessionId }, { session: mongoSession });
-      if (!rankingSource) {
-        throw new DomainConflictError(
-          `La session ${game.sessionId} no forma parte del manifest semanal sellado.`,
-        );
-      }
-      assertWeeklyRankingSourceIntegrity(rankingSource);
-      if (
-        rankingSource.gameId !== game.gameId
-        || rankingSource.walletNormalized !== game.walletNormalized
-        || rankingSource.reservationId !== credit.reservationId
-        || rankingSource.gameResultHash !== game.validation.resultHash
-        || rankingSource.creditPayloadHash !== credit.payloadHash
-        || rankingSource.cappedScoreRaw !== game.validation.cappedScoreRaw
-        || rankingSource.scoreCapRaw !== game.rule.calculation.scoreCapRaw
-        || rankingSource.gameRuleVersion !== game.rule.version
-        || rankingSource.gameRuleConfigHash !== game.rule.configHash
-      ) {
-        throw new DomainConflictError(
-          `El source semanal de ${game.sessionId} no liga sus documentos canonicos.`,
-        );
-      }
-    }
+    const arenaRanking = await resolveAppliedArenaRanking({
+      db,
+      session: mongoSession,
+      gameId: game.gameId,
+      walletAddress: game.walletNormalized,
+      creditSource: credit.bucket,
+      periodAnchorAt: rewardAnchor.effectiveAt,
+      rewardRule: rule,
+    });
 
     return {
       game,
@@ -343,8 +284,9 @@ export async function loadSettlementRewardSnapshot(input: SettleGameRewardsInput
       credit,
       assignment,
       ownAssignment,
-      ranking,
+      arenaRanking,
       periodId,
+      rewardEffectiveAt: rewardAnchor.effectiveAt,
       sourceId: `game-session:${sessionId}`,
       creditSource: credit.bucket,
       cukieSource,
@@ -368,7 +310,7 @@ export class RewardCalculationCoordinator {
       maxConvertibleRaw: snapshot.game.rule.reward.maxConvertibleRaw,
       creditSource: snapshot.creditSource,
       cukieSource: snapshot.cukieSource,
-      ranking: snapshot.ranking?.rank ?? null,
+      ranking: snapshot.arenaRanking.rank,
       creditCostUnits: snapshot.rule.runCredits.totalUnits,
       weeklyReserveUnits: snapshot.rule.runCredits.weeklyReserveUnits,
     } as const;
@@ -383,8 +325,8 @@ export class RewardCalculationCoordinator {
         snapshot.assignment?.assignmentId ?? snapshot.ownAssignment?.assignmentId ?? null,
       cukieAssignmentRequestHash:
         snapshot.assignment?.requestHash ?? snapshot.ownAssignment?.requestHash ?? null,
-      rankingId: snapshot.ranking?.rankingId ?? null,
-      rankingPayloadHash: snapshot.ranking?.payloadHash ?? null,
+      rankingId: snapshot.arenaRanking.sourceRankingId,
+      rankingPayloadHash: snapshot.arenaRanking.evidenceHash,
       rewardRuleVersion: snapshot.rule.version,
       rewardRuleConfigHash: snapshot.rule.configHash,
       calculatorInput,
@@ -401,7 +343,7 @@ export class RewardCalculationCoordinator {
       sourceId: snapshot.sourceId,
       sourceTotalRaw: calculated.totals.sourceTotalRaw,
       expectedRuleVersion: snapshot.rule.version,
-      ruleEffectiveAt: snapshot.game.settledAt!,
+      ruleEffectiveAt: snapshot.rewardEffectiveAt,
       allocations: calculated.allocations,
       accruals: calculated.accruals,
       calculation: {

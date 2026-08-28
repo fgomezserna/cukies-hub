@@ -18,6 +18,7 @@ import { ECONOMY_INDEXES } from './economy-indexes.js';
 import {
   ensureEconomySchema,
   migrateEconomySchemaV1ToV2,
+  migrateEconomySchemaV2ToV3,
   verifyEconomyTransactionSupport,
 } from './economy-schema.js';
 
@@ -66,6 +67,13 @@ export class IndexerStore {
     return metadata;
   }
 
+  async migrateEconomySchemaV3() {
+    const metadata = await migrateEconomySchemaV2ToV3(this.db, this.db.databaseName);
+    await this.ensureEconomyIndexes();
+    await verifyEconomyTransactionSupport(this.db, this.db.databaseName);
+    return metadata;
+  }
+
   async ensureIndexes() {
     await Promise.all([
       this.events().createIndex({
@@ -78,6 +86,39 @@ export class IndexerStore {
       this.events().createIndex({ status: 1, timestampMs: 1, blockNumber: 1, logIndex: 1 }),
       this.events().createIndex({ txHash: 1 }),
       this.events().createIndex({ eventName: 1, 'normalized.tokenId': 1, timestampMs: -1 }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        contractAddress: 1,
+        eventName: 1,
+        status: 1,
+        'normalized.accountNormalized': 1,
+        timestampMs: 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.accountNormalized': 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.beneficiaryNormalized': 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.fromNormalized': 1,
+      }),
+      this.events().createIndex({
+        chain: 1,
+        contractAlias: 1,
+        status: 1,
+        'normalized.toNormalized': 1,
+      }),
       this.cursors().createIndex({ chain: 1, contractAlias: 1, eventName: 1 }),
       this.db.collection('tx_nfts').createIndex({ eventId: 1 }, { unique: true, sparse: true }),
       this.db
@@ -108,9 +149,49 @@ export class IndexerStore {
       this.db.collection('reward_claims')
         .createIndex({ transactionHash: 1, logIndex: 1 }, { unique: true }),
       this.db.collection('chain_dead_letters').createIndex({ eventId: 1 }, { unique: true }),
+      this.db.collection('chain_dead_letters').createIndex({ chain: 1, contractAlias: 1, updatedAt: -1 }),
       this.db.collection('chain_indexer_runs').createIndex({ startedAt: -1 }),
       this.db.collection('cukies').createIndex({ state: 1, network: 1, ownerNormalized: 1, timeStamp: -1 }),
       this.db.collection('cukies').createIndex({ ownerNormalized: 1, state: 1, network: 1 }),
+      this.db.collection('cukies').createIndex(
+        { chainId: 1, collectionAddressNormalized: 1, tokenId: 1 },
+        {
+          name: 'cukies_bsc_asset_identity_unique',
+          unique: true,
+          partialFilterExpression: {
+            chainId: { $type: 'number' },
+            collectionAddressNormalized: { $type: 'string' },
+            tokenId: { $exists: true },
+          },
+        },
+      ),
+      this.db.collection('nft_vault_collections').createIndex(
+        { chainId: 1, vaultAlias: 1, vaultAddressNormalized: 1, collectionAddressNormalized: 1 },
+        { unique: true },
+      ),
+      this.db.collection('cukie_master_nft_positions').createIndex(
+        { chainId: 1, beneficiaryNormalized: 1, lifecycleOpen: 1, assetId: 1 },
+      ),
+      this.db.collection('cukie_pool_nft_vault_positions').createIndex(
+        { chainId: 1, beneficiaryNormalized: 1, lifecycleOpen: 1, assetId: 1 },
+      ),
+      this.db.collection('cukie_pool_nft_vault_positions').createIndex(
+        {
+          chainId: 1,
+          vaultAddressNormalized: 1,
+          collectionAddressNormalized: 1,
+          activationAt: 1,
+          exitRequestedAt: 1,
+        },
+        { name: 'cukie_pool_reward_census' },
+      ),
+      this.db.collection('cukie_pool_calendar_versions').createIndex(
+        { chainId: 1, vaultAddressNormalized: 1, calendarVersion: 1 },
+        { unique: true },
+      ),
+      this.db.collection('nft_vault_recovery_audit').createIndex(
+        { chainId: 1, vaultAlias: 1, assetId: 1, 'evidence.blockNumber': -1 },
+      ),
       this.db.collection('tx_nfts').createIndex({ tokenId: 1, timestampMs: -1 }),
       this.db.collection('point_transactions').createIndex({ addressNormalized: 1, chain: 1, type: 1, timestampMs: -1 }),
       this.db.collection('point_transactions').createIndex({ chain: 1, type: 1, timestampMs: -1 }),
@@ -162,8 +243,31 @@ export class IndexerStore {
     chainId: 56 | 97;
     safeBlockNumber: number;
     safeBlockHash: string;
+    safeBlockTimestampMs: number;
     checkedAt: Date;
   }) {
+    if (
+      !Number.isSafeInteger(input.safeBlockTimestampMs)
+      || input.safeBlockTimestampMs < 0
+    ) {
+      throw new Error('El timestamp del bloque canonico BSC es invalido.');
+    }
+    await this.db.collection<Document & { _id: string }>('chain_bsc_canonical_blocks').updateOne(
+      { _id: String(input.safeBlockNumber) },
+      {
+        $setOnInsert: {
+          _id: String(input.safeBlockNumber),
+          chain: 'BSC',
+          chainId: input.chainId,
+          blockNumber: input.safeBlockNumber,
+          blockHash: input.safeBlockHash.toLowerCase(),
+          blockTimestamp: new Date(input.safeBlockTimestampMs),
+          observedAt: input.checkedAt,
+          createdAt: input.checkedAt,
+        },
+      },
+      { upsert: true },
+    );
     await this.db.collection<Document & { _id: string }>('chain_bsc_checkpoints').updateOne(
       { _id: 'canonical-safe' },
       {
@@ -172,12 +276,105 @@ export class IndexerStore {
           chainId: input.chainId,
           safeBlockNumber: input.safeBlockNumber,
           safeBlockHash: input.safeBlockHash.toLowerCase(),
+          safeBlockTimestamp: new Date(input.safeBlockTimestampMs),
           checkedAt: input.checkedAt,
           updatedAt: input.checkedAt,
         },
         $setOnInsert: {
           _id: 'canonical-safe',
           createdAt: input.checkedAt,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  async listUnresolvedCompetitionCreditCutoffs(safeThrough: Date, limit: number) {
+    const schema = await this.db.collection<Document & { _id: string }>(
+      'economy_schema_metadata',
+    ).findOne({ _id: 'uki-economy', schemaVersion: 3 });
+    const coverage = await this.db.collection<Document & { _id: string }>(
+      'cukie_master_slot_history_state',
+    ).find({ _id: { $in: ['uki', 'nft'] } }).limit(3).toArray();
+    if (!schema || coverage.length !== 2) return [];
+    const reliableDates = [schema.migratedAt ?? schema.initializedAt, ...coverage.map((item) => item.completeFrom)];
+    if (reliableDates.some((value) => !(value instanceof Date))) return [];
+    const reliableFrom = new Date(Math.max(...reliableDates.map((value) => (value as Date).getTime())));
+    const rules = await this.db.collection<{
+      active?: boolean;
+      activeFrom?: Date;
+      activeUntil?: Date;
+      cutoffHourUtc?: number;
+      cutoffMinuteUtc?: number;
+      scope?: string;
+    }>('economy_rule_versions').find({
+      scope: 'competition_credits',
+      activeFrom: { $lte: safeThrough },
+      $or: [
+        { activeUntil: { $exists: false } },
+        { activeUntil: { $gt: reliableFrom } },
+      ],
+    }).sort({ activeFrom: 1, _id: 1 }).limit(100).toArray();
+    const candidates: Date[] = [];
+    for (const rule of rules) {
+      if (
+        !(rule.activeFrom instanceof Date)
+        || !Number.isSafeInteger(rule.cutoffHourUtc)
+        || !Number.isSafeInteger(rule.cutoffMinuteUtc)
+      ) continue;
+      const firstReliableInstant = rule.activeFrom > reliableFrom ? rule.activeFrom : reliableFrom;
+      let cutoff = new Date(Date.UTC(
+        firstReliableInstant.getUTCFullYear(),
+        firstReliableInstant.getUTCMonth(),
+        firstReliableInstant.getUTCDate(),
+        Number(rule.cutoffHourUtc),
+        Number(rule.cutoffMinuteUtc),
+      ));
+      if (cutoff < firstReliableInstant) cutoff = new Date(cutoff.getTime() + 86_400_000);
+      const end = rule.activeUntil && rule.activeUntil < safeThrough ? rule.activeUntil : safeThrough;
+      while (cutoff <= end) {
+        if (candidates.length >= 20_000) {
+          throw new Error('El backlog de cutoffs canonicos excede el limite auditable de 20.000.');
+        }
+        candidates.push(cutoff);
+        cutoff = new Date(cutoff.getTime() + 86_400_000);
+      }
+    }
+    const unique = [...new Map(candidates.map((cutoff) => [cutoff.toISOString(), cutoff])).values()]
+      .sort((left, right) => left.getTime() - right.getTime());
+    if (unique.length === 0) return [];
+    const existing = await this.db.collection<Document & { _id: string }>(
+      'competition_credit_cutoff_blocks',
+    ).find(
+      { _id: { $in: unique.map((cutoff) => cutoff.toISOString()) } },
+      { projection: { _id: 1 } },
+    ).toArray();
+    const resolved = new Set(existing.map((item) => String(item._id)));
+    return unique.filter((cutoff) => !resolved.has(cutoff.toISOString())).slice(0, limit);
+  }
+
+  async upsertCompetitionCreditCutoffBlock(input: {
+    cutoff: Date;
+    chainId: 56 | 97;
+    blockNumber: number;
+    blockHash: string;
+    blockTimestamp: Date;
+    successorBlockNumber: number;
+    successorBlockHash: string;
+    successorBlockTimestamp: Date;
+    safeBlockNumber: number;
+    safeBlockHash: string;
+    resolvedAt: Date;
+  }) {
+    await this.db.collection<Document & { _id: string }>(
+      'competition_credit_cutoff_blocks',
+    ).updateOne(
+      { _id: input.cutoff.toISOString() },
+      {
+        $setOnInsert: {
+          _id: input.cutoff.toISOString(),
+          ...input,
+          createdAt: input.resolvedAt,
         },
       },
       { upsert: true },
@@ -369,6 +566,8 @@ export class IndexerStore {
             eventId: event._id,
             eventName: event.eventName,
             chain: event.chain,
+            contractAlias: event.contractAlias,
+            contractAddress: event.contractAddress,
             error: message,
             updatedAt: now(),
           },

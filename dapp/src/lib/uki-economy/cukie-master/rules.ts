@@ -16,7 +16,9 @@ import type {
 } from './types';
 
 export const CUKIE_MASTER_INITIAL_CAPACITY = 500;
-export const CUKIE_MASTER_MAX_CAPACITY = 5_000;
+// Each independent route may grow from 500 to 2,500 positions. Together, the
+// NFT and UKI routes therefore preserve the approved 5,000-position global cap.
+export const CUKIE_MASTER_MAX_CAPACITY = 2_500;
 export const CUKIE_MASTER_MAX_SLOTS_PER_ROUTE = 5;
 // keccak256("PRESALE"), matching VestingVault.PRESALE_SCHEDULE_ID.
 export const CUKIE_MASTER_PRESALE_VESTING_SCHEDULE_ID =

@@ -19,6 +19,7 @@ describe("competition credit rules", () => {
     expect(buildCompetitionCreditPeriod(cutoff, rule)).toEqual({
       periodId: `credits-v1:${rule.configHash}:2026-07-10T12:00:00.000Z`,
       cutoff,
+      settlementTarget: new Date("2026-07-10T16:00:00.000Z"),
       nextCutoff: new Date("2026-07-11T12:00:00.000Z"),
       ruleVersion: "credits-v1",
       ruleConfigHash: rule.configHash,
@@ -152,7 +153,7 @@ describe("competition credit rules", () => {
     );
   });
 
-  it("requires exact UKI cursor address, chain, safe block and verified contract identity", () => {
+  it("accepts a cursor at or ahead of the completed UKI watermark, never behind it", () => {
     const rule = testCompetitionCreditRule();
     const cursor = {
       contractAlias: "UKI_STAKING",
@@ -182,6 +183,12 @@ describe("competition credit rules", () => {
       expectedIdentity: rule.verifiedSourceIdentities.UKI_STAKING,
     };
     expect(creditSourceCursorIsHealthy(input)).toBe(true);
+    expect(
+      creditSourceCursorIsHealthy({
+        ...input,
+        cursor: { ...cursor, safeBlock: 101, nextBlock: 102 },
+      })
+    ).toBe(true);
     expect(
       creditSourceCursorIsHealthy({
         ...input,

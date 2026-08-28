@@ -7,10 +7,14 @@ import {
   ECONOMY_SCHEMA_METADATA_ID,
   ECONOMY_SCHEMA_VERSION,
   ECONOMY_V2_MIGRATION_ID,
+  ECONOMY_V3_MIGRATION_ID,
+  ECONOMY_V3_LEGACY_CREDIT_COLLECTIONS,
   EconomyTransactionSupportError,
+  assertEconomyV3LegacyCreditCollectionsEmpty,
   assertEconomySchema,
   ensureEconomySchema,
   migrateEconomySchemaV1ToV2,
+  migrateEconomySchemaV2ToV3,
   verifyEconomyTransactionSupport,
   type EconomySchemaMetadata,
 } from './economy-schema.js';
@@ -87,6 +91,31 @@ function fakeDb(initial?: EconomySchemaMetadata) {
 }
 
 describe('economy schema sentinel', () => {
+  it('preflights every legacy credit collection and reports all non-empty sources', async () => {
+    const seen: string[] = [];
+    const db = {
+      collection: (name: string) => ({
+        countDocuments: async () => {
+          seen.push(name);
+          return name === 'competition_credit_ledger' || name === 'credit_pool_positions' ? 2 : 0;
+        },
+      }),
+    } as unknown as Db;
+
+    await assert.rejects(
+      assertEconomyV3LegacyCreditCollectionsEmpty(db),
+      /competition_credit_ledger=2.*credit_pool_positions=2/,
+    );
+    assert.deepEqual(seen, [...ECONOMY_V3_LEGACY_CREDIT_COLLECTIONS]);
+  });
+
+  it('accepts the v3 preflight only when every legacy credit collection is empty', async () => {
+    const db = {
+      collection: () => ({ countDocuments: async () => 0 }),
+    } as unknown as Db;
+    await assert.doesNotReject(assertEconomyV3LegacyCreditCollectionsEmpty(db));
+  });
+
   it('initializes and refreshes atomically with the document returned by Mongo', async () => {
     const store = fakeDb();
 
@@ -206,7 +235,7 @@ describe('economy schema sentinel', () => {
       async (work) => work(session),
     );
 
-    assert.equal(result.schemaVersion, ECONOMY_SCHEMA_VERSION);
+    assert.equal(result.schemaVersion, 2);
     assert.equal(result.migratedFromVersion, 1);
     assert.equal(result.migrationId, ECONOMY_V2_MIGRATION_ID);
     assert.ok(result.migratedAt instanceof Date);
@@ -227,5 +256,65 @@ describe('economy schema sentinel', () => {
       migrateEconomySchemaV1ToV2(missing.db, 'cukieshub-new', async (work) => work(session)),
       /no contiene un sentinel v1 migrable/,
     );
+  });
+
+  it('backfills v2 slots without inventing historical block coverage', async () => {
+    const timestamp = new Date('2026-07-10T10:00:00.000Z');
+    let current: Record<string, unknown> = {
+      _id: ECONOMY_SCHEMA_METADATA_ID,
+      schemaVersion: 2,
+      dbName: 'cukieshub-new',
+      initializedAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const versions: Array<Record<string, unknown>> = [];
+    const historyStates: Array<Record<string, unknown>> = [];
+    const db = {
+      databaseName: 'cukieshub-new',
+      collection: (name: string) => ({
+        findOne: async () => name === 'economy_schema_metadata' ? current : null,
+        findOneAndUpdate: async (_filter: unknown, update: { $set: Record<string, unknown> }) => {
+          current = { ...current, ...update.$set };
+          return current;
+        },
+        countDocuments: async () => 0,
+        find: () => ({
+          toArray: async () => name === 'cukie_master_slots'
+            ? [{
+                _id: '0xabc:uki:1',
+                route: 'uki',
+                revision: 7,
+                sourceHash: 'legacy-source',
+              }]
+            : [],
+        }),
+        updateOne: async (_filter: unknown, update: { $setOnInsert?: Record<string, unknown>; $set?: Record<string, unknown> }) => {
+          const document = { ...update.$setOnInsert, ...update.$set };
+          if (name === 'cukie_master_slot_versions') versions.push(document);
+          if (name === 'cukie_master_slot_history_state') historyStates.push(document);
+          return { matchedCount: 1, upsertedCount: 1 };
+        },
+        listIndexes: () => ({ toArray: async () => [] }),
+        dropIndex: async () => undefined,
+        createIndex: async () => 'test-index',
+      }),
+    } as unknown as Db;
+
+    const result = await migrateEconomySchemaV2ToV3(
+      db,
+      'cukieshub-new',
+      async (work) => work({ id: 'v3-migration' } as unknown as ClientSession),
+    );
+
+    assert.equal(result.schemaVersion, 3);
+    assert.equal(result.migrationId, ECONOMY_V3_MIGRATION_ID);
+    assert.equal(versions.length, 1);
+    assert.equal(versions[0].historicalEvidenceStatus, 'unverified_backfill');
+    assert.equal('effectiveBlockNumber' in versions[0], false);
+    assert.equal(historyStates.length, 2);
+    for (const state of historyStates) {
+      assert.equal(state.historicalBlockCoverage, 'unverified');
+      assert.equal('completeFromBlockNumber' in state, false);
+    }
   });
 });

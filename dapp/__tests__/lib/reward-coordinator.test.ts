@@ -116,6 +116,36 @@ describe("RewardCalculationCoordinator", () => {
     expect(assertSettlementResourceBindings(game, credit, assignment)).toBe("pool_original");
   });
 
+  it("identifica Seiku sin atribuirlo al pool Original", () => {
+    const { game, credit, assignment } = resourceFixture();
+    const seiku = {
+      ...assignment,
+      kind: "seiku" as const,
+      assetId: "seiku:fixture",
+      tokenId: null,
+      ownerNormalized: null,
+      ownerRewardEligible: false,
+    };
+    game.cukie.reservationId = seiku.assignmentId;
+    game.cukie.evidenceHash = stableGameEconomyHash({
+      kind: "game-cukie-pool-assignment-evidence",
+      assignmentId: seiku.assignmentId,
+      sessionId: seiku.sessionId,
+      assignmentKind: seiku.kind,
+      assetId: seiku.assetId,
+      tokenId: seiku.tokenId,
+      ownerNormalized: seiku.ownerNormalized,
+      generation: seiku.generation,
+      rarity: seiku.rarity,
+      ownerRewardEligible: seiku.ownerRewardEligible,
+      assignedAt: seiku.assignedAt,
+      expiresAt: seiku.expiresAt,
+      requestHash: seiku.requestHash,
+    });
+
+    expect(assertSettlementResourceBindings(game, credit, seiku)).toBe("seiku");
+  });
+
   it.each([
     ["sessionId", (credit: CreditReservation) => ({ ...credit, sessionId: "session:other" })],
     ["wallet", (credit: CreditReservation) => ({ ...credit, walletNormalized: `0x${"c".repeat(40)}` })],
@@ -173,10 +203,11 @@ describe("RewardCalculationCoordinator", () => {
         assignmentId: "pool-assignment:1",
         requestHash: "3".repeat(64),
       },
-      ranking: {
-        rankingId: "ranking:1",
-        payloadHash: "4".repeat(64),
+      arenaRanking: {
+        sourceRankingId: "ranking:1",
+        evidenceHash: "4".repeat(64),
         rank: 5,
+        rewardBps: 6_000,
       },
       periodId: "2026-W28",
       sourceId: "game-session:session:canonical",
@@ -216,7 +247,8 @@ describe("RewardCalculationCoordinator", () => {
       BigInt(0),
     )).toBe(BigInt(1125));
     expect(persisted.accruals).toEqual(expect.arrayContaining([
-      { category: "weekly_prize_pool", amountRaw: "2500" },
+      { category: "weekly_prize_pool", amountRaw: "2000" },
+      { category: "ambassador_program_pending", amountRaw: "500" },
       { category: "credit_pool_weekly", amountRaw: "3750" },
       { category: "cukie_pool_original_weekly", amountRaw: "1875" },
       { category: "undistributed_pending", amountRaw: "750" },
@@ -249,7 +281,12 @@ describe("RewardCalculationCoordinator", () => {
       credit: { reservationId: "credit:zero", payloadHash: "2".repeat(64), bucket: "own" },
       assignment: null,
       ownAssignment: { assignmentId: "own:zero", requestHash: "3".repeat(64) },
-      ranking: null,
+      arenaRanking: {
+        sourceRankingId: null,
+        evidenceHash: "4".repeat(64),
+        rank: null,
+        rewardBps: 10_000,
+      },
       periodId: "2026-W28",
       sourceId: "game-session:session:zero",
       creditSource: "own",
@@ -266,9 +303,13 @@ describe("RewardCalculationCoordinator", () => {
       now: NOW,
     });
     expect(persistAllocationSet).toHaveBeenCalledWith(expect.objectContaining({
-      sourceTotalRaw: "2500",
+      sourceTotalRaw: "10000",
       allocations: [],
-      accruals: [{ category: "weekly_prize_pool", amountRaw: "2500" }],
+      accruals: [
+        { category: "weekly_prize_pool", amountRaw: "2000" },
+        { category: "ambassador_program_pending", amountRaw: "500" },
+        { category: "undistributed_pending", amountRaw: "7500" },
+      ],
     }));
   });
 });

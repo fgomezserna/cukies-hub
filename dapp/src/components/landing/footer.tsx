@@ -7,12 +7,18 @@ import { usePublicLocale } from '@/providers/public-locale-provider';
 const footerCopy = {
   es: {
     home: 'Inicio',
-    rewards: 'Premios',
+    buy: 'Comprar UKI',
+    staking: 'Staking',
+    play: 'Jugar',
+    vesting: 'Vesting',
     rights: 'Todos los derechos reservados.',
   },
   en: {
     home: 'Home',
-    rewards: 'Rewards',
+    buy: 'Buy UKI',
+    staking: 'Staking',
+    play: 'Play',
+    vesting: 'Vesting',
     rights: 'All rights reserved.',
   },
 } as const;
@@ -74,7 +80,10 @@ export function LandingFooter() {
 
         <div className="uki-footer-links">
           <Link href="/" className="hover:text-[var(--uki-cyan)]">{copy.home}</Link>
-          <Link href="/premios" className="hover:text-[var(--uki-cyan)]">{copy.rewards}</Link>
+          <Link href="/#comprar" className="hover:text-[var(--uki-cyan)]">{copy.buy}</Link>
+          <Link href="/cukie-master" className="hover:text-[var(--uki-cyan)]">{copy.staking}</Link>
+          <Link href="/games/treasure-hunt" className="hover:text-[var(--uki-cyan)]">{copy.play}</Link>
+          <Link href="/vesting" className="hover:text-[var(--uki-cyan)]">{copy.vesting}</Link>
         </div>
 
         <p className="uki-footer-copy">

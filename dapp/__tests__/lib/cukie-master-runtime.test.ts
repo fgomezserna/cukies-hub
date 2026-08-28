@@ -1,6 +1,9 @@
 import {
+  fullReconciliationRoutesForSource,
+  legacyNftRecalculationJobRepair,
   recalculationFenceFilter,
   recalculationRetryBackoffMs,
+  routedRecalculationJobId,
 } from '@/lib/uki-economy/cukie-master/runtime-queue';
 import {
   FULL_RECONCILIATION_SOURCES,
@@ -42,6 +45,15 @@ describe('Cukie Master runtime queue', () => {
     });
     expect(recalculationFenceFilter({ _id: 'job-1', fenceToken: 8 }, 'worker-b'))
       .not.toEqual(current);
+  });
+
+  it('binds every queue identity to one route', () => {
+    expect(routedRecalculationJobId('chain-event:event-1:0xabc', 'uki')).toBe(
+      'chain-event:event-1:0xabc:uki',
+    );
+    expect(routedRecalculationJobId('chain-event:event-1:0xabc', 'nft')).toBe(
+      'chain-event:event-1:0xabc:nft',
+    );
   });
 });
 
@@ -122,6 +134,7 @@ describe('Cukie Master full reconciliation policy', () => {
       'presale-entitlements',
       'nft-owners',
       'nft-active-locks',
+      'nft-custodial-positions',
     ]);
     expect(normalizedWalletsFromSourcePage([
       { _id: 'stake-1', walletNormalized: WALLET_B.toUpperCase() },
@@ -151,6 +164,37 @@ describe('Cukie Master full reconciliation policy', () => {
     expect(fullReconciliationJobId(cycleId, WALLET_A)).toBe(
       fullReconciliationJobId(cycleId, WALLET_A),
     );
+  });
+
+  it('enqueues only the affected route, or both explicit jobs for projected positions', () => {
+    expect(fullReconciliationRoutesForSource('staking-positions')).toEqual(['uki']);
+    expect(fullReconciliationRoutesForSource('vesting-positions')).toEqual(['uki']);
+    expect(fullReconciliationRoutesForSource('presale-participants')).toEqual(['uki']);
+    expect(fullReconciliationRoutesForSource('nft-owners')).toEqual(['nft']);
+    expect(fullReconciliationRoutesForSource('nft-active-locks')).toEqual(['nft']);
+    expect(fullReconciliationRoutesForSource('nft-custodial-positions')).toEqual(['nft']);
+    expect(fullReconciliationRoutesForSource('projected-positions')).toEqual(['uki', 'nft']);
+    expect(() => fullReconciliationRoutesForSource('unknown-source')).toThrow(
+      'Fuente de reconciliacion Cukie Master desconocida',
+    );
+  });
+
+  it('repairs legacy NFT jobs that were created without a route', () => {
+    const now = new Date('2026-08-16T12:00:00.000Z');
+    expect(legacyNftRecalculationJobRepair(now)).toEqual({
+      filter: {
+        sourceType: 'nft_lock_event',
+        route: { $exists: false },
+        status: { $in: ['pending', 'failed'] },
+        walletNormalized: { $regex: '^0x[0-9a-f]{40}$' },
+      },
+      update: {
+        $set: { route: 'nft', status: 'pending', availableAt: now, updatedAt: now },
+        $unset: {
+          leasedBy: '', leaseExpiresAt: '', completedAt: '', expiresAt: '', lastErrorCode: '',
+        },
+      },
+    });
   });
 });
 

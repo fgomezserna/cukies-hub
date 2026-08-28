@@ -27,12 +27,23 @@ export type CukieMasterIndexerHealth = {
   checkedAt: Date;
 };
 
+export type CukieMasterChainEvidence = {
+  eventId: string;
+  blockNumber: number;
+  blockHash: string;
+  blockTimestamp: Date;
+};
+
 export type CukieMasterSourceRef = {
   source: string;
   collection: string;
   documentId: string | null;
   valueRaw?: string;
   observedAt?: string | null;
+  eventId?: string | null;
+  blockNumber?: number | null;
+  blockHash?: string | null;
+  blockTimestamp?: Date | null;
 };
 
 export type CukieMasterUkiSource = {
@@ -43,6 +54,7 @@ export type CukieMasterUkiSource = {
   refs: CukieMasterSourceRef[];
   completeness: CukieMasterSourceCompleteness;
   sourceHash: string;
+  effectiveChainEvidence?: CukieMasterChainEvidence;
 };
 
 export type CukieMasterSlotStatus = 'qualifying' | 'active' | 'grace' | 'inactive';
@@ -62,6 +74,9 @@ export type CukieMasterSlot = {
   roundId: string;
   ruleVersion: string;
   sourceHash: string;
+  sourceBlockNumber?: number;
+  sourceBlockHash?: string;
+  sourceBlockTimestamp?: Date;
   revision: number;
   createdAt: Date;
   updatedAt: Date;
@@ -84,6 +99,7 @@ export type CukieMasterNftSource = {
   refs: CukieMasterSourceRef[];
   completeness: CukieMasterSourceCompleteness;
   sourceHash: string;
+  effectiveChainEvidence?: CukieMasterChainEvidence;
 };
 
 export type CukieMasterRouteSource = CukieMasterUkiSource | CukieMasterNftSource;
@@ -179,6 +195,8 @@ export type CukieMasterWalletStatus = {
   walletAddress: string;
   walletNormalized: string;
   routes: Record<CukieMasterRoute, {
+    roundId: string;
+    ruleVersion: string;
     position: CukieMasterPosition | null;
     slots: CukieMasterSlot[];
     nextSlotRequirement: CukieMasterRequirement;

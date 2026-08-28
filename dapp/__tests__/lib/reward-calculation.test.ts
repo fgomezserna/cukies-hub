@@ -26,7 +26,7 @@ describe("reward settlement calculations", () => {
     grossConvertedRaw: "7500",
     maxConvertibleRaw: "7500",
     creditCostUnits: 100,
-    weeklyReserveUnits: 25,
+    weeklyReserveUnits: 20,
   } as const;
 
   test.each([
@@ -62,19 +62,45 @@ describe("reward settlement calculations", () => {
       ranking: null,
       expected: { player: "7500" },
     },
+    {
+      label: "creditos propios + Seiku",
+      creditSource: "own" as const,
+      cukieSource: "seiku" as const,
+      ranking: null,
+      expected: { player: "3750", undistributed_pending: "3750" },
+    },
+    {
+      label: "creditos pool + Seiku",
+      creditSource: "pool" as const,
+      cukieSource: "seiku" as const,
+      ranking: 1,
+      expected: {
+        credit_pool_weekly: "3750",
+        player: "1875",
+        undistributed_pending: "1875",
+      },
+    },
   ])("reparte el caso $label", ({ expected, ...scenario }) => {
     const result = calculateSettlementRewardAllocations(rule, {
       ...base,
       ...scenario,
     });
     const claimableExpected = Object.fromEntries(
-      Object.entries(expected).filter(([category]) => !category.endsWith("_weekly")),
+      Object.entries(expected).filter(([category]) => (
+        !category.endsWith("_weekly") && category !== "undistributed_pending"
+      )),
     );
     expect(amountsByCategory(result.allocations)).toEqual(claimableExpected);
     expect(Object.fromEntries(result.accruals.map((item) => [item.category, item.amountRaw])))
-      .toEqual(expect.objectContaining({ weekly_prize_pool: "2500" }));
+      .toEqual(expect.objectContaining({
+        weekly_prize_pool: "2000",
+        ambassador_program_pending: "500",
+      }));
     for (const [category, amountRaw] of Object.entries(expected)) {
       if (category.endsWith("_weekly")) {
+        expect(result.accruals).toContainEqual({ category, amountRaw });
+      }
+      if (category === "undistributed_pending") {
         expect(result.accruals).toContainEqual({ category, amountRaw });
       }
     }
@@ -100,11 +126,12 @@ describe("reward settlement calculations", () => {
     });
     expect(result.totals.playerBaseRaw).toBe("3750");
     expect(result.totals.undistributedRaw).toBe("1500");
-    expect(result.totals.weeklyPrizePoolRaw).toBe("2500");
+    expect(result.totals.weeklyPrizePoolRaw).toBe("2000");
+    expect(result.totals.ambassadorProgramRaw).toBe("500");
     expect(result.totals.sourceTotalRaw).toBe("10000");
   });
 
-  it("materializa 2.5 UKI de bote semanal incluso con score cero", () => {
+  it("materializa 2 UKI semanales y 0.5 para embajadores incluso con score cero", () => {
     const result = calculateSettlementRewardAllocations(rule, {
       ...base,
       grossConvertedRaw: "0",
@@ -114,16 +141,83 @@ describe("reward settlement calculations", () => {
     });
     expect(result.allocations).toEqual([]);
     expect(result.accruals).toEqual([
-      { category: "weekly_prize_pool", amountRaw: "2500" },
+      { category: "weekly_prize_pool", amountRaw: "2000" },
+      { category: "ambassador_program_pending", amountRaw: "500" },
+      { category: "undistributed_pending", amountRaw: "7500" },
     ]);
     expect(result.totals).toMatchObject({
       grossConvertedRaw: "0",
-      weeklyPrizePoolRaw: "2500",
-      sourceTotalRaw: "2500",
+      maxConvertibleRaw: "7500",
+      unconvertedRaw: "7500",
+      weeklyPrizePoolRaw: "2000",
+      ambassadorProgramRaw: "500",
+      undistributedRaw: "7500",
+      sourceTotalRaw: "10000",
     });
   });
 
-  it("rechaza ranking con creditos propios y una reserva distinta de 2.5/10", () => {
+  it("V3 separa la reserva ambassador en 0.4 ordinario y 0.1 semanal", () => {
+    const v3 = testRewardRule();
+    v3.version = "rewards-v3";
+    v3.runCredits = {
+      ...v3.runCredits,
+      ambassadorOrdinaryUnits: 4,
+      ambassadorWeeklyUnits: 1,
+    };
+    v3.configHash = buildRewardRuleConfigHash(v3);
+
+    const result = calculateSettlementRewardAllocations(v3, {
+      ...base,
+      creditSource: "own",
+      cukieSource: "own",
+      ranking: null,
+    });
+
+    expect(result.accruals).toEqual([
+      { category: "weekly_prize_pool", amountRaw: "2000" },
+      { category: "ambassador_ordinary_pending", amountRaw: "400" },
+      { category: "ambassador_weekly_pending", amountRaw: "100" },
+    ]);
+    expect(result.totals).toMatchObject({
+      ambassadorProgramRaw: "500",
+      ambassadorOrdinaryRaw: "400",
+      ambassadorWeeklyRaw: "100",
+      sourceTotalRaw: "10000",
+    });
+  });
+
+  it("conserva el presupuesto nominal con score parcial antes de repartirlo", () => {
+    const result = calculateSettlementRewardAllocations(rule, {
+      ...base,
+      grossConvertedRaw: "3750",
+      creditSource: "own",
+      cukieSource: "own",
+      ranking: null,
+    });
+
+    expect(result.allocations).toEqual([
+      { walletNormalized: PLAYER, category: "player", amountRaw: "3750" },
+    ]);
+    expect(result.accruals).toEqual([
+      { category: "weekly_prize_pool", amountRaw: "2000" },
+      { category: "ambassador_program_pending", amountRaw: "500" },
+      { category: "undistributed_pending", amountRaw: "3750" },
+    ]);
+    expect(result.totals).toMatchObject({
+      grossConvertedRaw: "3750",
+      maxConvertibleRaw: "7500",
+      unconvertedRaw: "3750",
+      playerRaw: "3750",
+      undistributedRaw: "3750",
+      sourceTotalRaw: "10000",
+    });
+    expect(
+      result.allocations.reduce((sum, item) => sum + BigInt(item.amountRaw), BigInt(0))
+      + result.accruals.reduce((sum, item) => sum + BigInt(item.amountRaw), BigInt(0))
+    ).toBe(BigInt(10000));
+  });
+
+  it("rechaza ranking con creditos propios y una reserva semanal distinta de 2/10", () => {
     expect(() =>
       calculateSettlementRewardAllocations(rule, {
         ...base,
@@ -135,7 +229,7 @@ describe("reward settlement calculations", () => {
     expect(() =>
       calculateSettlementRewardAllocations(rule, {
         ...base,
-        weeklyReserveUnits: 24,
+        weeklyReserveUnits: 19,
         creditSource: "pool",
         cukieSource: "own",
         ranking: 5,
@@ -158,6 +252,31 @@ describe("reward pool calculations", () => {
       (sum, allocation) => sum + BigInt(allocation.amountRaw),
       BigInt(0),
     )).toBe(BigInt(10000));
+  });
+
+  it("V3 reparte 80/10/10 con un unico destino marketing-desarrollo", () => {
+    const v3 = testRewardRule();
+    v3.version = "rewards-v3";
+    v3.undistributedBps = {
+      treasury: 8_000,
+      marketing: 0,
+      development: 0,
+      marketingDevelopment: 1_000,
+      supplyReduction: 1_000,
+    };
+    v3.destinations = {
+      ...v3.destinations,
+      marketingDevelopment: v3.destinations.marketing,
+    };
+    v3.configHash = buildRewardRuleConfigHash(v3);
+
+    expect(amountsByCategory(
+      calculateUndistributedRewardAllocations(v3, "10000").allocations,
+    )).toEqual({
+      treasury: "8000",
+      marketing_development: "1000",
+      supply_reduction: "1000",
+    });
   });
 
   it("asigna el remainder raw de forma determinista sin perder unidades", () => {
@@ -265,12 +384,11 @@ describe("reward pool calculations", () => {
     expect(result.totals.distributionRaw).toBe("400");
   });
 
-  it("aplica seis tramos acumulativos y conserva tramos sin elegibles como carry", () => {
+  it("aplica seis tramos acumulativos y deja los tramos sin elegibles como pending", () => {
     const rule = testRewardRule();
     const result = calculateCukiePoolDistribution(rule, {
       generation: "original",
       sourcePoolRaw: "60",
-      carryWallet: rule.destinations.cukiePoolOriginal,
       participants: [
         { walletAddress: COMMON, rarityLevel: 0, units: 1 },
         { walletAddress: GOAT, rarityLevel: 5, units: 1 },
@@ -279,19 +397,18 @@ describe("reward pool calculations", () => {
     const byWallet = Object.fromEntries(
       result.allocations.map((item) => [item.walletNormalized, item.amountRaw])
     );
-    expect(byWallet[COMMON]).toBe("5");
-    expect(byWallet[GOAT]).toBe("55");
-    expect(result.totals.tierAmountsRaw).toEqual(["10", "10", "10", "10", "10", "10"]);
+    expect(byWallet[COMMON]).toBe("14");
+    expect(byWallet[GOAT]).toBe("46");
+    expect(result.totals.tierAmountsRaw).toEqual(["27", "12", "9", "7", "4", "1"]);
 
     const carry = calculateCukiePoolDistribution(rule, {
       generation: "second_plus",
       sourcePoolRaw: "60",
-      carryWallet: rule.destinations.cukiePoolSecondPlus,
       participants: [{ walletAddress: COMMON, rarityLevel: 0, units: 1 }],
     });
-    expect(carry.totals).toMatchObject({ distributedRaw: "10", carriedRaw: "50" });
-    expect(
-      carry.allocations.find((item) => item.category.endsWith("carry"))?.amountRaw
-    ).toBe("50");
+    expect(carry.totals).toMatchObject({ distributedRaw: "27", carriedRaw: "33" });
+    expect(carry.accruals).toEqual([
+      { category: "undistributed_pending", amountRaw: "33" },
+    ]);
   });
 });

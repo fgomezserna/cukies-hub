@@ -9,6 +9,7 @@ import {
   normalizeCompetitionAlias,
   validateCompetitionAlias,
   type CompetitionConfig,
+  type CompetitionStakingEligibility,
 } from '..';
 import {
   validateCompetitionEvidence,
@@ -20,7 +21,9 @@ import type {
   CompetitionParticipantRecord,
   CompetitionRepository,
   CompetitionReviewDecision,
+  CompetitionStakingSource,
 } from './models';
+import { CompetitionEntitlementConflictError } from './models';
 import {
   createCheckpointReceipt,
   verifyCheckpointReceipt,
@@ -35,6 +38,9 @@ export type CompetitionServiceErrorCode =
   | 'COMPETITION_NOT_ACTIVE'
   | 'INVALID_WALLET'
   | 'GAME_SESSION_NOT_ELIGIBLE'
+  | 'ELIGIBILITY_UNAVAILABLE'
+  | 'NO_ATTEMPTS_REMAINING'
+  | 'PARTICIPANT_DISQUALIFIED'
   | 'ATTEMPT_ALREADY_ACTIVE'
   | 'ATTEMPT_NOT_FOUND'
   | 'ATTEMPT_NOT_ACTIVE'
@@ -60,6 +66,7 @@ export class CompetitionServiceError extends Error {
 
 interface CompetitionServiceDependencies {
   readonly repository: CompetitionRepository;
+  readonly stakingSource?: CompetitionStakingSource;
   readonly environment?: CompetitionEnvironment;
   readonly proofSecret?: string;
   readonly now?: () => Date;
@@ -108,6 +115,13 @@ interface AttemptEvidenceRequest {
   readonly clientTimestampMs?: number | null;
 }
 
+interface AttemptAbandonRequest {
+  readonly walletAddress: string;
+  readonly attemptId: string;
+  readonly receipt: string;
+  readonly sequence: number;
+}
+
 interface AttemptAdjudicationRequest {
   readonly attemptId: string;
   readonly decision: CompetitionReviewDecision;
@@ -128,6 +142,18 @@ const MAX_INTERNAL_REVIEW_TEXT_LENGTH = 1_000;
 const MAX_INTERNAL_REVIEWER_LENGTH = 128;
 const MAX_INTERNAL_ATTEMPT_ID_LENGTH = 128;
 const FINAL_ATTEMPT_STATUSES = new Set(['review', 'valid', 'invalid']);
+
+function safeAttemptAllowance(stakedUkiRaw: string, stakePerAttemptRaw: string) {
+  const quotient = BigInt(stakedUkiRaw) / BigInt(stakePerAttemptRaw);
+  if (quotient > BigInt(Number.MAX_SAFE_INTEGER)) return Number.MAX_SAFE_INTEGER;
+  return Number(quotient);
+}
+
+function ticketsForScore(score: number, pointsPerTicket: number) {
+  return Number.isSafeInteger(score) && score >= 0
+    ? Math.floor(score / pointsPerTicket)
+    : 0;
+}
 
 function activeCampaign(environment: CompetitionEnvironment, now: Date) {
   const runtime = resolveCompetitionRuntime(environment, now);
@@ -274,6 +300,7 @@ function publicAttempt(attempt: CompetitionAttemptRecord, secret: string) {
     campaignId: attempt.campaignId,
     gameId: attempt.gameId,
     mode: attempt.mode,
+    eligibilityKind: attempt.eligibilityKind ?? 'presale',
     rulesVersion: attempt.rulesVersion,
     alias: displayCompetitionAlias(attempt.playerAlias),
     seed: attempt.seed,
@@ -346,6 +373,73 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
         503,
       );
     }
+  }
+
+  async function stakingEligibility(
+    campaign: CompetitionConfig,
+    walletAddress: string,
+    current: Date,
+  ): Promise<CompetitionStakingEligibility | null> {
+    if (campaign.eligibilityKind !== 'uki_staking') return null;
+    if (!dependencies.stakingSource) {
+      throw new CompetitionServiceError(
+        'ELIGIBILITY_UNAVAILABLE',
+        'The staking eligibility source is not configured',
+        503,
+      );
+    }
+    const snapshot = await dependencies.stakingSource.getSnapshot({
+      campaign,
+      walletAddress,
+      now: current,
+    });
+    const attempts = await dependencies.repository.listAttempts(
+      campaign.campaignId,
+      walletAddress,
+      500,
+    );
+    const attemptsUsed = dependencies.repository.countAttempts
+      ? await dependencies.repository.countAttempts(campaign.campaignId, walletAddress)
+      : attempts.length;
+    const attemptsGranted = safeAttemptAllowance(
+      snapshot.stakedUkiRaw,
+      campaign.stakePerAttemptRaw,
+    );
+    const validTop = buildCompetitionRanking(attempts, campaign);
+    const provisionalTop = buildCompetitionRanking(
+      attempts.map((attempt) => attempt.status === 'review'
+        ? { ...attempt, status: 'valid' as const }
+        : attempt),
+      campaign,
+    );
+    const totalTickets = validTop.reduce(
+      (total, attempt) => total + ticketsForScore(attempt.score, campaign.pointsPerTicket),
+      0,
+    );
+    const provisionalTickets = provisionalTop.reduce(
+      (total, attempt) => total + ticketsForScore(attempt.score, campaign.pointsPerTicket),
+      0,
+    );
+    return {
+      ...snapshot,
+      attemptsGranted,
+      attemptsUsed,
+      attemptsRemaining: snapshot.disqualified
+        ? 0
+        : Math.max(0, attemptsGranted - attemptsUsed),
+      topAttemptsCount: provisionalTop.length,
+      totalTickets: snapshot.disqualified ? 0 : totalTickets,
+      provisionalTickets: snapshot.disqualified ? 0 : provisionalTickets,
+    };
+  }
+
+  async function getStakingEligibility(walletAddress: string) {
+    const { campaign, current } = await prepareCampaign(false);
+    const wallet = normalizeCompetitionWallet(walletAddress);
+    if (!isCompetitionWalletAddress(wallet)) {
+      throw new CompetitionServiceError('INVALID_WALLET', 'A valid EVM wallet is required', 400);
+    }
+    return stakingEligibility(campaign, wallet, current);
   }
 
   async function finalizePendingFinishForReview(
@@ -555,7 +649,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     if (!gameSession || !sessionOwned) {
       throw new CompetitionServiceError(
         'GAME_SESSION_NOT_ELIGIBLE',
-        'The game session is not eligible for the presale competition',
+        'The game session is not eligible for the competition',
         403,
       );
     }
@@ -606,8 +700,31 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     ) {
       throw new CompetitionServiceError(
         'GAME_SESSION_NOT_ELIGIBLE',
-        'The game session is not eligible for the presale competition',
+        'The game session is not eligible for the competition',
         403,
+      );
+    }
+
+    const eligibility = await stakingEligibility(campaign, walletAddress, current);
+    if (eligibility && !eligibility.ready) {
+      throw new CompetitionServiceError(
+        'ELIGIBILITY_UNAVAILABLE',
+        'Staking eligibility is waiting for a healthy confirmed indexer snapshot',
+        503,
+      );
+    }
+    if (eligibility?.disqualified) {
+      throw new CompetitionServiceError(
+        'PARTICIPANT_DISQUALIFIED',
+        'This wallet withdrew UKI during the campaign and is disqualified',
+        403,
+      );
+    }
+    if (eligibility && eligibility.attemptsRemaining < 1) {
+      throw new CompetitionServiceError(
+        'NO_ATTEMPTS_REMAINING',
+        'No competition attempts remain for the confirmed staking balance',
+        409,
       );
     }
 
@@ -620,7 +737,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     });
 
     const cleanReferralCode = input.referralCode?.trim();
-    if (cleanReferralCode && dependencies.applyReferral) {
+    if (campaign.eligibilityKind === 'presale' && cleanReferralCode && dependencies.applyReferral) {
       try {
         await dependencies.applyReferral(walletAddress, cleanReferralCode);
       } catch {
@@ -647,6 +764,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       campaignId: campaign.campaignId,
       gameId: campaign.gameId,
       mode: campaign.mode,
+      eligibilityKind: campaign.eligibilityKind,
       walletAddress,
       playerAlias: participant.alias,
       userId: input.userId,
@@ -660,6 +778,9 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       startedAt: current.toISOString(),
       finishedAt: null,
       status: 'active',
+      entitlementSlot: eligibility ? eligibility.attemptsUsed + 1 : null,
+      stakeBalanceRawAtStart: eligibility?.stakedUkiRaw ?? null,
+      stakingSnapshotBlock: eligibility?.indexedThroughBlock ?? null,
       nextSequence: 0,
       lastDigest: genesisDigest,
       lastScore: 0,
@@ -723,6 +844,13 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       } catch {
         // Preserve the insert failure. A failed release leaves the session closed to
         // legacy rewards, which is the safe side of the boundary.
+      }
+      if (error instanceof CompetitionEntitlementConflictError) {
+        throw new CompetitionServiceError(
+          'NO_ATTEMPTS_REMAINING',
+          'The staking entitlement was consumed by another concurrent start',
+          409,
+        );
       }
       throw error;
     }
@@ -977,6 +1105,104 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     }, 'finish');
   }
 
+  async function abandonAttempt(request: AttemptAbandonRequest) {
+    const { campaign, current } = await prepareCampaign(false);
+    const walletAddress = normalizeCompetitionWallet(request.walletAddress);
+    if (!isCompetitionWalletAddress(walletAddress)) {
+      throw new CompetitionServiceError('INVALID_WALLET', 'A valid EVM wallet is required', 400);
+    }
+    const signedReceipt = verifyCheckpointReceiptSignature(request.receipt, proofSecret());
+    if (
+      !signedReceipt ||
+      signedReceipt.campaignId !== campaign.campaignId ||
+      signedReceipt.attemptId !== request.attemptId ||
+      signedReceipt.walletAddress !== walletAddress ||
+      signedReceipt.nextSequence !== request.sequence
+    ) {
+      throw new CompetitionServiceError('INVALID_RECEIPT', 'Invalid abandon receipt', 403);
+    }
+    const attempt = await dependencies.repository.findAttempt(request.attemptId);
+    if (
+      !attempt ||
+      attempt.campaignId !== campaign.campaignId ||
+      attempt.walletAddress !== walletAddress
+    ) {
+      throw new CompetitionServiceError('ATTEMPT_NOT_FOUND', 'Competition attempt not found', 404);
+    }
+    if (attempt.gameSessionId !== signedReceipt.gameSessionId) {
+      throw new CompetitionServiceError('INVALID_RECEIPT', 'Invalid abandon receipt', 403);
+    }
+    if (attempt.status === 'abandoned') {
+      return {
+        accepted: true,
+        replayed: true,
+        status: attempt.status,
+        score: attempt.score,
+        gameTimeMs: attempt.gameTimeMs,
+        nextSequence: attempt.nextSequence,
+        receipt: null,
+      } as const;
+    }
+    activeCampaign(environment, current);
+    const receipt = verifyCheckpointReceipt(request.receipt, proofSecret(), current);
+    if (
+      !receipt ||
+      attempt.status !== 'active' ||
+      attempt.finishPendingAuthority === true ||
+      attempt.nextSequence !== receipt.nextSequence ||
+      attempt.lastDigest !== receipt.previousDigest
+    ) {
+      throw new CompetitionServiceError('ATTEMPT_NOT_ACTIVE', 'Competition attempt is closed', 409);
+    }
+    const finished = await (dependencies.finishGameSession?.({
+      userId: attempt.userId,
+      gameSessionId: attempt.gameSessionId,
+      attemptId: attempt.attemptId,
+    }) ?? Promise.resolve(true));
+    if (!finished) {
+      throw new CompetitionServiceError(
+        'EVIDENCE_CONFLICT',
+        'Competition abandon authority is not confirmed',
+        409,
+      );
+    }
+    const abandoned = await dependencies.repository.abandonAttempt({
+      attemptId: attempt.attemptId,
+      walletAddress,
+      expectedSequence: attempt.nextSequence,
+      expectedPreviousDigest: attempt.lastDigest,
+      now: current.toISOString(),
+    });
+    if (!abandoned) {
+      const currentAttempt = await dependencies.repository.findAttempt(attempt.attemptId);
+      if (currentAttempt?.status === 'abandoned') {
+        return {
+          accepted: true,
+          replayed: true,
+          status: currentAttempt.status,
+          score: currentAttempt.score,
+          gameTimeMs: currentAttempt.gameTimeMs,
+          nextSequence: currentAttempt.nextSequence,
+          receipt: null,
+        } as const;
+      }
+      throw new CompetitionServiceError(
+        'EVIDENCE_CONFLICT',
+        'Competition attempt changed while it was being abandoned',
+        409,
+      );
+    }
+    return {
+      accepted: true,
+      replayed: false,
+      status: abandoned.status,
+      score: abandoned.score,
+      gameTimeMs: abandoned.gameTimeMs,
+      nextSequence: abandoned.nextSequence,
+      receipt: null,
+    } as const;
+  }
+
   async function recoverPendingFinishes(limit = 500): Promise<CompetitionPendingFinishRecoveryResult> {
     const { campaign, current } = await prepareCampaign(false);
     const safeLimit = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 500, 1), 500);
@@ -1123,20 +1349,33 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
   }
 
   async function rankedLeaderboard(limit?: number) {
-    const { campaign } = await prepareCampaign(false);
+    const { campaign, current } = await prepareCampaign(false);
     const safeLimit = limit === undefined
       ? undefined
       : Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 100, 1), 500);
-    const attempts = await (
-      safeLimit === undefined
-        ? dependencies.repository.listValidAttempts(campaign.campaignId)
-        : dependencies.repository.listValidAttempts(campaign.campaignId, safeLimit)
+    const attempts = await dependencies.repository.listValidAttempts(
+      campaign.campaignId,
+      safeLimit,
+      campaign.topAttemptsPerWallet,
+    );
+    const disqualifiedWallets = campaign.eligibilityKind === 'uki_staking'
+      ? await dependencies.stakingSource?.listDisqualifiedWallets({ campaign, now: current })
+      : new Set<string>();
+    if (campaign.eligibilityKind === 'uki_staking' && !disqualifiedWallets) {
+      throw new CompetitionServiceError(
+        'ELIGIBILITY_UNAVAILABLE',
+        'The staking eligibility source is not configured',
+        503,
+      );
+    }
+    const eligibleAttempts = attempts.filter(
+      (attempt) => !disqualifiedWallets?.has(attempt.walletAddress.toLowerCase()),
     );
     const reviewStatusByAttemptId = new Map(
-      attempts.map((attempt) => [attempt.attemptId, attempt.status] as const),
+      eligibleAttempts.map((attempt) => [attempt.attemptId, attempt.status] as const),
     );
     const completeRanking = buildCompetitionRanking(
-      attempts.map((attempt) => attempt.status === 'review'
+      eligibleAttempts.map((attempt) => attempt.status === 'review'
         ? { ...attempt, status: 'valid' as const }
         : attempt),
       campaign,
@@ -1163,6 +1402,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
         reviewStatus: reviewStatusByAttemptId.get(attempt.attemptId) === 'review'
           ? 'pending' as const
           : 'approved' as const,
+        tickets: ticketsForScore(attempt.score, campaign.pointsPerTicket),
         isMe: currentWallet === attempt.walletAddress,
       })),
     };
@@ -1174,6 +1414,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       campaign,
       entries: ranking.map((attempt) => ({
         ...attempt,
+        tickets: ticketsForScore(attempt.score, campaign.pointsPerTicket),
         reviewStatus: reviewStatusByAttemptId.get(attempt.attemptId) === 'review'
           ? 'pending' as const
           : 'approved' as const,
@@ -1184,6 +1425,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
   return {
     getRuntime: () => resolveCompetitionRuntime(environment, now()),
     getParticipant,
+    getStakingEligibility,
     updateAlias,
     startAttempt,
     recordCheckpoint: async (request: AttemptEvidenceRequest) => {
@@ -1198,6 +1440,7 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       return { ...result, receipt: result.receipt, status: 'active' as const };
     },
     finishAttempt,
+    abandonAttempt,
     recoverPendingFinishes,
     listReviewAttempts,
     getAttemptForReview,

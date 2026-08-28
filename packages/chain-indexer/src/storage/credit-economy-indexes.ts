@@ -11,6 +11,7 @@ export const CREDIT_ECONOMY_COLLECTIONS = [
   "competition_credit_pool_configs",
   "competition_credit_runs",
   "competition_credit_run_items",
+  "competition_credit_run_holds",
   "competition_credit_lots",
   "competition_credit_pool_lots",
   "competition_credit_account_periods",
@@ -50,7 +51,7 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
   },
   {
     collection: "competition_credit_runs",
-    keys: { "period.periodId": 1 },
+    keys: { "period.periodId": 1, route: 1 },
     options: { unique: true },
   },
   {
@@ -60,15 +61,25 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
   },
   {
     collection: "competition_credit_runs",
-    keys: { status: 1, leaseExpiresAt: 1, _id: 1 },
+    keys: { route: 1, "period.cutoff": 1, status: 1, leaseExpiresAt: 1, _id: 1 },
   },
   {
     collection: "competition_credit_run_items",
     keys: { runId: 1, status: 1, _id: 1 },
   },
   {
+    collection: "competition_credit_run_holds",
+    keys: { runId: 1, status: 1, _id: 1 },
+    options: { name: "competition_credit_run_holds_status" },
+  },
+  {
+    collection: "competition_credit_run_holds",
+    keys: { holdId: 1 },
+    options: { unique: true, name: "competition_credit_run_holds_identity" },
+  },
+  {
     collection: "competition_credit_run_items",
-    keys: { periodId: 1, slotId: 1, eligibilityEpoch: 1 },
+    keys: { earnedPeriodId: 1, slotRoute: 1, slotId: 1, eligibilityEpoch: 1 },
     options: { unique: true },
   },
   {
@@ -83,7 +94,7 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
   },
   {
     collection: "competition_credit_lots",
-    keys: { periodId: 1, sourceSlotId: 1, eligibilityEpoch: 1 },
+    keys: { periodId: 1, route: 1, runId: 1, sourceSlotId: 1, eligibilityEpoch: 1 },
     options: { unique: true },
   },
   {
@@ -110,7 +121,7 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
   },
   {
     collection: "competition_credit_pool_lots",
-    keys: { periodId: 1, sourceSlotId: 1, eligibilityEpoch: 1 },
+    keys: { periodId: 1, route: 1, runId: 1, sourceSlotId: 1, eligibilityEpoch: 1 },
     options: { unique: true },
   },
   {
@@ -127,7 +138,7 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
   },
   {
     collection: "competition_credit_account_periods",
-    keys: { walletNormalized: 1, periodId: 1 },
+    keys: { walletNormalized: 1, periodId: 1, route: 1 },
     options: { unique: true },
   },
   {
@@ -136,7 +147,7 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
   },
   {
     collection: "competition_credit_pool_periods",
-    keys: { periodId: 1 },
+    keys: { periodId: 1, route: 1 },
     options: { unique: true },
   },
   {
@@ -166,17 +177,22 @@ export const CREDIT_ECONOMY_INDEXES: CreditEconomyIndexDefinition[] = [
     keys: { periodId: 1, _id: 1 },
   },
   {
+    collection: "competition_credit_reservations",
+    keys: { "allocations.runId": 1, periodId: 1, _id: 1 },
+    options: { name: "competition_credit_reservations_run_scope" },
+  },
+  {
     collection: "competition_credit_incidents",
     keys: { incidentId: 1 },
     options: { unique: true },
   },
   {
     collection: "competition_credit_incidents",
-    keys: { status: 1, walletNormalized: 1, detectedAt: -1 },
+    keys: { route: 1, status: 1, walletNormalized: 1, detectedAt: -1 },
   },
   {
     collection: "competition_credit_incidents",
-    keys: { runId: 1, status: 1 },
+    keys: { route: 1, runId: 1, status: 1 },
   },
   {
     collection: "competition_credit_ledger",

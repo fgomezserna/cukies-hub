@@ -1,7 +1,15 @@
 import type {
   CompetitionAttempt,
   CompetitionConfig,
+  CompetitionStakingSnapshot,
 } from '..';
+
+export class CompetitionEntitlementConflictError extends Error {
+  constructor() {
+    super('Competition staking entitlement slot was consumed concurrently');
+    this.name = 'CompetitionEntitlementConflictError';
+  }
+}
 import type { CompetitionEvidencePoint } from './evidence';
 
 export type CompetitionStoredEvidencePoint = CompetitionEvidencePoint;
@@ -79,6 +87,13 @@ export interface CompetitionRepository {
     walletAddress: string,
     now: string,
   ): Promise<void>;
+  abandonAttempt(input: {
+    attemptId: string;
+    walletAddress: string;
+    expectedSequence: number;
+    expectedPreviousDigest: string;
+    now: string;
+  }): Promise<CompetitionAttemptRecord | null>;
   listPendingFinishAttempts(
     campaignId: string,
     limit: number,
@@ -117,7 +132,24 @@ export interface CompetitionRepository {
     walletAddress: string,
     limit: number,
   ): Promise<CompetitionAttemptRecord[]>;
-  listValidAttempts(campaignId: string, limit?: number): Promise<CompetitionAttemptRecord[]>;
+  countAttempts?(campaignId: string, walletAddress: string): Promise<number>;
+  listValidAttempts(
+    campaignId: string,
+    limit?: number,
+    perWalletLimit?: number,
+  ): Promise<CompetitionAttemptRecord[]>;
+}
+
+export interface CompetitionStakingSource {
+  getSnapshot(input: {
+    campaign: CompetitionConfig;
+    walletAddress: string;
+    now: Date;
+  }): Promise<CompetitionStakingSnapshot>;
+  listDisqualifiedWallets(input: {
+    campaign: CompetitionConfig;
+    now: Date;
+  }): Promise<ReadonlySet<string>>;
 }
 
 export interface CompetitionGameSessionAuthority {
