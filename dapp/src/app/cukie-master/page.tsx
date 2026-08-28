@@ -4,8 +4,8 @@ import { LaunchInfoPage } from '@/components/launch/info-page';
 import { UKI_PRESALE_CHAIN_LABEL } from '@/components/landing/sale-config';
 
 export const metadata: Metadata = {
-  title: 'Cukie Master por UKI | Cukies World',
-  description: 'Consulta tus plazas Cukie Master y gestiona el staking de UKI.',
+  title: 'Cukie Master | Staking de Cukies y UKI | Cukies World',
+  description: 'Deposita Cukies Originales o stakea UKI, gestiona tus cupos y decide cómo usar tus créditos diarios.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -17,38 +17,49 @@ export default function CukieMasterPage() {
     <LaunchInfoPage
       variant="workspace"
       eyebrow={`${isStaging ? 'Área de pruebas' : 'Red configurada'} · ${UKI_PRESALE_CHAIN_LABEL}`}
-      title="Conviértete en Cukie Master"
-      subtitle="Stakea tus UKI y desbloquea tus Cukie Master. Tus UKI de preventa pendientes y tus UKI en staking se suman automáticamente."
+      title="Conviértete en Cukie Master con tus Cukies o tus UKI"
+      subtitle="Deposita Cukies Originales en el vault o suma tus UKI de vesting y staking. Cada cupo maduro recibe créditos diarios que puedes usar para jugar o aportar al pool."
       heroImage="/brand/generated/uki-cukie-master-scene-v2.png"
       heroAlt="Escena Cukie Master con token UKI y bóveda"
-      primaryCta={{ label: 'Gestionar staking', href: '#uki-staking' }}
-      secondaryCta={{ label: 'Ver competición', href: '/games/treasure-hunt/competitions' }}
+      primaryCta={{ label: 'Stakear mis Cukies', href: '#cukie-master-nft-staking' }}
+      secondaryCta={{ label: 'Gestionar UKI', href: '#uki-staking' }}
       metrics={[
-        { label: 'Por Cukie Master', value: '20.000 UKI', helper: 'Vesting y staking suman' },
-        { label: 'Por wallet', value: 'Máximo 5', helper: 'Mediante UKI' },
-        { label: 'Plazas con UKI', value: 'Hasta 2.500', helper: 'Capacidad máxima' },
+        { label: 'Ruta Cukies', value: '3 puntos', helper: 'Por cupo inicial' },
+        { label: 'Ruta UKI', value: '20.000 UKI', helper: 'Por cupo inicial' },
+        { label: 'Créditos diarios', value: '100', helper: 'Por cupo maduro' },
+        { label: 'Máximo por wallet', value: '5 + 5', helper: 'Cinco por cada ruta' },
       ]}
       beforeSections={<CukieMasterWorkspace testnetOnly={isStaging} />}
       sections={[
         {
-          title: 'Cómo funciona',
+          title: 'Dos rutas independientes',
           bullets: [
-            '20.000 UKI equivalen a 1 Cukie Master.',
-            'Tus UKI en vesting y en staking se suman automáticamente.',
-            'Puedes conseguir un máximo de 5 Cukie Masters mediante UKI.',
+            'Cada 3 puntos de rareza de Cukies Originales depositados conceden inicialmente 1 cupo.',
+            'Cada 20.000 UKI computables conceden inicialmente 1 cupo; vesting pendiente y staking se suman.',
+            'Puedes mantener hasta 5 cupos por Cukies y otros 5 por UKI en la misma wallet.',
+            'Un Cukie depositado queda custodiado por el contrato y no puede jugarse, venderse ni transferirse hasta retirarlo.',
           ],
         },
         {
-          title: 'Staking y competición',
-          text: 'Solo los UKI depositados en staking conceden partidas para el Torneo Lanzamiento UKI.',
+          title: 'Créditos propios o pool',
+          text: 'Cada cupo debe mantenerse 24 horas antes de su primera entrega. Después recibe 100 créditos en cada corte diario de las 14:00 UTC.',
           bullets: [
-            'Cada 2.000 UKI completos en staking te permiten jugar 1 partida.',
-            'Puedes retirar cuando quieras, pero una retirada durante el torneo descalifica la wallet.',
-            'Los intentos, resultados y tickets se consultan directamente en Treasure Hunt.',
+            'Antes del corte eliges, en múltiplos de 10, cuántos créditos conserva el cupo y cuántos aporta al pool.',
+            'Los créditos propios se usan primero para jugar; si no alcanzan, una partida puede tomar exactamente 10 créditos del pool.',
+            'Los créditos no se transfieren entre wallets y no equivalen directamente a UKI.',
+          ],
+        },
+        {
+          title: 'Staking UKI y competición',
+          text: 'La condición Cukie Master y el Torneo Lanzamiento UKI son cálculos distintos.',
+          bullets: [
+            'Cukie Master suma vesting pendiente y UKI depositados en staking.',
+            'El torneo usa exclusivamente UKI confirmados en staking: cada 2.000 UKI completos conceden una partida.',
+            'Retirar durante el torneo descalifica la wallet para esa campaña, aunque vuelva a depositar.',
           ],
         },
       ]}
-      note="Comprueba siempre la red, la cantidad y el contrato antes de confirmar una operación. El staking no implica rentabilidad garantizada."
+      note="Comprueba siempre la red, el NFT, la cantidad y el contrato antes de confirmar. Ser Cukie Master, aportar al pool o hacer staking no garantiza rentabilidad."
     />
   );
 }
