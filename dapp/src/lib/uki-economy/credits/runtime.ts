@@ -13,6 +13,7 @@ import {
   assertCompetitionCreditRule,
   assertRuleActiveAt,
   currentCompetitionCreditPeriod,
+  MAX_COMPETITION_CREDIT_BATCH_SIZE,
   validCreditDate,
   validCreditText,
 } from './rules';
@@ -209,9 +210,9 @@ export function loadCompetitionCreditRuntimeConfig(
     expectedRuleVersion,
     batchLimit: boundedInteger(
       environment.COMPETITION_CREDITS_BATCH_LIMIT,
-      100,
+      50,
       1,
-      500,
+      MAX_COMPETITION_CREDIT_BATCH_SIZE,
       'COMPETITION_CREDITS_BATCH_LIMIT',
     ),
     maxBatchesPerTick: boundedInteger(
@@ -513,7 +514,7 @@ export async function runCompetitionCreditRuntimeTick(input: {
               workerId,
               fenceToken: run.fenceToken,
               now: batchNow,
-              limit: config.batchLimit,
+              limit: Math.min(config.batchLimit, rule.maxBatchSize),
             };
             const batch = await services.processRunBatch(batchInput);
             batchesProcessed += 1;
