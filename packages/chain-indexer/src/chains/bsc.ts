@@ -36,6 +36,93 @@ type CanonicalBlockHeader = {
   timestamp: bigint;
 };
 
+type BscCheckpoint = {
+  _id: 'canonical-safe';
+  safeBlockNumber: number;
+  safeBlockHash: string;
+};
+
+type ExpectedCanonicalBlock = {
+  blockNumber: number;
+  blockHash: string;
+};
+
+export async function assertBscCanonicalCheckpoint(
+  store: IndexerStore,
+  checkpoint: BscCheckpoint,
+  observedHash: string,
+  detectedAt = now(),
+) {
+  if (checkpoint.safeBlockHash.toLowerCase() === observedHash.toLowerCase()) return;
+  const incidentId = `bsc-reorg:${checkpoint.safeBlockNumber}`;
+  await store.db.collection<{ _id: string }>('chain_integrity_incidents').updateOne(
+    { _id: incidentId },
+    {
+      $set: {
+        status: 'open',
+        chain: 'BSC',
+        type: 'canonical_checkpoint_mismatch',
+        safeBlockNumber: checkpoint.safeBlockNumber,
+        expectedBlockHash: checkpoint.safeBlockHash,
+        observedBlockHash: observedHash,
+        detectedAt,
+        updatedAt: detectedAt,
+        recoveryStatus: 'operator_required',
+      },
+      $setOnInsert: { _id: incidentId, createdAt: detectedAt },
+    },
+    { upsert: true },
+  );
+  throw new Error(
+    `Reorg BSC detectado en bloque seguro ${checkpoint.safeBlockNumber}; incidente ${incidentId} abierto.`,
+  );
+}
+
+export async function assertBscCanonicalRangeBlock(
+  store: IndexerStore,
+  expected: ExpectedCanonicalBlock,
+  observedHash: string,
+  detectedAt = now(),
+) {
+  if (expected.blockHash.toLowerCase() === observedHash.toLowerCase()) return;
+  const incidentId = `bsc-range-reorg:${expected.blockNumber}`;
+  await store.db.collection<{ _id: string }>('chain_integrity_incidents').updateOne(
+    { _id: incidentId },
+    {
+      $set: {
+        status: 'open',
+        chain: 'BSC',
+        type: 'canonical_range_mismatch',
+        blockNumber: expected.blockNumber,
+        expectedBlockHash: expected.blockHash,
+        observedBlockHash: observedHash,
+        detectedAt,
+        updatedAt: detectedAt,
+        recoveryStatus: 'operator_required',
+      },
+      $setOnInsert: { _id: incidentId, createdAt: detectedAt },
+    },
+    { upsert: true },
+  );
+  throw new Error(
+    `Reorg BSC detectado durante la ingesta en bloque ${expected.blockNumber}; incidente ${incidentId} abierto.`,
+  );
+}
+
+export async function validateBscCanonicalRange(
+  store: IndexerStore,
+  expectedBlocks: ExpectedCanonicalBlock[],
+  readBlockHash: (blockNumber: number) => Promise<string>,
+) {
+  for (const expected of expectedBlocks) {
+    await assertBscCanonicalRangeBlock(
+      store,
+      expected,
+      await readBlockHash(expected.blockNumber),
+    );
+  }
+}
+
 export async function findGreatestBscBlockBeforeTimestamp(input: {
   cutoffTimestampMs: number;
   safeBlockNumber: number;
@@ -271,6 +358,46 @@ export async function ingestBscOnce(
     config.bscExpectedChainId,
   );
 
+  const readCanonicalBlockHash = async (
+    blockNumber: number,
+    preferredRpc?: BscRpcClient,
+  ) => {
+    const candidates = preferredRpc
+      ? rpcClientsWithPreferredFirst(preferredRpc, rpcClients)
+      : rpcClients;
+    const { value: block } = await withBscRpcFallback(
+      candidates,
+      config.bscExpectedChainId,
+      (rpc) => rpc.client.getBlock({ blockNumber: BigInt(blockNumber) }),
+    );
+    if (!block.hash) throw new Error(`RPC BSC devolvio bloque ${blockNumber} sin hash canonico.`);
+    return block.hash;
+  };
+
+  const openCanonicalIncident = await store.db.collection<{ _id: string }>(
+    'chain_integrity_incidents',
+  ).findOne({
+    chain: 'BSC',
+    status: 'open',
+    type: { $in: ['canonical_checkpoint_mismatch', 'canonical_range_mismatch'] },
+  });
+  if (openCanonicalIncident) {
+    throw new Error(
+      `Indexer BSC bloqueado por incidente canonico ${String(openCanonicalIncident._id)}.`,
+    );
+  }
+
+  const storedCheckpoint = await store.db.collection<BscCheckpoint>(
+    'chain_bsc_checkpoints',
+  ).findOne({ _id: 'canonical-safe' });
+  if (storedCheckpoint) {
+    await assertBscCanonicalCheckpoint(
+      store,
+      storedCheckpoint,
+      await readCanonicalBlockHash(storedCheckpoint.safeBlockNumber),
+    );
+  }
+
   const { value: latestBlockValue, rpc: latestBlockRpc } = await withBscRpcFallback(
     rpcClients,
     config.bscExpectedChainId,
@@ -460,6 +587,7 @@ export async function ingestBscOnce(
     );
 
     const events: ChainEvent[] = [];
+    const expectedRangeBlocks = new Map<number, string>();
 
     for (const log of logs) {
       const logArgs =
@@ -482,6 +610,19 @@ export async function ingestBscOnce(
       );
       const logIndex = Number(log.logIndex ?? 0);
       const createdAt = now();
+      if (typeof log.blockHash !== 'string' || !log.blockHash) {
+        throw new Error(`Log BSC ${String(log.transactionHash)}:${logIndex} sin blockHash.`);
+      }
+      const expectedBlockHash = expectedRangeBlocks.get(blockNumber);
+      if (expectedBlockHash) {
+        await assertBscCanonicalRangeBlock(
+          store,
+          { blockNumber, blockHash: expectedBlockHash },
+          log.blockHash,
+        );
+      } else {
+        expectedRangeBlocks.set(blockNumber, log.blockHash);
+      }
 
       events.push({
         _id: `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
@@ -505,6 +646,15 @@ export async function ingestBscOnce(
         updatedAt: createdAt,
       });
     }
+
+    await validateBscCanonicalRange(
+      store,
+      [...expectedRangeBlocks].map(([blockNumber, blockHash]) => ({
+        blockNumber,
+        blockHash,
+      })),
+      (blockNumber) => readCanonicalBlockHash(blockNumber, logsRpc),
+    );
 
     const result = await store.upsertEvents(events);
     inserted += result.inserted;

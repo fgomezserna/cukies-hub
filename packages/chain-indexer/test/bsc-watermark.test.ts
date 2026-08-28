@@ -35,7 +35,15 @@ function config(overrides: Partial<IndexerConfig> = {}): IndexerConfig {
 
 function fakeStore(
   cursor: Partial<ChainCursor> | null = null,
-  options: { failCursorUpdate?: boolean } = {},
+  options: {
+    failCursorUpdate?: boolean;
+    checkpoint?: {
+      _id: 'canonical-safe';
+      safeBlockNumber: number;
+      safeBlockHash: string;
+    };
+    canonicalIncident?: { _id: string };
+  } = {},
 ) {
   const updates: Array<{
     config: ContractEventConfig;
@@ -44,8 +52,26 @@ function fakeStore(
   const eventBatches: unknown[][] = [];
   const checkpoints: unknown[] = [];
   const stakingBootstraps: unknown[] = [];
+  const incidents: unknown[] = [];
   const operations: string[] = [];
   const store = {
+    db: {
+      collection(name: string) {
+        return {
+          findOne: async () => (
+            name === 'chain_bsc_checkpoints'
+              ? options.checkpoint ?? null
+              : name === 'chain_integrity_incidents'
+                ? options.canonicalIncident ?? null
+                : null
+          ),
+          updateOne: async (...args: unknown[]) => {
+            incidents.push(args);
+            return { acknowledged: true };
+          },
+        };
+      },
+    },
     getCursor: async () => cursor,
     updateCursor: async (
       contractEvent: ContractEventConfig,
@@ -69,7 +95,15 @@ function fakeStore(
     },
   } as unknown as IndexerStore;
 
-  return { store, updates, eventBatches, checkpoints, stakingBootstraps, operations };
+  return {
+    store,
+    updates,
+    eventBatches,
+    checkpoints,
+    stakingBootstraps,
+    incidents,
+    operations,
+  };
 }
 
 function rpc(input: {
@@ -163,7 +197,7 @@ test('reuses an event block timestamp when the range watermark is the same block
     blockCalls,
     logs: [{
       transactionHash: '0xabc',
-      blockHash: '0xdef',
+      blockHash: `0x${BigInt(104).toString(16).padStart(64, '0')}`,
       blockNumber: BigInt(104),
       logIndex: 0,
       args: {
@@ -179,12 +213,76 @@ test('reuses an event block timestamp when the range watermark is the same block
 
   await ingestBscOnce(store, config(), { rpcClients: [client] });
 
-  assert.deepEqual(blockCalls, [BigInt(110), BigInt(100), BigInt(104)]);
+  assert.deepEqual(blockCalls, [BigInt(110), BigInt(100), BigInt(104), BigInt(104)]);
   assert.equal(eventBatches[0]?.length, 1);
   assert.equal((eventBatches[0]?.[0] as { timestampMs: number }).timestampMs, 1_040_000);
   assert.equal(updates[0]?.update.processedFromBlock, 100);
   assert.equal(updates[0]?.update.processedFromTimestampMs, 1_000_000);
   assert.equal(updates[0]?.update.processedThroughTimestampMs, 1_040_000);
+});
+
+test('aborts before persisting events when an ingested log is no longer canonical', async () => {
+  const client = rpc({
+    host: 'primary.test',
+    logs: [{
+      transactionHash: '0xabc',
+      blockHash: `0x${'f'.repeat(64)}`,
+      blockNumber: BigInt(104),
+      logIndex: 0,
+      args: {
+        buyer: PLAYER,
+        asmAmount: BigInt(1),
+        ukiAmount: BigInt(2),
+        totalBuyerAsm: BigInt(1),
+        totalBuyerUki: BigInt(2),
+      },
+    }],
+  });
+  const { store, updates, eventBatches, incidents } = fakeStore();
+
+  await assert.rejects(
+    ingestBscOnce(store, config(), { rpcClients: [client] }),
+    /Reorg BSC detectado durante la ingesta/,
+  );
+
+  assert.deepEqual(eventBatches, []);
+  assert.deepEqual(updates, []);
+  assert.equal(incidents.length, 1);
+});
+
+test('aborts before processing cursors when the persisted checkpoint has forked', async () => {
+  const client = rpc({ host: 'primary.test' });
+  const { store, updates, eventBatches, incidents } = fakeStore(null, {
+    checkpoint: {
+      _id: 'canonical-safe',
+      safeBlockNumber: 90,
+      safeBlockHash: `0x${'f'.repeat(64)}`,
+    },
+  });
+
+  await assert.rejects(
+    ingestBscOnce(store, config(), { rpcClients: [client] }),
+    /Reorg BSC detectado en bloque seguro 90/,
+  );
+
+  assert.deepEqual(eventBatches, []);
+  assert.deepEqual(updates, []);
+  assert.equal(incidents.length, 1);
+});
+
+test('keeps ingestion blocked until an open canonical incident is resolved', async () => {
+  const client = rpc({ host: 'primary.test' });
+  const { store, updates, eventBatches } = fakeStore(null, {
+    canonicalIncident: { _id: 'bsc-range-reorg:104' },
+  });
+
+  await assert.rejects(
+    ingestBscOnce(store, config(), { rpcClients: [client] }),
+    /bloqueado por incidente canonico bsc-range-reorg:104/,
+  );
+
+  assert.deepEqual(eventBatches, []);
+  assert.deepEqual(updates, []);
 });
 
 test('persists a safe-head watermark when the cursor is already caught up', async () => {
