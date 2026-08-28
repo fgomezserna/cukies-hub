@@ -136,13 +136,37 @@ function services(overrides: Partial<CompetitionCreditRuntimeServices> = {}) {
 
 describe('competition credit runtime', () => {
   it('is disabled by default and requires an explicit pinned rule when enabled', () => {
-    expect(loadCompetitionCreditRuntimeConfig({}).enabled).toBe(false);
+    expect(loadCompetitionCreditRuntimeConfig({})).toMatchObject({
+      enabled: false,
+      batchLimit: 50,
+    });
     expect(() => loadCompetitionCreditRuntimeConfig({
       COMPETITION_CREDITS_RUNTIME_ENABLED: 'true',
     })).toThrow(CompetitionCreditRuntimeConfigurationError);
     expect(() => loadCompetitionCreditRuntimeConfig({
       COMPETITION_CREDITS_RUNTIME_ENABLED: 'yes',
     })).toThrow(/true o false/);
+    expect(() => loadCompetitionCreditRuntimeConfig({
+      COMPETITION_CREDITS_BATCH_LIMIT: '101',
+    })).toThrow(/entre 1 y 100/);
+  });
+
+  it('caps the configured batch limit to the active rule contract', async () => {
+    const runtimeServices = services();
+
+    await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config: { ...config, batchLimit: 100 },
+      clock: () => now,
+      coordinator: new MemoryCoordinator(),
+      services: runtimeServices,
+      loadActiveRule: async () => ({ ...rule, maxBatchSize: 50 }),
+    });
+
+    expect(runtimeServices.processRunBatch).toHaveBeenCalledTimes(2);
+    expect(runtimeServices.processRunBatch).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 50 }),
+    );
   });
 
   it('refreshes, snapshots, fences, applies, opens and expires in one bounded tick', async () => {
