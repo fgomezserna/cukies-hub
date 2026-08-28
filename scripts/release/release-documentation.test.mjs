@@ -54,5 +54,16 @@ test('bootstrap queda fail-closed con App dedicada, custom branches, sync y free
   assert.match(workflow, /custom.*`staging`/is);
   assert.match(workflow, /custom.*`main`/is);
   assert.match(workflow, /#235/);
+  assert.match(workflow, /pnpm verify:quick/);
+  assert.match(workflow, /pnpm verify:candidate/);
+  assert.match(workflow, /`CI Quality \/ Required`.*en `main`/is);
+  assert.match(workflow, /mismo\s+check CI en `staging`/is);
+  assert.match(workflow, /--ci-context 'CI Quality \/ Required'/);
+  assert.match(workflow, /contenedor nuevo/);
+  assert.match(workflow, /sin red, mounts, secretos/);
+  assert.match(candidate, /pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile/);
+  assert.match(candidate, /candidate completo hacia `main`/);
+  assert.match(candidate, /pnpm verify/);
+  assert.match(candidate, /test merge exacto/);
   assert.doesNotMatch(workflow, /actor autorizado crea manualmente/);
 });

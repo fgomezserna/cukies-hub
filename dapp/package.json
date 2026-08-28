@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:ci": "jest --ci --runInBand",
     "postinstall": "prisma generate",
     "init-chat-rooms": "node scripts/init-chat-rooms-with-env.mjs",
     "competition:archive:import": "tsx scripts/import-competition-ranking-archive.ts",

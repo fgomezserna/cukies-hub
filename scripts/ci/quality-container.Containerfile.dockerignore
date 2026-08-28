@@ -1,0 +1,1 @@
+# Trusted Dockerfile-specific policy: every pinned candidate path enters the build context.

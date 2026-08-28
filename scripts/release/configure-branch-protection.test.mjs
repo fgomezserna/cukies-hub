@@ -179,6 +179,11 @@ test('los planes mantienen main lineal y permiten merge commits de sync en stagi
   const attested = buildReleaseGuardPlan({
     phase: 'bootstrap-attested',
     releaseAppId: RELEASE_APP_ID,
+    ciRequirement: {
+      kind: 'check',
+      context: 'CI Quality / Required',
+      appId: RELEASE_APP_ID,
+    },
   });
   const steady = buildReleaseGuardPlan({
     phase: 'steady-state',
@@ -189,6 +194,9 @@ test('los planes mantienen main lineal y permiten merge commits de sync en stagi
   assert.deepEqual(attested.branches.main.required_status_checks.checks, [
     { context: 'release/staging-deployed', app_id: RELEASE_APP_ID },
     { context: 'release/staging-validated', app_id: RELEASE_APP_ID },
+  ]);
+  assert.deepEqual(attested.branches.staging.required_status_checks.checks, [
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
   ]);
   assert.deepEqual(steady.branches.main.required_status_checks.contexts, [CI_CONTEXT_PLACEHOLDER]);
   assert.deepEqual(steady.branches.main.required_status_checks.checks, [
@@ -254,6 +262,7 @@ test('preserva checks ajenos con app_id exacto sin degradarlos a contexts legacy
   ]);
   assert.deepEqual(plan.branches.staging.required_status_checks.checks, [
     { context: 'ci/staging', app_id: 5252 },
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
   ]);
 });
 
@@ -274,6 +283,11 @@ test('CLI es dry-run bootstrap-lock por defecto y no llama fetch ni requiere tok
 test('dry-run de fases con statuses exige identidad App dedicada explícita', async () => {
   for (const argv of [
     ['--phase', 'bootstrap-attested'],
+    [
+      '--phase', 'steady-state',
+      '--release-app-id', String(RELEASE_APP_ID),
+      '--release-app-slug', RELEASE_APP_SLUG,
+    ],
     ['--phase', 'steady-state', '--release-app-id', '15368', '--release-app-slug', 'github-actions'],
   ]) {
     const errors = [];
@@ -285,7 +299,7 @@ test('dry-run de fases con statuses exige identidad App dedicada explícita', as
       stderr: { write: (value) => errors.push(value) },
     });
     assert.equal(exitCode, 1);
-    assert.match(errors.join(''), /release-app|GitHub Actions/i);
+    assert.match(errors.join(''), /release-app|GitHub Actions|CI context/i);
   }
 
   const output = [];
@@ -294,6 +308,7 @@ test('dry-run de fases con statuses exige identidad App dedicada explícita', as
       '--phase', 'bootstrap-attested',
       '--release-app-id', String(RELEASE_APP_ID),
       '--release-app-slug', RELEASE_APP_SLUG,
+      '--ci-context', 'CI Quality / Required',
     ],
     env: {},
     fetchFn: async () => assert.fail('dry-run must not call fetch'),
@@ -302,6 +317,34 @@ test('dry-run de fases con statuses exige identidad App dedicada explícita', as
   });
   assert.equal(exitCode, 0);
   assert.match(output.join(''), new RegExp(String(RELEASE_APP_ID)));
+  const attestedPlan = JSON.parse(output.join('').split('\n').slice(1).join('\n'));
+  assert.deepEqual(attestedPlan.branches.staging.required_status_checks.checks, [
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
+  ]);
+
+  const steadyOutput = [];
+  const steadyExitCode = await runConfigureBranchProtectionCli({
+    argv: [
+      '--phase', 'steady-state',
+      '--release-app-id', String(RELEASE_APP_ID),
+      '--release-app-slug', RELEASE_APP_SLUG,
+      '--ci-context', 'CI Quality / Required',
+    ],
+    env: {},
+    fetchFn: async () => assert.fail('dry-run must not call fetch'),
+    stdout: { write: (value) => steadyOutput.push(value) },
+    stderr: { write: () => assert.fail('valid dry-run must not write stderr') },
+  });
+  const steadyPlan = JSON.parse(steadyOutput.join('').split('\n').slice(1).join('\n'));
+  assert.equal(steadyExitCode, 0);
+  assert.deepEqual(steadyPlan.branches.main.required_status_checks.checks, [
+    { context: 'release/promotion-gate', app_id: RELEASE_APP_ID },
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
+  ]);
+  assert.deepEqual(steadyPlan.branches.staging.required_status_checks.checks, [
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
+  ]);
+  assert.doesNotMatch(steadyOutput.join(''), new RegExp(CI_CONTEXT_PLACEHOLDER));
 });
 
 test('cualquier --apply sin confirmación literal falla antes de fetch', async () => {
@@ -384,6 +427,7 @@ test('bootstrap-attested valida App dedicada, candidato, entorno, procedencia y 
     phase: 'bootstrap-attested',
     repository: REPOSITORY,
     candidateSha: CANDIDATE_SHA,
+    ciContext: 'CI Quality / Required',
     ...releaseAppOptions(),
     confirmation: RELEASE_GUARDS_CONFIRMATION,
     token: 'test-token',
@@ -397,18 +441,23 @@ test('bootstrap-attested valida App dedicada, candidato, entorno, procedencia y 
       jsonResponse(statusPayload()),
       jsonResponse(actionsRunPayload()),
       jsonResponse(ancestryPayload()),
+      jsonResponse(successfulCheckRuns({ sha: CANDIDATE_SHA })),
       jsonResponse({ url: 'protected-main' }),
       jsonResponse({ url: 'protected-staging' }),
     ], requests),
   });
-  assert.equal(requests.length, 13);
+  assert.equal(requests.length, 14);
   assert.match(requests[4].url, new RegExp(`/apps/${RELEASE_APP_SLUG}$`));
   assert.match(requests[10].url, new RegExp(`/compare/${MAIN_SHA}\\.\\.\\.${CANDIDATE_SHA}\\?per_page=100$`));
-  assert.match(requests[11].url, /branches\/main\/protection$/);
-  assert.match(requests[12].url, /branches\/staging\/protection$/);
-  assert.deepEqual(JSON.parse(requests[11].options.body).required_status_checks.checks, [
+  assert.match(requests[11].url, new RegExp(`/commits/${CANDIDATE_SHA}/check-runs`));
+  assert.match(requests[12].url, /branches\/main\/protection$/);
+  assert.match(requests[13].url, /branches\/staging\/protection$/);
+  assert.deepEqual(JSON.parse(requests[12].options.body).required_status_checks.checks, [
     { context: 'release/staging-deployed', app_id: RELEASE_APP_ID },
     { context: 'release/staging-validated', app_id: RELEASE_APP_ID },
+  ]);
+  assert.deepEqual(JSON.parse(requests[13].options.body).required_status_checks.checks, [
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
   ]);
   assert.equal(plan.phase, 'bootstrap-attested');
 });
@@ -419,6 +468,7 @@ test('bootstrap-attested falla sin mutar para candidato o App incorrectos', asyn
     phase: 'bootstrap-attested',
     repository: REPOSITORY,
     candidateSha: OTHER_SHA,
+    ciContext: 'CI Quality / Required',
     ...releaseAppOptions(),
     confirmation: RELEASE_GUARDS_CONFIRMATION,
     token: 'test-token',
@@ -432,6 +482,7 @@ test('bootstrap-attested falla sin mutar para candidato o App incorrectos', asyn
     phase: 'bootstrap-attested',
     repository: REPOSITORY,
     candidateSha: CANDIDATE_SHA,
+    ciContext: 'CI Quality / Required',
     ...releaseAppOptions(),
     confirmation: RELEASE_GUARDS_CONFIRMATION,
     token: 'test-token',
@@ -442,6 +493,48 @@ test('bootstrap-attested falla sin mutar para candidato o App incorrectos', asyn
     ], wrongAppRequests),
   }), /dedicated release GitHub App/i);
   assert.equal(wrongAppRequests.some(({ options }) => options.method === 'PUT'), false);
+
+  const wrongCiRequests = [];
+  await assert.rejects(applyReleaseGuardPlan({
+    phase: 'bootstrap-attested',
+    repository: REPOSITORY,
+    candidateSha: CANDIDATE_SHA,
+    ciContext: 'CI Quality / Required',
+    ...releaseAppOptions(),
+    confirmation: RELEASE_GUARDS_CONFIRMATION,
+    token: 'test-token',
+    apiBaseUrl: 'https://api.github.test',
+    fetchFn: sequenceFetch([
+      ...branchPreflightResponses(),
+      jsonResponse(releaseApp()),
+      jsonResponse(validEnvironment()),
+      jsonResponse(validBranchPolicies('staging')),
+      jsonResponse({ sha: MAIN_SHA }),
+      jsonResponse(statusPayload()),
+      jsonResponse(actionsRunPayload()),
+      jsonResponse(ancestryPayload()),
+      jsonResponse(successfulCheckRuns({ sha: CANDIDATE_SHA, appId: 15368 })),
+    ], wrongCiRequests),
+  }), /staging CI check.*dedicated release GitHub App/i);
+  assert.equal(wrongCiRequests.some(({ options }) => options.method === 'PUT'), false);
+});
+
+test('bootstrap-attested exige el contexto CI antes de consultar o mutar GitHub', async () => {
+  let fetchCalls = 0;
+  await assert.rejects(applyReleaseGuardPlan({
+    phase: 'bootstrap-attested',
+    repository: REPOSITORY,
+    candidateSha: CANDIDATE_SHA,
+    ...releaseAppOptions(),
+    confirmation: RELEASE_GUARDS_CONFIRMATION,
+    token: 'test-token',
+    apiBaseUrl: 'https://api.github.test',
+    fetchFn: async () => {
+      fetchCalls += 1;
+      return jsonResponse({});
+    },
+  }), /CI context/i);
+  assert.equal(fetchCalls, 0);
 });
 
 test('steady-state exige SHA actual, CI e identidad release antes de configurar', async () => {
@@ -505,17 +598,19 @@ test('steady-state valida workflow, ambos entornos y check verde antes de PUT', 
       jsonResponse(validEnvironment('Release Gate')),
       jsonResponse(validBranchPolicies('main')),
       jsonResponse(successfulCheckRuns()),
+      jsonResponse(successfulCheckRuns({ sha: CANDIDATE_SHA })),
       jsonResponse({ url: 'protected-main' }),
       jsonResponse({ url: 'protected-staging' }),
     ], requests),
   });
-  assert.equal(requests.length, 13);
+  assert.equal(requests.length, 14);
   assert.match(requests[5].url, /main-promotion-gate\.yml\?ref=main$/);
   assert.match(requests[6].url, /environments\/Staging$/);
   assert.match(requests[7].url, /deployment-branch-policies\?per_page=100$/);
   assert.match(requests[8].url, /environments\/Release%20Gate$/);
   assert.match(requests[9].url, /deployment-branch-policies\?per_page=100$/);
   assert.match(requests[10].url, new RegExp(`/commits/${MAIN_SHA}/check-runs\\?`));
+  assert.match(requests[11].url, new RegExp(`/commits/${CANDIDATE_SHA}/check-runs\\?`));
   assert.deepEqual(plan.branches.main.required_status_checks.checks, [
     { context: 'ci/security', app_id: 4242 },
     { context: 'release/promotion-gate', app_id: RELEASE_APP_ID },
@@ -523,7 +618,38 @@ test('steady-state valida workflow, ambos entornos y check verde antes de PUT', 
   ]);
   assert.deepEqual(plan.branches.staging.required_status_checks.checks, [
     { context: 'ci/staging', app_id: 5252 },
+    { context: 'CI Quality / Required', app_id: RELEASE_APP_ID },
   ]);
+});
+
+test('steady-state rechaza CI de staging emitido por otra App sin hacer PUT', async () => {
+  const requests = [];
+  await assert.rejects(applyReleaseGuardPlan({
+    phase: 'steady-state',
+    repository: REPOSITORY,
+    candidateSha: MAIN_SHA,
+    ciContext: 'CI Quality / Required',
+    ...releaseAppOptions(),
+    confirmation: RELEASE_GUARDS_CONFIRMATION,
+    token: 'test-token',
+    apiBaseUrl: 'https://api.github.test',
+    fetchFn: sequenceFetch([
+      ...branchPreflightResponses(),
+      jsonResponse(releaseApp()),
+      jsonResponse({
+        type: 'file',
+        path: '.github/workflows/main-promotion-gate.yml',
+        sha: WORKFLOW_BLOB_SHA,
+      }),
+      jsonResponse(validEnvironment('Staging')),
+      jsonResponse(validBranchPolicies('staging')),
+      jsonResponse(validEnvironment('Release Gate')),
+      jsonResponse(validBranchPolicies('main')),
+      jsonResponse(successfulCheckRuns()),
+      jsonResponse(successfulCheckRuns({ sha: CANDIDATE_SHA, appId: 15368 })),
+    ], requests),
+  }), /main and staging.*dedicated release GitHub App/i);
+  assert.equal(requests.some(({ options }) => options.method === 'PUT'), false);
 });
 
 test('steady-state rechaza environment relajado o CI ambiguo sin hacer PUT', async () => {

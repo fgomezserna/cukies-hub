@@ -71,10 +71,9 @@ No abras una RC para una tarea docs interna que se pueda cerrar al merge sin dep
 
 ### Automatizada
 
-- [ ] `pnpm dapp lint`
-- [ ] `pnpm dapp typecheck`
-- [ ] `pnpm dapp test`
-- [ ] `pnpm --filter @cukies/contracts test`, si aplica.
+- [ ] `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile` con la version pnpm declarada en CI.
+- [ ] `pnpm verify` (perfil candidate completo).
+- [ ] `CI Quality / Required` verde en el SHA exacto de `staging`, emitido por la App dedicada.
 - [ ] `pnpm --filter @cukies/contracts freeze:manifest`, si aplica.
 - [ ] Otros:
 
@@ -263,7 +262,8 @@ auto-mergea y debe usar **Create a merge commit**.
 `pull_request_target` no puede proteger la primera promocion con un archivo que aun no esta en la
 base. Antes de mergear el tooling, `bootstrap-lock` deja `main` read-only e instala
 PR/reviews/CODEOWNERS/admins y prohibe force/delete en ambas ramas, sin exigir statuses
-inexistentes. `bootstrap-attested` solo desbloquea live despues de validar las attestations exactas.
+inexistentes. `bootstrap-attested` solo desbloquea live despues de validar las attestations exactas
+y el check CI app-bound verde sobre el mismo SHA, que queda requerido desde ese momento en staging.
 La QA no depende de
 `workflow_dispatch`: el workflow de `push` a `staging` espera la aprobacion del Environment
 protegido `Staging` antes de verificar y firmar ambas attestations con una GitHub App dedicada.
@@ -275,13 +275,25 @@ La App dedicada necesita `Commit statuses: write`, `Checks: write`, `Contents: w
 sync en `main`, tras aprobar `Release Gate`. El `GITHUB_TOKEN` del repositorio no crea ese PR.
 
 `bootstrap-attested` exige el SHA actual de `staging` y verifica Environment, creador, Actions run,
-workflow/ref/SHA/conclusion de los dos statuses y ancestry; no fabrica attestations. Tras la primera
-promocion y su sync con merge commit, steady-state exige `release/promotion-gate` mas el check CI
-de #235, ambos emitidos por la misma App dedicada y ligados a su `app_id`. La App global de GitHub
-Actions no es valida. El placeholder
+workflow/ref/SHA/conclusion de los dos statuses, ancestry y `CI Quality / Required` verde de la App
+dedicada; no fabrica attestations ni CI. El tooling de
+#232 y el contrato CI de #235 deben entrar antes por PR a `staging`. Tras la primera promocion y su
+sync con merge commit, steady-state exige `release/promotion-gate` y `CI Quality / Required` en
+`main`, mas el mismo CI en `staging`; todos proceden de la misma App dedicada y quedan ligados a su
+`app_id`. La App global de GitHub Actions no es valida. El placeholder
 `__REPLACE_WITH_EXISTING_REQUIRED_CI_CONTEXT__` nunca es aplicable. Mainnet y preventa permanecen
 congeladas: esta plantilla no autoriza apply, promocion, deploy, contrato, direccion, fecha, env ni
 cambio de runtime.
+
+El CI de PR usa el test merge exacto: quick hacia `staging` y candidate completo hacia `main`,
+incluidos hotfixes; los pushes protegidos tambien usan candidate. El runner confiable materializa
+el arbol Git exacto y construye una imagen ligada al SHA, consumida por ID inmutable, con install
+inerte y sin ejecutar Prisma en su capa compartida. Prisma solo se genera dentro de los gates dapp
+que lo requieren, tras validar su configuracion con tooling root-owned y revalidar el source. Cada
+test/build corre en un contenedor nuevo sin red, mounts, secretos ni capabilities, de modo que ningun
+proceso candidato puede contaminar el siguiente gate. Los filtros fallan si el workspace no existe. El Environment
+protegido solo se abre en el attestor, despues de revalidar la identidad viva del SHA, para crear
+`CI Quality / Required` con la App dedicada.
 
 `CODEOWNERS` exige revision sobre workflows, manifiestos, scripts release y la propia politica a uno de los
 tres colaboradores verificados: `@fgomezserna`, `@JairoGG-ai` o `@accesovip`. La proteccion exige
