@@ -85,6 +85,7 @@ function rpc(input: {
     contractAddress: `0x${string}`;
     blockNumber: bigint;
     status: 'success' | 'reverted';
+    transactionHash: `0x${string}`;
   };
 }) {
   return {
@@ -110,6 +111,7 @@ function rpc(input: {
         contractAddress: null,
         blockNumber: BigInt(0),
         status: 'reverted',
+        transactionHash: `0x${'0'.repeat(64)}`,
       },
     },
   };
@@ -312,7 +314,12 @@ test('uses and seals the independent TOKEN_V2 deployment identity', async () => 
     host: 'testnet.test',
     chainId: 97,
     bytecode,
-    receipt: { contractAddress: address, blockNumber: 106n, status: 'success' },
+    receipt: {
+      contractAddress: address,
+      blockNumber: 106n,
+      status: 'success',
+      transactionHash: deploymentTxHash,
+    },
     logCalls,
   });
   const { store, updates } = fakeStore();
@@ -357,7 +364,12 @@ test('verifies UKI contract receipt and runtime before sealing cursor identity',
     host: 'testnet.test',
     chainId: 97,
     bytecode,
-    receipt: { contractAddress: address, blockNumber: 105n, status: 'success' },
+    receipt: {
+      contractAddress: address,
+      blockNumber: 105n,
+      status: 'success',
+      transactionHash: deploymentTxHash,
+    },
   });
   const { store, updates, stakingBootstraps, checkpoints, operations } = fakeStore();
 
@@ -389,7 +401,12 @@ test('rejects a UKI contract when its live runtime hash differs from the pinned 
     host: 'testnet.test',
     chainId: 97,
     bytecode: '0x60006000',
-    receipt: { contractAddress: address, blockNumber: 105n, status: 'success' },
+    receipt: {
+      contractAddress: address,
+      blockNumber: 105n,
+      status: 'success',
+      transactionHash: `0x${'4'.repeat(64)}`,
+    },
   });
   const { store, updates, stakingBootstraps } = fakeStore();
 
@@ -429,6 +446,7 @@ test('rejects a UKI contract when the deployment receipt points to another addre
       contractAddress: `0x${'9'.repeat(40)}`,
       blockNumber: 105n,
       status: 'success',
+      transactionHash: `0x${'4'.repeat(64)}`,
     },
   });
   const { store, updates } = fakeStore();
@@ -464,7 +482,12 @@ test('does not seal an existing UKI cursor whose coverage starts after deploymen
     host: 'testnet.test',
     chainId: 97,
     bytecode,
-    receipt: { contractAddress: address, blockNumber: 105n, status: 'success' },
+    receipt: {
+      contractAddress: address,
+      blockNumber: 105n,
+      status: 'success',
+      transactionHash: `0x${'4'.repeat(64)}`,
+    },
   });
   const { store, updates } = fakeStore({
     nextBlock: 111,
