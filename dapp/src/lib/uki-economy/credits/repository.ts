@@ -22,6 +22,12 @@ import {
   creditSourceCursorIsHealthy,
 } from "./source-health";
 import {
+  deriveVerifiedCreditHistoryCoverage,
+  PENDING_CREDIT_SOURCE_EVENT_STATUSES,
+  type CreditVerifiedHistoryCoverage,
+  type CreditVerifiedSlotVersion,
+} from "./history-coverage";
+import {
   CREDIT_RULE_SCOPE,
   CREDIT_SCHEMA_VERSION,
   CREDIT_SOURCE_WATERMARK_IDS,
@@ -79,6 +85,11 @@ export interface CompetitionCreditRepository {
     route: CreditRoute,
     limit: number
   ): Promise<CreditSnapshotSlot[]>;
+  ensureVerifiedHistoryCoverage(
+    route: CreditRoute,
+    limit: number,
+    now: Date
+  ): Promise<CreditVerifiedHistoryCoverage>;
   readSourceHealth(
     now: Date,
     rule: CompetitionCreditRule,
@@ -255,6 +266,11 @@ function mongoCollections(db: Db) {
       _id: CreditRoute;
       completeFrom: Date;
       completeFromBlockNumber?: number;
+      historicalBlockCoverage?: string;
+      verifiedSlotCount?: number;
+      verifiedAt?: Date;
+      observedThrough?: Date;
+      updatedAt?: Date;
     }>("cukie_master_slot_history_state"),
     configs: db.collection<CreditPoolConfiguration>(
       "competition_credit_pool_configs"
@@ -535,6 +551,112 @@ export function createMongoCompetitionCreditRepository(
         .sort({ _id: 1 })
         .limit(limit)
         .toArray(),
+    async ensureVerifiedHistoryCoverage(route, limit, now) {
+      const existing = await collections.slotHistoryState.findOne(
+        { _id: route },
+        options
+      );
+      if (
+        existing &&
+        Number.isSafeInteger(existing.completeFromBlockNumber) &&
+        Number(existing.completeFromBlockNumber) >= 0 &&
+        existing.completeFrom instanceof Date &&
+        !Number.isNaN(existing.completeFrom.getTime())
+      ) {
+        return {
+          completeFrom: existing.completeFrom,
+          completeFromBlockNumber: Number(existing.completeFromBlockNumber),
+          verifiedSlotCount: Number(existing.verifiedSlotCount ?? 0),
+        };
+      }
+
+      const [sourceSlots, earliestVerifiedVersions] = await Promise.all([
+        collections.slots
+          .find({ route }, { ...options, projection: { _id: 1, route: 1 } })
+          .sort({ _id: 1 })
+          .limit(limit + 1)
+          .toArray(),
+        collections.slotVersions.aggregate<CreditVerifiedSlotVersion>([
+          {
+            $match: {
+              route,
+              effectiveBlockNumber: { $type: "number" },
+              effectiveBlockHash: { $regex: /^0x[0-9a-f]{64}$/ },
+              effectiveBlockTimestamp: { $type: "date" },
+              "slot.sourceBlockNumber": { $type: "number" },
+              "slot.sourceBlockHash": { $regex: /^0x[0-9a-f]{64}$/ },
+              "slot.sourceBlockTimestamp": { $type: "date" },
+            },
+          },
+          {
+            $sort: {
+              slotId: 1,
+              effectiveBlockNumber: 1,
+              "slot.revision": 1,
+              _id: 1,
+            },
+          },
+          { $group: { _id: "$slotId", version: { $first: "$$ROOT" } } },
+          { $replaceRoot: { newRoot: "$version" } },
+          { $sort: { slotId: 1 } },
+          { $limit: limit + 1 },
+        ], options).toArray(),
+      ]);
+      if (
+        sourceSlots.length > limit ||
+        earliestVerifiedVersions.length > limit
+      ) {
+        throw new DomainConflictError(
+          `La cobertura historica ${route} excede el limite auditable.`,
+          { reasonCode: "HISTORY_COVERAGE_LIMIT_EXCEEDED", route }
+        );
+      }
+      const coverage = deriveVerifiedCreditHistoryCoverage({
+        route,
+        sourceSlots,
+        earliestVerifiedVersions,
+      });
+      await collections.slotHistoryState.updateOne(
+        {
+          _id: route,
+          completeFromBlockNumber: { $exists: false },
+        },
+        {
+          $setOnInsert: { _id: route },
+          $set: {
+            completeFrom: coverage.completeFrom,
+            completeFromBlockNumber: coverage.completeFromBlockNumber,
+            historicalBlockCoverage: "verified_from_canonical_slot_versions",
+            verifiedSlotCount: coverage.verifiedSlotCount,
+            verifiedAt: now,
+            updatedAt: now,
+          },
+          $max: { observedThrough: now },
+        },
+        { ...options, upsert: !existing }
+      );
+      const persisted = await collections.slotHistoryState.findOne(
+        { _id: route },
+        options
+      );
+      if (
+        !persisted ||
+        !Number.isSafeInteger(persisted.completeFromBlockNumber) ||
+        !(persisted.completeFrom instanceof Date)
+      ) {
+        throw new DomainConflictError(
+          `No se pudo acreditar la cobertura historica ${route}.`,
+          { reasonCode: "HISTORY_COVERAGE_PERSIST_FAILED", route }
+        );
+      }
+      return {
+        completeFrom: persisted.completeFrom,
+        completeFromBlockNumber: Number(persisted.completeFromBlockNumber),
+        verifiedSlotCount: Number(
+          persisted.verifiedSlotCount ?? coverage.verifiedSlotCount
+        ),
+      };
+    },
     async listSourceSlotsAtCutoff(cutoffBlock, route, limit) {
       const coverage = await collections.slotHistoryState.findOne(
         { _id: route },
@@ -546,7 +668,13 @@ export function createMongoCompetitionCreditRepository(
         Number(coverage.completeFromBlockNumber) > cutoffBlock.blockNumber
       ) {
         throw new DomainConflictError(
-          `El historial temporal ${route} no cubre el bloque ${cutoffBlock.blockNumber}.`
+          `El historial temporal ${route} no cubre el bloque ${cutoffBlock.blockNumber}.`,
+          {
+            reasonCode: "HISTORY_CUTOFF_NOT_COVERED",
+            route,
+            cutoffBlockNumber: cutoffBlock.blockNumber,
+            completeFromBlockNumber: coverage?.completeFromBlockNumber ?? null,
+          }
         );
       }
       const versions = await collections.slotVersions.aggregate<{
@@ -665,7 +793,7 @@ export function createMongoCompetitionCreditRepository(
         db.collection("chain_events").countDocuments(
           {
             contractAlias: { $in: aliases },
-            status: { $ne: "projected" },
+            status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
           },
           options
         ),

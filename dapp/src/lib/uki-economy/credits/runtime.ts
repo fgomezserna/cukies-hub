@@ -55,6 +55,7 @@ type RuntimeRunDocument = {
   endedAt?: Date;
   expiresAt: Date;
   errorCode?: string;
+  routeResults?: CompetitionCreditRouteRuntimeResult[];
   creditRunId?: string;
   periodId?: string;
   result?: CompetitionCreditRuntimeResult;
@@ -69,6 +70,7 @@ type RuntimeStateDocument = {
   lastSuccessAt?: Date;
   lastFailureAt?: Date;
   lastErrorCode?: string;
+  lastRouteResults?: CompetitionCreditRouteRuntimeResult[];
   consecutiveFailures?: number;
   createdAt: Date;
   updatedAt: Date;
@@ -94,6 +96,7 @@ export interface CompetitionCreditRuntimeCoordinator {
     lease: CompetitionCreditRuntimeLease,
     now: Date,
     errorCode: string,
+    routeResults?: CompetitionCreditRouteRuntimeResult[],
   ): Promise<void>;
 }
 
@@ -119,6 +122,7 @@ export type CompetitionCreditRouteRuntimeResult = {
   pendingItems: number;
   warningCode?: 'SNAPSHOT_LATE';
   errorCode?: string;
+  reasonCodes?: string[];
 };
 
 export type CompetitionCreditRuntimeResult = {
@@ -248,6 +252,18 @@ function runtimeErrorCode(error: unknown) {
   return 'TICK_FAILED';
 }
 
+function runtimeReasonCodes(error: unknown) {
+  if (!(error instanceof DomainConflictError)) return [];
+  const candidates = [
+    error.details?.reasonCode,
+    ...(Array.isArray(error.details?.warnings) ? error.details.warnings : []),
+  ];
+  return [...new Set(candidates.filter(
+    (value): value is string =>
+      typeof value === 'string' && /^[A-Z0-9:_-]{1,160}$/.test(value),
+  ))].slice(0, 20);
+}
+
 export function createMongoCompetitionCreditRuntimeCoordinator(
   db: Db,
 ): CompetitionCreditRuntimeCoordinator {
@@ -356,23 +372,28 @@ export function createMongoCompetitionCreditRuntimeCoordinator(
         { _id: GLOBAL_LEASE_ID, leasedBy: lease.leasedBy, fenceToken: lease.fenceToken },
         {
           $set: { lastSuccessAt: now, updatedAt: now, consecutiveFailures: 0 },
-          $unset: { lastErrorCode: '', lastFailureAt: '' },
+          $unset: { lastErrorCode: '', lastFailureAt: '', lastRouteResults: '' },
         },
       );
     },
-    async failRun(runtimeRunId, lease, now, errorCode) {
+    async failRun(runtimeRunId, lease, now, errorCode, routeResults = []) {
       await runs.updateOne(
         {
           _id: runtimeRunId,
           status: 'running',
           runtimeFenceToken: lease.fenceToken,
         },
-        { $set: { status: 'error', endedAt: now, errorCode } },
+        { $set: { status: 'error', endedAt: now, errorCode, routeResults } },
       );
       await states.updateOne(
         { _id: GLOBAL_LEASE_ID, leasedBy: lease.leasedBy, fenceToken: lease.fenceToken },
         {
-          $set: { lastFailureAt: now, lastErrorCode: errorCode, updatedAt: now },
+          $set: {
+            lastFailureAt: now,
+            lastErrorCode: errorCode,
+            lastRouteResults: routeResults,
+            updatedAt: now,
+          },
           $inc: { consecutiveFailures: 1 },
         },
       );
@@ -424,13 +445,14 @@ export async function runCompetitionCreditRuntimeTick(input: {
   let lease = await coordinator.acquire(workerId, startedAt, config.leaseMs);
   if (!lease) throw new CompetitionCreditRuntimeBusyError();
   const runtimeRunId = await coordinator.startRun(workerId, lease, startedAt);
+  const attemptedRouteResults: CompetitionCreditRouteRuntimeResult[] = [];
 
   try {
     const rule = await (input.loadActiveRule ?? loadRule)(
       validClockDate(clock),
       config.expectedRuleVersion,
     );
-    const routeResults: CompetitionCreditRouteRuntimeResult[] = [];
+    const routeResults = attemptedRouteResults;
     let firstRouteError: unknown = null;
     for (const route of ['uki', 'nft'] as const) {
       try {
@@ -522,6 +544,7 @@ export async function runCompetitionCreditRuntimeTick(input: {
         });
       } catch (error) {
         firstRouteError ??= error;
+        const reasonCodes = runtimeReasonCodes(error);
         routeResults.push({
           route,
           status: 'blocked',
@@ -531,6 +554,7 @@ export async function runCompetitionCreditRuntimeTick(input: {
           itemsApplied: 0,
           pendingItems: 0,
           errorCode: runtimeErrorCode(error),
+          ...(reasonCodes.length > 0 ? { reasonCodes } : {}),
         });
       }
     }
@@ -568,7 +592,13 @@ export async function runCompetitionCreditRuntimeTick(input: {
   } catch (error) {
     const failedAt = validClockDate(clock);
     try {
-      await coordinator.failRun(runtimeRunId, lease, failedAt, runtimeErrorCode(error));
+      await coordinator.failRun(
+        runtimeRunId,
+        lease,
+        failedAt,
+        runtimeErrorCode(error),
+        attemptedRouteResults,
+      );
     } catch {
       // The original domain failure remains authoritative; observability is best-effort here.
     }
