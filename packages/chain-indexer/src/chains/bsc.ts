@@ -11,7 +11,9 @@ import { bscEventAbis } from '../config/abis.js';
 import { getContractEventConfigs } from '../config/contracts.js';
 import { normalizeDomainEvent } from '../normalize.js';
 import type {
+  ChainCursor,
   ChainEvent,
+  ContractEventConfig,
   IndexerConfig,
   VerifiedBscContractIdentity,
 } from '../types.js';
@@ -231,6 +233,46 @@ async function verifyBscContractIdentity(input: {
   };
 }
 
+type SealedBscCursorIdentity = Pick<
+  ChainCursor,
+  | 'contractAddress'
+  | 'bootstrapStatus'
+  | 'bootstrapStartBlock'
+  | 'bootstrapVerifiedAt'
+  | 'verifiedChainId'
+  | 'contractCodeHash'
+  | 'contractDeploymentBlock'
+  | 'contractDeploymentTxHash'
+  | 'contractConfigHash'
+>;
+
+export function assertBscCursorBootstrapIdentity(input: {
+  contractEvent: ContractEventConfig;
+  cursor: SealedBscCursorIdentity | null;
+  identity: VerifiedBscContractIdentity;
+}) {
+  if (!input.cursor || input.cursor.bootstrapStatus !== 'verified') return;
+
+  const cursor = input.cursor;
+  const identity = input.identity;
+  const matches = identity.alias === input.contractEvent.contractAlias
+    && identity.address.toLowerCase() === input.contractEvent.contractAddress.toLowerCase()
+    && cursor.contractAddress.toLowerCase() === input.contractEvent.contractAddress.toLowerCase()
+    && cursor.bootstrapStartBlock === identity.startBlock
+    && cursor.bootstrapVerifiedAt instanceof Date
+    && cursor.verifiedChainId === identity.chainId
+    && cursor.contractCodeHash?.toLowerCase() === identity.runtimeCodeHash.toLowerCase()
+    && cursor.contractDeploymentBlock === identity.deploymentBlock
+    && cursor.contractDeploymentTxHash?.toLowerCase() === identity.deploymentTxHash.toLowerCase()
+    && cursor.contractConfigHash?.toLowerCase() === identity.configHash.toLowerCase();
+
+  if (!matches) {
+    throw new Error(
+      `Config drift en bootstrap ${input.contractEvent.contractAlias}:${input.contractEvent.eventName}; se requiere rewind/rebootstrap explicito.`,
+    );
+  }
+}
+
 async function getLogsWithFallback(
   client: BscClient,
   params: {
@@ -389,6 +431,13 @@ export async function ingestBscOnce(
       throw new Error(
         `${contractEvent.contractAlias}:${contractEvent.eventName} no demuestra cobertura desde el bloque de despliegue verificado.`,
       );
+    }
+    if (verified) {
+      assertBscCursorBootstrapIdentity({
+        contractEvent,
+        cursor,
+        identity: verified.identity,
+      });
     }
     const verifiedCursorFields = verified
       ? {
