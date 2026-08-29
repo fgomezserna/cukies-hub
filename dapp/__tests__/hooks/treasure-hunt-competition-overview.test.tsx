@@ -60,6 +60,24 @@ function statusResponse(disqualified: boolean) {
   };
 }
 
+function statusResponseWithAttempts(attemptsRemaining: number) {
+  const response = statusResponse(false);
+  return {
+    ...response,
+    eligibility: {
+      ...response.eligibility,
+      stakedUkiRaw: attemptsRemaining >= 9
+        ? '21999000000000000000000'
+        : response.eligibility.stakedUkiRaw,
+      totalStakedUkiRaw: attemptsRemaining >= 9
+        ? '41999000000000000000000'
+        : response.eligibility.totalStakedUkiRaw,
+      attemptsGranted: attemptsRemaining + response.eligibility.attemptsUsed,
+      attemptsRemaining,
+    },
+  };
+}
+
 const leaderboardResponse = {
   success: true,
   campaignId: 'uki-staking-testnet-2026-08',
@@ -121,5 +139,29 @@ describe('useTreasureHuntCompetitionOverview', () => {
     await waitFor(() => expect(result.current.status?.eligibility?.disqualified).toBe(true));
 
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it('actualiza los cupos al recibir la confirmación de staking', async () => {
+    let statusReads = 0;
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/games/treasure-hunt/competition') {
+        statusReads += 1;
+        return jsonResponse(statusResponseWithAttempts(statusReads >= 2 ? 9 : 8));
+      }
+      return jsonResponse(leaderboardResponse);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const { result } = renderHook(() => useTreasureHuntCompetitionOverview({
+      autoRefreshMs: 0,
+    }));
+
+    await waitFor(() => expect(result.current.status?.eligibility?.attemptsRemaining).toBe(8));
+    act(() => {
+      window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
+    });
+    await waitFor(() => expect(result.current.status?.eligibility?.attemptsRemaining).toBe(9));
+
+    expect(statusReads).toBeGreaterThanOrEqual(2);
   });
 });

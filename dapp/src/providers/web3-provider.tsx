@@ -2,7 +2,7 @@
 
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
-import { defineChain } from 'viem';
+import { defineChain, fallback } from 'viem';
 import { coinbaseWallet, injected, metaMask, walletConnect } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -17,7 +17,11 @@ import {
 } from '@/lib/wallet-connectors';
 
 const queryClient = new QueryClient();
-const BSC_RPC_URL = 'https://bsc-dataseed1.binance.org';
+const BSC_RPC_URLS = [
+  'https://bsc-rpc.publicnode.com',
+  'https://bsc-dataseed-public.bnbchain.org',
+  'https://rpc-bnb.blockmachine.io',
+] as const;
 const BSC_TESTNET_RPC_URL = 'https://data-seed-prebsc-1-s1.binance.org:8545';
 
 // Binance Smart Chain Mainnet
@@ -31,7 +35,7 @@ const bsc = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [BSC_RPC_URL],
+      http: [...BSC_RPC_URLS],
     },
   },
   blockExplorers: {
@@ -128,7 +132,10 @@ export const config = createConfig({
   connectors,
   ssr: true,
   transports: {
-    [bsc.id]: http(BSC_RPC_URL),
+    [bsc.id]: fallback(BSC_RPC_URLS.map((url) => http(url, {
+      retryCount: 0,
+      timeout: 4_000,
+    })), { rank: true }),
     [bscTestnet.id]: http(BSC_TESTNET_RPC_URL),
     [mainnet.id]: http(),
     [sepolia.id]: http(),

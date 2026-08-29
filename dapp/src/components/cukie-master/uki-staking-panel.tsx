@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import {
   useAccount,
@@ -92,6 +99,7 @@ export function UkiStakingPanel({
   const [lastAction, setLastAction] = useState<TransactionAction>(null);
   const [lastCompletedAction, setLastCompletedAction] = useState<TransactionAction>(null);
   const [approvedAmount, setApprovedAmount] = useState<bigint | null>(null);
+  const [isRetryingReads, setIsRetryingReads] = useState(false);
 
   const tokenAddress = ukiSaleContracts.ukiTokenAddress as Address | undefined;
   const stakingAddress = ukiSaleContracts.ukiStakingAddress as Address | undefined;
@@ -103,7 +111,7 @@ export function UkiStakingPanel({
   );
   const hasContractConfig = Boolean(tokenAddress && stakingAddress);
   const publicReadsEnabled = Boolean(hasContractConfig && !isUnsafeStagingChain);
-  const walletReadsEnabled = Boolean(address && hasContractConfig && !isWrongChain && !isUnsafeStagingChain);
+  const walletReadsEnabled = Boolean(address && hasContractConfig && !isUnsafeStagingChain);
 
   const {
     data: stakingToken,
@@ -173,6 +181,8 @@ export function UkiStakingPanel({
   const walletReadFailed = operation === 'stake'
     ? isLiquidBalanceError || isAllowanceError
     : isStakedBalanceError;
+  const readRequestFailed = isStakingTokenError || isPausedError ||
+    isLiquidBalanceError || isAllowanceError || isStakedBalanceError;
   const effectiveAllowance = approvedAmount && (!allowance || approvedAmount > allowance)
     ? approvedAmount
     : allowance;
@@ -244,7 +254,7 @@ export function UkiStakingPanel({
       window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Staking confirmado',
-        description: 'Tus UKI ya constan en el contrato de Cukie Master.',
+        description: 'Tus UKI ya constan en el contrato de staking. Estamos actualizando tus partidas del torneo.',
       });
     } else if (lastAction === 'unstake') {
       setAmount(DEFAULT_AMOUNT);
@@ -296,6 +306,23 @@ export function UkiStakingPanel({
   function selectQuickAmount(value: string) {
     setAmount(value);
     setLastCompletedAction(null);
+  }
+
+  async function retryContractReads() {
+    setIsRetryingReads(true);
+    try {
+      await Promise.allSettled([
+        refetchStakingToken(),
+        refetchPaused(),
+        ...(address ? [
+          refetchLiquidBalance(),
+          refetchAllowance(),
+          refetchStakedBalance(),
+        ] : []),
+      ]);
+    } finally {
+      setIsRetryingReads(false);
+    }
   }
 
   function switchToStagingNetwork() {
@@ -461,6 +488,18 @@ export function UkiStakingPanel({
               <InlineWarning text={`No tienes suficiente UKI ${operation === 'stake' ? 'líquido' : 'en staking'} para esta operación.`} />
             ) : !parsedAmount ? (
               <InlineWarning text="Introduce una cantidad de UKI mayor que cero." />
+            ) : null}
+
+            {readRequestFailed ? (
+              <button
+                type="button"
+                disabled={isRetryingReads}
+                onClick={() => void retryContractReads()}
+                className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-[8px] border border-white/15 px-3 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-cream)] transition hover:border-[var(--uki-cyan-border)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isRetryingReads ? 'animate-spin' : ''}`} />
+                <span>{isRetryingReads ? 'Reintentando lecturas' : 'Reintentar lecturas'}</span>
+              </button>
             ) : null}
 
             <div className="mt-5">

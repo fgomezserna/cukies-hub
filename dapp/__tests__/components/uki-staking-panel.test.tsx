@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { parseUnits } from 'viem';
 import {
   useAccount,
@@ -51,6 +51,7 @@ jest.mock('lucide-react', () => ({
   Check: () => null,
   ExternalLink: () => null,
   Loader2: () => null,
+  RefreshCw: () => null,
   ShieldCheck: () => null,
 }));
 
@@ -191,6 +192,73 @@ describe('UkiStakingPanel', () => {
     expect(writeContract).not.toHaveBeenCalled();
   });
 
+  it('keeps BSC balance reads enabled when the wallet is on another chain', () => {
+    const queryEnabled = new Map<string, boolean>();
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 56,
+      isConnected: true,
+    } as never);
+    mockUseReadContract.mockImplementation((config) => {
+      queryEnabled.set(String(config?.functionName), Boolean(config?.query?.enabled));
+      switch (config?.functionName) {
+        case 'ukiToken':
+          return readResult(stakingToken);
+        case 'paused':
+          return readResult(stakingPaused);
+        case 'balanceOf':
+          return readResult(parseUnits('50000', 18));
+        case 'allowance':
+          return readResult(allowance);
+        case 'stakedBalance':
+          return readResult(parseUnits('25000', 18));
+        default:
+          return readResult(undefined);
+      }
+    });
+
+    render(<UkiStakingPanel />);
+
+    expect(queryEnabled.get('balanceOf')).toBe(true);
+    expect(queryEnabled.get('allowance')).toBe(true);
+    expect(queryEnabled.get('stakedBalance')).toBe(true);
+    expect(screen.getByText('50.000')).toBeInTheDocument();
+    expect(screen.getByText('25.000')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain Testnet/i })).toBeEnabled();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it('offers an explicit retry after a contract read fails', async () => {
+    const refetchLiquidBalance = jest.fn().mockResolvedValue({ data: parseUnits('50000', 18) });
+    mockUseReadContract.mockImplementation((config) => {
+      switch (config?.functionName) {
+        case 'ukiToken':
+          return readResult(stakingToken);
+        case 'paused':
+          return readResult(stakingPaused);
+        case 'balanceOf':
+          return {
+            data: undefined,
+            isError: true,
+            refetch: refetchLiquidBalance,
+          } as never;
+        case 'allowance':
+          return readResult(allowance);
+        case 'stakedBalance':
+          return readResult(parseUnits('25000', 18));
+        default:
+          return readResult(undefined);
+      }
+    });
+
+    render(<UkiStakingPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar lecturas' }));
+
+    await waitFor(() => expect(refetchLiquidBalance).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(/No se han podido leer los balances con garantías/i)).toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
   it('blocks contract writes until the connected EVM wallet has authenticated', () => {
     mockUseAuth.mockReturnValue({
       user: null,
@@ -253,6 +321,34 @@ describe('UkiStakingPanel', () => {
       functionName: 'stake',
       args: [parseUnits('2000', 18)],
     }));
+  });
+
+  it('refreshes tournament attempts after a confirmed staking transaction', async () => {
+    allowance = parseUnits('50000', 18);
+    const tournamentRefresh = jest.fn();
+    window.addEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
+    const { rerender } = render(<UkiStakingPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hacer staking' }));
+    mockUseWriteContract.mockReturnValue({
+      writeContract,
+      data: `0x${'a'.repeat(64)}`,
+      error: null,
+      isPending: false,
+      reset,
+    } as never);
+    mockUseWaitForTransactionReceipt.mockReturnValue({
+      isLoading: false,
+      isSuccess: true,
+    } as never);
+    rerender(<UkiStakingPanel />);
+
+    await waitFor(() => expect(tournamentRefresh).toHaveBeenCalledTimes(1));
+    expect(toast).toHaveBeenCalledWith({
+      title: 'Staking confirmado',
+      description: 'Tus UKI ya constan en el contrato de staking. Estamos actualizando tus partidas del torneo.',
+    });
+    window.removeEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
   });
 
   it('withdraws only up to the verified staked balance', () => {
