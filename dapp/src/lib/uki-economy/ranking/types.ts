@@ -48,6 +48,11 @@ export type WeeklyRankingSource = {
   walletNormalized: string;
   periodAnchorAt: Date;
   settledAt: Date;
+  creditBucket: "pool";
+  creditCostCode: string;
+  creditAmountCredits: number;
+  creditExpiresAt: Date;
+  creditEvidenceHash: string;
   cappedScoreRaw: string;
   scoreCapRaw: string;
   gameResultHash: string;
