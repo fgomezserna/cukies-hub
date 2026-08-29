@@ -46,6 +46,11 @@ export interface CompetitionAttemptRecord extends CompetitionAttempt {
   readonly reviewReason?: string | null;
   readonly reviewedAt?: string | null;
   readonly reviewer?: string | null;
+  /** Audit marker for an entitlement restored after an operational incident. */
+  readonly entitlementRestoredAt?: string;
+  readonly entitlementRestoreReason?: string;
+  readonly entitlementRestoredBy?: string;
+  readonly restoredEntitlementSlot?: number;
   readonly evidence: readonly CompetitionStoredEvidencePoint[];
   readonly createdAt: string;
   readonly updatedAt: string;
