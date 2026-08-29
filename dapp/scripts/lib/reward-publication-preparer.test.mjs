@@ -174,6 +174,26 @@ test('el replay no duplica plan, batch ni proofs', async () => {
   assert.equal(context.db.rows.get('reward_claim_proofs').length, 1);
 });
 
+test('ignora allocations intermedias mientras no exista un cierre contable final', async () => {
+  const context = setup();
+  context.db.rows.set('reward_accounting_allocations', []);
+  context.db.rows.set('reward_allocations', [{
+    _id: 'intermediate-allocation',
+    allocationId: 'intermediate-allocation',
+    walletNormalized: PLAYER,
+    amountRaw: '1000000000000000000',
+    status: 'allocated',
+  }]);
+
+  const result = await prepare(context);
+
+  assert.equal(result, null);
+  assert.equal(context.db.rows.get('reward_allocations').length, 1);
+  assert.equal(context.db.rows.get('reward_publication_plans').length, 0);
+  assert.equal(context.db.rows.get('reward_claim_batches').length, 0);
+  assert.equal(context.db.rows.get('reward_claim_proofs').length, 0);
+});
+
 test('rechaza una allocation manipulada antes de persistir artifacts', async () => {
   const context = setup();
   context.db.rows.get('reward_accounting_allocations')[0].amountRaw = '11';

@@ -10,6 +10,7 @@ import {
   splitUndistributed,
   weeklySettlementSchedule,
 } from "@/lib/uki-economy/rewards/accounting";
+import { calculateSettlementRewardAllocations } from "@/lib/uki-economy/rewards/calculation";
 import { testRewardRule } from "@/lib/uki-economy/rewards/testing";
 import { RewardAccountingService } from "@/lib/uki-economy/rewards/accounting-repository";
 import {
@@ -242,6 +243,165 @@ describe("reward accounting invariants", () => {
     expect(result.topupRaw).toBe("450000000000000000");
     expect(result.priorReservedInflowRaw).toBe("210000000000000000");
     expect(result.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
+  });
+
+  it("cierra el reparto diario V4 completo sin perder ni duplicar UKI", () => {
+    const rule = testRewardRule({
+      _id: "reward_allocations:rewards-staging-test-v4",
+      version: "rewards-staging-test-v4",
+      activeFrom: new Date("2026-08-10T00:00:00.000Z"),
+      runCredits: {
+        unitScale: 10,
+        totalUnits: 100,
+        weeklyReserveUnits: 20,
+        ambassadorReserveUnits: 5,
+        ambassadorOrdinaryUnits: 4,
+        ambassadorWeeklyUnits: 1,
+        convertibleUnits: 75,
+      },
+      settlementBps: {
+        poolCredits: 5_000,
+        poolCukieWithOwnCredits: 5_000,
+        poolCukieWithPoolCredits: 2_500,
+      },
+      rankingPlayerBps: {
+        "1": 10_000,
+        "2": 9_000,
+        "3": 8_000,
+        "4": 7_000,
+        "5": 6_000,
+        "6": 5_000,
+        "7": 4_000,
+        "8": 3_000,
+        "9": 2_000,
+      },
+      creditPoolDaily: {
+        sourceShareBps: 10_000,
+        floorEnabled: true,
+        floorCreditsStep: 10,
+        floorAmountRaw: "750000000000000000",
+      },
+      emissionBudget: {
+        programStartsAt: new Date("2026-08-10T14:00:00.000Z"),
+        dayBoundarySecondUtc: 14 * 60 * 60,
+        lateReservationGraceSeconds: 86_400,
+        dailyCapRaw: DAILY_REWARD_EMISSION_RAW,
+        lifetimeCapRaw: raw(450_000_000),
+        unusedDailyCapacity: "materialize_undistributed",
+        overflowPolicy: "block",
+      },
+      cukiePool: {
+        cumulativeTierCount: 6,
+        cumulativeTierBps: [4_500, 2_000, 1_500, 1_200, 700, 100],
+      },
+      undistributedBps: {
+        treasury: 8_000,
+        marketing: 0,
+        development: 0,
+        marketingDevelopment: 1_000,
+        supplyReduction: 1_000,
+      },
+      destinations: {
+        creditPool: wallet(9101),
+        cukiePoolOriginal: wallet(9102),
+        cukiePoolSecondPlus: wallet(9103),
+        treasury: DESTINATIONS.treasury,
+        marketing: DESTINATIONS.marketingDevelopment,
+        development: DESTINATIONS.marketingDevelopment,
+        marketingDevelopment: DESTINATIONS.marketingDevelopment,
+        supplyReduction: DESTINATIONS.supplyReduction,
+      },
+    });
+    const scenarios = [
+      { sourceId: "session:own-own", playerWallet: wallet(1), creditSource: "own", cukieSource: "own", ranking: null },
+      { sourceId: "session:pool-own", playerWallet: wallet(2), creditSource: "pool", cukieSource: "own", ranking: 1 },
+      { sourceId: "session:own-original", playerWallet: wallet(3), creditSource: "own", cukieSource: "pool_original", ranking: null },
+      { sourceId: "session:pool-gen2", playerWallet: wallet(4), creditSource: "pool", cukieSource: "pool_second_plus", ranking: 1 },
+      { sourceId: "session:own-seiku", playerWallet: wallet(5), creditSource: "own", cukieSource: "seiku", ranking: null },
+    ] as const;
+    const sourceLines: DailyRewardSourceLine[] = scenarios.map((scenario) => {
+      const settlement = calculateSettlementRewardAllocations(rule, {
+        periodId: "2026-W34",
+        sourceId: scenario.sourceId,
+        playerWallet: scenario.playerWallet,
+        grossConvertedRaw: "7500000000000000000",
+        maxConvertibleRaw: "7500000000000000000",
+        creditCostUnits: 100,
+        weeklyReserveUnits: 20,
+        creditSource: scenario.creditSource,
+        cukieSource: scenario.cukieSource,
+        ranking: scenario.ranking,
+      });
+      return {
+        sourceId: scenario.sourceId,
+        sourceTotalRaw: settlement.totals.sourceTotalRaw,
+        allocations: settlement.allocations.map((allocation, index) => ({
+          allocationId: `${scenario.sourceId}:allocation:${index}`,
+          ...allocation,
+        })),
+        accruals: settlement.accruals.map((accrual, index) => ({
+          accrualId: `${scenario.sourceId}:accrual:${index}`,
+          ...accrual,
+        })),
+      };
+    });
+    const creditContributors = [
+      { walletNormalized: wallet(101), units: 10, ambassadorWalletNormalized: null },
+      { walletNormalized: wallet(102), units: 30, ambassadorWalletNormalized: null },
+    ];
+    const cukieOriginalParticipants = [
+      { walletNormalized: wallet(201), units: 1, rarityLevel: 5, ambassadorWalletNormalized: null },
+    ];
+    const cukieSecondPlusParticipants = [
+      { walletNormalized: wallet(202), units: 1, rarityLevel: 5, ambassadorWalletNormalized: null },
+    ];
+    const input = {
+      dayId: "2026-08-20",
+      rule,
+      sourceLines,
+      creditContributors,
+      cukieOriginalParticipants,
+      cukieSecondPlusParticipants,
+      destinations: DESTINATIONS,
+      sealedAt: new Date("2026-08-21T16:00:00.000Z"),
+    };
+    const result = calculateDailyRewardSettlement(input);
+    const sumCategory = (category: string) => result.allocations
+      .filter((allocation) => allocation.category === category)
+      .reduce((sum, allocation) => sum + BigInt(allocation.amountRaw), BigInt(0));
+
+    expect(sourceLines.map((line) => line.sourceTotalRaw)).toEqual(Array(5).fill(raw(10)));
+    expect(result.buckets).toEqual({
+      playersRaw: "20625000000000000000",
+      creditPoolRaw: "7500000000000000000",
+      cukiePoolRaw: "5625000000000000000",
+      ambassadorOrdinaryRaw: "0",
+      weeklyPrizeRaw: raw(10),
+      ambassadorWeeklyRaw: "500000000000000000",
+    });
+    expect(sumCategory("player")).toBe(BigInt("20625000000000000000"));
+    expect(sumCategory("credit_pool")).toBe(BigInt("7500000000000000000"));
+    expect(sumCategory("cukie_pool_original")).toBe(BigInt("3750000000000000000"));
+    expect(sumCategory("cukie_pool_second_plus")).toBe(BigInt("1875000000000000000"));
+    expect(result.sourceReservedRaw).toBe(raw(50));
+    expect(result.capacityMaterializedRaw).toBe(raw(499_950));
+    expect(result.topupRaw).toBe("0");
+    expect(result.undistributed).toEqual({
+      totalRaw: "499955750000000000000000",
+      treasuryRaw: "399964600000000000000000",
+      marketingDevelopmentRaw: "49995575000000000000000",
+      supplyReductionRaw: "49995575000000000000000",
+    });
+    expect(result.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
+
+    const replay = calculateDailyRewardSettlement({
+      ...input,
+      sourceLines: [...sourceLines].reverse(),
+      creditContributors: [...creditContributors].reverse(),
+      cukieOriginalParticipants: [...cukieOriginalParticipants].reverse(),
+      cukieSecondPlusParticipants: [...cukieSecondPlusParticipants].reverse(),
+    });
+    expect(replay).toEqual(result);
   });
 });
 
