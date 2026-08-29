@@ -28,6 +28,7 @@
     "staging:economy:rules:plan": "node scripts/assert-staging-only.mjs --scope dapp && node dapp/scripts/bootstrap-staging-economy-rules.mjs --plan",
     "staging:economy:rules:apply": "node scripts/assert-staging-only.mjs --scope dapp && node dapp/scripts/bootstrap-staging-economy-rules.mjs --apply --confirm APPLY_STAGING_TESTNET_97_RULES_V4",
     "staging:economy:rules:test": "node --test dapp/scripts/staging-economy-rules-policy.test.mjs",
+    "staging:rewards:prepare": "node scripts/assert-staging-only.mjs --scope dapp && node dapp/scripts/reward-batch-preparer.mjs",
     "staging:cards:setup": "node scripts/assert-staging-only.mjs --scope cuki-card-worker && pnpm cards:setup",
     "indexer:dev": "pnpm --filter @cukies/chain-indexer run dev",
     "indexer:setup": "pnpm --filter @cukies/chain-indexer run setup",

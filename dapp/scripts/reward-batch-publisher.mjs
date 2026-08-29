@@ -18,8 +18,8 @@ import { bscTestnet } from 'viem/chains';
 import {
   assertRewardPublicationPlanIntegrity,
   authorizeRewardClaimBatch,
-  buildRewardPublicationArtifacts,
 } from './lib/reward-batch-publication.mjs';
+import { prepareNextRewardPublicationPlan } from './lib/reward-publication-preparer.mjs';
 import {
   loadRewardBatchPublisherConfig,
   publicRewardBatchPublisherConfig,
@@ -179,7 +179,14 @@ async function runTick(context) {
   const now = new Date();
   let plan = await acquirePlan(context.db, context.runtime, now);
   if (!plan) {
-    const prepared = await prepareNextPlan(context.db, context.mongo, context.runtime, now);
+    const prepared = await prepareNextRewardPublicationPlan({
+      db: context.db,
+      mongoClient: context.mongo,
+      chainId: context.runtime.chainId,
+      tokenAddress: context.runtime.tokenAddress,
+      distributorAddress: context.runtime.distributorAddress,
+      now,
+    });
     if (!prepared) return { status: 'idle', completedAt: now.toISOString() };
     plan = await acquirePlan(context.db, context.runtime, new Date());
   }
@@ -245,78 +252,6 @@ async function acquirePlan(db, runtime, now) {
     { sort: { createdAt: 1, _id: 1 }, returnDocument: 'after' },
   );
   return result ?? null;
-}
-
-async function prepareNextPlan(db, mongo, runtime, now) {
-  const candidates = await db.collection('reward_accounting_allocations').aggregate([
-    { $match: { status: 'allocated_offchain', availableAt: { $lte: now } } },
-    { $sort: { availableAt: 1, accountingId: 1, _id: 1 } },
-    { $group: { _id: '$accountingId', accountingKind: { $first: '$accountingKind' } } },
-    { $limit: 50 },
-  ]).toArray();
-  for (const candidate of candidates) {
-    if (await db.collection('reward_publication_plans').findOne({ accountingId: candidate._id })) {
-      continue;
-    }
-    const session = mongo.startSession();
-    try {
-      let prepared = null;
-      await session.withTransaction(async () => {
-        const existing = await db.collection('reward_publication_plans').findOne(
-          { accountingId: candidate._id },
-          { session },
-        );
-        if (existing) {
-          prepared = existing;
-          return;
-        }
-        const allocations = await db.collection('reward_accounting_allocations')
-          .find({ accountingId: candidate._id }, { session })
-          .sort({ _id: 1 })
-          .toArray();
-        const accountingCollection = candidate.accountingKind === 'daily'
-          ? 'reward_daily_accounting'
-          : 'reward_weekly_prize_accounting';
-        const accounting = await db.collection(accountingCollection).findOne(
-          { _id: candidate._id },
-          { session },
-        );
-        if (!accounting) throw new Error(`No existe el cierre ${candidate._id}.`);
-        const rule = await db.collection('economy_rule_versions').findOne({
-          scope: 'reward_allocations',
-          version: accounting.ruleVersion,
-        }, { session });
-        const artifacts = buildRewardPublicationArtifacts({
-          accountingId: candidate._id,
-          accounting,
-          rule,
-          allocations,
-          chainId: runtime.chainId,
-          tokenAddress: runtime.tokenAddress,
-          distributorAddress: runtime.distributorAddress,
-          createdAt: now,
-        });
-        if (artifacts.proofs.length > 0) {
-          await db.collection('reward_claim_proofs').insertMany(artifacts.proofs, { session });
-          await db.collection('reward_claim_batches').insertOne(artifacts.batch, { session });
-        }
-        await db.collection('reward_publication_plans').insertOne(artifacts.plan, { session });
-        prepared = artifacts.plan;
-      }, {
-        readConcern: { level: 'snapshot' },
-        writeConcern: { w: 'majority' },
-      });
-      return prepared;
-    } catch (error) {
-      if (error && typeof error === 'object' && error.code === 11000) {
-        return db.collection('reward_publication_plans').findOne({ accountingId: candidate._id });
-      }
-      throw error;
-    } finally {
-      await session.endSession();
-    }
-  }
-  return null;
 }
 
 async function ensureAuthorizedBatch(db, runtime, plan) {

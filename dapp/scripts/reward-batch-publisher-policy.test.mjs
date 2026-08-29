@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  loadRewardBatchPreparerConfig,
   loadRewardBatchPublisherConfig,
+  publicRewardBatchPreparerConfig,
   publicRewardBatchPublisherConfig,
 } from './reward-batch-publisher-policy.mjs';
 
@@ -31,6 +33,25 @@ function environment(overrides = {}) {
   };
 }
 
+function preparerEnvironment(overrides = {}) {
+  return {
+    REWARD_BATCH_PREPARER_ENABLED: 'true',
+    REWARD_BATCH_PUBLISHER_ENABLED: 'false',
+    APP_ENV: 'staging',
+    STAGING_ONLY_GUARD: 'true',
+    COOLIFY_BRANCH: 'staging',
+    COOLIFY_RESOURCE_UUID: 'u4s804o4wwcckowgk0woo4wg',
+    CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
+    NEXT_PUBLIC_UKI_CHAIN_ID: '97',
+    CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
+    CHAIN_INDEXER_MONGO_URL: 'mongodb://user:secret@mongo:27017/cukieshub-new-staging',
+    NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x1111111111111111111111111111111111111111',
+    CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS:
+      '0x2222222222222222222222222222222222222222',
+    ...overrides,
+  };
+}
+
 test('permanece inerte sin clave cuando el gate esta apagado', () => {
   assert.deepEqual(loadRewardBatchPublisherConfig({
     REWARD_BATCH_PUBLISHER_ENABLED: 'false',
@@ -50,6 +71,45 @@ test('carga solo un publicador testnet aislado y no expone la clave', () => {
   assert.equal('privateKey' in publicConfig, false);
   assert.equal('mongoUrl' in publicConfig, false);
   assert.equal('rpcUrl' in publicConfig, false);
+});
+
+test('prepara drafts en staging sin RPC, signer ni clave privada', () => {
+  const config = loadRewardBatchPreparerConfig(preparerEnvironment());
+  assert.equal(config.chainId, 97);
+  assert.equal(config.databaseName, 'cukieshub-new-staging');
+  assert.equal(config.maxCandidates, 50);
+  assert.equal('privateKey' in config, false);
+  assert.equal('rpcUrl' in config, false);
+  const publicConfig = publicRewardBatchPreparerConfig(config);
+  assert.equal('mongoUrl' in publicConfig, false);
+});
+
+test('el preparador exige opt-in manual y publicador apagado', () => {
+  assert.throws(
+    () => loadRewardBatchPreparerConfig(preparerEnvironment({
+      REWARD_BATCH_PREPARER_ENABLED: 'false',
+    })),
+    /debe ser true/,
+  );
+  assert.throws(
+    () => loadRewardBatchPreparerConfig(preparerEnvironment({
+      REWARD_BATCH_PUBLISHER_ENABLED: 'true',
+    })),
+    /PUBLISHER_ENABLED=false/,
+  );
+});
+
+test('el preparador falla cerrado fuera de BSC Testnet/staging', () => {
+  assert.throws(
+    () => loadRewardBatchPreparerConfig(preparerEnvironment({ APP_ENV: 'production' })),
+    /APP_ENV debe ser staging/,
+  );
+  assert.throws(
+    () => loadRewardBatchPreparerConfig(preparerEnvironment({
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '56',
+    })),
+    /debe ser 97/,
+  );
 });
 
 for (const [name, override, message] of [
