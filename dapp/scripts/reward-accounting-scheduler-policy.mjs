@@ -26,7 +26,14 @@ function strictGate(environment, name) {
 }
 
 export function loadRewardAccountingSchedulerConfig(environment = process.env, host = 'scheduler') {
-  const enabled = strictGate(environment, 'REWARD_ACCOUNTING_RUNTIME_ENABLED');
+  const schedulerEnabled = strictGate(environment, 'REWARD_ACCOUNTING_SCHEDULER_ENABLED');
+  const runtimeEnabled = strictGate(environment, 'REWARD_ACCOUNTING_RUNTIME_ENABLED');
+  if (schedulerEnabled && !runtimeEnabled) {
+    throw new Error(
+      'REWARD_ACCOUNTING_RUNTIME_ENABLED debe ser true antes de activar el scheduler.',
+    );
+  }
+  const enabled = schedulerEnabled && runtimeEnabled;
   const baseUrl = (environment.REWARD_ACCOUNTING_DAPP_INTERNAL_URL ?? 'http://dapp:3000')
     .trim().replace(/\/$/, '');
   if (!/^https?:\/\//i.test(baseUrl)) {

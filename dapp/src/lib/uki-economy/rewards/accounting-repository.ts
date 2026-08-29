@@ -38,6 +38,20 @@ type SettledGameEvidence = {
   cukie: { state: "consumed"; reservationId: string; evidenceHash: string };
 };
 
+const CANONICAL_REWARD_DAY_ID = /^\d{4}-\d{2}-\d{2}$/;
+
+function rewardDayStart(dayId: string) {
+  const value = new Date(`${dayId}T00:00:00.000Z`);
+  if (
+    !CANONICAL_REWARD_DAY_ID.test(dayId)
+    || Number.isNaN(value.getTime())
+    || value.toISOString().slice(0, 10) !== dayId
+  ) {
+    throw new DomainConflictError(`El cierre reward contiene un dayId no canonico: ${dayId}.`);
+  }
+  return value;
+}
+
 export interface RewardAccountingRepository {
   findRewardRule(ruleVersion: string, at: Date): Promise<RewardRule | null>;
   materializeDailyCapacity(input: {
@@ -359,9 +373,13 @@ export function createMongoRewardAccountingRepository(
     async findNextClosableRewardDay(ruleVersion, now) {
       const rule = await rules.findOne({ scope: "reward_allocations", version: ruleVersion }, options);
       if (!rule) throw new DomainConflictError(`No existe la regla reward ${ruleVersion}.`);
-      const latest = await daily.findOne({}, { ...options, sort: { dayId: -1 } });
+      const latest = await daily.findOne({
+        ruleVersion,
+        status: "sealed",
+        dayId: { $regex: CANONICAL_REWARD_DAY_ID },
+      }, { ...options, sort: { dayId: -1 } });
       const next = latest
-        ? new Date(`${latest.dayId}T00:00:00.000Z`)
+        ? rewardDayStart(latest.dayId)
         : new Date(`${rule.activeFrom.toISOString().slice(0, 10)}T00:00:00.000Z`);
       if (latest) next.setUTCDate(next.getUTCDate() + 1);
       const startsAt = new Date(next.getTime() + rule.emissionBudget.dayBoundarySecondUtc * 1_000);
