@@ -16,12 +16,17 @@ import type { CreditReservation } from "@/lib/uki-economy/credits/types";
 import { stableGameEconomyHash } from "@/lib/uki-economy/game-economy/rules";
 import type { GameEconomySession } from "@/lib/uki-economy/game-economy/types";
 import { getIsoWeekPeriod } from "@/lib/uki-economy/periods";
+import { stableRewardHash } from "@/lib/uki-economy/rewards/rules";
 import type {
   WeeklyRankingRepository,
   WeeklyRankingTransactionRunner,
 } from "@/lib/uki-economy/ranking/repository";
 import { buildCurrentWeeklyRankingRule } from "@/lib/uki-economy/ranking/rules";
-import { WeeklyRankingService } from "@/lib/uki-economy/ranking/service";
+import {
+  assertWeeklyRankingSourceIntegrity,
+  WeeklyRankingService,
+  weeklyRankingSourcePayload,
+} from "@/lib/uki-economy/ranking/service";
 import type {
   WeeklyRankingAuditEvent,
   WeeklyRankingManifest,
@@ -229,6 +234,46 @@ describe("weekly ranking sealed producer", () => {
     await expect(service(repository).closePeriod({ period: PERIOD, now: SEALED_AT, pageSize: 10 }))
       .resolves.toMatchObject({ sourceCount: 1, participantCount: 1 });
     expect(repository.sources[0].sessionId).toBe(pooled.game.sessionId);
+    expect(repository.sources[0]).toMatchObject({
+      creditBucket: "pool",
+      creditCostCode: pooled.credit.costCode,
+      creditAmountCredits: pooled.credit.amountCredits,
+      creditExpiresAt: pooled.credit.expiresAt,
+      creditEvidenceHash: pooled.game.credit.evidenceHash,
+    });
+  });
+
+  it("fails closed if a sealed source is forged as an own-credit settlement", async () => {
+    const repository = new MemoryRankingRepository();
+    const pooled = fixture(1, "pool");
+    repository.sessions = [pooled.game];
+    repository.credits = [pooled.credit];
+    await service(repository).closePeriod({ period: PERIOD, now: SEALED_AT, pageSize: 10 });
+
+    const source = repository.sources[0]!;
+    const forgedBase = {
+      ...source,
+      creditBucket: "own",
+      creditEvidenceHash: stableGameEconomyHash({
+        kind: "game-credit-reservation-evidence",
+        reservationId: source.reservationId,
+        sessionId: source.sessionId,
+        walletNormalized: source.walletNormalized,
+        costCode: source.creditCostCode,
+        amountCredits: source.creditAmountCredits,
+        bucket: "own",
+        expiresAt: source.creditExpiresAt,
+        payloadHash: source.creditPayloadHash,
+      }),
+    };
+    const forged = {
+      ...forgedBase,
+      sourceHash: stableRewardHash(weeklyRankingSourcePayload(
+        forgedBase as unknown as Omit<WeeklyRankingSource, "sourceHash" | "createdAt">,
+      )),
+    } as unknown as WeeklyRankingSource;
+
+    expect(() => assertWeeklyRankingSourceIntegrity(forged)).toThrow(/no supera integridad/);
   });
 
   it("inherits nextRank into the following week and catches up in chronological order", async () => {

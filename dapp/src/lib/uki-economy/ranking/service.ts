@@ -63,17 +63,26 @@ function participantKey(value: RankingParticipantKey) {
   return `${value.gameId}\u0000${value.walletNormalized}`;
 }
 
-function expectedCreditEvidenceHash(reservation: CreditReservation) {
+function rankingCreditEvidenceHash(input: {
+  reservationId: string;
+  sessionId: string;
+  walletNormalized: string;
+  costCode: string;
+  amountCredits: number;
+  bucket: "own" | "pool";
+  expiresAt: Date;
+  payloadHash: string;
+}) {
   return stableGameEconomyHash({
     kind: "game-credit-reservation-evidence",
-    reservationId: reservation.reservationId,
-    sessionId: reservation.sessionId,
-    walletNormalized: reservation.walletNormalized,
-    costCode: reservation.costCode,
-    amountCredits: reservation.amountCredits,
-    bucket: reservation.bucket,
-    expiresAt: reservation.expiresAt,
-    payloadHash: reservation.payloadHash,
+    reservationId: input.reservationId,
+    sessionId: input.sessionId,
+    walletNormalized: input.walletNormalized,
+    costCode: input.costCode,
+    amountCredits: input.amountCredits,
+    bucket: input.bucket,
+    expiresAt: input.expiresAt,
+    payloadHash: input.payloadHash,
   });
 }
 
@@ -85,7 +94,7 @@ function assertRankingCreditBinding(game: GameEconomySession, credit: CreditRese
     || game.credit.state !== "consumed"
     || credit.status !== "consumed"
     || game.credit.reservationId !== credit.reservationId
-    || game.credit.evidenceHash !== expectedCreditEvidenceHash(credit)
+    || game.credit.evidenceHash !== rankingCreditEvidenceHash(credit)
     || credit.sessionId !== game.sessionId
     || credit.walletNormalized !== game.walletNormalized
     || credit.costCode !== game.rule.credit.costCode
@@ -98,7 +107,9 @@ function assertRankingCreditBinding(game: GameEconomySession, credit: CreditRese
   return credit;
 }
 
-function sourcePayload(source: Omit<WeeklyRankingSource, "sourceHash" | "createdAt">) {
+export function weeklyRankingSourcePayload(
+  source: Omit<WeeklyRankingSource, "sourceHash" | "createdAt">,
+) {
   return {
     kind: "weekly-ranking-source",
     sourceId: source.sourceId,
@@ -109,6 +120,11 @@ function sourcePayload(source: Omit<WeeklyRankingSource, "sourceHash" | "created
     walletNormalized: source.walletNormalized,
     periodAnchorAt: source.periodAnchorAt,
     settledAt: source.settledAt,
+    creditBucket: source.creditBucket,
+    creditCostCode: source.creditCostCode,
+    creditAmountCredits: source.creditAmountCredits,
+    creditExpiresAt: source.creditExpiresAt,
+    creditEvidenceHash: source.creditEvidenceHash,
     cappedScoreRaw: source.cappedScoreRaw,
     scoreCapRaw: source.scoreCapRaw,
     gameResultHash: source.gameResultHash,
@@ -121,6 +137,9 @@ function sourcePayload(source: Omit<WeeklyRankingSource, "sourceHash" | "created
 function buildSource(game: GameEconomySession, credit: CreditReservation, period: UtcPeriod, createdAt: Date) {
   assertGameSessionIntegrity(game);
   assertRankingCreditBinding(game, credit);
+  if (credit.bucket !== "pool") {
+    throw new DomainConflictError(`La session ${game.sessionId} no usa creditos del pool.`);
+  }
   const periodAnchorAt = game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
     && game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
     ? new Date(game.createdAt.getTime() - 14 * 60 * 60_000)
@@ -151,6 +170,11 @@ function buildSource(game: GameEconomySession, credit: CreditReservation, period
       ? game.createdAt
       : game.settledAt,
     settledAt: game.settledAt,
+    creditBucket: credit.bucket,
+    creditCostCode: credit.costCode,
+    creditAmountCredits: credit.amountCredits,
+    creditExpiresAt: credit.expiresAt,
+    creditEvidenceHash: game.credit.evidenceHash!,
     cappedScoreRaw: cappedScore.toString(10),
     scoreCapRaw: scoreCap.toString(10),
     gameResultHash: sha256(game.validation!.resultHash, "game.validation.resultHash"),
@@ -158,28 +182,46 @@ function buildSource(game: GameEconomySession, credit: CreditReservation, period
     gameRuleVersion: game.rule.version,
     gameRuleConfigHash: sha256(game.rule.configHash, "game.rule.configHash"),
   };
-  return {
+  return assertWeeklyRankingSourceIntegrity({
     ...base,
-    sourceHash: stableRewardHash(sourcePayload(base)),
+    sourceHash: stableRewardHash(weeklyRankingSourcePayload(base)),
     createdAt,
-  } satisfies WeeklyRankingSource;
+  } satisfies WeeklyRankingSource);
 }
 
 export function assertWeeklyRankingSourceIntegrity(source: WeeklyRankingSource) {
   const capped = parseCanonicalRaw(source.cappedScoreRaw, "source.cappedScoreRaw");
   const cap = parseCanonicalRaw(source.scoreCapRaw, "source.scoreCapRaw");
+  const creditExpiresAt = validRewardDate(source.creditExpiresAt, "source.creditExpiresAt");
+  const expectedEvidenceHash = rankingCreditEvidenceHash({
+    reservationId: source.reservationId,
+    sessionId: source.sessionId,
+    walletNormalized: source.walletNormalized,
+    costCode: source.creditCostCode,
+    amountCredits: source.creditAmountCredits,
+    bucket: source.creditBucket,
+    expiresAt: creditExpiresAt,
+    payloadHash: source.creditPayloadHash,
+  });
   if (source._id !== source.sourceId
     || !/^[0-9a-f]{64}$/.test(source.sourceId)
     || validRewardText(source.sessionId, "source.sessionId") !== source.sessionId
     || validRewardText(source.reservationId, "source.reservationId") !== source.reservationId
     || validRewardText(source.gameId, "source.gameId") !== source.gameId
     || validRewardWallet(source.walletNormalized) !== source.walletNormalized
+    || source.creditBucket !== "pool"
+    || validRewardText(source.creditCostCode, "source.creditCostCode") !== source.creditCostCode
+    || !Number.isSafeInteger(source.creditAmountCredits)
+    || source.creditAmountCredits < 1
+    || source.creditAmountCredits > 1_000
+    || !/^[0-9a-f]{64}$/.test(source.creditEvidenceHash)
+    || source.creditEvidenceHash !== expectedEvidenceHash
     || cap === BigInt(0)
     || capped > cap
     || !/^[0-9a-f]{64}$/.test(source.gameResultHash)
     || !/^[0-9a-f]{64}$/.test(source.creditPayloadHash)
     || !/^[0-9a-f]{64}$/.test(source.gameRuleConfigHash)
-    || source.sourceHash !== stableRewardHash(sourcePayload(source))
+    || source.sourceHash !== stableRewardHash(weeklyRankingSourcePayload(source))
     || getIsoWeekPeriodId(new Date(
       source.periodAnchorAt.getTime()
         - (source.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId ? 14 * 60 * 60_000 : 0),
