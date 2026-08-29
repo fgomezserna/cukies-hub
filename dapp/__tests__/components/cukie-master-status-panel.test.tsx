@@ -72,6 +72,7 @@ describe('CukieMasterStatusPanel', () => {
           routes: {
             uki: {
               position: { status: 'active', desiredSlots: 2, allocatedSlots: 2, protectedSlots: 0, graceEndsAt: null },
+              balanceQualifiedSlots: 2,
               currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
               pendingRequirement: null,
               requirementGraceEndsAt: null,
@@ -121,6 +122,63 @@ describe('CukieMasterStatusPanel', () => {
       indexedStakedRaw: '5000000000000000000000',
       allocatedSlots: 2,
     }));
+  });
+
+  it('muestra el Cukie Master derivado del saldo aunque el runtime no esté activo', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'ok',
+        data: {
+          walletNormalized: walletAddress,
+          totals: { desiredSlots: 0, allocatedSlots: 0, maxPotentialSlots: 10 },
+          routes: {
+            uki: {
+              position: null,
+              projectionFresh: false,
+              synchronizing: false,
+              previewSlots: null,
+              balanceQualifiedSlots: 1,
+              currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
+              pendingRequirement: null,
+              requirementGraceEndsAt: null,
+              deficitToNextSlot: { route: 'uki', ukiRaw: '19527488000000000000000' },
+              deficitToPreserveSlots: null,
+              slots: [],
+              source: {
+                complete: true,
+                status: 'available',
+                route: 'uki',
+                totalUkiRaw: '20472512000000000000000',
+                presaleLockedRaw: '0',
+                stakedUkiRaw: '20472512000000000000000',
+              },
+            },
+            nft: {
+              position: null,
+              currentRequirement: { route: 'nft', nftPoints: 3 },
+              pendingRequirement: null,
+              requirementGraceEndsAt: null,
+              deficitToNextSlot: null,
+              deficitToPreserveSlots: null,
+              slots: [],
+              source: { complete: false, status: 'unavailable' },
+            },
+          },
+          nftInventory: [],
+        },
+      }),
+    });
+
+    render(<CukieMasterStatusPanel ukiOnly />);
+
+    expect(await screen.findByText('UKI en vesting')).toBeInTheDocument();
+    expect(screen.getByText('UKI en staking').parentElement).toHaveTextContent('20.472,512');
+    expect(screen.getByText('Total computable').parentElement).toHaveTextContent('20.472,512');
+    expect(screen.getByText('Tus Cukie Masters').parentElement).toHaveTextContent('1/5');
+    expect(screen.getByRole('progressbar', { name: 'Progreso Cukie Master por UKI' }))
+      .toHaveAttribute('aria-valuenow', '1');
   });
 
   it('renders only the persisted public slot status returned by the API', async () => {

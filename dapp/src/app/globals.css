@@ -25,6 +25,9 @@ body {
 [data-game-layout='mobile-focus'] [data-game-viewport] iframe {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+}
+
+[data-game-layout='mobile-focus'] [data-game-viewport] iframe {
   transform: translateZ(0);
 }
 
