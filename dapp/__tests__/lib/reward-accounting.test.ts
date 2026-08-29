@@ -243,6 +243,74 @@ describe("reward accounting invariants", () => {
     expect(result.priorReservedInflowRaw).toBe("210000000000000000");
     expect(result.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
   });
+
+  it("consume el mínimo versionado y permite desactivarlo sin conservar el 0.75 hardcodeado", () => {
+    const close = (
+      rule: ReturnType<typeof testRewardRule>,
+      contributors: Array<{ walletNormalized: string; units: number; ambassadorWalletNormalized: null }>,
+    ) => calculateDailyRewardSettlement({
+      dayId: "2026-08-18",
+      rule,
+      sourceLines: [{
+        sourceId: "game-session:configured-floor",
+        sourceTotalRaw: "100000000000000000",
+        allocations: [],
+        accruals: [{
+          accrualId: "configured-credit",
+          category: "credit_pool_weekly",
+          amountRaw: "100000000000000000",
+        }],
+      }],
+      creditContributors: contributors,
+      cukieOriginalParticipants: [],
+      cukieSecondPlusParticipants: [],
+      destinations: DESTINATIONS,
+      sealedAt: new Date("2026-08-19T16:00:00.000Z"),
+    });
+    const configured = testRewardRule({
+      version: "reward-floor-20-v1",
+      creditPoolDaily: {
+        sourceShareBps: 10_000,
+        floorEnabled: true,
+        floorCreditsStep: 20,
+        floorAmountRaw: "1250000000000000000",
+      },
+    });
+    const configuredResult = close(configured, [{
+      walletNormalized: wallet(50),
+      units: 20,
+      ambassadorWalletNormalized: null,
+    }]);
+    expect(configuredResult.buckets.creditPoolRaw).toBe("1250000000000000000");
+    expect(configuredResult.topupRaw).toBe("1150000000000000000");
+    expect(configuredResult.allocations.find((item) => item.category === "credit_pool"))
+      .toMatchObject({
+        walletNormalized: wallet(50),
+        amountRaw: "1250000000000000000",
+      });
+
+    const disabled = testRewardRule({
+      version: "reward-floor-disabled-v1",
+      creditPoolDaily: {
+        sourceShareBps: 10_000,
+        floorEnabled: false,
+        floorCreditsStep: 10,
+        floorAmountRaw: "0",
+      },
+    });
+    const disabledResult = close(disabled, [{
+      walletNormalized: wallet(51),
+      units: 10,
+      ambassadorWalletNormalized: null,
+    }]);
+    expect(disabledResult.buckets.creditPoolRaw).toBe("100000000000000000");
+    expect(disabledResult.topupRaw).toBe("0");
+
+    expect(() => close(configured, [
+      { walletNormalized: wallet(52), units: 10, ambassadorWalletNormalized: null },
+      { walletNormalized: wallet(53), units: 10, ambassadorWalletNormalized: null },
+    ])).toThrow(/Cada aportacion.*multiplo de 20/);
+  });
 });
 
 describe("weekly prize", () => {
@@ -393,7 +461,9 @@ describe("pool tranches and timing", () => {
   });
 
   it("aplica max(ordinario + previo/7, 0.75) y 5% tambien al topup", () => {
+    const rule = testRewardRule();
     const tranche = calculatePoolTranche({
+      rule,
       periodId: "2026-W34", tranche: 0, participantWallet: wallet(1), ambassadorWallet: wallet(2),
       credits: 10, ordinaryRaw: "100000000000000000", priorPeriodRaw: "1400000000000000000",
       ordinarySourceId: "daily:2026-08-18", priorPeriodSourceId: "weekly:2026-W33",
@@ -405,12 +475,74 @@ describe("pool tranches and timing", () => {
     expect(tranche.topupRaw).toBe("450000000000000000");
     expect(tranche.ambassadorCommissionRaw).toBe("37500000000000000");
     expect(tranche.fundingRaw).toBe("787500000000000000");
+    expect(tranche.ruleVersion).toBe(rule.version);
+    expect(tranche.ruleConfigHash).toBe(rule.configHash);
     expect(() => calculatePoolTranche({
+      rule,
       periodId: "2026-W34", tranche: 0, participantWallet: wallet(1), ambassadorWallet: wallet(1),
       credits: 10, ordinaryRaw: "0", priorPeriodRaw: "0",
       ordinarySourceId: "daily:2026-08-18", priorPeriodSourceId: "weekly:2026-W33",
       scheduledAt: PAYOUT_AT, sealedAt: PAYOUT_AT,
     })).toThrow(/autorreferencia/);
+  });
+
+  it("usa el mínimo versionado también al sellar un tramo del pool", () => {
+    const configured = testRewardRule({
+      version: "reward-tranche-floor-20-v1",
+      creditPoolDaily: {
+        sourceShareBps: 10_000,
+        floorEnabled: true,
+        floorCreditsStep: 20,
+        floorAmountRaw: "1250000000000000000",
+      },
+    });
+    const tranche = calculatePoolTranche({
+      rule: configured,
+      periodId: "2026-W34",
+      tranche: 0,
+      participantWallet: wallet(3),
+      credits: 20,
+      ordinaryRaw: "100000000000000000",
+      priorPeriodRaw: "0",
+      ordinarySourceId: "daily:2026-08-18",
+      priorPeriodSourceId: "weekly:2026-W33",
+      scheduledAt: new Date("2026-08-18T16:00:00Z"),
+      sealedAt: new Date("2026-08-18T16:00:01Z"),
+    });
+    expect(tranche.guaranteedRaw).toBe("1250000000000000000");
+    expect(tranche.paymentRaw).toBe("1250000000000000000");
+    expect(tranche.topupRaw).toBe("1150000000000000000");
+    expect(tranche).toMatchObject({
+      ruleVersion: configured.version,
+      ruleConfigHash: configured.configHash,
+    });
+
+    const disabled = testRewardRule({
+      version: "reward-tranche-floor-disabled-v1",
+      creditPoolDaily: {
+        sourceShareBps: 10_000,
+        floorEnabled: false,
+        floorCreditsStep: 20,
+        floorAmountRaw: "0",
+      },
+    });
+    expect(calculatePoolTranche({
+      rule: disabled,
+      periodId: "2026-W34",
+      tranche: 0,
+      participantWallet: wallet(4),
+      credits: 20,
+      ordinaryRaw: "100000000000000000",
+      priorPeriodRaw: "0",
+      ordinarySourceId: "daily:2026-08-18",
+      priorPeriodSourceId: "weekly:2026-W33",
+      scheduledAt: new Date("2026-08-18T16:00:00Z"),
+      sealedAt: new Date("2026-08-18T16:00:01Z"),
+    })).toMatchObject({
+      guaranteedRaw: "0",
+      paymentRaw: "100000000000000000",
+      topupRaw: "0",
+    });
   });
 
   it("retiene toda participacion Seiku como no distribuida", () => {
