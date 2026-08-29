@@ -24,6 +24,7 @@ import {
 } from "./accounting-types";
 import {
   apportionRaw,
+  assertRewardRule,
   compareRewardText,
   stableRewardHash,
   validRewardDate,
@@ -286,6 +287,7 @@ export function calculateDailyRewardSettlement(input: {
   destinations: UndistributedDestinations;
   sealedAt: Date;
 }) {
+  assertRewardRule(input.rule);
   const source = dailyBucketsFromSources(input.sourceLines);
   const sourceReserved = parseRawAmount(source.sourceReservedRaw);
   const emission = parseRawAmount(DAILY_REWARD_EMISSION_RAW);
@@ -354,11 +356,27 @@ export function calculateDailyRewardSettlement(input: {
 
   const ordinaryCreditByWallet = apportionedByUnits(ordinaryCredit, input.creditContributors);
   const priorCreditByWallet = apportionedByUnits(priorCredit, input.creditContributors);
-  const totalCreditUnits = input.creditContributors.reduce((sum, item) => sum + item.units, 0);
-  if (!Number.isSafeInteger(totalCreditUnits) || totalCreditUnits % 10 !== 0) {
-    throw new DomainValidationError("Los creditos aportados deben sumar multiplos de 10.");
+  const floorStep = input.rule.creditPoolDaily.floorCreditsStep;
+  let totalCreditUnits = 0;
+  for (const contributor of input.creditContributors) {
+    if (
+      !Number.isSafeInteger(contributor.units)
+      || contributor.units <= 0
+      || contributor.units % floorStep !== 0
+    ) {
+      throw new DomainValidationError(
+        `Cada aportacion de creditos debe ser multiplo de ${floorStep}.`,
+      );
+    }
+    totalCreditUnits += contributor.units;
+    if (!Number.isSafeInteger(totalCreditUnits)) {
+      throw new DomainValidationError("La suma de creditos aportados no es segura.");
+    }
   }
-  const creditFloor = BigInt(totalCreditUnits / 10) * TOKEN * BigInt(75) / BigInt(100);
+  const creditFloor = input.rule.creditPoolDaily.floorEnabled
+    ? BigInt(totalCreditUnits / floorStep)
+      * parseRawAmount(input.rule.creditPoolDaily.floorAmountRaw)
+    : BigInt(0);
   const creditBase = ordinaryCredit + priorCredit;
   const creditPayment = input.creditContributors.length === 0
     ? BigInt(0)
@@ -1072,6 +1090,7 @@ export function splitIntoSevenTranches(totalRaw: string) {
 }
 
 export function calculatePoolTranche(input: {
+  rule: RewardRule;
   periodId: string;
   tranche: number;
   participantWallet: string;
@@ -1084,11 +1103,17 @@ export function calculatePoolTranche(input: {
   scheduledAt: Date;
   sealedAt: Date;
 }): PoolTrancheAccounting {
+  assertRewardRule(input.rule);
   if (!Number.isInteger(input.tranche) || input.tranche < 0 || input.tranche > 6) {
     throw new DomainValidationError("tranche debe estar entre 0 y 6.");
   }
-  if (!Number.isSafeInteger(input.credits) || input.credits < 0 || input.credits % 10 !== 0) {
-    throw new DomainValidationError("credits debe ser multiplo de 10.");
+  const floorStep = input.rule.creditPoolDaily.floorCreditsStep;
+  if (
+    !Number.isSafeInteger(input.credits)
+    || input.credits < 0
+    || input.credits % floorStep !== 0
+  ) {
+    throw new DomainValidationError(`credits debe ser multiplo de ${floorStep}.`);
   }
   const participantWallet = validRewardWallet(input.participantWallet, "participantWallet");
   const ambassadorWallet = input.ambassadorWallet
@@ -1100,12 +1125,17 @@ export function calculatePoolTranche(input: {
   const ordinary = canonicalRaw(input.ordinaryRaw, "ordinaryRaw");
   const priorSeventh = canonicalRaw(splitIntoSevenTranches(input.priorPeriodRaw)[input.tranche], "priorPeriodSeventhRaw");
   const base = ordinary + priorSeventh;
-  const guaranteed = BigInt(input.credits / 10) * TOKEN * BigInt(75) / BigInt(100);
+  const guaranteed = input.rule.creditPoolDaily.floorEnabled
+    ? BigInt(input.credits / floorStep)
+      * parseRawAmount(input.rule.creditPoolDaily.floorAmountRaw)
+    : BigInt(0);
   const payment = base > guaranteed ? base : guaranteed;
   const topup = payment - base;
   const commission = ambassadorWallet ? mulDiv(payment, BigInt(500), BPS) : BigInt(0);
   const payload = {
     periodId: validRewardText(input.periodId, "periodId"),
+    ruleVersion: input.rule.version,
+    ruleConfigHash: input.rule.configHash,
     tranche: input.tranche,
     participantWallet,
     fundingMode: "reserved_no_mint" as const,

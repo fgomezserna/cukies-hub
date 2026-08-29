@@ -264,6 +264,8 @@ export type WeeklyPrizeAccounting = {
 export type PoolTrancheAccounting = {
   _id: string;
   periodId: string;
+  ruleVersion: string;
+  ruleConfigHash: string;
   tranche: number;
   participantWallet: string;
   fundingMode: "reserved_no_mint";

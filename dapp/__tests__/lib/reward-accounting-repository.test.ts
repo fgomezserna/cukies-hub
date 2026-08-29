@@ -85,4 +85,37 @@ describe("Mongo reward accounting repository", () => {
       new Date("2027-01-01T00:00:00.000Z"),
     )).rejects.toThrow(/dayId no canonico/);
   });
+
+  it("conserva al aportante del periodo sin revalidar su estado actual de Cukie Master", async () => {
+    const contributor = "0x1111111111111111111111111111111111111111";
+    const aggregate = jest.fn((_pipeline: unknown[]) => ({
+      toArray: jest.fn(async () => [{ _id: contributor, units: 20 }]),
+    }));
+    const referralFind = jest.fn(() => ({
+      project: jest.fn(() => ({ toArray: jest.fn(async () => []) })),
+    }));
+    const db = {
+      collection: jest.fn((name: string) => {
+        if (name === "credit_pool_positions") return { aggregate };
+        if (name === "presale_participants") return { find: referralFind };
+        return {};
+      }),
+    } as unknown as Db;
+    const repository = createMongoRewardAccountingRepository(db, {} as ClientSession);
+
+    await expect(repository.listCreditContributors(
+      new Date("2026-08-20T14:00:00.000Z"),
+    )).resolves.toEqual([{
+      walletNormalized: contributor,
+      units: 20,
+      ambassadorWalletNormalized: null,
+    }]);
+
+    const pipeline = aggregate.mock.calls[0]?.[0];
+    expect(pipeline).toEqual(expect.arrayContaining([
+      { $match: { status: "open", periodId: { $regex: "2026-08-20T14:00:00\\.000Z$" } } },
+      { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
+    ]));
+    expect(JSON.stringify(pipeline)).not.toMatch(/cukie.?master|entitlement/i);
+  });
 });
