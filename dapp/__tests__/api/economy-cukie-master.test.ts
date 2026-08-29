@@ -178,6 +178,7 @@ describe('GET /api/economy/v1/cukie-master', () => {
       presaleLockedRaw: '20000000000000000000000',
       stakedUkiRaw: '5000000000000000000000',
     });
+    expect(body.data.routes.uki.balanceQualifiedSlots).toBe(1);
     expect(body.data.nftInventory[0]).toEqual(expect.objectContaining({
       assetId: 'cukies:42',
       imageUrl: expect.stringContaining('/42.png'),
@@ -185,6 +186,54 @@ describe('GET /api/economy/v1/cukie-master', () => {
       contributionPoints: 4,
     }));
     expect(JSON.stringify(body)).not.toMatch(/sourceHash|refs|internal warning|secret-asset-id/);
+  });
+
+  it('expone el Cukie Master derivado por saldo aunque el runtime no tenga ronda activa', async () => {
+    mockVerify.mockResolvedValue({ id: 'user-1' } as never);
+    const baseUki = route('uki');
+    const uki = {
+      ...baseUki,
+      roundId: 'uki:cukie-master-v1-5-per-route',
+      ruleVersion: 'cukie-master-v1-5-per-route',
+      position: null,
+      slots: [],
+      source: {
+        ...baseUki.source,
+        totalUkiRaw: '20472512000000000000000',
+        presaleLockedRaw: '0',
+        stakedUkiRaw: '20472512000000000000000',
+      },
+      sourceCompleteness: {
+        ...baseUki.sourceCompleteness,
+        complete: false,
+        warnings: ['No existe una ronda activa para la ruta uki.'],
+      },
+    };
+    mockStatus.mockResolvedValue({
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      routes: { uki, nft: route('nft') },
+      totals: { desiredSlots: 0, allocatedSlots: 0, maxPotentialSlots: 10 },
+    } as never);
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.routes.uki).toEqual(expect.objectContaining({
+      position: null,
+      slots: [],
+      projectionFresh: false,
+      synchronizing: false,
+      previewSlots: null,
+      balanceQualifiedSlots: 1,
+      source: expect.objectContaining({
+        complete: true,
+        totalUkiRaw: '20472512000000000000000',
+        presaleLockedRaw: '0',
+        stakedUkiRaw: '20472512000000000000000',
+      }),
+    }));
   });
 
   it('oculta Gen2 disponibles pero conserva posiciones custodiadas recuperables', async () => {
