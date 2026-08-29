@@ -8,9 +8,6 @@ jest.mock('@/components/cukie-master/workspace', () => ({
     <div data-testnet-only={String(Boolean(testnetOnly))}>Workspace personal</div>
   ),
 }));
-jest.mock('@/components/cukie-master/credit-panel', () => ({
-  CompetitionCreditPanel: () => <div>Panel de créditos activo</div>,
-}));
 jest.mock('@/components/launch/info-page', () => ({
   LaunchInfoPage: ({
     eyebrow,
@@ -57,7 +54,7 @@ describe('CukieMasterPage', () => {
     else process.env.APP_ENV = previousAppEnv;
   });
 
-  it('muestra únicamente el staking y sus reglas en staging', () => {
+  it('presenta las dos rutas Cukie Master y las reglas de créditos en staging', () => {
     process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'false';
     process.env.APP_ENV = 'staging';
     const { container } = render(<CukieMasterPage />);
@@ -66,22 +63,20 @@ describe('CukieMasterPage', () => {
     expect(screen.getByText('Workspace personal')).toBeInTheDocument();
     expect(screen.getByText('Workspace personal')).toHaveAttribute('data-testnet-only', 'true');
     expect(screen.getByText(/Área de pruebas · BNB Smart Chain Testnet/i)).toBeInTheDocument();
-    expect(screen.getByText('Cómo funciona')).toBeInTheDocument();
-    expect(screen.getByText(/20.000 UKI equivalen a 1 Cukie Master/i)).toBeInTheDocument();
-    expect(screen.getByText(/vesting y en staking se suman automáticamente/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cada 2.000 UKI completos en staking te permiten jugar 1 partida/i)).toBeInTheDocument();
-    expect(container).not.toHaveTextContent('ruta UKI');
-    expect(container).not.toHaveTextContent('ventana de gracia');
-    expect(screen.queryByText('Panel de créditos activo')).not.toBeInTheDocument();
+    expect(screen.getByText('Dos rutas independientes')).toBeInTheDocument();
+    expect(screen.getByText(/3 puntos de rareza de Cukies Originales/i)).toBeInTheDocument();
+    expect(screen.getByText(/20.000 UKI computables/i)).toBeInTheDocument();
+    expect(screen.getByText('Créditos propios o pool')).toBeInTheDocument();
+    expect(screen.getByText(/100 créditos en cada corte diario de las 14:00 UTC/i)).toBeInTheDocument();
+    expect(screen.getByText(/cada 2.000 UKI completos conceden una partida/i)).toBeInTheDocument();
     expect(container).not.toHaveTextContent('La UI debe');
   });
 
-  it('no recupera el panel legacy de créditos aunque su runtime siga habilitado', () => {
+  it('mantiene el workspace completo independientemente del gate operativo del scheduler', () => {
     process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'true';
     render(<CukieMasterPage />);
 
     expect(screen.getByText('Workspace personal')).toBeInTheDocument();
-    expect(screen.queryByText('Panel de créditos activo')).not.toBeInTheDocument();
-    expect(screen.queryByText(/La asignación de créditos está activa en este entorno/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Créditos propios o pool')).toBeInTheDocument();
   });
 });

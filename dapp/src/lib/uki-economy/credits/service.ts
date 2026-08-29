@@ -964,10 +964,17 @@ export function createCompetitionCreditService(
         throw new DomainConflictError(
           "No se puede publicar watermark con fuentes no saludables.",
           {
+            reasonCode: "SOURCE_UNHEALTHY",
+            route,
             warnings: health.warnings.slice(0, 20),
           }
         );
       }
+      await repository.ensureVerifiedHistoryCoverage(
+        route,
+        rule.maxSnapshotSlots,
+        now
+      );
       for (const route of ["uki", "nft"] as const) {
         if (
           validCreditText(

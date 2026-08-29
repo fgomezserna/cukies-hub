@@ -15,6 +15,7 @@ import {
   testCreditSourceWatermark,
 } from '@/lib/uki-economy/credits/testing';
 import type { CompetitionCreditRun } from '@/lib/uki-economy/credits/types';
+import { DomainConflictError } from '@/lib/uki-economy/errors';
 
 const now = new Date('2026-07-10T12:05:00.000Z');
 const rule = testCompetitionCreditRule();
@@ -62,6 +63,7 @@ function creditRun(status: CompetitionCreditRun['status'] = 'snapshotted'): Comp
 class MemoryCoordinator implements CompetitionCreditRuntimeCoordinator {
   busy = false;
   failed: string[] = [];
+  failedRoutes: CompetitionCreditRuntimeResult['routeResults'][] = [];
   finished: CompetitionCreditRuntimeResult[] = [];
   released = 0;
   lease: CompetitionCreditRuntimeLease = {
@@ -100,8 +102,10 @@ class MemoryCoordinator implements CompetitionCreditRuntimeCoordinator {
     _lease: CompetitionCreditRuntimeLease,
     _now: Date,
     errorCode: string,
+    routeResults: CompetitionCreditRuntimeResult['routeResults'] = [],
   ) {
     this.failed.push(errorCode);
+    this.failedRoutes.push(routeResults);
   }
 }
 
@@ -132,13 +136,37 @@ function services(overrides: Partial<CompetitionCreditRuntimeServices> = {}) {
 
 describe('competition credit runtime', () => {
   it('is disabled by default and requires an explicit pinned rule when enabled', () => {
-    expect(loadCompetitionCreditRuntimeConfig({}).enabled).toBe(false);
+    expect(loadCompetitionCreditRuntimeConfig({})).toMatchObject({
+      enabled: false,
+      batchLimit: 50,
+    });
     expect(() => loadCompetitionCreditRuntimeConfig({
       COMPETITION_CREDITS_RUNTIME_ENABLED: 'true',
     })).toThrow(CompetitionCreditRuntimeConfigurationError);
     expect(() => loadCompetitionCreditRuntimeConfig({
       COMPETITION_CREDITS_RUNTIME_ENABLED: 'yes',
     })).toThrow(/true o false/);
+    expect(() => loadCompetitionCreditRuntimeConfig({
+      COMPETITION_CREDITS_BATCH_LIMIT: '101',
+    })).toThrow(/entre 1 y 100/);
+  });
+
+  it('caps the configured batch limit to the active rule contract', async () => {
+    const runtimeServices = services();
+
+    await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config: { ...config, batchLimit: 100 },
+      clock: () => now,
+      coordinator: new MemoryCoordinator(),
+      services: runtimeServices,
+      loadActiveRule: async () => ({ ...rule, maxBatchSize: 50 }),
+    });
+
+    expect(runtimeServices.processRunBatch).toHaveBeenCalledTimes(2);
+    expect(runtimeServices.processRunBatch).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 50 }),
+    );
   });
 
   it('refreshes, snapshots, fences, applies, opens and expires in one bounded tick', async () => {
@@ -261,6 +289,78 @@ describe('competition credit runtime', () => {
       loadActiveRule: async () => rule,
     })).rejects.toThrow('sensitive upstream detail');
     expect(coordinator.failed).toEqual(['TICK_FAILED']);
+    expect(coordinator.released).toBe(1);
+  });
+
+  it('opens a healthy route even when the other route remains blocked', async () => {
+    const coordinator = new MemoryCoordinator();
+    const runtimeServices = services({
+      refreshSourceWatermark: jest.fn().mockImplementation(({ route }) =>
+        route === 'nft'
+          ? Promise.reject(new DomainConflictError('nft blocked', {
+              reasonCode: 'SOURCE_UNHEALTHY',
+            }))
+          : Promise.resolve(testCreditSourceWatermark()),
+      ),
+    });
+
+    const result = await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.routeResults).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'open' }),
+      expect.objectContaining({
+        route: 'nft',
+        status: 'blocked',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['SOURCE_UNHEALTHY'],
+      }),
+    ]);
+    expect(coordinator.failed).toHaveLength(0);
+    expect(coordinator.finished).toHaveLength(1);
+  });
+
+  it('persists route-specific domain blockers before keeping the scheduler failure visible', async () => {
+    const coordinator = new MemoryCoordinator();
+    const runtimeServices = services({
+      refreshSourceWatermark: jest.fn().mockImplementation(({ route }) =>
+        Promise.reject(new DomainConflictError('blocked source', {
+          reasonCode: 'SOURCE_UNHEALTHY',
+          warnings: [`CHAIN_EVENTS_NOT_PROJECTED:${route.toUpperCase()}`],
+        })),
+      ),
+    });
+
+    await expect(runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    })).rejects.toThrow('blocked source');
+
+    expect(coordinator.failed).toEqual(['DOMAIN_CONFLICT']);
+    expect(coordinator.failedRoutes[0]).toEqual([
+      expect.objectContaining({
+        route: 'uki',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['SOURCE_UNHEALTHY', 'CHAIN_EVENTS_NOT_PROJECTED:UKI'],
+      }),
+      expect.objectContaining({
+        route: 'nft',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['SOURCE_UNHEALTHY', 'CHAIN_EVENTS_NOT_PROJECTED:NFT'],
+      }),
+    ]);
+    expect(coordinator.finished).toHaveLength(0);
     expect(coordinator.released).toBe(1);
   });
 });

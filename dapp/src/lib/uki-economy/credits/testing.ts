@@ -325,6 +325,15 @@ export class MemoryCompetitionCreditRepository
     );
   }
 
+  async ensureVerifiedHistoryCoverage(route: "uki" | "nft") {
+    return {
+      completeFrom: new Date(0),
+      completeFromBlockNumber: this.state.historyCompleteFromBlock[route],
+      verifiedSlotCount: this.state.slots.filter((slot) => slot.route === route)
+        .length,
+    };
+  }
+
   async listSourceSlotsAtCutoff(
     cutoffBlock: CreditCanonicalBlockEvidence,
     route: "uki" | "nft",
