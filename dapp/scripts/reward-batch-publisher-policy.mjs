@@ -40,21 +40,7 @@ function databaseName(value) {
   }
 }
 
-export function loadRewardBatchPublisherConfig(environment = process.env, host = 'publisher') {
-  const enabled = explicit(environment.REWARD_BATCH_PUBLISHER_ENABLED);
-  const schedulerId = (environment.REWARD_BATCH_PUBLISHER_ID ?? host).trim();
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(schedulerId)) {
-    throw new Error('REWARD_BATCH_PUBLISHER_ID no es valido.');
-  }
-  const intervalMs = positiveInteger(
-    environment.REWARD_BATCH_PUBLISHER_INTERVAL_MS,
-    '60000',
-    'REWARD_BATCH_PUBLISHER_INTERVAL_MS',
-    10_000,
-    3_600_000,
-  );
-  if (!enabled) return { enabled, schedulerId, intervalMs };
-
+function loadStagingPublicationTarget(environment) {
   if (environment.APP_ENV !== 'staging') throw new Error('APP_ENV debe ser staging.');
   if (environment.STAGING_ONLY_GUARD !== 'true') {
     throw new Error('STAGING_ONLY_GUARD debe ser true.');
@@ -81,6 +67,72 @@ export function loadRewardBatchPublisherConfig(environment = process.env, host =
   if (databaseName(mongoUrl) !== STAGING_DATABASE) {
     throw new Error(`CHAIN_INDEXER_MONGO_URL debe apuntar a ${STAGING_DATABASE}.`);
   }
+  const tokenAddress = address(
+    environment.NEXT_PUBLIC_UKI_TOKEN_ADDRESS,
+    'NEXT_PUBLIC_UKI_TOKEN_ADDRESS',
+  );
+  const distributorAddress = address(
+    environment.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS
+      ?? environment.NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS,
+    'CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS',
+  );
+  if (tokenAddress === distributorAddress) {
+    throw new Error('UKI y RewardsDistributor no pueden compartir direccion.');
+  }
+  return {
+    mongoUrl,
+    databaseName: STAGING_DATABASE,
+    chainId: 97,
+    tokenAddress,
+    distributorAddress,
+  };
+}
+
+export function loadRewardBatchPreparerConfig(environment = process.env) {
+  if (!explicit(environment.REWARD_BATCH_PREPARER_ENABLED)) {
+    throw new Error('REWARD_BATCH_PREPARER_ENABLED debe ser true para la ejecucion manual.');
+  }
+  if (explicit(environment.REWARD_BATCH_PUBLISHER_ENABLED)) {
+    throw new Error('El preparador exige REWARD_BATCH_PUBLISHER_ENABLED=false.');
+  }
+  return {
+    ...loadStagingPublicationTarget(environment),
+    maxCandidates: positiveInteger(
+      environment.REWARD_BATCH_PREPARER_MAX_CANDIDATES,
+      '50',
+      'REWARD_BATCH_PREPARER_MAX_CANDIDATES',
+      1,
+      1_000,
+    ),
+  };
+}
+
+export function publicRewardBatchPreparerConfig(config) {
+  return {
+    chainId: config.chainId,
+    databaseName: config.databaseName,
+    tokenAddress: config.tokenAddress,
+    distributorAddress: config.distributorAddress,
+    maxCandidates: config.maxCandidates,
+  };
+}
+
+export function loadRewardBatchPublisherConfig(environment = process.env, host = 'publisher') {
+  const enabled = explicit(environment.REWARD_BATCH_PUBLISHER_ENABLED);
+  const schedulerId = (environment.REWARD_BATCH_PUBLISHER_ID ?? host).trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(schedulerId)) {
+    throw new Error('REWARD_BATCH_PUBLISHER_ID no es valido.');
+  }
+  const intervalMs = positiveInteger(
+    environment.REWARD_BATCH_PUBLISHER_INTERVAL_MS,
+    '60000',
+    'REWARD_BATCH_PUBLISHER_INTERVAL_MS',
+    10_000,
+    3_600_000,
+  );
+  if (!enabled) return { enabled, schedulerId, intervalMs };
+
+  const target = loadStagingPublicationTarget(environment);
   const rpcUrl = required(
     environment.CHAIN_INDEXER_BSC_RPC_URL ?? environment.BSC_RPC_URL,
     'CHAIN_INDEXER_BSC_RPC_URL',
@@ -93,18 +145,6 @@ export function loadRewardBatchPublisherConfig(environment = process.env, host =
   }
   if (parsedRpc.protocol !== 'https:' && parsedRpc.protocol !== 'http:') {
     throw new Error('CHAIN_INDEXER_BSC_RPC_URL debe usar HTTP(S).');
-  }
-  const tokenAddress = address(
-    environment.NEXT_PUBLIC_UKI_TOKEN_ADDRESS,
-    'NEXT_PUBLIC_UKI_TOKEN_ADDRESS',
-  );
-  const distributorAddress = address(
-    environment.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS
-      ?? environment.NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS,
-    'CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS',
-  );
-  if (tokenAddress === distributorAddress) {
-    throw new Error('UKI y RewardsDistributor no pueden compartir direccion.');
   }
   const privateKey = required(
     environment.REWARD_BATCH_PUBLISHER_PRIVATE_KEY,
@@ -125,12 +165,8 @@ export function loadRewardBatchPublisherConfig(environment = process.env, host =
     enabled,
     schedulerId,
     intervalMs,
-    mongoUrl,
-    databaseName: STAGING_DATABASE,
+    ...target,
     rpcUrl,
-    chainId: 97,
-    tokenAddress,
-    distributorAddress,
     privateKey,
     signerAddress,
     confirmations: positiveInteger(

@@ -278,6 +278,20 @@ UKI tiene supply fijo: este proceso materializa la reserva existente, no mintea.
 | `REWARD_BATCH_PUBLISHER_CONFIRMATIONS` | `12` | Cada operación queda firmada de forma durable antes del broadcast y confirmada antes de avanzar. |
 | `REWARD_BATCH_CLAIM_WINDOW_SECONDS` | `7776000` | Ventana inicial de 90 días para staging. |
 
+La preparación del borrador no requiere ni acepta autoridad on-chain. Con el
+publicador apagado, un operador puede materializar exactamente un cierre
+elegible como plan, batch y proofs `previewOnly` mediante:
+
+```bash
+REWARD_BATCH_PREPARER_ENABLED=true pnpm staging:rewards:prepare
+```
+
+El comando es staging-only, exige BSC Testnet `97`, la base
+`cukieshub-new-staging` y `REWARD_BATCH_PUBLISHER_ENABLED=false`. No carga RPC,
+signer ni clave privada; no autoriza, firma, publica, transfiere o quema. Los
+replays no duplican artifacts. La revisión del plan preparado es una operación
+separada de la activación posterior del publicador.
+
 El worker rechaza cualquier entorno que no sea rama `staging`, recurso
 `u4s804o4wwcckowgk0woo4wg`, base `cukieshub-new-staging` y BSC Testnet `97`.
 El canary aislado del 20-08-2026 desplegó token/distributor temporales, publicó
