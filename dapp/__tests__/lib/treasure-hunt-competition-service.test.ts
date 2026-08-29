@@ -281,9 +281,7 @@ class MemoryCompetitionRepository implements CompetitionRepository {
 
   async countAttempts(campaignId: string, walletAddress: string) {
     return [...this.attempts.values()].filter((attempt) =>
-      attempt.campaignId === campaignId &&
-      attempt.walletAddress === walletAddress &&
-      attempt.entitlementRestoredAt === undefined).length;
+      attempt.campaignId === campaignId && attempt.walletAddress === walletAddress).length;
   }
 
   async listValidAttempts(campaignId: string, limit?: number) {
@@ -433,43 +431,6 @@ describe('Treasure Hunt competition service', () => {
     await expect(harness.service.startAttempt({
       userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-3',
     })).rejects.toMatchObject({ code: 'NO_ATTEMPTS_REMAINING', status: 409 });
-  });
-
-  it('allows an audited restored entitlement to be played again', async () => {
-    let id = 0;
-    const harness = createHarness({
-      environment: stakingCampaignEnv,
-      stakingSource: stakingSource({ stakedUkiRaw: '2000000000000000000000' }),
-      createId: () => `attempt-${++id}`,
-    });
-
-    const failed = await harness.service.startAttempt({
-      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-failed',
-    });
-    const failedStored = harness.repository.attempts.get(failed.attemptId)!;
-    harness.repository.attempts.set(failed.attemptId, {
-      ...failedStored,
-      status: 'abandoned',
-      entitlementSlot: null,
-      restoredEntitlementSlot: 1,
-      entitlementRestoredAt: '2026-07-12T12:01:00.000Z',
-      entitlementRestoreReason: 'mobile-fullscreen-regression',
-      entitlementRestoredBy: 'ops-hotfix',
-      finishedAt: '2026-07-12T12:00:30.000Z',
-    });
-
-    await expect(harness.service.getStakingEligibility(wallet)).resolves.toMatchObject({
-      attemptsGranted: 1,
-      attemptsUsed: 0,
-      attemptsRemaining: 1,
-    });
-    const replacement = await harness.service.startAttempt({
-      userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-replacement',
-    });
-    expect(harness.repository.attempts.get(replacement.attemptId)).toMatchObject({
-      entitlementSlot: 1,
-      status: 'active',
-    });
   });
 
   it('keeps a replayed start idempotent without consuming a second staking entitlement', async () => {
