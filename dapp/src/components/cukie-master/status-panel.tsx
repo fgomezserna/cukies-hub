@@ -63,6 +63,7 @@ type PublicRoute = {
   projectionFresh?: boolean;
   synchronizing?: boolean;
   previewSlots?: number | null;
+  balanceQualifiedSlots?: number | null;
   deficitToNextSlot: Requirement | null;
   deficitToPreserveSlots: Requirement | null;
   slots: PublicSlot[];
@@ -452,9 +453,12 @@ export function CukieMasterStatusPanel({
 
 function UkiOnlyStatus({ route }: { route: PublicRoute }) {
   const breakdown = getUkiBreakdown(route);
-  const displayedSlots = route.synchronizing
-    ? route.previewSlots ?? 0
-    : route.position?.allocatedSlots ?? 0;
+  const displayedSlots = route.source.complete
+    ? route.balanceQualifiedSlots
+      ?? route.previewSlots
+      ?? route.position?.allocatedSlots
+      ?? 0
+    : 0;
   const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
   const nextStep = displayedSlots >= MAX_ROUTE_SLOTS
     ? 'Has alcanzado el máximo de 5 Cukie Masters mediante UKI.'
@@ -484,7 +488,7 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
         <StatusMetric
           label="Tus Cukie Masters"
           value={`${displayedSlots}/${MAX_ROUTE_SLOTS}`}
-          helper="Máximo 5 mediante UKI"
+          helper="Preventa pendiente + staking · máximo 5"
           tone="cyan"
         />
       </div>

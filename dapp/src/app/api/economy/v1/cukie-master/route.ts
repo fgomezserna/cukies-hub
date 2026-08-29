@@ -52,8 +52,7 @@ function publicRouteStatus(
   route: CukieMasterWalletStatus['routes']['uki'],
 ) {
   const position = route.position;
-  const previewSlots = (() => {
-    if (!route.sourceCompleteness.complete) return null;
+  const qualifiedSlots = (() => {
     try {
       const available = route.source.route === 'uki'
         ? BigInt(route.source.totalUkiRaw)
@@ -67,6 +66,19 @@ function publicRouteStatus(
       return null;
     }
   })();
+  const balanceQualifiedSlots = route.source.route === 'uki'
+    && route.source.completeness.complete
+    ? qualifiedSlots
+    : null;
+  // Projection validation remains tied to the active round/runtime. The
+  // balance-derived counter is deliberately independent: it only describes
+  // how many Cukie Masters the confirmed source balance qualifies for.
+  const previewSlots = route.sourceCompleteness.complete
+    ? qualifiedSlots
+    : null;
+  const publicSourceComplete = route.source.route === 'uki'
+    ? route.source.completeness.complete
+    : route.sourceCompleteness.complete;
   const positionShapeValid = position
     ? previewSlots !== null
       && Number.isSafeInteger(position.desiredSlots)
@@ -143,9 +155,10 @@ function publicRouteStatus(
     projectionFresh,
     synchronizing,
     previewSlots,
+    balanceQualifiedSlots,
     source: {
-      complete: route.sourceCompleteness.complete,
-      status: route.sourceCompleteness.complete ? 'available' : 'unavailable',
+      complete: publicSourceComplete,
+      status: publicSourceComplete ? 'available' : 'unavailable',
       route: route.source.route,
       ...(route.source.route === 'uki' ? {
         totalUkiRaw: route.source.totalUkiRaw,

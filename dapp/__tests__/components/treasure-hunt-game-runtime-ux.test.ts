@@ -85,6 +85,9 @@ describe('contrato UX del runtime de Treasure Hunt', () => {
     expect(hubStylesSource).toMatch(
       /\[data-game-layout='mobile-focus'\] \[data-game-viewport\] iframe[\s\S]*?transform: translateZ\(0\)/,
     );
+    expect(hubStylesSource).not.toMatch(
+      /\[data-game-layout='mobile-focus'\] \[data-game-viewport\] > \[data-game-landscape-surface\][^{]*\{[^}]*transform\s*:/,
+    );
   });
 
   it('no reproduce la voz de Trump al recoger checkpoint ni Haku', () => {
