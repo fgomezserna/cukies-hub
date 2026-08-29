@@ -19,7 +19,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_TEXT_LENGTH = 160;
 const MAX_RULE_COSTS = 100;
 const HARD_MAX_SNAPSHOT_SLOTS = 5_000;
-const HARD_MAX_BATCH_SIZE = 100;
+export const MAX_COMPETITION_CREDIT_BATCH_SIZE = 100;
 const HARD_MAX_LEASE_MS = 30 * 60 * 1000;
 const HARD_MAX_RESERVATION_TTL_MS = 24 * 60 * 60 * 1000;
 const SAFE_PERIOD_ID_MAX_LENGTH = 512;
@@ -319,7 +319,7 @@ export function assertCompetitionCreditRule(rule: CompetitionCreditRule) {
     rule.maxBatchSize,
     "rule.maxBatchSize",
     1,
-    HARD_MAX_BATCH_SIZE
+    MAX_COMPETITION_CREDIT_BATCH_SIZE
   );
   validBoundedInteger(
     rule.leaseDurationMs,
