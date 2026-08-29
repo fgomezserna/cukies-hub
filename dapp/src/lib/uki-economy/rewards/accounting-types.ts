@@ -207,6 +207,12 @@ export type WeeklyPoolReservation = {
   amountRaw: string;
   ambassadorReserveRaw: string;
   sourceWinningGameIds: string[];
+  tranches: Array<{
+    tranche: number;
+    scheduledAt: Date;
+    amountRaw: string;
+    ambassadorReserveRaw: string;
+  }>;
 };
 
 export type WeeklyAmbassadorPayout = {
@@ -235,6 +241,7 @@ export type WeeklyPrizeAccounting = {
   _id: string;
   periodId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   fundingMode: "reserved_no_mint";
   sourceDailyAccountingIds: string[];
   potRaw: string;

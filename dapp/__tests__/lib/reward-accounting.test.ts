@@ -1,10 +1,12 @@
 import {
+  assertWeeklyPrizeAccountingIntegrity,
   calculateDailyRewardSettlement,
   calculatePoolTranche,
   calculateWeeklyPrize,
   excludeSeikuFromCukiePool,
   reserveForCredits,
   sealDailyRewardAccounting,
+  selectStoredWeeklyPoolTranche,
   selectWeeklyBestResults,
   splitIntoSevenTranches,
   splitUndistributed,
@@ -37,6 +39,9 @@ const DESTINATIONS = {
   supplyReduction: wallet(9003),
 };
 const PAYOUT_AT = new Date("2026-08-24T17:00:00.000Z");
+const RULE_CONFIG_HASH = "a".repeat(64);
+const DAILY_ACCOUNTING_IDS = Array.from({ length: 7 }, (_, index) =>
+  `reward-daily:2026-08-${String(17 + index).padStart(2, "0")}`);
 const ENTROPY = {
   chainId: 97 as const,
   selectionPolicy: "first_safe_block_at_or_after_cutoff" as const,
@@ -49,11 +54,14 @@ const ENTROPY = {
   canonical: true as const,
   confirmedAt: new Date("2026-08-24T17:01:00.000Z"),
 };
-function settledResult(input: Pick<WeeklyGameResult, "wallet" | "gameId" | "scoreRaw" | "playedAt">): WeeklyGameResult {
+function settledResult(
+  input: Pick<WeeklyGameResult, "wallet" | "gameId" | "scoreRaw" | "playedAt">
+    & Partial<Pick<WeeklyGameResult, "sessionId">>,
+): WeeklyGameResult {
   const suffix = input.gameId.replace(/[^A-Za-z0-9]/g, "-");
   return {
     ...input,
-    sessionId: `session-${suffix}`,
+    sessionId: input.sessionId ?? `session-${suffix}`,
     periodAnchorAt: input.playedAt,
     settledAt: input.playedAt,
     status: "settled",
@@ -252,7 +260,7 @@ describe("weekly prize", () => {
         wallet: wallet(index + 1),
         gameId: `game-${index + 1}-${game}`,
         scoreRaw: String(1_000 - index - game),
-        playedAt: new Date(Date.UTC(2026, 7, 18 + game, 10, index)),
+        playedAt: new Date(Date.UTC(2026, 7, 18 + Math.floor(game / 2), 10 + game % 2, index)),
       }))).flat();
   }
 
@@ -268,13 +276,27 @@ describe("weekly prize", () => {
     expect(ranked[1].gamesPlayed).toBe(2);
   });
 
+  it("desempata de forma estable aunque score, fecha y gameId sean identicos", () => {
+    const common = {
+      wallet: wallet(1), gameId: "same-game", scoreRaw: "777",
+      playedAt: new Date("2026-08-20T11:00:00.000Z"),
+    };
+    const lateSession = settledResult({ ...common, sessionId: "session-z" });
+    const earlySession = settledResult({ ...common, sessionId: "session-a" });
+    expect(selectWeeklyBestResults([lateSession, earlySession])[0].best.sessionId)
+      .toBe("session-a");
+    expect(selectWeeklyBestResults([earlySession, lateSession])[0].best.sessionId)
+      .toBe("session-a");
+  });
+
   it("reparte 60/30/10, 10 loterias auditables y conserva el bote", () => {
     const result = calculateWeeklyPrize({
       periodId: "2026-W34",
       ruleVersion: "reward-v3",
+      ruleConfigHash: RULE_CONFIG_HASH,
       potRaw: "10000",
       ambassadorReserveRaw: "500",
-      sourceDailyAccountingIds: ["reward-daily:2026-08-18"],
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS,
       results: weeklyResults(),
       destinations: DESTINATIONS,
       lotteryEntropy: ENTROPY,
@@ -285,11 +307,24 @@ describe("weekly prize", () => {
       .toEqual([900, 800, 700, 650, 600, 550, 500, 450, 450, 400]);
     expect(result.winners.filter((winner) => winner.kind === "positions_11_25")).toHaveLength(15);
     expect(result.winners.filter((winner) => winner.kind === "lottery")).toHaveLength(10);
+    expect(result.ruleConfigHash).toBe(RULE_CONFIG_HASH);
+    expect(result.sourceDailyAccountingIds).toEqual(DAILY_ACCOUNTING_IDS);
     expect(result.winners.reduce((sum, winner) => sum + winner.shareBps, 0)).toBe(10_000);
     expect(BigInt(result.allocatedRaw) + BigInt(result.undistributed.totalRaw)).toBe(BigInt("10000"));
     expect(result.poolReservations.map((item) => item.pool)).toEqual([
       "credit", "cukie_original",
     ]);
+    for (const reservation of result.poolReservations) {
+      expect(reservation.tranches).toHaveLength(7);
+      expect(reservation.tranches.map((tranche) => tranche.scheduledAt))
+        .toEqual(result.poolTrancheSchedule);
+      expect(reservation.tranches.reduce((sum, tranche) => sum + BigInt(tranche.amountRaw), BigInt(0)))
+        .toBe(BigInt(reservation.amountRaw));
+      expect(reservation.tranches.reduce(
+        (sum, tranche) => sum + BigInt(tranche.ambassadorReserveRaw),
+        BigInt(0),
+      )).toBe(BigInt(reservation.ambassadorReserveRaw));
+    }
     expect(BigInt(result.ambassadorAllocatedRaw)
       + BigInt(result.ambassadorDeferredRaw)
       + BigInt(result.ambassadorUndistributed.totalRaw)).toBe(BigInt("500"));
@@ -306,23 +341,87 @@ describe("weekly prize", () => {
       ambassadorSnapshot: { walletNormalized: wallet(8000) },
     });
     const replay = calculateWeeklyPrize({
-      periodId: "2026-W34", ruleVersion: "reward-v3", potRaw: "10000", ambassadorReserveRaw: "500",
-      sourceDailyAccountingIds: ["reward-daily:2026-08-18"],
+      periodId: "2026-W34", ruleVersion: "reward-v3", ruleConfigHash: RULE_CONFIG_HASH,
+      potRaw: "10000", ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: [...DAILY_ACCOUNTING_IDS].reverse(),
       results: weeklyResults().reverse(), lotteryEntropy: ENTROPY, destinations: DESTINATIONS,
       payoutAt: PAYOUT_AT, sealedAt: ENTROPY.confirmedAt,
     });
     expect(replay.winners).toEqual(result.winners);
+    expect(replay.payloadHash).toBe(result.payloadHash);
+
+    const firstStored = selectStoredWeeklyPoolTranche(result, result.poolTrancheSchedule[0]);
+    expect(firstStored).toMatchObject({
+      weeklyAccountingId: "reward-weekly:2026-W34",
+      creditPoolRaw: result.poolReservations[0].tranches[0].amountRaw,
+      cukiePoolOriginalRaw: result.poolReservations[1].tranches[0].amountRaw,
+    });
+    const tampered: WeeklyPrizeAccounting = {
+      ...result,
+      poolReservations: result.poolReservations.map((reservation, index) => index === 0
+        ? {
+          ...reservation,
+          tranches: reservation.tranches.map((tranche, trancheIndex) => trancheIndex === 0
+            ? { ...tranche, amountRaw: "999" }
+            : tranche),
+        }
+        : reservation),
+    };
+    expect(() => assertWeeklyPrizeAccountingIntegrity(tampered)).toThrow(/canonico|conservan|payload sellado/);
+  });
+
+  it("falla cerrado con fuentes, periodo u horarios no canonicos", () => {
+    const base = {
+      periodId: "2026-W34",
+      ruleVersion: "reward-v3",
+      ruleConfigHash: RULE_CONFIG_HASH,
+      potRaw: "10000",
+      ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS,
+      results: weeklyResults(),
+      destinations: DESTINATIONS,
+      lotteryEntropy: ENTROPY,
+      payoutAt: PAYOUT_AT,
+      sealedAt: ENTROPY.confirmedAt,
+    };
+    expect(() => calculateWeeklyPrize({
+      ...base,
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS.slice(0, 6),
+    })).toThrow(/siete cierres diarios canonicos/);
+    expect(() => calculateWeeklyPrize({
+      ...base,
+      sourceDailyAccountingIds: [...DAILY_ACCOUNTING_IDS.slice(0, 6), "reward-daily:2026-08-24"],
+    })).toThrow(/siete cierres diarios canonicos/);
+    expect(() => calculateWeeklyPrize({ ...base, periodId: "2026-W35" }))
+      .toThrow(/periodId/);
+    expect(() => calculateWeeklyPrize({
+      ...base,
+      payoutAt: new Date("2026-08-24T17:00:01.000Z"),
+    })).toThrow(/17:00:00.000/);
+    expect(() => calculateWeeklyPrize({
+      ...base,
+      sealedAt: new Date("2026-08-24T17:00:30.000Z"),
+    })).toThrow(/confirmar la entropia/);
+    expect(() => calculateWeeklyPrize({
+      ...base,
+      results: [settledResult({
+        wallet: wallet(1), gameId: "late-source", scoreRaw: "100",
+        playedAt: new Date("2026-08-24T14:00:00.000Z"),
+      })],
+    })).toThrow(/no pertenece al periodo/);
   });
 
   it("falla cerrado sin bloque canonico posterior al lunes 17", () => {
     expect(() => calculateWeeklyPrize({
-      periodId: "2026-W34", ruleVersion: "reward-v3", potRaw: "10000", ambassadorReserveRaw: "500",
-      sourceDailyAccountingIds: ["reward-daily:2026-08-18"],
+      periodId: "2026-W34", ruleVersion: "reward-v3", ruleConfigHash: RULE_CONFIG_HASH,
+      potRaw: "10000", ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS,
       results: weeklyResults(), destinations: DESTINATIONS, payoutAt: PAYOUT_AT, sealedAt: PAYOUT_AT,
     })).toThrow(/pending_entropy/);
     expect(() => calculateWeeklyPrize({
-      periodId: "2026-W34", ruleVersion: "reward-v3", potRaw: "10000", ambassadorReserveRaw: "500",
-      sourceDailyAccountingIds: ["reward-daily:2026-08-18"],
+      periodId: "2026-W34", ruleVersion: "reward-v3", ruleConfigHash: RULE_CONFIG_HASH,
+      potRaw: "10000", ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS,
       results: weeklyResults(), destinations: DESTINATIONS, lotteryEntropy: { ...ENTROPY, blockTimestamp: new Date("2026-08-24T16:59:59Z") },
       payoutAt: PAYOUT_AT, sealedAt: ENTROPY.confirmedAt,
     })).toThrow(/pending_entropy/);
@@ -330,8 +429,9 @@ describe("weekly prize", () => {
 
   it("manda puestos y loterias ausentes a 80/10/10", () => {
     const result = calculateWeeklyPrize({
-      periodId: "2026-W34", ruleVersion: "reward-v3", potRaw: "10000", ambassadorReserveRaw: "500",
-      sourceDailyAccountingIds: ["reward-daily:2026-08-18"],
+      periodId: "2026-W34", ruleVersion: "reward-v3", ruleConfigHash: RULE_CONFIG_HASH,
+      potRaw: "10000", ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS,
       results: weeklyResults().slice(0, 50), lotteryEntropy: ENTROPY, destinations: DESTINATIONS,
       payoutAt: PAYOUT_AT, sealedAt: ENTROPY.confirmedAt,
     });
@@ -351,8 +451,9 @@ describe("weekly prize", () => {
     });
     source.ambassadorSnapshot.walletNormalized = null;
     const result = calculateWeeklyPrize({
-      periodId: "2026-W34", ruleVersion: "reward-v3", potRaw: "10000", ambassadorReserveRaw: "500",
-      sourceDailyAccountingIds: ["reward-daily:2026-08-18"], results: [source],
+      periodId: "2026-W34", ruleVersion: "reward-v3", ruleConfigHash: RULE_CONFIG_HASH,
+      potRaw: "10000", ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS, results: [source],
       lotteryEntropy: ENTROPY, destinations: DESTINATIONS, payoutAt: PAYOUT_AT, sealedAt: ENTROPY.confirmedAt,
     });
     expect(result.ambassadorPayouts).toEqual([]);
@@ -428,7 +529,8 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
   sources = new Map<string, WeeklyGameSource>();
   evidence = new Map<string, Awaited<ReturnType<RewardAccountingRepository["findSettledGameEvidence"]>>>();
   dailyLines: DailyRewardSourceLine[] = [];
-  findRewardRule = async () => null;
+  rewardRule: ReturnType<typeof testRewardRule> | null = null;
+  findRewardRule = async () => this.rewardRule;
   materializeDailyCapacity = async () => ({
     _id: "reward-daily-capacity:2026-08-20",
     dayId: "2026-08-20",
@@ -458,8 +560,9 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
       && value.periodAnchorAt >= startsAt && value.periodAnchorAt < endsAt);
   listDailyRewardSourceLines = async () => this.dailyLines;
   findNextClosableRewardDay = async () => null;
-  listDailyAccounting = async () => [...this.daily.values()].sort((left, right) =>
-    left.dayId.localeCompare(right.dayId));
+  listDailyAccounting = async (startsOn: string, endsBefore: string) => [...this.daily.values()]
+    .filter((value) => value.dayId >= startsOn && value.dayId < endsBefore)
+    .sort((left, right) => left.dayId.localeCompare(right.dayId));
   findFirstSafeLotteryEntropy = async () => ENTROPY;
   dailyReadiness = async () => ({
     unfinishedRuns: 0,
@@ -485,6 +588,78 @@ describe("accounting persistence and runtime gates", () => {
     await expect(service.sealDaily(first)).resolves.toEqual(first);
     await expect(service.sealDaily({ ...first, payloadHash: "f".repeat(64) })).rejects.toThrow(/payload distinto/);
     expect(repository.daily.size).toBe(1);
+  });
+
+  it("cierra una semana solo con siete dias de la misma regla y detecta fuentes tardias", async () => {
+    const repository = new MemoryAccountingRepository();
+    repository.rewardRule = testRewardRule({ version: "reward-v3" });
+    for (let index = 0; index < 7; index += 1) {
+      const dayId = `2026-08-${String(17 + index).padStart(2, "0")}`;
+      const daily = sealDailyRewardAccounting({
+        dayId,
+        ruleVersion: "reward-v3",
+        buckets: {
+          playersRaw: "0",
+          creditPoolRaw: "0",
+          cukiePoolRaw: "0",
+          ambassadorOrdinaryRaw: "0",
+          weeklyPrizeRaw: "100",
+          ambassadorWeeklyRaw: "5",
+        },
+        destinations: DESTINATIONS,
+        sealedAt: new Date(`${dayId}T23:00:00.000Z`),
+      });
+      repository.daily.set(dayId, daily);
+    }
+    const service = new RewardAccountingService(async (work) => work(repository));
+    const closeInput = {
+      periodId: "2026-W34",
+      startsAt: new Date("2026-08-17T14:00:00.000Z"),
+      ruleVersion: "reward-v3",
+      now: ENTROPY.confirmedAt,
+    };
+    const first = await service.closeWeeklyPeriod(closeInput);
+    expect(first.sourceDailyAccountingIds).toEqual(DAILY_ACCOUNTING_IDS);
+    expect(first.ruleConfigHash).toBe(repository.rewardRule.configHash);
+    await expect(service.closeWeeklyPeriod(closeInput)).resolves.toEqual(first);
+
+    const lateSource = {
+      ...settledResult({
+        wallet: wallet(1), gameId: "late-but-period-valid", scoreRaw: "500",
+        playedAt: new Date("2026-08-20T10:00:00.000Z"),
+      }),
+      _id: "reward-weekly-game-source:session-late-but-period-valid",
+      recordedAt: new Date("2026-08-24T17:02:00.000Z"),
+      payloadHash: "6".repeat(64),
+    };
+    repository.sources.set(lateSource.sessionId, lateSource);
+    await expect(service.closeWeeklyPeriod(closeInput)).rejects.toThrow(/payload distinto/);
+    expect(repository.weekly.size).toBe(1);
+  });
+
+  it("rechaza un conjunto diario incompleto o con una version mezclada", async () => {
+    const repository = new MemoryAccountingRepository();
+    repository.rewardRule = testRewardRule({ version: "reward-v3" });
+    for (let index = 0; index < 7; index += 1) {
+      const dayId = `2026-08-${String(17 + index).padStart(2, "0")}`;
+      repository.daily.set(dayId, sealDailyRewardAccounting({
+        dayId,
+        ruleVersion: index === 6 ? "reward-v2" : "reward-v3",
+        buckets: {
+          playersRaw: "0", creditPoolRaw: "0", cukiePoolRaw: "0",
+          ambassadorOrdinaryRaw: "0", weeklyPrizeRaw: "100", ambassadorWeeklyRaw: "5",
+        },
+        destinations: DESTINATIONS,
+        sealedAt: new Date(`${dayId}T23:00:00.000Z`),
+      }));
+    }
+    const service = new RewardAccountingService(async (work) => work(repository));
+    await expect(service.closeWeeklyPeriod({
+      periodId: "2026-W34",
+      startsAt: new Date("2026-08-17T14:00:00.000Z"),
+      ruleVersion: "reward-v3",
+      now: ENTROPY.confirmedAt,
+    })).rejects.toThrow(/siete cierres diarios canonicos de la misma regla/);
   });
 
   it("mantiene cada scheduler desactivado salvo opt-in explicito", () => {
