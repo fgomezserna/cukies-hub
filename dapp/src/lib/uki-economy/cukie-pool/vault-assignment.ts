@@ -15,6 +15,8 @@ import type { GameEconomySession } from '../game-economy/types';
 import {
   clonePoolAssignment,
   deterministicSeikuAssetId,
+  gamesQuota,
+  poolPriority,
   requiredPoolText,
   stableCukiePoolHash,
   validPoolDate,
@@ -122,6 +124,23 @@ function reservationHash(input: { sessionId: string; expiresAt: Date }) {
 
 function usageId(candidate: Pick<CukiePoolVaultCandidate, 'positionId'>, periodId: string) {
   return `${candidate.positionId}:period:${periodId}`;
+}
+
+function orderedCandidates(candidates: CukiePoolVaultCandidate[]) {
+  for (const candidate of candidates) {
+    if (
+      candidate.poolPriority !== poolPriority(candidate.generation)
+      || candidate.gamesQuota !== gamesQuota(candidate.generation, candidate.rarity)
+    ) throw new SchemaNotReadyError(
+      `Reglas de prioridad/cuota incoherentes para ${candidate.positionId}.`,
+    );
+  }
+  return [...candidates].sort((left, right) => (
+    poolPriority(left.generation) - poolPriority(right.generation)
+    || left.activationAt.getTime() - right.activationAt.getTime()
+    || left.depositedAt.getTime() - right.depositedAt.getTime()
+    || left.positionId.localeCompare(right.positionId)
+  ));
 }
 
 function validateUsage(
@@ -257,7 +276,7 @@ function createAssignment(runner: CukiePoolVaultAssignmentRunner) {
           if (bySession) return assertReservationRetry(bySession, { idempotencyKey, requestHash, sessionId });
 
           const period = await repository.currentPeriod(now);
-          const candidates = await repository.listCandidates(now);
+          const candidates = orderedCandidates(await repository.listCandidates(now));
           for (const candidate of candidates) {
             const usage = await repository.findUsage(usageId(candidate, period.periodId));
             if (usage) {
