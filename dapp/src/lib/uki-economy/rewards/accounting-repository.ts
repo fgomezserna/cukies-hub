@@ -4,6 +4,7 @@ import type { ClientSession, Db } from "mongodb";
 
 import { DomainConflictError } from "../errors";
 import { formatRawAmount, parseRawAmount } from "../money";
+import { getIsoWeekPeriodId } from "../periods";
 import {
   loadCukiePoolVaultRewardParticipants,
   requireCukiePoolVaultConfig,
@@ -21,8 +22,12 @@ import type {
   WeeklyGameResult,
   WeeklyGameSource,
 } from "./accounting-types";
-import { assertEligibleWeeklyGameResult } from "./accounting";
-import { stableRewardHash } from "./rules";
+import {
+  assertEligibleWeeklyGameResult,
+  assertWeeklyPrizeAccountingIntegrity,
+  selectStoredWeeklyPoolTranche,
+} from "./accounting";
+import { assertRewardRule, stableRewardHash, validRewardDate } from "./rules";
 import type { RewardRule } from "./types";
 import type { RewardEmissionBudgetDay, RewardEmissionBudgetState } from "./types";
 import { DAILY_REWARD_EMISSION_RAW } from "./accounting-types";
@@ -540,29 +545,7 @@ export function createMongoRewardAccountingRepository(
         poolTrancheSchedule: scheduledAt,
       }, options);
       if (!accounting) return null;
-      const tranche = accounting.poolTrancheSchedule.findIndex((at) =>
-        at.getTime() === scheduledAt.getTime());
-      if (tranche < 0) return null;
-      const { splitIntoSevenTranches } = await import("./accounting");
-      const value = (pool: "credit" | "cukie_original" | "cukie_second_plus") => {
-        const row = accounting.poolReservations.find((item) => item.pool === pool);
-        return {
-          amount: row ? splitIntoSevenTranches(row.amountRaw)[tranche] : "0",
-          ambassador: row ? splitIntoSevenTranches(row.ambassadorReserveRaw)[tranche] : "0",
-        };
-      };
-      const credit = value("credit");
-      const original = value("cukie_original");
-      const second = value("cukie_second_plus");
-      return {
-        weeklyAccountingId: accounting._id,
-        creditPoolRaw: credit.amount,
-        creditPoolAmbassadorRaw: credit.ambassador,
-        cukiePoolOriginalRaw: original.amount,
-        cukiePoolOriginalAmbassadorRaw: original.ambassador,
-        cukiePoolSecondPlusRaw: second.amount,
-        cukiePoolSecondPlusAmbassadorRaw: second.ambassador,
-      };
+      return selectStoredWeeklyPoolTranche(accounting, scheduledAt);
     },
   };
 }
@@ -696,8 +679,12 @@ export class RewardAccountingService {
 
   sealWeekly(accounting: WeeklyPrizeAccounting) {
     return this.runTransaction(async (repository) => {
+      assertWeeklyPrizeAccountingIntegrity(accounting);
       const current = await repository.findWeekly(accounting.periodId);
-      if (current) return assertReplay(current, accounting, `El cierre weekly ${accounting.periodId}`);
+      if (current) {
+        assertWeeklyPrizeAccountingIntegrity(current);
+        return assertReplay(current, accounting, `El cierre weekly ${accounting.periodId}`);
+      }
       await repository.insertWeekly(accounting);
       return accounting;
     });
@@ -711,8 +698,9 @@ export class RewardAccountingService {
   }) {
     return this.runTransaction(async (repository) => {
       const current = await repository.findWeekly(input.periodId);
-      if (current) return current;
-      const startsAt = new Date(input.startsAt);
+      if (current) assertWeeklyPrizeAccountingIntegrity(current);
+      const startsAt = validRewardDate(input.startsAt, "startsAt");
+      const now = validRewardDate(input.now, "now");
       const endsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60_000);
       const payoutAt = new Date(Date.UTC(
         endsAt.getUTCFullYear(),
@@ -723,23 +711,39 @@ export class RewardAccountingService {
       if (
         startsAt.getUTCDay() !== 1
         || startsAt.getUTCHours() !== 14
-        || input.now.getTime() < payoutAt.getTime()
+        || startsAt.getUTCMinutes() !== 0
+        || startsAt.getUTCSeconds() !== 0
+        || startsAt.getUTCMilliseconds() !== 0
+        || getIsoWeekPeriodId(startsAt) !== input.periodId
+        || now.getTime() < payoutAt.getTime()
       ) {
-        throw new DomainConflictError("El periodo weekly aun no puede pagarse el lunes a las 17 UTC.");
+        throw new DomainConflictError(
+          "El periodo weekly debe empezar el lunes 14:00 UTC y pagarse el lunes siguiente a las 17:00 UTC.",
+        );
       }
-      const daily = await repository.listDailyAccounting(
+      const daily = (await repository.listDailyAccounting(
         startsAt.toISOString().slice(0, 10),
         endsAt.toISOString().slice(0, 10),
-      );
-      if (daily.length !== 7) {
+      )).sort((left, right) => left.dayId.localeCompare(right.dayId));
+      const expectedDays = Array.from({ length: 7 }, (_, index) =>
+        new Date(startsAt.getTime() + index * 24 * 60 * 60_000).toISOString().slice(0, 10));
+      if (
+        daily.length !== 7
+        || daily.some((row, index) =>
+          row.dayId !== expectedDays[index]
+          || row._id !== `reward-daily:${expectedDays[index]}`
+          || row.ruleVersion !== input.ruleVersion
+          || row.status !== "sealed")
+      ) {
         throw new DomainConflictError(
-          `El weekly ${input.periodId} exige siete cierres diarios; disponibles=${daily.length}.`,
+          `El weekly ${input.periodId} exige siete cierres diarios canonicos de la misma regla.`,
         );
       }
       const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
       if (!rule) {
         throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.periodId}.`);
       }
+      assertRewardRule(rule, startsAt);
       const potRaw = daily.reduce(
         (sum, row) => sum + BigInt(row.buckets.weeklyPrizeRaw),
         BigInt(0),
@@ -748,12 +752,14 @@ export class RewardAccountingService {
         (sum, row) => sum + BigInt(row.buckets.ambassadorWeeklyRaw),
         BigInt(0),
       ).toString(10);
-      const entropy = await repository.findFirstSafeLotteryEntropy(payoutAt);
+      const resolvedEntropy = await repository.findFirstSafeLotteryEntropy(payoutAt);
+      const entropy = resolvedEntropy ?? current?.lotteryEntropy;
       const results = await repository.listEligibleWeeklyGameSources(startsAt, endsAt);
       const { calculateWeeklyPrize } = await import("./accounting");
       const accounting = calculateWeeklyPrize({
         periodId: input.periodId,
         ruleVersion: input.ruleVersion,
+        ruleConfigHash: rule.configHash,
         potRaw,
         ambassadorReserveRaw,
         sourceDailyAccountingIds: daily.map((row) => row._id),
@@ -766,8 +772,11 @@ export class RewardAccountingService {
           supplyReduction: rule.destinations.supplyReduction,
         },
         payoutAt,
-        sealedAt: input.now,
+        sealedAt: current?.sealedAt ?? now,
       });
+      if (current) {
+        return assertReplay(current, accounting, `El cierre weekly ${accounting.periodId}`);
+      }
       await repository.insertWeekly(accounting);
       return accounting;
     });

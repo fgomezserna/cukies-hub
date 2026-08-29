@@ -2,6 +2,7 @@ import "server-only";
 
 import { DomainConflictError, DomainValidationError } from "../errors";
 import { formatRawAmount, mulDiv, parseRawAmount, sumRawAmounts } from "../money";
+import { getIsoWeekPeriodId } from "../periods";
 import {
   DAILY_REWARD_EMISSION_RAW,
   type CukiePoolCandidate,
@@ -608,7 +609,9 @@ function betterResult(left: WeeklyGameResult, right: WeeklyGameResult) {
   const delta = validRewardDate(left.playedAt, "playedAt").getTime()
     - validRewardDate(right.playedAt, "playedAt").getTime();
   if (delta !== 0) return delta < 0 ? left : right;
-  return compareRewardText(left.gameId, right.gameId) <= 0 ? left : right;
+  const game = compareRewardText(left.gameId, right.gameId);
+  if (game !== 0) return game < 0 ? left : right;
+  return compareRewardText(left.sessionId, right.sessionId) <= 0 ? left : right;
 }
 
 function canonicalEvidenceHash(value: string, label: string) {
@@ -779,6 +782,7 @@ export function selectWeeklyBestResults(results: readonly WeeklyGameResult[]) {
 export function calculateWeeklyPrize(input: {
   periodId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   potRaw: string;
   ambassadorReserveRaw: string;
   sourceDailyAccountingIds: readonly string[];
@@ -790,18 +794,50 @@ export function calculateWeeklyPrize(input: {
 }): WeeklyPrizeAccounting {
   const periodId = validRewardText(input.periodId, "periodId");
   const ruleVersion = validRewardText(input.ruleVersion, "ruleVersion");
+  const ruleConfigHash = canonicalEvidenceHash(input.ruleConfigHash, "ruleConfigHash");
   const pot = canonicalRaw(input.potRaw, "potRaw");
   const ambassadorReserve = canonicalRaw(input.ambassadorReserveRaw, "ambassadorReserveRaw");
-  const sourceDailyAccountingIds = input.sourceDailyAccountingIds.map((id, index) =>
-    validRewardText(id, `sourceDailyAccountingIds[${index}]`));
-  if (sourceDailyAccountingIds.length === 0 || new Set(sourceDailyAccountingIds).size !== sourceDailyAccountingIds.length) {
-    throw new DomainValidationError("Weekly exige reservas diarias unicas como fuente.");
+  const payoutAt = validRewardDate(input.payoutAt, "payoutAt");
+  const sealedAt = validRewardDate(input.sealedAt, "sealedAt");
+  const payoutMonday = new Date(Date.UTC(
+    payoutAt.getUTCFullYear(),
+    payoutAt.getUTCMonth(),
+    payoutAt.getUTCDate(),
+  ));
+  if (
+    payoutMonday.getUTCDay() !== 1
+    || payoutAt.getUTCHours() !== 17
+    || payoutAt.getUTCMinutes() !== 0
+    || payoutAt.getUTCSeconds() !== 0
+    || payoutAt.getUTCMilliseconds() !== 0
+  ) {
+    throw new DomainConflictError("El payout weekly debe sellarse un lunes a las 17:00:00.000 UTC.");
   }
+  const periodMonday = new Date(payoutMonday.getTime() - WEEK_MS);
+  if (getIsoWeekPeriodId(periodMonday) !== periodId) {
+    throw new DomainConflictError("periodId no coincide con la semana UTC anterior al payout.");
+  }
+  const expectedDailyAccountingIds = Array.from({ length: 7 }, (_, index) =>
+    `reward-daily:${new Date(periodMonday.getTime() + index * DAY_MS).toISOString().slice(0, 10)}`);
+  const providedSourceDailyAccountingIds = input.sourceDailyAccountingIds.map((id, index) =>
+    validRewardText(id, `sourceDailyAccountingIds[${index}]`));
+  const canonicalSourceIds = [...providedSourceDailyAccountingIds].sort(compareRewardText);
+  if (
+    providedSourceDailyAccountingIds.length !== 7
+    || new Set(providedSourceDailyAccountingIds).size !== 7
+    || canonicalSourceIds.some((id, index) => id !== expectedDailyAccountingIds[index])
+  ) {
+    throw new DomainConflictError("Weekly exige los siete cierres diarios canonicos de su periodo.");
+  }
+  const sourceDailyAccountingIds = expectedDailyAccountingIds;
+  const poolTrancheSchedule = Array.from({ length: 7 }, (_, index) =>
+    new Date(payoutMonday.getTime() + (index + 1) * DAY_MS + 16 * 60 * 60_000));
   if (ambassadorReserve !== mulDiv(pot, BigInt(500), BPS)) {
     throw new DomainConflictError("La reserva ambassador weekly debe ser exactamente 5% del bote.");
   }
-  const payoutAt = validRewardDate(input.payoutAt, "payoutAt");
-  const sealedAt = validRewardDate(input.sealedAt, "sealedAt");
+  if (sealedAt.getTime() < payoutAt.getTime()) {
+    throw new DomainConflictError("El weekly no puede sellarse antes de su payout.");
+  }
   if (!input.lotteryEntropy) {
     throw new DomainConflictError("pending_entropy: falta el primer bloque BSC seguro posterior al payout.");
   }
@@ -833,6 +869,9 @@ export function calculateWeeklyPrize(input: {
       "pending_entropy: falta probar el primer bloque posterior al cutoff y su confirmacion.",
     );
   }
+  if (sealedAt.getTime() < confirmedAt.getTime()) {
+    throw new DomainConflictError("pending_entropy: el weekly no puede sellarse antes de confirmar la entropia.");
+  }
   const lotteryEntropy: WeeklyLotteryEntropy = {
     ...entropy,
     blockHash: entropy.blockHash.toLowerCase(),
@@ -841,6 +880,20 @@ export function calculateWeeklyPrize(input: {
     previousBlockTimestamp,
     confirmedAt,
   };
+  const gamePeriodStartsAt = new Date(periodMonday.getTime() + 14 * 60 * 60_000);
+  const gamePeriodEndsAt = new Date(gamePeriodStartsAt.getTime() + WEEK_MS);
+  for (const source of input.results) {
+    const canonical = canonicalWeeklyResult(source);
+    if (
+      canonical
+      && (
+        canonical.periodAnchorAt.getTime() < gamePeriodStartsAt.getTime()
+        || canonical.periodAnchorAt.getTime() >= gamePeriodEndsAt.getTime()
+      )
+    ) {
+      throw new DomainConflictError("La fuente weekly no pertenece al periodo que se esta cerrando.");
+    }
+  }
   const ranked = selectWeeklyBestResults(input.results);
   const winners: WeeklyPrizeWinner[] = [];
   const append = (
@@ -931,12 +984,24 @@ export function calculateWeeklyPrize(input: {
   }
   const poolReservations = [...poolReservationMap.entries()]
     .sort(([left], [right]) => compareRewardText(left, right))
-    .map(([pool, value]) => ({
-      pool: pool as "credit" | "cukie_original" | "cukie_second_plus",
-      amountRaw: formatRawAmount(value.amount),
-      ambassadorReserveRaw: formatRawAmount(mulDiv(value.amount, BigInt(500), BPS)),
-      sourceWinningGameIds: [...new Set(value.sourceWinningGameIds)].sort(compareRewardText),
-    }));
+    .map(([pool, value]) => {
+      const amountRaw = formatRawAmount(value.amount);
+      const ambassadorReserveRaw = formatRawAmount(mulDiv(value.amount, BigInt(500), BPS));
+      const amountTranches = splitIntoSevenTranches(amountRaw);
+      const ambassadorTranches = splitIntoSevenTranches(ambassadorReserveRaw);
+      return {
+        pool: pool as "credit" | "cukie_original" | "cukie_second_plus",
+        amountRaw,
+        ambassadorReserveRaw,
+        sourceWinningGameIds: [...new Set(value.sourceWinningGameIds)].sort(compareRewardText),
+        tranches: poolTrancheSchedule.map((scheduledAt, tranche) => ({
+          tranche,
+          scheduledAt,
+          amountRaw: amountTranches[tranche],
+          ambassadorReserveRaw: ambassadorTranches[tranche],
+        })),
+      };
+    });
   const ambassadorPayouts = winners.flatMap((winner) => {
     const ambassadorWallet = winner.sourceSnapshot.ambassadorSnapshot.walletNormalized;
     if (!ambassadorWallet || ambassadorWallet === winner.walletNormalized) return [];
@@ -973,16 +1038,6 @@ export function calculateWeeklyPrize(input: {
     ),
   };
   const lotteryEntropyHash = stableRewardHash({ periodId, lotteryEntropy });
-  const payoutMonday = new Date(Date.UTC(
-    payoutAt.getUTCFullYear(),
-    payoutAt.getUTCMonth(),
-    payoutAt.getUTCDate(),
-  ));
-  if (payoutMonday.getUTCDay() !== 1 || payoutAt.getUTCHours() !== 17) {
-    throw new DomainConflictError("El payout weekly debe sellarse un lunes a las 17:00 UTC.");
-  }
-  const poolTrancheSchedule = Array.from({ length: 7 }, (_, index) =>
-    new Date(payoutMonday.getTime() + (index + 1) * DAY_MS + 16 * 60 * 60_000));
   const allocationDrafts = new Map<string, Omit<RewardAccountingAllocation, "allocationId">>();
   const appendAllocation = (draft: Omit<RewardAccountingAllocation, "allocationId">) => {
     if (parseRawAmount(draft.amountRaw) === BigInt(0)) return;
@@ -1035,6 +1090,7 @@ export function calculateWeeklyPrize(input: {
   const payload = {
     periodId,
     ruleVersion,
+    ruleConfigHash,
     fundingMode: "reserved_no_mint" as const,
     sourceDailyAccountingIds,
     potRaw: formatRawAmount(pot),
@@ -1057,12 +1113,176 @@ export function calculateWeeklyPrize(input: {
     lotteryEntropyHash,
     payoutAt,
   };
-  return {
+  return assertWeeklyPrizeAccountingIntegrity({
     _id: `reward-weekly:${periodId}`,
     ...payload,
     payloadHash: stableRewardHash(payload),
     status: "sealed",
     sealedAt,
+  });
+}
+
+export function assertWeeklyPrizeAccountingIntegrity(
+  accounting: WeeklyPrizeAccounting,
+): WeeklyPrizeAccounting {
+  const periodId = validRewardText(accounting.periodId, "periodId");
+  validRewardText(accounting.ruleVersion, "ruleVersion");
+  canonicalEvidenceHash(accounting.ruleConfigHash, "ruleConfigHash");
+  const payoutAt = validRewardDate(accounting.payoutAt, "payoutAt");
+  const payoutMonday = new Date(Date.UTC(
+    payoutAt.getUTCFullYear(), payoutAt.getUTCMonth(), payoutAt.getUTCDate(),
+  ));
+  if (
+    payoutMonday.getUTCDay() !== 1
+    || payoutAt.getUTCHours() !== 17
+    || payoutAt.getUTCMinutes() !== 0
+    || payoutAt.getUTCSeconds() !== 0
+    || payoutAt.getUTCMilliseconds() !== 0
+  ) {
+    throw new DomainConflictError("El accounting weekly no contiene un payout canonico.");
+  }
+  const periodMonday = new Date(payoutMonday.getTime() - WEEK_MS);
+  if (getIsoWeekPeriodId(periodMonday) !== periodId) {
+    throw new DomainConflictError("El accounting weekly no coincide con su periodo ISO.");
+  }
+  const expectedSourceIds = Array.from({ length: 7 }, (_, index) =>
+    `reward-daily:${new Date(periodMonday.getTime() + index * DAY_MS).toISOString().slice(0, 10)}`);
+  if (
+    accounting.sourceDailyAccountingIds.length !== 7
+    || accounting.sourceDailyAccountingIds.some((id, index) => id !== expectedSourceIds[index])
+  ) {
+    throw new DomainConflictError("El accounting weekly no conserva sus siete cierres canonicos.");
+  }
+  const expectedSchedule = Array.from({ length: 7 }, (_, index) =>
+    new Date(payoutMonday.getTime() + (index + 1) * DAY_MS + 16 * 60 * 60_000));
+  if (
+    accounting.poolTrancheSchedule.length !== 7
+    || accounting.poolTrancheSchedule.some((scheduledAt, index) =>
+      validRewardDate(scheduledAt, `poolTrancheSchedule[${index}]`).getTime()
+        !== expectedSchedule[index].getTime())
+  ) {
+    throw new DomainConflictError("El accounting weekly no conserva el calendario de siete tramos.");
+  }
+  const reservationPools = new Set<string>();
+  for (const reservation of accounting.poolReservations) {
+    if (!["credit", "cukie_original", "cukie_second_plus"].includes(reservation.pool)) {
+      throw new DomainConflictError(`El pool weekly ${reservation.pool} no es canonico.`);
+    }
+    if (reservationPools.has(reservation.pool)) {
+      throw new DomainConflictError(`El pool weekly ${reservation.pool} esta duplicado.`);
+    }
+    reservationPools.add(reservation.pool);
+    const amount = canonicalRaw(reservation.amountRaw, `${reservation.pool}.amountRaw`);
+    const ambassador = canonicalRaw(
+      reservation.ambassadorReserveRaw,
+      `${reservation.pool}.ambassadorReserveRaw`,
+    );
+    if (
+      amount === BigInt(0)
+      || ambassador !== mulDiv(amount, BigInt(500), BPS)
+      || reservation.sourceWinningGameIds.length === 0
+      || new Set(reservation.sourceWinningGameIds).size !== reservation.sourceWinningGameIds.length
+      || reservation.sourceWinningGameIds.some((id, index) =>
+        validRewardText(id, `${reservation.pool}.sourceWinningGameIds[${index}]`) !== id)
+      || [...reservation.sourceWinningGameIds].sort(compareRewardText)
+        .some((id, index) => id !== reservation.sourceWinningGameIds[index])
+    ) {
+      throw new DomainConflictError(`La reserva weekly de ${reservation.pool} no es canonica.`);
+    }
+    if (reservation.tranches.length !== 7) {
+      throw new DomainConflictError(`El pool weekly ${reservation.pool} no contiene siete tramos.`);
+    }
+    const expectedAmountTranches = splitIntoSevenTranches(reservation.amountRaw);
+    const expectedAmbassadorTranches = splitIntoSevenTranches(reservation.ambassadorReserveRaw);
+    let trancheAmount = BigInt(0);
+    let trancheAmbassador = BigInt(0);
+    reservation.tranches.forEach((tranche, index) => {
+      if (
+        tranche.tranche !== index
+        || validRewardDate(tranche.scheduledAt, `${reservation.pool}.tranches[${index}].scheduledAt`)
+          .getTime() !== expectedSchedule[index].getTime()
+        || tranche.amountRaw !== expectedAmountTranches[index]
+        || tranche.ambassadorReserveRaw !== expectedAmbassadorTranches[index]
+      ) {
+        throw new DomainConflictError(`El tramo ${index} de ${reservation.pool} no es canonico.`);
+      }
+      trancheAmount += canonicalRaw(tranche.amountRaw, `${reservation.pool}.tranches[${index}].amountRaw`);
+      trancheAmbassador += canonicalRaw(
+        tranche.ambassadorReserveRaw,
+        `${reservation.pool}.tranches[${index}].ambassadorReserveRaw`,
+      );
+    });
+    if (trancheAmount !== amount || trancheAmbassador !== ambassador) {
+      throw new DomainConflictError(`Los siete tramos de ${reservation.pool} no conservan su reserva.`);
+    }
+  }
+  const poolReserved = sumRawAmounts(
+    accounting.poolReservations.map((reservation) => parseRawAmount(reservation.amountRaw)),
+  );
+  const ambassadorDeferred = sumRawAmounts(
+    accounting.poolReservations.map((reservation) =>
+      parseRawAmount(reservation.ambassadorReserveRaw)),
+  );
+  if (
+    poolReserved !== parseRawAmount(accounting.poolReservedRaw)
+    || ambassadorDeferred !== parseRawAmount(accounting.ambassadorDeferredRaw)
+    || parseRawAmount(accounting.allocatedRaw) + parseRawAmount(accounting.undistributed.totalRaw)
+      !== parseRawAmount(accounting.potRaw)
+    || parseRawAmount(accounting.ambassadorAllocatedRaw)
+      + ambassadorDeferred
+      + parseRawAmount(accounting.ambassadorUndistributed.totalRaw)
+      !== parseRawAmount(accounting.ambassadorReserveRaw)
+    || parseRawAmount(accounting.conservationRaw)
+      !== parseRawAmount(accounting.potRaw) + parseRawAmount(accounting.ambassadorReserveRaw)
+    || accounting.lotteryEntropyHash
+      !== stableRewardHash({ periodId, lotteryEntropy: accounting.lotteryEntropy })
+  ) {
+    throw new DomainConflictError("El accounting weekly no conserva sus reservas.");
+  }
+  if (
+    accounting._id !== `reward-weekly:${periodId}`
+    || accounting.status !== "sealed"
+    || accounting.fundingMode !== "reserved_no_mint"
+    || validRewardDate(accounting.sealedAt, "sealedAt").getTime()
+      < validRewardDate(accounting.lotteryEntropy.confirmedAt, "lotteryEntropy.confirmedAt").getTime()
+  ) {
+    throw new DomainConflictError("El accounting weekly no esta sellado de forma canonica.");
+  }
+  const { _id, payloadHash, status, sealedAt, ...payload } = accounting;
+  if (stableRewardHash(payload) !== payloadHash) {
+    throw new DomainConflictError("El accounting weekly almacenado diverge de su payload sellado.");
+  }
+  return accounting;
+}
+
+export function selectStoredWeeklyPoolTranche(
+  accounting: WeeklyPrizeAccounting,
+  scheduledAt: Date,
+): PriorWeeklyPoolTranche | null {
+  const sealed = assertWeeklyPrizeAccountingIntegrity(accounting);
+  const canonicalScheduledAt = validRewardDate(scheduledAt, "scheduledAt");
+  const tranche = sealed.poolTrancheSchedule.findIndex((at) =>
+    at.getTime() === canonicalScheduledAt.getTime());
+  if (tranche < 0) return null;
+  const value = (pool: "credit" | "cukie_original" | "cukie_second_plus") => {
+    const row = sealed.poolReservations.find((reservation) => reservation.pool === pool);
+    const stored = row?.tranches[tranche];
+    return {
+      amount: stored?.amountRaw ?? "0",
+      ambassador: stored?.ambassadorReserveRaw ?? "0",
+    };
+  };
+  const credit = value("credit");
+  const original = value("cukie_original");
+  const second = value("cukie_second_plus");
+  return {
+    weeklyAccountingId: sealed._id,
+    creditPoolRaw: credit.amount,
+    creditPoolAmbassadorRaw: credit.ambassador,
+    cukiePoolOriginalRaw: original.amount,
+    cukiePoolOriginalAmbassadorRaw: original.ambassador,
+    cukiePoolSecondPlusRaw: second.amount,
+    cukiePoolSecondPlusAmbassadorRaw: second.ambassador,
   };
 }
 
