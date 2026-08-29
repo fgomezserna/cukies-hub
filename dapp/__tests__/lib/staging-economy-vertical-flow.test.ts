@@ -50,6 +50,8 @@ import {
 
 const MASTER = `0x${"1".repeat(40)}`;
 const BORROWER = `0x${"2".repeat(40)}`;
+const MASTER_WITHOUT_OWN_CUKIE = `0x${"3".repeat(40)}`;
+const BORROWER_WITHOUT_OWN_CUKIE = `0x${"4".repeat(40)}`;
 const ACTIVE_FROM = new Date("2026-08-10T00:00:00.000Z");
 const CUTOFF = new Date("2026-08-24T14:00:00.000Z");
 const CREDIT_VERSION = "credits-staging-test-v4";
@@ -58,12 +60,13 @@ const REWARD_VERSION = "rewards-staging-test-v4";
 const SESSION_TTL_MS = 10 * 60 * 1_000;
 const TREASURE_HUNT_SHIFT_MS = 14 * 60 * 60 * 1_000;
 
-function nftMasterSlot(ordinal: number): CukieMasterSlot {
-  const slotId = `${MASTER.toLowerCase()}:nft:${ordinal}`;
+function nftMasterSlot(ordinal: number, walletAddress = MASTER): CukieMasterSlot {
+  const walletNormalized = walletAddress.toLowerCase();
+  const slotId = `${walletNormalized}:nft:${ordinal}`;
   return {
     _id: slotId,
-    walletAddress: MASTER,
-    walletNormalized: MASTER.toLowerCase(),
+    walletAddress,
+    walletNormalized,
     route: "nft",
     ordinal,
     eligibilityEpoch: 1,
@@ -287,6 +290,106 @@ class MemoryOwnCukieGamePort implements GameCukieResourcePort {
   }
 }
 
+type ScenarioCukieSource = "own" | "pool";
+
+type ScenarioCukieReservation = {
+  reservationId: string;
+  sessionId: string;
+  walletNormalized: string;
+  source: ScenarioCukieSource;
+  idempotencyKey: string;
+  evidenceHash: string;
+  status: "active" | "consumed" | "released";
+};
+
+class MemoryScenarioCukieGamePort implements GameCukieResourcePort {
+  readonly assignments = new Map<string, ScenarioCukieReservation>();
+
+  constructor(private readonly ownCukieWallets: ReadonlySet<string>) {}
+
+  async reserve(input: ReserveGameCukieInput) {
+    const replay = [...this.assignments.values()].find(
+      (assignment) => assignment.idempotencyKey === input.idempotencyKey,
+    );
+    if (replay) {
+      return {
+        reservationId: replay.reservationId,
+        evidenceHash: replay.evidenceHash,
+      };
+    }
+    if (
+      input.role !== "own_or_pool"
+      || input.selectionPolicy !== "owned_bsc_quota_then_pool_v1"
+      || input.assetIds.length !== 0
+    ) {
+      throw new Error("La selección de Cukie debe ser server-side y own-then-pool.");
+    }
+    const source: ScenarioCukieSource = this.ownCukieWallets.has(
+      input.walletNormalized,
+    )
+      ? "own"
+      : "pool";
+    const reservationId = `scenario-cukie:${source}:${input.sessionId}`;
+    const evidenceHash = stableGameEconomyHash({
+      kind: "scenario-cukie-reservation",
+      reservationId,
+      sessionId: input.sessionId,
+      walletNormalized: input.walletNormalized,
+      source,
+      requestHash: input.requestHash,
+      expiresAt: input.expiresAt,
+    });
+    this.assignments.set(reservationId, {
+      reservationId,
+      sessionId: input.sessionId,
+      walletNormalized: input.walletNormalized,
+      source,
+      idempotencyKey: input.idempotencyKey,
+      evidenceHash,
+      status: "active",
+    });
+    return { reservationId, evidenceHash };
+  }
+
+  private finish(
+    expectedOutcome: "consumed" | "released",
+    input: FinishGameResourceInput,
+  ) {
+    const assignment = input.reservationId
+      ? this.assignments.get(input.reservationId)
+      : [...this.assignments.values()].find(
+          (item) => item.idempotencyKey === input.reservationIdempotencyKey,
+        );
+    if (!assignment || assignment.sessionId !== input.sessionId) {
+      if (expectedOutcome === "released") {
+        return { outcome: expectedOutcome, reservation: null } as const;
+      }
+      throw new Error("No existe la asignación de Cukie del escenario.");
+    }
+    if (assignment.status !== expectedOutcome) {
+      if (assignment.status !== "active") {
+        throw new Error(`La asignación ya terminó como ${assignment.status}.`);
+      }
+      assignment.status = expectedOutcome;
+    }
+    return {
+      outcome: expectedOutcome,
+      reservation: {
+        reservationId: assignment.reservationId,
+        evidenceHash: assignment.evidenceHash,
+      },
+    } as const;
+  }
+
+  async consume(input: FinishGameResourceInput) {
+    return this.finish("consumed", input);
+  }
+
+  async release(input: FinishGameResourceInput) {
+    return this.finish("released", input);
+  }
+}
+
 async function openNftCreditRun(input: {
   repository: MemoryCompetitionCreditRepository;
   service: ReturnType<typeof createCompetitionCreditService>;
@@ -384,6 +487,177 @@ function rewardPeriod(session: GameEconomySession) {
 }
 
 describe("staging v4 Cukie Master -> credits -> game -> rewards", () => {
+  it("liquida una sola vez las cuatro combinaciones propias y prestadas", async () => {
+    const creditRule = testCompetitionCreditRule({
+      _id: `competition_credits:${CREDIT_VERSION}`,
+      version: CREDIT_VERSION,
+      activeFrom: ACTIVE_FROM,
+      cutoffHourUtc: 14,
+      cutoffMinuteUtc: 0,
+      settlementHourUtc: 14,
+      settlementMinuteUtc: 0,
+      expectedBscChainId: 97,
+      maxSnapshotSlots: 5_000,
+      costs: [{ costCode: "treasure-hunt:start", credits: 10, active: true }],
+    });
+    const masterSlots = [
+      nftMasterSlot(1, MASTER),
+      nftMasterSlot(1, MASTER_WITHOUT_OWN_CUKIE),
+    ];
+    const creditRepository = new MemoryCompetitionCreditRepository({
+      rule: creditRule,
+      slots: masterSlots,
+      watermark: null,
+    });
+    creditRepository.state.sourceHealth.observedThrough = CUTOFF;
+    creditRepository.state.sourceHealth.checkedAt = CUTOFF;
+    const creditService = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(creditRepository),
+    );
+    await creditService.configurePool({
+      walletAddress: MASTER,
+      slotId: masterSlots[0]._id,
+      poolCreditsPerSlot: 20,
+      idempotencyKey: "four-combinations-pool-20",
+      now: new Date(CUTOFF.getTime() - 10 * 60 * 1_000),
+    });
+    await openNftCreditRun({ repository: creditRepository, service: creditService });
+
+    const rewardRule = stagingRewardRule();
+    const gameRule = testGameEconomyRule({
+      gameId: "treasure-hunt",
+      version: GAME_VERSION,
+      activeFrom: ACTIVE_FROM,
+      sessionTtlMs: SESSION_TTL_MS,
+      credit: {
+        required: true,
+        consumeOnSettle: true,
+        costCode: "treasure-hunt:start",
+        creditRuleVersion: creditRule.version,
+        creditRuleConfigHash: creditRule.configHash,
+      },
+      reward: {
+        rewardRuleVersion: rewardRule.version,
+        rewardRuleConfigHash: rewardRule.configHash,
+        maxConvertibleRaw: "7500000000000000000",
+      },
+      cukie: {
+        required: true,
+        consumeOnSettle: true,
+        minAssets: 0,
+        maxAssets: 0,
+        role: "own_or_pool",
+        selectionPolicy: "owned_bsc_quota_then_pool_v1",
+      },
+      calculation: {
+        scoreCapRaw: "3000",
+        weightNumeratorRaw: "2500000000000000",
+        weightDenominatorRaw: "1",
+      },
+    });
+    const gameRepository = new MemoryGameEconomyRepository({ rules: [gameRule] });
+    const evidence = new MemoryGameEvidencePort();
+    const cukiePort = new MemoryScenarioCukieGamePort(
+      new Set([MASTER.toLowerCase(), BORROWER.toLowerCase()]),
+    );
+    const gameService = createGameEconomyService(
+      createMemoryGameEconomyRunner(gameRepository),
+      {
+        credits: createCreditGamePort({
+          repository: creditRepository,
+          service: creditService,
+        }),
+        cukies: cukiePort,
+        evidence,
+      },
+    );
+
+    const scenarios = [
+      {
+        wallet: MASTER,
+        suffix: "own-credit-own-cukie",
+        creditSource: "own",
+        cukieSource: "own",
+      },
+      {
+        wallet: MASTER_WITHOUT_OWN_CUKIE,
+        suffix: "own-credit-pool-cukie",
+        creditSource: "own",
+        cukieSource: "pool",
+      },
+      {
+        wallet: BORROWER,
+        suffix: "pool-credit-own-cukie",
+        creditSource: "pool",
+        cukieSource: "own",
+      },
+      {
+        wallet: BORROWER_WITHOUT_OWN_CUKIE,
+        suffix: "pool-credit-pool-cukie",
+        creditSource: "pool",
+        cukieSource: "pool",
+      },
+    ] as const;
+    const results = [];
+    for (const [index, scenario] of scenarios.entries()) {
+      const result = await settleTreasureHunt({
+        service: gameService,
+        evidence,
+        wallet: scenario.wallet,
+        suffix: scenario.suffix,
+        scoreRaw: String(1_000 + index * 100),
+        now: new Date(CUTOFF.getTime() + (index + 1) * 60_000),
+      });
+      results.push(result);
+      const credit = creditRepository.state.reservations.find(
+        (reservation) => reservation.sessionId === result.settled.sessionId,
+      );
+      const cukie = [...cukiePort.assignments.values()].find(
+        (assignment) => assignment.sessionId === result.settled.sessionId,
+      );
+      expect(credit).toMatchObject({
+        bucket: scenario.creditSource,
+        status: "consumed",
+        amountCredits: 10,
+      });
+      expect(cukie).toMatchObject({
+        source: scenario.cukieSource,
+        status: "consumed",
+      });
+      expect(result.settled).toMatchObject({
+        status: "settled",
+        credit: { state: "consumed" },
+        cukie: { state: "consumed" },
+      });
+    }
+
+    expect(
+      creditRepository.state.ledger.filter((entry) => entry.operation === "spend"),
+    ).toHaveLength(4);
+    expect(new Set(
+      creditRepository.state.ledger
+        .filter((entry) => entry.operation === "spend")
+        .map((entry) => entry.idempotencyKey),
+    ).size).toBe(4);
+    expect(creditRepository.state.poolPeriods).toContainEqual(
+      expect.objectContaining({ availableCredits: 0, spentCredits: 20 }),
+    );
+    expect([...cukiePort.assignments.values()]).toHaveLength(4);
+
+    const replayTarget = results[3];
+    const replay = await gameService.settleSession({
+      sessionId: replayTarget.settled.sessionId,
+      idempotencyKey: `settle-${scenarios[3].suffix}`,
+      expectedRevision: replayTarget.validated.revision,
+      now: new Date(CUTOFF.getTime() + 10 * 60_000),
+    });
+    expect(replay).toEqual(replayTarget.settled);
+    expect(
+      creditRepository.state.ledger.filter((entry) => entry.operation === "spend"),
+    ).toHaveLength(4);
+    expect([...cukiePort.assignments.values()]).toHaveLength(4);
+  });
+
   it("usa créditos propios y del pool una sola vez y materializa rewards sin duplicados", async () => {
     const creditRule = testCompetitionCreditRule({
       _id: `competition_credits:${CREDIT_VERSION}`,
