@@ -390,6 +390,24 @@ describe('Treasure Hunt competition persistence integrity', () => {
     );
   });
 
+  it('excludes audited entitlement restorations from the consumed-attempt count', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(0);
+    const repository = new MongoCompetitionRepository(
+      async () => databaseWith({ presale_game_attempts: { countDocuments } }),
+      aliasSecret,
+    );
+
+    await expect(repository.countAttempts(
+      campaign.campaignId,
+      '0x1111111111111111111111111111111111111111',
+    )).resolves.toBe(0);
+    expect(countDocuments).toHaveBeenCalledWith({
+      campaignId: campaign.campaignId,
+      walletAddress: '0x1111111111111111111111111111111111111111',
+      entitlementRestoredAt: { $exists: false },
+    });
+  });
+
   it('adjudicates review with a single immutable audit CAS', async () => {
     const findOneAndUpdate = jest.fn().mockResolvedValue({
       attemptId: 'attempt-1',

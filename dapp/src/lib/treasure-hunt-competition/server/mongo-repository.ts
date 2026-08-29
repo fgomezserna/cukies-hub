@@ -514,7 +514,11 @@ export class MongoCompetitionRepository implements CompetitionRepository {
   }
 
   async countAttempts(campaignId: string, walletAddress: string) {
-    return (await this.attempts()).countDocuments({ campaignId, walletAddress });
+    return (await this.attempts()).countDocuments({
+      campaignId,
+      walletAddress,
+      entitlementRestoredAt: { $exists: false },
+    });
   }
 
   async listValidAttempts(
