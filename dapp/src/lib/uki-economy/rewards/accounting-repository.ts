@@ -583,17 +583,29 @@ export class RewardAccountingService {
   closeDailyFromReservedSources(input: {
     dayId: string;
     ruleVersion: string;
-    destinations: DailyRewardAccounting["destinations"];
     sealedAt: Date;
   }) {
     return this.runTransaction(async (repository) => {
       const current = await repository.findDaily(input.dayId);
       if (current) return current;
-      const { dailyBucketsFromSources, sealDailyRewardAccounting } = await import("./accounting");
+      const startsAt = new Date(`${input.dayId}T14:00:00.000Z`);
+      const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
+      if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.dayId}.`);
+      const {
+        assertCurrentUndistributedRule,
+        dailyBucketsFromSources,
+        sealDailyRewardAccounting,
+      } = await import("./accounting");
+      const policy = assertCurrentUndistributedRule(rule);
       const sources = dailyBucketsFromSources(
         await repository.listDailyRewardSourceLines(input.dayId),
       );
-      const accounting = sealDailyRewardAccounting({ ...input, ...sources });
+      const accounting = sealDailyRewardAccounting({
+        ...input,
+        ...sources,
+        ruleConfigHash: policy.ruleConfigHash,
+        destinations: policy.destinations,
+      });
       await repository.insertDaily(accounting);
       return accounting;
     });
@@ -659,12 +671,6 @@ export class RewardAccountingService {
         cukieSecondPlusParticipants: second,
         ambassadorByWallet,
         priorWeekly: input.includePriorWeekly ? priorWeekly ?? undefined : undefined,
-        destinations: {
-          treasury: rule.destinations.treasury,
-          marketingDevelopment:
-            rule.destinations.marketingDevelopment ?? rule.destinations.marketing,
-          supplyReduction: rule.destinations.supplyReduction,
-        },
         sealedAt: input.now,
       });
       if (accounting.capacityMaterializedRaw !== capacity.capacityMaterializedRaw) {
@@ -755,22 +761,18 @@ export class RewardAccountingService {
       const resolvedEntropy = await repository.findFirstSafeLotteryEntropy(payoutAt);
       const entropy = resolvedEntropy ?? current?.lotteryEntropy;
       const results = await repository.listEligibleWeeklyGameSources(startsAt, endsAt);
-      const { calculateWeeklyPrize } = await import("./accounting");
+      const { assertCurrentUndistributedRule, calculateWeeklyPrize } = await import("./accounting");
+      const policy = assertCurrentUndistributedRule(rule);
       const accounting = calculateWeeklyPrize({
         periodId: input.periodId,
-        ruleVersion: input.ruleVersion,
-        ruleConfigHash: rule.configHash,
+        ruleVersion: policy.ruleVersion,
+        ruleConfigHash: policy.ruleConfigHash,
         potRaw,
         ambassadorReserveRaw,
         sourceDailyAccountingIds: daily.map((row) => row._id),
         results,
         lotteryEntropy: entropy ?? undefined,
-        destinations: {
-          treasury: rule.destinations.treasury,
-          marketingDevelopment:
-            rule.destinations.marketingDevelopment ?? rule.destinations.marketing,
-          supplyReduction: rule.destinations.supplyReduction,
-        },
+        destinations: policy.destinations,
         payoutAt,
         sealedAt: current?.sealedAt ?? now,
       });

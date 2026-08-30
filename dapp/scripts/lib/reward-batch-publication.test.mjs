@@ -54,29 +54,73 @@ function input() {
     allocation(1, 'player', PLAYER, '20'),
     allocation(2, 'ambassador_ordinary', PLAYER, '5'),
     allocation(3, 'credit_pool', PLAYER_TWO, '10'),
-    allocation(4, 'treasury', TREASURY, '40'),
-    allocation(5, 'marketing_development', MARKETING, '15'),
-    allocation(6, 'supply_reduction', REDUCTION, '10'),
+    allocation(4, 'treasury', TREASURY, '52'),
+    allocation(5, 'marketing_development', MARKETING, '6'),
+    allocation(6, 'supply_reduction', REDUCTION, '7'),
   ];
+  const sealedAllocations = allocations.map((entry) => ({
+    allocationId: entry.allocationId,
+    walletNormalized: entry.walletNormalized,
+    category: entry.category,
+    amountRaw: entry.amountRaw,
+    fundingMode: entry.fundingMode,
+    sourceIds: entry.sourceIds,
+  }));
+  const accountingPayload = {
+    dayId: '2026-08-19',
+    ruleVersion: 'rewards-staging-test-v3',
+    ruleConfigHash: 'b'.repeat(64),
+    sourceIds: ['source-a'],
+    sourceSetHash: 'c'.repeat(64),
+    sourceReservedRaw: '35',
+    capacityMaterializedRaw: '65',
+    priorReservedInflowRaw: '0',
+    topupRaw: '0',
+    buckets: {
+      playersRaw: '20',
+      creditPoolRaw: '10',
+      cukiePoolRaw: '0',
+      ambassadorOrdinaryRaw: '5',
+      weeklyPrizeRaw: '0',
+      ambassadorWeeklyRaw: '0',
+    },
+    undistributed: {
+      totalRaw: '65',
+      treasuryRaw: '52',
+      marketingDevelopmentRaw: '6',
+      supplyReductionRaw: '7',
+    },
+    priorReservedUndistributed: {
+      totalRaw: '0',
+      treasuryRaw: '0',
+      marketingDevelopmentRaw: '0',
+      supplyReductionRaw: '0',
+    },
+    destinations: {
+      treasury: TREASURY,
+      marketingDevelopment: MARKETING,
+      supplyReduction: REDUCTION,
+    },
+    allocations: sealedAllocations,
+  };
   return {
     accountingId: 'reward-daily:2026-08-19',
     accounting: {
       _id: 'reward-daily:2026-08-19',
-      ruleVersion: 'rewards-staging-test-v3',
-      payloadHash: 'a'.repeat(64),
+      ...accountingPayload,
+      payloadHash: stableRewardPublicationHash(accountingPayload),
       status: 'sealed',
-      allocations: allocations.map((entry) => ({
-        allocationId: entry.allocationId,
-        walletNormalized: entry.walletNormalized,
-        category: entry.category,
-        amountRaw: entry.amountRaw,
-        fundingMode: entry.fundingMode,
-        sourceIds: entry.sourceIds,
-      })),
     },
     rule: {
       version: 'rewards-staging-test-v3',
       configHash: 'b'.repeat(64),
+      undistributedBps: {
+        treasury: 8_000,
+        marketing: 0,
+        development: 0,
+        marketingDevelopment: 1_000,
+        supplyReduction: 1_000,
+      },
       destinations: {
         treasury: TREASURY,
         marketingDevelopment: MARKETING,
@@ -94,19 +138,21 @@ function input() {
 test('materializa solo beneficiarios como claims y separa transferencias/quema', () => {
   const artifacts = buildRewardPublicationArtifacts(input());
   assert.equal(artifacts.plan.claimableTotalRaw, '35');
-  assert.equal(artifacts.plan.treasuryRaw, '40');
-  assert.equal(artifacts.plan.marketingDevelopmentRaw, '15');
-  assert.equal(artifacts.plan.supplyReductionRaw, '10');
+  assert.equal(artifacts.plan.treasuryRaw, '52');
+  assert.equal(artifacts.plan.marketingDevelopmentRaw, '6');
+  assert.equal(artifacts.plan.supplyReductionRaw, '7');
   assert.equal(artifacts.plan.totalRaw, '100');
   assert.equal(artifacts.proofs.length, 2);
+  assert.equal(artifacts.proofs.some(({ walletAddress }) => [TREASURY, MARKETING, REDUCTION]
+    .includes(walletAddress.toLowerCase())), false);
   assert.deepEqual(
     artifacts.plan.operations.map(({ kind, amountRaw, status }) => ({ kind, amountRaw, status })),
     [
       { kind: 'fund_distributor', amountRaw: '35', status: 'pending' },
       { kind: 'publish_batch', amountRaw: '35', status: 'pending' },
-      { kind: 'transfer_treasury', amountRaw: '40', status: 'pending' },
-      { kind: 'transfer_marketing_development', amountRaw: '15', status: 'pending' },
-      { kind: 'burn_supply_reduction', amountRaw: '10', status: 'pending' },
+      { kind: 'transfer_treasury', amountRaw: '52', status: 'pending' },
+      { kind: 'transfer_marketing_development', amountRaw: '6', status: 'pending' },
+      { kind: 'burn_supply_reduction', amountRaw: '7', status: 'pending' },
     ],
   );
 });
@@ -171,7 +217,7 @@ test('rechaza una allocation manipulada o un destino de sistema incorrecto', () 
   assert.throws(() => buildRewardPublicationArtifacts(tampered), /no es canonica/);
 
   const wrongDestination = input();
-  wrongDestination.allocations[3] = allocation(4, 'treasury', PLAYER, '40');
+  wrongDestination.allocations[3] = allocation(4, 'treasury', PLAYER, '52');
   wrongDestination.accounting.allocations[3] = {
     allocationId: wrongDestination.allocations[3].allocationId,
     walletNormalized: wrongDestination.allocations[3].walletNormalized,
@@ -202,4 +248,57 @@ test('rechaza una allocation extra aunque su documento tenga un hash valido', ()
     sourceIds: unknown.allocations[0].sourceIds,
   };
   assert.throws(() => buildRewardPublicationArtifacts(unknown), /no es canonica/);
+});
+
+test('falla cerrado si cambia el configHash, la politica o un solo wei del reparto', () => {
+  const wrongConfigHash = input();
+  wrongConfigHash.accounting.ruleConfigHash = 'c'.repeat(64);
+  assert.throws(
+    () => buildRewardPublicationArtifacts(wrongConfigHash),
+    /configHash exacto/,
+  );
+
+  const historicalPolicy = input();
+  historicalPolicy.rule.undistributedBps = {
+    treasury: 8_000,
+    marketing: 500,
+    development: 500,
+    supplyReduction: 1_000,
+  };
+  assert.throws(
+    () => buildRewardPublicationArtifacts(historicalPolicy),
+    /80\/10\/10/,
+  );
+
+  const tamperedSplit = input();
+  tamperedSplit.accounting.undistributed = {
+    ...tamperedSplit.accounting.undistributed,
+    treasuryRaw: '51',
+    supplyReductionRaw: '8',
+  };
+  assert.throws(
+    () => buildRewardPublicationArtifacts(tamperedSplit),
+    /ultimo wei/,
+  );
+
+  const tamperedPayload = input();
+  tamperedPayload.accounting.topupRaw = '1';
+  assert.throws(
+    () => buildRewardPublicationArtifacts(tamperedPayload),
+    /payloadHash/,
+  );
+
+  const wrongSealedDestination = input();
+  wrongSealedDestination.accounting.destinations.treasury = PLAYER;
+  assert.throws(
+    () => buildRewardPublicationArtifacts(wrongSealedDestination),
+    /destinos sellados/,
+  );
+
+  const sharedRuleDestination = input();
+  sharedRuleDestination.rule.destinations.marketingDevelopment = TREASURY;
+  assert.throws(
+    () => buildRewardPublicationArtifacts(sharedRuleDestination),
+    /deben ser distintos/,
+  );
 });

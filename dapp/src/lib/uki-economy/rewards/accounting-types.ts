@@ -27,6 +27,7 @@ export type DailyRewardAccounting = {
   _id: string;
   dayId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   sourceIds: string[];
   sourceSetHash: string;
   sourceReservedRaw: string;
