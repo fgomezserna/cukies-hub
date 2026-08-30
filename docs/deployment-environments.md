@@ -207,10 +207,10 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
 | `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
 | `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | Vacío hasta desplegar y verificar el contrato nuevo en chain `97` | Marketplace UKI mainnet pendiente | Debe coincidir con `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS`; vacío mantiene la API cerrada. |
-| `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | Vacío hasta verificar un pool testnet | Pair mainnet oficial | Si está vacío, la home no anuncia ni enlaza un pool. |
+| `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | `0x8fa397B4E1DED911161f13C128DF369cE9a95B3A` | Pair mainnet oficial | Pair ASM/UKI de Pancake V2 verificado en chain 97; el guard rechaza cualquier otro. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS` | Vacío hasta verificar un locker testnet | Locker mainnet oficial | Si está vacío, la home no anuncia ni enlaza liquidez bloqueada. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL` | Vacío sin locker testnet | Fecha UTC aprobada | Es solo texto; exige un locker configurado para mostrarse. |
-| `NEXT_PUBLIC_UKI_SWAP_URL` | Vacío salvo URL verificada con `chain=bscTestnet` | Opcional; mainnet se construye con ASM/UKI | Stage nunca genera automáticamente una compra: sin pool confirmado, el CTA queda deshabilitado. |
+| `NEXT_PUBLIC_UKI_SWAP_URL` | `https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c` | Opcional; mainnet se construye con ASM/UKI | Stage habilita solo la ruta directa ASM/UKI y exige el pair verificado. BNB y USDT siguen deshabilitados hasta que el verificador demuestre una ruta. |
 | `NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Colección mainnet pendiente | Colección ERC-721 V2 custodiable de staging. |
 | `NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault mainnet pendiente | Custodia NFT para la ruta Cukie Master. |
 | `NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | Vault mainnet pendiente | Custodia NFT para el Cukie Pool. |

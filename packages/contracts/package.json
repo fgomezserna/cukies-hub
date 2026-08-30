@@ -18,6 +18,7 @@
     "deploy:testnet:staking-rewards": "hardhat run scripts/deploy-staking-rewards.testnet.cjs --network bscTestnet",
     "rehearse:testnet:liquidity-locker": "hardhat run scripts/rehearse-liquidity-locker.testnet.cjs --network bscTestnet",
     "complete:testnet:liquidity-locker": "hardhat run scripts/complete-liquidity-locker-rehearsal.testnet.cjs --network bscTestnet",
+    "verify:testnet:pancake-liquidity": "hardhat run --no-compile scripts/verify-pancake-liquidity.testnet.cjs --network bscTestnet",
     "preflight:mainnet:uki-launch": "hardhat run scripts/preflight-mainnet-uki-launch.cjs --network bsc",
     "deploy:mainnet:staking": "hardhat run scripts/deploy-mainnet-staking.cjs --network bsc",
     "deploy:mainnet:liquidity-locker": "hardhat run scripts/deploy-mainnet-liquidity-locker.cjs --network bsc",

@@ -9,6 +9,9 @@ export const STAGING_TARGET = Object.freeze({
   coolifyResourceUuid: 'u4s804o4wwcckowgk0woo4wg',
   chainId: '97',
   blockExplorerBaseUrl: 'https://testnet.bscscan.com',
+  asmTokenAddress: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
+  ukiTokenAddress: '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+  liquidityPairAddress: '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A',
   databaseName: 'cukies-hub-staging',
   legacyDatabaseName: 'cukies-legacy-staging',
   indexerDatabaseName: 'cukieshub-new-staging',
@@ -93,6 +96,10 @@ function requireSafeStagingSwapUrl(environment, failures) {
     if (
       url.protocol !== 'https:'
       || url.origin !== 'https://pancakeswap.finance'
+      || url.pathname !== '/swap'
+      || url.username
+      || url.password
+      || url.hash
       || url.searchParams.get('chain') !== 'bscTestnet'
     ) {
       failures.push('NEXT_PUBLIC_UKI_SWAP_URL must target PancakeSwap BSC Testnet');
@@ -174,6 +181,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
   let cardWorkerMongoDatabaseName = null;
   let authHost = null;
   let blockExplorerBaseUrl = null;
+  let liquidityPairAddress = null;
   let swapUrl = null;
   let ukiMarketplaceAddress = null;
 
@@ -189,6 +197,24 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
       environment,
       'NEXT_PUBLIC_BSCSCAN_BASE_URL',
       STAGING_TARGET.blockExplorerBaseUrl,
+      failures,
+    );
+    requireExact(
+      environment,
+      'NEXT_PUBLIC_ASM_TOKEN_ADDRESS',
+      STAGING_TARGET.asmTokenAddress,
+      failures,
+    );
+    requireExact(
+      environment,
+      'NEXT_PUBLIC_UKI_TOKEN_ADDRESS',
+      STAGING_TARGET.ukiTokenAddress,
+      failures,
+    );
+    liquidityPairAddress = requireExact(
+      environment,
+      'NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS',
+      STAGING_TARGET.liquidityPairAddress,
       failures,
     );
     swapUrl = requireSafeStagingSwapUrl(environment, failures);
@@ -273,6 +299,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     cardWorkerMongoDatabaseName,
     authHost,
     blockExplorerBaseUrl,
+    liquidityPairAddress,
     swapUrl,
     ukiMarketplaceAddress,
   };
