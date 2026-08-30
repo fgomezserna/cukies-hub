@@ -6,6 +6,7 @@ import { getIsoWeekPeriodId } from "../periods";
 import {
   type CukiePoolCandidate,
   type CukiePoolEligibilityResult,
+  type DailyAmbassadorSourceSnapshot,
   type DailyRewardAccounting,
   type DailyRewardBuckets,
   type DailyRewardSourceLine,
@@ -340,7 +341,7 @@ export function calculateDailyRewardSettlement(input: {
   creditContributors: readonly RewardAccountingParticipant[];
   cukieOriginalParticipants: readonly CukieRewardAccountingParticipant[];
   cukieSecondPlusParticipants: readonly CukieRewardAccountingParticipant[];
-  ambassadorByWallet?: Readonly<Record<string, string | null>>;
+  ambassadorBySource?: Readonly<Record<string, DailyAmbassadorSourceSnapshot>>;
   priorWeekly?: PriorWeeklyPoolTranche;
   sealedAt: Date;
 }) {
@@ -392,20 +393,17 @@ export function calculateDailyRewardSettlement(input: {
     "prior.cukiePoolSecondPlusAmbassadorRaw",
   );
 
-  const ambassadorByWallet = new Map<string, string | null>();
+  const ambassadorByParticipantWallet = new Map<string, string | null>();
   const addAmbassador = (walletInput: string, ambassadorInput: string | null) => {
     const wallet = validRewardWallet(walletInput);
     const ambassador = ambassadorInput ? validRewardWallet(ambassadorInput) : null;
     if (ambassador === wallet) throw new DomainConflictError("La autorreferencia no genera comision.");
-    const current = ambassadorByWallet.get(wallet);
+    const current = ambassadorByParticipantWallet.get(wallet);
     if (current !== undefined && current !== ambassador) {
       throw new DomainConflictError(`Snapshot ambassador contradictorio para ${wallet}.`);
     }
-    ambassadorByWallet.set(wallet, ambassador);
+    ambassadorByParticipantWallet.set(wallet, ambassador);
   };
-  for (const [wallet, ambassador] of Object.entries(input.ambassadorByWallet ?? {})) {
-    addAmbassador(wallet, ambassador);
-  }
   for (const participant of [
     ...input.creditContributors,
     ...input.cukieOriginalParticipants,
@@ -508,15 +506,56 @@ export function calculateDailyRewardSettlement(input: {
         .sort(compareRewardText),
     });
   };
+  let ordinaryCommission = BigInt(0);
   for (const line of input.sourceLines) {
     for (const allocation of line.allocations.filter((entry) => entry.category === "player")) {
+      const snapshot = input.ambassadorBySource?.[line.sourceId];
+      if (!snapshot) {
+        throw new DomainConflictError(
+          `Falta el snapshot ambassador de la fuente ${line.sourceId}.`,
+        );
+      }
+      const playerWallet = validRewardWallet(allocation.walletNormalized);
+      const snapshotWallet = validRewardWallet(
+        snapshot.walletNormalized,
+        "ambassadorBySource.walletNormalized",
+      );
+      const ambassador = snapshot.ambassadorWalletNormalized
+        ? validRewardWallet(
+            snapshot.ambassadorWalletNormalized,
+            "ambassadorBySource.ambassadorWalletNormalized",
+          )
+        : null;
+      if (snapshotWallet !== playerWallet) {
+        throw new DomainConflictError(
+          `El snapshot ambassador de ${line.sourceId} pertenece a otra wallet.`,
+        );
+      }
+      if (ambassador === playerWallet) {
+        throw new DomainConflictError("La autorreferencia no genera comision.");
+      }
       append({
-        walletNormalized: allocation.walletNormalized,
+        walletNormalized: playerWallet,
         category: "player",
         amountRaw: allocation.amountRaw,
         fundingMode: "daily_emission",
         sourceIds: [line.sourceId],
       });
+      if (ambassador) {
+        const commission = mulDiv(
+          canonicalRaw(allocation.amountRaw, "player.amountRaw"),
+          BigInt(500),
+          BPS,
+        );
+        ordinaryCommission += commission;
+        append({
+          walletNormalized: ambassador,
+          category: "ambassador_ordinary",
+          amountRaw: formatRawAmount(commission),
+          fundingMode: "daily_emission",
+          sourceIds: [line.sourceId],
+        });
+      }
     }
   }
   const appendMap = (
@@ -544,17 +583,16 @@ export function calculateDailyRewardSettlement(input: {
   const addBeneficiary = (target: Map<string, bigint>, wallet: string, amount: bigint) =>
     target.set(wallet, (target.get(wallet) ?? BigInt(0)) + amount);
   for (const draft of drafts.values()) {
-    if (!["player", "credit_pool", "cukie_pool_original", "cukie_pool_second_plus"].includes(draft.category)) continue;
+    if (!["credit_pool", "cukie_pool_original", "cukie_pool_second_plus"].includes(draft.category)) continue;
     addBeneficiary(
       draft.fundingMode === "daily_emission" ? ordinaryBeneficiary : priorBeneficiary,
       draft.walletNormalized,
       parseRawAmount(draft.amountRaw),
     );
   }
-  let ordinaryCommission = BigInt(0);
   let weeklyCommission = BigInt(0);
   for (const [wallet, amount] of ordinaryBeneficiary) {
-    const ambassador = ambassadorByWallet.get(wallet);
+    const ambassador = ambassadorByParticipantWallet.get(wallet);
     if (!ambassador) continue;
     const commission = mulDiv(amount, BigInt(500), BPS);
     ordinaryCommission += commission;
@@ -567,7 +605,7 @@ export function calculateDailyRewardSettlement(input: {
     });
   }
   for (const [wallet, amount] of priorBeneficiary) {
-    const ambassador = ambassadorByWallet.get(wallet);
+    const ambassador = ambassadorByParticipantWallet.get(wallet);
     if (!ambassador) continue;
     const commission = mulDiv(amount, BigInt(500), BPS);
     weeklyCommission += commission;

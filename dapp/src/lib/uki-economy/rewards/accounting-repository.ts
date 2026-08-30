@@ -12,6 +12,7 @@ import {
 } from "../cukie-pool/vault-source";
 import type {
   CukieRewardAccountingParticipant,
+  DailyAmbassadorSourceSnapshot,
   DailyRewardAccounting,
   DailyRewardSourceLine,
   PriorWeeklyPoolTranche,
@@ -101,7 +102,7 @@ export interface RewardAccountingRepository {
   listDailyAmbassadorSnapshots(
     startsAt: Date,
     endsAt: Date,
-  ): Promise<Record<string, string | null>>;
+  ): Promise<Record<string, DailyAmbassadorSourceSnapshot>>;
   listCukieParticipants(
     generation: "original" | "second_generation",
     startsAt: Date,
@@ -504,16 +505,28 @@ export function createMongoRewardAccountingRepository(
         resultValid: true,
         periodAnchorAt: { $gte: startsAt, $lt: endsAt },
       }, options).project<{
+        sessionId: string;
         wallet: string;
         ambassadorSnapshot: { walletNormalized: string | null };
-      }>({ _id: 0, wallet: 1, ambassadorSnapshot: 1 }).toArray();
-      const snapshots: Record<string, string | null> = {};
+      }>({ _id: 0, sessionId: 1, wallet: 1, ambassadorSnapshot: 1 }).toArray();
+      const snapshots: Record<string, DailyAmbassadorSourceSnapshot> = {};
       for (const row of rows) {
-        const value = row.ambassadorSnapshot.walletNormalized;
-        if (row.wallet in snapshots && snapshots[row.wallet] !== value) {
-          throw new DomainConflictError(`Snapshot ambassador contradictorio para ${row.wallet}.`);
+        const sourceId = `game-session:${row.sessionId}`;
+        const value = {
+          walletNormalized: row.wallet,
+          ambassadorWalletNormalized: row.ambassadorSnapshot.walletNormalized,
+        };
+        const current = snapshots[sourceId];
+        if (
+          current
+          && (
+            current.walletNormalized !== value.walletNormalized
+            || current.ambassadorWalletNormalized !== value.ambassadorWalletNormalized
+          )
+        ) {
+          throw new DomainConflictError(`Snapshot ambassador contradictorio para ${sourceId}.`);
         }
-        snapshots[row.wallet] = value;
+        snapshots[sourceId] = value;
       }
       return snapshots;
     },
@@ -691,7 +704,7 @@ export class RewardAccountingService {
         original,
         second,
         priorWeekly,
-        ambassadorByWallet,
+        ambassadorBySource,
       ] = await Promise.all([
         repository.listDailyRewardSourceLines(dayId),
         repository.listCreditContributors(startsAt),
@@ -719,7 +732,7 @@ export class RewardAccountingService {
         creditContributors,
         cukieOriginalParticipants: original,
         cukieSecondPlusParticipants: second,
-        ambassadorByWallet,
+        ambassadorBySource,
         priorWeekly: input.includePriorWeekly ? priorWeekly ?? undefined : undefined,
         sealedAt: input.now,
       });

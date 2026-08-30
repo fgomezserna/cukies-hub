@@ -130,6 +130,11 @@ export type DailyRewardSourceLine = {
   accruals: Array<{ accrualId: string; category: string; amountRaw: string }>;
 };
 
+export type DailyAmbassadorSourceSnapshot = {
+  walletNormalized: string;
+  ambassadorWalletNormalized: string | null;
+};
+
 export type RewardReserveBreakdown = {
   credits: number;
   performanceRaw: string;

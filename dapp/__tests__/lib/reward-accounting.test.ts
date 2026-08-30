@@ -36,6 +36,16 @@ import type { RewardAccountingRepository } from "@/lib/uki-economy/rewards/accou
 const TOKEN = BigInt("1000000000000000000");
 const raw = (uki: number) => (BigInt(uki) * TOKEN).toString();
 const wallet = (ordinal: number) => `0x${ordinal.toString(16).padStart(40, "0")}`;
+const noAmbassadorSnapshots = (sourceLines: readonly DailyRewardSourceLine[]) =>
+  Object.fromEntries(sourceLines.flatMap((line) => {
+    const player = line.allocations.find((allocation) => allocation.category === "player");
+    return player
+      ? [[line.sourceId, {
+          walletNormalized: player.walletNormalized,
+          ambassadorWalletNormalized: null,
+        }] as const]
+      : [];
+  }));
 const DESTINATIONS = {
   treasury: wallet(9001),
   marketingDevelopment: wallet(9002),
@@ -267,7 +277,12 @@ describe("reward accounting invariants", () => {
       }],
       cukieOriginalParticipants: [],
       cukieSecondPlusParticipants: [],
-      ambassadorByWallet: { [wallet(1)]: null },
+      ambassadorBySource: {
+        "game-session:guarantee": {
+          walletNormalized: wallet(1),
+          ambassadorWalletNormalized: null,
+        },
+      },
       priorWeekly: {
         weeklyAccountingId: "reward-weekly:2026-W33",
         creditPoolRaw: "200000000000000000",
@@ -307,6 +322,88 @@ describe("reward accounting invariants", () => {
     expect(systemRaw("treasury", "reserved_no_mint")).toBe(
       BigInt(result.priorReservedUndistributed.treasuryRaw),
     );
+  });
+
+  it("respeta el snapshot por partida si la atribucion se acepta a mitad del dia", () => {
+    const playerWallet = wallet(60);
+    const ambassadorWallet = wallet(61);
+    const sourceLines = ["before-attribution", "after-attribution"].map((suffix) => {
+      const sourceId = `game-session:${suffix}`;
+      const settlement = calculateSettlementRewardAllocations(CURRENT_REWARD_RULE, {
+        periodId: "2026-W34",
+        sourceId,
+        playerWallet,
+        grossConvertedRaw: "7500000000000000000",
+        maxConvertibleRaw: "7500000000000000000",
+        creditCostUnits: 100,
+        weeklyReserveUnits: 20,
+        creditSource: "own",
+        cukieSource: "own",
+        ranking: null,
+      });
+      return {
+        sourceId,
+        sourceTotalRaw: settlement.totals.sourceTotalRaw,
+        allocations: settlement.allocations.map((allocation, index) => ({
+          allocationId: `${sourceId}:allocation:${index}`,
+          ...allocation,
+        })),
+        accruals: settlement.accruals.map((accrual, index) => ({
+          accrualId: `${sourceId}:accrual:${index}`,
+          ...accrual,
+        })),
+      } satisfies DailyRewardSourceLine;
+    });
+
+    const result = calculateDailyRewardSettlement({
+      dayId: "2026-08-20",
+      rule: CURRENT_REWARD_RULE,
+      sourceLines,
+      creditContributors: [],
+      cukieOriginalParticipants: [],
+      cukieSecondPlusParticipants: [],
+      ambassadorBySource: {
+        "game-session:before-attribution": {
+          walletNormalized: playerWallet,
+          ambassadorWalletNormalized: null,
+        },
+        "game-session:after-attribution": {
+          walletNormalized: playerWallet,
+          ambassadorWalletNormalized: ambassadorWallet,
+        },
+      },
+      sealedAt: new Date("2026-08-21T16:00:00.000Z"),
+    });
+
+    expect(result.allocations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        walletNormalized: playerWallet,
+        category: "player",
+        amountRaw: raw(15),
+      }),
+      expect.objectContaining({
+        walletNormalized: ambassadorWallet,
+        category: "ambassador_ordinary",
+        amountRaw: "375000000000000000",
+        sourceIds: ["game-session:after-attribution"],
+      }),
+    ]));
+    expect(result.buckets.ambassadorOrdinaryRaw).toBe("375000000000000000");
+    expect(() => calculateDailyRewardSettlement({
+      dayId: "2026-08-20",
+      rule: CURRENT_REWARD_RULE,
+      sourceLines,
+      creditContributors: [],
+      cukieOriginalParticipants: [],
+      cukieSecondPlusParticipants: [],
+      ambassadorBySource: {
+        "game-session:before-attribution": {
+          walletNormalized: playerWallet,
+          ambassadorWalletNormalized: null,
+        },
+      },
+      sealedAt: new Date("2026-08-21T16:00:00.000Z"),
+    })).toThrow(/Falta el snapshot ambassador.*after-attribution/);
   });
 
   it("rechaza la regla historica 80/5/5/10 antes de calcular un cierre", () => {
@@ -488,6 +585,7 @@ describe("reward accounting invariants", () => {
       creditContributors,
       cukieOriginalParticipants,
       cukieSecondPlusParticipants,
+      ambassadorBySource: noAmbassadorSnapshots(sourceLines),
       sealedAt: new Date("2026-08-21T16:00:00.000Z"),
     };
     const result = calculateDailyRewardSettlement(input);
@@ -985,7 +1083,7 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
     missingWeeklySources: 0,
   });
   listCreditContributors: RewardAccountingRepository["listCreditContributors"] = async () => [];
-  listDailyAmbassadorSnapshots = async () => ({});
+  listDailyAmbassadorSnapshots = async () => noAmbassadorSnapshots(this.dailyLines);
   listCukieParticipants: RewardAccountingRepository["listCukieParticipants"] = async () => [];
   findPriorWeeklyPoolTranche: RewardAccountingRepository["findPriorWeeklyPoolTranche"] =
     async () => null;

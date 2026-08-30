@@ -7,6 +7,7 @@ import type {
   RewardEmissionBudgetState,
 } from "@/lib/uki-economy/rewards/types";
 import type {
+  DailyRewardAccounting,
   RewardDailyCapacityMaterialization,
 } from "@/lib/uki-economy/rewards/accounting-types";
 
@@ -133,6 +134,153 @@ describe("Mongo reward accounting repository", () => {
       { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
     ]));
     expect(JSON.stringify(pipeline)).not.toMatch(/cukie.?master|entitlement/i);
+  });
+
+  it("conserva snapshots ambassador distintos por partida durante el mismo dia", async () => {
+    const player = "0x1111111111111111111111111111111111111111";
+    const ambassador = "0x2222222222222222222222222222222222222222";
+    const toArray = jest.fn(async () => [
+      {
+        sessionId: "before-attribution",
+        wallet: player,
+        ambassadorSnapshot: { walletNormalized: null },
+      },
+      {
+        sessionId: "after-attribution",
+        wallet: player,
+        ambassadorSnapshot: { walletNormalized: ambassador },
+      },
+    ]);
+    const project = jest.fn(() => ({ toArray }));
+    const find = jest.fn(() => ({ project }));
+    const db = {
+      collection: jest.fn((name: string) => (
+        name === "reward_weekly_game_sources" ? { find } : {}
+      )),
+    } as unknown as Db;
+    const repository = createMongoRewardAccountingRepository(db, {} as ClientSession);
+    const startsAt = new Date("2026-08-20T14:00:00.000Z");
+    const endsAt = new Date("2026-08-21T14:00:00.000Z");
+
+    await expect(repository.listDailyAmbassadorSnapshots(startsAt, endsAt))
+      .resolves.toEqual({
+        "game-session:before-attribution": {
+          walletNormalized: player,
+          ambassadorWalletNormalized: null,
+        },
+        "game-session:after-attribution": {
+          walletNormalized: player,
+          ambassadorWalletNormalized: ambassador,
+        },
+      });
+    expect(find).toHaveBeenCalledWith({
+      status: "settled",
+      outcome: "completed",
+      resultValid: true,
+      periodAnchorAt: { $gte: startsAt, $lt: endsAt },
+    }, { session: {} });
+    expect(project).toHaveBeenCalledWith({
+      _id: 0,
+      sessionId: 1,
+      wallet: 1,
+      ambassadorSnapshot: 1,
+    });
+  });
+
+  it("hace disponible la comision en el mismo cierre diario que el pago referido", async () => {
+    const player = "0x1111111111111111111111111111111111111111";
+    const ambassador = "0x2222222222222222222222222222222222222222";
+    const sealedAt = new Date("2026-08-21T16:00:00.000Z");
+    const insertOne = jest.fn(async (_accounting: DailyRewardAccounting) => ({ acknowledged: true }));
+    const insertMany = jest.fn(async (_documents: unknown[]) => ({ acknowledged: true }));
+    const db = {
+      collection: jest.fn((name: string) => {
+        if (name === "reward_daily_accounting") return { insertOne };
+        if (name === "reward_accounting_allocations") return { insertMany };
+        return {};
+      }),
+    } as unknown as Db;
+    const repository = createMongoRewardAccountingRepository(db, {} as ClientSession);
+    const accounting = {
+      _id: "reward-daily:2026-08-20",
+      dayId: "2026-08-20",
+      ruleVersion: "rewards-staging-test-v4",
+      ruleConfigHash: "a".repeat(64),
+      sourceIds: ["game-session:after-attribution"],
+      sourceSetHash: "b".repeat(64),
+      sourceReservedRaw: "100",
+      capacityMaterializedRaw: "0",
+      priorReservedInflowRaw: "0",
+      topupRaw: "0",
+      emissionRaw: "100",
+      buckets: {
+        playersRaw: "95",
+        creditPoolRaw: "0",
+        cukiePoolRaw: "0",
+        ambassadorOrdinaryRaw: "5",
+        weeklyPrizeRaw: "0",
+        ambassadorWeeklyRaw: "0",
+      },
+      undistributed: {
+        totalRaw: "0",
+        treasuryRaw: "0",
+        marketingDevelopmentRaw: "0",
+        supplyReductionRaw: "0",
+      },
+      priorReservedUndistributed: {
+        totalRaw: "0",
+        treasuryRaw: "0",
+        marketingDevelopmentRaw: "0",
+        supplyReductionRaw: "0",
+      },
+      destinations: {
+        treasury: "0x9000000000000000000000000000000000000001",
+        marketingDevelopment: "0x9000000000000000000000000000000000000002",
+        supplyReduction: "0x9000000000000000000000000000000000000003",
+      },
+      allocations: [
+        {
+          allocationId: "player-allocation",
+          walletNormalized: player,
+          category: "player",
+          amountRaw: "95",
+          fundingMode: "daily_emission",
+          sourceIds: ["game-session:after-attribution"],
+        },
+        {
+          allocationId: "ambassador-allocation",
+          walletNormalized: ambassador,
+          category: "ambassador_ordinary",
+          amountRaw: "5",
+          fundingMode: "daily_emission",
+          sourceIds: ["game-session:after-attribution"],
+        },
+      ],
+      conservationRaw: "100",
+      payloadHash: "c".repeat(64),
+      status: "sealed",
+      sealedAt,
+    } satisfies DailyRewardAccounting;
+
+    await repository.insertDaily(accounting);
+
+    expect(insertOne).toHaveBeenCalledWith(accounting, { session: {} });
+    const documents = insertMany.mock.calls[0]?.[0];
+    expect(documents).toHaveLength(2);
+    expect(documents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        walletNormalized: player,
+        category: "player",
+        availableAt: sealedAt,
+        createdAt: sealedAt,
+      }),
+      expect.objectContaining({
+        walletNormalized: ambassador,
+        category: "ambassador_ordinary",
+        availableAt: sealedAt,
+        createdAt: sealedAt,
+      }),
+    ]));
   });
 
   it("materializa el cap de 600000 de la regla y hace replay sin consumirlo dos veces", async () => {
