@@ -52,6 +52,7 @@ El trabajo de una rama se prueba localmente por bloques y no provoca un desplieg
 pnpm test:staging:contracts
 pnpm staging:cukie-master:verify-local
 pnpm staging:credits:verify-local
+pnpm staging:game-rewards:verify-local
 pnpm staging:marketplace:verify-local
 ```
 
@@ -72,6 +73,12 @@ El gate de creditos fija Stage y chain `97`, valida la regla de 100 creditos dia
 las rutas UKI/NFT, la configuracion own/pool, la reserva para jugar, la caducidad conjunta de
 creditos propios y aportados al pool, la idempotencia, el catch-up, el scheduler HMAC y los
 indices/cortes canonicos del indexador. No conecta con la base ni firma transacciones de Stage.
+
+El gate de juego y recompensas recorre las cuatro combinaciones de creditos y Cukies propios o
+prestados, la prioridad Original -> Segunda Generacion -> Seiku, cuotas, settlement autoritativo,
+reparto a jugador/pools, minimo del pool de creditos, presupuesto diario, recuperacion de rewards,
+APIs privadas, schedulers e indices. La recuperacion filtra en Mongo los sources ya materializados
+antes de limitar el batch, evitando que el historial procesado oculte una partida sin premio.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 

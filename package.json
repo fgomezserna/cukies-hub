@@ -25,6 +25,7 @@
     "staging:bridge:verify-local": "node scripts/verify-staging-bridge-local.mjs",
     "staging:cukie-master:verify-local": "node scripts/verify-staging-cukie-master-local.mjs",
     "staging:credits:verify-local": "node scripts/verify-staging-credits-local.mjs",
+    "staging:game-rewards:verify-local": "node scripts/verify-staging-game-rewards-local.mjs",
     "staging:marketplace:verify-local": "node scripts/verify-staging-marketplace-local.mjs",
     "staging:indexer:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup",
     "staging:economy:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup:economy",

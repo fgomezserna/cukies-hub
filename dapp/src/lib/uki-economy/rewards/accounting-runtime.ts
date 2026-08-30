@@ -116,36 +116,55 @@ export function assertRewardAccountingActionEnabled(
   }
 }
 
+export function buildPendingTreasureHuntRewardPipeline(limit: number) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
+    throw new DomainValidationError("limit debe estar entre 1 y 1000.");
+  }
+  return [
+    {
+      $match: {
+        status: "settled",
+        gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
+        "rule.version": TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
+        settledAt: { $type: "date" },
+      },
+    },
+    { $sort: { settledAt: 1 as const, sessionId: 1 as const } },
+    {
+      $set: {
+        __rewardSourceId: { $concat: ["game-session:", "$sessionId"] },
+      },
+    },
+    {
+      $lookup: {
+        from: "reward_source_manifests",
+        localField: "__rewardSourceId",
+        foreignField: "_id",
+        as: "__rewardManifest",
+      },
+    },
+    { $match: { "__rewardManifest.0": { $exists: false } } },
+    { $limit: limit },
+    { $project: { __rewardSourceId: 0, __rewardManifest: 0 } },
+  ];
+}
+
 export async function settlePendingTreasureHuntRewards(input: {
   now?: Date;
   limit?: number;
 }) {
   const now = input.now ?? new Date();
   const limit = input.limit ?? 100;
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
-    throw new DomainValidationError("limit debe estar entre 1 y 1000.");
-  }
+  const pipeline = buildPendingTreasureHuntRewardPipeline(limit);
   const { getEconomyDb } = await import("@/lib/indexer-db/mongodb");
   const { rewardCalculationCoordinator } = await import("./coordinator");
   const db = await getEconomyDb();
   const candidates = await db.collection<GameEconomySession>("game_economy_sessions")
-    .find({
-      status: "settled",
-      gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
-      "rule.version": TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
-      settledAt: { $type: "date" },
-    })
-    .sort({ createdAt: 1, sessionId: 1 })
-    .limit(limit * 4)
+    .aggregate<GameEconomySession>(pipeline)
     .toArray();
   let settled = 0;
   let replayed = 0;
-  let scanned = 0;
   for (const game of candidates) {
-    if (scanned >= limit) break;
-    const sourceId = `game-session:${game.sessionId}`;
-    if (await db.collection<{ _id: string }>("reward_source_manifests").findOne({ _id: sourceId })) continue;
-    scanned += 1;
     const result = await rewardCalculationCoordinator.settleGame({
       sessionId: game.sessionId,
       periodId: getIsoWeekPeriodId(new Date(game.createdAt.getTime() - 14 * 60 * 60_000)),
@@ -155,7 +174,7 @@ export async function settlePendingTreasureHuntRewards(input: {
     if (result.result.status === "allocated" && result.result.replayed) replayed += 1;
     else if (result.result.status === "allocated") settled += 1;
   }
-  return { scanned, settled, replayed };
+  return { scanned: candidates.length, settled, replayed };
 }
 
 function pendingAccountingError(error: unknown) {
