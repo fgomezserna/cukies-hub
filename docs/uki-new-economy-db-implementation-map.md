@@ -132,11 +132,14 @@ deployment Coolify `1136` del commit `2df68a6` verificó los 13 cursores de los
 tres aliases nuevos, además de conservar verificados y avanzando los cuatro
 cursores legacy de `TOKEN` y `UKI_STAKING`.
 
-Para considerar el bridge usable en staging faltan configuracion por entorno,
-origen Tron testnet, executor idempotente, confirmaciones, proteccion de replay,
-reintentos/dead-letter, receipts visibles en UI y una prueba que reconcilie
-ownership y supply en ambos extremos. Antes de produccion tambien hay que cerrar
-si el modelo real es lock/escrow o burn/mint y auditar los privilegios legacy.
+Para considerar el bridge usable en staging ya no falta la arquitectura local:
+el runtime, los endpoints lock/mint/release y el relayer idempotente estan
+implementados y probados. Lo pendiente es operacional: desplegar endpoints y
+colecciones reales en Nile/BSC Testnet, autorizar el relayer, hacer el handover de
+claves y ejecutar un E2E firmado que reconcilie receipts, ownership, metadata y
+una sola representacion circulante en ambos extremos. Antes de habilitarlo tambien
+hay que reemplazar la tarifa fija legacy de 10 TRX por una tarifa derivada del gas
+BSC medido y aprobar su buffer.
 
 ## Estado revisable: creditos de competicion y pool de creditos
 
@@ -237,7 +240,8 @@ El maximo potencial por wallet es 10 cupos si el usuario alcanza 5 por ruta. Est
 | Tabla por wallet de Cukie Points | Export desde legacy `points` + wallets/user linkage + pending on-chain. Guardar resumen estructural, no datos sensibles en Git. | Serializadores JSONL/CSV canónicos implementados; falta proporcionar fuentes/cutoffs live autorizados. |
 | Pausar crias con Cukie Points | Operacion legacy: pausar contrato/UI. No crear nueva mecanica de breeding en UKI. | Pendiente de accion ops. |
 | Bridge Tron -> BSC | Migracion unidireccional a BSC; nueva economia solo acepta nuevas posiciones BSC. `NftInventoryService` marca Tron como lectura/migracion. | Parcial: contrato, UI fail-closed y relayer idempotente estan emulados localmente; faltan deploy Nile/BSC Testnet y E2E real. |
-| Marketplace legacy | Mantener lectura/acciones legacy mientras se migra. Nuevo marketplace con UKI seria feature separada; el marketplace actual usa moneda nativa. | Parcial: vistas legacy existentes. |
+| Marketplace legacy | Mantenerlo como fuente histórica durante la migración, pero publicar solo órdenes con evidencia owner/listing coherente. `Stake`, `Transfer`, bridge, compra o cancelación invalidan o cierran la orden; Cukie Points se repara con eventos absolutos. | Implementado y probado localmente sobre el indexador Stage. Tarifas legacy verificadas por lectura: venta 10%, cancelación 0, cambio 0.0002 BNB/10 TRX y unstake sin fee. Falta ejecutar y auditar el backfill antes de trasladar el filtro a producción. |
+| Marketplace UKI | Contrato BSC no custodial: el NFT permanece en la wallet hasta la compra; owner y approval se revalidan al llenar. Precio exacto al vendedor en UKI y comisión pagada por el comprador en UKI, BNB o USDT mediante rutas configuradas. | Contrato, API/UI, indexación, replay y estados `active/sold/cancelled/expired/invalid` implementados y probados localmente. Sigue cerrado en Stage porque el contrato no está desplegado/verificado en chain 97. La ruta ASM/UKI existe, pero BNB/USDT no tienen hoy ruta verificada; la comisión nueva requiere decisión de producto antes del deploy. |
 | Premios preventa | Registrar elegibilidad/ranking off-chain; mint/entrega de NFTs requiere flujo BSC/ops especifico. | Pendiente. |
 | Cierre preventa y extension | Contrato `Presale` permite mover ventanas; decision de prolongar se decide por estado on-chain/indexado. | Implementado en contrato, pendiente de politica ops. |
 | Torneo compradores preventa | Crear entitlement ledger: 1 partida por cada 1,000 UKI comprados, basado en eventos `Purchased`. | Pendiente. |
