@@ -16,6 +16,9 @@ jest.mock('lucide-react', () => {
 jest.mock('@/components/uki-marketplace/marketplace-client', () => ({
   UkiMarketplaceClient: () => <div data-testid="uki-marketplace" />,
 }));
+jest.mock('@/components/uki-marketplace/seller-panel', () => ({
+  UkiMarketplaceSellerPanel: () => <div data-testid="uki-marketplace-seller" />,
+}));
 jest.mock('@/components/legacy-marketplace/marketplace-client', () => ({
   MarketplaceClient: () => <div data-testid="legacy-marketplace" />,
 }));
@@ -25,6 +28,7 @@ describe('separación del marketplace', () => {
     render(<MarketplacePage />);
 
     expect(screen.getByTestId('uki-marketplace')).toBeInTheDocument();
+    expect(screen.getByTestId('uki-marketplace-seller')).toBeInTheDocument();
     expect(screen.getByTestId('legacy-marketplace')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Marketplace UKI' })).toHaveAttribute(
       'href',

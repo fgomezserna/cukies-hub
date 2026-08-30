@@ -8,6 +8,14 @@ import {
   type UkiMarketplaceRepository,
 } from './repository';
 import { ukiMarketplaceRuntime } from './runtime';
+import {
+  UkiMarketplaceUnavailableError,
+  UkiMarketplaceValidationError,
+} from './errors';
+export {
+  UkiMarketplaceUnavailableError,
+  UkiMarketplaceValidationError,
+} from './errors';
 import type {
   IndexedUkiMarketplaceOrder,
   UkiMarketplaceDisplayStatus,
@@ -15,20 +23,6 @@ import type {
   UkiMarketplaceOrderView,
   UkiMarketplaceRuntime,
 } from './types';
-
-export class UkiMarketplaceUnavailableError extends Error {
-  constructor() {
-    super('UKI marketplace unavailable');
-    this.name = 'UkiMarketplaceUnavailableError';
-  }
-}
-
-export class UkiMarketplaceValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'UkiMarketplaceValidationError';
-  }
-}
 
 export type UkiMarketplaceServiceDependencies = {
   repository: UkiMarketplaceRepository;

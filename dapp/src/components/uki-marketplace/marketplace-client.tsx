@@ -159,6 +159,12 @@ export function UkiMarketplaceClient() {
     return () => controller.abort();
   }, [reloadKey]);
 
+  useEffect(() => {
+    const refresh = () => setReloadKey((value) => value + 1);
+    window.addEventListener('cukies:uki-marketplace:refresh', refresh);
+    return () => window.removeEventListener('cukies:uki-marketplace:refresh', refresh);
+  }, []);
+
   return (
     <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#0c1514]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
