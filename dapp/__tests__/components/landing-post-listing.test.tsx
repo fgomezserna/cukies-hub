@@ -250,6 +250,7 @@ describe('home post-listing de UKI', () => {
 
   it('emula Stage con el pool ASM/UKI verificado y sin enlaces de mainnet', () => {
     renderLanding(STAGING_NETWORK);
+    if (!STAGING_NETWORK.swapUrl) throw new Error('Stage debe tener un swap ASM/UKI verificado.');
 
     expect(screen.getByText('UKI · BSC Testnet')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Comprar UKI con ASM' })[0]).toHaveAttribute(
