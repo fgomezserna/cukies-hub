@@ -29,7 +29,6 @@ export function MarketplaceClient() {
   const [data, setData] = useState<LegacyMarketplaceListResponse>(initialData);
   const [search, setSearch] = useState('');
   const [network, setNetwork] = useState('all');
-  const [state, setState] = useState('onSale');
   const [type, setType] = useState('all');
   const [generation, setGeneration] = useState('all');
   const [sort, setSort] = useState('newest');
@@ -43,16 +42,16 @@ export function MarketplaceClient() {
       limit: String(PAGE_SIZE),
       offset: String(offset),
       sort,
+      scope: 'marketplace',
     });
 
     if (search.trim()) params.set('search', search.trim());
     if (network !== 'all') params.set('network', network);
-    if (state !== 'all') params.set('state', state);
     if (type !== 'all') params.set('type', type);
     if (generation !== 'all') params.set('generation', generation);
 
     return params.toString();
-  }, [generation, network, offset, search, sort, state, type]);
+  }, [generation, network, offset, search, sort, type]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,7 +87,6 @@ export function MarketplaceClient() {
   function resetFilters() {
     setSearch('');
     setNetwork('all');
-    setState('onSale');
     setType('all');
     setGeneration('all');
     setSort('newest');
@@ -101,7 +99,7 @@ export function MarketplaceClient() {
   return (
     <section className="grid gap-5">
       <div className="rounded-[8px] border border-white/10 bg-black/30 p-4 backdrop-blur">
-        <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-[minmax(18rem,1fr)_repeat(6,minmax(9rem,auto))]">
+        <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-[minmax(18rem,1fr)_repeat(5,minmax(9rem,auto))]">
           <div className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <Input
@@ -125,22 +123,6 @@ export function MarketplaceClient() {
           >
             <option value="all">All networks</option>
             {data.facets.networks.map((facet) => (
-              <option key={facet.value} value={facet.value}>
-                {facet.value} ({facet.count})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={state}
-            onChange={(event) => {
-              setState(event.target.value);
-              setOffset(0);
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">All states</option>
-            {data.facets.states.map((facet) => (
               <option key={facet.value} value={facet.value}>
                 {facet.value} ({facet.count})
               </option>

@@ -189,6 +189,53 @@ async function insertNftTx(store: IndexerStore, event: ChainEvent, extra: Record
   );
 }
 
+type MarketplaceInvalidationReason = 'transfer' | 'staking' | 'breeding' | 'bridge';
+
+async function invalidateActiveMarketplaceListing(
+  store: IndexerStore,
+  event: ChainEvent,
+  id: string,
+  reason: MarketplaceInvalidationReason,
+  documentId = id,
+) {
+  const invalidatedAt = eventDate(event);
+
+  await Promise.all([
+    collection(store, 'cukies').updateOne(
+      {
+        _id: documentId,
+        $or: [
+          { marketplaceListingStatus: 'active' },
+          { state: 'onSale' },
+        ],
+      },
+      {
+        $set: {
+          marketplaceListingStatus: 'invalid',
+          marketplaceListingInvalidReason: reason,
+          marketplaceListingInvalidatedAt: invalidatedAt,
+          marketplaceListingEventId: event._id,
+          price: 0,
+          priceOriginal: '0',
+          updatedAt: now(),
+        },
+      },
+    ),
+    collection(store, 'marketplace_listings').updateOne(
+      { tokenId: id, status: 'active' },
+      {
+        $set: {
+          status: 'invalid',
+          invalidReason: reason,
+          invalidatedAt,
+          updatedAt: now(),
+          lastEventId: event._id,
+        },
+      },
+    ),
+  ]);
+}
+
 async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   if (event.chain === 'BSC') {
     if (event.contractAlias !== 'TOKEN' && event.contractAlias !== 'TOKEN_V2') {
@@ -217,6 +264,8 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
     return 'Transfer interno de contrato monitorizado';
   }
 
+  await invalidateActiveMarketplaceListing(store, event, id, 'transfer', documentId);
+
   await collection(store, 'cukies').updateOne(
     { _id: documentId },
     {
@@ -228,6 +277,8 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
         ownerNormalized: normalizeAddress(event.chain, to),
         network: event.chain,
         state: 'available',
+        price: 0,
+        priceOriginal: '0',
         updatedAt: now(),
         timeStamp: event.timestampMs,
         lastEventId: event._id,
@@ -338,18 +389,25 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
   if (event.eventName === 'TokenOnSale' || event.eventName === 'MarketTokenPriceChanged') {
     const price = numberField(event, 'price');
     const priceRaw = stringField(event, 'priceRaw');
-    const owner = stringField(event, 'owner');
+    const current = await collection(store, 'cukies').findOne({ _id: id });
+    const owner = stringField(event, 'owner')
+      ?? getString(current?.owner ?? current?.user);
+    const ownerNormalized = normalizeAddress(event.chain, owner);
 
     await collection(store, 'cukies').updateOne(
       { _id: id },
       {
         $set: {
           tokenId: id,
-          ...(owner ? { user: owner, owner, ownerNormalized: normalizeAddress(event.chain, owner) } : {}),
+          ...(owner ? { user: owner, owner, ownerNormalized } : {}),
           network: event.chain,
           state: 'onSale',
           price: price ?? 0,
           priceOriginal: priceRaw,
+          marketplaceListingStatus: 'active',
+          marketplaceListingChain: event.chain,
+          marketplaceListingOwnerNormalized: ownerNormalized,
+          marketplaceListingEventId: event._id,
           updatedAt: now(),
           timeStamp: event.timestampMs,
           lastEventId: event._id,
@@ -370,12 +428,11 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
         $set: {
           tokenId: id,
           chain: event.chain,
-          owner,
-          ownerNormalized: normalizeAddress(event.chain, owner),
+          ...(owner ? { owner, ownerNormalized } : {}),
           price: price ?? 0,
           priceRaw,
           status: 'active',
-          listedAt: event.eventName === 'TokenOnSale' ? eventDate(event) : undefined,
+          ...(event.eventName === 'TokenOnSale' ? { listedAt: eventDate(event) } : {}),
           updatedAt: now(),
           lastEventId: event._id,
         },
@@ -405,6 +462,9 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           state: 'available',
           price: 0,
           priceOriginal: '0',
+          marketplaceListingStatus: 'sold',
+          marketplaceListingChain: event.chain,
+          marketplaceListingEventId: event._id,
           updatedAt: now(),
           timeStamp: event.timestampMs,
           lastEventId: event._id,
@@ -460,6 +520,9 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           state: 'available',
           price: 0,
           priceOriginal: '0',
+          marketplaceListingStatus: 'cancelled',
+          marketplaceListingChain: event.chain,
+          marketplaceListingEventId: event._id,
           updatedAt: now(),
           timeStamp: event.timestampMs,
           lastEventId: event._id,
@@ -512,6 +575,8 @@ async function projectStaking(store: IndexerStore, event: ChainEvent) {
 
   const owner = stringField(event, 'owner');
 
+  await invalidateActiveMarketplaceListing(store, event, id, 'staking');
+
   await collection(store, 'cukies').updateOne(
     { _id: id },
     {
@@ -520,6 +585,8 @@ async function projectStaking(store: IndexerStore, event: ChainEvent) {
         ...(owner ? { user: owner, owner, ownerNormalized: normalizeAddress(event.chain, owner) } : {}),
         network: event.chain,
         state: event.eventName === 'Stake' ? 'staking' : 'available',
+        price: 0,
+        priceOriginal: '0',
         updatedAt: now(),
         timeStamp: event.timestampMs,
         lastEventId: event._id,
@@ -544,43 +611,56 @@ async function projectPoints(store: IndexerStore, event: ChainEvent) {
 
   if (!address || !addressNormalized) return `${event.eventName} sin address`;
 
-  await collection(store, 'point_transactions').updateOne(
-    { _id: event._id },
-    {
-      $setOnInsert: {
-        _id: event._id,
-        eventId: event._id,
-        chain: event.chain,
-        address,
-        addressNormalized,
-        points,
-        type: stringField(event, 'pointType'),
-        txHash: event.txHash,
-        blockNumber: event.blockNumber,
-        timestampMs: event.timestampMs,
-        date: eventDate(event),
-        createdAt: now(),
-      },
-    },
-    { upsert: true },
-  );
+  const session = store.db.client.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const transactions = collection(store, 'point_transactions');
+      await transactions.updateOne(
+        { _id: event._id },
+        {
+          $setOnInsert: {
+            _id: event._id,
+            eventId: event._id,
+            chain: event.chain,
+            chainId: event.chainId,
+            address,
+            addressNormalized,
+            points,
+            type: stringField(event, 'pointType'),
+            txHash: event.txHash,
+            blockNumber: event.blockNumber,
+            timestampMs: event.timestampMs,
+            date: eventDate(event),
+            createdAt: now(),
+          },
+        },
+        { upsert: true, session },
+      );
 
-  await collection(store, 'point_balances').updateOne(
-    { addressNormalized },
-    {
-      $set: {
-        address,
-        updatedAt: now(),
-      },
-      $inc: {
-        points,
-      },
-      $setOnInsert: {
-        createdAt: now(),
-      },
-    },
-    { upsert: true },
-  );
+      const [summary] = await transactions.aggregate<{ points: number }>([
+        { $match: { addressNormalized } },
+        { $group: { _id: null, points: { $sum: '$points' } } },
+      ], { session }).toArray();
+
+      await collection(store, 'point_balances').updateOne(
+        { addressNormalized },
+        {
+          $set: {
+            address,
+            points: summary?.points ?? 0,
+            lastEventId: event._id,
+            updatedAt: now(),
+          },
+          $setOnInsert: {
+            createdAt: now(),
+          },
+        },
+        { upsert: true, session },
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
 
   return null;
 }
@@ -592,11 +672,17 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
   if (!parent1 || !parent2) return `${event.eventName} sin parent1/parent2`;
 
   if (event.eventName === 'BreedStart') {
+    await Promise.all([
+      invalidateActiveMarketplaceListing(store, event, parent1, 'breeding'),
+      invalidateActiveMarketplaceListing(store, event, parent2, 'breeding'),
+    ]);
     await collection(store, 'cukies').updateMany(
       { _id: { $in: [parent1, parent2] } },
       {
         $set: {
           state: 'breeding',
+          price: 0,
+          priceOriginal: '0',
           updatedAt: now(),
           timeStamp: event.timestampMs,
           lastEventId: event._id,
@@ -678,6 +764,8 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
   const from = stringField(event, 'from');
   const to = stringField(event, 'to');
 
+  await invalidateActiveMarketplaceListing(store, event, id, 'bridge');
+
   if (event.eventName === 'JumpInBridge') {
     await collection(store, 'cukies').updateOne(
       { _id: id },
@@ -686,6 +774,8 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
           tokenId: id,
           state: 'inBridge',
           network: event.chain,
+          price: 0,
+          priceOriginal: '0',
           updatedAt: now(),
           timeStamp: event.timestampMs,
           lastEventId: event._id,
@@ -712,6 +802,8 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
           ownerNormalized: normalizeAddress(event.chain, to),
           state: 'available',
           network: event.chain,
+          price: 0,
+          priceOriginal: '0',
           updatedAt: now(),
           timeStamp: event.timestampMs,
           lastEventId: event._id,

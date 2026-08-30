@@ -154,6 +154,10 @@ export class IndexerStore {
       this.db.collection('cukies').createIndex({ state: 1, network: 1, ownerNormalized: 1, timeStamp: -1 }),
       this.db.collection('cukies').createIndex({ ownerNormalized: 1, state: 1, network: 1 }),
       this.db.collection('cukies').createIndex(
+        { state: 1, marketplaceListingStatus: 1, network: 1, timeStamp: -1 },
+        { name: 'cukies_active_marketplace' },
+      ),
+      this.db.collection('cukies').createIndex(
         { chainId: 1, collectionAddressNormalized: 1, tokenId: 1 },
         {
           name: 'cukies_bsc_asset_identity_unique',

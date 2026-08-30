@@ -100,6 +100,7 @@ export type LegacyMarketplaceListParams = {
   generation?: string;
   owner?: string;
   sort?: string;
+  marketplaceOnly?: boolean;
 };
 
 export type LegacyBreedingCandidatesParams = {

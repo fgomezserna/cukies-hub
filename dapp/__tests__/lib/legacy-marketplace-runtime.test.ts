@@ -1,4 +1,7 @@
-import { buildLegacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
+import {
+  buildLegacyMarketplaceRuntime,
+  getLegacyPointExplorerUrl,
+} from '@/lib/legacy-marketplace/runtime';
 
 describe('legacy marketplace runtime safety', () => {
   it('emula Stage sin montar lecturas, enlaces ni acciones de mainnet', () => {
@@ -56,5 +59,27 @@ describe('legacy marketplace runtime safety', () => {
       appEnv: 'staging',
       legacyMainnetEnabled: false,
     });
+  });
+
+  it('usa BscScan Testnet para eventos 97 y no filtra enlaces mainnet en Stage', () => {
+    const staging = buildLegacyMarketplaceRuntime({ APP_ENV: 'staging' });
+
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', 97, '0xtest')).toBe(
+      'https://testnet.bscscan.com/tx/0xtest',
+    );
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', 56, '0xmain')).toBeNull();
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', null, '0xlegacy')).toBeNull();
+    expect(getLegacyPointExplorerUrl(staging, 'TRON', null, 'tron-main')).toBeNull();
+  });
+
+  it('conserva los exploradores legacy exclusivamente en produccion', () => {
+    const production = buildLegacyMarketplaceRuntime({ APP_ENV: 'production' });
+
+    expect(getLegacyPointExplorerUrl(production, 'BSC', 56, '0xbsc')).toBe(
+      'https://bscscan.com/tx/0xbsc',
+    );
+    expect(getLegacyPointExplorerUrl(production, 'TRON', null, 'tron')).toBe(
+      'https://tronscan.org/#/transaction/tron',
+    );
   });
 });

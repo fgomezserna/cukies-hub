@@ -189,6 +189,29 @@ Farming:
 - Unstake: `stakingPoints.unstake(tokenId)`
 - Leer `getTokensOwner`, `calcPoints`, `pointsToType`.
 
+## Tarifas legacy verificadas
+
+Ultima comprobacion de solo lectura: 2026-08-30. Estas cifras describen los
+contratos legacy actuales; no fijan la tarifa del nuevo marketplace UKI.
+
+| Concepto | BSC legacy | TRON legacy | Evidencia |
+| --- | --- | --- | --- |
+| Comision de compraventa | 10% | 10% | `marketFeePercentage() = 1000`; los eventos TRON recientes confirmados mantienen `fee / price = 1000 bps`. |
+| Cancelacion de venta | 0 BNB | 0 TRX | `feeCancelPrice() = 0`. |
+| Cambio de precio | 0.0002 BNB | 10 TRX | `feeChangePrice()` en ambos contratos. |
+| Unstake de Cukie | Sin fee | Sin fee | `stakingPoints.unstake(uint256)` es `nonpayable` y las ABIs no exponen fee de unstake. |
+
+En Stage/Testnet las lecturas, enlaces y acciones de estos contratos mainnet
+permanecen desactivadas. Stage usa exclusivamente inventario indexado y solo
+expone enlaces BSC cuando el evento acredita `chainId = 97`.
+
+La vista publica del marketplace exige evidencia materializada de listado
+activo, red y owner coincidentes. Un `Stake`, `Transfer`, `BreedStart` o bridge
+invalida el listado; compra y cancelacion lo llevan a un estado terminal. Antes
+de llevar este filtro a produccion hay que ejecutar y auditar el backfill de
+ordenes BNB legacy para conservar las ordenes validas sin reactivarlas por
+suposicion.
+
 Breeding:
 
 - Leer `breedingPoints.getMaxBreedsByCukie()`

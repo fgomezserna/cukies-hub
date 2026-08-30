@@ -47,3 +47,26 @@ export const legacyMarketplaceRuntime = buildLegacyMarketplaceRuntime({
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   APP_ENV: process.env.APP_ENV,
 });
+
+export function getLegacyPointExplorerUrl(
+  runtime: LegacyMarketplaceRuntime,
+  network: string | null,
+  chainId: number | null,
+  txId: string | null,
+) {
+  if (!txId) return null;
+  if (network === 'BSC' && chainId === 97) {
+    return `https://testnet.bscscan.com/tx/${txId}`;
+  }
+  if (
+    network === 'BSC'
+    && runtime.legacyMainnetEnabled
+    && (chainId === 56 || chainId === null)
+  ) {
+    return `https://bscscan.com/tx/${txId}`;
+  }
+  if (network === 'TRON' && runtime.legacyMainnetEnabled) {
+    return `https://tronscan.org/#/transaction/${txId}`;
+  }
+  return null;
+}

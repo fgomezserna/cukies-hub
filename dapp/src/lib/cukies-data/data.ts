@@ -26,6 +26,10 @@ import {
   type LegacyMarketplaceListParams,
   type LegacyMarketplaceListResponse,
 } from '@/lib/legacy-marketplace/types';
+import {
+  getLegacyPointExplorerUrl,
+  legacyMarketplaceRuntime,
+} from '@/lib/legacy-marketplace/runtime';
 
 type CukiDocument = {
   _id: string;
@@ -51,6 +55,10 @@ type CukiDocument = {
   priceOriginal?: unknown;
   priceRaw?: unknown;
   needsMetadata?: unknown;
+  marketplaceListingStatus?: unknown;
+  marketplaceListingChain?: unknown;
+  marketplaceListingOwnerNormalized?: unknown;
+  marketplaceListingEventId?: unknown;
 };
 
 type HistoryDocument = {
@@ -94,6 +102,7 @@ type PointDocument = {
   transactionId?: unknown;
   chain?: unknown;
   network?: unknown;
+  chainId?: unknown;
 };
 
 const MAX_LIMIT = 60;
@@ -467,12 +476,26 @@ async function getFacets(collection: Collection<CukiDocument>) {
   };
 }
 
-function buildCukiFilter(params: LegacyMarketplaceListParams) {
+export function buildCukiFilter(params: LegacyMarketplaceListParams) {
   const filter: Filter<CukiDocument> = {};
   const search = params.search?.trim();
 
   if (isKnownNetwork(params.network)) filter.network = params.network;
   if (isKnownState(params.state)) filter.state = params.state;
+
+  if (params.marketplaceOnly || params.state === 'onSale') {
+    filter.state = 'onSale';
+    filter.marketplaceListingStatus = 'active';
+    filter.ownerNormalized = { $type: 'string', $ne: '' };
+    filter.marketplaceListingOwnerNormalized = { $type: 'string', $ne: '' };
+    filter.marketplaceListingEventId = { $type: 'string', $ne: '' };
+    filter.$expr = {
+      $and: [
+        { $eq: ['$ownerNormalized', '$marketplaceListingOwnerNormalized'] },
+        { $eq: ['$network', '$marketplaceListingChain'] },
+      ],
+    };
+  }
 
   if (params.type && params.type !== 'all') {
     const parsedType = Number(params.type);
@@ -660,15 +683,9 @@ export async function listCompletedBreeds(
   };
 }
 
-function getPointExplorerUrl(network: string | null, txId: string | null) {
-  if (!txId) return null;
-  if (network === 'BSC') return `https://bscscan.com/tx/${txId}`;
-  if (network === 'TRON') return `https://tronscan.org/#/transaction/${txId}`;
-  return null;
-}
-
 function normalizePointTransaction(document: PointDocument): LegacyCukiePointsTransaction {
   const network = toStringOrNull(document.network) ?? toStringOrNull(document.chain);
+  const chainId = toNumberOrNull(document.chainId);
   const txId = toStringOrNull(document.transactionId) ?? toStringOrNull(document.txHash);
   const id =
     toStringOrNull(document._id) ??
@@ -683,7 +700,12 @@ function normalizePointTransaction(document: PointDocument): LegacyCukiePointsTr
     txId,
     network,
     description: null,
-    explorerUrl: getPointExplorerUrl(network, txId),
+    explorerUrl: getLegacyPointExplorerUrl(
+      legacyMarketplaceRuntime,
+      network,
+      chainId,
+      txId,
+    ),
   };
 }
 
