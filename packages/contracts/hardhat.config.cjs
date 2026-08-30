@@ -8,6 +8,7 @@ require('solidity-coverage');
 const PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 const BSC_RPC_URL = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
 const BSC_TESTNET_RPC_URL = process.env.BSC_TESTNET_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545';
+const LOCAL_EVM_CHAIN_ID = Number(process.env.LOCAL_EVM_CHAIN_ID || 31337);
 
 const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
@@ -24,7 +25,7 @@ module.exports = {
   },
   networks: {
     hardhat: {
-      chainId: 31337
+      chainId: LOCAL_EVM_CHAIN_ID
     },
     bscTestnet: {
       url: BSC_TESTNET_RPC_URL,
