@@ -433,7 +433,7 @@ describe('Treasure Hunt competition service', () => {
     })).rejects.toMatchObject({ code: 'NO_ATTEMPTS_REMAINING', status: 409 });
   });
 
-  it('keeps a replayed start idempotent without consuming a second staking entitlement', async () => {
+  it('starts one attempt with exactly 2,000 UKI and keeps a replay idempotent', async () => {
     const source = stakingSource({ stakedUkiRaw: '2000000000000000000000' });
     const harness = createHarness({ environment: stakingCampaignEnv, stakingSource: source });
     const input = { userId: 'user-1', walletAddress: wallet, gameSessionId: 'game-session-1' };
@@ -443,6 +443,11 @@ describe('Treasure Hunt competition service', () => {
 
     expect(replay.attemptId).toBe(first.attemptId);
     expect(harness.repository.attempts.size).toBe(1);
+    expect(harness.repository.attempts.get(first.attemptId)).toMatchObject({
+      entitlementSlot: 1,
+      stakeBalanceRawAtStart: '2000000000000000000000',
+      status: 'active',
+    });
     await expect(harness.service.getStakingEligibility(wallet)).resolves.toMatchObject({
       attemptsUsed: 1,
       attemptsRemaining: 0,

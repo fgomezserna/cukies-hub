@@ -66,5 +66,15 @@ describe('AppLayout launch navigation', () => {
     ]) {
       expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
     }
+
+    expect(document.querySelector('[data-app-ambient-effects]')).not.toBeInTheDocument();
+  });
+
+  it('keeps ambient effects outside Treasure Hunt', () => {
+    mockUsePathname.mockReturnValue('/vesting');
+
+    render(<AppLayout><div>Contenido</div></AppLayout>);
+
+    expect(document.querySelector('[data-app-ambient-effects]')).toBeInTheDocument();
   });
 });

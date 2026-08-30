@@ -129,8 +129,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             backgroundSize: '120px 120px'
           }}></div>
           
-          {!isMarketplaceSection && (
-            <>
+          {!isMarketplaceSection && !isTreasureHunt && (
+            <div data-app-ambient-effects className="contents">
               {/* Ambient light effects */}
               <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl animate-pulse"></div>
               <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-teal-400/8 rounded-full blur-3xl animate-pulse delay-1000"></div>
@@ -162,7 +162,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400/0 via-teal-400/30 to-teal-400/0 wave-animation"></div>
                 <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-teal-400/0 via-teal-400/20 to-teal-400/0 wave-animation delay-4000"></div>
               </div>
-            </>
+            </div>
           )}
           
           {!isTreasureHunt ? <Header variant="default" /> : null}
