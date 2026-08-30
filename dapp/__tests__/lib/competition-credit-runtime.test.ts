@@ -10,11 +10,17 @@ import {
   type CompetitionCreditRuntimeServices,
 } from '@/lib/uki-economy/credits/runtime';
 import { currentCompetitionCreditPeriod } from '@/lib/uki-economy/credits/rules';
+import { createCompetitionCreditService } from '@/lib/uki-economy/credits/service';
 import {
+  createMemoryCompetitionCreditRunner,
+  MemoryCompetitionCreditRepository,
   testCompetitionCreditRule,
   testCreditSourceWatermark,
 } from '@/lib/uki-economy/credits/testing';
-import type { CompetitionCreditRun } from '@/lib/uki-economy/credits/types';
+import type {
+  CompetitionCreditRun,
+  CreditSnapshotSlot,
+} from '@/lib/uki-economy/credits/types';
 import { DomainConflictError } from '@/lib/uki-economy/errors';
 
 const now = new Date('2026-07-10T12:05:00.000Z');
@@ -360,7 +366,97 @@ describe('competition credit runtime', () => {
         reasonCodes: ['SOURCE_UNHEALTHY', 'CHAIN_EVENTS_NOT_PROJECTED:NFT'],
       }),
     ]);
+    expect(runtimeServices.expireReservationsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(runtimeServices.expireAvailableLotsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
     expect(coordinator.finished).toHaveLength(0);
     expect(coordinator.released).toBe(1);
+  });
+
+  it('materializes the daily expiry even when both grant sources are blocked', async () => {
+    const previousCutoff = new Date('2026-07-09T12:00:00.000Z');
+    const wallet = `0x${'7'.repeat(40)}`;
+    const sourceSlot: CreditSnapshotSlot = {
+      _id: 'uki-slot-expiry',
+      walletNormalized: wallet,
+      route: 'uki',
+      ordinal: 1,
+      eligibilityEpoch: 1,
+      status: 'active',
+      qualifiedSince: new Date('2026-07-08T12:00:00.000Z'),
+      creditEligibleFrom: previousCutoff,
+      roundId: 'uki-round-expiry',
+      ruleVersion: 'cukie-master-v1',
+      sourceHash: 'c'.repeat(64),
+      revision: 1,
+      createdAt: new Date('2026-07-08T12:00:00.000Z'),
+      updatedAt: previousCutoff,
+    };
+    const repository = new MemoryCompetitionCreditRepository({ rule, slots: [sourceSlot] });
+    const creditService = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    const dailyRun = await creditService.createDailyRun({
+      route: 'uki',
+      cutoff: previousCutoff,
+      expectedRuleVersion: rule.version,
+      now: new Date('2026-07-09T16:01:00.000Z'),
+    });
+    const claimed = await creditService.claimRun({
+      runId: dailyRun.runId,
+      workerId: 'credit-worker',
+      now: new Date('2026-07-09T16:01:01.000Z'),
+    });
+    await creditService.processRunBatch({
+      runId: dailyRun.runId,
+      workerId: 'credit-worker',
+      fenceToken: claimed.fenceToken,
+      now: new Date('2026-07-09T16:01:02.000Z'),
+    });
+    await creditService.openRun({
+      runId: dailyRun.runId,
+      workerId: 'credit-worker',
+      fenceToken: claimed.fenceToken,
+      now: new Date('2026-07-09T16:01:03.000Z'),
+    });
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 100,
+      expiredCredits: 0,
+      expiresAt: new Date('2026-07-10T12:00:00.000Z'),
+    });
+
+    const blockedServices: CompetitionCreditRuntimeServices = {
+      ...creditService,
+      findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(period),
+      refreshSourceWatermark: jest.fn().mockRejectedValue(
+        new DomainConflictError('blocked source', { reasonCode: 'SOURCE_UNHEALTHY' }),
+      ),
+    };
+
+    await expect(runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator: new MemoryCoordinator(),
+      services: blockedServices,
+      loadActiveRule: async () => rule,
+    })).rejects.toThrow('blocked source');
+
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 0,
+      expiredCredits: 100,
+    });
+    expect(repository.state.ledger).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        operation: 'expire',
+        amountCredits: 100,
+        walletNormalized: wallet,
+      }),
+    ]));
   });
 });

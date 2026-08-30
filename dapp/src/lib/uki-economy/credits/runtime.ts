@@ -560,7 +560,6 @@ export async function runCompetitionCreditRuntimeTick(input: {
       }
     }
     const successfulRoutes = routeResults.filter((route) => !route.errorCode);
-    if (successfulRoutes.length === 0 && firstRouteError) throw firstRouteError;
 
     const expiryNow = validClockDate(clock);
     lease = await coordinator.renew(lease, expiryNow, config.leaseMs);
@@ -568,6 +567,7 @@ export async function runCompetitionCreditRuntimeTick(input: {
       services.expireReservationsBatch({ now: expiryNow, limit: config.expiryLimit }),
       services.expireAvailableLotsBatch({ now: expiryNow, limit: config.expiryLimit }),
     ]);
+    if (successfulRoutes.length === 0 && firstRouteError) throw firstRouteError;
     const completedAt = validClockDate(clock);
     const primary = successfulRoutes[0]!;
     const result: CompetitionCreditRuntimeResult = {

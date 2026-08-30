@@ -943,7 +943,7 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
   dailyLines: DailyRewardSourceLine[] = [];
   rewardRule: ReturnType<typeof testRewardRule> = CURRENT_REWARD_RULE;
   findRewardRule = async () => this.rewardRule;
-  materializeDailyCapacity = async () => ({
+  materializeDailyCapacity: RewardAccountingRepository["materializeDailyCapacity"] = async () => ({
     _id: "reward-daily-capacity:2026-08-20",
     dayId: "2026-08-20",
     budgetDayId: "2026-08-20T14:00:00.000Z",
@@ -971,7 +971,7 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
     .filter((value) => value.status === "settled" && value.outcome === "completed" && value.resultValid
       && value.periodAnchorAt >= startsAt && value.periodAnchorAt < endsAt);
   listDailyRewardSourceLines = async () => this.dailyLines;
-  findNextClosableRewardDay = async () => null;
+  findNextClosableRewardDay: RewardAccountingRepository["findNextClosableRewardDay"] = async () => null;
   listDailyAccounting = async (startsOn: string, endsBefore: string) => [...this.daily.values()]
     .filter((value) => value.dayId >= startsOn && value.dayId < endsBefore)
     .sort((left, right) => left.dayId.localeCompare(right.dayId));
@@ -981,9 +981,9 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
     missingRewardSources: 0,
     missingWeeklySources: 0,
   });
-  listCreditContributors = async () => [];
+  listCreditContributors: RewardAccountingRepository["listCreditContributors"] = async () => [];
   listDailyAmbassadorSnapshots = async () => ({});
-  listCukieParticipants = async () => [];
+  listCukieParticipants: RewardAccountingRepository["listCukieParticipants"] = async () => [];
   findPriorWeeklyPoolTranche = async () => null;
 }
 
@@ -1002,6 +1002,92 @@ describe("accounting persistence and runtime gates", () => {
     await expect(service.sealDaily(first)).resolves.toEqual(first);
     await expect(service.sealDaily({ ...first, payloadHash: "f".repeat(64) })).rejects.toThrow(/payload distinto/);
     expect(repository.daily.size).toBe(1);
+  });
+
+  it("cierra el ciclo diario productivo con jugador, pools y capacidad no distribuida", async () => {
+    const repository = new MemoryAccountingRepository();
+    const dayId = "2026-08-20";
+    const startsAt = new Date("2026-08-20T14:00:00.000Z");
+    const settlement = calculateSettlementRewardAllocations(CURRENT_REWARD_RULE, {
+      periodId: "2026-W34",
+      sourceId: "game-session:daily-close",
+      playerWallet: wallet(1),
+      grossConvertedRaw: "7500000000000000000",
+      maxConvertibleRaw: "7500000000000000000",
+      creditCostUnits: 100,
+      weeklyReserveUnits: 20,
+      creditSource: "pool",
+      cukieSource: "pool_original",
+      ranking: 1,
+    });
+    repository.dailyLines = [{
+      sourceId: "game-session:daily-close",
+      sourceTotalRaw: settlement.totals.sourceTotalRaw,
+      allocations: settlement.allocations.map((allocation, index) => ({
+        allocationId: `daily-close:allocation:${index}`,
+        ...allocation,
+      })),
+      accruals: settlement.accruals.map((accrual, index) => ({
+        accrualId: `daily-close:accrual:${index}`,
+        ...accrual,
+      })),
+    }];
+    repository.findNextClosableRewardDay = async () => ({ dayId, startsAt });
+    repository.materializeDailyCapacity = async () => ({
+      _id: `reward-daily-capacity:${dayId}`,
+      dayId,
+      budgetDayId: startsAt.toISOString(),
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      ruleConfigHash: CURRENT_REWARD_RULE.configHash,
+      previousDailyRaw: raw(10),
+      capacityMaterializedRaw: raw(499_990),
+      resultingDailyRaw: DAILY_REWARD_EMISSION_RAW,
+      previousLifetimeRaw: raw(10),
+      resultingLifetimeRaw: DAILY_REWARD_EMISSION_RAW,
+      payloadHash: "2".repeat(64),
+      status: "sealed" as const,
+      sealedAt: new Date("2026-08-21T16:00:00.000Z"),
+    });
+    repository.listCreditContributors = async () => [{
+      walletNormalized: wallet(101),
+      units: 10,
+      ambassadorWalletNormalized: null,
+    }];
+    repository.listCukieParticipants = async (generation) => generation === "original"
+      ? [{
+          walletNormalized: wallet(201),
+          units: 1,
+          rarityLevel: 5,
+          ambassadorWalletNormalized: null,
+        }]
+      : [];
+    const service = new RewardAccountingService(async (work) => work(repository));
+
+    const result = await service.closeNextDaily({
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-21T16:00:00.000Z"),
+      includePriorWeekly: false,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.sourceReservedRaw).toBe(raw(10));
+    expect(result?.capacityMaterializedRaw).toBe(raw(499_990));
+    expect(result?.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
+    expect(result?.allocations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ walletNormalized: wallet(1), category: "player" }),
+      expect.objectContaining({ walletNormalized: wallet(101), category: "credit_pool" }),
+      expect.objectContaining({ walletNormalized: wallet(201), category: "cukie_pool_original" }),
+      expect.objectContaining({ walletNormalized: DESTINATIONS.treasury, category: "treasury" }),
+      expect.objectContaining({
+        walletNormalized: DESTINATIONS.marketingDevelopment,
+        category: "marketing_development",
+      }),
+      expect.objectContaining({
+        walletNormalized: DESTINATIONS.supplyReduction,
+        category: "supply_reduction",
+      }),
+    ]));
+    expect(repository.daily.get(dayId)).toEqual(result);
   });
 
   it("cierra una semana solo con siete dias de la misma regla y detecta fuentes tardias", async () => {
