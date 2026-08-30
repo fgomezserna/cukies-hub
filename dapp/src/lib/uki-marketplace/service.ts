@@ -148,6 +148,21 @@ export async function listPublicUkiMarketplaceOrders(input: {
   });
   const inspections = await dependencies.liveReader.inspectOrders(candidates);
 
+  if (
+    candidates.length > 0
+    && candidates.every((order) => {
+      const inspection = inspections.get(order.orderId);
+      return !inspection
+        || (
+          inspection.contractState === null
+          && inspection.ownerNormalized === null
+          && inspection.marketplaceApproved === null
+        );
+    })
+  ) {
+    throw new UkiMarketplaceUnavailableError();
+  }
+
   return candidates
     .map((order) => {
       const resolved = resolveActiveStatus(order, inspections.get(order.orderId), now);

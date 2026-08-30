@@ -25,7 +25,15 @@ const initialData: LegacyMarketplaceListResponse = {
   },
 };
 
-export function MarketplaceClient() {
+type MarketplaceClientProps = {
+  heading?: string;
+  description?: string;
+};
+
+export function MarketplaceClient({
+  heading = 'Cukies marketplace',
+  description,
+}: MarketplaceClientProps = {}) {
   const [data, setData] = useState<LegacyMarketplaceListResponse>(initialData);
   const [search, setSearch] = useState('');
   const [network, setNetwork] = useState('all');
@@ -190,12 +198,14 @@ export function MarketplaceClient() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-headline text-2xl font-bold text-white">
-            Cukies marketplace
+            {heading}
           </h2>
           <p className="text-sm text-slate-400">
             {isLoading
               ? 'Loading indexed inventory...'
-              : `${data.total.toLocaleString()} results · source ${data.source}`}
+              : description
+                ? `${data.total.toLocaleString()} results · ${description}`
+                : `${data.total.toLocaleString()} results · source ${data.source}`}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-400">

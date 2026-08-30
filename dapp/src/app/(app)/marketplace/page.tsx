@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight, Heart, Search, ShoppingCart, Wallet } from 'lucide-react';
 
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
+import { UkiMarketplaceClient } from '@/components/uki-marketplace/marketplace-client';
 
 export default function MarketplacePage() {
   return (
@@ -17,14 +18,15 @@ export default function MarketplacePage() {
               Marketplace Cukies
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Usa esta pantalla como entrada de compra: filtra Cukies en venta,
-              abre una ficha y confirma precio, red y propietario antes de operar.
+              El nuevo mercado usa UKI como precio de referencia y mantiene el NFT en
+              la wallet del vendedor. Los anuncios anteriores siguen disponibles en
+              una sección Legacy independiente.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[
-                [Search, 'Filtra por red, tipo o estado'],
-                [ShoppingCart, 'Abre la ficha antes de comprar'],
-                [Wallet, 'Conecta la wallet de la red correcta'],
+                [Search, 'Filtra y revisa anuncios válidos'],
+                [ShoppingCart, 'Confirma precio, vendedor y caducidad'],
+                [Wallet, 'El NFT permanece con el vendedor'],
               ].map(([Icon, label]) => (
                 <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
                   <Icon className="h-3.5 w-3.5 text-cyan-200" />
@@ -60,7 +62,43 @@ export default function MarketplacePage() {
         </div>
       </section>
 
-      <MarketplaceClient />
+      <nav aria-label="Secciones del marketplace" className="flex flex-wrap gap-2">
+        <Link
+          href="#marketplace-uki"
+          className="rounded-[8px] border border-cyan-200/25 bg-cyan-200/[0.07] px-4 py-2 text-sm font-semibold text-cyan-100 transition duration-300 ease-out hover:bg-cyan-200/[0.11] active:scale-[0.98]"
+        >
+          Marketplace UKI
+        </Link>
+        <Link
+          href="#marketplace-legacy"
+          className="rounded-[8px] border border-white/10 bg-white/[0.025] px-4 py-2 text-sm font-semibold text-slate-300 transition duration-300 ease-out hover:border-white/20 hover:text-white active:scale-[0.98]"
+        >
+          Marketplace Legacy
+        </Link>
+      </nav>
+
+      <section id="marketplace-uki" className="scroll-mt-24">
+        <UkiMarketplaceClient />
+      </section>
+
+      <section id="marketplace-legacy" className="grid scroll-mt-24 gap-4 border-t border-white/10 pt-6">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Compatibilidad histórica
+          </p>
+          <h2 className="mt-1 font-headline text-2xl font-bold text-white">
+            Marketplace Legacy · BNB y TRX
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Conserva los anuncios y condiciones anteriores. En Stage/Testnet las
+            operaciones Legacy permanecen desactivadas y solo se consulta el inventario.
+          </p>
+        </div>
+        <MarketplaceClient
+          heading="Inventario Legacy"
+          description="anuncios BNB/TRX indexados"
+        />
+      </section>
     </div>
   );
 }
