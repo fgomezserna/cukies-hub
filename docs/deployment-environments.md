@@ -51,6 +51,7 @@ El trabajo de una rama se prueba localmente por bloques y no provoca un desplieg
 ```bash
 pnpm test:staging:contracts
 pnpm staging:cukie-master:verify-local
+pnpm staging:credits:verify-local
 pnpm staging:marketplace:verify-local
 ```
 
@@ -66,6 +67,11 @@ El gate de Cukie Master cubre los contratos de staking UKI y vault NFT, las dos 
 la entrega/configuracion de creditos, API, cliente e indexador. Incluye regresiones de recarga:
 reintento inicial acotado, conservacion de la ultima lectura confirmada ante un fallo transitorio,
 bloqueo de estimaciones sensibles y rechazo de respuestas antiguas que lleguen fuera de orden.
+
+El gate de creditos fija Stage y chain `97`, valida la regla de 100 creditos diarios por cupo,
+las rutas UKI/NFT, la configuracion own/pool, la reserva para jugar, la caducidad conjunta de
+creditos propios y aportados al pool, la idempotencia, el catch-up, el scheduler HMAC y los
+indices/cortes canonicos del indexador. No conecta con la base ni firma transacciones de Stage.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 

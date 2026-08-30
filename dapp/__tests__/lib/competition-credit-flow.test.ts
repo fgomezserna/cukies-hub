@@ -734,6 +734,75 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     ).toEqual([]);
   });
 
+  it("expires own and pooled unused credits exactly once at the same daily cutoff", async () => {
+    const repository = new MemoryCompetitionCreditRepository({
+      slots: [slot()],
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    await service.configurePool({
+      walletAddress: WALLET,
+      slotId: "uki-slot-1",
+      poolCreditsPerSlot: 40,
+      idempotencyKey: "pool-config-daily-expiry",
+      now: new Date("2026-07-10T11:00:00.000Z"),
+    });
+    const run = await openDailyRun({ repository, service });
+
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 60,
+      expiredCredits: 0,
+    });
+    expect(repository.state.poolLots[0]).toMatchObject({
+      availableCredits: 40,
+      expiredCredits: 0,
+    });
+
+    const cutoff = new Date("2026-07-11T12:00:00.000Z");
+    await expect(service.expireAvailableLotsBatch({ now: cutoff })).resolves.toEqual({
+      scanned: 2,
+      expired: 2,
+      skipped: 0,
+    });
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 0,
+      expiredCredits: 60,
+    });
+    expect(repository.state.poolLots[0]).toMatchObject({
+      availableCredits: 0,
+      expiredCredits: 40,
+    });
+    expect(repository.state.accounts).toContainEqual(expect.objectContaining({
+      walletNormalized: WALLET.toLowerCase(),
+      availableCredits: 0,
+      expiredCredits: 60,
+      poolDepositedCredits: 40,
+    }));
+    expect(repository.state.poolPeriods).toContainEqual(expect.objectContaining({
+      availableCredits: 0,
+      expiredCredits: 40,
+      contributedCredits: 40,
+    }));
+    expect(
+      repository.state.ledger
+        .filter((entry) => entry.operation === "expire")
+        .map((entry) => ({ bucket: entry.bucket, amountCredits: entry.amountCredits }))
+    ).toEqual(expect.arrayContaining([
+      { bucket: "own", amountCredits: 60 },
+      { bucket: "pool", amountCredits: 40 },
+    ]));
+
+    await expect(service.expireAvailableLotsBatch({
+      now: new Date(cutoff.getTime() + 1_000),
+    })).resolves.toEqual({ scanned: 0, expired: 0, skipped: 0 });
+    expect(
+      reconcileCompetitionCreditSnapshot(
+        (await repository.readReconciliationSnapshot(run.runId))!
+      ).reasonCodes
+    ).toEqual([]);
+  });
+
   it("rolls back the complete transaction when persistence fails after work", async () => {
     const repository = new MemoryCompetitionCreditRepository({
       slots: [slot()],
