@@ -34,16 +34,26 @@ CHAIN_INDEXER_DB_NAME=cukieshub-new
 Dapp presale testnet:
 
 ```bash
+NEXT_PUBLIC_APP_ENV=staging
 NEXT_PUBLIC_UKI_CHAIN_ID=97
 NEXT_PUBLIC_ASM_TOKEN_ADDRESS=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C
 NEXT_PUBLIC_UKI_TOKEN_ADDRESS=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c
 NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS=0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154
 NEXT_PUBLIC_UKI_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
+NEXT_PUBLIC_UKI_STAKING_ADDRESS=0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205
 NEXT_PUBLIC_BSCSCAN_BASE_URL=https://testnet.bscscan.com
+NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS=
+NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS=
+NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL=
+NEXT_PUBLIC_UKI_SWAP_URL=
 NEXT_PUBLIC_UKI_PRESALE_START_ISO=2026-08-05T10:59:20.000Z
 NEXT_PUBLIC_UKI_PRESALE_START_LABEL=testnet abierta
 NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL=abierta
 ```
+
+Mientras no exista un pool testnet verificado, las cuatro variables de liquidez y
+swap permanecen vacías. La home de staging muestra token y staking en BscScan
+Testnet, pero deshabilita la compra y no reutiliza el pair o el locker de mainnet.
 
 Las variables `NEXT_PUBLIC_*` se inyectan tambien como build args. Tras cambiarlas en Coolify hay que reconstruir la imagen, no solo reiniciar el contenedor.
 

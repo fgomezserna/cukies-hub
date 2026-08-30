@@ -64,6 +64,16 @@ test('dapp exposes a Docker alias scoped to its Coolify resource', () => {
   assert.ok(definition.includes(`          - ${resourceScopedDappAlias}`));
 });
 
+test('dapp injects the public environment identity and optional liquidity links', () => {
+  const definition = serviceDefinition('dapp');
+
+  assert.ok(definition.includes('        NEXT_PUBLIC_APP_ENV: ${APP_ENV:-production}'));
+  assert.ok(definition.includes('      NEXT_PUBLIC_APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS:-}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS:-}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_UKI_SWAP_URL: ${NEXT_PUBLIC_UKI_SWAP_URL:-}'));
+});
+
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {
   test(`${serviceName} only calls its resource-scoped dapp alias`, () => {
     const definition = serviceDefinition(serviceName);

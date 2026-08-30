@@ -1,10 +1,28 @@
 import { cleanup, render, screen } from '@testing-library/react';
 
 import { CukiesLanding } from '@/components/landing/sections';
-import {
-  PANCAKESWAP_UKI_URL,
-  UKI_MAINNET_ADDRESSES,
-} from '@/components/landing/data';
+import { buildLandingNetworkConfig } from '@/lib/landing-network';
+
+const PRODUCTION_NETWORK = buildLandingNetworkConfig({
+  APP_ENV: 'production',
+  NEXT_PUBLIC_UKI_CHAIN_ID: '56',
+  NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0x707F0f4a39a4a26239F7D00463B15AB5656861f9',
+  NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA',
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: '0xaD18ff665E99d0033c3BB9d73182c2B03Df59696',
+  NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: '0x40b315f31421b5D31DE018055Cb30f78265024Be',
+  NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS: '0xb3E43944DF782EEeD9A99f0CFA4301c72b9629E6',
+  NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL: '23 feb 2027 · 15:33 UTC',
+  NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://bscscan.com',
+});
+
+const STAGING_NETWORK = buildLandingNetworkConfig({
+  APP_ENV: 'staging',
+  NEXT_PUBLIC_UKI_CHAIN_ID: '97',
+  NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
+  NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: '0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205',
+  NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
+});
 
 let mockLocale: 'es' | 'en' = 'es';
 let mockCompetitionError: string | null = null;
@@ -114,6 +132,10 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 }));
 
 describe('home post-listing de UKI', () => {
+  const renderLanding = (network = PRODUCTION_NETWORK) => render(
+    <CukiesLanding network={network} />,
+  );
+
   beforeEach(() => {
     mockLocale = 'es';
     mockCompetitionError = null;
@@ -127,14 +149,14 @@ describe('home post-listing de UKI', () => {
   });
 
   it('presenta el recorrido operativo y elimina la preventa activa', () => {
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByRole('heading', { level: 1, name: 'UKI ya está activo' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Entrar al torneo' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Hacer staking' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Comprar UKI con ASM' })[0]).toHaveAttribute(
       'href',
-      PANCAKESWAP_UKI_URL,
+      PRODUCTION_NETWORK.swapUrl ?? undefined,
     );
 
     expect(screen.getByRole('heading', { name: 'De UKI a la competición' })).toBeInTheDocument();
@@ -151,23 +173,23 @@ describe('home post-listing de UKI', () => {
   });
 
   it('publica las direcciones oficiales y el acceso específico de participantes', () => {
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByRole('link', { name: 'Token UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/token/${UKI_MAINNET_ADDRESSES.token}`,
+      `https://bscscan.com/token/${PRODUCTION_NETWORK.ukiTokenAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Pool ASM / UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/address/${UKI_MAINNET_ADDRESSES.pair}`,
+      `https://bscscan.com/address/${PRODUCTION_NETWORK.liquidityPairAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Staking UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/address/${UKI_MAINNET_ADDRESSES.staking}`,
+      `https://bscscan.com/address/${PRODUCTION_NETWORK.stakingAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Liquidez bloqueada: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/address/${UKI_MAINNET_ADDRESSES.locker}`,
+      `https://bscscan.com/address/${PRODUCTION_NETWORK.liquidityLockerAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Consultar vesting' })).toHaveAttribute('href', '/vesting');
     expect(screen.getByRole('link', { name: 'Ver premios' })).toHaveAttribute('href', '/premios');
@@ -175,7 +197,7 @@ describe('home post-listing de UKI', () => {
 
   it('mantiene copy equivalente en inglés', () => {
     mockLocale = 'en';
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByRole('heading', { level: 1, name: 'UKI is now live' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'From UKI to competition' })).toBeInTheDocument();
@@ -186,7 +208,7 @@ describe('home post-listing de UKI', () => {
 
   it('mantiene acciones útiles cuando el estado en directo no está disponible', () => {
     mockCompetitionError = 'offline';
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByText(/Los datos en directo se están actualizando/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Jugar ahora' })).toHaveAttribute(
@@ -203,7 +225,7 @@ describe('home post-listing de UKI', () => {
     mockWalletConnected = false;
     mockWalletDisqualified = true;
 
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByText('Conecta wallet', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText('—/10')).toBeInTheDocument();
@@ -215,11 +237,36 @@ describe('home post-listing de UKI', () => {
   it('mantiene visible la descalificación cuando la wallet afectada está conectada', () => {
     mockWalletDisqualified = true;
 
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(
       screen.getByText('Esta wallet está descalificada para la edición actual.'),
     ).toBeInTheDocument();
     expect(screen.getByText('0/10')).toBeInTheDocument();
+  });
+
+  it('emula Stage sin exponer compras, pools ni enlaces de mainnet', () => {
+    renderLanding(STAGING_NETWORK);
+
+    expect(screen.getByText('UKI · BSC Testnet')).toBeInTheDocument();
+    expect(screen.getByText(/En esta red de pruebas no hay compra habilitada/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Comprar UKI con ASM' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Compra no habilitada en este entorno').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: 'Pool ASM / UKI: Abrir en BscScan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Liquidez bloqueada: Abrir en BscScan' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Token UKI: Abrir en BscScan' })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/token/${STAGING_NETWORK.ukiTokenAddress}`,
+    );
+    expect(screen.getByRole('link', { name: 'Staking UKI: Abrir en BscScan' })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/address/${STAGING_NETWORK.stakingAddress}`,
+    );
+
+    for (const link of screen.getAllByRole('link')) {
+      const href = link.getAttribute('href') ?? '';
+      expect(href).not.toMatch(/^https:\/\/bscscan\.com/);
+      expect(href).not.toContain('chain=bsc&');
+    }
   });
 });
