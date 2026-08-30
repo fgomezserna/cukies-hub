@@ -262,49 +262,91 @@ describe("reward emission budget", () => {
     expect(repository.state.allocations).toHaveLength(0);
   });
 
-  it("acepta nuevos caps versionados pero no permite reiniciar el calendario global", async () => {
+  it("pasa de 500000 a 600000 solo en un nuevo dia y conserva el lifetime global de 450M", async () => {
     const firstRule = ruleWithBudget(
-      { dailyCapRaw: "100", lifetimeCapRaw: "1000" },
-      { activeUntil: new Date("2026-07-11T00:00:00.000Z") },
+      {
+        dailyCapRaw: "500000000000000000000000",
+        lifetimeCapRaw: "450000000000000000000000000",
+      },
+      { activeUntil: new Date("2026-07-11T14:00:00.000Z") },
     );
     const { repository, service } = subject(firstRule);
     await service.persistAllocationSet(allocationInput({
       rule: firstRule,
       sourceId: "game-a:rule-v1",
-      amountRaw: "50",
-      ruleEffectiveAt: new Date("2026-07-10T12:00:00.000Z"),
+      amountRaw: "500000000000000000000000",
+      ruleEffectiveAt: new Date("2026-07-10T14:00:00.000Z"),
     }));
 
     const secondRule = ruleWithBudget(
-      { dailyCapRaw: "200", lifetimeCapRaw: "1000" },
+      {
+        dailyCapRaw: "600000000000000000000000",
+        lifetimeCapRaw: "450000000000000000000000000",
+      },
       {
         _id: "reward-allocations:v2",
         version: "rewards-v2",
-        activeFrom: new Date("2026-07-11T00:00:00.000Z"),
+        activeFrom: new Date("2026-07-11T14:00:00.000Z"),
       },
     );
     repository.state.rules.push(secondRule);
     await expect(service.persistAllocationSet(allocationInput({
       rule: secondRule,
       sourceId: "game-b:rule-v2",
-      amountRaw: "150",
-      ruleEffectiveAt: new Date("2026-07-11T12:00:00.000Z"),
+      amountRaw: "600000000000000000000000",
+      ruleEffectiveAt: new Date("2026-07-11T14:00:00.000Z"),
       periodId: "2026-W29",
     }))).resolves.toMatchObject({
       status: "allocated",
-      emissionBudgetEvent: { ruleVersion: "rewards-v2", dailyCapRaw: "200" },
+      emissionBudgetEvent: {
+        ruleVersion: "rewards-v2",
+        dailyCapRaw: "600000000000000000000000",
+        lifetimeCapRaw: "450000000000000000000000000",
+      },
     });
-    expect(repository.state.emissionBudgetStates[0].reservedLifetimeRaw).toBe("200");
+    expect(repository.state.emissionBudgetDays.map((day) => ({
+      dayId: day.dayId,
+      reservedRaw: day.reservedRaw,
+    }))).toEqual([
+      {
+        dayId: "2026-07-10T14:00:00.000Z",
+        reservedRaw: "500000000000000000000000",
+      },
+      {
+        dayId: "2026-07-11T14:00:00.000Z",
+        reservedRaw: "600000000000000000000000",
+      },
+    ]);
+    expect(repository.state.emissionBudgetEvents.map((event) => ({
+      ruleVersion: event.ruleVersion,
+      ruleConfigHash: event.ruleConfigHash,
+      dailyCapRaw: event.dailyCapRaw,
+    }))).toEqual([
+      {
+        ruleVersion: firstRule.version,
+        ruleConfigHash: firstRule.configHash,
+        dailyCapRaw: "500000000000000000000000",
+      },
+      {
+        ruleVersion: secondRule.version,
+        ruleConfigHash: secondRule.configHash,
+        dailyCapRaw: "600000000000000000000000",
+      },
+    ]);
+    expect(repository.state.emissionBudgetStates[0]).toMatchObject({
+      lifetimeCapRaw: "450000000000000000000000000",
+      reservedLifetimeRaw: "1100000000000000000000000",
+    });
 
     const unsafeCapRule = ruleWithBudget(
       {
-        dailyCapRaw: "200",
-        lifetimeCapRaw: "1200",
+        dailyCapRaw: "600000000000000000000000",
+        lifetimeCapRaw: "451000000000000000000000000",
       },
       {
         _id: "reward-allocations:v3",
         version: "rewards-v3",
-        activeFrom: new Date("2026-07-12T00:00:00.000Z"),
+        activeFrom: new Date("2026-07-12T14:00:00.000Z"),
       },
     );
     repository.state.rules.push(unsafeCapRule);
@@ -312,20 +354,20 @@ describe("reward emission budget", () => {
       rule: unsafeCapRule,
       sourceId: "game-c:unsafe-lifetime-cap",
       amountRaw: "10",
-      ruleEffectiveAt: new Date("2026-07-12T12:00:00.000Z"),
+      ruleEffectiveAt: new Date("2026-07-12T14:00:00.000Z"),
       periodId: "2026-W29",
     }))).rejects.toThrow(/no pueden cambiar tras iniciar el ledger/);
 
     const unsafeCalendarRule = ruleWithBudget(
       {
-        dailyCapRaw: "200",
-        lifetimeCapRaw: "1000",
+        dailyCapRaw: "600000000000000000000000",
+        lifetimeCapRaw: "450000000000000000000000000",
         dayBoundarySecondUtc: 3_600,
       },
       {
         _id: "reward-allocations:v4",
         version: "rewards-v4",
-        activeFrom: new Date("2026-07-12T00:00:00.000Z"),
+        activeFrom: new Date("2026-07-12T14:00:00.000Z"),
       },
     );
     repository.state.rules.push(unsafeCalendarRule);
@@ -333,9 +375,10 @@ describe("reward emission budget", () => {
       rule: unsafeCalendarRule,
       sourceId: "game-d:unsafe-calendar-reset",
       amountRaw: "10",
-      ruleEffectiveAt: new Date("2026-07-12T12:00:00.000Z"),
+      ruleEffectiveAt: new Date("2026-07-12T14:00:00.000Z"),
       periodId: "2026-W29",
     }))).rejects.toThrow(/no pueden cambiar tras iniciar el ledger/);
-    expect(repository.state.emissionBudgetStates[0].reservedLifetimeRaw).toBe("200");
+    expect(repository.state.emissionBudgetStates[0].reservedLifetimeRaw)
+      .toBe("1100000000000000000000000");
   });
 });
