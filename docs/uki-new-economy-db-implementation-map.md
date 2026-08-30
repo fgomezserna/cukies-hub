@@ -40,6 +40,54 @@ Tron -> BSC real end-to-end.
 | Tron testnet/Nile | Sin contrato fuente ni activos de prueba comprobados. |
 | E2E ownership/supply/replay/recovery | Ausente. |
 
+### Avance local Stage/Testnet del 2026-08-30
+
+Se ha eliminado el fallback silencioso del cliente bridge hacia los contratos
+mainnet. El runtime nuevo solo se habilita cuando toda la topologia es coherente:
+
+- `APP_ENV=staging`.
+- BSC chain `97` con coleccion y endpoint propios.
+- TRON `nile` con RPC, coleccion y endpoint propios.
+- Ninguna address coincide con los contratos legacy mainnet.
+- La fixture BSC Testnet que solo emite eventos no puede configurarse como endpoint.
+
+Sin esa topologia, `/bridge` queda apagado y no monta hooks de lectura, approvals ni
+firmas on-chain. La configuracion se valida en
+`dapp/src/lib/legacy-marketplace/bridge-runtime.ts`.
+
+Tambien existe una primera vertical contractual local en
+`packages/contracts/contracts/CukiesBridgeEndpoint.sol`. Dos instancias emulan
+TRON y BSC con:
+
+- lock/mint/release y vuelta completa;
+- comision nativa exacta enviada a treasury;
+- relayer allowlisted, pausa y ownership no renunciable;
+- `transferId` de un solo uso y proteccion contra replay;
+- bloqueo de doble circulacion y de liberacion de NFTs no registrados;
+- metadata completa hasheada para tipo, generacion, seis skills, energia y vida;
+- recovery solo para transferencias no registradas y con el endpoint pausado.
+
+La emulacion local Stage se ejecuta sin desplegar ni firmar transacciones:
+
+```bash
+pnpm staging:bridge:verify-local
+```
+
+Evidencia obtenida por lecturas publicas el 2026-08-30, solo para auditar el modelo
+legacy y no para reutilizarlo en Stage:
+
+- TRON mainnet: `bridgePrice=10_000_000 SUN` (`10 TRX`) y `paused=false`.
+- BSC mainnet: `bridgePrice=0`, `paused=false` y owner todavia
+  `0x7894df8379c2e156f0e4d9df0829127d605bd52b`.
+- Dos salidas BSC legacy confirmadas consumieron `223678` y `223666` gas:
+  `0x0f1a9cfbb2d27e3eee58c52a00f1592ecea6e006b3b9d6ca8cdbdd67b03039ea`
+  y `0x31116020150232ad1f006973140d8b71c0b371b1e4da5d462e64ad8c8d471acc`.
+
+Esto aun no cierra el bridge del documento. Faltan el relayer idempotente, despliegues
+en Nile/BSC Testnet, E2E real con reconciliacion de ownership/supply, politica de
+confirmaciones/reintentos/DLQ y sustituir los `10 TRX` por una tarifa derivada del
+coste BSC medido con buffer aprobado.
+
 Direcciones legacy mainnet documentadas:
 
 - Tron NFT: `TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe`.

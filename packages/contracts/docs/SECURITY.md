@@ -43,6 +43,22 @@ The current Slither triage intentionally excludes these detectors in `slither.co
 
 Any new Slither finding outside this accepted list must be triaged before testnet/mainnet.
 
+### Stage bridge triage 2026-08-30
+
+The full analyzer run reports no untriaged reentrancy, replay or state-ordering
+finding in `CukiesBridgeEndpoint`. Three endpoint-specific informational findings
+remain accepted for the local/Nile/BSC Testnet candidate:
+
+| Detector | Bridge-specific triage |
+| --- | --- |
+| `low-level-calls` | The exact native bridge fee is forwarded with a checked `call` after all state and events are prepared. `nonReentrant` protects the entry point and a failed payment reverts the whole request. This intentionally supports treasury contracts whose receive path needs more than the `transfer` stipend. |
+| `missing-inheritance` | `StagingCukiesNftV2` structurally implements `ICukiesBridgeCollection`; the interface lives in the endpoint candidate and making the pre-existing test collection inherit it would couple the fixture to the bridge. Deployment verification must still prove the configured collection supports `ownerOf`, `safeTransferFrom` and endpoint-only `mint`. |
+| `unindexed-event-address` | `JumpInBridge` and `JumpOutBridge` preserve the historical event ABI consumed by the legacy indexer. The parallel `BridgeRequested` and `BridgeCompleted` events index transfer id, token id and wallet for new monitoring. |
+
+The remaining findings from the full-repository run belong to pre-existing vault
+or mock contracts and are not suppressed by this bridge change. They must retain
+their own triage before any affected contract is promoted.
+
 ## Deep audit findings 2026-06-08
 
 These findings are blockers, explicit launch decisions or final-evidence requirements from the 2026-06-08 deep audit. A04 and A07 require a fix or an approved exception before deploy. A01, A02, A03 and A05 are implemented in the current code and still require final deploy/preflight evidence. A06 and A08-A10 require final launch evidence.
@@ -72,7 +88,10 @@ Review the launch threat model before each deploy candidate:
 
 - `packages/contracts/docs/THREAT_MODEL.md`
 
-The current model covers `UKIToken`, `Presale`, `VestingVault`, `UKIStaking` and `RewardsDistributor`. Mainnet reward publication still requires an approved Safe/multisig operating policy and independent audit evidence.
+The current model covers `UKIToken`, `Presale`, `VestingVault`, `UKIStaking`,
+`RewardsDistributor`, `LiquidityLocker` and the testnet-only
+`CukiesBridgeEndpoint`. Mainnet reward publication and any production bridge still
+require an approved Safe/multisig operating policy and independent audit evidence.
 
 ## Manual review checklist
 
@@ -100,6 +119,16 @@ The current model covers `UKIToken`, `Presale`, `VestingVault`, `UKIStaking` and
 - BscScan verification succeeds for all deployed contracts.
 - Emergency pause flow has been tested on testnet.
 - Dapp env addresses match the deployed contracts and chain id.
+- Bridge endpoints are testnet-only until relayer compromise, replay, cross-chain
+  recovery and global circulating-supply invariants receive an independent audit.
+- Every bridge relayer is explicit, monitored and removable; no deployer or personal
+  wallet remains allowlisted by accident.
+- The collection owner/minter is the intended endpoint and both endpoint owner and
+  fee recipient are approved operational wallets.
+- A repeated `transferId`, direct safe transfer, release of an untracked NFT and
+  recovery of a live bridge position all revert on testnet.
+- The TRON source fee is derived from measured destination gas plus an approved
+  buffer; the historical `10 TRX` is not copied as a constant.
 
 ## Known limits
 
@@ -108,3 +137,6 @@ The current model covers `UKIToken`, `Presale`, `VestingVault`, `UKIStaking` and
 - Contract ownership transfer is an operational step after deploy.
 - `UKIToken.pause()` intentionally freezes vault releases too; use only through the multisig emergency runbook.
 - External audit is still required before mainnet funds are accepted.
+- `CukiesBridgeEndpoint` currently trusts an allowlisted relayer to attest the
+  opposite-chain event and metadata. This is acceptable only for the Stage/Nile
+  rehearsal; production requires an approved quorum/proof model and audit.

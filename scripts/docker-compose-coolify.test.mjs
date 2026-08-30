@@ -74,9 +74,16 @@ test('dapp injects the public environment identity and optional liquidity links'
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_SWAP_URL: ${NEXT_PUBLIC_UKI_SWAP_URL:-}'));
-  assert.ok(definition.includes('NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: ${NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS:-}'));
   assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: ${CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS:-${NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS:-}}'));
   assert.ok(definition.includes('CHAIN_INDEXER_BSC_RPC_URLS: ${CHAIN_INDEXER_BSC_RPC_URLS:-}'));
+  assert.ok(definition.includes('        NEXT_PUBLIC_CUKIES_BRIDGE_MODE: ${NEXT_PUBLIC_CUKIES_BRIDGE_MODE:-disabled}'));
+  assert.ok(definition.includes('      NEXT_PUBLIC_CUKIES_BRIDGE_MODE: ${NEXT_PUBLIC_CUKIES_BRIDGE_MODE:-disabled}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID: ${NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID:-}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL: ${NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL:-}'));
+  assert.doesNotMatch(
+    definition,
+    /NEXT_PUBLIC_CUKIES_BRIDGE_(?:BSC|TRON)_[A-Z_]+:.*(?:b775ec58411F0460716CC7FA6FbbE2c38AfD2A6E|TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ)/i,
+  );
 });
 
 test('chain-indexer receives an isolated verified UKI marketplace identity', () => {
