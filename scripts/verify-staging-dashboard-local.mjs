@@ -8,10 +8,16 @@ const stageEnvironment = {
   NEXT_PUBLIC_UKI_CHAIN_ID: '97',
   CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
   LOCAL_EVM_CHAIN_ID: '97',
-  CUKIE_MASTER_RUNTIME_ENABLED: 'false',
-  CREDIT_DAILY_RUNTIME_ENABLED: 'false',
+  CHAIN_INDEXER_CUKIE_MASTER_ENABLED: 'false',
+  COMPETITION_CREDITS_RUNTIME_ENABLED: 'false',
+  GAME_ECONOMY_RUNTIME_ENABLED: 'false',
   CUKIE_POOL_RUNTIME_ENABLED: 'false',
+  REWARD_ACCOUNTING_SCHEDULER_ENABLED: 'false',
   REWARD_ACCOUNTING_RUNTIME_ENABLED: 'false',
+  REWARD_DAILY_ACCOUNTING_ENABLED: 'false',
+  REWARD_WEEKLY_PAYOUT_ENABLED: 'false',
+  REWARD_POOL_TRANCHES_ENABLED: 'false',
+  REWARD_BATCH_PUBLISHER_ENABLED: 'false',
 };
 
 const checks = [
@@ -29,6 +35,10 @@ const checks = [
       '__tests__/app/dashboard-routes.test.tsx',
       '__tests__/components/app-layout-navigation.test.tsx',
       '__tests__/components/landing-header.test.tsx',
+      '__tests__/components/dashboard-overview-panel.test.tsx',
+      '__tests__/lib/dashboard-runtime.test.ts',
+      '__tests__/lib/dashboard-summary.test.ts',
+      '__tests__/lib/dashboard-default-dependencies.test.ts',
     ],
   },
   {
@@ -38,8 +48,6 @@ const checks = [
       'dapp',
       'test',
       '--runInBand',
-      '__tests__/components/economy-overview-panel.test.tsx',
-      '__tests__/components/holdings-overview-panel.test.tsx',
       '__tests__/components/ambassador-attribution-panel.test.tsx',
     ],
   },
@@ -58,6 +66,7 @@ const checks = [
       '__tests__/api/uki-marketplace-orders.test.ts',
       '__tests__/api/vesting-status-route.test.ts',
       '__tests__/api/ambassador-attribution-route.test.ts',
+      '__tests__/api/dashboard-summary.test.ts',
     ],
   },
   {

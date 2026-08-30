@@ -30,10 +30,16 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
 - En la rama de trabajo, `/dashboard` ya es la ruta canonica dentro del app
   shell y `/wallet` redirige a `/dashboard` como alias legacy. Este cambio aun
   no se ha desplegado en Stage.
-- El Dashboard consume modulos reales de Cukie Master, creditos, Cukie Pool,
-  rewards, marketplace, vesting y embajadores mediante sus APIs privadas.
-- Los modulos se degradan por separado ante errores, pero aun no existe la API
-  agregada con identidad, red, freshness y alertas priorizadas.
+- El Dashboard consume en una sola llamada privada
+  `/api/dashboard/v1/summary` los modulos reales de Cukie Master, creditos,
+  Cukie Pool, rewards, marketplace/Cukies, vesting y juego/ranking. Embajadores
+  conserva su API de lectura/escritura separada.
+- La wallet se deriva exclusivamente de la sesion EVM firmada; la API no
+  acepta otra wallet por query o body.
+- Cada modulo publica `ready`, `degraded` o `unavailable`, su timestamp y sus
+  incidencias. Un fallo conserva los demas datos y nunca se convierte en cero.
+- La UI muestra identidad, chain requerida/actual, freshness, alertas y cambio
+  explicito a BSC Testnet 97.
 - La home ya comunica el estado posterior a la preventa, la liquidez, el
   staking y el torneo.
 - `/vesting` ya consulta la posicion on-chain de la wallet sin exigir una
@@ -43,12 +49,12 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
 - El Cukie Pool se opera actualmente en `/cukie-hodler#mi-cukie-pool`.
 - Marketplace, inventario y juego tienen rutas propias; la navegacion comun
   ya expone el Dashboard, pero el sitemap operativo completo sigue pendiente.
-- Aun falta completar la agregacion de Cukies, juego/ranking, freshness y
-  alertas para satisfacer todo el punto 5.
+- Aun faltan el ajuste completo de navegacion, el render responsive/E2E y el
+  gate visual final. Ninguno de estos cambios se ha desplegado todavia.
 
-Por tanto, la frontera de rutas ya esta corregida localmente, pero el punto 5
-del DOCX no se considera cerrado hasta completar el contrato agregado, los
-estados operativos y el gate de Stage/Testnet.
+Por tanto, la frontera funcional del Dashboard esta cubierta localmente, pero
+el punto 5 del DOCX no se considera cerrado hasta completar la navegacion y
+validar el candidato agrupado en Stage/Testnet.
 
 ## Decisiones de arquitectura propuestas
 
@@ -229,6 +235,15 @@ Reglas del contrato:
 5. Alertas priorizadas y CTAs hacia las pantallas ya existentes.
 6. Navegacion que separe el sitio publico del app shell autenticado.
 7. Tests de contrato, auth, parcialidad, estados vacios y render responsive.
+
+Estado local de implementacion:
+
+- Puntos 1-5: implementados y cubiertos por el gate
+  `pnpm staging:dashboard:verify-local`.
+- Punto 6: separacion publico/app shell iniciada; falta incorporar todos los
+  destinos operativos sin duplicar rutas legacy.
+- Punto 7: contrato, auth, parcialidad, vacios y chain cubiertos; responsive y
+  E2E se validaran sobre el candidato agrupado.
 
 ## Ampliaciones posteriores
 

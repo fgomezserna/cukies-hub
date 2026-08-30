@@ -89,9 +89,10 @@ Tambien verifica APIs, HMAC, indices y la preparacion preview-only de claims y d
 publica ni escribe en Stage.
 
 El gate del dashboard valida la ruta canonica `/dashboard`, el alias legacy `/wallet`, la
-navegacion, los modulos economicos y las APIs privadas que los alimentan. Ejecuta todo con
-Stage/chain `97`, los runtimes automaticos desactivados y repositorios mock o en memoria; no
-despliega, firma ni escribe en las bases de Stage.
+navegacion, el contrato agregado `/api/dashboard/v1/summary`, la sesion EVM firmante, la
+degradacion parcial, los timestamps, la red del navegador y los adaptadores de todos los
+dominios. Ejecuta todo con Stage/chain `97`, los runtimes automaticos desactivados y repositorios
+mock o en memoria; no despliega, firma ni escribe en las bases de Stage.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 
