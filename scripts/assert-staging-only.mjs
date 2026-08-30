@@ -8,6 +8,7 @@ export const STAGING_TARGET = Object.freeze({
   coolifyApplicationId: '28',
   coolifyResourceUuid: 'u4s804o4wwcckowgk0woo4wg',
   chainId: '97',
+  blockExplorerBaseUrl: 'https://testnet.bscscan.com',
   databaseName: 'cukies-hub-staging',
   legacyDatabaseName: 'cukies-legacy-staging',
   indexerDatabaseName: 'cukieshub-new-staging',
@@ -82,6 +83,37 @@ function requireStagingAuthUrl(environment, failures) {
   }
 }
 
+function requireSafeStagingSwapUrl(environment, failures) {
+  const value = environment.NEXT_PUBLIC_UKI_SWAP_URL?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const expectedAsm = environment.NEXT_PUBLIC_ASM_TOKEN_ADDRESS?.trim();
+    const expectedUki = environment.NEXT_PUBLIC_UKI_TOKEN_ADDRESS?.trim();
+    if (
+      url.protocol !== 'https:'
+      || url.origin !== 'https://pancakeswap.finance'
+      || url.searchParams.get('chain') !== 'bscTestnet'
+    ) {
+      failures.push('NEXT_PUBLIC_UKI_SWAP_URL must target PancakeSwap BSC Testnet');
+      return null;
+    }
+    if (
+      !expectedAsm
+      || !expectedUki
+      || url.searchParams.get('inputCurrency')?.toLowerCase() !== expectedAsm.toLowerCase()
+      || url.searchParams.get('outputCurrency')?.toLowerCase() !== expectedUki.toLowerCase()
+    ) {
+      failures.push('NEXT_PUBLIC_UKI_SWAP_URL must use the configured staging ASM/UKI tokens');
+      return null;
+    }
+    return url.toString();
+  } catch {
+    failures.push('NEXT_PUBLIC_UKI_SWAP_URL is not a valid URL');
+    return null;
+  }
+}
+
 export function validateStagingEnvironment(environment = process.env, scope = 'full') {
   const failures = [];
   const supportedScopes = new Set([
@@ -124,14 +156,24 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
   let cardWorkerDatabaseName = null;
   let cardWorkerMongoDatabaseName = null;
   let authHost = null;
+  let blockExplorerBaseUrl = null;
+  let swapUrl = null;
 
   if (scope === 'full' || scope === 'dapp') {
+    requireExact(environment, 'NEXT_PUBLIC_APP_ENV', STAGING_TARGET.appEnv, failures);
     publicChainId = requireExact(
       environment,
       'NEXT_PUBLIC_UKI_CHAIN_ID',
       STAGING_TARGET.chainId,
       failures,
     );
+    blockExplorerBaseUrl = requireExact(
+      environment,
+      'NEXT_PUBLIC_BSCSCAN_BASE_URL',
+      STAGING_TARGET.blockExplorerBaseUrl,
+      failures,
+    );
+    swapUrl = requireSafeStagingSwapUrl(environment, failures);
     legacyDatabaseName = requireMongoDatabase(
       environment,
       'CUKIES_DATABASE_URL',
@@ -208,6 +250,8 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     cardWorkerDatabaseName,
     cardWorkerMongoDatabaseName,
     authHost,
+    blockExplorerBaseUrl,
+    swapUrl,
   };
 }
 

@@ -12,7 +12,11 @@ function stagingEnvironment(overrides = {}) {
     STAGING_ONLY_GUARD: 'true',
     COOLIFY_BRANCH: '"staging"',
     COOLIFY_RESOURCE_UUID: 'u4s804o4wwcckowgk0woo4wg',
+    NEXT_PUBLIC_APP_ENV: 'staging',
     NEXT_PUBLIC_UKI_CHAIN_ID: '97',
+    NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
+    NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+    NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
     DATABASE_URL: 'mongodb://staging-user:redacted@mongo:27017/cukies-hub-staging?authSource=admin',
     CUKIES_DATABASE_URL:
@@ -46,6 +50,13 @@ for (const [name, override, expectedMessage] of [
   ['main branch', { COOLIFY_BRANCH: '"main"' }, 'must equal staging'],
   ['production Coolify UUID', { COOLIFY_RESOURCE_UUID: 'jookw8ow8woks088s44404ok' }, 'must equal u4s804'],
   ['BSC mainnet public chain', { NEXT_PUBLIC_UKI_CHAIN_ID: '56' }, 'must equal 97'],
+  ['public production app env', { NEXT_PUBLIC_APP_ENV: 'production' }, 'must equal staging'],
+  ['BscScan mainnet', { NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://bscscan.com' }, 'testnet.bscscan.com'],
+  [
+    'PancakeSwap mainnet',
+    { NEXT_PUBLIC_UKI_SWAP_URL: 'https://pancakeswap.finance/swap?chain=bsc' },
+    'must target PancakeSwap BSC Testnet',
+  ],
   ['BSC mainnet indexer chain', { CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '56' }, 'must equal 97'],
   ['production hub database', { DATABASE_URL: 'mongodb://mongo:27017/cukies-hub' }, 'cukies-hub-staging'],
   [
@@ -76,6 +87,22 @@ test('never includes Mongo credentials in a rejection message', () => {
       DATABASE_URL: `mongodb://user:${secret}@mongo:27017/production`,
     })),
     (error) => error instanceof StagingGuardError && !error.message.includes(secret),
+  );
+});
+
+test('accepts an optional swap only when it uses the configured testnet tokens', () => {
+  const result = validateStagingEnvironment(stagingEnvironment({
+    NEXT_PUBLIC_UKI_SWAP_URL:
+      'https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+  }));
+
+  assert.match(result.swapUrl, /chain=bscTestnet/);
+  assert.throws(
+    () => validateStagingEnvironment(stagingEnvironment({
+      NEXT_PUBLIC_UKI_SWAP_URL:
+        'https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0x1111111111111111111111111111111111111111&outputCurrency=0x2222222222222222222222222222222222222222',
+    })),
+    /must use the configured staging ASM\/UKI tokens/,
   );
 });
 

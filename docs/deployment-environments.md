@@ -117,9 +117,11 @@ Reglas operativas:
 El guard `pnpm guard:staging` valida sin imprimir secretos:
 
 - `APP_ENV=staging`;
+- `NEXT_PUBLIC_APP_ENV=staging` en el bundle público;
 - rama real inyectada por Coolify `COOLIFY_BRANCH=staging`;
 - UUID real del recurso `u4s804o4wwcckowgk0woo4wg` (app `28`);
 - BSC Testnet `97` tanto en la dapp como en el indexer;
+- explorer público exacto `https://testnet.bscscan.com` y ausencia de enlaces PancakeSwap mainnet;
 - `DATABASE_URL` -> `cukies-hub-staging`;
 - `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`;
 - `CHAIN_INDEXER_DB_NAME` y `CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`;
@@ -184,13 +186,18 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `TREASURE_HUNT_COMPETITION_MAX_WINS_PER_WALLET` | `1` | Igual si se aprueba | Sin ganadores duplicados. |
 | `NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED` (`sybil-slayer`) | `true` solo durante QA autorizada | `false` | Variable de build del recurso separado; exige rebuild. |
 | `NEXT_PUBLIC_DAPP_ORIGIN` (`sybil-slayer`) | `https://cukieshub.eurekand.com` | Origen dapp production | Variable de build y origen exacto permitido por `frame-ancestors`. |
+| `NEXT_PUBLIC_APP_ENV` | `staging` | `production` | Se deriva de `APP_ENV` durante el build para que el cliente también falle cerrado. |
 | `NEXT_PUBLIC_UKI_CHAIN_ID` | `97` | `56` | BSC testnet vs BSC mainnet. |
-| `NEXT_PUBLIC_ASM_TOKEN_ADDRESS` | ASM testnet | ASM mainnet | Verificado por chain. |
-| `NEXT_PUBLIC_UKI_TOKEN_ADDRESS` | UKI testnet | UKI mainnet | Desde freeze/deploy. |
+| `NEXT_PUBLIC_ASM_TOKEN_ADDRESS` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` | ASM mainnet | Verificado por chain. |
+| `NEXT_PUBLIC_UKI_TOKEN_ADDRESS` | `0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c` | UKI mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS` | Vault testnet | Vault mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_PRESALE_ADDRESS` | Presale testnet | Presale mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
 | `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
+| `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | Vacío hasta verificar un pool testnet | Pair mainnet oficial | Si está vacío, la home no anuncia ni enlaza un pool. |
+| `NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS` | Vacío hasta verificar un locker testnet | Locker mainnet oficial | Si está vacío, la home no anuncia ni enlaza liquidez bloqueada. |
+| `NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL` | Vacío sin locker testnet | Fecha UTC aprobada | Es solo texto; exige un locker configurado para mostrarse. |
+| `NEXT_PUBLIC_UKI_SWAP_URL` | Vacío salvo URL verificada con `chain=bscTestnet` | Opcional; mainnet se construye con ASM/UKI | Stage nunca genera automáticamente una compra: sin pool confirmado, el CTA queda deshabilitado. |
 | `NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Colección mainnet pendiente | Colección ERC-721 V2 custodiable de staging. |
 | `NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault mainnet pendiente | Custodia NFT para la ruta Cukie Master. |
 | `NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | Vault mainnet pendiente | Custodia NFT para el Cukie Pool. |

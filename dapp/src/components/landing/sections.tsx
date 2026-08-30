@@ -19,10 +19,9 @@ import {
 
 import {
   faqsByLocale,
+  getParticipationSteps,
+  getTransparencyItems,
   landingCopyByLocale,
-  PANCAKESWAP_UKI_URL,
-  participationStepsByLocale,
-  transparencyItemsByLocale,
   utilityCardsByLocale,
 } from './data';
 import { LandingFooter } from './footer';
@@ -37,10 +36,18 @@ import {
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { TOKENOMICS_URL_BY_LOCALE } from '@/lib/public-locale';
+import {
+  landingNetworkConfig,
+  type LandingNetworkConfig,
+} from '@/lib/landing-network';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { usePublicLocale } from '@/providers/public-locale-provider';
 
-export function CukiesLanding() {
+export function CukiesLanding({
+  network = landingNetworkConfig,
+}: {
+  network?: LandingNetworkConfig;
+} = {}) {
   return (
     <main
       id="contenido-principal"
@@ -50,10 +57,10 @@ export function CukiesLanding() {
       <div className="uki-noise" />
       <div className="uki-grid-bg" />
       <LandingHeader />
-      <HeroSection />
-      <LaunchStatusStrip />
+      <HeroSection network={network} />
+      <LaunchStatusStrip network={network} />
       <div className="uki-section-divider" />
-      <ParticipationFlow />
+      <ParticipationFlow network={network} />
       <div className="uki-section-divider" />
       <CompetitionSpotlight />
       <div className="uki-section-divider" />
@@ -65,7 +72,7 @@ export function CukiesLanding() {
       <div className="uki-section-divider" />
       <PresaleParticipants />
       <div className="uki-section-divider" />
-      <TransparencySection />
+      <TransparencySection network={network} />
       <div className="uki-section-divider" />
       <FaqAndCta />
       <LandingFooter />
@@ -73,7 +80,7 @@ export function CukiesLanding() {
   );
 }
 
-function HeroSection() {
+function HeroSection({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].hero;
 
@@ -91,12 +98,14 @@ function HeroSection() {
       <div className="uki-hero-vignette" />
       <div className="uki-container uki-hero-layout">
         <ScrollReveal animation="left" duration={900} className="uki-hero-content">
-          <p className="uki-launch-badge">{copy.badge}</p>
+          <p className="uki-launch-badge">
+            {network.appEnv === 'staging' ? `UKI · ${network.networkLabel}` : copy.badge}
+          </p>
           <h1 className="uki-hero-title max-w-[13ch] text-balance">
             <span className="uki-hero-title-line">{copy.title}</span>
           </h1>
           <p className="mt-5 max-w-[34rem] text-lg font-semibold leading-relaxed text-[var(--uki-text)] sm:text-xl">
-            {copy.lead}
+            {network.swapUrl ? copy.lead : copy.leadUnavailable}
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -105,33 +114,40 @@ function HeroSection() {
               {copy.stake}
             </LandingButton>
           </div>
-          <a
-            href={PANCAKESWAP_UKI_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
-          >
-            {copy.buy}
-            <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
-          </a>
+          {network.swapUrl ? (
+            <a
+              href={network.swapUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+            >
+              {copy.buy}
+              <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
+            </a>
+          ) : (
+            <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-muted)]" aria-disabled="true">
+              {copy.buyUnavailable}
+              <CircleAlert className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+          )}
         </ScrollReveal>
 
         <ScrollReveal animation="right" duration={900} className="uki-hero-overview-wrap w-full">
-          <LaunchOverview />
+          <LaunchOverview network={network} />
         </ScrollReveal>
       </div>
     </section>
   );
 }
 
-function LaunchOverview() {
+function LaunchOverview({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].hero;
 
   const rows = [
-    { icon: ShieldCheck, label: copy.pool, value: 'ASM / UKI', tone: 'text-[var(--uki-cyan)]' },
-    { icon: Crown, label: copy.staking, value: copy.network, tone: 'text-[var(--uki-gold)]' },
-    { icon: LockKeyhole, label: copy.lock, value: copy.lockValue, tone: 'text-[#f19bff]' },
+    { icon: ShieldCheck, label: copy.pool, value: network.liquidityPairAddress ? 'ASM / UKI' : copy.unavailable, tone: 'text-[var(--uki-cyan)]' },
+    { icon: Crown, label: copy.staking, value: network.stakingAddress ? network.networkLabel : copy.unavailable, tone: 'text-[var(--uki-gold)]' },
+    { icon: LockKeyhole, label: copy.lock, value: network.liquidityLockerAddress ? network.liquidityUnlockLabel ?? copy.lockValue : copy.unavailable, tone: 'text-[#f19bff]' },
   ];
 
   return (
@@ -145,7 +161,7 @@ function LaunchOverview() {
           <div>
             <p className="uki-label">{copy.live}</p>
             <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-cream)]">
-              ASM / UKI
+              {network.liquidityPairAddress ? 'ASM / UKI' : network.networkLabel}
             </p>
           </div>
           <div className="flex items-center -space-x-2" aria-label="Par oficial ASM y UKI">
@@ -172,36 +188,43 @@ function LaunchOverview() {
           ))}
         </div>
 
-        <a
-          href={PANCAKESWAP_UKI_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)] transition hover:bg-[var(--uki-cyan)]/15 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
-        >
-          <span>{copy.buy}</span>
-          <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
-        </a>
+        {network.swapUrl ? (
+          <a
+            href={network.swapUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)] transition hover:bg-[var(--uki-cyan)]/15 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+          >
+            <span>{copy.buy}</span>
+            <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
+          </a>
+        ) : (
+          <span className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-white/10 bg-white/[0.03] px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]" aria-disabled="true">
+            <span>{copy.buyUnavailable}</span>
+            <CircleAlert className="h-4 w-4" strokeWidth={1.8} />
+          </span>
+        )}
       </div>
     </Panel>
   );
 }
 
-function LaunchStatusStrip() {
+function LaunchStatusStrip({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].hero;
-  const items = [
-    [copy.pool, 'PancakeSwap V2'],
-    [copy.staking, copy.network],
-    [copy.lock, copy.lockValue],
+  const items: Array<[string, string, boolean]> = [
+    [copy.pool, network.liquidityPairAddress ? 'PancakeSwap V2' : copy.unavailable, Boolean(network.liquidityPairAddress)],
+    [copy.staking, network.stakingAddress ? network.networkLabel : copy.unavailable, Boolean(network.stakingAddress)],
+    [copy.lock, network.liquidityLockerAddress ? network.liquidityUnlockLabel ?? copy.lockValue : copy.unavailable, Boolean(network.liquidityLockerAddress)],
   ];
 
   return (
     <section aria-label={copy.live} className="uki-container uki-facts-section">
       <ScrollReveal animation="fade" duration={700}>
         <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#0d0b24]/82 sm:grid-cols-3">
-          {items.map(([label, value]) => (
+          {items.map(([label, value, active]) => (
             <article key={label} className="flex items-center gap-3 border-b border-white/10 px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#65e2a2] shadow-[0_0_14px_rgba(101,226,162,0.55)]" />
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${active ? 'bg-[#65e2a2] shadow-[0_0_14px_rgba(101,226,162,0.55)]' : 'bg-white/25'}`} />
               <div>
                 <p className="uki-label">{label}</p>
                 <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">{value}</p>
@@ -214,10 +237,10 @@ function LaunchStatusStrip() {
   );
 }
 
-function ParticipationFlow() {
+function ParticipationFlow({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].flow;
-  const steps = participationStepsByLocale[locale];
+  const steps = getParticipationSteps(locale, network);
 
   return (
     <section id="comprar" className="uki-container uki-home-section">
@@ -245,15 +268,22 @@ function ParticipationFlow() {
               <p className="mt-4 max-w-[34rem] text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
                 {step.text}
               </p>
-              <a
-                href={step.href}
-                target={step.external ? '_blank' : undefined}
-                rel={step.external ? 'noreferrer' : undefined}
-                className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
-              >
-                {step.action}
-                {step.external ? <ExternalLink className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-              </a>
+              {step.href ? (
+                <a
+                  href={step.href}
+                  target={step.external ? '_blank' : undefined}
+                  rel={step.external ? 'noreferrer' : undefined}
+                  className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+                >
+                  {step.action}
+                  {step.external ? <ExternalLink className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                </a>
+              ) : (
+                <span className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-muted)]" aria-disabled="true">
+                  {step.action}
+                  <CircleAlert className="h-4 w-4" />
+                </span>
+              )}
             </article>
           </ScrollReveal>
         ))}
@@ -573,10 +603,10 @@ function PresaleParticipants() {
   );
 }
 
-function TransparencySection() {
+function TransparencySection({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].transparency;
-  const items = transparencyItemsByLocale[locale];
+  const items = getTransparencyItems(locale, network);
 
   return (
     <section id="transparencia" className="uki-container uki-home-section">
@@ -612,6 +642,11 @@ function TransparencySection() {
           </ScrollReveal>
         ))}
       </div>
+      {items.length === 0 ? (
+        <p className="mt-7 rounded-[10px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm font-semibold text-[var(--uki-muted)]">
+          {copy.empty}
+        </p>
+      ) : null}
     </section>
   );
 }
