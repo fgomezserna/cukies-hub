@@ -434,7 +434,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
     },
     {
       question: '¿Por qué la compra directa se realiza con ASM?',
-      answer: 'El pool inicial es ASM/UKI. PancakeSwap puede no encontrar todavía una ruta automática desde BNB o USDT, por lo que la entrada directa y verificable es ASM.',
+      answer: 'En BSC Testnet, el pool verificado es ASM/UKI. No existe una ruta demostrada desde BNB o USDT, por lo que la única entrada habilitada en Stage es ASM.',
     },
     {
       question: '¿Cómo consigo intentos para el torneo?',
@@ -460,7 +460,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
     },
     {
       question: 'Why is the direct purchase made with ASM?',
-      answer: 'The initial pool is ASM/UKI. PancakeSwap may not yet find an automatic route from BNB or USDT, so ASM is the direct, verifiable entry asset.',
+      answer: 'On BSC Testnet, the verified pool is ASM/UKI. No route from BNB or USDT has been proven, so ASM is the only entry asset enabled in Stage.',
     },
     {
       question: 'How do I get tournament attempts?',

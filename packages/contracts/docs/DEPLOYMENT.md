@@ -205,6 +205,29 @@ It mints six original-generation fixtures to the testnet deployer, one for each 
 
 ## BSC Testnet Pancake V2 liquidity-lock rehearsal
 
+Before changing any public Stage link, run the read-only liquidity verifier. It refuses every
+network except BSC Testnet 97, pins the PancakeSwap V2 router/factory and verifies the deployed
+tASM/UKI pair, its reserves and the routes currently accepted by the router. It does not need a
+private key and never broadcasts:
+
+```bash
+pnpm --filter @cukies/contracts verify:testnet:pancake-liquidity
+```
+
+The verified Stage pair is `0x8fa397B4E1DED911161f13C128DF369cE9a95B3A`. The verifier emits
+the exact Stage URL for the direct ASM to UKI route. BNB remains disabled while neither
+WBNB/ASM nor WBNB/UKI has liquidity. USDT remains unconfigured until an explicitly approved
+Testnet token address is supplied as `PANCAKE_TESTNET_USDT_ADDRESS` and the verifier proves a
+working route. Never infer a Testnet USDT address from an unofficial list.
+
+The UKI logo used by Stage is the repository asset
+`dapp/public/brand/official/uki-token-cukies-world-coin.png`. PancakeSwap does not provide a
+repository-side metadata switch for this Testnet token: its current default and extended lists
+contain no chain-97 entries. Its published process points token icons to Trust Wallet assets and
+discourages unsolicited additions to the Pancake default/extended lists. Treat that as a separate
+external production-token process; do not submit a mainnet asset or third-party PR from this
+Testnet verification task.
+
 `LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.
 
 The rehearsal is chain-97-only and creates the initial tASM/tUKI PancakeSwap V2 pair with `0.1 tASM + 60 tUKI`, preserving the target ratio `1 ASM = 600 UKI`. It transfers every LP token minted to a short-lived test locker, proves that early release reverts and prints the public receipt/code-hash evidence needed for the completion step.

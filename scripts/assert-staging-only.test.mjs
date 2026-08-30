@@ -16,6 +16,7 @@ function stagingEnvironment(overrides = {}) {
     NEXT_PUBLIC_UKI_CHAIN_ID: '97',
     NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
     NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+    NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A',
     NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
     DATABASE_URL: 'mongodb://staging-user:redacted@mongo:27017/cukies-hub-staging?authSource=admin',
@@ -38,6 +39,7 @@ test('accepts only the exact staging application, chain and database perimeter',
   assert.equal(result.gitBranch, 'staging');
   assert.equal(result.coolifyApplicationId, '28');
   assert.equal(result.publicChainId, '97');
+  assert.equal(result.liquidityPairAddress, '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A');
   assert.equal(result.databaseName, 'cukies-hub-staging');
   assert.equal(result.legacyDatabaseName, 'cukies-legacy-staging');
   assert.equal(result.indexerDatabaseName, 'cukieshub-new-staging');
@@ -52,6 +54,21 @@ for (const [name, override, expectedMessage] of [
   ['BSC mainnet public chain', { NEXT_PUBLIC_UKI_CHAIN_ID: '56' }, 'must equal 97'],
   ['public production app env', { NEXT_PUBLIC_APP_ENV: 'production' }, 'must equal staging'],
   ['BscScan mainnet', { NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://bscscan.com' }, 'testnet.bscscan.com'],
+  [
+    'unknown ASM token',
+    { NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0x1111111111111111111111111111111111111111' },
+    'must equal 0xf93dd40',
+  ],
+  [
+    'unknown UKI token',
+    { NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x2222222222222222222222222222222222222222' },
+    'must equal 0x42895b',
+  ],
+  [
+    'unknown PancakeSwap pair',
+    { NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: '0x3333333333333333333333333333333333333333' },
+    'must equal 0x8fa397',
+  ],
   [
     'PancakeSwap mainnet',
     { NEXT_PUBLIC_UKI_SWAP_URL: 'https://pancakeswap.finance/swap?chain=bsc' },
@@ -103,6 +120,13 @@ test('accepts an optional swap only when it uses the configured testnet tokens',
         'https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0x1111111111111111111111111111111111111111&outputCurrency=0x2222222222222222222222222222222222222222',
     })),
     /must use the configured staging ASM\/UKI tokens/,
+  );
+  assert.throws(
+    () => validateStagingEnvironment(stagingEnvironment({
+      NEXT_PUBLIC_UKI_SWAP_URL:
+        'https://pancakeswap.finance/not-swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+    })),
+    /must target PancakeSwap BSC Testnet/,
   );
 });
 
