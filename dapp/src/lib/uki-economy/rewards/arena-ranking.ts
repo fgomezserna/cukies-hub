@@ -56,19 +56,22 @@ export async function resolveAppliedArenaRanking(input: {
   const shiftedPeriod = getIsoWeekPeriod(
     new Date(periodAnchorAt.getTime() - RANKING_BOUNDARY_SHIFT_MS),
   );
-  const previousPeriodId = getIsoWeekPeriodId(
-    new Date(shiftedPeriod.start.getTime() - 7 * 24 * 60 * 60_000),
-  );
-  const options = input.session ? { session: input.session } : undefined;
+  const options = input.session ? { session: input.session } : {};
   const previous = await input.db.collection<WeeklyRankingSnapshot>("game_weekly_rankings")
     .findOne({
-      periodId: previousPeriodId,
       gameId: input.gameId,
       walletNormalized,
       status: "sealed",
-    }, options);
+      periodStart: { $lt: shiftedPeriod.start },
+    }, {
+      ...options,
+      sort: { periodStart: -1, _id: -1 },
+    });
 
   if (!previous) {
+    const previousPeriodId = getIsoWeekPeriodId(
+      new Date(shiftedPeriod.start.getTime() - 7 * 24 * 60 * 60_000),
+    );
     const rank = 5;
     const snapshot = {
       rank,
@@ -89,6 +92,7 @@ export async function resolveAppliedArenaRanking(input: {
   }
 
   assertWeeklyRankingSnapshotIntegrity(previous);
+  const previousPeriodId = previous.periodId;
   const manifest = await input.db.collection<WeeklyRankingManifest>("weekly_ranking_manifests")
     .findOne({ manifestId: previous.manifestId, periodId: previousPeriodId }, options);
   if (!manifest) {

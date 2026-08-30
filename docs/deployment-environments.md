@@ -54,6 +54,7 @@ pnpm staging:cukie-master:verify-local
 pnpm staging:credits:verify-local
 pnpm staging:game-rewards:verify-local
 pnpm staging:marketplace:verify-local
+pnpm staging:weekly-rewards:verify-local
 ```
 
 Este comando levanta la red Hardhat efimera con `chainId=97` y usa contratos mock para UKI, USDT, WBNB, NFT y router cuando el escenario lo requiere. No se conecta a BSC Testnet, no usa fondos y no escribe en las bases de staging. Las pruebas de dapp e indexer deben ejecutarse con sus flags de staging y fixtures de chain `97`; las pruebas que escriben usan exclusivamente servicios locales o en memoria.
@@ -79,6 +80,12 @@ prestados, la prioridad Original -> Segunda Generacion -> Seiku, cuotas, settlem
 reparto a jugador/pools, minimo del pool de creditos, presupuesto diario, recuperacion de rewards,
 APIs privadas, schedulers e indices. La recuperacion filtra en Mongo los sources ya materializados
 antes de limitar el batch, evitando que el historial procesado oculte una partida sin premio.
+
+El gate semanal cubre exclusivamente Stage/chain `97`: ranking solo con creditos prestados,
+persistencia del ultimo rango aunque haya semanas sin actividad, 60/30/10, entropia BSC,
+siete tramos, minimo del pool de creditos, 80/10/10 no distribuido y embajadores directos al 5%.
+Tambien verifica APIs, HMAC, indices y la preparacion preview-only de claims y destinos; no firma,
+publica ni escribe en Stage.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 

@@ -27,6 +27,7 @@
     "staging:credits:verify-local": "node scripts/verify-staging-credits-local.mjs",
     "staging:game-rewards:verify-local": "node scripts/verify-staging-game-rewards-local.mjs",
     "staging:marketplace:verify-local": "node scripts/verify-staging-marketplace-local.mjs",
+    "staging:weekly-rewards:verify-local": "node scripts/verify-staging-weekly-rewards-local.mjs",
     "staging:indexer:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup",
     "staging:economy:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup:economy",
     "staging:economy:setup:prod": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm --filter @cukies/chain-indexer run setup:economy:prod",
