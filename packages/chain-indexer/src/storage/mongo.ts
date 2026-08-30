@@ -126,6 +126,45 @@ export class IndexerStore {
         .createIndex({ eventId: 1 }, { unique: true, sparse: true }),
       this.db.collection('point_balances').createIndex({ addressNormalized: 1 }, { unique: true }),
       this.db.collection('marketplace_listings').createIndex({ tokenId: 1 }, { unique: true }),
+      this.db.collection('uki_marketplace_orders').createIndex(
+        { chainId: 1, marketplaceAddressNormalized: 1, orderId: 1 },
+        { unique: true, name: 'uki_marketplace_order_identity' },
+      ),
+      this.db.collection('uki_marketplace_orders').createIndex(
+        {
+          chainId: 1,
+          marketplaceAddressNormalized: 1,
+          status: 1,
+          expiresAt: 1,
+          listedAt: -1,
+          _id: -1,
+        },
+        { name: 'uki_marketplace_public_active' },
+      ),
+      this.db.collection('uki_marketplace_orders').createIndex(
+        {
+          chainId: 1,
+          marketplaceAddressNormalized: 1,
+          sellerNormalized: 1,
+          listedAt: -1,
+          _id: -1,
+        },
+        { name: 'uki_marketplace_seller_history' },
+      ),
+      this.db.collection('uki_marketplace_orders').createIndex(
+        {
+          chainId: 1,
+          marketplaceAddressNormalized: 1,
+          collectionAddressNormalized: 1,
+          tokenId: 1,
+          listedAt: -1,
+        },
+        { name: 'uki_marketplace_asset_history' },
+      ),
+      this.db.collection('uki_marketplace_token_nonces').createIndex(
+        { chainId: 1, marketplaceAddressNormalized: 1, collectionAddressNormalized: 1, tokenId: 1 },
+        { unique: true, name: 'uki_marketplace_token_nonce_identity' },
+      ),
       this.db.collection('bridge_transfers').createIndex({ eventId: 1 }, { unique: true }),
       this.db.collection('presale_purchases').createIndex({ eventId: 1 }, { unique: true }),
       this.db.collection('presale_purchases').createIndex({ txHash: 1, logIndex: 1 }, { unique: true }),

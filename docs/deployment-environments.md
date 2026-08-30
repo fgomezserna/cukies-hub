@@ -206,6 +206,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_PRESALE_ADDRESS` | Presale testnet | Presale mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
 | `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | Vacío hasta desplegar y verificar el contrato nuevo en chain `97` | Marketplace UKI mainnet pendiente | Debe coincidir con `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS`; vacío mantiene la API cerrada. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | Vacío hasta verificar un pool testnet | Pair mainnet oficial | Si está vacío, la home no anuncia ni enlaza un pool. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS` | Vacío hasta verificar un locker testnet | Locker mainnet oficial | Si está vacío, la home no anuncia ni enlaza liquidez bloqueada. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL` | Vacío sin locker testnet | Fecha UTC aprobada | Es solo texto; exige un locker configurado para mostrarse. |
@@ -251,12 +252,16 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 
 | Variable | Staging | Nota |
 | --- | --- | --- |
-| `CHAIN_INDEXER_CONTRACT_ALIASES` | Aliases previos más `UKI_STAKING,TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT` | `UKI_STAKING` es obligatorio para elegibilidad y descalificación; nunca sustituir ni reiniciar aliases existentes. |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | Aliases previos más `UKI_STAKING,TOKEN_V2,CUKIE_MASTER_NFT_VAULT,CUKIE_POOL_NFT_VAULT`; añadir `UKI_MARKETPLACE` solo tras su despliegue verificado | Nunca sustituir ni reiniciar aliases existentes. `MARKETPLACE` conserva las órdenes Legacy BNB; `UKI_MARKETPLACE` es independiente. |
 | `CHAIN_INDEXER_TOKEN_ADDRESS` | Fuente legacy ya verificada | Se conserva sin cambios, con su identidad y cursores existentes. |
 | `CHAIN_INDEXER_TOKEN_V2_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Nueva colección ERC-721 custodiable de chain `97`; sin fallback a `TOKEN`. |
 | `CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault custodial independiente para Cukie Master. |
 | `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | Vault custodial independiente para Cukie Pool. |
 | `CHAIN_INDEXER_MARKETPLACE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos marketplace, sin custodia ni valor. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS` | Vacío hasta desplegar y verificar el contrato nuevo | Marketplace no custodial con precios UKI; no reutiliza la address Legacy BNB. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_{START_BSC_BLOCK,DEPLOYMENT_BSC_BLOCK}` | Vacío hasta despliegue | Ambos deben coincidir con el bloque exacto del receipt Testnet. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH` | Vacío hasta despliegue | Evidencia exacta del receipt BSC Testnet. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH` | Vacío hasta despliegue | Keccak-256 del bytecode runtime verificado. |
 | `CHAIN_INDEXER_BRIDGE_ADDRESS` | Pendiente de `deploy:testnet:nft-source` | Emisor testnet de eventos bridge, sin custodia ni valor. |
 | `CHAIN_INDEXER_TOKEN_V2_{START_BSC_BLOCK,DEPLOYMENT_BSC_BLOCK}` | `125280412` | Start y deployment block coinciden. |
 | `CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_TX_HASH` | `0xef06344f418e176f1f1a5d7a4f7acf98680fcfd344331ff7323d0cf1ac7e77a9` | Receipt BSC Testnet verificado. |

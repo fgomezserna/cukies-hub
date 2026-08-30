@@ -115,6 +115,49 @@ export function normalizeDomainEvent(
     });
   }
 
+  if (contractAlias === 'UKI_MARKETPLACE') {
+    const collection = getString(args.collection);
+    const seller = getString(args.seller);
+    const buyer = getString(args.buyer);
+    const owner = getString(args.owner);
+    const paymentToken = getString(args.paymentToken);
+    const status = eventName === 'UkiMarketplaceOrderCreated'
+      ? 'active'
+      : eventName === 'UkiMarketplaceOrderFilled'
+        ? 'sold'
+        : eventName === 'UkiMarketplaceOrderCancelled'
+          ? 'cancelled'
+          : eventName === 'UkiMarketplaceOrderExpired'
+            ? 'expired'
+            : eventName === 'UkiMarketplaceOrderInvalidated'
+              ? 'invalid'
+              : null;
+
+    return toJsonRecord({
+      ...base,
+      orderId: getString(args.orderId),
+      collection,
+      collectionNormalized: normalizeAddress(chain, collection),
+      seller,
+      sellerNormalized: normalizeAddress(chain, seller),
+      buyer,
+      buyerNormalized: normalizeAddress(chain, buyer),
+      owner,
+      ownerNormalized: normalizeAddress(chain, owner),
+      paymentToken,
+      paymentTokenNormalized: normalizeAddress(chain, paymentToken),
+      ukiPriceRaw: getString(args.ukiPrice),
+      paymentAmountRaw: getString(args.paymentAmount),
+      feeAmountRaw: getString(args.feeAmount),
+      expiresAtRaw: getString(args.expiresAt),
+      nonceRaw: getString(args.nonce),
+      feeBpsRaw: getString(args.feeBps),
+      reason: getString(args.reason),
+      status,
+      txType: eventName,
+    });
+  }
+
   if (eventName === 'Stake' || eventName === 'Unstake') {
     return toJsonRecord({
       ...base,

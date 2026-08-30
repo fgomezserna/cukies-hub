@@ -282,6 +282,7 @@ export async function ingestBscOnce(
     tokenAddress: config.tokenAddress,
     tokenV2Address: config.tokenV2Address,
     marketplaceAddress: config.marketplaceAddress,
+    ukiMarketplaceAddress: config.ukiMarketplaceAddress,
     bridgeAddress: config.bridgeAddress,
     presaleAddress: config.presaleAddress,
     ukiStakingAddress: config.ukiStakingAddress,
@@ -370,6 +371,8 @@ export async function ingestBscOnce(
               ? config.tokenV2StartBlock
               : contractEvent.contractAlias === 'MARKETPLACE'
                 ? config.marketplaceStartBlock
+                : contractEvent.contractAlias === 'UKI_MARKETPLACE'
+                  ? config.ukiMarketplaceStartBlock
                 : contractEvent.contractAlias === 'BRIDGE'
                   ? config.bridgeStartBlock
                   : contractEvent.contractAlias === 'CUKIE_MASTER_NFT_VAULT'

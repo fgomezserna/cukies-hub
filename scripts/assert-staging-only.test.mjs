@@ -106,6 +106,29 @@ test('accepts an optional swap only when it uses the configured testnet tokens',
   );
 });
 
+test('accepts only one coherent optional UKI marketplace address across dapp and indexer', () => {
+  const marketplace = '0x1111111111111111111111111111111111111111';
+  const result = validateStagingEnvironment(stagingEnvironment({
+    NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: marketplace,
+    CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: marketplace.toUpperCase().replace('0X', '0x'),
+  }));
+  assert.equal(result.ukiMarketplaceAddress, marketplace);
+
+  assert.throws(
+    () => validateStagingEnvironment(stagingEnvironment({
+      NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: marketplace,
+      CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: '0x2222222222222222222222222222222222222222',
+    })),
+    /marketplace addresses must match/,
+  );
+  assert.throws(
+    () => validateStagingEnvironment(stagingEnvironment({
+      NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: '0x0000000000000000000000000000000000000000',
+    })),
+    /non-zero BSC address/,
+  );
+});
+
 test('uses service scopes without requiring unrelated credentials', () => {
   const common = {
     APP_ENV: 'staging',

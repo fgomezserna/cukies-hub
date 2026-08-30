@@ -69,9 +69,24 @@ test('dapp injects the public environment identity and optional liquidity links'
 
   assert.ok(definition.includes('        NEXT_PUBLIC_APP_ENV: ${APP_ENV:-production}'));
   assert.ok(definition.includes('      NEXT_PUBLIC_APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}'));
+  assert.ok(definition.includes('      NEXT_PUBLIC_UKI_CHAIN_ID: ${NEXT_PUBLIC_UKI_CHAIN_ID:-56}'));
+  assert.ok(definition.includes('      NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: ${NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_SWAP_URL: ${NEXT_PUBLIC_UKI_SWAP_URL:-}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: ${NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS:-}'));
+  assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: ${CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS:-${NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS:-}}'));
+  assert.ok(definition.includes('CHAIN_INDEXER_BSC_RPC_URLS: ${CHAIN_INDEXER_BSC_RPC_URLS:-}'));
+});
+
+test('chain-indexer receives an isolated verified UKI marketplace identity', () => {
+  const definition = serviceDefinition('chain-indexer');
+
+  assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: ${CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS:-${NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS:-}}'));
+  assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK: ${CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK:-}'));
+  assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_BSC_BLOCK: ${CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_BSC_BLOCK:-}'));
+  assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH: ${CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH:-}'));
+  assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH: ${CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH:-}'));
 });
 
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {

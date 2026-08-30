@@ -135,6 +135,8 @@ function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
     tokenAddress: process.env.CHAIN_INDEXER_TOKEN_ADDRESS,
     tokenV2Address: process.env.CHAIN_INDEXER_TOKEN_V2_ADDRESS,
     marketplaceAddress: process.env.CHAIN_INDEXER_MARKETPLACE_ADDRESS,
+    ukiMarketplaceAddress: process.env.CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS
+      ?? process.env.NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS,
     bridgeAddress: process.env.CHAIN_INDEXER_BRIDGE_ADDRESS,
     presaleAddress: process.env.CHAIN_INDEXER_PRESALE_ADDRESS,
     ukiStakingAddress: process.env.CHAIN_INDEXER_UKI_STAKING_ADDRESS,
@@ -145,8 +147,9 @@ function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
   })[event.chain];
   const normalized = normalizeAddress(event.chain, value);
 
-  return Object.values(addresses).some(
-    (address) => normalizeAddress(event.chain, address) === normalized,
+  return Object.entries(addresses).some(
+    ([alias, address]) => alias !== 'UKI_MARKETPLACE'
+      && normalizeAddress(event.chain, address) === normalized,
   );
 }
 
@@ -567,6 +570,316 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
   }
 
   return null;
+}
+
+type UkiMarketplaceTerminalStatus = 'sold' | 'cancelled' | 'expired' | 'invalid';
+
+function bytes32Field(event: ChainEvent, key: string) {
+  const value = stringField(event, key)?.toLowerCase() ?? null;
+  return value && /^0x[0-9a-f]{64}$/.test(value) ? value : null;
+}
+
+function uintStringField(event: ChainEvent, key: string) {
+  const value = stringField(event, key);
+  return value && /^\d+$/.test(value) ? value : null;
+}
+
+function ukiMarketplaceOrderDocumentId(event: ChainEvent, orderId: string) {
+  if (event.chainId !== 56 && event.chainId !== 97) {
+    throw new Error(`${event.eventName} no tiene chainId BSC 56/97.`);
+  }
+  return `${event.chainId}:${event.contractAddress.toLowerCase()}:${orderId}`;
+}
+
+function ukiMarketplaceEventEvidence(event: ChainEvent) {
+  return {
+    eventId: event._id,
+    transactionHash: event.txHash.toLowerCase(),
+    blockNumber: event.blockNumber,
+    logIndex: event.logIndex,
+    observedAt: eventDate(event),
+    ...(event.blockHash ? { blockHash: event.blockHash.toLowerCase() } : {}),
+  };
+}
+
+async function transitionUkiMarketplaceOrder(input: {
+  store: IndexerStore;
+  event: ChainEvent;
+  orderId: string;
+  status: UkiMarketplaceTerminalStatus;
+  values: Record<string, unknown>;
+}) {
+  const orders = collection(input.store, 'uki_marketplace_orders');
+  const documentId = ukiMarketplaceOrderDocumentId(input.event, input.orderId);
+  const current = await orders.findOne({ _id: documentId });
+  if (!current) {
+    throw new Error(`${input.event.eventName} ${input.orderId} no tiene OrderCreated proyectado.`);
+  }
+  if (current.status === input.status && current.stateEventId === input.event._id) return;
+  if (current.status !== 'active') {
+    throw new Error(
+      `${input.event.eventName} ${input.orderId} contradice el estado ${String(current.status)}.`,
+    );
+  }
+
+  const result = await orders.updateOne(
+    { _id: documentId, status: 'active' },
+    {
+      $set: {
+        status: input.status,
+        ...input.values,
+        stateEventId: input.event._id,
+        updatedAt: now(),
+      },
+    },
+  );
+  if (result.matchedCount !== 1) {
+    throw new Error(`${input.event.eventName} ${input.orderId} perdio la transicion atomica.`);
+  }
+}
+
+export async function projectUkiMarketplaceEvent(
+  store: IndexerStore,
+  event: ChainEvent,
+) {
+  if (event.chain !== 'BSC' || event.contractAlias !== 'UKI_MARKETPLACE') {
+    return `${event.eventName} fuera de UKI_MARKETPLACE BSC`;
+  }
+  await verifiedContractCursor(store, event, 'UKI_MARKETPLACE');
+  if (event.chainId !== 56 && event.chainId !== 97) {
+    return `${event.eventName} sin chainId BSC valido`;
+  }
+  if (!isAddress(event.contractAddress) || /^0x0{40}$/i.test(event.contractAddress)) {
+    return `${event.eventName} sin marketplace address BSC valida`;
+  }
+
+  if (event.eventName === 'UkiMarketplaceTokenNonceInvalidated') {
+    const collectionAddress = stringField(event, 'collection');
+    const collectionAddressNormalized = stringField(event, 'collectionNormalized');
+    const owner = stringField(event, 'owner');
+    const ownerNormalized = stringField(event, 'ownerNormalized');
+    const id = tokenId(event);
+    const nonceRaw = uintStringField(event, 'nonceRaw');
+    if (
+      !collectionAddress
+      || !collectionAddressNormalized
+      || !isAddress(collectionAddress)
+      || !owner
+      || !ownerNormalized
+      || !isAddress(owner)
+      || !id
+      || !/^\d+$/.test(id)
+      || !nonceRaw
+    ) {
+      return 'TokenNonceInvalidated UKI con evidencia invalida';
+    }
+    const documentId = [
+      event.chainId,
+      event.contractAddress.toLowerCase(),
+      collectionAddressNormalized,
+      id,
+    ].join(':');
+    await monotonicAbsoluteUpdate(
+      collection(store, 'uki_marketplace_token_nonces'),
+      documentId,
+      { blockNumber: event.blockNumber, logIndex: event.logIndex },
+      {
+        chain: 'BSC',
+        chainId: event.chainId,
+        marketplaceAddressNormalized: event.contractAddress.toLowerCase(),
+        collectionAddress,
+        collectionAddressNormalized,
+        tokenId: id,
+        nonceRaw,
+        owner,
+        ownerNormalized,
+        invalidationEventId: event._id,
+        invalidatedAt: eventDate(event),
+        updatedAt: now(),
+      },
+      now(),
+    );
+    return null;
+  }
+
+  const orderId = bytes32Field(event, 'orderId');
+  if (!orderId) return `${event.eventName} sin orderId bytes32 valido`;
+
+  if (event.eventName === 'UkiMarketplaceOrderCreated') {
+    const collectionAddress = stringField(event, 'collection');
+    const collectionAddressNormalized = stringField(event, 'collectionNormalized');
+    const seller = stringField(event, 'seller');
+    const sellerNormalized = stringField(event, 'sellerNormalized');
+    const id = tokenId(event);
+    const ukiPriceRaw = uintStringField(event, 'ukiPriceRaw');
+    const expiresAtRaw = uintStringField(event, 'expiresAtRaw');
+    const nonceRaw = uintStringField(event, 'nonceRaw');
+    const feeBpsRaw = uintStringField(event, 'feeBpsRaw');
+    if (
+      !collectionAddress
+      || !collectionAddressNormalized
+      || !isAddress(collectionAddress)
+      || !seller
+      || !sellerNormalized
+      || !isAddress(seller)
+      || !id
+      || !/^\d+$/.test(id)
+      || !ukiPriceRaw
+      || BigInt(ukiPriceRaw) === 0n
+      || !expiresAtRaw
+      || BigInt(expiresAtRaw) <= BigInt(Math.floor(event.timestampMs / 1_000))
+      || !nonceRaw
+      || BigInt(nonceRaw) === 0n
+      || !feeBpsRaw
+      || BigInt(feeBpsRaw) > 1_000n
+    ) {
+      return 'OrderCreated UKI con evidencia invalida';
+    }
+    const expiresAtMs = BigInt(expiresAtRaw) * 1_000n;
+    if (expiresAtMs > BigInt(Number.MAX_SAFE_INTEGER)) {
+      return 'OrderCreated UKI con expiracion fuera de rango';
+    }
+    const documentId = ukiMarketplaceOrderDocumentId(event, orderId);
+    const orders = collection(store, 'uki_marketplace_orders');
+    const current = await orders.findOne({ _id: documentId });
+    if (current) {
+      if (current.createdEventId === event._id) return null;
+      throw new Error(`OrderCreated UKI duplicado para ${orderId}.`);
+    }
+    await orders.updateOne(
+      { _id: documentId },
+      {
+        $setOnInsert: {
+          _id: documentId,
+          orderId,
+          chain: 'BSC',
+          chainId: event.chainId,
+          marketplaceAddressNormalized: event.contractAddress.toLowerCase(),
+          collectionAddress,
+          collectionAddressNormalized,
+          tokenId: id,
+          seller,
+          sellerNormalized,
+          ukiPriceRaw,
+          expiresAtRaw,
+          expiresAt: new Date(Number(expiresAtMs)),
+          nonceRaw,
+          feeBps: Number(feeBpsRaw),
+          status: 'active',
+          createdEventId: event._id,
+          stateEventId: event._id,
+          createdEvidence: ukiMarketplaceEventEvidence(event),
+          listedAt: eventDate(event),
+          createdAt: now(),
+          updatedAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+    return null;
+  }
+
+  if (event.eventName === 'UkiMarketplaceOrderCancelled') {
+    const seller = stringField(event, 'seller');
+    const sellerNormalized = stringField(event, 'sellerNormalized');
+    const documentId = ukiMarketplaceOrderDocumentId(event, orderId);
+    const current = await collection(store, 'uki_marketplace_orders').findOne({ _id: documentId });
+    if (
+      !seller
+      || !sellerNormalized
+      || !isAddress(seller)
+      || (current && current.sellerNormalized !== sellerNormalized)
+    ) {
+      return 'OrderCancelled UKI con seller invalido';
+    }
+    await transitionUkiMarketplaceOrder({
+      store,
+      event,
+      orderId,
+      status: 'cancelled',
+      values: {
+        cancelledAt: eventDate(event),
+        cancelledEvidence: ukiMarketplaceEventEvidence(event),
+      },
+    });
+    return null;
+  }
+
+  if (event.eventName === 'UkiMarketplaceOrderExpired') {
+    await transitionUkiMarketplaceOrder({
+      store,
+      event,
+      orderId,
+      status: 'expired',
+      values: {
+        expiredAt: eventDate(event),
+        expiredEvidence: ukiMarketplaceEventEvidence(event),
+      },
+    });
+    return null;
+  }
+
+  if (event.eventName === 'UkiMarketplaceOrderInvalidated') {
+    const reason = bytes32Field(event, 'reason');
+    if (!reason) return 'OrderInvalidated UKI sin reason bytes32 valido';
+    await transitionUkiMarketplaceOrder({
+      store,
+      event,
+      orderId,
+      status: 'invalid',
+      values: {
+        invalidReason: reason,
+        invalidatedAt: eventDate(event),
+        invalidatedEvidence: ukiMarketplaceEventEvidence(event),
+      },
+    });
+    return null;
+  }
+
+  if (event.eventName === 'UkiMarketplaceOrderFilled') {
+    const buyer = stringField(event, 'buyer');
+    const buyerNormalized = stringField(event, 'buyerNormalized');
+    const paymentToken = stringField(event, 'paymentToken');
+    const paymentTokenNormalized = stringField(event, 'paymentTokenNormalized');
+    const paymentAmountRaw = uintStringField(event, 'paymentAmountRaw');
+    const feeAmountRaw = uintStringField(event, 'feeAmountRaw');
+    const ukiPriceRaw = uintStringField(event, 'ukiPriceRaw');
+    const documentId = ukiMarketplaceOrderDocumentId(event, orderId);
+    const current = await collection(store, 'uki_marketplace_orders').findOne({ _id: documentId });
+    if (
+      !buyer
+      || !buyerNormalized
+      || !isAddress(buyer)
+      || !paymentToken
+      || !paymentTokenNormalized
+      || !isAddress(paymentToken)
+      || !paymentAmountRaw
+      || !feeAmountRaw
+      || !ukiPriceRaw
+      || (current && current.ukiPriceRaw !== ukiPriceRaw)
+    ) {
+      return 'OrderFilled UKI con evidencia de pago invalida';
+    }
+    await transitionUkiMarketplaceOrder({
+      store,
+      event,
+      orderId,
+      status: 'sold',
+      values: {
+        buyer,
+        buyerNormalized,
+        paymentToken,
+        paymentTokenNormalized,
+        paymentAmountRaw,
+        feeAmountRaw,
+        soldAt: eventDate(event),
+        soldEvidence: ukiMarketplaceEventEvidence(event),
+      },
+    });
+    return null;
+  }
+
+  return `Evento UKI marketplace no soportado: ${event.eventName}`;
 }
 
 async function projectStaking(store: IndexerStore, event: ChainEvent) {
@@ -1503,6 +1816,10 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'CukieMetadataConfigured') {
     return projectCukieMetadata(store, event);
+  }
+
+  if (event.contractAlias === 'UKI_MARKETPLACE') {
+    return projectUkiMarketplaceEvent(store, event);
   }
 
   if (

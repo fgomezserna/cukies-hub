@@ -114,6 +114,23 @@ function requireSafeStagingSwapUrl(environment, failures) {
   }
 }
 
+function validateOptionalUkiMarketplaceIdentity(environment, failures) {
+  const publicAddress = environment.NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS?.trim();
+  const indexerAddress = environment.CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS?.trim();
+  for (const [key, address] of [
+    ['NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS', publicAddress],
+    ['CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS', indexerAddress],
+  ]) {
+    if (address && (!/^0x[0-9a-f]{40}$/i.test(address) || /^0x0{40}$/i.test(address))) {
+      failures.push(`${key} must be a non-zero BSC address`);
+    }
+  }
+  if (publicAddress && indexerAddress && publicAddress.toLowerCase() !== indexerAddress.toLowerCase()) {
+    failures.push('public and indexer UKI marketplace addresses must match');
+  }
+  return publicAddress?.toLowerCase() ?? indexerAddress?.toLowerCase() ?? null;
+}
+
 export function validateStagingEnvironment(environment = process.env, scope = 'full') {
   const failures = [];
   const supportedScopes = new Set([
@@ -158,6 +175,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
   let authHost = null;
   let blockExplorerBaseUrl = null;
   let swapUrl = null;
+  let ukiMarketplaceAddress = null;
 
   if (scope === 'full' || scope === 'dapp') {
     requireExact(environment, 'NEXT_PUBLIC_APP_ENV', STAGING_TARGET.appEnv, failures);
@@ -216,6 +234,10 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     );
   }
 
+  if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer') {
+    ukiMarketplaceAddress = validateOptionalUkiMarketplaceIdentity(environment, failures);
+  }
+
   if (scope === 'full' || scope === 'cuki-card-worker') {
     cardWorkerDatabaseName = requireExact(
       environment,
@@ -252,6 +274,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     authHost,
     blockExplorerBaseUrl,
     swapUrl,
+    ukiMarketplaceAddress,
   };
 }
 
