@@ -120,6 +120,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     'full',
     'dapp',
     'chain-indexer',
+    'cukies-bridge-relayer',
     'cuki-card-worker',
     'economy-scheduler',
   ]);
@@ -155,6 +156,8 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
   let indexerMongoDatabaseName = null;
   let cardWorkerDatabaseName = null;
   let cardWorkerMongoDatabaseName = null;
+  let bridgeRelayerDatabaseName = null;
+  let bridgeRelayerMongoDatabaseName = null;
   let authHost = null;
   let blockExplorerBaseUrl = null;
   let swapUrl = null;
@@ -231,6 +234,51 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     );
   }
 
+  if (scope === 'cukies-bridge-relayer') {
+    requireExact(environment, 'CUKIES_BRIDGE_RELAYER_ENABLED', 'true', failures);
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM',
+      'ENABLE_TRON_NILE_TO_BSC_TESTNET_RELAYER',
+      failures,
+    );
+    requireExact(environment, 'CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID', '97', failures);
+    requireExact(environment, 'CUKIES_BRIDGE_RELAYER_TRON_NETWORK', 'nile', failures);
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_TRON_RPC_URL',
+      'https://nile.trongrid.io',
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL',
+      'https://nile.trongrid.io/v1',
+      failures,
+    );
+    bridgeRelayerDatabaseName = requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_DB_NAME',
+      STAGING_TARGET.indexerDatabaseName,
+      failures,
+    );
+    bridgeRelayerMongoDatabaseName = requireMongoDatabase(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_MONGO_URL',
+      STAGING_TARGET.indexerDatabaseName,
+      failures,
+    );
+    for (const key of [
+      'CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS',
+      'CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS',
+      'CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS',
+      'CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS',
+      'CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS',
+      'CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS',
+      'CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY',
+    ]) required(environment, key, failures);
+  }
+
   if (failures.length > 0) throw new StagingGuardError(failures);
 
   return {
@@ -249,6 +297,8 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     indexerMongoDatabaseName,
     cardWorkerDatabaseName,
     cardWorkerMongoDatabaseName,
+    bridgeRelayerDatabaseName,
+    bridgeRelayerMongoDatabaseName,
     authHost,
     blockExplorerBaseUrl,
     swapUrl,

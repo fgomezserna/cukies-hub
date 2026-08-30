@@ -132,6 +132,28 @@ test('uses service scopes without requiring unrelated credentials', () => {
   assert.equal(validateStagingEnvironment({
     ...common,
     DATABASE_URL: 'mongodb://mongo:27017/cukies-hub-staging',
+    CUKIES_BRIDGE_RELAYER_ENABLED: 'true',
+    CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM:
+      'ENABLE_TRON_NILE_TO_BSC_TESTNET_RELAYER',
+    CUKIES_BRIDGE_RELAYER_MONGO_URL:
+      'mongodb://mongo:27017/cukieshub-new-staging',
+    CUKIES_BRIDGE_RELAYER_DB_NAME: 'cukieshub-new-staging',
+    CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: '97',
+    CUKIES_BRIDGE_RELAYER_TRON_NETWORK: 'nile',
+    CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: 'https://nile.trongrid.io',
+    CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL: 'https://nile.trongrid.io/v1',
+    CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS: 'TNileCollection',
+    CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS: 'TNileEndpoint',
+    CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS: '1788000000000',
+    CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS: 'https://bsc-testnet.example',
+    CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS: '0xcollection',
+    CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS: '0xendpoint',
+    CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY: 'present-not-printed',
+  }, 'cukies-bridge-relayer').scope, 'cukies-bridge-relayer');
+
+  assert.equal(validateStagingEnvironment({
+    ...common,
+    DATABASE_URL: 'mongodb://mongo:27017/cukies-hub-staging',
     CHAIN_INDEXER_MONGO_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',

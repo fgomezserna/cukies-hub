@@ -199,6 +199,14 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL` | Vacío sin locker testnet | Fecha UTC aprobada | Es solo texto; exige un locker configurado para mostrarse. |
 | `NEXT_PUBLIC_UKI_SWAP_URL` | Vacío salvo URL verificada con `chain=bscTestnet` | Opcional; mainnet se construye con ASM/UKI | Stage nunca genera automáticamente una compra: sin pool confirmado, el CTA queda deshabilitado. |
 | `NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Colección mainnet pendiente | Colección ERC-721 V2 custodiable de staging. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_MODE` | `disabled` hasta completar E2E; despues `testnet` | `disabled`; `live` no esta soportado | Nunca habilitar parcialmente. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID` | `97` | Sin configurar | Esta entrega rechaza expresamente chain `56`. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS` | Coleccion bridge BSC Testnet pendiente | Sin configurar | No usar la fixture que solo emite eventos. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS` | Endpoint custodial BSC Testnet pendiente | Sin configurar | Stage rechaza expresamente el bridge legacy mainnet. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK` | `nile` | Sin configurar | Esta entrega rechaza expresamente `mainnet`. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL` | `https://nile.trongrid.io` | Sin configurar | Se valida el origin HTTPS exacto. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS` | Coleccion Nile pendiente | Sin configurar | No reutilizar `TVkQ...` en Stage. |
+| `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS` | Endpoint custodial Nile pendiente | Sin configurar | No reutilizar `TXVr...` en Stage. |
 | `NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS` | `0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB` | Vault mainnet pendiente | Custodia NFT para la ruta Cukie Master. |
 | `NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS` | `0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b` | Vault mainnet pendiente | Custodia NFT para el Cukie Pool. |
 | `NEXT_PUBLIC_BSCSCAN_BASE_URL` | `https://testnet.bscscan.com` | `https://bscscan.com` | Enlaces de tx/address. |

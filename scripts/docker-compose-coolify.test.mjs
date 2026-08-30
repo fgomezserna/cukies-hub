@@ -9,6 +9,7 @@ const compose = await readFile(
 
 const guardedWorkers = [
   'chain-indexer',
+  'cukies-bridge-relayer',
   'cukie-master-scheduler',
   'competition-credit-scheduler',
   'game-economy-scheduler',
@@ -58,6 +59,20 @@ test('chain-indexer reports health from its staging Mongo connection', () => {
   assert.match(definition, /      start_period: 90s/);
 });
 
+test('bridge relayer is opt-in, Nile-to-BSC-Testnet only and has no mainnet defaults', () => {
+  const definition = serviceDefinition('cukies-bridge-relayer');
+
+  assert.match(definition, /    profiles:\n      - bridge-relayer/);
+  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_ENABLED: ${CUKIES_BRIDGE_RELAYER_ENABLED:-false}'));
+  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: ${CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID:-97}'));
+  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_TRON_NETWORK: ${CUKIES_BRIDGE_RELAYER_TRON_NETWORK:-nile}'));
+  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: ${CUKIES_BRIDGE_RELAYER_TRON_RPC_URL:-https://nile.trongrid.io}'));
+  assert.doesNotMatch(
+    definition,
+    /b775ec58411F0460716CC7FA6FbbE2c38AfD2A6E|TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ|api\.trongrid\.io\/v1/i,
+  );
+});
+
 test('dapp exposes a Docker alias scoped to its Coolify resource', () => {
   const definition = serviceDefinition('dapp');
 
@@ -72,6 +87,14 @@ test('dapp injects the public environment identity and optional liquidity links'
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS: ${NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS:-}'));
   assert.ok(definition.includes('NEXT_PUBLIC_UKI_SWAP_URL: ${NEXT_PUBLIC_UKI_SWAP_URL:-}'));
+  assert.ok(definition.includes('        NEXT_PUBLIC_CUKIES_BRIDGE_MODE: ${NEXT_PUBLIC_CUKIES_BRIDGE_MODE:-disabled}'));
+  assert.ok(definition.includes('      NEXT_PUBLIC_CUKIES_BRIDGE_MODE: ${NEXT_PUBLIC_CUKIES_BRIDGE_MODE:-disabled}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID: ${NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID:-}'));
+  assert.ok(definition.includes('NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL: ${NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL:-}'));
+  assert.doesNotMatch(
+    definition,
+    /NEXT_PUBLIC_CUKIES_BRIDGE_(?:BSC|TRON)_[A-Z_]+:.*(?:b775ec58411F0460716CC7FA6FbbE2c38AfD2A6E|TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ)/i,
+  );
 });
 
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {

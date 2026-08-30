@@ -203,6 +203,30 @@ STAGING_NFT_DEPLOYMENT_CONFIRM=BSC_TESTNET_97_ONLY
 
 It mints six original-generation fixtures to the testnet deployer, one for each stable rarity value `1..6`. Their expected Cukie Master points are `1, 2, 4, 7, 10, 15` (39 total), which must produce the route maximum of five slots. The output includes only public evidence: contract addresses, deployment receipts/blocks, runtime bytecode hashes and fixture mint transactions. Never reuse these contracts or fixtures in mainnet/production.
 
+## Local Stage bridge rehearsal
+
+`CukiesBridgeEndpoint` is currently a local/testnet candidate, not a production
+bridge. The local rehearsal deploys two endpoint instances in Hardhat and proves a
+full TRON-emulated -> BSC-emulated -> TRON-emulated round trip with custody,
+metadata, fees, replay protection, pause and recovery checks.
+
+Run the complete local Stage gate from the repository root:
+
+```bash
+pnpm staging:bridge:verify-local
+```
+
+The command forces `APP_ENV=staging`, BSC chain `97` for the client policy and
+leaves the public bridge mode disabled. It neither broadcasts nor requires a
+private key. Do not configure `NEXT_PUBLIC_CUKIES_BRIDGE_MODE=testnet` until both
+real endpoints, the relayer and the cross-chain E2E receipt set exist.
+
+The opt-in relayer lives in `packages/cukies-bridge-relayer` and its Docker profile
+is `bridge-relayer`. It supports only `TRON Nile -> BSC Testnet`, is disabled by
+default and requires the exact Stage execution confirmation documented in its
+README. Do not add that profile or any signing key until endpoint deployment,
+allowlist, source timestamp and the operator runbook have been reviewed together.
+
 ## BSC Testnet Pancake V2 liquidity-lock rehearsal
 
 `LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.

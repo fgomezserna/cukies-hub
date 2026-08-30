@@ -6,6 +6,10 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {
+    CukieBridgeMetadata,
+    ICukiesBridgeCollection
+} from "./ICukiesBridgeCollection.sol";
 
 /**
  * @title StagingCukiesNftV2
@@ -14,7 +18,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  *      5 legendary and 6 goat. Generation 1 is original and 2 is second generation.
  *      This fixture deliberately has no burn path.
  */
-contract StagingCukiesNftV2 is Ownable, IERC721Metadata {
+contract StagingCukiesNftV2 is Ownable, IERC721Metadata, ICukiesBridgeCollection {
     struct CukieMetadata {
         uint8 rarity;
         uint8 generation;
@@ -24,6 +28,7 @@ contract StagingCukiesNftV2 is Ownable, IERC721Metadata {
     string public constant override symbol = "stCUKI2";
 
     mapping(uint256 tokenId => CukieMetadata metadata) private _cukieMetadata;
+    mapping(uint256 tokenId => CukieBridgeMetadata metadata) private _bridgeMetadata;
     mapping(uint256 tokenId => address owner) private _owners;
     mapping(address owner => uint256 balance) private _balances;
     mapping(uint256 tokenId => address approved) private _tokenApprovals;
@@ -41,6 +46,7 @@ contract StagingCukiesNftV2 is Ownable, IERC721Metadata {
     error ERC721TokenAlreadyMinted(uint256 tokenId);
     error InvalidRarity(uint8 rarity);
     error InvalidGeneration(uint8 generation);
+    error InvalidBridgeAttribute(uint256 value);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -122,17 +128,63 @@ contract StagingCukiesNftV2 is Ownable, IERC721Metadata {
 
     /// @notice Safely mints one staging Cukie with immutable rarity and generation metadata.
     function mint(address to, uint256 tokenId, uint8 rarity, uint8 generation) external onlyOwner {
+        CukieBridgeMetadata memory metadata = CukieBridgeMetadata({
+            typeId: rarity,
+            generation: generation,
+            skills: [uint256(0), 0, 0, 0, 0, 0],
+            energy: 0,
+            health: 0
+        });
+        _mintBridge(to, tokenId, metadata);
+    }
+
+    function mintBridge(
+        address to,
+        uint256 tokenId,
+        CukieBridgeMetadata calldata metadata
+    ) external override onlyOwner {
+        _mintBridge(to, tokenId, metadata);
+    }
+
+    function _mintBridge(
+        address to,
+        uint256 tokenId,
+        CukieBridgeMetadata memory metadata
+    ) private {
         if (to == address(0)) revert ERC721InvalidReceiver(to);
         if (_owners[tokenId] != address(0)) revert ERC721TokenAlreadyMinted(tokenId);
-        if (rarity < 1 || rarity > 6) revert InvalidRarity(rarity);
-        if (generation < 1 || generation > 2) revert InvalidGeneration(generation);
+        if (metadata.typeId < 1 || metadata.typeId > 6) {
+            revert InvalidRarity(uint8(metadata.typeId));
+        }
+        if (metadata.generation < 1 || metadata.generation > 2) {
+            revert InvalidGeneration(uint8(metadata.generation));
+        }
+        for (uint256 index = 0; index < metadata.skills.length; index += 1) {
+            if (metadata.skills[index] > type(uint8).max) {
+                revert InvalidBridgeAttribute(metadata.skills[index]);
+            }
+        }
+        if (metadata.energy > type(uint8).max) {
+            revert InvalidBridgeAttribute(metadata.energy);
+        }
+        if (metadata.health > type(uint8).max) {
+            revert InvalidBridgeAttribute(metadata.health);
+        }
 
         _owners[tokenId] = to;
         _balances[to] += 1;
-        _cukieMetadata[tokenId] = CukieMetadata({rarity: rarity, generation: generation});
+        _cukieMetadata[tokenId] = CukieMetadata({
+            rarity: uint8(metadata.typeId),
+            generation: uint8(metadata.generation)
+        });
+        _bridgeMetadata[tokenId] = metadata;
 
         emit Transfer(address(0), to, tokenId);
-        emit CukieMetadataConfigured(tokenId, rarity, generation);
+        emit CukieMetadataConfigured(
+            tokenId,
+            uint8(metadata.typeId),
+            uint8(metadata.generation)
+        );
         _checkOnERC721Received(msg.sender, address(0), to, tokenId, "");
     }
 
@@ -140,6 +192,16 @@ contract StagingCukiesNftV2 is Ownable, IERC721Metadata {
         ownerOf(tokenId);
         CukieMetadata memory metadata = _cukieMetadata[tokenId];
         return (metadata.rarity, metadata.generation);
+    }
+
+    function bridgeMetadata(uint256 tokenId)
+        external
+        view
+        override
+        returns (CukieBridgeMetadata memory metadata)
+    {
+        ownerOf(tokenId);
+        return _bridgeMetadata[tokenId];
     }
 
     function _safeTransfer(
@@ -202,7 +264,7 @@ contract StagingCukiesNftV2 is Ownable, IERC721Metadata {
     function _toDecimalString(uint256 value) private pure returns (string memory) {
         if (value == 0) return "0";
 
-        uint256 digits;
+        uint256 digits = 0;
         uint256 remaining = value;
         while (remaining != 0) {
             digits += 1;

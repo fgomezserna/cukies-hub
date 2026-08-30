@@ -22,11 +22,18 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { useTronLink } from '@/hooks/use-tronlink';
-import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
-import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import {
-  readLegacyTronContract,
-  sendLegacyTronContract,
+  legacyMarketplaceBscAbis,
+  legacyMarketplaceTronAbis,
+} from '@/lib/legacy-marketplace/abis';
+import { cukiesBridgeEndpointAbi } from '@/lib/legacy-marketplace/bridge-endpoint-abi';
+import {
+  cukiesBridgeRuntimeConfig,
+  type CukiesBridgeRuntimeConfig,
+} from '@/lib/legacy-marketplace/bridge-runtime';
+import {
+  readTronContractAt,
+  sendTronContractAt,
 } from '@/lib/legacy-marketplace/tron';
 import type {
   LegacyMarketplaceCukiItem,
@@ -50,9 +57,57 @@ type TronBridgeSnapshot = {
   approved: boolean | null;
 };
 
-const bscTokenAddress = legacyMarketplaceContracts.bsc.contracts.token;
-const bscBridgeAddress = legacyMarketplaceContracts.bsc.contracts.bridge;
-const tronBridgeAddress = legacyMarketplaceContracts.tron.contracts.bridge;
+type EnabledBridgeRuntime = {
+  bscChainId: 97;
+  bscNetworkLabel: string;
+  bscTokenAddress: Address;
+  bscBridgeAddress: Address;
+  tronNetworkLabel: string;
+  tronRpcUrl: string;
+  tronTokenAddress: string;
+  tronBridgeAddress: string;
+};
+
+function enabledBridgeRuntime(
+  config: CukiesBridgeRuntimeConfig,
+): EnabledBridgeRuntime | null {
+  if (
+    !config.enabled
+    || config.bsc.chainId !== 97
+    || !config.bsc.collectionAddress
+    || !config.bsc.endpointAddress
+    || !config.tron.collectionAddress
+    || !config.tron.endpointAddress
+    || !config.tron.rpcUrl
+  ) {
+    return null;
+  }
+
+  return {
+    bscChainId: config.bsc.chainId,
+    bscNetworkLabel: config.bsc.networkLabel,
+    bscTokenAddress: config.bsc.collectionAddress,
+    bscBridgeAddress: config.bsc.endpointAddress,
+    tronNetworkLabel: config.tron.networkLabel,
+    tronRpcUrl: config.tron.rpcUrl,
+    tronTokenAddress: config.tron.collectionAddress,
+    tronBridgeAddress: config.tron.endpointAddress,
+  };
+}
+
+function tronWalletRpcOrigin() {
+  if (typeof window === 'undefined') return null;
+  const configuredHost = window.tronWeb?.fullNode?.host
+    ?? window.tronLink?.tronWeb?.fullNode?.host
+    ?? window.tron?.tronWeb?.fullNode?.host;
+  if (typeof configuredHost !== 'string') return null;
+
+  try {
+    return new URL(configuredHost).origin;
+  } catch {
+    return null;
+  }
+}
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown bridge error';
@@ -178,7 +233,52 @@ function BridgeCukiCard({
   );
 }
 
+function BridgeUnavailable({ config }: { config: CukiesBridgeRuntimeConfig }) {
+  return (
+    <section
+      role="status"
+      data-testid="cukies-bridge-disabled"
+      className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-5 text-amber-50"
+    >
+      <div className="flex items-start gap-3">
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
+        <div>
+          <h2 className="font-headline text-xl font-bold text-white">
+            Bridge Testnet desactivado de forma segura
+          </h2>
+          <p className="mt-2 text-sm text-amber-100/90">
+            Stage no usara los contratos legacy de mainnet. El bridge se habilitara
+            solo cuando existan endpoints con custodia real en BSC Testnet y TRON Nile.
+          </p>
+          {config.issues.length > 0 && (
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-amber-100/80">
+              {config.issues.map((issue) => <li key={issue}>{issue}</li>)}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function BridgeClient() {
+  const runtime = enabledBridgeRuntime(cukiesBridgeRuntimeConfig);
+  if (!runtime) return <BridgeUnavailable config={cukiesBridgeRuntimeConfig} />;
+
+  return <BridgeOperationsClient runtime={runtime} />;
+}
+
+function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) {
+  const {
+    bscChainId,
+    bscNetworkLabel,
+    bscTokenAddress,
+    bscBridgeAddress,
+    tronNetworkLabel,
+    tronRpcUrl,
+    tronTokenAddress,
+    tronBridgeAddress,
+  } = runtime;
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, isPending: isWriting } = useWriteContract();
@@ -188,7 +288,7 @@ export function BridgeClient() {
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
   } = useTronLink();
-  const [sourceNetwork, setSourceNetwork] = useState<BridgeNetwork>('TRON');
+  const [sourceNetwork] = useState<BridgeNetwork>('TRON');
   const [destinationOwner, setDestinationOwner] = useState('');
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
   const [bridgingCukies, setBridgingCukies] = useState<LegacyMarketplaceCukiItem[]>([]);
@@ -206,29 +306,31 @@ export function BridgeClient() {
 
   const destinationNetwork = getDestinationNetwork(sourceNetwork);
   const sourceOwner = sourceNetwork === 'BSC' ? address : tronAddress;
-  const bscReady = sourceNetwork === 'BSC' && isConnected && chainId === 56;
-  const tronReady = sourceNetwork === 'TRON' && isTronConnected;
+  const bscReady = sourceNetwork === 'BSC' && isConnected && chainId === bscChainId;
+  const tronReady = sourceNetwork === 'TRON'
+    && isTronConnected
+    && tronWalletRpcOrigin() === tronRpcUrl;
   const ready = sourceNetwork === 'BSC' ? bscReady : tronReady;
   const disabled = isWriting || isSwitchingChain;
 
   const { data: bscBridgePrice } = useReadContract({
     address: bscBridgeAddress,
-    abi: legacyMarketplaceBscAbis.bridge,
+    abi: cukiesBridgeEndpointAbi,
     functionName: 'bridgePrice',
-    chainId: 56,
+    chainId: bscChainId,
   });
   const { data: bscPaused } = useReadContract({
     address: bscBridgeAddress,
-    abi: legacyMarketplaceBscAbis.bridge,
+    abi: cukiesBridgeEndpointAbi,
     functionName: 'paused',
-    chainId: 56,
+    chainId: bscChainId,
   });
   const { data: bscApproved } = useReadContract({
     address: bscTokenAddress,
     abi: legacyMarketplaceBscAbis.token,
     functionName: 'isApprovedForAll',
     args: address ? [address, bscBridgeAddress] : undefined,
-    chainId: 56,
+    chainId: bscChainId,
     query: {
       enabled: Boolean(address),
     },
@@ -346,15 +448,22 @@ export function BridgeClient() {
 
     try {
       const [price, paused, approval] = await Promise.all([
-        readLegacyTronContract<unknown>(
+        readTronContractAt<unknown>(
           window.tronWeb,
-          'bridge',
+          cukiesBridgeEndpointAbi,
+          tronBridgeAddress,
           'bridgePrice',
         ),
-        readLegacyTronContract<unknown>(window.tronWeb, 'bridge', 'paused'),
-        readLegacyTronContract<unknown>(
+        readTronContractAt<unknown>(
           window.tronWeb,
-          'token',
+          cukiesBridgeEndpointAbi,
+          tronBridgeAddress,
+          'paused',
+        ),
+        readTronContractAt<unknown>(
+          window.tronWeb,
+          legacyMarketplaceTronAbis.token,
+          tronTokenAddress,
           'isApprovedForAll',
           [tronAddress, tronBridgeAddress],
         ),
@@ -368,7 +477,7 @@ export function BridgeClient() {
     } catch (error) {
       setStatus(getErrorMessage(error));
     }
-  }, [tronAddress]);
+  }, [tronAddress, tronBridgeAddress, tronTokenAddress]);
 
   useEffect(() => {
     void refreshCandidates();
@@ -388,8 +497,8 @@ export function BridgeClient() {
       setStatus('Conecta una wallet EVM desde el header.');
       return false;
     }
-    if (chainId !== 56) {
-      switchChain({ chainId: 56 });
+    if (chainId !== bscChainId) {
+      switchChain({ chainId: bscChainId });
       return false;
     }
     return true;
@@ -407,6 +516,10 @@ export function BridgeClient() {
     }
     if (!window.tronWeb) {
       setStatus('TronLink no ha expuesto tronWeb todavia.');
+      return false;
+    }
+    if (tronWalletRpcOrigin() !== tronRpcUrl) {
+      setStatus(`Cambia TronLink a ${tronNetworkLabel} antes de continuar.`);
       return false;
     }
     return true;
@@ -437,6 +550,7 @@ export function BridgeClient() {
         abi: legacyMarketplaceBscAbis.token,
         functionName: 'setApprovalForAll',
         args: [bscBridgeAddress, true],
+        chainId: bscChainId,
       });
       return;
     }
@@ -444,9 +558,10 @@ export function BridgeClient() {
     if (!(await ensureTron()) || !window.tronWeb) return;
     setStatus('Enviando approval del bridge en TRON...');
     try {
-      await sendLegacyTronContract(
+      await sendTronContractAt(
         window.tronWeb,
-        'token',
+        legacyMarketplaceTronAbis.token,
+        tronTokenAddress,
         'setApprovalForAll',
         [tronBridgeAddress, true],
         { feeLimit: 800_000_000, shouldPollResponse: false },
@@ -484,10 +599,11 @@ export function BridgeClient() {
       setStatus('Enviando Cukie al bridge desde BSC...');
       writeContract({
         address: bscBridgeAddress,
-        abi: legacyMarketplaceBscAbis.bridge,
-        functionName: 'jumpInBridge',
+        abi: cukiesBridgeEndpointAbi,
+        functionName: 'requestBridge',
         args: [BigInt(selectedCuki.tokenId), contractDestination as Address, destinationPrefix],
         value: (bscBridgePrice as bigint | undefined) ?? BigInt(0),
+        chainId: bscChainId,
       });
       return;
     }
@@ -495,10 +611,11 @@ export function BridgeClient() {
     if (!(await ensureTron()) || !window.tronWeb) return;
     setStatus('Enviando Cukie al bridge desde TRON...');
     try {
-      await sendLegacyTronContract(
+      await sendTronContractAt(
         window.tronWeb,
-        'bridge',
-        'jumpInBridge',
+        cukiesBridgeEndpointAbi,
+        tronBridgeAddress,
+        'requestBridge',
         [selectedCuki.tokenId, contractDestination, destinationPrefix],
         {
           callValue: Number(tronSnapshot.rawPrice ?? 0),
@@ -522,27 +639,14 @@ export function BridgeClient() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-headline text-2xl font-bold text-white">
-                Source network
+                Migracion TRON a BSC
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Select where the Cukie currently lives.
+                La entrega Stage solo habilita la direccion Nile hacia BSC Testnet.
               </p>
             </div>
-            <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
-              {(['TRON', 'BSC'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setSourceNetwork(item)}
-                  className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
-                    sourceNetwork === item
-                      ? 'bg-cyan-300 text-slate-950'
-                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
+            <div className="rounded-[8px] border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+              TRON Nile → BSC Testnet
             </div>
           </div>
 
@@ -611,16 +715,16 @@ export function BridgeClient() {
         <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
           {sourceNetwork === 'BSC' ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>Conecta una wallet EVM y usa BNB Smart Chain.</span>
-              {isConnected && chainId !== 56 && (
-                <Button onClick={() => switchChain({ chainId: 56 })}>
-                  Switch to BSC
+              <span>Conecta una wallet EVM y usa {bscNetworkLabel}.</span>
+              {isConnected && chainId !== bscChainId && (
+                <Button onClick={() => switchChain({ chainId: bscChainId })}>
+                  Switch to {bscNetworkLabel}
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>Conecta TronLink para iniciar bridge desde TRON.</span>
+              <span>Conecta TronLink en {tronNetworkLabel} para iniciar el bridge.</span>
               <Button onClick={() => void ensureTron()}>Connect TronLink</Button>
             </div>
           )}
@@ -782,7 +886,6 @@ export function BridgeClient() {
           {status}
         </div>
       )}
-
     </div>
   );
 }
