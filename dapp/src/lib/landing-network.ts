@@ -75,7 +75,15 @@ function validateSwapUrl(
     const chain = url.searchParams.get('chain');
     const inputAddress = url.searchParams.get('inputCurrency');
     const outputAddress = url.searchParams.get('outputCurrency');
-    if (url.protocol !== 'https:' || url.origin !== PANCAKESWAP_ORIGIN || chain !== expectedChain) {
+    if (
+      url.protocol !== 'https:'
+      || url.origin !== PANCAKESWAP_ORIGIN
+      || url.pathname !== '/swap'
+      || url.username
+      || url.password
+      || url.hash
+      || chain !== expectedChain
+    ) {
       issues.push('NEXT_PUBLIC_UKI_SWAP_URL does not match the configured BSC network');
       return null;
     }
@@ -163,11 +171,17 @@ export function buildLandingNetworkConfig(
     ukiTokenAddress,
     issues,
   );
+  if (configuredSwapValue && !liquidityPairAddress) {
+    issues.push('NEXT_PUBLIC_UKI_SWAP_URL requires NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS');
+  }
 
-  const generatedMainnetSwapUrl = chainId === 56 && asmTokenAddress && ukiTokenAddress
+  const generatedMainnetSwapUrl = chainId === 56
+    && asmTokenAddress
+    && ukiTokenAddress
+    && liquidityPairAddress
     ? `${PANCAKESWAP_ORIGIN}/swap?chain=bsc&inputCurrency=${asmTokenAddress}&outputCurrency=${ukiTokenAddress}`
     : null;
-  const swapUrl = networkIsConsistent
+  const swapUrl = networkIsConsistent && liquidityPairAddress
     ? configuredSwapValue
       ? configuredSwapUrl
       : generatedMainnetSwapUrl

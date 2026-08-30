@@ -6,6 +6,9 @@ import {
 const TESTNET_UKI = '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c';
 const TESTNET_ASM = '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C';
 const TESTNET_STAKING = '0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205';
+const TESTNET_PAIR = '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A';
+const TESTNET_SWAP =
+  `https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=${TESTNET_ASM}&outputCurrency=${TESTNET_UKI}`;
 
 describe('landing network safety', () => {
   it('emula app 28 con contratos y explorer exclusivos de BSC Testnet', () => {
@@ -15,14 +18,16 @@ describe('landing network safety', () => {
       NEXT_PUBLIC_ASM_TOKEN_ADDRESS: TESTNET_ASM,
       NEXT_PUBLIC_UKI_TOKEN_ADDRESS: TESTNET_UKI,
       NEXT_PUBLIC_UKI_STAKING_ADDRESS: TESTNET_STAKING,
+      NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: TESTNET_PAIR,
       NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
+      NEXT_PUBLIC_UKI_SWAP_URL: TESTNET_SWAP,
     });
 
     expect(config.issues).toEqual([]);
     expect(config.chainId).toBe(97);
     expect(config.networkLabel).toBe('BSC Testnet');
-    expect(config.swapUrl).toBeNull();
-    expect(config.liquidityPairAddress).toBeNull();
+    expect(config.swapUrl).toBe(TESTNET_SWAP);
+    expect(config.liquidityPairAddress).toBe(TESTNET_PAIR);
     expect(config.liquidityLockerAddress).toBeNull();
     expect(getLandingExplorerUrl(config, 'token', config.ukiTokenAddress)).toBe(
       `https://testnet.bscscan.com/token/${TESTNET_UKI}`,
@@ -30,6 +35,22 @@ describe('landing network safety', () => {
     expect(getLandingExplorerUrl(config, 'address', config.stakingAddress)).toBe(
       `https://testnet.bscscan.com/address/${TESTNET_STAKING}`,
     );
+  });
+
+  it('no habilita el swap de staging sin declarar el pair verificado', () => {
+    const config = buildLandingNetworkConfig({
+      APP_ENV: 'staging',
+      NEXT_PUBLIC_UKI_CHAIN_ID: '97',
+      NEXT_PUBLIC_ASM_TOKEN_ADDRESS: TESTNET_ASM,
+      NEXT_PUBLIC_UKI_TOKEN_ADDRESS: TESTNET_UKI,
+      NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
+      NEXT_PUBLIC_UKI_SWAP_URL: TESTNET_SWAP,
+    });
+
+    expect(config.issues).toContain(
+      'NEXT_PUBLIC_UKI_SWAP_URL requires NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS',
+    );
+    expect(config.swapUrl).toBeNull();
   });
 
   it('falla cerrado si staging recibe chain 56, BscScan mainnet o chain=bsc', () => {
