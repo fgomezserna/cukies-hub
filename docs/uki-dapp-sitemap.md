@@ -1,7 +1,7 @@
 # UKI dapp sitemap
 
-Estado: propuesta actualizada, pendiente de validacion de producto y del gate
-visual.
+Estado: arquitectura aprobada e implementacion local en curso; el styling final
+sigue pendiente del gate visual.
 
 - Issue ejecutable: #289 `UKI-031.0`.
 - Epic: #72 `UKI-031`.
@@ -27,9 +27,13 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
 
 ## Evidencia del estado actual
 
-- `/dashboard` redirige a `/wallet`.
-- `/wallet` es una pagina informativa estatica: describe modulos esperados,
-  pero no consume datos personales ni funciona como dashboard.
+- En la rama de trabajo, `/dashboard` ya es la ruta canonica dentro del app
+  shell y `/wallet` redirige a `/dashboard` como alias legacy. Este cambio aun
+  no se ha desplegado en Stage.
+- El Dashboard consume modulos reales de Cukie Master, creditos, Cukie Pool,
+  rewards, marketplace, vesting y embajadores mediante sus APIs privadas.
+- Los modulos se degradan por separado ante errores, pero aun no existe la API
+  agregada con identidad, red, freshness y alertas priorizadas.
 - La home ya comunica el estado posterior a la preventa, la liquidez, el
   staking y el torneo.
 - `/vesting` ya consulta la posicion on-chain de la wallet sin exigir una
@@ -37,22 +41,21 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
 - Cukie Master, creditos, staking UKI y staking NFT conviven actualmente en
   `/cukie-master`.
 - El Cukie Pool se opera actualmente en `/cukie-hodler#mi-cukie-pool`.
-- Marketplace, inventario y juego tienen rutas propias, pero no aparecen
-  organizados en una navegacion operativa comun.
-- No existe una pantalla funcional que agregue slots, creditos, Cukies,
-  rewards y alertas para la wallet autenticada.
+- Marketplace, inventario y juego tienen rutas propias; la navegacion comun
+  ya expone el Dashboard, pero el sitemap operativo completo sigue pendiente.
+- Aun falta completar la agregacion de Cukies, juego/ranking, freshness y
+  alertas para satisfacer todo el punto 5.
 
-Por tanto, la pantalla desplegada en `/wallet` no satisface el punto 5 del
-DOCX: se comporta como una explicacion del futuro Dashboard, no como la
-herramienta solicitada.
+Por tanto, la frontera de rutas ya esta corregida localmente, pero el punto 5
+del DOCX no se considera cerrado hasta completar el contrato agregado, los
+estados operativos y el gate de Stage/Testnet.
 
 ## Decisiones de arquitectura propuestas
 
 ### Ruta canonica
 
-- `/dashboard` sera la ruta canonica del resumen autenticado.
-- `/wallet` quedara como alias de compatibilidad y redirigira a `/dashboard`
-  cuando el Dashboard funcional este disponible.
+- `/dashboard` es la ruta canonica del resumen autenticado.
+- `/wallet` es un alias de compatibilidad que redirige a `/dashboard`.
 - No se mantendran dos dashboards con datos o responsabilidades distintas.
 
 ### Separacion de superficies

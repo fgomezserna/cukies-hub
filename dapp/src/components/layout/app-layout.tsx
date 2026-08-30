@@ -12,7 +12,7 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import {
-  Home,
+  LayoutDashboard,
   Gamepad2,
   Trophy,
   LockKeyhole,
@@ -48,7 +48,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isMarketplaceSection = pathname.startsWith('/marketplace');
 
   const navigationItems = [
-    { href: '/', label: 'Preventa UKI', Icon: Home, active: pathname === '/' },
+    {
+      href: '/dashboard',
+      label: 'Dashboard',
+      Icon: LayoutDashboard,
+      active: pathname === '/dashboard',
+    },
     {
       href: '/games/treasure-hunt',
       label: 'Jugar',

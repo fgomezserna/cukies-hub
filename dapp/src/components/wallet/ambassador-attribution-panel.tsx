@@ -66,7 +66,7 @@ export function AmbassadorAttributionPanel() {
   const hasReadInvitationRef = useRef(false);
 
   const invitationPath = useMemo(() => (
-    walletAddress ? `/wallet?ambassador=${encodeURIComponent(walletAddress)}` : null
+    walletAddress ? `/dashboard?ambassador=${encodeURIComponent(walletAddress)}` : null
   ), [walletAddress]);
 
   useEffect(() => {

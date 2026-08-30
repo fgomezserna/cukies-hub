@@ -15,7 +15,7 @@ export default function ComoJugarPage() {
       heroImage="/brand/generated/uki-treasure-hunt-scene-v2.png"
       heroAlt="Escena de Treasure Hunt en jungla con cofre"
       primaryCta={{ label: 'Ver juegos', href: '/games' }}
-      secondaryCta={{ label: 'Ver wallet', href: '/wallet' }}
+      secondaryCta={{ label: 'Ver dashboard', href: '/dashboard' }}
       metrics={[
         { label: 'Entrada', value: '10 créditos', helper: 'Por partida' },
         { label: 'Pool semanal', value: '2.5 créditos', helper: 'Van al bote semanal' },

@@ -19,7 +19,7 @@ jest.mock('@/components/layout/header', () => ({
 
 jest.mock('lucide-react', () => ({
   PanelLeft: () => null,
-  Home: () => null,
+  LayoutDashboard: () => null,
   Gamepad2: () => null,
   Trophy: () => null,
   LockKeyhole: () => null,
@@ -40,7 +40,10 @@ describe('AppLayout launch navigation', () => {
   it('shows the five launch destinations and hides community links', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
-    expect(screen.getByRole('link', { name: 'Preventa UKI' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
     expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute(
       'href',
       '/games/treasure-hunt',
@@ -54,6 +57,7 @@ describe('AppLayout launch navigation', () => {
 
     for (const hiddenLabel of [
       'Inicio',
+      'Preventa UKI',
       'Juegos',
       'Ranking',
       'Misiones',

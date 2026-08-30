@@ -63,7 +63,7 @@ function attribution(source: 'presale_locked' | 'signed_wallet_session' = 'signe
 describe('AmbassadorAttributionPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    window.history.replaceState({}, '', '/wallet');
+    window.history.replaceState({}, '', '/dashboard');
     mockUseAuth.mockReturnValue(authValue());
     global.fetch = fetchMock;
     Object.defineProperty(navigator, 'clipboard', {
@@ -84,7 +84,7 @@ describe('AmbassadorAttributionPanel', () => {
   });
 
   it('precarga el enlace, fija el embajador y muestra la política inmutable', async () => {
-    window.history.replaceState({}, '', `/wallet?ambassador=${ambassador}`);
+    window.history.replaceState({}, '', `/dashboard?ambassador=${ambassador}`);
     fetchMock
       .mockResolvedValueOnce(response(null))
       .mockResolvedValueOnce(response(attribution()));
@@ -140,7 +140,7 @@ describe('AmbassadorAttributionPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copiar enlace' }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(
-      `http://localhost/wallet?ambassador=${wallet}`,
+      `http://localhost/dashboard?ambassador=${wallet}`,
     ));
     expect(screen.getByRole('button', { name: 'Enlace copiado' })).toBeInTheDocument();
   });

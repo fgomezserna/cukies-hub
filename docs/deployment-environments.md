@@ -52,6 +52,7 @@ El trabajo de una rama se prueba localmente por bloques y no provoca un desplieg
 pnpm test:staging:contracts
 pnpm staging:cukie-master:verify-local
 pnpm staging:credits:verify-local
+pnpm staging:dashboard:verify-local
 pnpm staging:game-rewards:verify-local
 pnpm staging:marketplace:verify-local
 pnpm staging:weekly-rewards:verify-local
@@ -86,6 +87,11 @@ persistencia del ultimo rango aunque haya semanas sin actividad, 60/30/10, entro
 siete tramos, minimo del pool de creditos, 80/10/10 no distribuido y embajadores directos al 5%.
 Tambien verifica APIs, HMAC, indices y la preparacion preview-only de claims y destinos; no firma,
 publica ni escribe en Stage.
+
+El gate del dashboard valida la ruta canonica `/dashboard`, el alias legacy `/wallet`, la
+navegacion, los modulos economicos y las APIs privadas que los alimentan. Ejecuta todo con
+Stage/chain `97`, los runtimes automaticos desactivados y repositorios mock o en memoria; no
+despliega, firma ni escribe en las bases de Stage.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 

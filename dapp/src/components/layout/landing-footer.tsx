@@ -16,7 +16,7 @@ export default function LandingFooter() {
           <div>
             <h3 className="font-semibold mb-4 font-headline">Plataforma</h3>
             <ul className="space-y-2">
-              <li><Link href="/wallet" className="text-sm text-muted-foreground hover:text-foreground">Wallet</Link></li>
+              <li><Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">Dashboard</Link></li>
               <li><Link href="/games" className="text-sm text-muted-foreground hover:text-foreground">Juegos</Link></li>
               <li><Link href="/leaderboard" className="text-sm text-muted-foreground hover:text-foreground">Leaderboard</Link></li>
             </ul>
