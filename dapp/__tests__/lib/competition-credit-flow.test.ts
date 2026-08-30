@@ -44,12 +44,15 @@ function slot(overrides: Partial<CreditSnapshotSlot> = {}): CreditSnapshotSlot {
 async function openDailyRun(input: {
   repository: MemoryCompetitionCreditRepository;
   service: ReturnType<typeof createCompetitionCreditService>;
+  route?: "uki" | "nft";
   cutoff?: Date;
   now?: Date;
 }) {
+  const route = input.route ?? "uki";
   const cutoff = input.cutoff ?? CUTOFF;
   const now = input.now ?? new Date(cutoff.getTime() + 60_000);
   const run = await input.service.createDailyRun({
+    route,
     cutoff,
     expectedRuleVersion: "credits-v1",
     now,
@@ -147,6 +150,119 @@ function replaceWithFragmentedLots(input: {
 }
 
 describe("competition credit grant -> pool -> reservation flow", () => {
+  it("grants every eligible UKI and NFT slot exactly once for a 5+5 Cukie Master", async () => {
+    const stagingCutoff = new Date("2026-07-10T14:00:00.000Z");
+    const maximumWalletSlots = (["uki", "nft"] as const).flatMap((route) =>
+      Array.from({ length: 5 }, (_, index) =>
+        slot({
+          _id: `${route}-max-wallet-${index + 1}`,
+          walletNormalized: WALLET,
+          route,
+          ordinal: index + 1,
+        })
+      )
+    );
+    const secondWalletSlots = (["uki", "nft"] as const).map((route) =>
+      slot({
+        _id: `${route}-second-wallet-1`,
+        walletNormalized: BORROWER,
+        route,
+        ordinal: 1,
+      })
+    );
+    const repository = new MemoryCompetitionCreditRepository({
+      rule: testCompetitionCreditRule({
+        cutoffHourUtc: 14,
+        settlementHourUtc: 16,
+        expectedBscChainId: 97,
+      }),
+      slots: [...maximumWalletSlots, ...secondWalletSlots],
+    });
+    repository.state.sourceHealth.observedThrough = stagingCutoff;
+    repository.state.sourceHealth.checkedAt = stagingCutoff;
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+
+    const openedRuns: CompetitionCreditRun[] = [];
+    for (const [index, route] of (["uki", "nft"] as const).entries()) {
+      const refreshAt = new Date(stagingCutoff.getTime() + index * 10_000);
+      await service.refreshSourceWatermark({
+        route,
+        expectedRuleVersion: "credits-v1",
+        now: refreshAt,
+      });
+      const run = await openDailyRun({
+        repository,
+        service,
+        route,
+        cutoff: stagingCutoff,
+        now: new Date(refreshAt.getTime() + 1_000),
+      });
+      expect(run).toMatchObject({
+        route,
+        expectedItemCount: 6,
+        expectedGrantCredits: 600,
+        expectedOwnCredits: 600,
+        expectedPoolCredits: 0,
+      });
+      openedRuns.push(run);
+    }
+
+    expect(repository.state.runs).toHaveLength(2);
+    expect(repository.state.items).toHaveLength(12);
+    expect(repository.state.ownLots).toHaveLength(12);
+    expect(
+      repository.state.ledger.filter((entry) => entry.operation === "grant")
+    ).toHaveLength(12);
+    expect(
+      new Set(repository.state.ledger.map((entry) => entry._id)).size
+    ).toBe(repository.state.ledger.length);
+    expect(repository.state.accounts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          walletNormalized: WALLET.toLowerCase(),
+          route: "uki",
+          grantedCredits: 500,
+          availableCredits: 500,
+        }),
+        expect.objectContaining({
+          walletNormalized: WALLET.toLowerCase(),
+          route: "nft",
+          grantedCredits: 500,
+          availableCredits: 500,
+        }),
+        expect.objectContaining({
+          walletNormalized: BORROWER.toLowerCase(),
+          route: "uki",
+          grantedCredits: 100,
+          availableCredits: 100,
+        }),
+        expect.objectContaining({
+          walletNormalized: BORROWER.toLowerCase(),
+          route: "nft",
+          grantedCredits: 100,
+          availableCredits: 100,
+        }),
+      ])
+    );
+
+    for (const run of openedRuns) {
+      const replay = await service.createDailyRun({
+        route: run.route,
+        cutoff: stagingCutoff,
+        expectedRuleVersion: "credits-v1",
+        now: new Date(stagingCutoff.getTime() + 60_000),
+      });
+      expect(replay.runId).toBe(run.runId);
+    }
+    expect(repository.state.runs).toHaveLength(2);
+    expect(repository.state.items).toHaveLength(12);
+    expect(
+      repository.state.ledger.filter((entry) => entry.operation === "grant")
+    ).toHaveLength(12);
+  });
+
   it("does not replay a rule marked unrecoverable by the schema migration", async () => {
     const legacyRule = testCompetitionCreditRule({
       _id: "competition-credits:legacy",
