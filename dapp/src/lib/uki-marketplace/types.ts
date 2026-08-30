@@ -70,6 +70,16 @@ export type UkiMarketplaceOrderView = {
   invalidatedAt: string | null;
 };
 
+export type UkiMarketplaceOrdersResponse =
+  | {
+      status: 'ok';
+      data: { orders: UkiMarketplaceOrderView[] };
+    }
+  | {
+      status: 'error';
+      code: string;
+    };
+
 export type UkiMarketplaceRuntime = {
   ready: boolean;
   chainId: 56 | 97 | null;

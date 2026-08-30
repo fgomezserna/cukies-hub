@@ -12,5 +12,6 @@ export type {
   UkiMarketplaceDisplayStatus,
   UkiMarketplaceLiveInspection,
   UkiMarketplaceOrderView,
+  UkiMarketplaceOrdersResponse,
   UkiMarketplaceRuntime,
 } from './types';

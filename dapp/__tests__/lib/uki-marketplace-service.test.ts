@@ -155,6 +155,22 @@ describe('UKI marketplace Stage service', () => {
     ).resolves.toEqual([]);
   });
 
+  it('reports the public feed unavailable when no indexed candidate can be verified live', async () => {
+    const candidate = order('a');
+    const context = dependencies({
+      publicOrders: [candidate],
+      inspections: new Map([[candidate.orderId, inspection({
+        contractState: null,
+        ownerNormalized: null,
+        marketplaceApproved: null,
+      })]]),
+    });
+
+    await expect(
+      listPublicUkiMarketplaceOrders({}, context.dependencies),
+    ).rejects.toBeInstanceOf(UkiMarketplaceUnavailableError);
+  });
+
   it('shows approval loss as requires_attention only in the authenticated seller view', async () => {
     const revoked = order('6');
     const transferred = order('7');
