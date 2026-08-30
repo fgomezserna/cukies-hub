@@ -1,7 +1,10 @@
 import "server-only";
 
 import { withEconomyTransaction } from "@/lib/indexer-db/mongodb";
-import { assertRewardRule } from "@/lib/uki-economy/rewards/rules";
+import {
+  assertRewardRule,
+  rewardRuleEffectiveUntil,
+} from "@/lib/uki-economy/rewards/rules";
 import type { RewardRule } from "@/lib/uki-economy/rewards/types";
 
 import {
@@ -147,13 +150,14 @@ export async function persistGameEconomyRule(
       );
     }
     assertRewardRule(rewardRule);
+    const rewardEffectiveUntil = rewardRuleEffectiveUntil(rewardRule);
     const rewardCoversGameWindow =
       rewardRule.active
       && rewardRule.activeFrom.getTime() <= candidate.activeFrom.getTime()
       && (candidate.activeUntil
-        ? !rewardRule.activeUntil
-          || rewardRule.activeUntil.getTime() >= candidate.activeUntil.getTime()
-        : !rewardRule.activeUntil);
+        ? !rewardEffectiveUntil
+          || rewardEffectiveUntil.getTime() >= candidate.activeUntil.getTime()
+        : !rewardEffectiveUntil);
     if (!rewardCoversGameWindow) {
       throw new DomainConflictError(
         "La vigencia rewards no cubre toda la vigencia de la regla GameEconomy.",

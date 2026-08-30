@@ -10,6 +10,8 @@ import {
 } from "./rules";
 import type { PersistRewardRuleInput, RewardRule } from "./types";
 
+const DAY_MS = 86_400_000;
+
 function ruleIdentity(rule: RewardRule) {
   return stableRewardHash({
     _id: rule._id,
@@ -29,6 +31,45 @@ function isMongoDuplicateKey(error: unknown) {
   );
 }
 
+function sameGlobalEmissionLedger(left: RewardRule, right: RewardRule) {
+  const current = left.emissionBudget;
+  const next = right.emissionBudget;
+  return current.programStartsAt.getTime() === next.programStartsAt.getTime()
+    && current.dayBoundarySecondUtc === next.dayBoundarySecondUtc
+    && current.lateReservationGraceSeconds === next.lateReservationGraceSeconds
+    && current.lifetimeCapRaw === next.lifetimeCapRaw
+    && current.unusedDailyCapacity === next.unusedDailyCapacity
+    && current.overflowPolicy === next.overflowPolicy;
+}
+
+function assertFutureRuleTransition(
+  current: RewardRule,
+  next: RewardRule,
+  now: Date,
+) {
+  if (next.activeFrom.getTime() <= now.getTime()) {
+    throw new DomainConflictError(
+      `La regla ${next.version} solo puede superseder otra desde un corte futuro.`,
+    );
+  }
+  if (current.activeFrom.getTime() >= next.activeFrom.getTime()) {
+    throw new DomainConflictError(
+      `La regla ${next.version} no es posterior a ${current.version}.`,
+    );
+  }
+  const boundaryMs = next.emissionBudget.dayBoundarySecondUtc * 1_000;
+  if ((next.activeFrom.getTime() - boundaryMs) % DAY_MS !== 0) {
+    throw new DomainConflictError(
+      `La regla ${next.version} debe empezar exactamente en un corte diario.`,
+    );
+  }
+  if (!sameGlobalEmissionLedger(current, next)) {
+    throw new DomainConflictError(
+      "La supersesion puede cambiar el cap diario, pero no reiniciar calendario, politicas ni lifetime cap.",
+    );
+  }
+}
+
 export class RewardRuleService {
   constructor(private readonly runTransaction: RewardTransactionRunner) {}
 
@@ -40,6 +81,11 @@ export class RewardRuleService {
       createdAt: now,
       updatedAt: now,
     };
+    if (rule.supersededAt || rule.supersededByVersion) {
+      throw new DomainValidationError(
+        "La supersesion es metadata operativa y no puede venir en la regla candidata.",
+      );
+    }
     assertRewardRule(rule);
     if (rule.activeUntil && rule.activeUntil.getTime() <= now.getTime()) {
       throw new DomainValidationError("No se puede crear una regla ya vencida.");
@@ -62,8 +108,13 @@ export class RewardRuleService {
           rule.activeUntil,
         );
         if (overlap) {
-          throw new DomainConflictError(
-            `La regla ${rule.version} solapa la ventana activa de ${overlap.version}.`,
+          assertRewardRule(overlap);
+          assertFutureRuleTransition(overlap, rule, now);
+          await repository.supersedeRule(
+            overlap.version,
+            rule.activeFrom,
+            rule.version,
+            now,
           );
         }
       }

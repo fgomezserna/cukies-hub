@@ -116,6 +116,26 @@ export function buildRewardRuleConfigHash(rule: RewardRule) {
   });
 }
 
+export function rewardRuleEffectiveUntil(rule: RewardRule) {
+  if (!rule.activeUntil) return rule.supersededAt;
+  if (!rule.supersededAt) return rule.activeUntil;
+  return rule.activeUntil.getTime() <= rule.supersededAt.getTime()
+    ? rule.activeUntil
+    : rule.supersededAt;
+}
+
+export function rewardRuleActiveAtQuery(atInput: Date) {
+  const at = validRewardDate(atInput, "at");
+  return {
+    active: true,
+    activeFrom: { $lte: at },
+    $and: [
+      { $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: at } }] },
+      { $or: [{ supersededAt: { $exists: false } }, { supersededAt: { $gt: at } }] },
+    ],
+  };
+}
+
 export function assertRewardRule(rule: RewardRule, at?: Date) {
   if (!rule || rule.scope !== REWARD_RULE_SCOPE) {
     throw new DomainValidationError("La regla no pertenece a reward_allocations.");
@@ -135,6 +155,28 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
     if (rule.activeUntil.getTime() <= rule.activeFrom.getTime()) {
       throw new DomainValidationError("rule.activeUntil debe ser posterior a activeFrom.");
     }
+  }
+  if (rule.supersededAt) {
+    validRewardDate(rule.supersededAt, "rule.supersededAt");
+    if (rule.supersededAt.getTime() <= rule.activeFrom.getTime()) {
+      throw new DomainValidationError("rule.supersededAt debe ser posterior a activeFrom.");
+    }
+    if (
+      rule.activeUntil
+      && rule.supersededAt.getTime() > rule.activeUntil.getTime()
+    ) {
+      throw new DomainValidationError("rule.supersededAt no puede ampliar activeUntil.");
+    }
+    if (
+      !rule.supersededByVersion
+      || validRewardText(rule.supersededByVersion, "rule.supersededByVersion")
+        !== rule.supersededByVersion
+      || rule.supersededByVersion === rule.version
+    ) {
+      throw new DomainValidationError("rule.supersededByVersion no es una version posterior valida.");
+    }
+  } else if (rule.supersededByVersion !== undefined) {
+    throw new DomainValidationError("rule.supersededByVersion exige supersededAt.");
   }
   boundedInteger(rule.tokenDecimals, "rule.tokenDecimals", 0, MAX_TOKEN_DECIMALS);
   if (rule.tokenDecimals !== 18) {
@@ -325,10 +367,11 @@ export function assertRewardRule(rule: RewardRule, at?: Date) {
   }
   if (at) {
     const checkedAt = validRewardDate(at, "at");
+    const effectiveUntil = rewardRuleEffectiveUntil(rule);
     if (
       !rule.active ||
       rule.activeFrom.getTime() > checkedAt.getTime() ||
-      (rule.activeUntil && rule.activeUntil.getTime() <= checkedAt.getTime())
+      (effectiveUntil && effectiveUntil.getTime() <= checkedAt.getTime())
     ) {
       throw new DomainValidationError("La regla de rewards no esta activa en la fecha indicada.");
     }

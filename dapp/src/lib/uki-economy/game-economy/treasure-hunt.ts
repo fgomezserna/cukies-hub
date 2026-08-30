@@ -51,6 +51,7 @@ import { createMongoGameEconomyService } from "./service";
 import { rewardAccountingService } from "../rewards/accounting-repository";
 import type { WeeklyGameResult } from "../rewards/accounting-types";
 import { resolveAppliedArenaRanking } from "../rewards/arena-ranking";
+import { rewardRuleActiveAtQuery } from "../rewards/rules";
 import type { RewardRule } from "../rewards/types";
 
 type CompetitionAttemptAuthority = {
@@ -735,9 +736,7 @@ async function weeklyResultFor(
     scope: "reward_allocations",
     version: session.rule.reward.rewardRuleVersion,
     configHash: session.rule.reward.rewardRuleConfigHash,
-    active: true,
-    activeFrom: { $lte: run.reservedAt },
-    $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: run.reservedAt } }],
+    ...rewardRuleActiveAtQuery(run.reservedAt),
   });
   if (!rewardRule) {
     throw new DomainConflictError("La partida no liga la regla rewards de su periodo.");
