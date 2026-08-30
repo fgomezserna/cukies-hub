@@ -18,6 +18,7 @@
     "contracts": "pnpm --filter @cukies/contracts",
     "chain-indexer": "pnpm --filter @cukies/chain-indexer",
     "card-worker": "pnpm --filter @cukies/cuki-card-worker",
+    "bridge-relayer": "pnpm --filter @cukies/cukies-bridge-relayer",
     "guard:staging": "node scripts/assert-staging-only.mjs",
     "guard:staging:test": "node --test scripts/assert-staging-only.test.mjs scripts/docker-compose-coolify.test.mjs",
     "staging:bridge:verify-local": "node scripts/verify-staging-bridge-local.mjs",

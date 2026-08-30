@@ -221,6 +221,12 @@ leaves the public bridge mode disabled. It neither broadcasts nor requires a
 private key. Do not configure `NEXT_PUBLIC_CUKIES_BRIDGE_MODE=testnet` until both
 real endpoints, the relayer and the cross-chain E2E receipt set exist.
 
+The opt-in relayer lives in `packages/cukies-bridge-relayer` and its Docker profile
+is `bridge-relayer`. It supports only `TRON Nile -> BSC Testnet`, is disabled by
+default and requires the exact Stage execution confirmation documented in its
+README. Do not add that profile or any signing key until endpoint deployment,
+allowlist, source timestamp and the operator runbook have been reviewed together.
+
 ## BSC Testnet Pancake V2 liquidity-lock rehearsal
 
 `LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.

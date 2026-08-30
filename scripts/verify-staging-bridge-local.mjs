@@ -33,6 +33,14 @@ const checks = [
     ],
   },
   {
+    label: 'Relayer: idempotencia, backoff, DLQ, metadata y Stage-only',
+    args: ['--filter', '@cukies/cukies-bridge-relayer', 'test'],
+  },
+  {
+    label: 'Relayer TypeScript',
+    args: ['--filter', '@cukies/cukies-bridge-relayer', 'typecheck'],
+  },
+  {
     label: 'DApp TypeScript',
     args: ['--filter', 'dapp', 'typecheck'],
   },
