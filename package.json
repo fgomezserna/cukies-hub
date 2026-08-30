@@ -28,6 +28,7 @@
     "staging:dashboard:verify-local": "node scripts/verify-staging-dashboard-local.mjs",
     "staging:game-rewards:verify-local": "node scripts/verify-staging-game-rewards-local.mjs",
     "staging:marketplace:verify-local": "node scripts/verify-staging-marketplace-local.mjs",
+    "staging:tokenomics:verify-local": "pnpm --filter dapp run verify:tokenomics:local",
     "staging:weekly-rewards:verify-local": "node scripts/verify-staging-weekly-rewards-local.mjs",
     "staging:indexer:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup",
     "staging:economy:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup:economy",

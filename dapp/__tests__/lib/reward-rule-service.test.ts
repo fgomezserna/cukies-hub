@@ -25,6 +25,7 @@ describe("RewardRuleService", () => {
     expect(replay.replayed).toBe(true);
     expect(repository.state.rules).toHaveLength(1);
     expect(replay.rule.configHash).toBe(rule.configHash);
+    expect(replay.rule).not.toHaveProperty("activeUntil");
   });
 
   it("programa un cap nuevo en un corte futuro sin mutar el configHash anterior", async () => {
@@ -134,6 +135,7 @@ describe("RewardRuleService", () => {
         },
       },
     });
+    expect(command.payload).not.toHaveProperty("activeUntil");
   });
 
   it("rechaza una regla interna sin presupuesto de emision", () => {

@@ -74,10 +74,11 @@ export class RewardRuleService {
   constructor(private readonly runTransaction: RewardTransactionRunner) {}
 
   async persistRule(input: PersistRewardRuleInput) {
-    const { now: nowInput, ...ruleInput } = input;
+    const { now: nowInput, activeUntil, ...ruleInput } = input;
     const now = validRewardDate(nowInput, "now");
     const rule: RewardRule = {
       ...ruleInput,
+      ...(activeUntil ? { activeUntil } : {}),
       createdAt: now,
       updatedAt: now,
     };

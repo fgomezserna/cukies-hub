@@ -133,13 +133,14 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
     ],
     "destinations",
   );
+  const activeUntil = optionalIsoDate(item.activeUntil, "activeUntil");
   return {
     _id: item._id,
     scope: item.scope,
     version: item.version,
     active: item.active,
     activeFrom: isoDate(item.activeFrom, "activeFrom"),
-    activeUntil: optionalIsoDate(item.activeUntil, "activeUntil"),
+    ...(activeUntil ? { activeUntil } : {}),
     tokenDecimals: item.tokenDecimals,
     runCredits,
     settlementBps,

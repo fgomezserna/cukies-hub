@@ -23,7 +23,7 @@ const RULE_SPECS = Object.freeze([
       scope: rule.scope,
       active: true,
       _id: { $ne: rule._id },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: rule.activeFrom } }],
+      $or: [{ activeUntil: null }, { activeUntil: { $gt: rule.activeFrom } }],
     }),
   },
   {
@@ -36,7 +36,7 @@ const RULE_SPECS = Object.freeze([
       scope: rule.scope,
       active: true,
       _id: { $ne: rule._id },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: rule.activeFrom } }],
+      $or: [{ activeUntil: null }, { activeUntil: { $gt: rule.activeFrom } }],
     }),
   },
   {
@@ -49,7 +49,7 @@ const RULE_SPECS = Object.freeze([
       gameId: rule.gameId,
       active: true,
       _id: { $ne: rule._id },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: rule.activeFrom } }],
+      $or: [{ activeUntil: null }, { activeUntil: { $gt: rule.activeFrom } }],
     }),
   },
   {
@@ -62,7 +62,7 @@ const RULE_SPECS = Object.freeze([
       scope: rule.scope,
       active: true,
       _id: { $ne: rule._id },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: rule.activeFrom } }],
+      $or: [{ activeUntil: null }, { activeUntil: { $gt: rule.activeFrom } }],
     }),
   },
 ]);
@@ -240,7 +240,7 @@ async function main() {
                 _id: action.supersedesId,
                 active: true,
                 $or: [
-                  { activeUntil: { $exists: false } },
+                  { activeUntil: null },
                   { activeUntil: { $gt: action.rule.activeFrom } },
                 ],
               },

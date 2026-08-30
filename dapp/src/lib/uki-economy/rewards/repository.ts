@@ -161,8 +161,20 @@ export function createMongoRewardRepository(
       active: true,
       ...(activeUntil ? { activeFrom: { $lt: activeUntil } } : {}),
       $and: [
-        { $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: activeFrom } }] },
-        { $or: [{ supersededAt: { $exists: false } }, { supersededAt: { $gt: activeFrom } }] },
+        {
+          $or: [
+            { activeUntil: { $exists: false } },
+            { activeUntil: { $type: "null" as const } },
+            { activeUntil: { $gt: activeFrom } },
+          ],
+        },
+        {
+          $or: [
+            { supersededAt: { $exists: false } },
+            { supersededAt: { $type: "null" as const } },
+            { supersededAt: { $gt: activeFrom } },
+          ],
+        },
       ],
     }, { ...options, sort: { activeFrom: -1, _id: -1 } }),
     async supersedeRule(version, supersededAt, supersededByVersion, now) {
@@ -171,8 +183,21 @@ export function createMongoRewardRepository(
         version,
         active: true,
         activeFrom: { $lt: supersededAt },
-        supersededAt: { $exists: false },
-        $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gte: supersededAt } }],
+        $and: [
+          {
+            $or: [
+              { supersededAt: { $exists: false } },
+              { supersededAt: { $type: "null" as const } },
+            ],
+          },
+          {
+            $or: [
+              { activeUntil: { $exists: false } },
+              { activeUntil: { $type: "null" as const } },
+              { activeUntil: { $gte: supersededAt } },
+            ],
+          },
+        ],
       }, {
         $set: { supersededAt, supersededByVersion, updatedAt: now },
       }, options);

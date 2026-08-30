@@ -130,8 +130,20 @@ export function rewardRuleActiveAtQuery(atInput: Date) {
     active: true,
     activeFrom: { $lte: at },
     $and: [
-      { $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: at } }] },
-      { $or: [{ supersededAt: { $exists: false } }, { supersededAt: { $gt: at } }] },
+      {
+        $or: [
+          { activeUntil: { $exists: false } },
+          { activeUntil: { $type: "null" as const } },
+          { activeUntil: { $gt: at } },
+        ],
+      },
+      {
+        $or: [
+          { supersededAt: { $exists: false } },
+          { supersededAt: { $type: "null" as const } },
+          { supersededAt: { $gt: at } },
+        ],
+      },
     ],
   };
 }
