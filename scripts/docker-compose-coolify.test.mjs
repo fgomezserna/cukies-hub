@@ -64,6 +64,9 @@ test('bridge relayer is opt-in, Nile-to-BSC-Testnet only and has no mainnet defa
 
   assert.match(definition, /    profiles:\n      - bridge-relayer/);
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_ENABLED: ${CUKIES_BRIDGE_RELAYER_ENABLED:-false}'));
+  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_MONGO_URL: ${CUKIES_BRIDGE_RELAYER_MONGO_URL:-}'));
+  assert.doesNotMatch(definition, /CUKIES_BRIDGE_RELAYER_MONGO_URL:.*\$\{CHAIN_INDEXER_MONGO_URL/);
+  assert.ok(definition.includes('process.env.CUKIES_BRIDGE_RELAYER_MONGO_URL || process.env.CHAIN_INDEXER_MONGO_URL || process.env.DATABASE_URL'));
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: ${CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID:-97}'));
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_TRON_NETWORK: ${CUKIES_BRIDGE_RELAYER_TRON_NETWORK:-nile}'));
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: ${CUKIES_BRIDGE_RELAYER_TRON_RPC_URL:-https://nile.trongrid.io}'));
