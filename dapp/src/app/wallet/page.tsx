@@ -18,7 +18,7 @@ export default function WalletInfoPage() {
       subtitle="Consulta y gestiona desde un único acceso tu identidad de wallet, atribución de embajador y accesos a Cukie Master, créditos, pools y rewards."
       heroImage="/brand/generated/uki-utility-map-scene-v3.png"
       heroAlt="Mapa de utilidad UKI con token y bóveda"
-      primaryCta={{ label: 'Abrir mi panel', href: '#ambassador-program' }}
+      primaryCta={{ label: 'Abrir mi panel', href: '#wallet-economy-overview' }}
       secondaryCta={{ label: 'Ver Cukie Master', href: '/cukie-master' }}
       metrics={[
         { label: 'UKI', value: 'Compra + vesting', helper: 'Asignación y desbloqueo' },

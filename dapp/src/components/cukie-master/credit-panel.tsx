@@ -154,7 +154,7 @@ export function CompetitionCreditPanel() {
   if (!authLoading && state === 'idle') return null;
 
   return (
-    <section className="uki-container relative z-[2] pb-14">
+    <section id="competition-credits" className="uki-container relative z-[2] scroll-mt-28 pb-14">
       <Panel innerClassName="p-5 sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
