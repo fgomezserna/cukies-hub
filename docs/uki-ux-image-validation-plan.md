@@ -100,26 +100,29 @@ No debe mostrar:
 ### Dashboard Wallet
 
 Estado: `prompt draft`.
-Issue: #145.
-Ruta: `/wallet`.
+Issues: #145, #289.
+Ruta canonica: `/dashboard` (`/wallet` queda como alias legacy).
 
 Prompt propuesto:
 
 ```text
-Dashboard wallet para economia Cukies UKI en prelaunch, pantalla de producto densa y operativa. Resumen de wallet conectada o estado desconectado, UKI comprado/staked, NFTs disponibles o bloqueados, creditos, cupos Cukie Master, rewards pendientes y alertas de chain/bridge/listing. Debe diferenciar datos activos, coming next y datos bloqueados. Estilo app gaming-finance, oscuro, teal/gold, tablas compactas, badges de estado, sin hero marketing. No mostrar rewards como claimable si no hay batch/proof.
+Dashboard autenticado y operativo de Cukies World para BSC Testnet, no landing. App shell navegable con sidebar compacto y cabecera de identidad/wallet. Primera zona: alertas priorizadas y siguientes acciones. Debajo, modulos densos pero legibles para UKI en vesting/staking, slots Cukie Master separados en ruta UKI y ruta NFT, creditos propios/pool/proximo corte, Cukies por estado canonico, disponibilidad de juego/ranking y rewards pending/claimable/claimed. Cada modulo muestra freshness, estados partial/stale y CTA a su pantalla especializada. Dark gaming-finance con el sistema visual UKI aprobado, teal/magenta/gold, tablas compactas y badges funcionales. Sin hero ilustrado, sin copy de preventa, sin infografia, sin cifras ficticias y sin claims finales si no existe batch/proof.
 ```
 
 Debe mostrar:
 
 - Alertas de chain/datos stale.
-- Modulos separados para UKI, NFTs, creditos, cupos y rewards.
-- Estados bloqueados/coming next.
+- Modulos separados para identidad, UKI, slots, creditos, Cukies, juego y rewards.
+- Estados disconnected, unsigned, partial, stale, blocked y ready.
+- Navegacion hacia marketplace, Cukie Master, Cukie Pool, juego, rankings,
+  rewards y vesting.
 
 No debe mostrar:
 
 - Compra principal dentro del dashboard.
 - Configuracion avanzada de pools.
 - Claims finales sin proof.
+- Hero marketing, ilustracion dominante o bloques que parezcan un deck.
 
 ### Cukie Master
 
