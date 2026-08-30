@@ -6,7 +6,6 @@ import type { GameEconomySession } from "../game-economy/types";
 import {
   TREASURE_HUNT_ECONOMY_POLICY,
   assertTreasureHuntStagingRuntime,
-  getTreasureHuntWeeklyPeriod,
 } from "../game-economy/treasure-hunt-policy";
 import { getIsoWeekPeriodId } from "../periods";
 import type { WeeklyLotteryEntropy } from "./accounting-types";
@@ -32,9 +31,28 @@ export type RewardAccountingRuntimeConfig = {
   dailyCloseEnabled: boolean;
   weeklyPayoutEnabled: boolean;
   poolTranchesEnabled: boolean;
+  weeklyCatchUpLimit: number;
   schedulerId: string;
   ruleVersion: string;
 };
+
+export interface RewardAccountingRuntimeService {
+  closeNextDaily(input: {
+    ruleVersion: string;
+    now: Date;
+    includePriorWeekly: boolean;
+  }): Promise<{ dayId: string } | null>;
+  nextWeeklyPeriod(input: {
+    ruleVersion: string;
+    now: Date;
+  }): Promise<{ periodId: string; startsAt: Date; payoutAt: Date } | null>;
+  closeWeeklyPeriod(input: {
+    periodId: string;
+    startsAt: Date;
+    ruleVersion: string;
+    now: Date;
+  }): Promise<{ periodId: string }>;
+}
 
 function explicitGate(value: string | undefined) {
   return value === "true";
@@ -46,6 +64,25 @@ function required(value: string | undefined, label: string) {
   return normalized;
 }
 
+function boundedInteger(
+  value: string | undefined,
+  label: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
+  const normalized = value?.trim();
+  if (!normalized) return fallback;
+  if (!/^\d+$/.test(normalized)) {
+    throw new DomainValidationError(`${label} debe ser un entero.`);
+  }
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new DomainValidationError(`${label} debe estar entre ${minimum} y ${maximum}.`);
+  }
+  return parsed;
+}
+
 export function loadRewardAccountingRuntimeConfig(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): RewardAccountingRuntimeConfig {
@@ -53,6 +90,13 @@ export function loadRewardAccountingRuntimeConfig(
     dailyCloseEnabled: explicitGate(env.REWARD_DAILY_ACCOUNTING_ENABLED),
     weeklyPayoutEnabled: explicitGate(env.REWARD_WEEKLY_PAYOUT_ENABLED),
     poolTranchesEnabled: explicitGate(env.REWARD_POOL_TRANCHES_ENABLED),
+    weeklyCatchUpLimit: boundedInteger(
+      env.REWARD_WEEKLY_CATCH_UP_LIMIT,
+      "REWARD_WEEKLY_CATCH_UP_LIMIT",
+      8,
+      1,
+      52,
+    ),
     schedulerId: required(env.REWARD_ACCOUNTING_SCHEDULER_ID, "REWARD_ACCOUNTING_SCHEDULER_ID"),
     ruleVersion: required(env.REWARD_ACCOUNTING_RULE_VERSION, "REWARD_ACCOUNTING_RULE_VERSION"),
   };
@@ -223,21 +267,32 @@ async function ensureWeeklyLotteryEntropy(cutoff: Date) {
 export async function runRewardAccountingRuntimeTick(input: {
   now?: Date;
   config?: RewardAccountingRuntimeConfig;
+  service?: RewardAccountingRuntimeService;
+  ensureWeeklyEntropy?: (cutoff: Date) => Promise<void>;
 }) {
   assertTreasureHuntStagingRuntime(process.env);
   const now = input.now ?? new Date();
   const config = input.config ?? loadRewardAccountingRuntimeConfig();
   const result: {
     daily: { status: "disabled" | "idle" | "sealed" | "pending"; dayId?: string; reason?: string };
-    weekly: { status: "disabled" | "idle" | "sealed" | "pending"; periodId?: string; reason?: string };
+    weekly: {
+      status: "disabled" | "idle" | "sealed" | "pending";
+      periodId?: string;
+      reason?: string;
+      periodsProcessed?: number;
+    };
   } = {
     daily: { status: config.dailyCloseEnabled ? "idle" : "disabled" },
     weekly: { status: config.weeklyPayoutEnabled ? "idle" : "disabled" },
   };
+  let service = input.service;
+  const accountingService = async () => {
+    service ??= (await import("./accounting-repository")).rewardAccountingService;
+    return service;
+  };
   if (config.dailyCloseEnabled) {
     try {
-      const { rewardAccountingService } = await import("./accounting-repository");
-      const daily = await rewardAccountingService.closeNextDaily({
+      const daily = await (await accountingService()).closeNextDaily({
         ruleVersion: config.ruleVersion,
         now,
         includePriorWeekly: config.poolTranchesEnabled,
@@ -250,29 +305,39 @@ export async function runRewardAccountingRuntimeTick(input: {
     }
   }
   if (config.weeklyPayoutEnabled) {
-    const current = getTreasureHuntWeeklyPeriod(now);
-    const startsAt = new Date(current.startsAt.getTime() - 7 * 24 * 60 * 60_000);
-    const periodId = `th-week:${startsAt.toISOString()}`;
+    let pendingPeriodId: string | undefined;
     try {
-      const payoutAt = new Date(Date.UTC(
-        current.startsAt.getUTCFullYear(),
-        current.startsAt.getUTCMonth(),
-        current.startsAt.getUTCDate(),
-        17,
-      ));
-      if (now.getTime() >= payoutAt.getTime()) await ensureWeeklyLotteryEntropy(payoutAt);
-      const { rewardAccountingService } = await import("./accounting-repository");
-      const weekly = await rewardAccountingService.closeWeeklyPeriod({
-        periodId,
-        startsAt,
-        ruleVersion: config.ruleVersion,
-        now,
-      });
-      result.weekly = { status: "sealed", periodId: weekly.periodId };
+      const rewardAccountingService = await accountingService();
+      let periodsProcessed = 0;
+      for (let index = 0; index < config.weeklyCatchUpLimit; index += 1) {
+        const candidate = await rewardAccountingService.nextWeeklyPeriod({
+          ruleVersion: config.ruleVersion,
+          now,
+        });
+        if (!candidate) break;
+        pendingPeriodId = candidate.periodId;
+        await (input.ensureWeeklyEntropy ?? ensureWeeklyLotteryEntropy)(candidate.payoutAt);
+        const weekly = await rewardAccountingService.closeWeeklyPeriod({
+          periodId: candidate.periodId,
+          startsAt: candidate.startsAt,
+          ruleVersion: config.ruleVersion,
+          now,
+        });
+        periodsProcessed += 1;
+        result.weekly = {
+          status: "sealed",
+          periodId: weekly.periodId,
+          periodsProcessed,
+        };
+      }
     } catch (error) {
       const reason = pendingAccountingError(error);
       if (!reason) throw error;
-      result.weekly = { status: "pending", periodId, reason };
+      result.weekly = {
+        status: "pending",
+        ...(pendingPeriodId ? { periodId: pendingPeriodId } : {}),
+        reason,
+      };
     }
   }
   return { ...result, completedAt: now.toISOString() };

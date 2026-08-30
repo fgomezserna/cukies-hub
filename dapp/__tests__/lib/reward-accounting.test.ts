@@ -19,6 +19,8 @@ import {
   assertRewardAccountingActionEnabled,
   loadRewardAccountingRuntimeConfig,
   requireWeeklyLotteryEntropy,
+  runRewardAccountingRuntimeTick,
+  type RewardAccountingRuntimeService,
 } from "@/lib/uki-economy/rewards/accounting-runtime";
 import {
   DAILY_REWARD_EMISSION_RAW,
@@ -942,6 +944,7 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
   evidence = new Map<string, Awaited<ReturnType<RewardAccountingRepository["findSettledGameEvidence"]>>>();
   dailyLines: DailyRewardSourceLine[] = [];
   rewardRule: ReturnType<typeof testRewardRule> = CURRENT_REWARD_RULE;
+  findRewardRuleByVersion = async () => this.rewardRule;
   findRewardRule = async () => this.rewardRule;
   materializeDailyCapacity: RewardAccountingRepository["materializeDailyCapacity"] = async () => ({
     _id: "reward-daily-capacity:2026-08-20",
@@ -984,10 +987,28 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
   listCreditContributors: RewardAccountingRepository["listCreditContributors"] = async () => [];
   listDailyAmbassadorSnapshots = async () => ({});
   listCukieParticipants: RewardAccountingRepository["listCukieParticipants"] = async () => [];
-  findPriorWeeklyPoolTranche = async () => null;
+  findPriorWeeklyPoolTranche: RewardAccountingRepository["findPriorWeeklyPoolTranche"] =
+    async () => null;
 }
 
 describe("accounting persistence and runtime gates", () => {
+  it("entrega al scheduler el periodo ISO completo mas antiguo pendiente", async () => {
+    const repository = new MemoryAccountingRepository();
+    const service = new RewardAccountingService(async (work) => work(repository));
+    await expect(service.nextWeeklyPeriod({
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-24T17:01:00.000Z"),
+    })).resolves.toEqual({
+      periodId: "2026-W34",
+      startsAt: new Date("2026-08-17T14:00:00.000Z"),
+      payoutAt: new Date("2026-08-24T17:00:00.000Z"),
+    });
+    await expect(service.nextWeeklyPeriod({
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-24T16:59:59.999Z"),
+    })).resolves.toBeNull();
+  });
+
   it("hace replay idempotente y bloquea payload distinto", async () => {
     const repository = new MemoryAccountingRepository();
     const service = new RewardAccountingService(async (work) => work(repository));
@@ -1120,9 +1141,29 @@ describe("accounting persistence and runtime gates", () => {
       ruleVersion: "reward-v3",
       now: ENTROPY.confirmedAt,
     };
+    await expect(service.nextWeeklyPeriod({
+      ruleVersion: closeInput.ruleVersion,
+      now: closeInput.now,
+    })).resolves.toMatchObject({
+      periodId: closeInput.periodId,
+      startsAt: closeInput.startsAt,
+      payoutAt: PAYOUT_AT,
+    });
     const first = await service.closeWeeklyPeriod(closeInput);
     expect(first.sourceDailyAccountingIds).toEqual(DAILY_ACCOUNTING_IDS);
     expect(first.ruleConfigHash).toBe(repository.rewardRule.configHash);
+    await expect(service.nextWeeklyPeriod({
+      ruleVersion: closeInput.ruleVersion,
+      now: closeInput.now,
+    })).resolves.toBeNull();
+    await expect(service.nextWeeklyPeriod({
+      ruleVersion: closeInput.ruleVersion,
+      now: new Date("2026-08-31T17:01:00.000Z"),
+    })).resolves.toMatchObject({
+      periodId: "2026-W35",
+      startsAt: new Date("2026-08-24T14:00:00.000Z"),
+      payoutAt: new Date("2026-08-31T17:00:00.000Z"),
+    });
     await expect(service.closeWeeklyPeriod(closeInput)).resolves.toEqual(first);
 
     const lateSource = {
@@ -1137,6 +1178,143 @@ describe("accounting persistence and runtime gates", () => {
     repository.sources.set(lateSource.sessionId, lateSource);
     await expect(service.closeWeeklyPeriod(closeInput)).rejects.toThrow(/payload distinto/);
     expect(repository.weekly.size).toBe(1);
+  });
+
+  it("liquida las reservas semanales en siete cierres diarios sin volver a mintear", async () => {
+    const repository = new MemoryAccountingRepository();
+    repository.rewardRule = CURRENT_REWARD_RULE;
+    for (let index = 0; index < 7; index += 1) {
+      const dayId = `2026-08-${String(17 + index).padStart(2, "0")}`;
+      repository.daily.set(dayId, sealDailyRewardAccounting({
+        dayId,
+        ruleVersion: CURRENT_REWARD_RULE.version,
+        ruleConfigHash: CURRENT_REWARD_RULE.configHash,
+        emissionRaw: CURRENT_REWARD_RULE.emissionBudget.dailyCapRaw,
+        buckets: {
+          playersRaw: "0",
+          creditPoolRaw: "0",
+          cukiePoolRaw: "0",
+          ambassadorOrdinaryRaw: "0",
+          weeklyPrizeRaw: raw(20),
+          ambassadorWeeklyRaw: raw(1),
+        },
+        destinations: DESTINATIONS,
+        sealedAt: new Date(`${dayId}T16:00:00.000Z`),
+      }));
+    }
+    const winningResult = settledResult({
+      wallet: wallet(1),
+      gameId: "weekly-seven-tranches",
+      scoreRaw: "3000",
+      playedAt: new Date("2026-08-18T10:00:00.000Z"),
+    });
+    repository.sources.set(winningResult.sessionId, {
+      ...winningResult,
+      _id: `reward-weekly-source:${winningResult.sessionId}`,
+      payloadHash: "6".repeat(64),
+      recordedAt: new Date("2026-08-18T10:00:01.000Z"),
+    });
+    const service = new RewardAccountingService(async (work) => work(repository));
+    const weekly = await service.closeWeeklyPeriod({
+      periodId: "2026-W34",
+      startsAt: new Date("2026-08-17T14:00:00.000Z"),
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: ENTROPY.confirmedAt,
+    });
+
+    expect(weekly.poolReservations.map((reservation) => reservation.pool)).toEqual([
+      "credit",
+      "cukie_original",
+    ]);
+    expect(weekly.poolTrancheSchedule.map((scheduledAt) => scheduledAt.toISOString())).toEqual([
+      "2026-08-25T16:00:00.000Z",
+      "2026-08-26T16:00:00.000Z",
+      "2026-08-27T16:00:00.000Z",
+      "2026-08-28T16:00:00.000Z",
+      "2026-08-29T16:00:00.000Z",
+      "2026-08-30T16:00:00.000Z",
+      "2026-08-31T16:00:00.000Z",
+    ]);
+
+    repository.dailyLines = [];
+    repository.listCreditContributors = async () => [{
+      walletNormalized: wallet(101),
+      units: 10,
+      ambassadorWalletNormalized: wallet(102),
+    }];
+    repository.listCukieParticipants = async (generation) => generation === "original"
+      ? [{
+          walletNormalized: wallet(201),
+          units: 1,
+          rarityLevel: 5,
+          ambassadorWalletNormalized: wallet(202),
+        }]
+      : [];
+    repository.findPriorWeeklyPoolTranche = async (scheduledAt) =>
+      selectStoredWeeklyPoolTranche(weekly, scheduledAt);
+    let nextCandidate: { dayId: string; startsAt: Date } | null = null;
+    repository.findNextClosableRewardDay = async () => nextCandidate;
+    repository.materializeDailyCapacity = async ({ dayId, startsAt, now }) => ({
+      _id: `reward-daily-capacity:${dayId}`,
+      dayId,
+      budgetDayId: startsAt.toISOString(),
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      ruleConfigHash: CURRENT_REWARD_RULE.configHash,
+      previousDailyRaw: "0",
+      capacityMaterializedRaw: DAILY_REWARD_EMISSION_RAW,
+      resultingDailyRaw: DAILY_REWARD_EMISSION_RAW,
+      previousLifetimeRaw: "0",
+      resultingLifetimeRaw: DAILY_REWARD_EMISSION_RAW,
+      payloadHash: "7".repeat(64),
+      status: "sealed" as const,
+      sealedAt: now,
+    });
+
+    let totalPriorInflow = BigInt(0);
+    for (let index = 0; index < 7; index += 1) {
+      const startsAt = new Date(Date.UTC(2026, 7, 24 + index, 14));
+      const dayId = startsAt.toISOString().slice(0, 10);
+      nextCandidate = { dayId, startsAt };
+      const closed = await service.closeNextDaily({
+        ruleVersion: CURRENT_REWARD_RULE.version,
+        now: weekly.poolTrancheSchedule[index],
+        includePriorWeekly: true,
+      });
+      expect(closed).not.toBeNull();
+      expect(closed?.priorReservedInflowRaw).not.toBe("0");
+      expect(closed?.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
+      expect(closed?.allocations).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          walletNormalized: wallet(101),
+          category: "credit_pool",
+          fundingMode: "reserved_no_mint",
+        }),
+        expect.objectContaining({
+          walletNormalized: wallet(201),
+          category: "cukie_pool_original",
+          fundingMode: "reserved_no_mint",
+        }),
+        expect.objectContaining({
+          walletNormalized: wallet(102),
+          category: "ambassador_weekly",
+          fundingMode: "reserved_no_mint",
+        }),
+        expect.objectContaining({
+          walletNormalized: wallet(202),
+          category: "ambassador_weekly",
+          fundingMode: "reserved_no_mint",
+        }),
+      ]));
+      const reservedAllocations = closed!.allocations
+        .filter((allocation) => allocation.fundingMode === "reserved_no_mint")
+        .reduce((sum, allocation) => sum + BigInt(allocation.amountRaw), BigInt(0));
+      expect(reservedAllocations + BigInt(closed!.priorReservedUndistributed.totalRaw))
+        .toBe(BigInt(closed!.priorReservedInflowRaw));
+      totalPriorInflow += BigInt(closed!.priorReservedInflowRaw);
+    }
+    expect(totalPriorInflow).toBe(
+      BigInt(weekly.poolReservedRaw) + BigInt(weekly.ambassadorDeferredRaw),
+    );
   });
 
   it("rechaza un conjunto diario incompleto o con una version mezclada", async () => {
@@ -1173,10 +1351,97 @@ describe("accounting persistence and runtime gates", () => {
       REWARD_DAILY_ACCOUNTING_ENABLED: "true",
       REWARD_WEEKLY_PAYOUT_ENABLED: "false",
       REWARD_POOL_TRANCHES_ENABLED: "TRUE",
+      REWARD_WEEKLY_CATCH_UP_LIMIT: "12",
     });
-    expect(config).toMatchObject({ dailyCloseEnabled: true, weeklyPayoutEnabled: false, poolTranchesEnabled: false });
+    expect(config).toMatchObject({
+      dailyCloseEnabled: true,
+      weeklyPayoutEnabled: false,
+      poolTranchesEnabled: false,
+      weeklyCatchUpLimit: 12,
+    });
     expect(() => assertRewardAccountingActionEnabled(config, "daily")).not.toThrow();
     expect(() => assertRewardAccountingActionEnabled(config, "weekly")).toThrow(/deshabilitada/);
+    expect(() => loadRewardAccountingRuntimeConfig({
+      REWARD_ACCOUNTING_SCHEDULER_ID: "reward-accounting-staging",
+      REWARD_ACCOUNTING_RULE_VERSION: "reward-v3",
+      REWARD_WEEKLY_CATCH_UP_LIMIT: "53",
+    })).toThrow(/entre 1 y 52/);
+  });
+
+  it("recupera cierres semanales atrasados en orden y hasta el limite del tick", async () => {
+    const candidates = [
+      {
+        periodId: "2026-W33",
+        startsAt: new Date("2026-08-10T14:00:00.000Z"),
+        payoutAt: new Date("2026-08-17T17:00:00.000Z"),
+      },
+      {
+        periodId: "2026-W34",
+        startsAt: new Date("2026-08-17T14:00:00.000Z"),
+        payoutAt: new Date("2026-08-24T17:00:00.000Z"),
+      },
+      null,
+    ];
+    const runtimeService: RewardAccountingRuntimeService = {
+      closeNextDaily: jest.fn(async () => null),
+      nextWeeklyPeriod: jest.fn(async () => candidates.shift() ?? null),
+      closeWeeklyPeriod: jest.fn(async ({ periodId }) => ({ periodId })),
+    };
+    const ensureWeeklyEntropy = jest.fn(async (_cutoff: Date) => undefined);
+    const guardedKeys = [
+      "APP_ENV",
+      "STAGING_ONLY_GUARD",
+      "NEXT_PUBLIC_UKI_CHAIN_ID",
+      "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID",
+    ] as const;
+    const previous = new Map(guardedKeys.map((key) => [key, process.env[key]]));
+    Object.assign(process.env, {
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
+    });
+    try {
+      await expect(runRewardAccountingRuntimeTick({
+        now: new Date("2026-08-24T17:02:00.000Z"),
+        config: {
+          dailyCloseEnabled: false,
+          weeklyPayoutEnabled: true,
+          poolTranchesEnabled: true,
+          weeklyCatchUpLimit: 2,
+          schedulerId: "reward-accounting-staging",
+          ruleVersion: CURRENT_REWARD_RULE.version,
+        },
+        service: runtimeService,
+        ensureWeeklyEntropy,
+      })).resolves.toMatchObject({
+        daily: { status: "disabled" },
+        weekly: { status: "sealed", periodId: "2026-W34", periodsProcessed: 2 },
+      });
+    } finally {
+      for (const key of guardedKeys) {
+        const value = previous.get(key);
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+    expect(ensureWeeklyEntropy.mock.calls.map(([cutoff]) => cutoff.toISOString())).toEqual([
+      "2026-08-17T17:00:00.000Z",
+      "2026-08-24T17:00:00.000Z",
+    ]);
+    expect(runtimeService.nextWeeklyPeriod).toHaveBeenCalledTimes(2);
+    expect(runtimeService.closeWeeklyPeriod).toHaveBeenNthCalledWith(1, {
+      periodId: "2026-W33",
+      startsAt: new Date("2026-08-10T14:00:00.000Z"),
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-24T17:02:00.000Z"),
+    });
+    expect(runtimeService.closeWeeklyPeriod).toHaveBeenNthCalledWith(2, {
+      periodId: "2026-W34",
+      startsAt: new Date("2026-08-17T14:00:00.000Z"),
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-24T17:02:00.000Z"),
+    });
   });
 
   it("mantiene pending el weekly hasta que el indexer entrega entropia posterior", async () => {

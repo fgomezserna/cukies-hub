@@ -3,6 +3,7 @@ import "server-only";
 import type { ClientSession, Db } from "mongodb";
 
 import { DomainConflictError } from "../errors";
+import { getTreasureHuntWeeklyPeriod } from "../game-economy/treasure-hunt-policy";
 import { formatRawAmount, parseRawAmount } from "../money";
 import { getIsoWeekPeriodId } from "../periods";
 import {
@@ -64,6 +65,7 @@ function rewardDayStart(dayId: string) {
 }
 
 export interface RewardAccountingRepository {
+  findRewardRuleByVersion(ruleVersion: string): Promise<RewardRule | null>;
   findRewardRule(ruleVersion: string, at: Date): Promise<RewardRule | null>;
   materializeDailyCapacity(input: {
     dayId: string;
@@ -178,6 +180,10 @@ export function createMongoRewardAccountingRepository(
     ]));
   };
   return {
+    findRewardRuleByVersion: (ruleVersion) => rewardRules.findOne({
+      scope: "reward_allocations",
+      version: ruleVersion,
+    }, options),
     findRewardRule: (ruleVersion, at) => rewardRules.findOne({
       scope: "reward_allocations",
       version: ruleVersion,
@@ -584,6 +590,35 @@ function assertReplay<T extends { payloadHash: string }>(
 
 export class RewardAccountingService {
   constructor(private readonly runTransaction: RewardAccountingTransactionRunner) {}
+
+  nextWeeklyPeriod(input: { ruleVersion: string; now: Date }) {
+    return this.runTransaction(async (repository) => {
+      const now = validRewardDate(input.now, "now");
+      const rule = await repository.findRewardRuleByVersion(input.ruleVersion);
+      if (!rule) throw new DomainConflictError(`No existe la regla reward ${input.ruleVersion}.`);
+      assertRewardRule(rule);
+      const firstContainingPeriod = getTreasureHuntWeeklyPeriod(rule.activeFrom);
+      let startsAt = firstContainingPeriod.startsAt.getTime() < rule.activeFrom.getTime()
+        ? new Date(firstContainingPeriod.startsAt.getTime() + 7 * 24 * 60 * 60_000)
+        : firstContainingPeriod.startsAt;
+      const effectiveUntil = [rule.activeUntil, rule.supersededAt]
+        .filter((value): value is Date => value instanceof Date)
+        .sort((left, right) => left.getTime() - right.getTime())[0];
+      while (true) {
+        const endsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60_000);
+        const payoutAt = new Date(endsAt.getTime() + 3 * 60 * 60_000);
+        if (
+          payoutAt.getTime() > now.getTime()
+          || (effectiveUntil && endsAt.getTime() > effectiveUntil.getTime())
+        ) return null;
+        const periodId = getIsoWeekPeriodId(startsAt);
+        const current = await repository.findWeekly(periodId);
+        if (!current) return { periodId, startsAt, payoutAt };
+        assertWeeklyPrizeAccountingIntegrity(current);
+        startsAt = endsAt;
+      }
+    });
+  }
 
   sealDaily(accounting: DailyRewardAccounting) {
     return this.runTransaction(async (repository) => {
