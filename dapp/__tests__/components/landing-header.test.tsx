@@ -48,9 +48,9 @@ describe('components/landing/LandingHeader', () => {
         expect.objectContaining({ href: expect.stringContaining('/games/treasure-hunt') }),
       ]),
     );
-    expect(screen.getAllByRole('link', { name: 'Comprar UKI' })).toEqual(
+    expect(screen.getAllByRole('link', { name: 'Mi wallet' })).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ href: expect.stringContaining('/#comprar') }),
+        expect.objectContaining({ href: expect.stringContaining('/wallet') }),
       ]),
     );
     expect(screen.getAllByRole('link', { name: 'Staking' })).toEqual(
@@ -65,7 +65,7 @@ describe('components/landing/LandingHeader', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('link', { name: 'Home' }).length).toBeGreaterThan(0);
       expect(screen.getAllByRole('link', { name: 'Play' }).length).toBeGreaterThan(0);
-      expect(screen.getAllByRole('link', { name: 'Buy UKI' }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('link', { name: 'My wallet' }).length).toBeGreaterThan(0);
       expect(window.localStorage.getItem(PUBLIC_LOCALE_STORAGE_KEY)).toBe('en');
     });
   });

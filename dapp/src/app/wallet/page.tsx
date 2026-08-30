@@ -1,20 +1,24 @@
 import type { Metadata } from 'next';
 import { LaunchInfoPage } from '@/components/launch/info-page';
+import { WalletDashboardWorkspace } from '@/components/wallet/dashboard-workspace';
 
 export const metadata: Metadata = {
   title: 'Wallet UKI | Cukies World',
   description: 'Vista de wallet para UKI, NFTs, créditos, Cukie Master y rewards.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function WalletInfoPage() {
   return (
     <LaunchInfoPage
+      variant="workspace"
       eyebrow="Panel"
       title="Wallet UKI"
-      subtitle="La vista de wallet resume estado de compra, vesting, NFTs, créditos, cupos, pools y alertas sin sustituir las pantallas especializadas."
+      subtitle="Consulta y gestiona desde un único acceso tu identidad de wallet, atribución de embajador y accesos a Cukie Master, créditos, pools y rewards."
       heroImage="/brand/generated/uki-utility-map-scene-v3.png"
       heroAlt="Mapa de utilidad UKI con token y bóveda"
-      primaryCta={{ label: 'Conectar wallet', href: '/#presale-console' }}
+      primaryCta={{ label: 'Abrir mi panel', href: '#ambassador-program' }}
       secondaryCta={{ label: 'Ver Cukie Master', href: '/cukie-master' }}
       metrics={[
         { label: 'UKI', value: 'Compra + vesting', helper: 'Asignación y desbloqueo' },
@@ -22,6 +26,7 @@ export default function WalletInfoPage() {
         { label: 'Créditos', value: 'Balance interno', helper: 'Uso, expiración y origen' },
         { label: 'Rewards', value: 'Pendiente / reclamable', helper: 'Sin mezclar estimaciones con claims' },
       ]}
+      beforeSections={<WalletDashboardWorkspace />}
       sections={[
         {
           title: 'Módulos esperados',
@@ -58,7 +63,7 @@ export default function WalletInfoPage() {
           ],
         },
       ]}
-      note="El dashboard es una vista de salud de wallet. Las acciones complejas deben vivir en preventa, Cukie Master, pools, juegos, arena y rewards claim."
+      note="El dashboard es una vista de salud y acceso de wallet. Las acciones especializadas permanecen en Cukie Master, pools, juegos, marketplace, vesting y rewards claim."
     />
   );
 }
