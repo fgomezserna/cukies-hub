@@ -18,6 +18,7 @@ const expiry = BigInt(1_800_000_000);
 let allowance = BigInt(0);
 let purchased = false;
 let walletAddress = buyer;
+let nativePaymentsAllowed = true;
 
 const readContract = jest.fn(async (input: {
   address: string;
@@ -49,6 +50,8 @@ const readContract = jest.fn(async (input: {
       return false;
     case 'paymentTokenAllowed':
       return true;
+    case 'nativePaymentAllowed':
+      return nativePaymentsAllowed;
     case 'getAmountsIn':
       return input.args?.[1] && (input.args[1] as string[])[0] === usdt
         ? [BigInt(2_000_000), price]
@@ -106,6 +109,9 @@ jest.mock('@/lib/uki-marketplace/public-config', () => ({
   ukiMarketplacePublicConfig: {
     ready: true,
     checkoutReady: true,
+    ukiPaymentReady: true,
+    bnbPaymentReady: true,
+    usdtPaymentReady: true,
     chainId: 97,
     marketplaceAddress: '0x1111111111111111111111111111111111111111',
     collectionAddresses: ['0x2222222222222222222222222222222222222222'],
@@ -128,6 +134,7 @@ jest.mock('@/lib/uki-marketplace/public-config', () => ({
 }));
 
 import { UkiMarketplaceBuyerCheckout } from '@/components/uki-marketplace/buyer-checkout';
+import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config';
 
 const order: UkiMarketplaceOrderView = {
   orderId,
@@ -158,7 +165,22 @@ describe('checkout comprador marketplace UKI', () => {
     allowance = BigInt(0);
     purchased = false;
     walletAddress = buyer;
+    nativePaymentsAllowed = true;
+    ukiMarketplacePublicConfig.ukiPaymentReady = true;
+    ukiMarketplacePublicConfig.bnbPaymentReady = true;
+    ukiMarketplacePublicConfig.usdtPaymentReady = true;
     jest.clearAllMocks();
+  });
+
+  it('mantiene la compra UKI disponible y oculta BNB/USDT cuando siguen bloqueados', async () => {
+    ukiMarketplacePublicConfig.bnbPaymentReady = false;
+    ukiMarketplacePublicConfig.usdtPaymentReady = false;
+
+    render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
+
+    expect(await screen.findByRole('button', { name: 'Autorizar UKI y comprar' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'BNB' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'USDT' })).not.toBeInTheDocument();
   });
 
   it('autoriza el total UKI exacto, compra y verifica la entrega atómica', async () => {
@@ -200,6 +222,19 @@ describe('checkout comprador marketplace UKI', () => {
     })));
     expect(writeContractAsync).not.toHaveBeenCalledWith(expect.objectContaining({
       functionName: 'approve',
+    }));
+  });
+
+  it('falla cerrado si BNB está configurado en la UI pero bloqueado on-chain', async () => {
+    nativePaymentsAllowed = false;
+    render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'BNB' }));
+
+    expect(await screen.findByText('El pago con BNB está deshabilitado on-chain en este Stage.'))
+      .toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'buyWithNative',
     }));
   });
 

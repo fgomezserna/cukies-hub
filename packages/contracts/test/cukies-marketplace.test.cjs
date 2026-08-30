@@ -37,6 +37,8 @@ describe('CukiesMarketplace', function () {
 
     await marketplace.connect(owner).setCollectionAllowed(await nft.getAddress(), true);
     await marketplace.connect(owner).setPaymentTokenAllowed(await usdt.getAddress(), true);
+    const nativePaymentInitiallyAllowed = await marketplace.nativePaymentAllowed();
+    await marketplace.connect(owner).setNativePaymentAllowed(true);
     await router.setRate(await usdt.getAddress(), ethers.parseEther('2'));
     await router.setRate(await wrappedNative.getAddress(), ethers.parseEther('2'));
     await uki.mint(await router.getAddress(), ethers.parseEther('1000000'));
@@ -54,6 +56,7 @@ describe('CukiesMarketplace', function () {
       router,
       marketplace,
       nft,
+      nativePaymentInitiallyAllowed,
     };
   }
 
@@ -217,6 +220,31 @@ describe('CukiesMarketplace', function () {
       recipientBalanceBefore + fee,
     );
     expect(await marketplace.claimableNativeFees(feeRecipient.address)).to.equal(0);
+  });
+
+  it('keeps native checkout disabled by default and exposes an owner-only activation gate', async function () {
+    const fixture = await loadFixture(deployFixture);
+    const { owner, seller, buyer, marketplace, wrappedNative, uki, nativePaymentInitiallyAllowed } = fixture;
+    expect(nativePaymentInitiallyAllowed).to.equal(false);
+
+    await marketplace.connect(owner).setNativePaymentAllowed(false);
+    const { orderId } = await listToken(fixture, 114, ethers.parseEther('1'));
+    const deadline = BigInt(await time.latest()) + 600n;
+    const path = [await wrappedNative.getAddress(), await uki.getAddress()];
+    await expect(
+      marketplace.connect(buyer).buyWithNative(orderId, path, deadline, {
+        value: ethers.parseEther('3'),
+      }),
+    ).to.be.revertedWithCustomError(marketplace, 'NativePaymentNotAllowed');
+    expect(await marketplace.orderState(orderId)).to.equal(ACTIVE);
+
+    await expect(marketplace.connect(seller).setNativePaymentAllowed(true))
+      .to.be.revertedWithCustomError(marketplace, 'OwnableUnauthorizedAccount')
+      .withArgs(seller.address);
+    await expect(marketplace.connect(owner).setNativePaymentAllowed(true))
+      .to.emit(marketplace, 'NativePaymentAllowedUpdated')
+      .withArgs(true);
+    expect(await marketplace.nativePaymentAllowed()).to.equal(true);
   });
 
   it('invalidates stale orders after approval revocation or ownership transfer', async function () {

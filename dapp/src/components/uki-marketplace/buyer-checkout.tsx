@@ -124,15 +124,20 @@ export function UkiMarketplaceBuyerCheckout({
   const [quoteState, setQuoteState] = useState<QuoteState>({ kind: 'loading' });
   const [transactionState, setTransactionState] = useState<TransactionState>({ kind: 'idle' });
   const [reloadKey, setReloadKey] = useState(0);
+  const availableCurrencies = CURRENCIES.filter((item) => {
+    if (item === 'UKI') return ukiMarketplacePublicConfig.ukiPaymentReady;
+    if (item === 'BNB') return ukiMarketplacePublicConfig.bnbPaymentReady;
+    return ukiMarketplacePublicConfig.usdtPaymentReady;
+  });
 
   const configReady = ukiMarketplacePublicConfig.ready
     && ukiMarketplacePublicConfig.checkoutReady
+    && ukiMarketplacePublicConfig.ukiPaymentReady
     && ukiMarketplacePublicConfig.chainId === 97
     && Boolean(ukiMarketplacePublicConfig.marketplaceAddress)
     && Boolean(ukiMarketplacePublicConfig.ukiTokenAddress)
     && Boolean(ukiMarketplacePublicConfig.routerAddress)
-    && Boolean(ukiMarketplacePublicConfig.wrappedNativeAddress)
-    && Boolean(ukiMarketplacePublicConfig.usdtTokenAddress);
+    && Boolean(ukiMarketplacePublicConfig.wrappedNativeAddress);
 
   const readQuote = useCallback(async (): Promise<Quote> => {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
@@ -147,7 +152,6 @@ export function UkiMarketplaceBuyerCheckout({
       || !configuredUki
       || !configuredRouter
       || !configuredWrappedNative
-      || !configuredUsdt
     ) {
       throw new Error('CHECKOUT_UNAVAILABLE');
     }
@@ -266,6 +270,9 @@ export function UkiMarketplaceBuyerCheckout({
     let quotedPaymentRaw = ukiPrice;
 
     if (currency === 'BNB') {
+      if (!ukiMarketplacePublicConfig.bnbPaymentReady) {
+        throw new Error('El pago con BNB no está habilitado en este Stage.');
+      }
       tokenAddress = null;
       path = ukiMarketplacePublicConfig.bnbPaymentPath;
       symbol = 'BNB';
@@ -277,12 +284,22 @@ export function UkiMarketplaceBuyerCheckout({
       ) {
         throw new Error('La ruta BNB → UKI no coincide con el contrato de Stage.');
       }
-      const amounts = await publicClient.readContract({
-        address: configuredRouter,
-        abi: ukiMarketplaceRouterReadAbi,
-        functionName: 'getAmountsIn',
-        args: [ukiPrice, path],
-      });
+      const [nativePaymentAllowed, amounts] = await Promise.all([
+        publicClient.readContract({
+          address: marketplaceAddress,
+          abi: ukiMarketplaceReadAbi,
+          functionName: 'nativePaymentAllowed',
+        }),
+        publicClient.readContract({
+          address: configuredRouter,
+          abi: ukiMarketplaceRouterReadAbi,
+          functionName: 'getAmountsIn',
+          args: [ukiPrice, path],
+        }),
+      ]);
+      if (!nativePaymentAllowed) {
+        throw new Error('El pago con BNB está deshabilitado on-chain en este Stage.');
+      }
       if (
         amounts.length !== path.length
         || amounts.at(-1) !== ukiPrice
@@ -292,6 +309,9 @@ export function UkiMarketplaceBuyerCheckout({
       }
       quotedPaymentRaw = amounts[0];
     } else if (currency === 'USDT') {
+      if (!ukiMarketplacePublicConfig.usdtPaymentReady || !configuredUsdt) {
+        throw new Error('El pago con USDT no está habilitado en este Stage.');
+      }
       tokenAddress = configuredUsdt;
       path = ukiMarketplacePublicConfig.usdtPaymentPath;
       if (
@@ -602,8 +622,15 @@ export function UkiMarketplaceBuyerCheckout({
             </Button>
           </div>
 
-          <div aria-label="Moneda de pago" className="mt-4 grid grid-cols-3 gap-2">
-            {CURRENCIES.map((item) => (
+          <div
+            aria-label="Moneda de pago"
+            className={availableCurrencies.length === 1
+              ? 'mt-4 grid grid-cols-1 gap-2'
+              : availableCurrencies.length === 2
+                ? 'mt-4 grid grid-cols-2 gap-2'
+                : 'mt-4 grid grid-cols-3 gap-2'}
+          >
+            {availableCurrencies.map((item) => (
               <button
                 key={item}
                 type="button"
@@ -629,7 +656,8 @@ export function UkiMarketplaceBuyerCheckout({
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-400">
                   El anuncio puede consultarse, pero no se habilitará una firma hasta que
-                  router, UKI, WBNB, USDT y rutas de pago coincidan con el contrato Testnet.
+                  marketplace, router, UKI y WBNB coincidan con el contrato Testnet.
+                  BNB y USDT se habilitan por separado cuando sus rutas están verificadas.
                 </p>
               </div>
             )}
