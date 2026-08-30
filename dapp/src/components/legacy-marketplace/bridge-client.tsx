@@ -288,7 +288,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
   } = useTronLink();
-  const [sourceNetwork, setSourceNetwork] = useState<BridgeNetwork>('TRON');
+  const [sourceNetwork] = useState<BridgeNetwork>('TRON');
   const [destinationOwner, setDestinationOwner] = useState('');
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
   const [bridgingCukies, setBridgingCukies] = useState<LegacyMarketplaceCukiItem[]>([]);
@@ -639,27 +639,14 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-headline text-2xl font-bold text-white">
-                Source network
+                Migracion TRON a BSC
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Select where the Cukie currently lives.
+                La entrega Stage solo habilita la direccion Nile hacia BSC Testnet.
               </p>
             </div>
-            <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
-              {(['TRON', 'BSC'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setSourceNetwork(item)}
-                  className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
-                    sourceNetwork === item
-                      ? 'bg-cyan-300 text-slate-950'
-                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
+            <div className="rounded-[8px] border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+              TRON Nile → BSC Testnet
             </div>
           </div>
 

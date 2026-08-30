@@ -6,15 +6,10 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
-interface ICukiesBridgeCollection is IERC721 {
-    function mint(
-        address to,
-        uint256 tokenId,
-        uint8 rarity,
-        uint8 generation
-    ) external;
-}
+import {
+    CukieBridgeMetadata,
+    ICukiesBridgeCollection
+} from "./ICukiesBridgeCollection.sol";
 
 /**
  * @title CukiesBridgeEndpoint
@@ -33,25 +28,18 @@ contract CukiesBridgeEndpoint is
     uint8 public constant TRON_NETWORK = 0;
     uint8 public constant BSC_NETWORK = 1;
 
-    struct CukieMetadata {
-        uint256 typeId;
-        uint256 generation;
-        uint256[6] skills;
-        uint256 energy;
-        uint256 health;
-    }
-
     struct BridgeRequest {
         uint256 tokenId;
         address sourceOwner;
-        address destinationOwner;
+        bytes20 destinationOwner;
         uint8 destinationNetwork;
         uint256 feePaid;
         uint256 createdAt;
         bytes32 metadataHash;
     }
 
-    ICukiesBridgeCollection public immutable collection;
+    IERC721 public immutable collection;
+    ICukiesBridgeCollection public immutable bridgeCollection;
     uint8 public immutable localNetwork;
 
     address payable public feeRecipient;
@@ -63,7 +51,7 @@ contract CukiesBridgeEndpoint is
     mapping(bytes32 transferId => BridgeRequest request) public bridgeRequests;
     mapping(uint256 tokenId => bytes32 transferId) public lockedTransferByToken;
 
-    mapping(uint256 tokenId => CukieMetadata metadata) private _tokenMetadata;
+    mapping(uint256 tokenId => CukieBridgeMetadata metadata) private _tokenMetadata;
     mapping(uint256 tokenId => bytes32 metadataHash) public tokenMetadataHash;
 
     bool private _expectingCollectionTransfer;
@@ -83,7 +71,7 @@ contract CukiesBridgeEndpoint is
         bytes32 indexed transferId,
         uint256 indexed tokenId,
         address indexed sourceOwner,
-        address destinationOwner,
+        bytes20 destinationOwner,
         uint8 sourceNetwork,
         uint8 destinationNetwork,
         uint256 nonce,
@@ -127,6 +115,7 @@ contract CukiesBridgeEndpoint is
     error DestinationTokenNotTracked(uint256 tokenId);
     error InvalidCukieType(uint256 typeId);
     error InvalidCukieGeneration(uint256 generation);
+    error MetadataHashMismatch(bytes32 expected, bytes32 actual);
     error FeeTransferFailed();
     error TrackedTokenRecoveryForbidden(uint256 tokenId, bytes32 transferId);
     error OwnershipRenounceDisabled();
@@ -149,7 +138,8 @@ contract CukiesBridgeEndpoint is
         }
         if (initialFeeRecipient == address(0)) revert InvalidRecipient();
 
-        collection = ICukiesBridgeCollection(collectionAddress);
+        collection = IERC721(collectionAddress);
+        bridgeCollection = ICukiesBridgeCollection(collectionAddress);
         localNetwork = network;
         feeRecipient = initialFeeRecipient;
         bridgePrice = initialBridgePrice;
@@ -157,10 +147,10 @@ contract CukiesBridgeEndpoint is
 
     function requestBridge(
         uint256 tokenId,
-        address destinationOwner,
+        bytes20 destinationOwner,
         uint8 destinationNetwork
     ) external payable nonReentrant whenNotPaused returns (bytes32 transferId) {
-        if (destinationOwner == address(0)) revert InvalidRecipient();
+        if (destinationOwner == bytes20(0)) revert InvalidRecipient();
         if (
             destinationNetwork != TRON_NETWORK
                 && destinationNetwork != BSC_NETWORK
@@ -199,8 +189,12 @@ contract CukiesBridgeEndpoint is
             )
         );
 
-        bytes32 metadataHash = tokenMetadataHash[tokenId];
+        CukieBridgeMetadata memory metadata = bridgeCollection.bridgeMetadata(tokenId);
+        _validateMetadata(metadata);
+        bytes32 metadataHash = hashMetadata(metadata);
         uint256 createdAt = block.timestamp * 1_000;
+        _tokenMetadata[tokenId] = metadata;
+        tokenMetadataHash[tokenId] = metadataHash;
         lockedTransferByToken[tokenId] = transferId;
         bridgeRequests[transferId] = BridgeRequest({
             tokenId: tokenId,
@@ -227,7 +221,7 @@ contract CukiesBridgeEndpoint is
         emit JumpInBridge(
             tokenId,
             msg.sender,
-            destinationOwner,
+            address(destinationOwner),
             destinationNetwork,
             createdAt
         );
@@ -255,12 +249,14 @@ contract CukiesBridgeEndpoint is
         uint256 tokenId,
         address destinationOwner,
         uint8 sourceNetwork,
-        CukieMetadata calldata metadata
+        bytes32 sourceMetadataHash,
+        CukieBridgeMetadata calldata metadata
     ) external nonReentrant whenNotPaused onlyRelayer {
         _validateCompletion(
             transferId,
             destinationOwner,
             sourceNetwork,
+            sourceMetadataHash,
             metadata
         );
 
@@ -289,7 +285,8 @@ contract CukiesBridgeEndpoint is
         bytes32 transferId,
         address destinationOwner,
         uint8 sourceNetwork,
-        CukieMetadata calldata metadata
+        bytes32 sourceMetadataHash,
+        CukieBridgeMetadata calldata metadata
     ) private view {
         if (transferId == bytes32(0)) revert InvalidTransferId();
         if (processedTransfers[transferId]) {
@@ -304,11 +301,10 @@ contract CukiesBridgeEndpoint is
         if (sourceNetwork == localNetwork) {
             revert InvalidNetwork(sourceNetwork);
         }
-        if (metadata.typeId < 1 || metadata.typeId > 6) {
-            revert InvalidCukieType(metadata.typeId);
-        }
-        if (metadata.generation < 1 || metadata.generation > 2) {
-            revert InvalidCukieGeneration(metadata.generation);
+        _validateMetadata(metadata);
+        bytes32 actualMetadataHash = hashMetadata(metadata);
+        if (sourceMetadataHash != actualMetadataHash) {
+            revert MetadataHashMismatch(sourceMetadataHash, actualMetadataHash);
         }
     }
 
@@ -328,11 +324,10 @@ contract CukiesBridgeEndpoint is
             collection.safeTransferFrom(address(this), destinationOwner, tokenId);
         } catch {
             minted = true;
-            collection.mint(
+            bridgeCollection.mintBridge(
                 destinationOwner,
                 tokenId,
-                uint8(_tokenMetadata[tokenId].typeId),
-                uint8(_tokenMetadata[tokenId].generation)
+                _tokenMetadata[tokenId]
             );
         }
     }
@@ -340,17 +335,26 @@ contract CukiesBridgeEndpoint is
     function tokenMetadata(uint256 tokenId)
         external
         view
-        returns (CukieMetadata memory metadata, bytes32 metadataHash)
+        returns (CukieBridgeMetadata memory metadata, bytes32 metadataHash)
     {
         return (_tokenMetadata[tokenId], tokenMetadataHash[tokenId]);
     }
 
-    function hashMetadata(CukieMetadata calldata metadata)
+    function hashMetadata(CukieBridgeMetadata memory metadata)
         public
         pure
         returns (bytes32)
     {
         return keccak256(abi.encode(metadata));
+    }
+
+    function _validateMetadata(CukieBridgeMetadata memory metadata) private pure {
+        if (metadata.typeId < 1 || metadata.typeId > 6) {
+            revert InvalidCukieType(metadata.typeId);
+        }
+        if (metadata.generation < 1 || metadata.generation > 2) {
+            revert InvalidCukieGeneration(metadata.generation);
+        }
     }
 
     function setRelayer(address relayer, bool allowed) external onlyOwner {

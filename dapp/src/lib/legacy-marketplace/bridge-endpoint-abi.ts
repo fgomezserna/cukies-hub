@@ -21,7 +21,7 @@ export const cukiesBridgeEndpointAbi = [
     stateMutability: 'payable',
     inputs: [
       { name: 'tokenId', type: 'uint256' },
-      { name: 'destinationOwner', type: 'address' },
+      { name: 'destinationOwner', type: 'bytes20' },
       { name: 'destinationNetwork', type: 'uint8' },
     ],
     outputs: [{ name: 'transferId', type: 'bytes32' }],

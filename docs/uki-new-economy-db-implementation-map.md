@@ -83,10 +83,16 @@ legacy y no para reutilizarlo en Stage:
   `0x0f1a9cfbb2d27e3eee58c52a00f1592ecea6e006b3b9d6ca8cdbdd67b03039ea`
   y `0x31116020150232ad1f006973140d8b71c0b371b1e4da5d462e64ad8c8d471acc`.
 
-Esto aun no cierra el bridge del documento. Faltan el relayer idempotente, despliegues
-en Nile/BSC Testnet, E2E real con reconciliacion de ownership/supply, politica de
-confirmaciones/reintentos/DLQ y sustituir los `10 TRX` por una tarifa derivada del
-coste BSC medido con buffer aprobado.
+El relayer Stage-only ya existe en `packages/cukies-bridge-relayer`: procesa solo
+`BridgeRequested` confirmados de Nile hacia BSC Testnet, deduplica por `transferId`,
+verifica metadata/custodia, usa leases, backoff y DLQ, no reenvia receipts ambiguos
+y reconcilia una unica representacion circulante. El profile Docker permanece
+desactivado y exige gates explicitos de Stage.
+
+Esto aun no cierra el bridge del documento. Faltan los despliegues reales en
+Nile/BSC Testnet, allowlist/key handover, el E2E real con receipts y reconciliacion,
+y sustituir los `10 TRX` por una tarifa derivada del coste BSC medido con buffer
+aprobado.
 
 Direcciones legacy mainnet documentadas:
 
@@ -230,7 +236,7 @@ El maximo potencial por wallet es 10 cupos si el usuario alcanza 5 por ruta. Est
 | Pausar generacion de Cukie Points | Operacion legacy controlada por contrato; antes de ejecutar, generar snapshot de claimed + pending usando `points` + `calcPoints(tokenId)`. Resultado se importa como baseline a `cukieshub-new`. | Biblioteca preview-only, manifest, plan sin firma y verificador implementados; snapshot/report live y ejecución siguen pendientes de aprobación. |
 | Tabla por wallet de Cukie Points | Export desde legacy `points` + wallets/user linkage + pending on-chain. Guardar resumen estructural, no datos sensibles en Git. | Serializadores JSONL/CSV canónicos implementados; falta proporcionar fuentes/cutoffs live autorizados. |
 | Pausar crias con Cukie Points | Operacion legacy: pausar contrato/UI. No crear nueva mecanica de breeding en UKI. | Pendiente de accion ops. |
-| Bridge Tron -> BSC | Mantener bridge existente como flujo legacy; nueva economia solo acepta nuevas posiciones BSC. `NftInventoryService` marca Tron como lectura/migracion. | Parcial: UI e indexer existen, pero no hay executor/relayer ni E2E testnet; el fixture solo emite eventos. |
+| Bridge Tron -> BSC | Migracion unidireccional a BSC; nueva economia solo acepta nuevas posiciones BSC. `NftInventoryService` marca Tron como lectura/migracion. | Parcial: contrato, UI fail-closed y relayer idempotente estan emulados localmente; faltan deploy Nile/BSC Testnet y E2E real. |
 | Marketplace legacy | Mantener lectura/acciones legacy mientras se migra. Nuevo marketplace con UKI seria feature separada; el marketplace actual usa moneda nativa. | Parcial: vistas legacy existentes. |
 | Premios preventa | Registrar elegibilidad/ranking off-chain; mint/entrega de NFTs requiere flujo BSC/ops especifico. | Pendiente. |
 | Cierre preventa y extension | Contrato `Presale` permite mover ventanas; decision de prolongar se decide por estado on-chain/indexado. | Implementado en contrato, pendiente de politica ops. |

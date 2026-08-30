@@ -21,7 +21,7 @@ describe('CukiesBridgeEndpoint', function () {
     const Nft = await ethers.getContractFactory('StagingCukiesNftV2');
     const tronNft = await Nft.deploy(owner.address);
     const bscNft = await Nft.deploy(owner.address);
-    await tronNft.mint(alice.address, tokenId, metadata.typeId, metadata.generation);
+    await tronNft.mintBridge(alice.address, tokenId, metadata);
 
     const Endpoint = await ethers.getContractFactory('CukiesBridgeEndpoint');
     const tronEndpoint = await Endpoint.deploy(
@@ -104,12 +104,34 @@ describe('CukiesBridgeEndpoint', function () {
 
     expect(await tronNft.ownerOf(tokenId)).to.equal(await tronEndpoint.getAddress());
     expect(await tronEndpoint.lockedTransferByToken(tokenId)).to.equal(outboundId);
-    expect(outbound.metadataHash).to.equal(ethers.ZeroHash);
+    expect(outbound.metadataHash).to.equal(await tronEndpoint.hashMetadata(metadata));
+
+    const alteredMetadata = { ...metadata, energy: metadata.energy + 1n };
+    await expect(
+      bscEndpoint
+        .connect(relayer)
+        .completeBridge(
+          outboundId,
+          tokenId,
+          bob.address,
+          TRON,
+          outbound.metadataHash,
+          alteredMetadata,
+        ),
+    ).to.be.revertedWithCustomError(bscEndpoint, 'MetadataHashMismatch');
+    expect(await bscEndpoint.processedTransfers(outboundId)).to.equal(false);
 
     await expect(
       bscEndpoint
         .connect(relayer)
-        .completeBridge(outboundId, tokenId, bob.address, TRON, metadata),
+        .completeBridge(
+          outboundId,
+          tokenId,
+          bob.address,
+          TRON,
+          outbound.metadataHash,
+          metadata,
+        ),
     )
       .to.emit(bscEndpoint, 'BridgeCompleted')
       .withArgs(
@@ -124,6 +146,12 @@ describe('CukiesBridgeEndpoint', function () {
       );
 
     expect(await bscNft.ownerOf(tokenId)).to.equal(bob.address);
+    const bridgedMetadata = await bscNft.bridgeMetadata(tokenId);
+    expect(bridgedMetadata.typeId).to.equal(metadata.typeId);
+    expect(bridgedMetadata.generation).to.equal(metadata.generation);
+    expect([...bridgedMetadata.skills]).to.deep.equal(metadata.skills);
+    expect(bridgedMetadata.energy).to.equal(metadata.energy);
+    expect(bridgedMetadata.health).to.equal(metadata.health);
     expect((await bscEndpoint.tokenMetadata(tokenId))[1]).to.equal(
       await bscEndpoint.hashMetadata(metadata),
     );
@@ -142,7 +170,14 @@ describe('CukiesBridgeEndpoint', function () {
     await expect(
       tronEndpoint
         .connect(relayer)
-        .completeBridge(inboundId, tokenId, alice.address, BSC, metadata),
+        .completeBridge(
+          inboundId,
+          tokenId,
+          alice.address,
+          BSC,
+          inbound.metadataHash,
+          metadata,
+        ),
     )
       .to.emit(tronEndpoint, 'BridgeCompleted')
       .withArgs(
@@ -187,27 +222,56 @@ describe('CukiesBridgeEndpoint', function () {
     await expect(
       bscEndpoint
         .connect(stranger)
-        .completeBridge(outbound.transferId, tokenId, bob.address, TRON, metadata),
+        .completeBridge(
+          outbound.transferId,
+          tokenId,
+          bob.address,
+          TRON,
+          outbound.metadataHash,
+          metadata,
+        ),
     )
       .to.be.revertedWithCustomError(bscEndpoint, 'UnauthorizedRelayer')
       .withArgs(stranger.address);
 
     await bscEndpoint
       .connect(relayer)
-      .completeBridge(outbound.transferId, tokenId, bob.address, TRON, metadata);
+      .completeBridge(
+        outbound.transferId,
+        tokenId,
+        bob.address,
+        TRON,
+        outbound.metadataHash,
+        metadata,
+      );
     await expect(
       bscEndpoint
         .connect(relayer)
-        .completeBridge(outbound.transferId, tokenId, bob.address, TRON, metadata),
+        .completeBridge(
+          outbound.transferId,
+          tokenId,
+          bob.address,
+          TRON,
+          outbound.metadataHash,
+          metadata,
+        ),
     )
       .to.be.revertedWithCustomError(bscEndpoint, 'TransferAlreadyProcessed')
       .withArgs(outbound.transferId);
 
     const conflictingId = ethers.keccak256(ethers.toUtf8Bytes('conflicting-transfer'));
+    const metadataHash = await bscEndpoint.hashMetadata(metadata);
     await expect(
       bscEndpoint
         .connect(relayer)
-        .completeBridge(conflictingId, tokenId, alice.address, TRON, metadata),
+        .completeBridge(
+          conflictingId,
+          tokenId,
+          alice.address,
+          TRON,
+          metadataHash,
+          metadata,
+        ),
     )
       .to.be.revertedWithCustomError(bscEndpoint, 'DestinationTokenNotInCustody')
       .withArgs(tokenId, bob.address);
@@ -274,7 +338,14 @@ describe('CukiesBridgeEndpoint', function () {
     await expect(
       tronEndpoint
         .connect(relayer)
-        .completeBridge(untrackedId, tokenId, alice.address, BSC, metadata),
+        .completeBridge(
+          untrackedId,
+          tokenId,
+          alice.address,
+          BSC,
+          await tronEndpoint.hashMetadata(metadata),
+          metadata,
+        ),
     )
       .to.be.revertedWithCustomError(tronEndpoint, 'DestinationTokenNotTracked')
       .withArgs(tokenId);

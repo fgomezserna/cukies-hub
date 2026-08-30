@@ -46,18 +46,20 @@ Any new Slither finding outside this accepted list must be triaged before testne
 ### Stage bridge triage 2026-08-30
 
 The full analyzer run reports no untriaged reentrancy, replay or state-ordering
-finding in `CukiesBridgeEndpoint`. Three endpoint-specific informational findings
+finding in `CukiesBridgeEndpoint`. Two endpoint-specific informational findings
 remain accepted for the local/Nile/BSC Testnet candidate:
 
 | Detector | Bridge-specific triage |
 | --- | --- |
 | `low-level-calls` | The exact native bridge fee is forwarded with a checked `call` after all state and events are prepared. `nonReentrant` protects the entry point and a failed payment reverts the whole request. This intentionally supports treasury contracts whose receive path needs more than the `transfer` stipend. |
-| `missing-inheritance` | `StagingCukiesNftV2` structurally implements `ICukiesBridgeCollection`; the interface lives in the endpoint candidate and making the pre-existing test collection inherit it would couple the fixture to the bridge. Deployment verification must still prove the configured collection supports `ownerOf`, `safeTransferFrom` and endpoint-only `mint`. |
 | `unindexed-event-address` | `JumpInBridge` and `JumpOutBridge` preserve the historical event ABI consumed by the legacy indexer. The parallel `BridgeRequested` and `BridgeCompleted` events index transfer id, token id and wallet for new monitoring. |
 
 The remaining findings from the full-repository run belong to pre-existing vault
-or mock contracts and are not suppressed by this bridge change. They must retain
-their own triage before any affected contract is promoted.
+or fixture contracts and are not suppressed by this bridge change. The `assembly`
+finding in `StagingCukiesNftV2` is the standard revert-reason bubbling path used by
+its ERC-721 receiver check; the bridge change does not introduce a new assembly
+path. All remaining findings must retain their own triage before any affected
+contract is promoted.
 
 ## Deep audit findings 2026-06-08
 

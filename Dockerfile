@@ -96,6 +96,7 @@ COPY games/tower-builder/package.json games/tower-builder/package.json
 COPY packages/chain-indexer/package.json packages/chain-indexer/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/cuki-card-worker/package.json packages/cuki-card-worker/package.json
+COPY packages/cukies-bridge-relayer/package.json packages/cukies-bridge-relayer/package.json
 COPY packages/game-bridge/package.json packages/game-bridge/package.json
 
 RUN pnpm install --frozen-lockfile
@@ -108,6 +109,8 @@ RUN if [ "$CUKIES_SERVICE" = "dapp" ]; then \
       pnpm --filter @cukies/chain-indexer run build; \
     elif [ "$CUKIES_SERVICE" = "cuki-card-worker" ]; then \
       pnpm --filter @cukies/cuki-card-worker run build; \
+    elif [ "$CUKIES_SERVICE" = "cukies-bridge-relayer" ]; then \
+      pnpm --filter @cukies/cukies-bridge-relayer run build; \
     else \
       echo "CUKIES_SERVICE no soportado: $CUKIES_SERVICE" && exit 1; \
     fi
