@@ -61,6 +61,7 @@ export const ECONOMY_COLLECTIONS = [
   'treasure_hunt_weekly_bests',
   'game_economy_runtime_state',
   'game_economy_runtime_runs',
+  'ambassador_attributions',
   'reward_rule_state',
   'reward_emission_budget_state',
   'reward_emission_budget_days',
@@ -697,6 +698,21 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     collection: 'treasure_hunt_weekly_bests',
     keys: { weeklyPeriodId: 1, scoreDigits: -1, scoreRaw: -1, achievedAt: 1 },
     options: { name: 'treasure_weekly_best_score_order' },
+  },
+  {
+    collection: 'ambassador_attributions',
+    keys: { referredWalletNormalized: 1 },
+    options: { unique: true, name: 'ambassador_referred_wallet_unique' },
+  },
+  {
+    collection: 'ambassador_attributions',
+    keys: { ambassadorWalletNormalized: 1, acceptedAt: -1, _id: 1 },
+    options: { name: 'ambassador_direct_referrals' },
+  },
+  {
+    collection: 'ambassador_attributions',
+    keys: { source: 1, policyVersion: 1, acceptedAt: -1 },
+    options: { name: 'ambassador_policy_audit' },
   },
   {
     collection: 'game_economy_events',

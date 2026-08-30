@@ -7,6 +7,7 @@ import { getEconomyDb, withEconomyTransaction } from "@/lib/indexer-db/mongodb";
 import type { CreditReservation } from "@/lib/uki-economy/credits/types";
 import type { CukiePoolAssignment } from "@/lib/uki-economy/cukie-pool/types";
 import type { OwnCukieAssignment } from "@/lib/uki-economy/own-cukie/types";
+import { resolveMongoAmbassadorAttribution } from "@/lib/uki-economy/ambassadors/repository";
 
 import {
   DomainConflictError,
@@ -51,11 +52,6 @@ import { rewardAccountingService } from "../rewards/accounting-repository";
 import type { WeeklyGameResult } from "../rewards/accounting-types";
 import { resolveAppliedArenaRanking } from "../rewards/arena-ranking";
 import type { RewardRule } from "../rewards/types";
-
-type PresaleParticipantReferral = {
-  normalizedWalletAddress: string;
-  lockedSponsorWalletAddress?: string | null;
-};
 
 type CompetitionAttemptAuthority = {
   attemptId: string;
@@ -288,7 +284,7 @@ export async function assertTreasureHuntAuthorityGameSession(input: {
   return current;
 }
 
-async function loadReservedResources(session: GameEconomySession) {
+async function loadReservedResources(session: GameEconomySession, materializedAt: Date) {
   if (
     session.status !== "started" ||
     !session.startedAt ||
@@ -318,11 +314,14 @@ async function loadReservedResources(session: GameEconomySession) {
   if (assignment.sessionId !== session.sessionId) {
     throw new DomainConflictError("La asignacion Cukie pertenece a otra sesion.");
   }
-  const referral = await db.collection<PresaleParticipantReferral>("presale_participants")
-    .findOne({ normalizedWalletAddress: session.walletNormalized });
-  const ambassadorWalletNormalized = referral?.lockedSponsorWalletAddress
-    ? validGameWallet(referral.lockedSponsorWalletAddress)
-    : null;
+  const ambassadorAttribution = await resolveMongoAmbassadorAttribution(
+    db,
+    session.walletNormalized,
+    session.createdAt,
+    undefined,
+    materializedAt,
+  );
+  const ambassadorWalletNormalized = ambassadorAttribution?.ambassadorWalletNormalized ?? null;
   if (ambassadorWalletNormalized === session.walletNormalized) {
     throw new DomainConflictError("La autorreferencia no puede fijarse como ambassador.");
   }
@@ -333,6 +332,13 @@ async function loadReservedResources(session: GameEconomySession) {
     creditEvidenceHash: session.credit.evidenceHash,
     cukieEvidenceHash: session.cukie.evidenceHash,
     ambassadorWalletNormalized,
+    ambassadorAttributionEvidence: ambassadorAttribution ? {
+      attributionId: ambassadorAttribution.attributionId,
+      evidenceHash: ambassadorAttribution.evidenceHash,
+      policyVersion: ambassadorAttribution.policyVersion,
+      commissionBps: ambassadorAttribution.commissionBpsSnapshot,
+      levels: ambassadorAttribution.levelsSnapshot,
+    } : null,
   };
 }
 
@@ -372,7 +378,7 @@ export async function openTreasureHuntEconomyRun(input: {
     idempotencyKey: `treasure-open-${stableGameEconomyHash({ runId })}`,
     now,
   });
-  const resources = await loadReservedResources(gameSession);
+  const resources = await loadReservedResources(gameSession, now);
   const daily = getTreasureHuntDailyPeriod(gameSession.createdAt);
   const weekly = getTreasureHuntWeeklyPeriod(gameSession.createdAt);
   const quotaId = resources.credit.bucket === "pool"
@@ -416,6 +422,7 @@ export async function openTreasureHuntEconomyRun(input: {
     ambassadorEvidenceHash: stableGameEconomyHash({
       walletNormalized,
       ambassadorWalletNormalized: resources.ambassadorWalletNormalized,
+      attribution: resources.ambassadorAttributionEvidence,
       capturedAt: ambassadorCapturedAt,
     }),
     quotaReservationId: quotaId,

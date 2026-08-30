@@ -1,0 +1,214 @@
+import type { ClientSession, Db } from "mongodb";
+
+import { DomainConflictError } from "../errors";
+import {
+  assertAmbassadorAttribution,
+  buildAmbassadorAttribution,
+  stableAmbassadorHash,
+  validAmbassadorWallet,
+} from "./rules";
+import type {
+  AmbassadorAttribution,
+  AmbassadorAttributionRepository,
+  LockedPresaleAmbassador,
+} from "./types";
+
+type PresaleParticipant = {
+  normalizedWalletAddress: string;
+  lockedSponsorWalletAddress?: string | null;
+  sponsorLockedAt?: Date | null;
+  firstPurchaseAt?: Date | null;
+};
+
+function duplicateKey(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === 11000);
+}
+
+function lockedPresaleAmbassador(
+  row: PresaleParticipant | null,
+): LockedPresaleAmbassador | null {
+  if (!row?.lockedSponsorWalletAddress) return null;
+  const referredWalletNormalized = validAmbassadorWallet(
+    row.normalizedWalletAddress,
+    "presale.normalizedWalletAddress",
+  );
+  const ambassadorWalletNormalized = validAmbassadorWallet(
+    row.lockedSponsorWalletAddress,
+    "presale.lockedSponsorWalletAddress",
+  );
+  const lockedAt = row.sponsorLockedAt instanceof Date && !Number.isNaN(row.sponsorLockedAt.getTime())
+    ? row.sponsorLockedAt
+    : row.firstPurchaseAt instanceof Date && !Number.isNaN(row.firstPurchaseAt.getTime())
+      ? row.firstPurchaseAt
+      : null;
+  if (!lockedAt) {
+    throw new DomainConflictError(
+      `El sponsor bloqueado de preventa no tiene fecha canonica para ${referredWalletNormalized}.`,
+    );
+  }
+  return {
+    referredWalletNormalized,
+    ambassadorWalletNormalized,
+    lockedAt,
+    sourceReferenceHash: stableAmbassadorHash({
+      collection: "presale_participants",
+      referredWalletNormalized,
+      ambassadorWalletNormalized,
+      lockedAt,
+    }),
+  };
+}
+
+export function createMongoAmbassadorAttributionRepository(
+  db: Db,
+  session?: ClientSession,
+): AmbassadorAttributionRepository {
+  const options = session ? { session } : {};
+  const attributions = db.collection<AmbassadorAttribution>("ambassador_attributions");
+  const presale = db.collection<PresaleParticipant>("presale_participants");
+  return {
+    async findAttribution(referredWalletNormalized) {
+      const row = await attributions.findOne(
+        { referredWalletNormalized },
+        options,
+      );
+      return row ? assertAmbassadorAttribution(row) : null;
+    },
+    async findLockedPresaleAmbassador(referredWalletNormalized) {
+      const row = await presale.findOne(
+        { normalizedWalletAddress: referredWalletNormalized },
+        {
+          ...options,
+          projection: {
+            _id: 0,
+            normalizedWalletAddress: 1,
+            lockedSponsorWalletAddress: 1,
+            sponsorLockedAt: 1,
+            firstPurchaseAt: 1,
+          },
+        },
+      );
+      return lockedPresaleAmbassador(row);
+    },
+    async insertAttribution(attribution) {
+      assertAmbassadorAttribution(attribution);
+      try {
+        await attributions.insertOne(attribution, options);
+        return "inserted";
+      } catch (error) {
+        if (duplicateKey(error)) return "duplicate";
+        throw error;
+      }
+    },
+  };
+}
+
+export async function resolveMongoAmbassadorAttributionsForWallets(
+  db: Db,
+  wallets: readonly string[],
+  effectiveAt: Date,
+  session?: ClientSession,
+  materializedAt = new Date(),
+) {
+  const normalized = [...new Set(wallets.map((wallet) => validAmbassadorWallet(wallet)))].sort();
+  const resolved = new Map<string, AmbassadorAttribution | null>();
+  if (normalized.length === 0) return resolved;
+  const options = session ? { session } : {};
+  const attributions = db.collection<AmbassadorAttribution>("ambassador_attributions");
+  const [existingRows, presaleRows] = await Promise.all([
+    attributions.find({
+      referredWalletNormalized: { $in: normalized },
+      acceptedAt: { $lte: effectiveAt },
+    }, options).toArray(),
+    db.collection<PresaleParticipant>("presale_participants").find(
+      {
+        normalizedWalletAddress: { $in: normalized },
+        lockedSponsorWalletAddress: { $type: "string" },
+      },
+      {
+        ...options,
+        projection: {
+          _id: 0,
+          normalizedWalletAddress: 1,
+          lockedSponsorWalletAddress: 1,
+          sponsorLockedAt: 1,
+          firstPurchaseAt: 1,
+        },
+      },
+    ).toArray(),
+  ]);
+  const existing = new Map(existingRows.map((row) => [
+    row.referredWalletNormalized,
+    assertAmbassadorAttribution(row),
+  ]));
+  const locked = new Map(presaleRows.flatMap((row) => {
+    const value = lockedPresaleAmbassador(row);
+    if (!value) throw new DomainConflictError("El sponsor de preventa no pudo normalizarse.");
+    return value.lockedAt.getTime() <= effectiveAt.getTime()
+      ? [[value.referredWalletNormalized, value] as const]
+      : [];
+  }));
+  const missingPresale = [...locked.values()]
+    .filter((value) => !existing.has(value.referredWalletNormalized))
+    .map((value) => buildAmbassadorAttribution({
+      referredWallet: value.referredWalletNormalized,
+      ambassadorWallet: value.ambassadorWalletNormalized,
+      source: "presale_locked",
+      sourceReferenceHash: value.sourceReferenceHash,
+      acceptedAt: value.lockedAt,
+      now: materializedAt,
+    }));
+  if (missingPresale.length > 0) {
+    await attributions.bulkWrite(
+      missingPresale.map((attribution) => ({
+        updateOne: {
+          filter: { _id: attribution._id },
+          update: { $setOnInsert: attribution },
+          upsert: true,
+        },
+      })),
+      { ...options, ordered: false },
+    );
+    const insertedOrRaced = await attributions.find(
+      {
+        referredWalletNormalized: { $in: missingPresale.map((row) => row.referredWalletNormalized) },
+        acceptedAt: { $lte: effectiveAt },
+      },
+      options,
+    ).toArray();
+    for (const row of insertedOrRaced) {
+      existing.set(row.referredWalletNormalized, assertAmbassadorAttribution(row));
+    }
+  }
+  for (const wallet of normalized) {
+    const attribution = existing.get(wallet) ?? null;
+    const presaleAttribution = locked.get(wallet);
+    if (
+      presaleAttribution &&
+      attribution?.ambassadorWalletNormalized !== presaleAttribution.ambassadorWalletNormalized
+    ) {
+      throw new DomainConflictError(
+        `La atribucion ambassador contradice el sponsor de preventa para ${wallet}.`,
+      );
+    }
+    resolved.set(wallet, attribution);
+  }
+  return resolved;
+}
+
+export async function resolveMongoAmbassadorAttribution(
+  db: Db,
+  wallet: string,
+  effectiveAt: Date,
+  session?: ClientSession,
+  materializedAt = new Date(),
+) {
+  const walletNormalized = validAmbassadorWallet(wallet);
+  return (await resolveMongoAmbassadorAttributionsForWallets(
+    db,
+    [walletNormalized],
+    effectiveAt,
+    session,
+    materializedAt,
+  )).get(walletNormalized) ?? null;
+}
