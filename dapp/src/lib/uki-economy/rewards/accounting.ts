@@ -24,6 +24,7 @@ import {
 } from "./accounting-types";
 import {
   apportionRaw,
+  assertRewardRule,
   compareRewardText,
   stableRewardHash,
   validRewardDate,
@@ -58,6 +59,58 @@ function exactDayId(value: string) {
     throw new DomainValidationError("dayId no identifica un dia UTC valido.");
   }
   return value;
+}
+
+function canonicalConfigHash(value: string, label = "ruleConfigHash") {
+  if (!/^[0-9a-f]{64}$/.test(value)) {
+    throw new DomainValidationError(`${label} debe ser SHA-256 canonico.`);
+  }
+  return value;
+}
+
+/**
+ * Politica operativa vigente para todo UKI que no termina en un beneficiario.
+ * Se valida contra la regla completa y su configHash para impedir que una
+ * version con pesos historicos (80/5/5/10) vuelva a entrar por error.
+ */
+export function assertCurrentUndistributedRule(rule: RewardRule) {
+  assertRewardRule(rule);
+  const weights = rule.undistributedBps;
+  if (
+    weights.treasury !== 8_000
+    || weights.marketing !== 0
+    || weights.development !== 0
+    || (weights.marketingDevelopment ?? 0) !== 1_000
+    || weights.supplyReduction !== 1_000
+  ) {
+    throw new DomainConflictError(
+      "La regla de UKI no distribuido debe ser exactamente 80/10/10 con marketing y desarrollo unificados.",
+    );
+  }
+  if (!rule.destinations.marketingDevelopment) {
+    throw new DomainValidationError(
+      "La regla 80/10/10 exige un destino unificado de marketing y desarrollo.",
+    );
+  }
+  const destinations = {
+    treasury: validRewardWallet(rule.destinations.treasury, "destinations.treasury"),
+    marketingDevelopment: validRewardWallet(
+      rule.destinations.marketingDevelopment,
+      "destinations.marketingDevelopment",
+    ),
+    supplyReduction: validRewardWallet(
+      rule.destinations.supplyReduction,
+      "destinations.supplyReduction",
+    ),
+  };
+  if (new Set(Object.values(destinations)).size !== 3) {
+    throw new DomainValidationError("Los tres destinos contables deben ser distintos.");
+  }
+  return {
+    ruleVersion: rule.version,
+    ruleConfigHash: canonicalConfigHash(rule.configHash),
+    destinations,
+  };
 }
 
 export function splitUndistributed(totalRaw: string): UndistributedSplit {
@@ -95,6 +148,7 @@ export function reserveForCredits(credits: number): RewardReserveBreakdown {
 export function sealDailyRewardAccounting(input: {
   dayId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   buckets: DailyRewardBuckets;
   sourceIds?: readonly string[];
   sourceReservedRaw?: string;
@@ -108,6 +162,7 @@ export function sealDailyRewardAccounting(input: {
 }): DailyRewardAccounting {
   const dayId = exactDayId(input.dayId);
   const ruleVersion = validRewardText(input.ruleVersion, "ruleVersion");
+  const ruleConfigHash = canonicalConfigHash(input.ruleConfigHash);
   const sealedAt = validRewardDate(input.sealedAt, "sealedAt");
   const destinations = {
     treasury: validRewardWallet(input.destinations.treasury, "destinations.treasury"),
@@ -173,7 +228,7 @@ export function sealDailyRewardAccounting(input: {
     compareRewardText(left.allocationId, right.allocationId));
   const sourceSetHash = stableRewardHash({ dayId, sourceIds, sourceReservedRaw });
   const payload = {
-    dayId, ruleVersion, sourceIds, sourceSetHash, sourceReservedRaw,
+    dayId, ruleVersion, ruleConfigHash, sourceIds, sourceSetHash, sourceReservedRaw,
     capacityMaterializedRaw, priorReservedInflowRaw, topupRaw,
     buckets, undistributed, priorReservedUndistributed, destinations, allocations,
   };
@@ -283,9 +338,9 @@ export function calculateDailyRewardSettlement(input: {
   cukieSecondPlusParticipants: readonly CukieRewardAccountingParticipant[];
   ambassadorByWallet?: Readonly<Record<string, string | null>>;
   priorWeekly?: PriorWeeklyPoolTranche;
-  destinations: UndistributedDestinations;
   sealedAt: Date;
 }) {
+  const policy = assertCurrentUndistributedRule(input.rule);
   const source = dailyBucketsFromSources(input.sourceLines);
   const sourceReserved = parseRawAmount(source.sourceReservedRaw);
   const emission = parseRawAmount(DAILY_REWARD_EMISSION_RAW);
@@ -543,9 +598,9 @@ export function calculateDailyRewardSettlement(input: {
     fundingMode: RewardAccountingAllocation["fundingMode"],
     sourceIds: string[],
   ) => {
-    append({ walletNormalized: input.destinations.treasury, category: "treasury", amountRaw: split.treasuryRaw, fundingMode, sourceIds });
-    append({ walletNormalized: input.destinations.marketingDevelopment, category: "marketing_development", amountRaw: split.marketingDevelopmentRaw, fundingMode, sourceIds });
-    append({ walletNormalized: input.destinations.supplyReduction, category: "supply_reduction", amountRaw: split.supplyReductionRaw, fundingMode, sourceIds });
+    append({ walletNormalized: policy.destinations.treasury, category: "treasury", amountRaw: split.treasuryRaw, fundingMode, sourceIds });
+    append({ walletNormalized: policy.destinations.marketingDevelopment, category: "marketing_development", amountRaw: split.marketingDevelopmentRaw, fundingMode, sourceIds });
+    append({ walletNormalized: policy.destinations.supplyReduction, category: "supply_reduction", amountRaw: split.supplyReductionRaw, fundingMode, sourceIds });
   };
   appendDestinationSplit(
     splitUndistributed(formatRawAmount(currentUndistributed)),
@@ -570,6 +625,7 @@ export function calculateDailyRewardSettlement(input: {
   return sealDailyRewardAccounting({
     dayId: input.dayId,
     ruleVersion: input.rule.version,
+    ruleConfigHash: policy.ruleConfigHash,
     buckets,
     sourceIds: source.sourceIds,
     sourceReservedRaw: source.sourceReservedRaw,
@@ -578,7 +634,7 @@ export function calculateDailyRewardSettlement(input: {
     topupRaw: formatRawAmount(topup),
     priorReservedUndistributedRaw: formatRawAmount(priorUndistributed),
     allocations,
-    destinations: input.destinations,
+    destinations: policy.destinations,
     sealedAt: input.sealedAt,
   });
 }
@@ -761,6 +817,7 @@ export function selectWeeklyBestResults(results: readonly WeeklyGameResult[]) {
 export function calculateWeeklyPrize(input: {
   periodId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   potRaw: string;
   ambassadorReserveRaw: string;
   sourceDailyAccountingIds: readonly string[];
@@ -772,6 +829,7 @@ export function calculateWeeklyPrize(input: {
 }): WeeklyPrizeAccounting {
   const periodId = validRewardText(input.periodId, "periodId");
   const ruleVersion = validRewardText(input.ruleVersion, "ruleVersion");
+  const ruleConfigHash = canonicalConfigHash(input.ruleConfigHash);
   const pot = canonicalRaw(input.potRaw, "potRaw");
   const ambassadorReserve = canonicalRaw(input.ambassadorReserveRaw, "ambassadorReserveRaw");
   const sourceDailyAccountingIds = input.sourceDailyAccountingIds.map((id, index) =>
@@ -954,6 +1012,9 @@ export function calculateWeeklyPrize(input: {
       "destinations.supplyReduction",
     ),
   };
+  if (new Set(Object.values(destinations)).size !== 3) {
+    throw new DomainValidationError("Los tres destinos contables deben ser distintos.");
+  }
   const lotteryEntropyHash = stableRewardHash({ periodId, lotteryEntropy });
   const payoutMonday = new Date(Date.UTC(
     payoutAt.getUTCFullYear(),
@@ -1017,6 +1078,7 @@ export function calculateWeeklyPrize(input: {
   const payload = {
     periodId,
     ruleVersion,
+    ruleConfigHash,
     fundingMode: "reserved_no_mint" as const,
     sourceDailyAccountingIds,
     potRaw: formatRawAmount(pot),

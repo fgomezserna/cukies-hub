@@ -27,6 +27,7 @@ export type DailyRewardAccounting = {
   _id: string;
   dayId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   sourceIds: string[];
   sourceSetHash: string;
   sourceReservedRaw: string;
@@ -235,6 +236,7 @@ export type WeeklyPrizeAccounting = {
   _id: string;
   periodId: string;
   ruleVersion: string;
+  ruleConfigHash: string;
   fundingMode: "reserved_no_mint";
   sourceDailyAccountingIds: string[];
   potRaw: string;

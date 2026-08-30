@@ -27,6 +27,7 @@ const ACCOUNTING_CATEGORIES = new Set([
   ...CLAIMABLE_CATEGORIES,
 ]);
 const RAW = /^(0|[1-9][0-9]*)$/;
+const SHA_256 = /^[0-9a-f]{64}$/;
 
 function stableValue(value) {
   if (value instanceof Date) return value.toISOString();
@@ -189,6 +190,178 @@ function assertSystemDestination(allocations, category, expectedAddress) {
   return expected;
 }
 
+function assertUndistributedRule(rule) {
+  if (!rule || !SHA_256.test(rule.configHash ?? '')) {
+    throw new Error('La regla de rewards no contiene un configHash canonico.');
+  }
+  const weights = rule.undistributedBps;
+  if (
+    !weights
+    || weights.treasury !== 8_000
+    || weights.marketing !== 0
+    || weights.development !== 0
+    || (weights.marketingDevelopment ?? 0) !== 1_000
+    || weights.supplyReduction !== 1_000
+  ) {
+    throw new Error(
+      'La regla de UKI no distribuido debe ser exactamente 80/10/10 con marketing y desarrollo unificados.',
+    );
+  }
+  if (!rule.destinations?.marketingDevelopment) {
+    throw new Error('La regla 80/10/10 exige el destino unificado marketingDevelopment.');
+  }
+  const destinations = {
+    treasury: canonicalWallet(rule.destinations.treasury, 'destinations.treasury').toLowerCase(),
+    marketingDevelopment: canonicalWallet(
+      rule.destinations.marketingDevelopment,
+      'destinations.marketingDevelopment',
+    ).toLowerCase(),
+    supplyReduction: canonicalWallet(
+      rule.destinations.supplyReduction,
+      'destinations.supplyReduction',
+    ).toLowerCase(),
+  };
+  if (new Set(Object.values(destinations)).size !== 3) {
+    throw new Error('Los tres destinos 80/10/10 deben ser distintos.');
+  }
+  return destinations;
+}
+
+function canonicalUndistributedSplit(split, label) {
+  if (!split || typeof split !== 'object') {
+    throw new Error(`${label} no contiene el reparto 80/10/10 sellado.`);
+  }
+  const total = canonicalRaw(split.totalRaw, `${label}.totalRaw`);
+  const treasury = canonicalRaw(split.treasuryRaw, `${label}.treasuryRaw`);
+  const marketingDevelopment = canonicalRaw(
+    split.marketingDevelopmentRaw,
+    `${label}.marketingDevelopmentRaw`,
+  );
+  const supplyReduction = canonicalRaw(
+    split.supplyReductionRaw,
+    `${label}.supplyReductionRaw`,
+  );
+  const expectedTreasury = total * 8_000n / 10_000n;
+  const expectedMarketingDevelopment = total * 1_000n / 10_000n;
+  const expectedSupplyReduction = total - expectedTreasury - expectedMarketingDevelopment;
+  if (
+    treasury !== expectedTreasury
+    || marketingDevelopment !== expectedMarketingDevelopment
+    || supplyReduction !== expectedSupplyReduction
+  ) {
+    throw new Error(`${label} no aplica exactamente 80/10/10 hasta el ultimo wei.`);
+  }
+  return { treasury, marketingDevelopment, supplyReduction };
+}
+
+function assertAccountingUndistributed(allocations, accounting, accountingKind) {
+  const parts = accountingKind === 'daily'
+    ? [
+        ['accounting.undistributed', accounting.undistributed, 'daily_emission'],
+        [
+          'accounting.priorReservedUndistributed',
+          accounting.priorReservedUndistributed,
+          'reserved_no_mint',
+        ],
+      ]
+    : [
+        ['accounting.undistributed', accounting.undistributed, 'reserved_no_mint'],
+        [
+          'accounting.ambassadorUndistributed',
+          accounting.ambassadorUndistributed,
+          'reserved_no_mint',
+        ],
+      ];
+  const expectedByFunding = new Map();
+  for (const [label, split, fundingMode] of parts) {
+    const expected = canonicalUndistributedSplit(split, label);
+    const current = expectedByFunding.get(fundingMode) ?? {
+      treasury: 0n,
+      marketingDevelopment: 0n,
+      supplyReduction: 0n,
+    };
+    current.treasury += expected.treasury;
+    current.marketingDevelopment += expected.marketingDevelopment;
+    current.supplyReduction += expected.supplyReduction;
+    expectedByFunding.set(fundingMode, current);
+  }
+  for (const [fundingMode, expected] of expectedByFunding) {
+    const scoped = allocations.filter((allocation) => allocation.fundingMode === fundingMode);
+    const actual = {
+      treasury: sumCategory(scoped, 'treasury'),
+      marketingDevelopment: sumCategory(scoped, 'marketing_development'),
+      supplyReduction: sumCategory(scoped, 'supply_reduction'),
+    };
+    if (
+      actual.treasury !== expected.treasury
+      || actual.marketingDevelopment !== expected.marketingDevelopment
+      || actual.supplyReduction !== expected.supplyReduction
+    ) {
+      throw new Error(
+        `Las salidas ${fundingMode} no coinciden con el reparto 80/10/10 sellado.`,
+      );
+    }
+  }
+}
+
+function assertAccountingPayloadHash(accounting, accountingKind) {
+  let payload;
+  if (accountingKind === 'daily' && String(accounting.dayId).startsWith('canary:')) {
+    payload = {
+      kind: 'reward-canary-accounting',
+      accountingId: accounting._id,
+      allocations: accounting.allocations,
+    };
+  } else if (accountingKind === 'daily') {
+    payload = {
+      dayId: accounting.dayId,
+      ruleVersion: accounting.ruleVersion,
+      ruleConfigHash: accounting.ruleConfigHash,
+      sourceIds: accounting.sourceIds,
+      sourceSetHash: accounting.sourceSetHash,
+      sourceReservedRaw: accounting.sourceReservedRaw,
+      capacityMaterializedRaw: accounting.capacityMaterializedRaw,
+      priorReservedInflowRaw: accounting.priorReservedInflowRaw,
+      topupRaw: accounting.topupRaw,
+      buckets: accounting.buckets,
+      undistributed: accounting.undistributed,
+      priorReservedUndistributed: accounting.priorReservedUndistributed,
+      destinations: accounting.destinations,
+      allocations: accounting.allocations,
+    };
+  } else {
+    payload = {
+      periodId: accounting.periodId,
+      ruleVersion: accounting.ruleVersion,
+      ruleConfigHash: accounting.ruleConfigHash,
+      fundingMode: accounting.fundingMode,
+      sourceDailyAccountingIds: accounting.sourceDailyAccountingIds,
+      potRaw: accounting.potRaw,
+      ambassadorReserveRaw: accounting.ambassadorReserveRaw,
+      winners: accounting.winners,
+      poolReservations: accounting.poolReservations,
+      poolTrancheSchedule: accounting.poolTrancheSchedule,
+      ambassadorPayouts: accounting.ambassadorPayouts,
+      playerAllocatedRaw: accounting.playerAllocatedRaw,
+      poolReservedRaw: accounting.poolReservedRaw,
+      allocatedRaw: accounting.allocatedRaw,
+      ambassadorAllocatedRaw: accounting.ambassadorAllocatedRaw,
+      ambassadorDeferredRaw: accounting.ambassadorDeferredRaw,
+      undistributed: accounting.undistributed,
+      ambassadorUndistributed: accounting.ambassadorUndistributed,
+      destinations: accounting.destinations,
+      allocations: accounting.allocations,
+      conservationRaw: accounting.conservationRaw,
+      lotteryEntropy: accounting.lotteryEntropy,
+      lotteryEntropyHash: accounting.lotteryEntropyHash,
+      payoutAt: accounting.payoutAt,
+    };
+  }
+  if (accounting.payloadHash !== stableRewardPublicationHash(payload)) {
+    throw new Error(`El payloadHash de ${accounting._id} no coincide con su cierre inmutable.`);
+  }
+}
+
 function materializeMerkleDraft(input) {
   const claims = input.claims;
   const batchId = keccak256(stringToHex(input.periodId));
@@ -300,6 +473,13 @@ export function buildRewardPublicationArtifacts(input) {
   if (!input.rule || input.rule.version !== input.accounting.ruleVersion) {
     throw new Error(`El cierre ${input.accountingId} no liga una regla exacta.`);
   }
+  const ruleDestinations = assertUndistributedRule(input.rule);
+  if (
+    !SHA_256.test(input.accounting.ruleConfigHash ?? '')
+    || input.accounting.ruleConfigHash !== input.rule.configHash
+  ) {
+    throw new Error(`El cierre ${input.accountingId} no liga el configHash exacto de su regla.`);
+  }
   const allocations = input.allocations
     .map((allocation) => validateAccountingAllocation(allocation, input.accountingId))
     .sort((left, right) => left._id.localeCompare(right._id));
@@ -331,21 +511,46 @@ export function buildRewardPublicationArtifacts(input) {
   if (allocations.some((allocation) => allocation.accountingKind !== accountingKind)) {
     throw new Error('El cierre mezcla clases contables.');
   }
+  if (
+    accountingKind === 'weekly'
+    && allocations.some((allocation) => allocation.fundingMode !== 'reserved_no_mint')
+  ) {
+    throw new Error('El cierre weekly solo puede publicar UKI previamente reservado.');
+  }
+  if (
+    !input.accounting.destinations
+    || canonicalWallet(
+      input.accounting.destinations.treasury,
+      'accounting.destinations.treasury',
+    ).toLowerCase() !== ruleDestinations.treasury
+    || canonicalWallet(
+      input.accounting.destinations.marketingDevelopment,
+      'accounting.destinations.marketingDevelopment',
+    ).toLowerCase() !== ruleDestinations.marketingDevelopment
+    || canonicalWallet(
+      input.accounting.destinations.supplyReduction,
+      'accounting.destinations.supplyReduction',
+    ).toLowerCase() !== ruleDestinations.supplyReduction
+  ) {
+    throw new Error('Los destinos sellados no coinciden con la regla 80/10/10.');
+  }
+  assertAccountingUndistributed(allocations, input.accounting, accountingKind);
   const treasuryAddress = assertSystemDestination(
     allocations,
     'treasury',
-    input.rule.destinations.treasury,
+    ruleDestinations.treasury,
   );
   const marketingDevelopmentAddress = assertSystemDestination(
     allocations,
     'marketing_development',
-    input.rule.destinations.marketingDevelopment ?? input.rule.destinations.marketing,
+    ruleDestinations.marketingDevelopment,
   );
   assertSystemDestination(
     allocations,
     'supply_reduction',
-    input.rule.destinations.supplyReduction,
+    ruleDestinations.supplyReduction,
   );
+  assertAccountingPayloadHash(input.accounting, accountingKind);
   const sourceAllocationSetHash = stableRewardPublicationHash({
     kind: 'reward-accounting-allocation-set',
     accountingId: input.accountingId,
