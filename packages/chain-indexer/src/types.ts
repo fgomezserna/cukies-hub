@@ -7,6 +7,7 @@ export type ContractAlias =
   | 'STAKING_POINTS'
   | 'BREEDING_POINTS'
   | 'MARKETPLACE'
+  | 'UKI_MARKETPLACE'
   | 'BRIDGE'
   | 'PRESALE'
   | 'UKI_STAKING'
@@ -28,6 +29,12 @@ export type EventName =
   | 'TokenBought'
   | 'MarketTokenSaleCancelled'
   | 'MarketTokenPriceChanged'
+  | 'UkiMarketplaceOrderCreated'
+  | 'UkiMarketplaceOrderCancelled'
+  | 'UkiMarketplaceOrderExpired'
+  | 'UkiMarketplaceOrderInvalidated'
+  | 'UkiMarketplaceTokenNonceInvalidated'
+  | 'UkiMarketplaceOrderFilled'
   | 'JumpInBridge'
   | 'JumpOutBridge'
   | 'Purchased'
@@ -97,6 +104,7 @@ export type VerifiedBscContractAlias =
   | 'TOKEN'
   | 'TOKEN_V2'
   | 'MARKETPLACE'
+  | 'UKI_MARKETPLACE'
   | 'BRIDGE'
   | 'UKI_STAKING'
   | 'VESTING_VAULT'
@@ -160,6 +168,7 @@ export type IndexerConfig = {
   tokenAddress?: string;
   tokenV2Address?: string;
   marketplaceAddress?: string;
+  ukiMarketplaceAddress?: string;
   bridgeAddress?: string;
   ukiStakingAddress?: string;
   rewardsDistributorAddress?: string;
@@ -170,6 +179,7 @@ export type IndexerConfig = {
   tokenStartBlock?: number;
   tokenV2StartBlock?: number;
   marketplaceStartBlock?: number;
+  ukiMarketplaceStartBlock?: number;
   bridgeStartBlock?: number;
   rewardsDistributorStartBlock?: number;
   vestingVaultStartBlock?: number;

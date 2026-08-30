@@ -16,6 +16,7 @@ const bscContracts = {
   | 'UKI_STAKING'
   | 'VESTING_VAULT'
   | 'REWARDS_DISTRIBUTOR'
+  | 'UKI_MARKETPLACE'
   | 'CUKIE_MASTER_NFT_VAULT'
   | 'CUKIE_POOL_NFT_VAULT'
 >, string>;
@@ -34,6 +35,7 @@ const tronContracts = {
   | 'UKI_STAKING'
   | 'VESTING_VAULT'
   | 'REWARDS_DISTRIBUTOR'
+  | 'UKI_MARKETPLACE'
   | 'CUKIE_MASTER_NFT_VAULT'
   | 'CUKIE_POOL_NFT_VAULT'
 >, string>;
@@ -49,6 +51,14 @@ const eventsByContract = {
     'TokenBought',
     'MarketTokenSaleCancelled',
     'MarketTokenPriceChanged',
+  ],
+  UKI_MARKETPLACE: [
+    'UkiMarketplaceOrderCreated',
+    'UkiMarketplaceOrderCancelled',
+    'UkiMarketplaceOrderExpired',
+    'UkiMarketplaceOrderInvalidated',
+    'UkiMarketplaceTokenNonceInvalidated',
+    'UkiMarketplaceOrderFilled',
   ],
   BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
   PRESALE: ['Purchased'],
@@ -76,6 +86,7 @@ type BscContractAddressOptions = {
   tokenAddress?: string;
   tokenV2Address?: string;
   marketplaceAddress?: string;
+  ukiMarketplaceAddress?: string;
   bridgeAddress?: string;
   presaleAddress?: string;
   ukiStakingAddress?: string;
@@ -92,6 +103,9 @@ export function getMonitoredContractAddresses(options: BscContractAddressOptions
       ...(options.tokenAddress ? { TOKEN: options.tokenAddress } : {}),
       ...(options.tokenV2Address ? { TOKEN_V2: options.tokenV2Address } : {}),
       ...(options.marketplaceAddress ? { MARKETPLACE: options.marketplaceAddress } : {}),
+      ...(options.ukiMarketplaceAddress
+        ? { UKI_MARKETPLACE: options.ukiMarketplaceAddress }
+        : {}),
       ...(options.bridgeAddress ? { BRIDGE: options.bridgeAddress } : {}),
       ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
       ...(options.ukiStakingAddress ? { UKI_STAKING: options.ukiStakingAddress } : {}),
@@ -135,6 +149,7 @@ export function getContractEventConfigs(
     tokenAddress?: string;
     tokenV2Address?: string;
     marketplaceAddress?: string;
+    ukiMarketplaceAddress?: string;
     bridgeAddress?: string;
     presaleAddress?: string;
     ukiStakingAddress?: string;
@@ -150,6 +165,7 @@ export function getContractEventConfigs(
   const tokenAddress = options.tokenAddress?.trim();
   const tokenV2Address = options.tokenV2Address?.trim();
   const marketplaceAddress = options.marketplaceAddress?.trim();
+  const ukiMarketplaceAddress = options.ukiMarketplaceAddress?.trim();
   const bridgeAddress = options.bridgeAddress?.trim();
   const ukiStakingAddress = options.ukiStakingAddress?.trim();
   const vestingVaultAddress = options.vestingVaultAddress?.trim();
@@ -161,6 +177,7 @@ export function getContractEventConfigs(
     ['TOKEN', tokenAddress],
     ['TOKEN_V2', tokenV2Address],
     ['MARKETPLACE', marketplaceAddress],
+    ['UKI_MARKETPLACE', ukiMarketplaceAddress],
     ['BRIDGE', bridgeAddress],
     ['UKI_STAKING', ukiStakingAddress],
     ['VESTING_VAULT', vestingVaultAddress],
@@ -174,6 +191,14 @@ export function getContractEventConfigs(
     if (allowedAliases?.has(alias) && !address) {
       throw new Error(`${alias} fue solicitado sin una address BSC configurada.`);
     }
+  }
+
+  if (
+    marketplaceAddress
+    && ukiMarketplaceAddress
+    && marketplaceAddress.toLowerCase() === ukiMarketplaceAddress.toLowerCase()
+  ) {
+    throw new Error('MARKETPLACE y UKI_MARKETPLACE deben usar addresses BSC distintas.');
   }
 
   const nftCustodyAddresses = [
@@ -199,6 +224,7 @@ export function getContractEventConfigs(
       alias === 'TOKEN'
       || alias === 'TOKEN_V2'
       || alias === 'MARKETPLACE'
+      || alias === 'UKI_MARKETPLACE'
       || alias === 'BRIDGE'
       || alias === 'UKI_STAKING'
       || alias === 'VESTING_VAULT'
@@ -225,6 +251,9 @@ export function getContractEventConfigs(
             : {}),
           ...((!allowedAliases || allowedAliases.has('MARKETPLACE')) && marketplaceAddress
             ? { MARKETPLACE: marketplaceAddress }
+            : {}),
+          ...((!allowedAliases || allowedAliases.has('UKI_MARKETPLACE')) && ukiMarketplaceAddress
+            ? { UKI_MARKETPLACE: ukiMarketplaceAddress }
             : {}),
           ...((!allowedAliases || allowedAliases.has('BRIDGE')) && bridgeAddress
             ? { BRIDGE: bridgeAddress }

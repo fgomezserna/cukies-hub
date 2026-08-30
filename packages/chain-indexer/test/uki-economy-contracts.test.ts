@@ -17,6 +17,7 @@ const VESTING = `0x${'3'.repeat(40)}`;
 const TOKEN = `0x${'4'.repeat(40)}`;
 const TOKEN_V2 = `0x${'7'.repeat(40)}`;
 const MARKETPLACE = `0x${'5'.repeat(40)}`;
+const UKI_MARKETPLACE = `0x${'8'.repeat(40)}`;
 const BRIDGE = `0x${'6'.repeat(40)}`;
 const WALLET = `0x${'a'.repeat(40)}`;
 const BATCH_ID = `0x${'b'.repeat(64)}`;
@@ -213,6 +214,50 @@ test('registers the explicit verified BSC NFT sources without mainnet address fa
   assert.throws(
     () => getContractEventConfigs(['BSC'], { contractAliases: ['TOKEN'] }),
     /TOKEN fue solicitado sin una address BSC configurada/,
+  );
+});
+
+test('registers the new UKI marketplace separately from legacy BNB orders', () => {
+  const configs = getContractEventConfigs(['BSC'], {
+    marketplaceAddress: MARKETPLACE,
+    ukiMarketplaceAddress: UKI_MARKETPLACE,
+    contractAliases: ['MARKETPLACE', 'UKI_MARKETPLACE'],
+  });
+  assert.deepEqual(
+    configs.map(({ contractAlias, eventName, contractAddress }) => (
+      `${contractAlias}:${eventName}:${contractAddress.toLowerCase()}`
+    )),
+    [
+      `MARKETPLACE:TokenOnSale:${MARKETPLACE}`,
+      `MARKETPLACE:TokenBought:${MARKETPLACE}`,
+      `MARKETPLACE:MarketTokenSaleCancelled:${MARKETPLACE}`,
+      `MARKETPLACE:MarketTokenPriceChanged:${MARKETPLACE}`,
+      `UKI_MARKETPLACE:UkiMarketplaceOrderCreated:${UKI_MARKETPLACE}`,
+      `UKI_MARKETPLACE:UkiMarketplaceOrderCancelled:${UKI_MARKETPLACE}`,
+      `UKI_MARKETPLACE:UkiMarketplaceOrderExpired:${UKI_MARKETPLACE}`,
+      `UKI_MARKETPLACE:UkiMarketplaceOrderInvalidated:${UKI_MARKETPLACE}`,
+      `UKI_MARKETPLACE:UkiMarketplaceTokenNonceInvalidated:${UKI_MARKETPLACE}`,
+      `UKI_MARKETPLACE:UkiMarketplaceOrderFilled:${UKI_MARKETPLACE}`,
+    ],
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], { contractAliases: ['UKI_MARKETPLACE'] }),
+    /UKI_MARKETPLACE fue solicitado sin una address BSC configurada/,
+  );
+  assert.throws(
+    () => getContractEventConfigs(['BSC'], {
+      marketplaceAddress: MARKETPLACE,
+      ukiMarketplaceAddress: MARKETPLACE,
+      contractAliases: ['MARKETPLACE', 'UKI_MARKETPLACE'],
+    }),
+    /deben usar addresses BSC distintas/,
+  );
+  assert.throws(
+    () => getContractEventConfigs(['TRON'], {
+      ukiMarketplaceAddress: UKI_MARKETPLACE,
+      contractAliases: ['UKI_MARKETPLACE'],
+    }),
+    /solo se indexan con BSC habilitada/,
   );
 });
 
