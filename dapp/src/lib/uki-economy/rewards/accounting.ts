@@ -3,7 +3,6 @@ import "server-only";
 import { DomainConflictError, DomainValidationError } from "../errors";
 import { formatRawAmount, mulDiv, parseRawAmount, sumRawAmounts } from "../money";
 import {
-  DAILY_REWARD_EMISSION_RAW,
   type CukiePoolCandidate,
   type CukiePoolEligibilityResult,
   type DailyRewardAccounting,
@@ -95,6 +94,7 @@ export function reserveForCredits(credits: number): RewardReserveBreakdown {
 export function sealDailyRewardAccounting(input: {
   dayId: string;
   ruleVersion: string;
+  emissionRaw: string;
   buckets: DailyRewardBuckets;
   sourceIds?: readonly string[];
   sourceReservedRaw?: string;
@@ -128,9 +128,13 @@ export function sealDailyRewardAccounting(input: {
     canonicalRaw(value, `buckets.${key}`),
   ] as const);
   const accounted = sumRawAmounts(entries.map(([, value]) => value));
-  const emission = parseRawAmount(DAILY_REWARD_EMISSION_RAW);
+  const emissionRaw = formatRawAmount(canonicalRaw(input.emissionRaw, "emissionRaw"));
+  const emission = parseRawAmount(emissionRaw);
+  if (emission <= BigInt(0)) {
+    throw new DomainValidationError("La emision diaria debe ser positiva.");
+  }
   if (accounted > emission) {
-    throw new DomainConflictError("La contabilidad diaria excede la emision fija de 500000 UKI.");
+    throw new DomainConflictError("La contabilidad diaria excede la emision de su regla.");
   }
   const buckets = Object.fromEntries(
     entries.map(([key, value]) => [key, formatRawAmount(value)]),
@@ -146,13 +150,13 @@ export function sealDailyRewardAccounting(input: {
     : formatRawAmount(canonicalRaw(input.sourceReservedRaw, "sourceReservedRaw"));
   const sourceReserved = parseRawAmount(sourceReservedRaw);
   if (sourceReserved > emission) {
-    throw new DomainConflictError("Las reservas source exceden la emision diaria fija.");
+    throw new DomainConflictError("Las reservas source exceden la emision diaria de su regla.");
   }
   const capacityMaterializedRaw = input.capacityMaterializedRaw === undefined
     ? formatRawAmount(emission - sourceReserved)
     : formatRawAmount(canonicalRaw(input.capacityMaterializedRaw, "capacityMaterializedRaw"));
   if (sourceReserved + parseRawAmount(capacityMaterializedRaw) !== emission) {
-    throw new DomainConflictError("La capacidad materializada no completa exactamente 500000 UKI.");
+    throw new DomainConflictError("La capacidad materializada no completa la emision de su regla.");
   }
   const topupRaw = formatRawAmount(canonicalRaw(input.topupRaw ?? "0", "topupRaw"));
   if (
@@ -175,13 +179,12 @@ export function sealDailyRewardAccounting(input: {
   const payload = {
     dayId, ruleVersion, sourceIds, sourceSetHash, sourceReservedRaw,
     capacityMaterializedRaw, priorReservedInflowRaw, topupRaw,
-    buckets, undistributed, priorReservedUndistributed, destinations, allocations,
+    emissionRaw, buckets, undistributed, priorReservedUndistributed,
+    destinations, allocations, conservationRaw: emissionRaw,
   };
   return {
     _id: `reward-daily:${dayId}`,
     ...payload,
-    emissionRaw: DAILY_REWARD_EMISSION_RAW,
-    conservationRaw: DAILY_REWARD_EMISSION_RAW,
     payloadHash: stableRewardHash(payload),
     status: "sealed",
     sealedAt,
@@ -229,7 +232,7 @@ export function dailyBucketsFromSources(lines: readonly DailyRewardSourceLine[])
         totals.ambassadorWeeklyRaw += amount - ordinary;
       }
       // Destinos finales y undistributed_pending permanecen dentro del resto
-      // exacto de 500k; no se vuelven a reservar ni a mintear.
+      // exacto del cap diario versionado; no se vuelven a reservar ni a mintear.
     }
   }
   return {
@@ -288,9 +291,10 @@ export function calculateDailyRewardSettlement(input: {
 }) {
   const source = dailyBucketsFromSources(input.sourceLines);
   const sourceReserved = parseRawAmount(source.sourceReservedRaw);
-  const emission = parseRawAmount(DAILY_REWARD_EMISSION_RAW);
+  const emissionRaw = formatRawAmount(parseRawAmount(input.rule.emissionBudget.dailyCapRaw));
+  const emission = parseRawAmount(emissionRaw);
   if (sourceReserved > emission) {
-    throw new DomainConflictError("Los sources diarios exceden 500000 UKI.");
+    throw new DomainConflictError("Los sources diarios exceden el cap de la regla.");
   }
   const capacity = emission - sourceReserved;
   const prior = input.priorWeekly ?? zeroPriorWeeklyPoolTranche();
@@ -531,7 +535,7 @@ export function calculateDailyRewardSettlement(input: {
   const accounted = sumRawAmounts(Object.values(buckets).map(parseRawAmount));
   const currentUndistributed = emission - accounted;
   if (currentUndistributed < BigInt(0)) {
-    throw new DomainConflictError("El cierre diario excede 500000 UKI tras las garantias.");
+    throw new DomainConflictError("El cierre diario excede el cap de la regla tras las garantias.");
   }
   const priorPoolUndistributed = (input.creditContributors.length === 0 ? priorCredit : BigInt(0))
     + priorOriginal.carried
@@ -570,6 +574,7 @@ export function calculateDailyRewardSettlement(input: {
   return sealDailyRewardAccounting({
     dayId: input.dayId,
     ruleVersion: input.rule.version,
+    emissionRaw,
     buckets,
     sourceIds: source.sourceIds,
     sourceReservedRaw: source.sourceReservedRaw,

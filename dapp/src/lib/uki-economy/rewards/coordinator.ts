@@ -28,6 +28,7 @@ import type { RewardAllocationService } from "./service";
 import { rewardAllocationService } from "./service";
 import {
   assertRewardRule,
+  rewardRuleActiveAtQuery,
   stableRewardHash,
   validRewardText,
   validRewardWallet,
@@ -212,9 +213,7 @@ export async function loadSettlementRewardSnapshot(input: SettleGameRewardsInput
     const rule = await db.collection<RewardRule>("economy_rule_versions").findOne({
       scope: "reward_allocations",
       version: expectedRuleVersion,
-      active: true,
-      activeFrom: { $lte: rewardAnchor.effectiveAt },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: rewardAnchor.effectiveAt } }],
+      ...rewardRuleActiveAtQuery(rewardAnchor.effectiveAt),
     }, { session: mongoSession });
     if (!rule) {
       throw new DomainConflictError(

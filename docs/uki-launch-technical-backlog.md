@@ -902,6 +902,15 @@ Issues hijas:
     - 10% reduccion supply.
     - Marcado como pendiente si falta decision on-chain/off-chain.
 
+- UKI-060.6 Task - Versionar el presupuesto diario futuro sin alterar historicos (#292)
+  - Acceptance criteria:
+    - El cierre deriva su total exacto de `RewardRule.emissionBudget.dailyCapRaw`.
+    - 500,000 sigue siendo la regla Stage actual; 600,000 solo puede entrar con
+      una version nueva en un corte diario futuro.
+    - La regla anterior conserva `configHash`; reservas, cierres y batches
+      anteriores no se recalculan.
+    - Calendario, politicas y `lifetimeCapRaw` no se reinician en el mismo ledger.
+
 Dependencias: UKI-050, UKI-052.
 
 ### UKI-061 Epic - Claim UX/API

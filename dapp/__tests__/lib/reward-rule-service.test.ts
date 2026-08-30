@@ -27,18 +27,93 @@ describe("RewardRuleService", () => {
     expect(replay.rule.configHash).toBe(rule.configHash);
   });
 
-  it("rechaza ventanas activas solapadas", async () => {
+  it("programa un cap nuevo en un corte futuro sin mutar el configHash anterior", async () => {
     const repository = new MemoryRewardRepository(null);
     const service = new RewardRuleService(createMemoryRewardTransactionRunner(repository));
-    await service.persistRule(input(testRewardRule()));
-    const overlapping = testRewardRule({
+    const current = testRewardRule();
+    await service.persistRule(input(current));
+    const next = testRewardRule({
       _id: "reward-allocations:v2",
       version: "rewards-v2",
-      activeFrom: new Date("2026-07-05T00:00:00.000Z"),
+      activeFrom: new Date("2026-07-05T14:00:00.000Z"),
+      emissionBudget: {
+        ...current.emissionBudget,
+        dailyCapRaw: "2000000000000000000000000000000",
+      },
     });
 
-    await expect(service.persistRule(input(overlapping))).rejects.toThrow(/solapa/);
-    expect(repository.state.rules).toHaveLength(1);
+    await expect(service.persistRule(input(next))).resolves.toMatchObject({
+      replayed: false,
+      rule: { version: "rewards-v2" },
+    });
+    expect(repository.state.rules).toHaveLength(2);
+    expect(repository.state.rules[0]).toMatchObject({
+      version: "rewards-v1",
+      configHash: current.configHash,
+      supersededAt: new Date("2026-07-05T14:00:00.000Z"),
+      supersededByVersion: "rewards-v2",
+    });
+    await expect(repository.findRuleAt(
+      new Date("2026-07-05T13:59:59.999Z"),
+      "rewards-v1",
+    )).resolves.toMatchObject({ version: "rewards-v1" });
+    await expect(repository.findRuleAt(
+      new Date("2026-07-05T14:00:00.000Z"),
+      "rewards-v1",
+    )).resolves.toBeNull();
+    await expect(repository.findRuleAt(
+      new Date("2026-07-05T14:00:00.000Z"),
+      "rewards-v2",
+    )).resolves.toMatchObject({ version: "rewards-v2" });
+  });
+
+  it("rechaza supersesiones retroactivas, fuera de corte o que reinicien el ledger", async () => {
+    const cases = [
+      {
+        name: "retroactiva",
+        next: (current: RewardRule) => testRewardRule({
+          _id: "reward-allocations:retro",
+          version: "rewards-retro",
+          activeFrom: new Date("2026-07-01T00:00:00.000Z"),
+          emissionBudget: current.emissionBudget,
+        }),
+        expected: /posterior|corte futuro/,
+      },
+      {
+        name: "fuera de corte",
+        next: (current: RewardRule) => testRewardRule({
+          _id: "reward-allocations:off-boundary",
+          version: "rewards-off-boundary",
+          activeFrom: new Date("2026-07-05T14:00:01.000Z"),
+          emissionBudget: current.emissionBudget,
+        }),
+        expected: /corte diario/,
+      },
+      {
+        name: "reinicia lifetime cap",
+        next: (current: RewardRule) => testRewardRule({
+          _id: "reward-allocations:new-lifetime",
+          version: "rewards-new-lifetime",
+          activeFrom: new Date("2026-07-05T14:00:00.000Z"),
+          emissionBudget: {
+            ...current.emissionBudget,
+            lifetimeCapRaw: "200000000000000000000000000000000",
+          },
+        }),
+        expected: /lifetime cap/,
+      },
+    ];
+
+    for (const scenario of cases) {
+      const repository = new MemoryRewardRepository(null);
+      const service = new RewardRuleService(createMemoryRewardTransactionRunner(repository));
+      const current = testRewardRule();
+      await service.persistRule(input(current));
+      await expect(service.persistRule(input(scenario.next(current))))
+        .rejects.toThrow(scenario.expected);
+      expect(repository.state.rules).toHaveLength(1);
+      expect(repository.state.rules[0].supersededAt).toBeUndefined();
+    }
   });
 
   it("parsea la configuracion explicita de presupuesto sin defaults", () => {

@@ -67,7 +67,7 @@ function validRevision(value: number, label: string) {
   }
 }
 
-function validateBudgetState(
+export function assertRewardEmissionBudgetState(
   state: RewardEmissionBudgetState,
   rule: RewardRule,
 ) {
@@ -386,7 +386,7 @@ export async function reserveRewardEmissionBudget(
   );
   const state = await repository.findEmissionBudgetState();
   const day = await repository.findEmissionBudgetDay(window.dayId);
-  if (state) validateBudgetState(state, rule);
+  if (state) assertRewardEmissionBudgetState(state, rule);
   if (day) validateBudgetDay(day, window);
 
   if (

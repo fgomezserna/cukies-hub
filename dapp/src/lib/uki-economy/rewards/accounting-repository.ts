@@ -22,10 +22,14 @@ import type {
   WeeklyGameSource,
 } from "./accounting-types";
 import { assertEligibleWeeklyGameResult } from "./accounting";
-import { stableRewardHash } from "./rules";
+import { assertRewardEmissionBudgetState } from "./emission-budget";
+import {
+  assertRewardRule,
+  rewardRuleActiveAtQuery,
+  stableRewardHash,
+} from "./rules";
 import type { RewardRule } from "./types";
 import type { RewardEmissionBudgetDay, RewardEmissionBudgetState } from "./types";
-import { DAILY_REWARD_EMISSION_RAW } from "./accounting-types";
 
 type SettledGameEvidence = {
   sessionId: string;
@@ -71,7 +75,10 @@ export interface RewardAccountingRepository {
   insertWeeklyGameSource(source: WeeklyGameSource): Promise<void>;
   listEligibleWeeklyGameSources(startsAt: Date, endsAt: Date): Promise<WeeklyGameSource[]>;
   listDailyRewardSourceLines(dayId: string): Promise<DailyRewardSourceLine[]>;
-  findNextClosableRewardDay(ruleVersion: string, now: Date): Promise<string | null>;
+  findNextClosableRewardDay(
+    ruleVersion: string,
+    now: Date,
+  ): Promise<{ dayId: string; startsAt: Date } | null>;
   listDailyAccounting(startsOn: string, endsBefore: string): Promise<DailyRewardAccounting[]>;
   findFirstSafeLotteryEntropy(
     cutoff: Date,
@@ -171,25 +178,29 @@ export function createMongoRewardAccountingRepository(
     findRewardRule: (ruleVersion, at) => rewardRules.findOne({
       scope: "reward_allocations",
       version: ruleVersion,
-      active: true,
-      activeFrom: { $lte: at },
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: at } }],
+      ...rewardRuleActiveAtQuery(at),
     }, options),
     async materializeDailyCapacity(input) {
       const current = await capacityMaterializations.findOne({ dayId: input.dayId }, options);
       if (current) return current;
+      assertRewardRule(input.rule, input.startsAt);
+      const expectedStartsAt = new Date(
+        rewardDayStart(input.dayId).getTime()
+          + input.rule.emissionBudget.dayBoundarySecondUtc * 1_000,
+      );
       if (
         input.rule.emissionBudget.unusedDailyCapacity !== "materialize_undistributed"
-        || input.rule.emissionBudget.dailyCapRaw !== DAILY_REWARD_EMISSION_RAW
-        || input.startsAt.toISOString() !== `${input.dayId}T14:00:00.000Z`
+        || input.startsAt.getTime() !== expectedStartsAt.getTime()
       ) {
-        throw new DomainConflictError("La regla no permite materializar la capacidad diaria fija.");
+        throw new DomainConflictError("La regla no permite materializar la capacidad diaria solicitada.");
       }
       const budgetDayId = input.startsAt.toISOString();
       const day = await budgetDays.findOne({ _id: budgetDayId }, options);
       const state = await budgetStates.findOne({ _id: "reward_allocations" }, options);
+      if (state) assertRewardEmissionBudgetState(state, input.rule);
       const previousDaily = day ? parseRawAmount(day.reservedRaw) : BigInt(0);
       const cap = parseRawAmount(input.rule.emissionBudget.dailyCapRaw);
+      const capRaw = formatRawAmount(cap);
       if (previousDaily > cap) throw new DomainConflictError("El budget diario ya excede su cap.");
       const capacity = cap - previousDaily;
       const previousLifetime = state ? parseRawAmount(state.reservedLifetimeRaw) : BigInt(0);
@@ -200,7 +211,7 @@ export function createMongoRewardAccountingRepository(
       const resultingDay: RewardEmissionBudgetDay = day
         ? {
             ...day,
-            reservedRaw: DAILY_REWARD_EMISSION_RAW,
+            reservedRaw: capRaw,
             revision: day.revision + 1,
             updatedAt: input.now,
           }
@@ -213,7 +224,7 @@ export function createMongoRewardAccountingRepository(
               input.startsAt.getTime()
                 + (24 * 60 * 60 + input.rule.emissionBudget.lateReservationGraceSeconds) * 1_000,
             ),
-            reservedRaw: DAILY_REWARD_EMISSION_RAW,
+            reservedRaw: capRaw,
             revision: 0,
             createdAt: input.now,
             updatedAt: input.now,
@@ -246,7 +257,7 @@ export function createMongoRewardAccountingRepository(
         ruleConfigHash: input.rule.configHash,
         previousDailyRaw: formatRawAmount(previousDaily),
         capacityMaterializedRaw: formatRawAmount(capacity),
-        resultingDailyRaw: DAILY_REWARD_EMISSION_RAW,
+        resultingDailyRaw: capRaw,
         previousLifetimeRaw: formatRawAmount(previousLifetime),
         resultingLifetimeRaw: formatRawAmount(resultingLifetime),
       };
@@ -384,7 +395,9 @@ export function createMongoRewardAccountingRepository(
       if (latest) next.setUTCDate(next.getUTCDate() + 1);
       const startsAt = new Date(next.getTime() + rule.emissionBudget.dayBoundarySecondUtc * 1_000);
       const closesAt = new Date(startsAt.getTime() + 26 * 60 * 60_000);
-      return now.getTime() >= closesAt.getTime() ? next.toISOString().slice(0, 10) : null;
+      return now.getTime() >= closesAt.getTime()
+        ? { dayId: next.toISOString().slice(0, 10), startsAt }
+        : null;
     },
     listDailyAccounting: (startsOn, endsBefore) => daily.find({
       dayId: { $gte: startsOn, $lt: endsBefore },
@@ -600,6 +613,7 @@ export class RewardAccountingService {
   closeDailyFromReservedSources(input: {
     dayId: string;
     ruleVersion: string;
+    emissionRaw: string;
     destinations: DailyRewardAccounting["destinations"];
     sealedAt: Date;
   }) {
@@ -622,9 +636,9 @@ export class RewardAccountingService {
     includePriorWeekly: boolean;
   }) {
     return this.runTransaction(async (repository) => {
-      const dayId = await repository.findNextClosableRewardDay(input.ruleVersion, input.now);
-      if (!dayId) return null;
-      const startsAt = new Date(`${dayId}T14:00:00.000Z`);
+      const candidate = await repository.findNextClosableRewardDay(input.ruleVersion, input.now);
+      if (!candidate) return null;
+      const { dayId, startsAt } = candidate;
       const endsAt = new Date(startsAt.getTime() + 24 * 60 * 60_000);
       const readiness = await repository.dailyReadiness(startsAt, endsAt);
       if (

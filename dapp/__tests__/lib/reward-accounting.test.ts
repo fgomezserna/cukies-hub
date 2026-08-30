@@ -102,6 +102,7 @@ describe("reward accounting invariants", () => {
     const closed = sealDailyRewardAccounting({
       dayId: "2026-08-20",
       ruleVersion: "reward-v3",
+      emissionRaw: DAILY_REWARD_EMISSION_RAW,
       buckets: {
         playersRaw: raw(100_000),
         creditPoolRaw: raw(50_000),
@@ -134,6 +135,7 @@ describe("reward accounting invariants", () => {
     expect(() => sealDailyRewardAccounting({
       dayId: "2026-08-20",
       ruleVersion: "reward-v3",
+      emissionRaw: DAILY_REWARD_EMISSION_RAW,
       buckets: {
         playersRaw: raw(500_001), creditPoolRaw: "0", cukiePoolRaw: "0",
         ambassadorOrdinaryRaw: "0", weeklyPrizeRaw: "0", ambassadorWeeklyRaw: "0",
@@ -141,6 +143,39 @@ describe("reward accounting invariants", () => {
       destinations: DESTINATIONS,
       sealedAt: new Date(),
     })).toThrow(/excede/);
+  });
+
+  it("aplica 600000 UKI solo cuando la regla diaria versionada los define", () => {
+    const base = testRewardRule();
+    const rule = testRewardRule({
+      _id: "reward-allocations:v600k",
+      version: "reward-v600k",
+      emissionBudget: {
+        ...base.emissionBudget,
+        dailyCapRaw: raw(600_000),
+        lifetimeCapRaw: raw(450_000_000),
+        unusedDailyCapacity: "materialize_undistributed",
+      },
+    });
+    const result = calculateDailyRewardSettlement({
+      dayId: "2026-08-20",
+      rule,
+      sourceLines: [],
+      creditContributors: [],
+      cukieOriginalParticipants: [],
+      cukieSecondPlusParticipants: [],
+      destinations: DESTINATIONS,
+      sealedAt: new Date("2026-08-21T16:00:00.000Z"),
+    });
+
+    expect(result.emissionRaw).toBe(raw(600_000));
+    expect(result.conservationRaw).toBe(raw(600_000));
+    expect(result.undistributed).toEqual({
+      totalRaw: raw(600_000),
+      treasuryRaw: raw(480_000),
+      marketingDevelopmentRaw: raw(60_000),
+      supplyReductionRaw: raw(60_000),
+    });
   });
 
   it("combina ordinario + tramo previo antes de garantizar 0.75 y calcula el 5% sobre el pago final", () => {
@@ -478,6 +513,7 @@ describe("accounting persistence and runtime gates", () => {
     const service = new RewardAccountingService(async (work) => work(repository));
     const first = sealDailyRewardAccounting({
       dayId: "2026-08-20", ruleVersion: "reward-v3",
+      emissionRaw: DAILY_REWARD_EMISSION_RAW,
       buckets: { playersRaw: "1", creditPoolRaw: "0", cukiePoolRaw: "0", ambassadorOrdinaryRaw: "0", weeklyPrizeRaw: "0", ambassadorWeeklyRaw: "0" },
       destinations: DESTINATIONS, sealedAt: new Date("2026-08-21T00:00:00Z"),
     });
@@ -562,6 +598,7 @@ describe("accounting persistence and runtime gates", () => {
     const service = new RewardAccountingService(async (work) => work(repository));
     const result = await service.closeDailyFromReservedSources({
       dayId: "2026-08-20", ruleVersion: "reward-v3", destinations: DESTINATIONS,
+      emissionRaw: DAILY_REWARD_EMISSION_RAW,
       sealedAt: new Date("2026-08-21T00:00:00Z"),
     });
     expect(result.sourceReservedRaw).toBe(raw(10));

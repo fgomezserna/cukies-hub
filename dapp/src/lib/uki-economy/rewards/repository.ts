@@ -20,6 +20,7 @@ import {
   type RewardRuleState,
   type RewardSourceManifest,
 } from "./types";
+import { rewardRuleActiveAtQuery } from "./rules";
 
 export interface RewardRepository {
   findRuleAt(at: Date, expectedVersion: string): Promise<RewardRule | null>;
@@ -28,6 +29,12 @@ export interface RewardRepository {
     activeFrom: Date,
     activeUntil?: Date,
   ): Promise<RewardRule | null>;
+  supersedeRule(
+    version: string,
+    supersededAt: Date,
+    supersededByVersion: string,
+    now: Date,
+  ): Promise<RewardRule>;
   insertRule(rule: RewardRule): Promise<void>;
   advanceRuleScope(now: Date): Promise<RewardRuleState>;
   findEmissionBudgetEvent(sourceId: string): Promise<RewardEmissionBudgetEvent | null>;
@@ -141,9 +148,7 @@ export function createMongoRewardRepository(
         {
           scope: REWARD_RULE_SCOPE,
           version: expectedVersion,
-          active: true,
-          activeFrom: { $lte: at },
-          $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: at } }],
+          ...rewardRuleActiveAtQuery(at),
         },
         { ...options, sort: { activeFrom: -1, _id: -1 } }
       ),
@@ -155,8 +160,29 @@ export function createMongoRewardRepository(
       scope: REWARD_RULE_SCOPE,
       active: true,
       ...(activeUntil ? { activeFrom: { $lt: activeUntil } } : {}),
-      $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: activeFrom } }],
-    }, options),
+      $and: [
+        { $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gt: activeFrom } }] },
+        { $or: [{ supersededAt: { $exists: false } }, { supersededAt: { $gt: activeFrom } }] },
+      ],
+    }, { ...options, sort: { activeFrom: -1, _id: -1 } }),
+    async supersedeRule(version, supersededAt, supersededByVersion, now) {
+      const result = await rules.updateOne({
+        scope: REWARD_RULE_SCOPE,
+        version,
+        active: true,
+        activeFrom: { $lt: supersededAt },
+        supersededAt: { $exists: false },
+        $or: [{ activeUntil: { $exists: false } }, { activeUntil: { $gte: supersededAt } }],
+      }, {
+        $set: { supersededAt, supersededByVersion, updatedAt: now },
+      }, options);
+      if (result.matchedCount !== 1) {
+        throw new DomainConflictError(`La regla ${version} perdio su fence de supersesion.`);
+      }
+      const updated = await rules.findOne({ scope: REWARD_RULE_SCOPE, version }, options);
+      if (!updated) throw new DomainConflictError(`La regla ${version} desaparecio al supersederla.`);
+      return updated;
+    },
     async insertRule(rule) {
       await rules.insertOne(rule, options);
     },

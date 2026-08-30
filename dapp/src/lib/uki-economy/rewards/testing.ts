@@ -165,7 +165,8 @@ export class MemoryRewardRepository implements RewardRepository {
             rule.version === expectedVersion &&
             rule.active &&
             rule.activeFrom.getTime() <= at.getTime() &&
-            (!rule.activeUntil || rule.activeUntil.getTime() > at.getTime())
+            (!rule.activeUntil || rule.activeUntil.getTime() > at.getTime()) &&
+            (!rule.supersededAt || rule.supersededAt.getTime() > at.getTime())
         )
       ) ?? null
     );
@@ -180,7 +181,30 @@ export class MemoryRewardRepository implements RewardRepository {
       rule.active
       && (!activeUntil || rule.activeFrom.getTime() < activeUntil.getTime())
       && (!rule.activeUntil || rule.activeUntil.getTime() > activeFrom.getTime())
+      && (!rule.supersededAt || rule.supersededAt.getTime() > activeFrom.getTime())
     )) ?? null);
+  }
+
+  async supersedeRule(
+    version: string,
+    supersededAt: Date,
+    supersededByVersion: string,
+    now: Date,
+  ) {
+    const rule = this.state.rules.find((item) => item.version === version);
+    if (
+      !rule
+      || !rule.active
+      || rule.activeFrom.getTime() >= supersededAt.getTime()
+      || rule.supersededAt
+      || (rule.activeUntil && rule.activeUntil.getTime() < supersededAt.getTime())
+    ) {
+      throw new DomainConflictError(`La regla ${version} perdio su fence de supersesion.`);
+    }
+    rule.supersededAt = clone(supersededAt);
+    rule.supersededByVersion = supersededByVersion;
+    rule.updatedAt = clone(now);
+    return clone(rule);
   }
 
   async insertRule(rule: RewardRule) {

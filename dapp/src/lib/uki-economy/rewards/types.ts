@@ -54,6 +54,13 @@ export type RewardRule = {
   active: boolean;
   activeFrom: Date;
   activeUntil?: Date;
+  /**
+   * Corte operativo programado por una regla posterior. No forma parte del
+   * configHash economico: permite cerrar solo el futuro de una regla ya
+   * auditada sin reescribir la configuracion que sellaron sus historicos.
+   */
+  supersededAt?: Date;
+  supersededByVersion?: string;
   tokenDecimals: number;
   runCredits: {
     /** 10 creditos se representan como 100 unidades; no se usan floats. */

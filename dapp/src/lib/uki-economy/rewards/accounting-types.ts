@@ -33,13 +33,13 @@ export type DailyRewardAccounting = {
   capacityMaterializedRaw: string;
   priorReservedInflowRaw: string;
   topupRaw: string;
-  emissionRaw: typeof DAILY_REWARD_EMISSION_RAW;
+  emissionRaw: string;
   buckets: DailyRewardBuckets;
   undistributed: UndistributedSplit;
   priorReservedUndistributed: UndistributedSplit;
   destinations: UndistributedDestinations;
   allocations: RewardAccountingAllocation[];
-  conservationRaw: typeof DAILY_REWARD_EMISSION_RAW;
+  conservationRaw: string;
   payloadHash: string;
   status: "sealed";
   sealedAt: Date;
@@ -53,7 +53,7 @@ export type RewardDailyCapacityMaterialization = {
   ruleConfigHash: string;
   previousDailyRaw: string;
   capacityMaterializedRaw: string;
-  resultingDailyRaw: typeof DAILY_REWARD_EMISSION_RAW;
+  resultingDailyRaw: string;
   previousLifetimeRaw: string;
   resultingLifetimeRaw: string;
   payloadHash: string;

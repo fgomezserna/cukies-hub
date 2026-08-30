@@ -34,10 +34,12 @@ estos puntos, cerrados posteriormente en la conversacion:
 
 ### Guardarrail tecnico de emision
 
-- Cada dia economico se contabilizan exactamente `500,000 UKI` del programa de
+- Con la regla actual de staging, cada dia economico se contabilizan exactamente
+  `500,000 UKI` del programa de
   recompensas. La parte asignada a jugadores, pools, embajadores y reservas
   semanales, mas la parte no distribuida, debe reconciliar exactamente ese
-  importe. No es solo un cap variable.
+  importe. El cierre usa el `dailyCapRaw` de la version que cubre ese dia; no
+  existe un literal global que pueda reinterpretar dias ya cerrados.
 - UKI tiene suministro fijo: esta contabilidad no crea supply nuevo. Los lotes
   de rewards se financian desde la reserva UKI prefundada y las entregas
   posteriores de importes ya reservados no vuelven a consumir presupuesto ni
@@ -46,6 +48,16 @@ estos puntos, cerrados posteriormente en la conversacion:
   `500,000 UKI` diarios cubre 900 dias; la incompatibilidad con la comunicacion
   historica de seis anos sigue bloqueando una regla mainnet, no la validacion
   funcional en BSC Testnet.
+- Producto puede cambiar el ritmo de un periodo futuro, por ejemplo de
+  `500,000` a `600,000 UKI` diarios, pero solo programando una regla nueva en
+  un corte diario aun no abierto. La regla anterior conserva su `configHash` y
+  deja de ser seleccionable desde ese corte mediante metadata operativa de
+  supersesion. No se editan reservas, cierres, allocations, accruals, tramos ni
+  batches anteriores.
+- Cambiar el ritmo no aumenta la reserva. Si los `450,000,000 UKI` se usaran
+  enteramente a `600,000 UKI/dia`, durarian 750 dias. Tras un cambio parcial,
+  la duracion restante es `saldo restante / nuevo ritmo diario`. Cualquier
+  promesa temporal publica debe recalcularse antes de aprobar la nueva regla.
 - Antes de crear un manifest, allocation o accrual, el servicio reserva el
   total bruto de la fuente dentro de la misma transaccion Mongo. Los replays no
   vuelven a consumir presupuesto y un exceso diario o acumulado falla cerrado,
@@ -95,6 +107,18 @@ Suministro total: 1,000,000,000 UKI.
 | Programa de Recompensas Cukie Masters | 45% | Entrega durante 6 anos segun programa de recompensas. |
 | Ecosistema | 25% | Preventa, airdrops, reservas, marketing, eventos y oportunidades. |
 | Liquidez | 18% | Listing en Pancake, market making, liquidez posterior o exchange centralizado. |
+
+### Matriz de mutabilidad
+
+| Elemento | Se puede cambiar | Condicion |
+| --- | --- | --- |
+| Supply total de UKI | No se puede aumentar | `UKIToken` mintea todo en constructor y no expone mint. El burn solo reduce supply. |
+| Vesting de preventa | Solo antes de congelarlo | `presaleVestingStart` y duracion pueden ajustarse antes de `freezePresaleVestingConfig()`; despues quedan bloqueados. Los claims no deben abrirse antes del freeze. |
+| Schedules no preventa ya creadas | No retroactivamente | Un mismo `scheduleId` solo admite mas asignacion con exactamente el mismo start, cliff y duration. |
+| Reward diario ya reservado o sellado | No | Eventos, dias, cierres, tramos y batches son append-only/inmutables y se verifican por hashes y fences. |
+| Ritmo diario de rewards futuro | Si | Nueva `RewardRule`, corte diario futuro, mismo calendario/politicas y mismo `lifetimeCapRaw`. La regla anterior se supersede sin alterar su `configHash`. |
+| Techo acumulado, calendario y politica del ledger iniciado | No en el mismo ledger | Un cambio exigiria una migracion de presupuesto separada, auditada y aprobada; nunca reinterpreta historicos. |
+| Batch Merkle publicado | No | `RewardsDistributor` rechaza reutilizar `batchId`; solo permite claims, cierre tras expirar y recuperar saldo no reservado. |
 | Equipo | 12% | Team y asignaciones de incentivos Concilium/Ascensum. |
 
 ## Matriz de pools y vesting UKI
@@ -548,11 +572,12 @@ del jugador pasa tambien a `undistributed_pending`.
 
 ## UKI no distribuidos
 
-Presupuesto diario fijo de recompensas: 500,000 UKI.
+Presupuesto diario de la regla Stage vigente: 500,000 UKI. Cada version fija
+su propio `dailyCapRaw` para los dias que cubre.
 
 En cada cierre debe cumplirse exactamente:
 
-`jugadores + pool de creditos + Cukie Pools + embajadores ordinarios + bote semanal + embajadores semanales + no distribuido = 500,000 UKI`.
+`jugadores + pool de creditos + Cukie Pools + embajadores ordinarios + bote semanal + embajadores semanales + no distribuido = dailyCapRaw de la regla del dia`.
 
 El bote semanal y su reserva de embajadores se descuentan el dia en que se
 generan. Su pago posterior transforma una obligacion ya reservada con delta de
