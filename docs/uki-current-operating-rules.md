@@ -546,6 +546,25 @@ del jugador pasa tambien a `undistributed_pending`.
 - La reserva semanal de embajadores acompana al beneficiario final de cada
   parte. Lo no pagado por ausencia de embajador pasa a no distribuido.
 
+## Programa de embajadores
+
+- La politica inicial de staging es `ambassador-direct-staging-v1`: un unico
+  nivel directo y una comision de 500 bps, el 5% del pago final del referido.
+- La wallet referida acepta a su embajador mediante una sesion EVM firmada. La
+  vinculacion no exige compra, se guarda en `ambassador_attributions` y es
+  inmutable; un replay identico es idempotente y un sponsor distinto falla
+  cerrado.
+- Un sponsor que quedo bloqueado por una compra confirmada durante la preventa
+  tiene precedencia, se materializa en la coleccion canonica y no puede ser
+  sustituido. Un sponsor provisional de preventa que nunca fue bloqueado no se
+  convierte en atribucion economica sin la firma actual de la wallet referida.
+- Treasure Hunt captura la atribucion vigente al abrir cada run. Los pools de
+  creditos y Cukies la capturan en el corte economico del periodo. Una
+  atribucion posterior no modifica rewards ya generadas.
+- La comision se materializa en el mismo cierre diario, semanal o de tramo que
+  el pago del referido. Las asignaciones del propio embajador no vuelven a
+  generar comision.
+
 ## UKI no distribuidos
 
 Presupuesto diario fijo de recompensas: 500,000 UKI.

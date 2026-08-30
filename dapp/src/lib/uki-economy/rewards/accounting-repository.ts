@@ -24,6 +24,7 @@ import type {
 import { assertEligibleWeeklyGameResult } from "./accounting";
 import { stableRewardHash } from "./rules";
 import type { RewardRule } from "./types";
+import { resolveMongoAmbassadorAttributionsForWallets } from "../ambassadors/repository";
 import type { RewardEmissionBudgetDay, RewardEmissionBudgetState } from "./types";
 import { DAILY_REWARD_EMISSION_RAW } from "./accounting-types";
 
@@ -150,21 +151,17 @@ export function createMongoRewardAccountingRepository(
     amountRaw: string;
   }>("reward_pool_accruals");
   const options = { session };
-  const referralsFor = async (wallets: string[]) => {
+  const referralsFor = async (wallets: string[], effectiveAt: Date) => {
     if (wallets.length === 0) return new Map<string, string | null>();
-    const rows = await db.collection<{
-      normalizedWalletAddress: string;
-      lockedSponsorWalletAddress?: string | null;
-    }>("presale_participants").find({
-      normalizedWalletAddress: { $in: wallets },
-    }, options).project({
-      _id: 0,
-      normalizedWalletAddress: 1,
-      lockedSponsorWalletAddress: 1,
-    }).toArray();
-    return new Map(rows.map((row) => [
-      row.normalizedWalletAddress,
-      row.lockedSponsorWalletAddress ?? null,
+    const rows = await resolveMongoAmbassadorAttributionsForWallets(
+      db,
+      wallets,
+      effectiveAt,
+      session,
+    );
+    return new Map([...rows].map(([wallet, attribution]) => [
+      wallet,
+      attribution?.ambassadorWalletNormalized ?? null,
     ]));
   };
   return {
@@ -468,7 +465,7 @@ export function createMongoRewardAccountingRepository(
         { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
         { $sort: { _id: 1 } },
       ], options).toArray();
-      const referrals = await referralsFor(rows.map((row) => row._id));
+      const referrals = await referralsFor(rows.map((row) => row._id), startsAt);
       return rows.map((row) => ({
         walletNormalized: row._id,
         units: row.units,
@@ -520,7 +517,10 @@ export function createMongoRewardAccountingRepository(
       const rows = [...grouped.values()].sort((left, right) => (
         left.wallet.localeCompare(right.wallet) || left.rarity.localeCompare(right.rarity)
       ));
-      const referrals = await referralsFor([...new Set(rows.map((row) => row.wallet))]);
+      const referrals = await referralsFor(
+        [...new Set(rows.map((row) => row.wallet))],
+        startsAt,
+      );
       return rows.map((row) => {
         const rarity = rarityLevel.get(row.rarity);
         if (rarity === undefined) {

@@ -62,6 +62,7 @@ describe('economy indexes', () => {
         'treasure_hunt_pool_daily_usage:{"walletNormalized":1,"dailyPeriodId":1}',
         'treasure_hunt_pool_quota_reservations:{"runId":1}',
         'treasure_hunt_weekly_bests:{"walletNormalized":1,"weeklyPeriodId":1,"gameId":1}',
+        'ambassador_attributions:{"referredWalletNormalized":1}',
         'nft_asset_locks:{"assetId":1,"status":1}',
         'nft_asset_locks:{"idempotencyKey":1}',
         'nft_asset_locks:{"lockId":1}',
