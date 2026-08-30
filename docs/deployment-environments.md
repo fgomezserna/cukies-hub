@@ -44,6 +44,18 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 | Staging | `staging` | Coolify `game-hub-staging` | BSC testnet | DB staging | QA integrada. |
 | Production | `main` + tag `prod-*` | Coolify `game-hub` | BSC mainnet | DB production | Usuarios reales. |
 
+### Validacion local antes de desplegar
+
+El trabajo de una rama se prueba localmente por bloques y no provoca un despliegue de Coolify por cada cambio. Para contratos, el comando reproducible es:
+
+```bash
+pnpm test:staging:contracts
+```
+
+Este comando levanta la red Hardhat efimera con `chainId=97` y usa contratos mock para UKI, USDT, WBNB, NFT y router cuando el escenario lo requiere. No se conecta a BSC Testnet, no usa fondos y no escribe en las bases de staging. Las pruebas de dapp e indexer deben ejecutarse con sus flags de staging y fixtures de chain `97`; las pruebas que escriben usan exclusivamente servicios locales o en memoria.
+
+Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
+
 ## Reglas de ramas
 
 | Rama | Regla |

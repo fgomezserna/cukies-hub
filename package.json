@@ -17,6 +17,7 @@
     "hyppie-road": "pnpm --filter hyppie-road",
     "tower-builder": "pnpm --filter tower-builder",
     "contracts": "pnpm --filter @cukies/contracts",
+    "test:staging:contracts": "pnpm --filter @cukies/contracts test:staging",
     "chain-indexer": "pnpm --filter @cukies/chain-indexer",
     "card-worker": "pnpm --filter @cukies/cuki-card-worker",
     "bridge-relayer": "pnpm --filter @cukies/cukies-bridge-relayer",
