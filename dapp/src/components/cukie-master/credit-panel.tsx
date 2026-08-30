@@ -15,6 +15,12 @@ type CreditConfiguration = {
   effectiveCutoff: string | null;
 };
 
+type CreditRouteStatus = {
+  balance: { blocked: boolean };
+  pool: { blocked: boolean };
+  grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
+};
+
 type CreditStatus = {
   walletNormalized: string;
   rule: {
@@ -32,6 +38,7 @@ type CreditStatus = {
     blocked: boolean;
   };
   pool: { availableCredits: number; reservedCredits: number; blocked: boolean };
+  routes: Record<'uki' | 'nft', CreditRouteStatus>;
   configurations: CreditConfiguration[];
   activeReservations: number;
   grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
@@ -92,12 +99,25 @@ export function CompetitionCreditPanel() {
     return () => controller.abort();
   }, [authLoading, load, walletAddress]);
 
-  const canConfigure = useMemo(() => Boolean(
-    status && status.grants.healthy && !status.balance.blocked && !status.pool.blocked,
-  ), [status]);
+  const routeAvailability = useMemo(() => ({
+    uki: Boolean(
+      status?.routes.uki.grants.healthy
+      && !status.routes.uki.balance.blocked
+      && !status.routes.uki.pool.blocked,
+    ),
+    nft: Boolean(
+      status?.routes.nft.grants.healthy
+      && !status.routes.nft.balance.blocked
+      && !status.routes.nft.pool.blocked,
+    ),
+  }), [status]);
+
+  const unavailableRoutes = useMemo(() => (
+    (['uki', 'nft'] as const).filter((route) => !routeAvailability[route])
+  ), [routeAvailability]);
 
   async function save(configuration: CreditConfiguration) {
-    if (!walletAddress || !canConfigure || savingSlot) return;
+    if (!walletAddress || !routeAvailability[configuration.route] || savingSlot) return;
     const poolCreditsPerSlot = drafts[configuration.slotId];
     if (!Number.isInteger(poolCreditsPerSlot) || poolCreditsPerSlot < 0 ||
       poolCreditsPerSlot > 100 || poolCreditsPerSlot % 10 !== 0) {
@@ -176,69 +196,78 @@ export function CompetitionCreditPanel() {
               <CreditMetric label="Pool del periodo" value={status.pool.availableCredits} />
             </div>
 
-            {!canConfigure ? (
+            {unavailableRoutes.length > 0 ? (
               <div className="mt-5 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
                 <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                  Configuración bloqueada hasta que regla, watermark e incidentes estén saludables.
+                  Configuración bloqueada solo en {unavailableRoutes.map((route) => (
+                    route === 'uki' ? 'Ruta UKI' : 'Ruta Cukies'
+                  )).join(' y ')} hasta que su watermark e incidentes estén saludables.
                 </p>
               </div>
-            ) : (
+            ) : null}
+
+            {unavailableRoutes.length < 2 ? (
               <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-[var(--uki-muted)]">
                 <CheckCircle2 className="h-4 w-4 text-[var(--uki-cyan)]" />
-                Regla {status.rule.version}: 100 créditos por cupo; aportación en múltiplos de 10.
+                Regla {status.rule.version}: las rutas saludables permiten aportar en múltiplos de 10.
               </div>
-            )}
+            ) : null}
 
             <div className="mt-5 space-y-3">
               {status.configurations.length === 0 ? (
                 <p className="text-sm font-semibold text-[var(--uki-muted)]">
                   No hay cupos activos configurables en este momento.
                 </p>
-              ) : status.configurations.map((configuration) => (
-                <div
-                  key={configuration.slotId}
-                  className="grid gap-3 rounded-[8px] border border-white/10 bg-black/20 p-4 sm:grid-cols-[1fr_auto_auto] sm:items-center"
-                >
-                  <div>
-                    <p className="text-sm font-black text-[var(--uki-cream)]">
-                      {configuration.route === 'uki' ? 'Ruta UKI' : 'Ruta Cukies'} · Cupo {configuration.ordinal}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                      Aplicación: {utcLabel(configuration.effectiveCutoff)}
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-[var(--uki-text)]">
-                    Al pool
-                    <select
-                      aria-label={`Créditos al pool para ${configuration.slotId}`}
-                      value={drafts[configuration.slotId] ?? 0}
-                      disabled={!canConfigure || savingSlot !== null}
-                      onChange={(event) => setDrafts((current) => ({
-                        ...current,
-                        [configuration.slotId]: Number(event.target.value),
-                      }))}
-                      className="rounded-[6px] border border-white/15 bg-black/40 px-3 py-2 text-[var(--uki-cream)]"
-                    >
-                      {Array.from({ length: 11 }, (_, index) => index * 10).map((value) => (
-                        <option key={value} value={value}>{value}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    disabled={!canConfigure || savingSlot !== null ||
-                      drafts[configuration.slotId] === configuration.poolCreditsPerSlot}
-                    onClick={() => save(configuration)}
-                    className="inline-flex items-center justify-center gap-2 rounded-[6px] border border-[var(--uki-cyan-border)] px-4 py-2 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-40"
+              ) : status.configurations.map((configuration) => {
+                const canConfigureRoute = routeAvailability[configuration.route];
+                return (
+                  <div
+                    key={configuration.slotId}
+                    className="grid gap-3 rounded-[8px] border border-white/10 bg-black/20 p-4 sm:grid-cols-[1fr_auto_auto] sm:items-center"
                   >
-                    {savingSlot === configuration.slotId
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <Save className="h-4 w-4" />}
-                    Guardar
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <p className="text-sm font-black text-[var(--uki-cream)]">
+                        {configuration.route === 'uki' ? 'Ruta UKI' : 'Ruta Cukies'} · Cupo {configuration.ordinal}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                        {canConfigureRoute
+                          ? `Aplicación: ${utcLabel(configuration.effectiveCutoff)}`
+                          : 'Ruta bloqueada: no se guardará ninguna aportación.'}
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-[var(--uki-text)]">
+                      Al pool
+                      <select
+                        aria-label={`Créditos al pool para ${configuration.slotId}`}
+                        value={drafts[configuration.slotId] ?? 0}
+                        disabled={!canConfigureRoute || savingSlot !== null}
+                        onChange={(event) => setDrafts((current) => ({
+                          ...current,
+                          [configuration.slotId]: Number(event.target.value),
+                        }))}
+                        className="rounded-[6px] border border-white/15 bg-black/40 px-3 py-2 text-[var(--uki-cream)]"
+                      >
+                        {Array.from({ length: 11 }, (_, index) => index * 10).map((value) => (
+                          <option key={value} value={value}>{value}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!canConfigureRoute || savingSlot !== null ||
+                        drafts[configuration.slotId] === configuration.poolCreditsPerSlot}
+                      onClick={() => save(configuration)}
+                      className="inline-flex items-center justify-center gap-2 rounded-[6px] border border-[var(--uki-cyan-border)] px-4 py-2 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {savingSlot === configuration.slotId
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Save className="h-4 w-4" />}
+                      Guardar
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             {saveResult === 'saved' ? (

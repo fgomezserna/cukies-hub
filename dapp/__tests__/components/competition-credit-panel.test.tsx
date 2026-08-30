@@ -46,6 +46,18 @@ function statusResponse() {
           blocked: false,
         },
         pool: { availableCredits: 400, reservedCredits: 10, blocked: false },
+        routes: {
+          uki: {
+            balance: { blocked: false },
+            pool: { blocked: false },
+            grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+          },
+          nft: {
+            balance: { blocked: false },
+            pool: { blocked: false },
+            grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+          },
+        },
         configurations: [{
           slotId: 'slot-1',
           route: 'uki',
@@ -106,5 +118,47 @@ describe('CompetitionCreditPanel', () => {
     expect(await screen.findByText(/no está disponible con garantías/i)).toBeInTheDocument();
     expect(screen.queryByText('Disponibles')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Guardar/i })).not.toBeInTheDocument();
+  });
+
+  it('permite configurar la ruta UKI aunque la ruta Cukies esté bloqueada', async () => {
+    const partialStatus = statusResponse();
+    const body = await partialStatus.json();
+    body.data.grants.healthy = false;
+    body.data.grants.openIncidents = 1;
+    body.data.routes.nft.grants.healthy = false;
+    body.data.routes.nft.grants.openIncidents = 1;
+    body.data.configurations.push({
+      slotId: 'slot-nft-1',
+      route: 'nft',
+      ordinal: 1,
+      status: 'active',
+      poolCreditsPerSlot: 0,
+      effectiveCutoff: '2026-07-11T12:00:00.000Z',
+    });
+
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => body })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'ok' }) })
+      .mockResolvedValueOnce(statusResponse());
+
+    render(<CompetitionCreditPanel />);
+
+    const ukiSelect = await screen.findByLabelText('Créditos al pool para slot-1');
+    const nftSelect = screen.getByLabelText('Créditos al pool para slot-nft-1');
+    expect(ukiSelect).toBeEnabled();
+    expect(nftSelect).toBeDisabled();
+    expect(screen.getByText(/bloqueada solo en Ruta Cukies/i)).toBeInTheDocument();
+
+    fireEvent.change(ukiSelect, { target: { value: '30' } });
+    const buttons = screen.getAllByRole('button', { name: /Guardar/i });
+    expect(buttons[0]).toBeEnabled();
+    expect(buttons[1]).toBeDisabled();
+    fireEvent.click(buttons[0]);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      slotId: 'slot-1',
+      poolCreditsPerSlot: 30,
+    });
   });
 });
