@@ -25,6 +25,59 @@ export type LegacyTronWebLike = {
   ) => LegacyTronContractInstance | Promise<LegacyTronContractInstance>;
 };
 
+export async function getTronContractAt(
+  tronWeb: LegacyTronWebLike,
+  abi: unknown,
+  address: string,
+) {
+  return tronWeb.contract(abi, address);
+}
+
+export async function readTronContractAt<TValue = unknown>(
+  tronWeb: LegacyTronWebLike,
+  abi: unknown,
+  address: string,
+  functionName: string,
+  args: readonly unknown[] = [],
+) {
+  const contract = await getTronContractAt(tronWeb, abi, address);
+  const method = contract[functionName];
+
+  if (typeof method !== 'function') {
+    throw new Error(`TRON contract ${address} has no method ${functionName}`);
+  }
+
+  const call = method(...args);
+  if (typeof call.call !== 'function') {
+    throw new Error(`TRON contract ${address}.${functionName} is not readable`);
+  }
+
+  return call.call() as Promise<TValue>;
+}
+
+export async function sendTronContractAt(
+  tronWeb: LegacyTronWebLike,
+  abi: unknown,
+  address: string,
+  functionName: string,
+  args: readonly unknown[] = [],
+  options?: Record<string, unknown>,
+) {
+  const contract = await getTronContractAt(tronWeb, abi, address);
+  const method = contract[functionName];
+
+  if (typeof method !== 'function') {
+    throw new Error(`TRON contract ${address} has no method ${functionName}`);
+  }
+
+  const call = method(...args);
+  if (typeof call.send !== 'function') {
+    throw new Error(`TRON contract ${address}.${functionName} is not writable`);
+  }
+
+  return call.send(options);
+}
+
 export function getLegacyTronContractDescriptor(
   contractName: LegacyTronContractName,
 ) {
@@ -40,7 +93,7 @@ export async function getLegacyTronContract(
 ) {
   const { address, abi } = getLegacyTronContractDescriptor(contractName);
 
-  return tronWeb.contract(abi, address);
+  return getTronContractAt(tronWeb, abi, address);
 }
 
 export async function readLegacyTronContract<TValue = unknown>(

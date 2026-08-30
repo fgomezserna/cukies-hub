@@ -20,6 +20,7 @@
     "card-worker": "pnpm --filter @cukies/cuki-card-worker",
     "guard:staging": "node scripts/assert-staging-only.mjs",
     "guard:staging:test": "node --test scripts/assert-staging-only.test.mjs scripts/docker-compose-coolify.test.mjs",
+    "staging:bridge:verify-local": "node scripts/verify-staging-bridge-local.mjs",
     "staging:indexer:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup",
     "staging:economy:setup": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm indexer:setup:economy",
     "staging:economy:setup:prod": "node scripts/assert-staging-only.mjs --scope chain-indexer && pnpm --filter @cukies/chain-indexer run setup:economy:prod",
