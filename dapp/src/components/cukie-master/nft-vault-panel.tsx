@@ -36,6 +36,7 @@ const erc721CustodyAbi = [
 
 const NFT_INDEXER_SYNC_RETRY_MS = 10_000;
 const NFT_INDEXER_SYNC_RETRY_WINDOW_MS = 180_000;
+const INITIAL_LOAD_RETRY_DELAYS_MS = [750, 2_000, 5_000] as const;
 
 type PublicNft = {
   assetId: string;
@@ -180,8 +181,24 @@ export function CukieMasterNftVaultPanel() {
   useEffect(() => {
     if (authLoading || !user?.walletAddress) return;
     const controller = new AbortController();
-    void refresh(controller.signal).catch(() => undefined);
-    return () => controller.abort();
+    let retryTimer: number | null = null;
+    let retryIndex = 0;
+    const load = async () => {
+      try {
+        await refresh(controller.signal);
+      } catch (reason) {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        const retryDelay = INITIAL_LOAD_RETRY_DELAYS_MS[retryIndex];
+        if (retryDelay === undefined) return;
+        retryIndex += 1;
+        retryTimer = window.setTimeout(() => void load(), retryDelay);
+      }
+    };
+    void load();
+    return () => {
+      controller.abort();
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+    };
   }, [authLoading, refresh, user?.walletAddress]);
 
   const assets = useMemo(
@@ -601,7 +618,7 @@ export function CukieMasterNftVaultPanel() {
             <p className="text-sm font-semibold text-[var(--uki-muted)]">No tienes Cukies Originales disponibles ni posiciones custodiadas para esta wallet. Los Cukies de Segunda Generación que permanezcan en tu wallet no se muestran en esta ruta.</p>
           ) : !status ? (
             <p role="alert" className="text-sm font-semibold text-amber-200">
-              No se pudo verificar el inventario custodial. Los depósitos permanecen bloqueados; la recuperación on-chain sigue disponible.
+              No se pudo verificar el inventario custodial. Reintentaremos automáticamente; los depósitos permanecen bloqueados y la recuperación on-chain sigue disponible.
             </p>
           ) : assets.map((asset) => {
             const working = activeAssetId === asset.assetId;

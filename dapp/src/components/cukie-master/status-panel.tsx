@@ -35,6 +35,7 @@ const STAKING_REFRESH_DELAYS_MS = [
 ] as const;
 const SYNCHRONIZATION_POLL_MS = 10_000;
 const SYNCHRONIZATION_POLL_WINDOW_MS = 180_000;
+const INITIAL_LOAD_RETRY_DELAYS_MS = [750, 2_000, 5_000] as const;
 
 type RouteKey = 'uki' | 'nft';
 
@@ -132,7 +133,7 @@ export function CukieMasterStatusPanel({
 } = {}) {
   const { user, isLoading: authLoading } = useAuth();
   const [status, setStatus] = useState<PublicStatus | null>(null);
-  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'stale' | 'unavailable'>('idle');
   const [activeRoute, setActiveRoute] = useState<RouteKey>('uki');
   const [reloadNonce, setReloadNonce] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -143,6 +144,8 @@ export function CukieMasterStatusPanel({
   const requestIdRef = useRef(0);
   const refreshTimersRef = useRef<number[]>([]);
   const synchronizationStartedAtRef = useRef<number | null>(null);
+  const initialRetryCountRef = useRef(0);
+  const retryWalletRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -150,17 +153,24 @@ export function CukieMasterStatusPanel({
       requestIdRef.current += 1;
       hasReadyStatusRef.current = false;
       loadedWalletRef.current = null;
+      initialRetryCountRef.current = 0;
+      retryWalletRef.current = null;
       setStatus(null);
       setState('idle');
       setIsRefreshing(false);
       return;
     }
     const walletNormalized = user.walletAddress.toLowerCase();
+    if (retryWalletRef.current !== walletNormalized) {
+      retryWalletRef.current = walletNormalized;
+      initialRetryCountRef.current = 0;
+    }
     const backgroundRefresh = hasReadyStatusRef.current
       && loadedWalletRef.current === walletNormalized;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     const controller = new AbortController();
+    let retryTimer: number | null = null;
     if (backgroundRefresh) setIsRefreshing(true);
     else {
       setStatus(null);
@@ -176,21 +186,37 @@ export function CukieMasterStatusPanel({
         if (requestIdRef.current !== requestId) return;
         hasReadyStatusRef.current = true;
         loadedWalletRef.current = walletNormalized;
+        initialRetryCountRef.current = 0;
         setStatus(body.data);
         setState('ready');
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         if (requestIdRef.current !== requestId) return;
-        hasReadyStatusRef.current = false;
-        loadedWalletRef.current = null;
-        setStatus(null);
-        setState('unavailable');
+        if (backgroundRefresh) {
+          setState('stale');
+        } else {
+          hasReadyStatusRef.current = false;
+          loadedWalletRef.current = null;
+          setStatus(null);
+          setState('unavailable');
+        }
+        const retryDelay = INITIAL_LOAD_RETRY_DELAYS_MS[initialRetryCountRef.current];
+        if (retryDelay !== undefined) {
+          initialRetryCountRef.current += 1;
+          retryTimer = window.setTimeout(
+            () => setReloadNonce((value) => value + 1),
+            retryDelay,
+          );
+        }
       })
       .finally(() => {
         if (requestIdRef.current === requestId) setIsRefreshing(false);
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+    };
   }, [authLoading, reloadNonce, user?.walletAddress]);
 
   useEffect(() => {
@@ -363,15 +389,36 @@ export function CukieMasterStatusPanel({
         ) : null}
 
         {state === 'unavailable' ? (
+          <div role="alert" className="mt-6 flex flex-col gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4 sm:flex-row sm:items-center">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                No podemos verificar tu estado económico ahora mismo. No mostramos cifras sin confirmar y reintentaremos automáticamente.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                initialRetryCountRef.current = 0;
+                setReloadNonce((value) => value + 1);
+              }}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[7px] border border-amber-200/30 px-3 text-xs font-black uppercase text-amber-100"
+            >
+              Reintentar ahora
+            </button>
+          </div>
+        ) : null}
+
+        {state === 'stale' && status ? (
           <div role="alert" className="mt-6 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
             <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              No podemos verificar tu estado económico ahora mismo. No mostramos cifras antiguas ni cambiamos tus cupos; vuelve a intentarlo en unos minutos.
+              La última actualización no respondió. Conservamos tu última lectura confirmada mientras reintentamos; las estimaciones sensibles permanecen desactivadas hasta recuperar la conexión.
             </p>
           </div>
         ) : null}
 
-        {state === 'ready' && status && totalCounts ? (
+        {(state === 'ready' || state === 'stale') && status && totalCounts ? (
           ukiOnly ? (
             <UkiOnlyStatus route={status.routes.uki} />
           ) : (

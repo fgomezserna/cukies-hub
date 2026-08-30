@@ -50,6 +50,7 @@ El trabajo de una rama se prueba localmente por bloques y no provoca un desplieg
 
 ```bash
 pnpm test:staging:contracts
+pnpm staging:cukie-master:verify-local
 pnpm staging:marketplace:verify-local
 ```
 
@@ -60,6 +61,11 @@ API, indexador y typechecks. El checkout UKI directo es el nucleo habilitable; B
 rutas opcionales independientes y permanecen ocultas si su configuracion no esta completa. El
 mensaje final del gate confirma expresamente que no se ha desplegado ni firmado ninguna
 transaccion real.
+
+El gate de Cukie Master cubre los contratos de staking UKI y vault NFT, las dos rutas de cupos,
+la entrega/configuracion de creditos, API, cliente e indexador. Incluye regresiones de recarga:
+reintento inicial acotado, conservacion de la ultima lectura confirmada ante un fallo transitorio,
+bloqueo de estimaciones sensibles y rechazo de respuestas antiguas que lleguen fuera de orden.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 

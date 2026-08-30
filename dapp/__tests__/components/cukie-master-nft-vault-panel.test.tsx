@@ -327,6 +327,32 @@ describe('CukieMasterNftVaultPanel', () => {
     }
   });
 
+  it('recupera automáticamente un fallo transitorio de la carga inicial del inventario', async () => {
+    jest.useFakeTimers();
+    try {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }),
+        })
+        .mockResolvedValueOnce(response(status()));
+
+      render(<CukieMasterNftVaultPanel />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText(/Reintentaremos automáticamente/i)).toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(750);
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(await screen.findByRole('button', { name: /Hacer staking/i })).toBeEnabled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('cancela una consulta de sincronización en vuelo al desmontarse', async () => {
     jest.useFakeTimers();
     try {
