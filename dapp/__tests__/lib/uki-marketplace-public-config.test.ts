@@ -17,6 +17,10 @@ describe('configuración pública del marketplace UKI', () => {
       collectionAddress: collection,
     })).toMatchObject({
       ready: true,
+      checkoutReady: false,
+      ukiPaymentReady: false,
+      bnbPaymentReady: false,
+      usdtPaymentReady: false,
       chainId: 97,
       marketplaceAddress: marketplace,
       collectionAddresses: [collection],
@@ -40,6 +44,9 @@ describe('configuración pública del marketplace UKI', () => {
     })).toMatchObject({
       ready: true,
       checkoutReady: true,
+      ukiPaymentReady: true,
+      bnbPaymentReady: true,
+      usdtPaymentReady: true,
       ukiTokenAddress: uki,
       routerAddress: router,
       wrappedNativeAddress: wbnb,
@@ -50,7 +57,29 @@ describe('configuración pública del marketplace UKI', () => {
     });
   });
 
-  it('mantiene consulta y venta disponibles pero bloquea compras con rutas incoherentes', () => {
+  it('habilita UKI directo sin obligar a configurar todavía BNB ni USDT', () => {
+    const result = resolveUkiMarketplacePublicConfig({
+      appEnvironment: 'staging',
+      chainId: '97',
+      marketplaceAddress: marketplace,
+      collectionAddress: collection,
+      ukiTokenAddress: uki,
+      routerAddress: router,
+      wrappedNativeAddress: wbnb,
+    });
+
+    expect(result).toMatchObject({
+      ready: true,
+      checkoutReady: true,
+      ukiPaymentReady: true,
+      bnbPaymentReady: false,
+      usdtPaymentReady: false,
+    });
+    expect(result.checkoutIssues.join(' ')).toContain('BNB → UKI');
+    expect(result.checkoutIssues.join(' ')).toContain('USDT');
+  });
+
+  it('mantiene UKI y USDT disponibles aunque la ruta BNB sea incoherente', () => {
     const result = resolveUkiMarketplacePublicConfig({
       appEnvironment: 'staging',
       chainId: '97',
@@ -64,7 +93,10 @@ describe('configuración pública del marketplace UKI', () => {
       usdtPaymentPath: `${usdt},${uki}`,
     });
     expect(result.ready).toBe(true);
-    expect(result.checkoutReady).toBe(false);
+    expect(result.checkoutReady).toBe(true);
+    expect(result.ukiPaymentReady).toBe(true);
+    expect(result.bnbPaymentReady).toBe(false);
+    expect(result.usdtPaymentReady).toBe(true);
     expect(result.checkoutIssues.join(' ')).toContain('BNB → UKI');
   });
 

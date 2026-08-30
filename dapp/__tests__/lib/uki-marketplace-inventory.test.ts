@@ -7,6 +7,9 @@ const collection = '0x2222222222222222222222222222222222222222';
 const config: UkiMarketplacePublicConfig = {
   ready: true,
   checkoutReady: false,
+  ukiPaymentReady: false,
+  bnbPaymentReady: false,
+  usdtPaymentReady: false,
   chainId: 97,
   marketplaceAddress: marketplace,
   collectionAddresses: [collection],

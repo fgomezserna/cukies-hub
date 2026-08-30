@@ -64,6 +64,7 @@ contract CukiesMarketplace is Ownable2Step, Pausable, ReentrancyGuard {
 
     address public feeRecipient;
     uint16 public feeBps;
+    bool public nativePaymentAllowed;
 
     mapping(address collection => bool allowed) public collectionAllowed;
     mapping(address paymentToken => bool allowed) public paymentTokenAllowed;
@@ -74,6 +75,7 @@ contract CukiesMarketplace is Ownable2Step, Pausable, ReentrancyGuard {
 
     event CollectionAllowedUpdated(address indexed collection, bool allowed);
     event PaymentTokenAllowedUpdated(address indexed paymentToken, bool allowed);
+    event NativePaymentAllowedUpdated(bool allowed);
     event FeeConfigUpdated(address indexed recipient, uint16 feeBps);
     event OrderCreated(
         bytes32 indexed orderId,
@@ -112,6 +114,7 @@ contract CukiesMarketplace is Ownable2Step, Pausable, ReentrancyGuard {
     error InvalidCollection();
     error CollectionNotAllowed();
     error PaymentTokenNotAllowed();
+    error NativePaymentNotAllowed();
     error InvalidPrice();
     error InvalidExpiry();
     error InvalidPath();
@@ -182,6 +185,11 @@ contract CukiesMarketplace is Ownable2Step, Pausable, ReentrancyGuard {
         }
         paymentTokenAllowed[paymentToken] = allowed;
         emit PaymentTokenAllowedUpdated(paymentToken, allowed);
+    }
+
+    function setNativePaymentAllowed(bool allowed) external onlyOwner {
+        nativePaymentAllowed = allowed;
+        emit NativePaymentAllowedUpdated(allowed);
     }
 
     function setFeeConfig(address recipient, uint16 newFeeBps) external onlyOwner {
@@ -334,6 +342,7 @@ contract CukiesMarketplace is Ownable2Step, Pausable, ReentrancyGuard {
         address[] calldata path,
         uint256 deadline
     ) external payable nonReentrant whenNotPaused {
+        if (!nativePaymentAllowed) revert NativePaymentNotAllowed();
         _validatePath(path, wrappedNative);
         _validateDeadline(deadline);
 

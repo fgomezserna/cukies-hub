@@ -83,6 +83,13 @@ export const ukiMarketplaceReadAbi = [
     inputs: [{ name: 'paymentToken', type: 'address' }],
     outputs: [{ name: '', type: 'bool' }],
   },
+  {
+    type: 'function',
+    name: 'nativePaymentAllowed',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+  },
 ] as const satisfies Abi;
 
 export const ukiMarketplaceWriteAbi = [

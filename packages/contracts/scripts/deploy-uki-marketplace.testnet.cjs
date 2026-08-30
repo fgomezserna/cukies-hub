@@ -94,6 +94,7 @@ async function assertDeploymentState(marketplace, address, plan) {
     feeBps: Number(await marketplace.feeBps()),
     owner: normalizeAddress(await marketplace.owner(), "marketplace.owner"),
     collectionAllowed: await marketplace.collectionAllowed(plan.collection),
+    nativePaymentAllowed: await marketplace.nativePaymentAllowed(),
     paused: await marketplace.paused(),
   };
 
@@ -116,6 +117,8 @@ async function assertDeploymentState(marketplace, address, plan) {
     throw new Error("Marketplace collection allowlist was not persisted.");
   if (observed.paused)
     throw new Error("Fresh marketplace unexpectedly deployed paused.");
+  if (observed.nativePaymentAllowed)
+    throw new Error("Fresh marketplace unexpectedly enabled native payments.");
 
   return observed;
 }
@@ -242,7 +245,7 @@ async function main() {
           requestedOwner: plan.owner,
           pendingOwner,
           paymentTokensEnabled: [],
-          nativeRouteEnabled: false,
+          nativeRouteEnabled: state.nativePaymentAllowed,
           tokenRouteEnabled: false,
         },
         configurationTransactions: {

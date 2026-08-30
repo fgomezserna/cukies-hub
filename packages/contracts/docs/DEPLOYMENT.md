@@ -277,9 +277,20 @@ support, records the exact deployment receipt/runtime hash, allowlists only the 
 collection and starts a two-step owner handover when needed. It emits the public/indexer variables
 that must be copied to Stage after source verification.
 
-UKI checkout needs no swap route. BNB and USDT checkout remain disabled after deployment: do not
-set their public paths or allowlist an ERC-20 payment token until the read-only Pancake verifier
-proves the complete corresponding route on chain `97`.
+Before any real deployment, run the complete local Stage gate from the repository root:
+
+```bash
+pnpm staging:marketplace:verify-local
+```
+
+It emulates BSC Testnet with an ephemeral Hardhat chain configured as `97` and validates contract,
+deployment plan, DApp, API and indexer without an RPC broadcast or signing a real transaction.
+
+UKI checkout needs no swap route and remains independently available when its core contract
+identity is complete. Native payment starts `false` on-chain and only the contract owner can
+enable it explicitly. BNB and USDT checkout remain disabled after deployment: do not set their
+public paths, enable native payment or allowlist an ERC-20 payment token until the read-only
+Pancake verifier proves the complete corresponding route on chain `97`.
 
 `LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.
 

@@ -50,9 +50,16 @@ El trabajo de una rama se prueba localmente por bloques y no provoca un desplieg
 
 ```bash
 pnpm test:staging:contracts
+pnpm staging:marketplace:verify-local
 ```
 
 Este comando levanta la red Hardhat efimera con `chainId=97` y usa contratos mock para UKI, USDT, WBNB, NFT y router cuando el escenario lo requiere. No se conecta a BSC Testnet, no usa fondos y no escribe en las bases de staging. Las pruebas de dapp e indexer deben ejecutarse con sus flags de staging y fixtures de chain `97`; las pruebas que escriben usan exclusivamente servicios locales o en memoria.
+
+El gate especifico de Marketplace ejecuta conjuntamente contrato, plan de deploy Testnet, DApp,
+API, indexador y typechecks. El checkout UKI directo es el nucleo habilitable; BNB y USDT son
+rutas opcionales independientes y permanecen ocultas si su configuracion no esta completa. El
+mensaje final del gate confirma expresamente que no se ha desplegado ni firmado ninguna
+transaccion real.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 
@@ -209,7 +216,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | Vacío hasta desplegar y verificar el contrato nuevo en chain `97` | Marketplace UKI mainnet pendiente | Debe coincidir con `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS`; vacío mantiene la API cerrada. |
 | `NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS` | `0xD99D1c33F9fC3444f8101754aBC46c52416550D1` solo tras desplegar Marketplace | Router mainnet pendiente | Pancake V2 Testnet fijado por el deploy; no habilita por sí solo BNB/USDT. |
 | `NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS` | `0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd` solo tras desplegar Marketplace | WBNB mainnet pendiente | Debe coincidir con `router.WETH()` en chain `97`. |
-| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS` | Vacío | USDT mainnet pendiente | No existe token/ruta Testnet aprobada; vacío mantiene USDT cerrado. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS` | Vacío | USDT mainnet pendiente | No existe token/ruta Testnet aprobada; vacío mantiene solo USDT cerrado y no bloquea UKI directo. |
 | `NEXT_PUBLIC_UKI_MARKETPLACE_{BNB,USDT}_PATH` | Vacío | Rutas mainnet pendientes | Solo se rellenan después de que el verificador pruebe la ruta completa en la chain objetivo. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | `0x8fa397B4E1DED911161f13C128DF369cE9a95B3A` | Pair mainnet oficial | Pair ASM/UKI de Pancake V2 verificado en chain 97; el guard rechaza cualquier otro. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS` | Vacío hasta verificar un locker testnet | Locker mainnet oficial | Si está vacío, la home no anuncia ni enlaza liquidez bloqueada. |

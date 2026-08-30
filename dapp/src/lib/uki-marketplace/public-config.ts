@@ -3,6 +3,9 @@ import { isAddress, type Address } from 'viem';
 export type UkiMarketplacePublicConfig = {
   ready: boolean;
   checkoutReady: boolean;
+  ukiPaymentReady: boolean;
+  bnbPaymentReady: boolean;
+  usdtPaymentReady: boolean;
   chainId: 56 | 97 | null;
   marketplaceAddress: Address | null;
   collectionAddresses: Address[];
@@ -99,34 +102,47 @@ export function resolveUkiMarketplacePublicConfig(
     issues.push('La lista pública de colecciones UKI no es válida.');
   }
 
-  const checkoutIssues: string[] = [];
-  if (!ukiTokenAddress) checkoutIssues.push('La address pública de UKI no es válida.');
-  if (!routerAddress) checkoutIssues.push('La address pública del router no es válida.');
-  if (!wrappedNativeAddress) checkoutIssues.push('La address pública de WBNB no es válida.');
-  if (!usdtTokenAddress) checkoutIssues.push('La address pública de USDT no es válida.');
+  const coreCheckoutIssues: string[] = [];
+  if (!ukiTokenAddress) coreCheckoutIssues.push('La address pública de UKI no es válida.');
+  if (!routerAddress) coreCheckoutIssues.push('La address pública del router no es válida.');
+  if (!wrappedNativeAddress) coreCheckoutIssues.push('La address pública de WBNB no es válida.');
+  if (sameAddress(ukiTokenAddress, wrappedNativeAddress)) {
+    coreCheckoutIssues.push('UKI y WBNB deben ser contratos distintos.');
+  }
+
+  const bnbCheckoutIssues: string[] = [];
   if (bnbPaymentPath.invalid) {
-    checkoutIssues.push('La ruta pública BNB → UKI no es válida.');
+    bnbCheckoutIssues.push('La ruta pública BNB → UKI no es válida.');
   } else if (
     !sameAddress(bnbPaymentPath.addresses[0] ?? null, wrappedNativeAddress)
     || !sameAddress(bnbPaymentPath.addresses.at(-1) ?? null, ukiTokenAddress)
   ) {
-    checkoutIssues.push('La ruta pública BNB → UKI no coincide con WBNB y UKI.');
+    bnbCheckoutIssues.push('La ruta pública BNB → UKI no coincide con WBNB y UKI.');
   }
+
+  const usdtCheckoutIssues: string[] = [];
+  if (!usdtTokenAddress) usdtCheckoutIssues.push('La address pública de USDT no es válida.');
   if (usdtPaymentPath.invalid) {
-    checkoutIssues.push('La ruta pública USDT → UKI no es válida.');
+    usdtCheckoutIssues.push('La ruta pública USDT → UKI no es válida.');
   } else if (
     !sameAddress(usdtPaymentPath.addresses[0] ?? null, usdtTokenAddress)
     || !sameAddress(usdtPaymentPath.addresses.at(-1) ?? null, ukiTokenAddress)
   ) {
-    checkoutIssues.push('La ruta pública USDT → UKI no coincide con USDT y UKI.');
+    usdtCheckoutIssues.push('La ruta pública USDT → UKI no coincide con USDT y UKI.');
   }
   if (
     sameAddress(ukiTokenAddress, usdtTokenAddress)
-    || sameAddress(ukiTokenAddress, wrappedNativeAddress)
     || sameAddress(usdtTokenAddress, wrappedNativeAddress)
   ) {
-    checkoutIssues.push('Las monedas de pago configuradas deben ser contratos distintos.');
+    usdtCheckoutIssues.push('USDT debe ser un contrato distinto de UKI y WBNB.');
   }
+
+  const checkoutReady = issues.length === 0 && coreCheckoutIssues.length === 0;
+  const checkoutIssues = [
+    ...coreCheckoutIssues,
+    ...bnbCheckoutIssues,
+    ...usdtCheckoutIssues,
+  ];
 
   const explorerBaseUrl = input.explorerBaseUrl?.trim().replace(/\/$/, '')
     || (chainId === 97
@@ -137,7 +153,10 @@ export function resolveUkiMarketplacePublicConfig(
 
   return {
     ready: issues.length === 0,
-    checkoutReady: issues.length === 0 && checkoutIssues.length === 0,
+    checkoutReady,
+    ukiPaymentReady: checkoutReady,
+    bnbPaymentReady: checkoutReady && bnbCheckoutIssues.length === 0,
+    usdtPaymentReady: checkoutReady && usdtCheckoutIssues.length === 0,
     chainId,
     marketplaceAddress,
     collectionAddresses: collections.addresses,
