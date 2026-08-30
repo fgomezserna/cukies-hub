@@ -32,11 +32,12 @@ jest.mock('@/components/cukie-master/credit-panel', () => ({
 }));
 
 describe('CukieMasterWorkspace', () => {
-  it('compone las dos rutas, ambos staking y la configuración de créditos', () => {
+  it('prioriza la lectura UKI y conserva staking de Cukies y créditos', () => {
     render(<CukieMasterWorkspace testnetOnly />);
 
-    expect(screen.getByText('Estado UKI y NFT')).toHaveAttribute('data-uki-only', 'false');
+    expect(screen.getByText('Estado UKI y NFT')).toHaveAttribute('data-uki-only', 'true');
     expect(screen.getByText('Staking UKI')).toHaveAttribute('data-testnet-only', 'true');
+    expect(screen.getByText('Cukies Originales y créditos')).toBeInTheDocument();
     expect(screen.getByText('Vault custodial de Cukies')).toBeInTheDocument();
     expect(screen.getByText('Créditos propios y pool')).toBeInTheDocument();
   });
