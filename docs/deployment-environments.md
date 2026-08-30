@@ -207,6 +207,10 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
 | `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
 | `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | Vacío hasta desplegar y verificar el contrato nuevo en chain `97` | Marketplace UKI mainnet pendiente | Debe coincidir con `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS`; vacío mantiene la API cerrada. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS` | `0xD99D1c33F9fC3444f8101754aBC46c52416550D1` solo tras desplegar Marketplace | Router mainnet pendiente | Pancake V2 Testnet fijado por el deploy; no habilita por sí solo BNB/USDT. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS` | `0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd` solo tras desplegar Marketplace | WBNB mainnet pendiente | Debe coincidir con `router.WETH()` en chain `97`. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS` | Vacío | USDT mainnet pendiente | No existe token/ruta Testnet aprobada; vacío mantiene USDT cerrado. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_{BNB,USDT}_PATH` | Vacío | Rutas mainnet pendientes | Solo se rellenan después de que el verificador pruebe la ruta completa en la chain objetivo. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | `0x8fa397B4E1DED911161f13C128DF369cE9a95B3A` | Pair mainnet oficial | Pair ASM/UKI de Pancake V2 verificado en chain 97; el guard rechaza cualquier otro. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS` | Vacío hasta verificar un locker testnet | Locker mainnet oficial | Si está vacío, la home no anuncia ni enlaza liquidez bloqueada. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL` | Vacío sin locker testnet | Fecha UTC aprobada | Es solo texto; exige un locker configurado para mostrarse. |

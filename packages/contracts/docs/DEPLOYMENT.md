@@ -252,6 +252,35 @@ discourages unsolicited additions to the Pancake default/extended lists. Treat t
 external production-token process; do not submit a mainnet asset or third-party PR from this
 Testnet verification task.
 
+## BSC Testnet UKI marketplace deployment
+
+The new marketplace is a separate non-custodial contract; it must never reuse the Legacy BNB
+marketplace address. Its deployment script is chain-97-only and pins the verified Testnet UKI,
+Pancake V2 router and WBNB addresses. It refuses a fresh deployment when any public or indexer
+marketplace address is already configured.
+
+The fee is deliberately not defaulted. Product must approve an integer from `0` to `1000` bps and
+the operator confirmation must bind that exact value:
+
+```bash
+export UKI_MARKETPLACE_DEPLOYER_ADDRESS=0x...
+export UKI_MARKETPLACE_OWNER=0x...
+export UKI_MARKETPLACE_FEE_RECIPIENT=0x...
+export UKI_MARKETPLACE_COLLECTION_ADDRESS=0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8
+export UKI_MARKETPLACE_FEE_BPS=<BPS_APROBADOS>
+export UKI_MARKETPLACE_DEPLOYMENT_CONFIRM=BSC_TESTNET_97_MARKETPLACE_FEE_<BPS_APROBADOS>
+pnpm --filter @cukies/contracts deploy:testnet:marketplace
+```
+
+The script verifies bytecode for every immutable dependency, checks `router.WETH()`, proves ERC-721
+support, records the exact deployment receipt/runtime hash, allowlists only the canonical Testnet
+collection and starts a two-step owner handover when needed. It emits the public/indexer variables
+that must be copied to Stage after source verification.
+
+UKI checkout needs no swap route. BNB and USDT checkout remain disabled after deployment: do not
+set their public paths or allowlist an ERC-20 payment token until the read-only Pancake verifier
+proves the complete corresponding route on chain `97`.
+
 `LiquidityLocker` holds one V2 LP ERC-20 until an immutable UTC timestamp. Its beneficiary cannot be changed or renounced after deployment. Anyone may execute the matured release, but the LP tokens always go to that fixed beneficiary.
 
 The rehearsal is chain-97-only and creates the initial tASM/tUKI PancakeSwap V2 pair with `0.1 tASM + 60 tUKI`, preserving the target ratio `1 ASM = 600 UKI`. It transfers every LP token minted to a short-lived test locker, proves that early release reverts and prints the public receipt/code-hash evidence needed for the completion step.

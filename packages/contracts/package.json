@@ -15,6 +15,7 @@
     "deploy:testnet:nft-source": "hardhat run scripts/deploy-nft-source.testnet.cjs --network bscTestnet",
     "deploy:testnet:nft-v2": "hardhat run scripts/deploy-nft-v2-testnet.cjs --network bscTestnet",
     "deploy:testnet:nft-vaults": "hardhat run scripts/deploy-nft-vaults-testnet.cjs --network bscTestnet",
+    "deploy:testnet:marketplace": "hardhat run scripts/deploy-uki-marketplace.testnet.cjs --network bscTestnet",
     "deploy:testnet:staking-rewards": "hardhat run scripts/deploy-staking-rewards.testnet.cjs --network bscTestnet",
     "rehearse:testnet:liquidity-locker": "hardhat run scripts/rehearse-liquidity-locker.testnet.cjs --network bscTestnet",
     "complete:testnet:liquidity-locker": "hardhat run scripts/complete-liquidity-locker-rehearsal.testnet.cjs --network bscTestnet",
