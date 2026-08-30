@@ -80,6 +80,31 @@ export type UkiMarketplaceOrdersResponse =
       code: string;
     };
 
+export type UkiMarketplaceInventoryBlocker =
+  | 'asset_not_available'
+  | 'conflicting_activity';
+
+export type UkiMarketplaceInventoryItem = {
+  assetId: string;
+  collectionAddress: `0x${string}`;
+  tokenId: string;
+  imageUrl: string | null;
+  rarity: string;
+  state: string;
+  listingEligible: boolean;
+  listingBlockers: UkiMarketplaceInventoryBlocker[];
+};
+
+export type UkiMarketplaceInventoryResponse =
+  | {
+      status: 'ok';
+      data: { items: UkiMarketplaceInventoryItem[] };
+    }
+  | {
+      status: 'error';
+      code: string;
+    };
+
 export type UkiMarketplaceRuntime = {
   ready: boolean;
   chainId: 56 | 97 | null;

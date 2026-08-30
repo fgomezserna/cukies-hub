@@ -3,6 +3,7 @@ import { ArrowUpRight, Heart, Search, ShoppingCart, Wallet } from 'lucide-react'
 
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
 import { UkiMarketplaceClient } from '@/components/uki-marketplace/marketplace-client';
+import { UkiMarketplaceSellerPanel } from '@/components/uki-marketplace/seller-panel';
 
 export default function MarketplacePage() {
   return (
@@ -78,6 +79,7 @@ export default function MarketplacePage() {
       </nav>
 
       <section id="marketplace-uki" className="scroll-mt-24">
+        <UkiMarketplaceSellerPanel />
         <UkiMarketplaceClient />
       </section>
 
