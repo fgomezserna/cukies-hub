@@ -613,6 +613,14 @@ UX image gate:
 
 Issues hijas:
 
+- UKI-031.0 Task - Actualizar arquitectura de informacion del Dashboard
+  - Issue: #289.
+  - Acceptance criteria:
+    - Separa informacion publica, area autenticada y vesting wallet-based.
+    - Define `/dashboard` como ruta canonica y `/wallet` como alias legacy.
+    - Cierra MVP, estados y limite del API agregado antes de implementar UI.
+    - Mantiene pendiente el gate visual.
+
 - UKI-031.1 Task - API resumen wallet
   - Acceptance criteria:
     - Devuelve wallet, slots, staked UKI, NFTs, creditos, rankings, rewards.

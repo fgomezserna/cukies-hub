@@ -1,8 +1,8 @@
 # UKI UX state matrix
 
-Estado: especificacion UX inicial para implementacion.
-Issue: #111 `UKI-070.2`.
-Fecha: 2026-05-17.
+Estado: especificacion UX actualizada; Dashboard pendiente de validacion visual.
+Issues: #111 `UKI-070.2`, #289 `UKI-031.0`.
+Fecha: 2026-08-30.
 Fuentes: `docs/uki-dapp-sitemap.md`, `docs/uki-current-operating-rules.md`, `docs/uki-technical-disclaimers.md`.
 
 ## Objetivo
@@ -55,16 +55,21 @@ Ruta: `/presale`
 
 ## Dashboard Wallet
 
-Ruta: `/wallet`
+Ruta canonica: `/dashboard`. `/wallet` sera alias legacy cuando la pantalla
+funcional este disponible.
 
 | Estado | UI esperada | Accion principal | Secundarias |
 | --- | --- | --- | --- |
-| Wallet desconectada | Estado vacio con valor de conectar: UKI, NFTs, creditos, cupos. | Connect wallet. | Read sale details. |
-| Chain incorrecta | Datos cacheados en solo lectura si son seguros; acciones bloqueadas. | Switch network. | Refresh data. |
-| Loading | Skeleton por modulos: UKI, NFTs, creditos, rewards, alerts. | Ninguna. | Ninguna. |
-| Sin actividad | Wallet conectada sin compra/stake/NFT detectado. | Go to presale. | Read Cukie Master. |
-| Datos inconsistentes | Alertas por NFT/listing/bridge/indexer; acciones sensibles bloqueadas. | Refresh / contact support. | View details. |
-| Ready | Resumen personal con alertas priorizadas y enlaces a pantallas especializadas. | Review wallet status. | Go to Cukie Master, View rewards. |
+| Wallet desconectada | Estado vacio con valor de conectar: UKI, Cukies, creditos, slots y rewards; sin cifras personales. | Connect wallet. | Como jugar. |
+| Wallet conectada sin firma | La wallet esta visible, pero los modulos privados permanecen cerrados hasta crear la sesion EVM firmada. | Firmar sesion. | Volver al inicio. |
+| Chain incorrecta | Datos ya verificados en solo lectura cuando sea seguro; acciones bloqueadas. En Stage exige chain 97. | Switch network. | Refresh data. |
+| Loading | Skeleton estable por modulos: identidad, alertas, UKI, slots, creditos, Cukies, juego y rewards. | Ninguna. | Ninguna. |
+| Partial | Mantiene los modulos validos y marca cada fuente fallida con `asOf`; nunca sustituye desconocido por cero. | Retry failed modules. | View available modules. |
+| Stale | Aviso de sincronizacion, timestamp y bloqueo de acciones sensibles. | Refresh data. | View source status. |
+| Sin actividad | Wallet firmada sin actividad economica detectada. | Go to Cukie Master. | View Cukies, Play. |
+| Datos inconsistentes | Alertas por NFT/listing/bridge/indexer, requisito o snapshot; acciones sensibles bloqueadas. | Refresh / contact support. | View details. |
+| Ready | Resumen personal con alertas priorizadas y enlaces a pantallas especializadas. | Play / Review wallet status. | Go to Cukie Master, View rewards. |
+| Error total | Error recuperable con codigo, contexto y retry; ningun modulo presenta ceros falsos. | Retry. | Contact support. |
 
 ## Cukie Master
 
