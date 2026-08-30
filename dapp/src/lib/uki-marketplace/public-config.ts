@@ -2,11 +2,19 @@ import { isAddress, type Address } from 'viem';
 
 export type UkiMarketplacePublicConfig = {
   ready: boolean;
+  checkoutReady: boolean;
   chainId: 56 | 97 | null;
   marketplaceAddress: Address | null;
   collectionAddresses: Address[];
+  ukiTokenAddress: Address | null;
+  routerAddress: Address | null;
+  wrappedNativeAddress: Address | null;
+  usdtTokenAddress: Address | null;
+  bnbPaymentPath: Address[];
+  usdtPaymentPath: Address[];
   explorerBaseUrl: string | null;
   issues: string[];
+  checkoutIssues: string[];
 };
 
 type PublicConfigInput = {
@@ -15,6 +23,12 @@ type PublicConfigInput = {
   marketplaceAddress?: string;
   collectionAddress?: string;
   collectionAddresses?: string;
+  ukiTokenAddress?: string;
+  routerAddress?: string;
+  wrappedNativeAddress?: string;
+  usdtTokenAddress?: string;
+  bnbPaymentPath?: string;
+  usdtPaymentPath?: string;
   explorerBaseUrl?: string;
 };
 
@@ -41,6 +55,21 @@ function configuredCollections(primary: string | undefined, multiple: string | u
   };
 }
 
+function configuredPath(value: string | undefined) {
+  const raw = value?.split(',').map((candidate) => candidate.trim()).filter(Boolean) ?? [];
+  const addresses = raw.map(configuredAddress);
+  return {
+    invalid: raw.length < 2
+      || raw.length > 5
+      || addresses.some((candidate) => candidate === null),
+    addresses: addresses.filter((candidate): candidate is Address => candidate !== null),
+  };
+}
+
+function sameAddress(left: Address | null, right: Address | null) {
+  return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+}
+
 export function resolveUkiMarketplacePublicConfig(
   input: PublicConfigInput,
 ): UkiMarketplacePublicConfig {
@@ -49,6 +78,12 @@ export function resolveUkiMarketplacePublicConfig(
   const chainId = parsedChainId === 56 || parsedChainId === 97 ? parsedChainId : null;
   const marketplaceAddress = configuredAddress(input.marketplaceAddress);
   const collections = configuredCollections(input.collectionAddress, input.collectionAddresses);
+  const ukiTokenAddress = configuredAddress(input.ukiTokenAddress);
+  const routerAddress = configuredAddress(input.routerAddress);
+  const wrappedNativeAddress = configuredAddress(input.wrappedNativeAddress);
+  const usdtTokenAddress = configuredAddress(input.usdtTokenAddress);
+  const bnbPaymentPath = configuredPath(input.bnbPaymentPath);
+  const usdtPaymentPath = configuredPath(input.usdtPaymentPath);
   const appEnvironment = input.appEnvironment?.trim();
 
   if (appEnvironment === 'staging' && chainId !== 97) {
@@ -64,6 +99,35 @@ export function resolveUkiMarketplacePublicConfig(
     issues.push('La lista pública de colecciones UKI no es válida.');
   }
 
+  const checkoutIssues: string[] = [];
+  if (!ukiTokenAddress) checkoutIssues.push('La address pública de UKI no es válida.');
+  if (!routerAddress) checkoutIssues.push('La address pública del router no es válida.');
+  if (!wrappedNativeAddress) checkoutIssues.push('La address pública de WBNB no es válida.');
+  if (!usdtTokenAddress) checkoutIssues.push('La address pública de USDT no es válida.');
+  if (bnbPaymentPath.invalid) {
+    checkoutIssues.push('La ruta pública BNB → UKI no es válida.');
+  } else if (
+    !sameAddress(bnbPaymentPath.addresses[0] ?? null, wrappedNativeAddress)
+    || !sameAddress(bnbPaymentPath.addresses.at(-1) ?? null, ukiTokenAddress)
+  ) {
+    checkoutIssues.push('La ruta pública BNB → UKI no coincide con WBNB y UKI.');
+  }
+  if (usdtPaymentPath.invalid) {
+    checkoutIssues.push('La ruta pública USDT → UKI no es válida.');
+  } else if (
+    !sameAddress(usdtPaymentPath.addresses[0] ?? null, usdtTokenAddress)
+    || !sameAddress(usdtPaymentPath.addresses.at(-1) ?? null, ukiTokenAddress)
+  ) {
+    checkoutIssues.push('La ruta pública USDT → UKI no coincide con USDT y UKI.');
+  }
+  if (
+    sameAddress(ukiTokenAddress, usdtTokenAddress)
+    || sameAddress(ukiTokenAddress, wrappedNativeAddress)
+    || sameAddress(usdtTokenAddress, wrappedNativeAddress)
+  ) {
+    checkoutIssues.push('Las monedas de pago configuradas deben ser contratos distintos.');
+  }
+
   const explorerBaseUrl = input.explorerBaseUrl?.trim().replace(/\/$/, '')
     || (chainId === 97
       ? 'https://testnet.bscscan.com'
@@ -73,11 +137,19 @@ export function resolveUkiMarketplacePublicConfig(
 
   return {
     ready: issues.length === 0,
+    checkoutReady: issues.length === 0 && checkoutIssues.length === 0,
     chainId,
     marketplaceAddress,
     collectionAddresses: collections.addresses,
+    ukiTokenAddress,
+    routerAddress,
+    wrappedNativeAddress,
+    usdtTokenAddress,
+    bnbPaymentPath: bnbPaymentPath.addresses,
+    usdtPaymentPath: usdtPaymentPath.addresses,
     explorerBaseUrl,
     issues,
+    checkoutIssues,
   };
 }
 
@@ -87,5 +159,11 @@ export const ukiMarketplacePublicConfig = resolveUkiMarketplacePublicConfig({
   marketplaceAddress: process.env.NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS,
   collectionAddress: process.env.NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS,
   collectionAddresses: process.env.NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESSES,
+  ukiTokenAddress: process.env.NEXT_PUBLIC_UKI_TOKEN_ADDRESS,
+  routerAddress: process.env.NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS,
+  wrappedNativeAddress: process.env.NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS,
+  usdtTokenAddress: process.env.NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS,
+  bnbPaymentPath: process.env.NEXT_PUBLIC_UKI_MARKETPLACE_BNB_PATH,
+  usdtPaymentPath: process.env.NEXT_PUBLIC_UKI_MARKETPLACE_USDT_PATH,
   explorerBaseUrl: process.env.NEXT_PUBLIC_BSCSCAN_BASE_URL,
 });

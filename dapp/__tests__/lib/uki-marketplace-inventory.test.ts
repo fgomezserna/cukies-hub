@@ -6,11 +6,19 @@ const marketplace = '0x1111111111111111111111111111111111111111';
 const collection = '0x2222222222222222222222222222222222222222';
 const config: UkiMarketplacePublicConfig = {
   ready: true,
+  checkoutReady: false,
   chainId: 97,
   marketplaceAddress: marketplace,
   collectionAddresses: [collection],
+  ukiTokenAddress: null,
+  routerAddress: null,
+  wrappedNativeAddress: null,
+  usdtTokenAddress: null,
+  bnbPaymentPath: [],
+  usdtPaymentPath: [],
   explorerBaseUrl: 'https://testnet.bscscan.com',
   issues: [],
+  checkoutIssues: ['not needed for inventory'],
 };
 
 function inventoryItem(
