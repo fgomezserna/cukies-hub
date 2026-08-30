@@ -54,12 +54,13 @@ export function LaunchInfoPage({
   variant = 'standard',
 }: InfoPageProps) {
   const isWorkspace = variant === 'workspace';
+  const Root = isWorkspace ? 'div' : 'main';
 
   return (
-    <main className="uki-landing min-h-screen overflow-x-clip bg-[var(--uki-bg)] text-[var(--uki-cream)]">
+    <Root className="uki-landing min-h-screen overflow-x-clip bg-[var(--uki-bg)] text-[var(--uki-cream)]">
       <div className="uki-noise" />
       <div className="uki-grid-bg" />
-      <LandingHeader evmOnly={isWorkspace} />
+      {!isWorkspace ? <LandingHeader /> : null}
 
       <section className={`uki-container relative z-[2] grid min-w-0 gap-6 ${
         isWorkspace
@@ -129,7 +130,7 @@ export function LaunchInfoPage({
       )}
 
       {afterSections}
-    </main>
+    </Root>
   );
 }
 

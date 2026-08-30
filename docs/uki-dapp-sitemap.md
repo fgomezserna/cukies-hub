@@ -44,17 +44,24 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
   staking y el torneo.
 - `/vesting` ya consulta la posicion on-chain de la wallet sin exigir una
   cuenta interna.
-- Cukie Master, creditos, staking UKI y staking NFT conviven actualmente en
-  `/cukie-master`.
-- El Cukie Pool se opera actualmente en `/cukie-hodler#mi-cukie-pool`.
-- Marketplace, inventario y juego tienen rutas propias; la navegacion comun
-  ya expone el Dashboard, pero el sitemap operativo completo sigue pendiente.
-- Aun faltan el ajuste completo de navegacion, el render responsive/E2E y el
-  gate visual final. Ninguno de estos cambios se ha desplegado todavia.
+- Cukie Master, creditos, staking UKI y staking NFT conviven en
+  `/cukie-master`, ahora dentro del app shell privado.
+- El Cukie Pool se opera en `/cukie-hodler#mi-cukie-pool`, tambien dentro del
+  app shell privado.
+- Marketplace, inventario, juego y ranking tienen rutas propias y ya aparecen
+  agrupados en la navegacion operativa. `/premios` permanece como historico
+  publico y no se mezcla con rewards vigentes.
+- El workspace ya no duplica el header publico ni anida un segundo `main`
+  dentro del app shell.
+- El recorrido local responsive se ha validado en navegador real para
+  Dashboard, Cukie Master, Cukie Pool, Marketplace, Ranking y la entrada al
+  juego. Ninguno de estos cambios se ha desplegado todavia.
+- Aun faltan el gate visual final y la validacion con datos integrados en el
+  despliegue agrupado de Stage.
 
-Por tanto, la frontera funcional del Dashboard esta cubierta localmente, pero
-el punto 5 del DOCX no se considera cerrado hasta completar la navegacion y
-validar el candidato agrupado en Stage/Testnet.
+Por tanto, la frontera funcional y la navegacion del Dashboard estan cubiertas
+localmente, pero el punto 5 del DOCX no se considera cerrado hasta validar el
+candidato agrupado con los datos y servicios reales de Stage/Testnet.
 
 ## Decisiones de arquitectura propuestas
 
@@ -238,12 +245,22 @@ Reglas del contrato:
 
 Estado local de implementacion:
 
-- Puntos 1-5: implementados y cubiertos por el gate
+- Puntos 1-7: implementados y cubiertos por el gate
   `pnpm staging:dashboard:verify-local`.
-- Punto 6: separacion publico/app shell iniciada; falta incorporar todos los
-  destinos operativos sin duplicar rutas legacy.
-- Punto 7: contrato, auth, parcialidad, vacios y chain cubiertos; responsive y
-  E2E se validaran sobre el candidato agrupado.
+
+Validacion responsive local realizada con el build de produccion y runtime
+emulado como Stage/chain `97`:
+
+- Desktop `1200px`: Dashboard con app shell, navegacion agrupada y un unico
+  landmark `main`.
+- Mobile `390x844`: Dashboard -> Cukie Master -> Cukie Pool -> Marketplace ->
+  Ranking, cerrando el drawer despues de cada navegacion.
+- Ranking, Reglas y Perfil conservan el app shell; solo la ruta exacta del
+  juego `/games/treasure-hunt` entra en modo inmersivo.
+- La prueba local no habilita schedulers, firmas ni escrituras. Sin una Mongo
+  local aislada, Marketplace muestra sus estados seguros de no disponibilidad;
+  el inventario real se comprobara una sola vez en el despliegue agrupado de
+  Stage.
 
 ## Ampliaciones posteriores
 

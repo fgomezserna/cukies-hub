@@ -7,13 +7,20 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard,
   Gamepad2,
+  Cookie,
+  Layers3,
+  Store,
   Trophy,
   LockKeyhole,
   Crown,
@@ -39,44 +46,102 @@ const SidebarLogo = () => {
   );
 };
 
+const SidebarNavigationLink = React.forwardRef<
+  HTMLAnchorElement,
+  React.ComponentProps<typeof Link>
+>(({ onClick, ...props }, ref) => {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <Link
+      ref={ref}
+      onClick={(event) => {
+        onClick?.(event);
+        setOpenMobile(false);
+      }}
+      {...props}
+    />
+  );
+});
+SidebarNavigationLink.displayName = 'SidebarNavigationLink';
+
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isMobileGameShell = useMobileGameShell();
   const isTreasureHunt = pathname.startsWith('/games/treasure-hunt');
+  const isTreasureHuntGameView = pathname === '/games/treasure-hunt';
+  const isTreasureHuntRanking = pathname.startsWith('/games/treasure-hunt/rankings');
   const isMobileTreasureHunt =
-    isMobileGameShell && isTreasureHunt;
+    isMobileGameShell && isTreasureHuntGameView;
   const isMarketplaceSection = pathname.startsWith('/marketplace');
 
-  const navigationItems = [
+  const navigationGroups = [
     {
-      href: '/dashboard',
-      label: 'Dashboard',
-      Icon: LayoutDashboard,
-      active: pathname === '/dashboard',
+      label: 'Resumen',
+      items: [{
+        href: '/dashboard',
+        label: 'Dashboard',
+        Icon: LayoutDashboard,
+        active: pathname === '/dashboard',
+      }],
     },
     {
-      href: '/games/treasure-hunt',
-      label: 'Jugar',
-      Icon: Gamepad2,
-      active: isTreasureHunt,
+      label: 'Recursos',
+      items: [
+        {
+          href: '/games/treasure-hunt',
+          label: 'Jugar',
+          Icon: Gamepad2,
+          active: isTreasureHuntGameView,
+        },
+        {
+          href: '/cukie-master',
+          label: 'Cukie Master',
+          Icon: Crown,
+          active: pathname.startsWith('/cukie-master'),
+        },
+        {
+          href: '/cukie-hodler#mi-cukie-pool',
+          label: 'Pool de Cukies',
+          Icon: Layers3,
+          active: pathname.startsWith('/cukie-hodler'),
+        },
+      ],
     },
     {
-      href: '/vesting',
-      label: 'Vesting',
-      Icon: LockKeyhole,
-      active: pathname.startsWith('/vesting'),
+      label: 'Activos',
+      items: [
+        {
+          href: '/cukies',
+          label: 'Cukies',
+          Icon: Cookie,
+          active: pathname.startsWith('/cukies'),
+        },
+        {
+          href: '/marketplace',
+          label: 'Marketplace',
+          Icon: Store,
+          active: pathname.startsWith('/marketplace'),
+        },
+      ],
     },
     {
-      href: '/premios',
-      label: 'Premios',
-      Icon: Trophy,
-      active: pathname.startsWith('/premios'),
+      label: 'Recompensas',
+      items: [{
+        href: '/games/treasure-hunt/rankings',
+        label: 'Ranking',
+        Icon: Trophy,
+        active: isTreasureHuntRanking,
+      }],
     },
     {
-      href: '/cukie-master',
-      label: 'Cukie Master',
-      Icon: Crown,
-      active: pathname.startsWith('/cukie-master'),
+      label: 'Externo',
+      items: [{
+        href: '/vesting',
+        label: 'Vesting',
+        Icon: LockKeyhole,
+        active: pathname === '/vesting',
+      }],
     },
   ];
 
@@ -95,26 +160,39 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeader className="border-b border-teal-400/20 bg-black/15 backdrop-blur-sm h-16 flex items-center">
             <SidebarLogo />
           </SidebarHeader>
-          <SidebarContent className="py-4 bg-black/10 backdrop-blur-sm">
-            <SidebarMenu className="px-3 space-y-1">
-              {navigationItems.map(({ href, label, Icon, active }) => (
-                <SidebarMenuItem key={href}>
-                  <Link href={href} passHref>
-                    <SidebarMenuButton
-                      isActive={active}
-                      className="group relative rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:border-cyan-300/30 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20 data-[active=true]:border-cyan-300/50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 group-hover:from-teal-400/30 group-hover:to-cyan-400/30 transition-all">
-                          <Icon className="h-4 w-4 text-cyan-300 group-hover:text-cyan-200 transition-colors" />
-                        </div>
-                        <span className="group-data-[collapsible=icon]:hidden font-medium">{label}</span>
-                      </div>
-                    </SidebarMenuButton>
-                  </Link>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+          <SidebarContent className="bg-black/10 py-2 backdrop-blur-sm">
+            {navigationGroups.map((group) => (
+              <SidebarGroup key={group.label} className="px-3 py-1">
+                <SidebarGroupLabel className="px-2 font-black uppercase tracking-[0.1em] text-cyan-100/55">
+                  {group.label}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="space-y-1">
+                    {group.items.map(({ href, label, Icon, active }) => (
+                      <SidebarMenuItem key={href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={active}
+                          tooltip={label}
+                          className="group relative rounded-xl transition-all duration-300 hover:border-cyan-300/30 hover:bg-gradient-to-r hover:from-teal-400/10 hover:to-teal-400/10 hover:shadow-md hover:shadow-teal-400/20 data-[active=true]:border-cyan-300/50 data-[active=true]:bg-gradient-to-r data-[active=true]:from-teal-400/20 data-[active=true]:to-teal-400/20"
+                        >
+                          <SidebarNavigationLink href={href}>
+                            <div className="flex items-center gap-3">
+                              <div className="rounded-lg bg-gradient-to-br from-teal-400/20 to-cyan-400/20 p-1.5 transition-all group-hover:from-teal-400/30 group-hover:to-cyan-400/30">
+                                <Icon className="h-4 w-4 text-cyan-300 transition-colors group-hover:text-cyan-200" />
+                              </div>
+                              <span className="font-medium group-data-[collapsible=icon]:hidden">
+                                {label}
+                              </span>
+                            </div>
+                          </SidebarNavigationLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
           </SidebarContent>
         </Sidebar>
         )}
@@ -170,7 +248,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           )}
           
-          {!isTreasureHunt ? <Header variant="default" /> : null}
+          {!isTreasureHuntGameView ? <Header variant="default" /> : null}
           <main
             data-app-main
             className={cn(

@@ -57,7 +57,7 @@ describe('TreasureHuntExperienceShell', () => {
     ).not.toHaveClass('truncate');
     expect(screen.getByText('Disponible')).toHaveClass('hidden');
     expect(screen.getByText('Contenido largo')).toBeInTheDocument();
-    expect(screen.getByTestId('treasure-wallet-controls')).toBeInTheDocument();
+    expect(screen.queryByTestId('treasure-wallet-controls')).not.toBeInTheDocument();
   });
 
   it('mantiene el iframe montado y comunica la visibilidad al cambiar de sección', async () => {
@@ -78,6 +78,7 @@ describe('TreasureHuntExperienceShell', () => {
 
     expect(persistentView).not.toHaveAttribute('hidden');
     expect(screen.queryByText('Contenido secundario')).not.toBeInTheDocument();
+    expect(screen.getByTestId('treasure-wallet-controls')).toBeInTheDocument();
 
     mockUsePathname.mockReturnValue('/games/treasure-hunt/rankings');
     view.rerender(
@@ -98,6 +99,7 @@ describe('TreasureHuntExperienceShell', () => {
     expect(screen.getByTitle('persistent-treasure-hunt-game')).toBe(iframe);
     expect(persistentView).toHaveAttribute('hidden');
     expect(screen.getByText('Contenido secundario')).toBeInTheDocument();
+    expect(screen.queryByTestId('treasure-wallet-controls')).not.toBeInTheDocument();
 
     mockUsePathname.mockReturnValue('/games/treasure-hunt');
     view.rerender(

@@ -126,9 +126,11 @@ export default function TreasureHuntExperienceShell({
             </div>
           </div>
 
-          <div className="absolute right-4 top-3 sm:right-7 lg:right-8">
-            <Header variant="game-overlay" />
-          </div>
+          {isGameViewActive ? (
+            <div className="absolute right-4 top-3 sm:right-7 lg:right-8">
+              <Header variant="game-overlay" />
+            </div>
+          ) : null}
         </div>
 
         <nav

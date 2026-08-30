@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
-import CukieMasterPage from '@/app/cukie-master/page';
+import CukieMasterPage from '@/app/(app)/cukie-master/page';
 
 jest.mock('lucide-react', () => ({
   ChevronDown: () => <svg aria-hidden="true" />,

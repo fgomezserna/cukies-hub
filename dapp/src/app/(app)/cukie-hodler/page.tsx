@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 export default function CukieHodlerPage() {
   return (
     <LaunchInfoPage
+      variant="workspace"
       eyebrow="Pool de Cukies"
       title="Cukie Hodler"
       subtitle="Una página para holders que quieran entender cómo aportar Cukies al pool, qué estados bloquean un NFT y cómo se asignan partidas disponibles."
@@ -23,6 +24,7 @@ export default function CukieHodlerPage() {
         { label: 'Prioridad', value: 'Originales', helper: 'Se prestan antes que segunda gen' },
         { label: 'Fallback', value: 'Seiku', helper: 'Si no hay Cukies disponibles' },
       ]}
+      beforeSections={<CukiePoolStatusPanel />}
       sections={[
         {
           title: 'Cómo funciona el pool',
@@ -61,7 +63,6 @@ export default function CukieHodlerPage() {
           text: 'Cada generación se liquida por separado con niveles acumulativos: todos 45%, No Común o superior 20%, Raro o superior 15%, Épico o superior 12%, Legendario o superior 7% y Goat 1%.',
         },
       ]}
-      afterSections={<CukiePoolStatusPanel />}
       note="El depósito se activa al comenzar el siguiente periodo de las 14:00 UTC. Si se solicita la salida, el NFT puede seguir prestándose hasta el corte, pero deja de participar en el reparto de ese periodo y queda retirable al finalizarlo."
     />
   );
