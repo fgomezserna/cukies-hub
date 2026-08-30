@@ -29,6 +29,7 @@ import {
   getLegacyBscExplorerAddressUrl,
   legacyMarketplaceContracts,
 } from '@/lib/legacy-marketplace/config';
+import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import { getCuki } from '@/lib/cukies-data/data';
 import type {
   LegacyMarketplaceCukiHistoryEntry,
@@ -57,6 +58,8 @@ const vitalLabels = [
 ] as const;
 
 function getExplorerUrl(network: string, tokenId: string) {
+  if (!legacyMarketplaceRuntime.legacyMainnetEnabled) return null;
+
   if (network === 'BSC') {
     return `${getLegacyBscExplorerAddressUrl(
       legacyMarketplaceContracts.bsc.contracts.token,
@@ -120,7 +123,7 @@ function getHistoryLabel(entry: LegacyMarketplaceCukiHistoryEntry) {
 }
 
 function getHistoryTransactionUrl(entry: LegacyMarketplaceCukiHistoryEntry) {
-  if (!entry.transactionId) return null;
+  if (!legacyMarketplaceRuntime.legacyMainnetEnabled || !entry.transactionId) return null;
   if (entry.network === 'BSC') return `https://bscscan.com/tx/${entry.transactionId}`;
   if (entry.network === 'TRON') {
     return `https://tronscan.org/#/transaction/${entry.transactionId}`;
@@ -281,6 +284,7 @@ export default async function MarketplaceDetailPage({
     { label: 'Generation', value: String(cuki.skills.generation ?? '-'), Icon: Zap },
     { label: 'Children', value: String(cuki.childrenCount ?? '-'), Icon: Users },
   ];
+  const explorerUrl = getExplorerUrl(cuki.network, cuki.tokenId);
 
   return (
     <div className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground">
@@ -292,15 +296,17 @@ export default async function MarketplaceDetailPage({
           <ArrowLeft className="h-4 w-4" />
           Back to marketplace
         </Link>
-        <a
-          href={getExplorerUrl(cuki.network, cuki.tokenId)}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/20"
-        >
-          Explorer
-          <ExternalLink className="h-4 w-4" />
-        </a>
+        {explorerUrl && (
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/20"
+          >
+            Explorer
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )}
       </div>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,420px)_minmax(0,1fr)]">

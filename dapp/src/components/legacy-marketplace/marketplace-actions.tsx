@@ -18,6 +18,7 @@ import { useTronLink } from '@/hooks/use-tronlink';
 import { getPreferredWalletConnector } from '@/lib/wallet-connectors';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
+import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
   readLegacyTronContract,
   sendLegacyTronContract,
@@ -44,6 +45,23 @@ function isSameWallet(left?: string | null, right?: string | null) {
 }
 
 export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
+  if (!legacyMarketplaceRuntime.legacyMainnetEnabled) {
+    return (
+      <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-5 text-amber-50">
+        <h2 className="font-headline text-xl font-bold">Marketplace en modo seguro</h2>
+        <p className="mt-2 text-sm text-amber-100/80">
+          {legacyMarketplaceRuntime.reason} El inventario indexado se puede revisar,
+          pero las operaciones se habilitaran cuando exista un contrato de marketplace
+          configurado en Testnet.
+        </p>
+      </div>
+    );
+  }
+
+  return <LegacyMainnetMarketplaceActions cuki={cuki} />;
+}
+
+function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   const { address, chainId, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnectingWallet } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();

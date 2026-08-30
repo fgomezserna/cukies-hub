@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTronLink } from '@/hooks/use-tronlink';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
+import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import { readLegacyTronContract } from '@/lib/legacy-marketplace/tron';
 import type {
   LegacyCukiePointsResponse,
@@ -132,7 +133,7 @@ export function CukiePointsClient() {
     args: address ? [address] : undefined,
     chainId: 56,
     query: {
-      enabled: Boolean(address),
+      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled && Boolean(address),
     },
   });
   const { data: bscTotal } = useReadContract({
@@ -140,22 +141,35 @@ export function CukiePointsClient() {
     abi: legacyMarketplaceBscAbis.points,
     functionName: 'getTotalPoints',
     chainId: 56,
+    query: {
+      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled,
+    },
   });
   const { data: bscEmitted } = useReadContract({
     address: bscPointsAddress,
     abi: legacyMarketplaceBscAbis.points,
     functionName: 'getTotalPointsEmited',
     chainId: 56,
+    query: {
+      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled,
+    },
   });
   const { data: bscBurned } = useReadContract({
     address: bscPointsAddress,
     abi: legacyMarketplaceBscAbis.points,
     functionName: 'getTotalPointsBurned',
     chainId: 56,
+    query: {
+      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled,
+    },
   });
 
   const refreshTronSnapshot = useCallback(async () => {
-    if (!tronAddress || !window.tronWeb) {
+    if (
+      !legacyMarketplaceRuntime.legacyMainnetEnabled
+      || !tronAddress
+      || !window.tronWeb
+    ) {
       setTronSnapshot({
         balance: null,
         total: null,
@@ -288,6 +302,12 @@ export function CukiePointsClient() {
 
   return (
     <div className="grid gap-6">
+      {!legacyMarketplaceRuntime.legacyMainnetEnabled && (
+        <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100">
+          {legacyMarketplaceRuntime.reason} Los totales y movimientos que ves debajo
+          proceden exclusivamente del indice aislado de Stage; no se consulta mainnet.
+        </div>
+      )}
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-4">
@@ -313,7 +333,7 @@ export function CukiePointsClient() {
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
               <span>{tronAddress ? shortWallet(tronAddress) : 'TronLink no conectado'}</span>
-              {!isTronConnected && (
+              {legacyMarketplaceRuntime.legacyMainnetEnabled && !isTronConnected && (
                 <Button
                   size="sm"
                   variant="outline"
