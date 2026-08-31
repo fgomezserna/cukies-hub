@@ -138,11 +138,11 @@ function CandidateCard({
       onClick={onSelect}
       className={`group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition ${
         selected
-          ? 'border-cyan-300/70 bg-cyan-300/15'
-          : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/35 hover:bg-cyan-300/10'
+          ? 'border-lilac-300/70 bg-lilac-300/15'
+          : 'border-white/10 bg-white/[0.03] hover:border-lilac-300/35 hover:bg-lilac-300/10'
       } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#071211]">
+      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
         <CukiImage
           src={cuki.imageUrl}
           alt={getCukiDisplayName(cuki)}
@@ -155,7 +155,7 @@ function CandidateCard({
           <p className="truncate font-headline text-lg font-bold text-white">
             {getCukiDisplayName(cuki)}
           </p>
-          {selected && <Check className="h-4 w-4 shrink-0 text-cyan-100" />}
+          {selected && <Check className="h-4 w-4 shrink-0 text-lilac-100" />}
         </div>
         <p className="mt-1 text-xs text-slate-400">
           {getTypeLabel(cuki.type)} · {cuki.network}
@@ -200,7 +200,7 @@ function BreedCard({
             {breed.parents[1]}
           </p>
         </div>
-        <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+        <span className="rounded-full border border-lilac-300/25 bg-lilac-300/10 px-3 py-1 text-xs font-semibold text-lilac-100">
           {breed.completed ? 'Completed' : canOpen ? 'Ready' : 'Active'}
         </span>
       </div>
@@ -224,7 +224,7 @@ function BreedCard({
         <div className="mt-4">
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-cyan-300"
+              className="h-full rounded-full bg-lilac-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -253,9 +253,9 @@ function CompletedCukiCard({ cuki }: { cuki: LegacyMarketplaceCukiItem }) {
   return (
     <Link
       href={`/marketplace/${cuki.tokenId}`}
-      className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-cyan-300/35 hover:bg-cyan-300/10"
+      className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#071211]">
+      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
         <CukiImage src={cuki.imageUrl} alt={getCukiDisplayName(cuki)} sizes="96px" />
       </div>
       <div className="min-w-0">
@@ -762,7 +762,7 @@ export function BreedingClient({
               onClick={() => setNetwork(item)}
               className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
                 network === item
-                  ? 'bg-cyan-300 text-slate-950'
+                  ? 'bg-lilac-300 text-slate-950'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
@@ -799,7 +799,7 @@ export function BreedingClient({
             key={label}
             className="rounded-[8px] border border-white/10 bg-black/30 p-4"
           >
-            <Icon className="mb-3 h-4 w-4 text-cyan-200" />
+            <Icon className="mb-3 h-4 w-4 text-lilac-200" />
             <p className="text-xs uppercase tracking-wide text-slate-500">
               {label}
             </p>
@@ -848,7 +848,7 @@ export function BreedingClient({
                 variant="outline"
                 disabled={isLoadingCandidates}
                 onClick={() => void refreshCandidates()}
-                className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+                className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
               >
                 {isLoadingCandidates ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -883,7 +883,7 @@ export function BreedingClient({
             </div>
           </section>
 
-          <aside className="grid content-start gap-4 rounded-[8px] border border-cyan-300/20 bg-black/35 p-5">
+          <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
             <div>
               <h2 className="font-headline text-2xl font-bold text-white">
                 Breeding desk
@@ -921,7 +921,7 @@ export function BreedingClient({
                 onClick={() => void approveBreeding()}
                 disabled={disabled || !ready}
                 variant="outline"
-                className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+                className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
               >
                 <Check className="mr-2 h-4 w-4" />
                 Approve breeding
@@ -950,7 +950,7 @@ export function BreedingClient({
               variant="outline"
               disabled={isLoadingBreeds || !ready}
               onClick={() => void refreshActiveBreeds()}
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               {isLoadingBreeds ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -988,7 +988,7 @@ export function BreedingClient({
             <Button
               variant="outline"
               onClick={() => void refreshCompleted()}
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               <RefreshCcw className="mr-2 h-4 w-4" />
               Refresh
@@ -1009,7 +1009,7 @@ export function BreedingClient({
       )}
 
       {status && (
-        <div className="rounded-[8px] border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-100">
+        <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-3 text-sm text-lilac-100">
           {status}
         </div>
       )}

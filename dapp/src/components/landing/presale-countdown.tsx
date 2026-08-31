@@ -27,7 +27,7 @@ export function PresaleCountdown() {
     <div className="mt-2 grid grid-cols-4 gap-2" aria-live="polite">
       {boxes.map((box) => (
         <div key={box.label} className="uki-countdown-box">
-          <span className="block font-headline text-xl font-black leading-none text-[var(--uki-cyan)]" suppressHydrationWarning>
+          <span className="block font-headline text-xl font-black leading-none text-[var(--uki-lilac)]" suppressHydrationWarning>
             {formatCountdownValue(box.value)}
           </span>
           <span className="mt-1.5 block text-[0.55rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">

@@ -97,7 +97,7 @@ const TaskItem = ({ text, completed, onVerify, disabled, taskType = 'auto_verify
     "flex items-center gap-4 py-4 px-5 rounded-xl transition-all duration-300 border-2",
     completed 
       ? "bg-gradient-to-r from-pink-600/10 to-pink-600/10 border-pink-600/30" 
-      : "bg-gradient-to-r from-blue-500/5 to-cyan-500/5 border-blue-500/20 hover:border-blue-400/40"
+      : "bg-gradient-to-r from-blue-500/5 to-lilac-500/5 border-blue-500/20 hover:border-blue-400/40"
   )}>
     <div className={cn(
       "p-1 rounded-full",
@@ -122,7 +122,7 @@ const TaskItem = ({ text, completed, onVerify, disabled, taskType = 'auto_verify
         "transition-all duration-300 font-semibold px-4 py-2 rounded-lg",
         completed 
           ? "border-pink-600/30 text-pink-500 hover:bg-pink-600/10" 
-          : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
+          : "bg-gradient-to-r from-blue-500 to-lilac-600 hover:from-blue-600 hover:to-lilac-700 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
       )}
       disabled={completed || disabled || isLoading} 
       onClick={() => onVerify({ type: taskType })}
@@ -1453,11 +1453,11 @@ function QuestsView() {
           <Card className="relative overflow-hidden border-2 border-blue-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-blue-500/20 hover:border-blue-400/40 transition-all duration-300">
             <CardHeader className="relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-br from-blue-400 to-lilac-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <Star className="h-8 w-8 text-white drop-shadow-lg" />
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">
+                  <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-lilac-500 bg-clip-text text-transparent">
                     ✨ {starterQuest.title}
                   </CardTitle>
                   <CardDescription className="text-base mt-1">
@@ -1496,7 +1496,7 @@ function QuestsView() {
                   }
               })}
             </CardContent>
-            <CardFooter className="relative flex-col items-stretch gap-6 bg-gradient-to-r from-blue-500/5 to-cyan-500/5">
+            <CardFooter className="relative flex-col items-stretch gap-6 bg-gradient-to-r from-blue-500/5 to-lilac-500/5">
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-muted-foreground">🎯 Progress</span>
@@ -1506,14 +1506,14 @@ function QuestsView() {
                 </div>
                 <div className="relative">
                   <Progress value={starterProgress} className="h-3" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-500/20 rounded-full" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-lilac-500/20 rounded-full" />
                 </div>
               </div>
               
               <Button 
                 onClick={() => handleClaimReward(starterQuest.id)} 
                 disabled={!isStarterTasksComplete || starterQuest.isCompleted}
-                className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-full bg-gradient-to-r from-blue-500 to-lilac-600 hover:from-blue-600 hover:to-lilac-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:hover:scale-100"
               >
                 {starterQuest.isCompleted ? '✅ Reward Claimed' : `🚀 Claim ${starterQuest.xp} XP`}
               </Button>
@@ -1532,7 +1532,7 @@ function QuestsView() {
               </TabsTrigger>
               <TabsTrigger 
                 value="active"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-lilac-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
               >
                 ⚡ Active
               </TabsTrigger>
@@ -1567,7 +1567,7 @@ function QuestsView() {
                                     ? "bg-gradient-to-br from-pink-500 to-pink-600" 
                                     : quest.isLocked 
                                       ? "bg-gradient-to-br from-gray-400 to-gray-500"
-                                      : "bg-gradient-to-br from-blue-400 to-cyan-500"
+                                      : "bg-gradient-to-br from-blue-400 to-lilac-500"
                                 )}>
                                   {quest.isLocked ? (
                                     <Lock className="h-7 w-7 text-white drop-shadow-lg" />
@@ -1659,7 +1659,7 @@ function QuestsView() {
                                   "w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:hover:scale-100",
                                   quest.isCompleted 
                                     ? "bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white shadow-pink-600/30 hover:shadow-pink-600/40"
-                                    : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-blue-500/30 hover:shadow-blue-500/40"
+                                    : "bg-gradient-to-r from-blue-500 to-lilac-600 hover:from-blue-600 hover:to-lilac-700 text-white shadow-blue-500/30 hover:shadow-blue-500/40"
                                 )}
                               >
                                 {quest.isCompleted ? '✅ Claimed' : `🚀 Claim ${quest.xp} XP`}

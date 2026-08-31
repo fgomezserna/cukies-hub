@@ -138,7 +138,7 @@ export default function TreasureHuntExperienceShell({
 
         <nav
           aria-label="Secciones de Treasure Hunt"
-          className="border-t border-[#2ce8dc]/16 bg-[#071312]/88"
+          className="border-t border-[#2ce8dc]/16 bg-[#0d0914]/88"
         >
           <div className="flex min-w-max overflow-x-auto px-1 sm:px-6 lg:px-8">
             {tabs.map(({ href, label }) => {

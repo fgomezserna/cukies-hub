@@ -551,9 +551,9 @@ export function PresalePurchasePanel() {
     : null;
 
   return (
-    <div className="mt-2 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[#04030a]/72 p-2.5">
+    <div className="mt-2 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[#04030a]/72 p-2.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
+        <span className="inline-flex items-center gap-2 font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">
           <ShoppingCart className="h-4 w-4" strokeWidth={1.8} />
           Comprar UKI
         </span>
@@ -569,12 +569,12 @@ export function PresalePurchasePanel() {
             <SheetTrigger asChild>
               <button
                 type="button"
-                className="text-left underline-offset-4 transition hover:text-[var(--uki-cyan)] hover:underline sm:text-right"
+                className="text-left underline-offset-4 transition hover:text-[var(--uki-lilac)] hover:underline sm:text-right"
               >
                 Comprado: <strong className="text-[var(--uki-cream)]">{formatTokenAmount(purchasedAsm)} ASM / {formatTokenAmount(purchasedUki)} UKI</strong>
               </button>
             </SheetTrigger>
-            <SheetContent className="w-full border-[var(--uki-cyan)]/25 bg-[#070817] text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.16)] sm:max-w-xl">
+            <SheetContent className="w-full border-[var(--uki-lilac)]/25 bg-[#070817] text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.16)] sm:max-w-xl">
               <SheetHeader>
                 <SheetTitle className="font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">Compras de UKI</SheetTitle>
                 <SheetDescription className="font-semibold text-[var(--uki-muted)]">
@@ -582,7 +582,7 @@ export function PresalePurchasePanel() {
                 </SheetDescription>
               </SheetHeader>
 
-              <div className="mt-6 rounded-[10px] border border-[var(--uki-cyan)]/20 bg-[#0d0b24]/70 p-4">
+              <div className="mt-6 rounded-[10px] border border-[var(--uki-lilac)]/20 bg-[#0d0b24]/70 p-4">
                 <div className="grid grid-cols-2 gap-3 text-[0.68rem] font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
                   <div>
                     <span>Total ASM</span>
@@ -598,7 +598,7 @@ export function PresalePurchasePanel() {
               <div className="mt-5 space-y-3">
                 {isHistoryLoading ? (
                   <div className="flex items-center gap-3 rounded-[10px] border border-white/10 bg-white/[0.03] p-4 text-sm font-semibold text-[var(--uki-text)]">
-                    <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" />
+                    <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" />
                     Cargando compras...
                   </div>
                 ) : historyError ? (
@@ -626,7 +626,7 @@ export function PresalePurchasePanel() {
                             href={purchase.txUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-[var(--uki-cyan)]/30 bg-[var(--uki-cyan)]/10 px-2.5 py-1.5 text-[0.66rem] font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)] transition hover:bg-[var(--uki-cyan)]/15"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac)]/10 px-2.5 py-1.5 text-[0.66rem] font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:bg-[var(--uki-lilac)]/15"
                           >
                             Ver tx
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -653,7 +653,7 @@ export function PresalePurchasePanel() {
           onChange={(event) => setAmount(event.target.value.replace(',', '.'))}
           inputMode="decimal"
           placeholder="1"
-          className="h-12 w-full rounded-[8px] border border-[var(--uki-cyan-border)] bg-[#0b0719]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-cyan)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-cyan)]"
+          className="h-12 w-full rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#0b0719]/92 px-3 font-headline text-lg font-black text-[var(--uki-cream)] caret-[var(--uki-lilac)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-lilac)]"
           style={{
             backgroundColor: '#0b0719',
             color: 'var(--uki-cream)',
@@ -714,7 +714,7 @@ export function PresalePurchasePanel() {
       ) : null}
 
       {lastAction === 'approved' && !isPending && !isConfirming ? (
-        <div className="uki-state-callout mt-2 border-[var(--uki-cyan)]/35 bg-[var(--uki-cyan)]/10">
+        <div className="uki-state-callout mt-2 border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10">
           <WalletCards className="h-4 w-4" strokeWidth={1.8} />
           <div>
             <p>ASM aprobado</p>
@@ -766,7 +766,7 @@ export function PresalePurchasePanel() {
       ) : null}
 
       {txHash && txUrl ? (
-        <a href={txUrl} target="_blank" rel="noreferrer" className="mt-2 block text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-cyan)] hover:text-[var(--uki-cream)]">
+        <a href={txUrl} target="_blank" rel="noreferrer" className="mt-2 block text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">
           Ver tx {formatTxLabel(txHash)}
         </a>
       ) : null}

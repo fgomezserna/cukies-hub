@@ -121,10 +121,10 @@ export default async function CukiesToolsPage() {
 
   return (
     <div className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground">
-      <section className="overflow-hidden rounded-[8px] border border-cyan-300/20 bg-black/35 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur sm:p-6">
+      <section className="overflow-hidden rounded-[8px] border border-lilac-300/20 bg-black/35 p-5 shadow-xl shadow-lilac-950/20 backdrop-blur sm:p-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
           <div className="min-w-0">
-            <div className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+            <div className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-lilac-100">
               <Cookie className="h-3.5 w-3.5" />
               Cukies NFT tools
             </div>
@@ -140,7 +140,7 @@ export default async function CukiesToolsPage() {
           <div className="grid gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
             {highlights.map((item) => (
               <div key={item} className="flex items-start gap-2">
-                <WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
+                <WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-lilac-200" />
                 <span>{item}</span>
               </div>
             ))}
@@ -154,7 +154,7 @@ export default async function CukiesToolsPage() {
             key={item.label}
             className="rounded-[8px] border border-white/10 bg-black/25 p-4"
           >
-            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] bg-cyan-300 text-sm font-black text-slate-950">
+            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] bg-lilac-300 text-sm font-black text-slate-950">
               {index + 1}
             </div>
             <p className="font-headline text-lg font-bold text-white">{item.label}</p>
@@ -169,7 +169,7 @@ export default async function CukiesToolsPage() {
             key={label}
             className="rounded-[8px] border border-white/10 bg-black/30 p-4 backdrop-blur"
           >
-            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[8px] bg-cyan-300/10 text-cyan-200">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[8px] bg-lilac-300/10 text-lilac-200">
               <Icon className="h-4 w-4" />
             </div>
             <p className="truncate font-headline text-2xl font-bold text-white">
@@ -189,16 +189,16 @@ export default async function CukiesToolsPage() {
           <Link
             key={href}
             href={href}
-            className="group flex min-h-[15rem] flex-col justify-between rounded-[8px] border border-white/10 bg-black/30 p-5 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-cyan-950/20"
+            className="group flex min-h-[15rem] flex-col justify-between rounded-[8px] border border-white/10 bg-black/30 p-5 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-lilac-300/35 hover:bg-lilac-950/20"
           >
             <div>
-              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[8px] bg-cyan-300/10 text-cyan-200">
+              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[8px] bg-lilac-300/10 text-lilac-200">
                 <Icon className="h-5 w-5" />
               </div>
               <h2 className="font-headline text-2xl font-bold text-white">
                 {title}
               </h2>
-              <p className="mt-2 inline-flex rounded-[6px] border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+              <p className="mt-2 inline-flex rounded-[6px] border border-lilac-300/20 bg-lilac-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-lilac-100">
                 {status}
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -206,7 +206,7 @@ export default async function CukiesToolsPage() {
               </p>
             </div>
 
-            <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-100">
+            <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-lilac-100">
               {action}
               <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
             </div>

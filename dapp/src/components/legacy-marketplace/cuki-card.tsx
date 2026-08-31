@@ -20,9 +20,9 @@ export function CukiCard({ cuki }: CukiCardProps) {
   return (
     <Link
       href={`/marketplace/${cuki.tokenId}`}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-white/10 bg-black/35 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-cyan-950/20"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-white/10 bg-black/35 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-lilac-300/35 hover:bg-lilac-950/20"
     >
-      <div className="relative aspect-[4/5] min-h-[22rem] bg-[#071211] sm:min-h-[24rem]">
+      <div className="relative aspect-[4/5] min-h-[22rem] bg-[#0d0914] sm:min-h-[24rem]">
         <CukiImage
           src={cuki.imageUrl}
           alt={getCukiDisplayName(cuki)}
@@ -32,7 +32,7 @@ export function CukiCard({ cuki }: CukiCardProps) {
         <div className="absolute left-3 top-3 rounded-full border border-black/30 bg-black/70 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
           {cuki.network}
         </div>
-        <div className="absolute right-3 top-3 rounded-full border border-cyan-300/25 bg-cyan-300/15 px-2.5 py-1 text-xs font-semibold text-cyan-100 backdrop-blur">
+        <div className="absolute right-3 top-3 rounded-full border border-lilac-300/25 bg-lilac-300/15 px-2.5 py-1 text-xs font-semibold text-lilac-100 backdrop-blur">
           {getStateLabel(cuki.state)}
         </div>
       </div>
@@ -47,7 +47,7 @@ export function CukiCard({ cuki }: CukiCardProps) {
               {getTypeLabel(cuki.type)} · Gen {cuki.skills.generation ?? '-'}
             </p>
           </div>
-          <ArrowUpRight className="h-4 w-4 shrink-0 text-cyan-200 opacity-70 transition group-hover:opacity-100" />
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-lilac-200 opacity-70 transition group-hover:opacity-100" />
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs">

@@ -61,7 +61,7 @@ export function TreasureHuntCompetitionSummary({
     <aside
       aria-labelledby={id}
       className={cn(
-        'overflow-hidden rounded-[8px] border border-white/20 bg-[#071312]/94',
+        'overflow-hidden rounded-[8px] border border-white/20 bg-[#0d0914]/94',
         className,
       )}
     >

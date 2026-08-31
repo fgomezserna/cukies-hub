@@ -22,7 +22,7 @@ export function CukiImage({
 
   if (!src || failed) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-cyan-950/30 via-[#071211] to-emerald-950/20 p-8">
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-lilac-950/30 via-[#0d0914] to-emerald-950/20 p-8">
         <Image
           src="/Cukie_logo_first.png"
           alt="Cukies World"

@@ -161,10 +161,10 @@ export default async function IndexerPage({ searchParams }: PageProps) {
         <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-sm text-cyan-200">
+              <div className="mb-2 flex items-center gap-2 text-sm text-lilac-200">
                 <Database className="h-4 w-4" />
                 <span>Mongo viewer</span>
-                <Badge variant="outline" className="border-cyan-300/30 text-cyan-100">
+                <Badge variant="outline" className="border-lilac-300/30 text-lilac-100">
                   {getIndexerDbName()}
                 </Badge>
               </div>
@@ -173,7 +173,7 @@ export default async function IndexerPage({ searchParams }: PageProps) {
                 Eventos normalizados, cursors y vistas materializadas generadas en la base nueva.
               </p>
             </div>
-            <Button asChild variant="outline" className="w-fit border-cyan-300/30 text-cyan-50">
+            <Button asChild variant="outline" className="w-fit border-lilac-300/30 text-lilac-50">
               <Link href={`/indexer?collection=${data.selectedCollection}&limit=${limit}`}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refrescar
@@ -188,8 +188,8 @@ export default async function IndexerPage({ searchParams }: PageProps) {
                 href={`/indexer?collection=${item.collection}&limit=${limit}`}
                 className={`rounded-[8px] border p-4 transition ${
                   item.collection === data.selectedCollection
-                    ? 'border-cyan-300/60 bg-cyan-300/10'
-                    : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/30'
+                    ? 'border-lilac-300/60 bg-lilac-300/10'
+                    : 'border-white/10 bg-white/[0.03] hover:border-lilac-300/30'
                 }`}
               >
                 <div className="text-xs text-slate-400">{item.collection}</div>
@@ -210,7 +210,7 @@ export default async function IndexerPage({ searchParams }: PageProps) {
                 <form className="flex w-full gap-2 md:w-[460px]">
                   <input type="hidden" name="collection" value={data.selectedCollection} />
                   <Input name="q" defaultValue={q} placeholder="Buscar tokenId, tx, evento, owner..." />
-                  <Button type="submit" variant="outline" className="border-cyan-300/30">
+                  <Button type="submit" variant="outline" className="border-lilac-300/30">
                     <Search className="h-4 w-4" />
                   </Button>
                 </form>
@@ -243,7 +243,7 @@ export default async function IndexerPage({ searchParams }: PageProps) {
                   {data.documents.map((document) => (
                     <TableRow key={String(document._id)} className="border-white/10">
                       <TableCell className="align-top">
-                        <div className="font-mono text-xs text-cyan-100">{String(document._id)}</div>
+                        <div className="font-mono text-xs text-lilac-100">{String(document._id)}</div>
                         {'eventName' in document && (
                           <Badge variant="outline" className="mt-2 border-white/15 text-slate-200">
                             {String(document.eventName)}

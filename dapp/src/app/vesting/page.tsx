@@ -183,7 +183,7 @@ export default function PublicVestingPage() {
       <LandingHeader />
 
       <section className="uki-container relative z-[2] pt-28 pb-6">
-        <div className="relative overflow-hidden rounded-[16px] border border-[var(--uki-cyan)]/20 bg-[#070817]/90 p-5 shadow-[0_0_52px_rgba(228,92,255,0.12)] sm:p-8">
+        <div className="relative overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/20 bg-[#070817]/90 p-5 shadow-[0_0_52px_rgba(228,92,255,0.12)] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(228,92,255,0.20),transparent_24rem),radial-gradient(circle_at_18%_78%,rgba(242,195,75,0.11),transparent_18rem)]" aria-hidden="true" />
           <div className="relative grid gap-8 xl:grid-cols-[1.08fr_0.92fr] xl:items-end">
             <div>
@@ -198,7 +198,7 @@ export default function PublicVestingPage() {
                 Revisa la asignación creada para tu cartera, cuánto queda bloqueado y qué parte puedes reclamar cuando el calendario de vesting empiece a liberar UKI.
               </p>
               <div className="mt-6 flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.12em]">
-                <span className="rounded-[7px] border border-[var(--uki-cyan)]/25 bg-[var(--uki-cyan)]/10 px-3 py-2 text-[var(--uki-cyan)]">
+                <span className="rounded-[7px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 px-3 py-2 text-[var(--uki-lilac)]">
                   Cadena BNB
                 </span>
                 <span className="rounded-[7px] border border-white/10 bg-white/5 px-3 py-2 text-[var(--uki-text)]">
@@ -210,10 +210,10 @@ export default function PublicVestingPage() {
               </div>
             </div>
 
-            <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#0d0b24]/82 p-5 shadow-[0_0_34px_rgba(228,92,255,0.1)]">
+            <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#0d0b24]/82 p-5 shadow-[0_0_34px_rgba(228,92,255,0.1)]">
               <div className="flex items-center gap-3">
                 <Sparkles className="h-5 w-5 text-[var(--uki-gold)]" />
-                <p className="font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">Inicio de vesting</p>
+                <p className="font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">Inicio de vesting</p>
               </div>
               <p className="mt-4 font-headline text-4xl font-black uppercase leading-none text-[var(--uki-cream)]">{vestingStartLabel}</p>
               <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
@@ -237,10 +237,10 @@ export default function PublicVestingPage() {
       <section className="uki-container relative z-[2] pb-6">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-[12px] border border-[var(--uki-cyan)]/18 bg-[#070817]/86 p-4 shadow-[0_0_28px_rgba(228,92,255,0.07)]">
+            <div key={metric.label} className="rounded-[12px] border border-[var(--uki-lilac)]/18 bg-[#070817]/86 p-4 shadow-[0_0_28px_rgba(228,92,255,0.07)]">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">{metric.label}</span>
-                <metric.icon className="h-4 w-4 text-[var(--uki-cyan)]" />
+                <metric.icon className="h-4 w-4 text-[var(--uki-lilac)]" />
               </div>
               <div className="mt-3 font-headline text-2xl font-black text-[var(--uki-cream)]">{metric.value}</div>
             </div>
@@ -249,7 +249,7 @@ export default function PublicVestingPage() {
       </section>
 
       <section className="uki-container relative z-[2] grid gap-6 pb-14 xl:grid-cols-[1.35fr_0.85fr]">
-        <div className="rounded-[14px] border border-[var(--uki-cyan)]/22 bg-[#070817]/90 p-5 shadow-[0_0_44px_rgba(228,92,255,0.08)]">
+        <div className="rounded-[14px] border border-[var(--uki-lilac)]/22 bg-[#070817]/90 p-5 shadow-[0_0_44px_rgba(228,92,255,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">Mi vesting de preventa</h2>
@@ -260,7 +260,7 @@ export default function PublicVestingPage() {
             <Button
               onClick={claimAll}
               disabled={!isConfigured || !isConnected || isPending || !claimable || claimable === BigInt(0)}
-              className="h-11 rounded-[8px] border border-[var(--uki-cyan)]/60 bg-[var(--uki-cyan)] px-5 font-headline text-xs font-black uppercase tracking-[0.1em] text-white shadow-[0_0_18px_rgba(228,92,255,0.22)] hover:bg-[#f19bff]"
+              className="h-11 rounded-[8px] border border-[var(--uki-lilac)]/60 bg-[var(--uki-lilac)] px-5 font-headline text-xs font-black uppercase tracking-[0.1em] text-white shadow-[0_0_18px_rgba(228,92,255,0.22)] hover:bg-[#f19bff]"
             >
               {isPending ? 'Confirmando...' : 'Reclamar UKI disponible'}
             </Button>
@@ -271,7 +271,7 @@ export default function PublicVestingPage() {
               href={getBscScanTxUrl(claimTxHash)}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-[8px] border border-[var(--uki-cyan)]/25 bg-[var(--uki-cyan)]/10 px-3 py-2 text-sm font-bold text-[var(--uki-cyan)] hover:bg-[var(--uki-cyan)]/15"
+              className="mt-4 inline-flex items-center gap-2 rounded-[8px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 px-3 py-2 text-sm font-bold text-[var(--uki-lilac)] hover:bg-[var(--uki-lilac)]/15"
             >
               Transacción de reclamación enviada
               <ExternalLink className="h-3.5 w-3.5" />
@@ -279,15 +279,15 @@ export default function PublicVestingPage() {
           ) : null}
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[220px_1fr]">
-            <div className="flex aspect-square items-center justify-center rounded-[14px] border border-[var(--uki-cyan)]/22 bg-[var(--uki-cyan)]/6">
+            <div className="flex aspect-square items-center justify-center rounded-[14px] border border-[var(--uki-lilac)]/22 bg-[var(--uki-lilac)]/6">
               <div className="text-center">
-                <div className="font-headline text-5xl font-black text-[var(--uki-cyan)]">{formatPercent(unlockProgress)}%</div>
+                <div className="font-headline text-5xl font-black text-[var(--uki-lilac)]">{formatPercent(unlockProgress)}%</div>
                 <div className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--uki-muted)]">liberado</div>
               </div>
             </div>
             <div className="flex flex-col justify-center gap-5">
               <div className="h-3 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-gradient-to-r from-[var(--uki-cyan)] to-[#f2c34b]" style={{ width: `${Math.min(unlockProgress, 100)}%` }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-[var(--uki-lilac)] to-[#f2c34b]" style={{ width: `${Math.min(unlockProgress, 100)}%` }} />
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
@@ -311,7 +311,7 @@ export default function PublicVestingPage() {
           </div>
 
           {hasPosition ? (
-            <p className="mt-5 rounded-[10px] border border-[var(--uki-cyan)]/25 bg-[var(--uki-cyan)]/10 p-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+            <p className="mt-5 rounded-[10px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 p-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
               Esta cartera tiene <strong className="text-[var(--uki-cream)]">{formatToken(totalAmount)} UKI</strong> asignados. Los <strong className="text-[var(--uki-cream)]">{formatToken(claimableAmount)} UKI</strong> disponibles ahora son solo la parte reclamable según el calendario lineal.
             </p>
           ) : isConfigured && isConnected && !hasWalletReadError ? (
@@ -321,7 +321,7 @@ export default function PublicVestingPage() {
           ) : null}
         </div>
 
-        <aside className="rounded-[14px] border border-[var(--uki-cyan)]/18 bg-[#0d0b24]/82 p-5 shadow-[0_0_36px_rgba(228,92,255,0.07)]">
+        <aside className="rounded-[14px] border border-[var(--uki-lilac)]/18 bg-[#0d0b24]/82 p-5 shadow-[0_0_36px_rgba(228,92,255,0.07)]">
           <h2 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">Qué pasa después de comprar</h2>
           <div className="mt-4 space-y-3">
             {[
@@ -331,7 +331,7 @@ export default function PublicVestingPage() {
               ['4', 'Reclamación disponible', 'Usa esta pantalla para liberar los UKI desbloqueados a la cartera conectada.'],
             ].map(([step, title, body]) => (
               <div key={step} className="grid grid-cols-[2rem_1fr] gap-3 rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[var(--uki-cyan)] text-sm font-black text-white">{step}</div>
+                <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[var(--uki-lilac)] text-sm font-black text-white">{step}</div>
                 <div>
                   <p className="font-bold text-[var(--uki-cream)]">{title}</p>
                   <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{body}</p>

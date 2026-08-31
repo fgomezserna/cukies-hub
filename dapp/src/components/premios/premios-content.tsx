@@ -323,7 +323,7 @@ export function PremiosContent() {
         <ScrollReveal animation="up" duration={700} className="w-full">
             {!isConnected || !address ? (
               <div className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 p-5">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">
                   {copy.walletProgress.badge}
                 </p>
                 <h2 className="mt-1 max-w-3xl font-headline text-xl font-black uppercase leading-tight text-[var(--uki-cream)] sm:text-2xl">
@@ -345,7 +345,7 @@ export function PremiosContent() {
                 aria-live="polite"
                 className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 p-5"
               >
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">
                   {copy.walletProgress.badge}
                 </p>
                 <h2 className="mt-1 font-headline text-xl font-black uppercase text-[var(--uki-cream)] sm:text-2xl">
@@ -387,7 +387,7 @@ export function PremiosContent() {
             ) : totalPurchasedRaw !== undefined ? (
               <div className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 p-5 shadow-[0_0_32px_rgba(228,92,255,0.08)]">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">
                     {copy.walletProgress.badge}
                   </p>
                   <h2 className="mt-1 font-headline text-xl font-black uppercase text-[var(--uki-cream)] sm:text-2xl">
@@ -403,14 +403,14 @@ export function PremiosContent() {
 
                 <div className="mt-4 border-t border-white/[0.08] pt-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
+                    <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">
                       {readCopy.raffle}
                     </p>
                     {nextTier && nextTierDisplay ? (
                       <div className="text-left sm:text-right">
                         <p className="text-xs font-semibold text-[var(--uki-text)]">
                           {copy.walletProgress.needsPrefix}{' '}
-                          <strong className="text-[var(--uki-cyan)]">{formatUkiRawAmount(remainingForNextRaw, locale)} UKI</strong>{' '}
+                          <strong className="text-[var(--uki-lilac)]">{formatUkiRawAmount(remainingForNextRaw, locale)} UKI</strong>{' '}
                           {copy.walletProgress.needsSuffix}
                         </p>
                         <p className="mt-0.5 text-[0.68rem] font-bold uppercase text-[var(--uki-muted)]">
@@ -455,7 +455,7 @@ export function PremiosContent() {
       </section>
 
       <section className="uki-container relative z-[2] pb-12">
-        <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-4 shadow-[0_0_44px_rgba(228,92,255,0.06)] sm:p-6">
+        <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#070817]/82 p-4 shadow-[0_0_44px_rgba(228,92,255,0.06)] sm:p-6">
           <div className="grid gap-8 lg:grid-cols-[0.34fr_0.66fr]">
             <ScrollReveal animation="left" duration={800} className="flex flex-col justify-between gap-6">
               <div>
@@ -468,11 +468,11 @@ export function PremiosContent() {
                 </p>
               </div>
 
-              <div className="rounded-[10px] border border-[var(--uki-cyan)]/20 bg-[#0d0b24]/60 p-4">
-                <p className="text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">{copy.purchase.notesTitle}</p>
+              <div className="rounded-[10px] border border-[var(--uki-lilac)]/20 bg-[#0d0b24]/60 p-4">
+                <p className="text-sm font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">{copy.purchase.notesTitle}</p>
                 <ul className="mt-4 space-y-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                   <li className="flex gap-3">
-                    <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+                    <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" strokeWidth={1.8} />
                     <span>{copy.purchase.extraTickets}</span>
                   </li>
                   <li className="flex gap-3">
@@ -504,7 +504,7 @@ export function PremiosContent() {
                       } bg-gradient-to-r p-4 sm:p-5 relative overflow-hidden transition-all duration-300 ${
                         totalPurchasedRaw !== undefined && !isUnlocked && !isNext ? 'opacity-52 filter saturate-50' : ''
                       } ${isUnlocked ? 'border-[#e45cff]/50 bg-[#051a1a]/40 shadow-[0_0_20px_rgba(228,92,255,0.08)]' : ''} ${
-                        isNext ? 'border-dashed border-[var(--uki-cyan)]/60 shadow-[0_0_20px_rgba(228,92,255,0.1)]' : ''
+                        isNext ? 'border-dashed border-[var(--uki-lilac)]/60 shadow-[0_0_20px_rgba(228,92,255,0.1)]' : ''
                       }`}
                     >
                       {/* Fila 1: Monto, Tier badge y Estado */}
@@ -527,7 +527,7 @@ export function PremiosContent() {
                         {totalPurchasedRaw !== undefined && (
                           <div className="shrink-0 mt-1 sm:mt-0">
                             {isUnlocked ? (
-                              <span className="inline-flex items-center gap-1.5 text-[0.68rem] text-[var(--uki-cyan)] font-bold bg-[#e45cff]/10 border border-[#e45cff]/30 px-2.5 py-1 rounded-[6px]">
+                              <span className="inline-flex items-center gap-1.5 text-[0.68rem] text-[var(--uki-lilac)] font-bold bg-[#e45cff]/10 border border-[#e45cff]/30 px-2.5 py-1 rounded-[6px]">
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                 {copy.purchase.achieved}
                               </span>
@@ -548,7 +548,7 @@ export function PremiosContent() {
 
                       {/* Fila 2: Premio y descripción */}
                       <div className="flex items-start gap-3">
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)] border border-[var(--uki-cyan)]/20">
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)] border border-[var(--uki-lilac)]/20">
                           <Gift className="h-4 w-4" />
                         </div>
                         <div>
@@ -655,7 +655,7 @@ export function PremiosContent() {
 
       <section id="progreso-referidos" className="uki-container relative z-[2] scroll-mt-28 pb-14">
         <ScrollReveal animation="scale" className="w-full">
-          <div className="rounded-[14px] border border-[var(--uki-cyan)]/25 bg-[#070817]/82 p-4 shadow-[0_0_48px_rgba(228,92,255,0.08)] sm:p-6">
+          <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#070817]/82 p-4 shadow-[0_0_48px_rgba(228,92,255,0.08)] sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[0.36fr_0.64fr]">
               <div>
                 <p className="uki-launch-badge">{copy.referralProgress.badge}</p>
@@ -714,7 +714,7 @@ function RulePanel({
   return (
     <article className="rounded-[10px] border border-white/10 bg-[#09091a]/82 p-4">
       <div className="flex items-center gap-3">
-        <Icon className="h-6 w-6 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+        <Icon className="h-6 w-6 text-[var(--uki-lilac)]" strokeWidth={1.8} />
         <h3 className="font-headline text-base font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">{title}</h3>
       </div>
       <div className="mt-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">{children}</div>

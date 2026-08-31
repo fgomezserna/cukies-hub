@@ -240,7 +240,7 @@ export default function TreasureHuntHistoryView() {
           id="competition-archive"
           value={selectedCampaignId ?? ''}
           onChange={(event) => handleCampaignChange(event.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[6px] border border-white/20 bg-[#071312] px-3 text-sm font-bold text-[#f2eee7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
+          className="mt-2 min-h-11 w-full rounded-[6px] border border-white/20 bg-[#0d0914] px-3 text-sm font-bold text-[#f2eee7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
         >
           {archives.map((item) => (
             <option key={item.campaignId} value={item.campaignId}>
@@ -300,7 +300,7 @@ export default function TreasureHuntHistoryView() {
               ['Entradas', archive.totalRankedEntries.toLocaleString('es-ES')],
               ['Participantes', archive.totalParticipants?.toLocaleString('es-ES') ?? '—'],
             ] as const).map(([label, value]) => (
-              <div key={label} className="min-w-0 bg-[#071312] px-4 py-3 sm:px-5 sm:py-4">
+              <div key={label} className="min-w-0 bg-[#0d0914] px-4 py-3 sm:px-5 sm:py-4">
                 <dt className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#969994]">{label}</dt>
                 <dd className="mt-1 truncate font-mono text-base font-black text-[#35eee2] sm:text-lg" title={value}>
                   {value}

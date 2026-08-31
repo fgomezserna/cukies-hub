@@ -73,7 +73,7 @@ function InactiveRow({
     <div
       role="group"
       aria-disabled="true"
-      className="grid min-h-[98px] grid-cols-[6.5rem_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-white/20 bg-[#071211]/88 text-[#aaa9a4] sm:grid-cols-[7.75rem_minmax(0,1fr)_15rem]"
+      className="grid min-h-[98px] grid-cols-[6.5rem_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-white/20 bg-[#0d0914]/88 text-[#aaa9a4] sm:grid-cols-[7.75rem_minmax(0,1fr)_15rem]"
     >
       <div className="flex items-center justify-center bg-[radial-gradient(circle,rgba(184,189,185,0.12),transparent_68%)]">
         <span className="inline-flex h-[70px] w-[70px] items-center justify-center rounded-full border border-white/10 bg-[#111b19] text-[#777d79] shadow-[inset_0_0_20px_rgba(255,255,255,0.04)]">
@@ -136,7 +136,7 @@ export default function TreasureHuntCompetitionsView() {
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_270px]">
         <main className="space-y-3">
-          <article className="overflow-hidden rounded-[8px] border border-[#be8c2d]/75 bg-[#071211]/94 shadow-[0_20px_60px_-42px_rgba(213,157,43,0.8)]">
+          <article className="overflow-hidden rounded-[8px] border border-[#be8c2d]/75 bg-[#0d0914]/94 shadow-[0_20px_60px_-42px_rgba(213,157,43,0.8)]">
             <div className="grid min-h-[210px] sm:grid-cols-[220px_minmax(0,1fr)]">
               <div className="relative min-h-[170px] overflow-hidden border-b border-[#be8c2d]/45 sm:min-h-0 sm:border-b-0 sm:border-r">
                 <Image
@@ -224,7 +224,7 @@ export default function TreasureHuntCompetitionsView() {
           ))}
         </main>
 
-        <aside className="rounded-[8px] border border-white/20 bg-[#071211]/92 p-4">
+        <aside className="rounded-[8px] border border-white/20 bg-[#0d0914]/92 p-4">
           <h3 className="flex items-center gap-2 font-headline text-lg font-bold text-[#f1dfbe]">
             <BarChart3 className="h-5 w-5 text-[#edc27a]" />
             Tus competiciones
@@ -260,7 +260,7 @@ export default function TreasureHuntCompetitionsView() {
         </aside>
       </div>
 
-      <details className="mt-5 rounded-[8px] border border-white/15 bg-[#071211]/80">
+      <details className="mt-5 rounded-[8px] border border-white/15 bg-[#0d0914]/80">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[#35eee2]">
           Administrar nombre y participación
         </summary>

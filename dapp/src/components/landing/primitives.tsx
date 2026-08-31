@@ -44,14 +44,14 @@ export function SectionHeading({
   title: ReactNode;
   subtitle?: string;
   align?: 'left' | 'center';
-  tone?: 'cream' | 'cyan';
+  tone?: 'cream' | 'lilac';
   withRule?: boolean;
   className?: string;
 }) {
   return (
     <div className={`${align === 'center' ? 'mx-auto max-w-3xl text-center' : 'max-w-3xl'} ${className}`}>
       {eyebrow ? <p className="uki-eyebrow">{eyebrow}</p> : null}
-      <h2 className={`uki-section-title ${tone === 'cyan' ? 'uki-section-title-cyan' : ''}`}>
+      <h2 className={`uki-section-title ${tone === 'lilac' ? 'uki-section-title-lilac' : ''}`}>
         <span>{title}</span>
         {withRule ? <span className="uki-heading-rule" aria-hidden="true" /> : null}
       </h2>
@@ -91,7 +91,7 @@ export function MetricTile({
 }) {
   return (
     <article className="uki-metric-tile">
-      <Icon className="h-9 w-9 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+      <Icon className="h-9 w-9 text-[var(--uki-lilac)]" strokeWidth={1.8} />
       <div>
         <p className="uki-label">{label}</p>
         <p className="mt-1 font-headline text-lg font-black uppercase leading-tight text-[var(--uki-cream)]">{value}</p>
@@ -103,15 +103,15 @@ export function MetricTile({
 
 export function TokenCoin({
   label,
-  tone = 'cyan',
+  tone = 'lilac',
   size = 'md',
 }: {
   label: string;
-  tone?: 'cyan' | 'gold' | 'purple' | 'bsc';
+  tone?: 'lilac' | 'gold' | 'purple' | 'bsc';
   size?: 'sm' | 'md' | 'lg';
 }) {
   const toneClass = {
-    cyan: 'uki-token-cyan',
+    lilac: 'uki-token-lilac',
     gold: 'uki-token-gold',
     purple: 'uki-token-purple',
     bsc: 'uki-token-bsc',

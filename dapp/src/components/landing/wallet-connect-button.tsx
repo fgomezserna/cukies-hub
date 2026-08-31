@@ -273,7 +273,7 @@ export function WalletStatusLabel() {
 
   if (!isConnected && isTronConnected && tronAddress) {
     return isSameWalletAddress(user?.walletAddress, tronAddress) ? (
-      <span className="text-[var(--uki-cyan)]">{shortAddress(tronAddress)}</span>
+      <span className="text-[var(--uki-lilac)]">{shortAddress(tronAddress)}</span>
     ) : (
       <span className="text-[#ffcc6d]">Firma requerida</span>
     );
@@ -295,7 +295,7 @@ export function WalletStatusLabel() {
     return <span className="text-[#ffcc6d]">Firma requerida</span>;
   }
 
-  return <span className="text-[var(--uki-cyan)]">{shortAddress(address)}</span>;
+  return <span className="text-[var(--uki-lilac)]">{shortAddress(address)}</span>;
 }
 
 export function WalletStateCallout() {

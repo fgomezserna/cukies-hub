@@ -130,7 +130,7 @@ export function WalletConnectorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] border border-[var(--uki-cyan-border)] bg-[#070817] p-4 text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.18)] sm:max-w-md">
+      <DialogContent className="max-w-[92vw] border border-[var(--uki-lilac-border)] bg-[#070817] p-4 text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.18)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-headline text-xl font-black uppercase tracking-[0.04em] text-[var(--uki-cream)]">
             {title}
@@ -146,9 +146,9 @@ export function WalletConnectorDialog({
               type="button"
               disabled={isBusy}
               onClick={() => void handleDialogAction(currentWalletAction, 'current-wallet-action')}
-              className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-[var(--uki-cyan)]/35 bg-[var(--uki-cyan)]/10 px-3 py-2 text-left transition hover:border-[var(--uki-cyan)]/55 hover:bg-[var(--uki-cyan)]/15 disabled:cursor-not-allowed disabled:opacity-55"
+              className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 px-3 py-2 text-left transition hover:border-[var(--uki-lilac)]/55 hover:bg-[var(--uki-lilac)]/15 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-cyan)]/30 bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]">
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
                 <ShieldAlert className="h-5 w-5" strokeWidth={1.8} />
               </span>
               <span>
@@ -160,7 +160,7 @@ export function WalletConnectorDialog({
                 </span>
               </span>
               {selectedId === 'current-wallet-action' || currentWalletAction.isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" />
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" />
               ) : null}
             </button>
           ) : null}
@@ -198,9 +198,9 @@ export function WalletConnectorDialog({
                 type="button"
                 disabled={isBusy}
                 onClick={() => void handleSelectConnector(connector)}
-                className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-[var(--uki-cyan)]/45 hover:bg-[var(--uki-cyan)]/10 disabled:cursor-not-allowed disabled:opacity-55"
+                className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-[var(--uki-lilac)]/45 hover:bg-[var(--uki-lilac)]/10 disabled:cursor-not-allowed disabled:opacity-55"
               >
-              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-cyan)]/25 bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]">
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
                 <ConnectorIcon connector={connector} />
                 </span>
                 <span>
@@ -211,7 +211,7 @@ export function WalletConnectorDialog({
                     {getConnectorDescription(connector)}
                   </span>
                 </span>
-                {isSelected ? <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" /> : null}
+                {isSelected ? <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" /> : null}
               </button>
             );
           })}
@@ -221,9 +221,9 @@ export function WalletConnectorDialog({
               type="button"
               disabled={isBusy || !tronLinkNative.isInstalled}
               onClick={() => void handleSelectTronLinkNative()}
-              className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-[var(--uki-cyan)]/45 hover:bg-[var(--uki-cyan)]/10 disabled:cursor-not-allowed disabled:opacity-55"
+              className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-[var(--uki-lilac)]/45 hover:bg-[var(--uki-lilac)]/10 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-cyan)]/25 bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]">
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
                 <TronLinkLogo />
               </span>
               <span>
@@ -235,7 +235,7 @@ export function WalletConnectorDialog({
                 </span>
               </span>
               {selectedId === 'tronlink-native' || tronLinkNative.isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" />
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" />
               ) : null}
             </button>
           ) : null}

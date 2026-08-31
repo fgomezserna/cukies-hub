@@ -9,7 +9,7 @@ export function SaleConsole() {
   return (
     <Panel id="presale-console" className="uki-sale-console" innerClassName="p-3">
       <div className="text-center">
-        <p className="font-headline text-xl font-black uppercase tracking-[0.12em] text-[var(--uki-cyan)]">
+        <p className="font-headline text-xl font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">
             Preventa UKI
         </p>
         <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[var(--uki-muted)]">

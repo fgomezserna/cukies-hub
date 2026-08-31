@@ -212,7 +212,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-      <Icon className="mb-3 h-4 w-4 text-cyan-200" />
+      <Icon className="mb-3 h-4 w-4 text-lilac-200" />
       <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 font-semibold text-white">{value}</p>
     </div>
@@ -237,9 +237,9 @@ function RelationCard({
   return (
     <Link
       href={`/marketplace/${relation.tokenId}`}
-      className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-cyan-300/35 hover:bg-cyan-300/10"
+      className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#071211]">
+      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
         <CukiImage
           src={relation.imageUrl}
           alt={`Cukie ${relation.tokenId}`}
@@ -301,7 +301,7 @@ export default async function MarketplaceDetailPage({
             href={explorerUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/20"
+            className="inline-flex items-center gap-2 rounded-[8px] border border-lilac-300/25 bg-lilac-300/10 px-3 py-2 text-sm font-semibold text-lilac-100 transition hover:bg-lilac-300/20"
           >
             Explorer
             <ExternalLink className="h-4 w-4" />
@@ -312,7 +312,7 @@ export default async function MarketplaceDetailPage({
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,420px)_minmax(0,1fr)]">
         <div className="grid min-w-0 content-start gap-5">
           <section className="min-w-0 overflow-hidden rounded-[8px] border border-white/10 bg-black/35 shadow-2xl shadow-black/25">
-            <div className="relative aspect-[4/5] min-h-[30rem] bg-[#071211]">
+            <div className="relative aspect-[4/5] min-h-[30rem] bg-[#0d0914]">
               <CukiImage
                 src={cuki.imageUrl}
                 alt={getCukiDisplayName(cuki)}
@@ -326,8 +326,8 @@ export default async function MarketplaceDetailPage({
         </div>
 
         <section className="grid min-w-0 content-start gap-5">
-          <div className="rounded-[8px] border border-cyan-300/20 bg-black/35 p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+          <div className="rounded-[8px] border border-lilac-300/20 bg-black/35 p-5 shadow-2xl shadow-lilac-950/20 backdrop-blur">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-lilac-300/25 bg-lilac-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-lilac-100">
               <Network className="h-3.5 w-3.5" />
               {cuki.network} · {getStateLabel(cuki.state)}
             </div>
@@ -347,7 +347,7 @@ export default async function MarketplaceDetailPage({
 
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
             <div className="mb-2 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-cyan-200" />
+              <Activity className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
                 General info
               </h2>
@@ -370,7 +370,7 @@ export default async function MarketplaceDetailPage({
 
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
             <div className="mb-4 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-cyan-200" />
+              <Zap className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
                 Skills
               </h2>
@@ -388,13 +388,13 @@ export default async function MarketplaceDetailPage({
                       <span className="text-sm font-semibold text-white">
                         {label}
                       </span>
-                      <span className="font-mono text-sm text-cyan-100">
+                      <span className="font-mono text-sm text-lilac-100">
                         {value}
                       </span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-cyan-300"
+                        className="h-full rounded-full bg-lilac-300"
                         style={{ width: `${Math.min(Number(value) * 20, 100)}%` }}
                       />
                     </div>
@@ -434,7 +434,7 @@ export default async function MarketplaceDetailPage({
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-cyan-200" />
+                <Users className="h-5 w-5 text-lilac-200" />
                 <h2 className="font-headline text-2xl font-bold text-white">
                   Family
                 </h2>
@@ -476,7 +476,7 @@ export default async function MarketplaceDetailPage({
 
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
             <div className="mb-4 flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-cyan-200" />
+              <BookOpen className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
                 History
               </h2>
@@ -506,7 +506,7 @@ export default async function MarketplaceDetailPage({
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         {item.network && (
-                          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 font-semibold text-cyan-100">
+                          <span className="rounded-full border border-lilac-300/20 bg-lilac-300/10 px-2.5 py-1 font-semibold text-lilac-100">
                             {item.network}
                           </span>
                         )}
@@ -520,7 +520,7 @@ export default async function MarketplaceDetailPage({
                             href={transactionUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-slate-300 transition hover:border-cyan-300/30 hover:text-white"
+                            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-slate-300 transition hover:border-lilac-300/30 hover:text-white"
                           >
                             Tx {shortTransaction(item.transactionId)}
                             <ExternalLink className="h-3 w-3" />
@@ -540,7 +540,7 @@ export default async function MarketplaceDetailPage({
 
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
             <div className="mb-3 flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-cyan-200" />
+              <Wallet className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
                 Marketplace data
               </h2>

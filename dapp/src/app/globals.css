@@ -338,12 +338,12 @@ body {
     --uki-cream: #fff2dc;
     --uki-text: rgba(255, 242, 220, 0.78);
     --uki-muted: rgba(255, 242, 220, 0.52);
-    --uki-cyan: #e45cff;
-    --uki-cyan-soft: rgba(228, 92, 255, 0.11);
-    --uki-cyan-border: rgba(228, 92, 255, 0.22);
+    --uki-lilac: #e45cff;
+    --uki-lilac-soft: rgba(228, 92, 255, 0.11);
+    --uki-lilac-border: rgba(228, 92, 255, 0.22);
     --uki-gold: #f2c34b;
-    --uki-cyan-strong: #e45cff;
-    --uki-cyan-border-strong: rgba(228, 92, 255, 0.28);
+    --uki-lilac-strong: #e45cff;
+    --uki-lilac-border-strong: rgba(228, 92, 255, 0.28);
     --uki-ease: cubic-bezier(0.32, 0.72, 0, 1);
     position: relative;
     font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
@@ -351,11 +351,11 @@ body {
     background:
       radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), transparent 25rem),
       radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), transparent 22rem),
-      linear-gradient(180deg, #04111a 0%, #04030a 48%, #010608 100%);
+      linear-gradient(180deg, #0b0810 0%, #04030a 48%, #07030a 100%);
   }
 
   .uki-landing :where(a, button, input, select, summary):focus-visible {
-    outline: 2px solid var(--uki-cyan);
+    outline: 2px solid var(--uki-lilac);
     outline-offset: 3px;
   }
 
@@ -430,15 +430,15 @@ body {
   }
 
   .uki-nav-link:hover {
-    border-color: var(--uki-cyan);
-    color: var(--uki-cyan);
+    border-color: var(--uki-lilac);
+    color: var(--uki-lilac);
     text-shadow: 0 0 14px rgba(228, 92, 255, 0.32);
     transform: translateY(-1px);
   }
 
   .uki-nav-link.is-active {
-    border-color: var(--uki-cyan);
-    color: var(--uki-cyan);
+    border-color: var(--uki-lilac);
+    color: var(--uki-lilac);
     text-shadow: 0 0 14px rgba(228, 92, 255, 0.32);
   }
 
@@ -471,7 +471,7 @@ body {
 
   .uki-language-switcher button:hover,
   .uki-language-switcher button.is-active {
-    background: var(--uki-cyan);
+    background: var(--uki-lilac);
     color: #04030a;
     box-shadow: 0 0 16px rgba(228, 92, 255, 0.18);
   }
@@ -494,7 +494,7 @@ body {
     border: 1px solid rgba(228, 92, 255, 0.78);
     background: rgba(2, 16, 21, 0.34);
     padding-inline: 1rem;
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
     cursor: pointer;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -568,8 +568,8 @@ body {
     margin-top: 1rem;
   }
 
-  .uki-section-title-cyan {
-    color: var(--uki-cyan);
+  .uki-section-title-lilac {
+    color: var(--uki-lilac);
     font-size: clamp(1.55rem, 2.25vw, 2.35rem);
     letter-spacing: 0;
     text-shadow:
@@ -645,8 +645,8 @@ body {
     bottom: -1px;
     height: clamp(16rem, 29vh, 23rem);
     background:
-      linear-gradient(180deg, rgba(2, 9, 13, 0) 0%, rgba(3, 14, 20, 0.5) 42%, #04111a 100%),
-      linear-gradient(90deg, #04111a 0%, rgba(4, 17, 26, 0.72) 16%, rgba(4, 17, 26, 0) 42%, rgba(4, 17, 26, 0) 58%, rgba(4, 17, 26, 0.72) 84%, #04111a 100%),
+      linear-gradient(180deg, rgba(2, 9, 13, 0) 0%, rgba(3, 14, 20, 0.5) 42%, #0b0810 100%),
+      linear-gradient(90deg, #0b0810 0%, rgba(4, 17, 26, 0.72) 16%, rgba(4, 17, 26, 0) 42%, rgba(4, 17, 26, 0) 58%, rgba(4, 17, 26, 0.72) 84%, #0b0810 100%),
       radial-gradient(ellipse at 50% 0%, rgba(228, 92, 255, 0.08), transparent 68%);
   }
 
@@ -686,8 +686,8 @@ body {
     inset: 0;
     z-index: 1;
     background:
-      linear-gradient(90deg, #04111a 0%, rgba(4, 17, 26, 0.86) 14%, rgba(2, 9, 13, 0.68) 25%, rgba(2, 9, 13, 0.04) 55%, rgba(2, 9, 13, 0.58) 76%, rgba(4, 17, 26, 0.88) 88%, #04111a 100%),
-      linear-gradient(0deg, #04111a 0%, rgba(3, 14, 20, 0.84) 18%, rgba(2, 9, 13, 0.42) 38%, transparent 58%, rgba(2, 9, 13, 0.18) 100%);
+      linear-gradient(90deg, #0b0810 0%, rgba(4, 17, 26, 0.86) 14%, rgba(2, 9, 13, 0.68) 25%, rgba(2, 9, 13, 0.04) 55%, rgba(2, 9, 13, 0.58) 76%, rgba(4, 17, 26, 0.88) 88%, #0b0810 100%),
+      linear-gradient(0deg, #0b0810 0%, rgba(3, 14, 20, 0.84) 18%, rgba(2, 9, 13, 0.42) 38%, transparent 58%, rgba(2, 9, 13, 0.18) 100%);
   }
 
   .uki-hero-sale-sign {
@@ -704,7 +704,7 @@ body {
       linear-gradient(180deg, rgba(72, 24, 104, 0.94), rgba(28, 12, 42, 0.96)),
       rgba(28, 12, 42, 0.96);
     padding: 0.72rem 1.1rem 0.86rem;
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
     font-family: var(--font-display), var(--font-space-grotesk), sans-serif;
     font-size: 1.55rem;
     font-weight: 400;
@@ -767,7 +767,7 @@ body {
   }
 
   .uki-button-primary {
-    background: var(--uki-cyan);
+    background: var(--uki-lilac);
     color: #04030a;
   }
 
@@ -780,7 +780,7 @@ body {
   .uki-button-ghost {
     border: 1px solid rgba(228, 92, 255, 0.42);
     background: rgba(228, 92, 255, 0.08);
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
   }
 
   .uki-button-icon {
@@ -861,7 +861,7 @@ body {
 
   .uki-countdown-box {
     border-radius: 8px;
-    border: 1px solid var(--uki-cyan-border);
+    border: 1px solid var(--uki-lilac-border);
     background:
       radial-gradient(circle at 50% 0%, rgba(228, 92, 255, 0.08), transparent 66%),
       #071b22;
@@ -951,7 +951,7 @@ body {
   .uki-state-callout-loading svg,
   .uki-state-callout-locked svg,
   .uki-state-callout-ready svg {
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
   }
 
   .uki-state-callout-warning svg {
@@ -964,7 +964,7 @@ body {
     gap: 0.75rem;
     min-height: 3rem;
     border-radius: 7px;
-    border: 1px solid var(--uki-cyan-border-strong);
+    border: 1px solid var(--uki-lilac-border-strong);
     background: rgba(6, 28, 25, 0.58);
     padding: 0.55rem 0.7rem;
     transition: transform 420ms var(--uki-ease), border-color 420ms var(--uki-ease), background-color 420ms var(--uki-ease);
@@ -1058,7 +1058,7 @@ body {
 
   .uki-token-official-uki {
     padding: 0.16rem;
-    background: radial-gradient(circle at 50% 28%, rgba(68, 237, 214, 0.24), rgba(10, 32, 32, 0.88));
+    background: radial-gradient(circle at 50% 28%, rgba(228, 92, 255, 0.24), rgba(10, 32, 32, 0.88));
   }
 
   .uki-conversion-arrow {
@@ -1069,7 +1069,7 @@ body {
     border-radius: 999px;
     border: 1px solid rgba(228, 92, 255, 0.42);
     background: rgba(228, 92, 255, 0.08);
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       0 0 18px rgba(228, 92, 255, 0.16);
@@ -1133,7 +1133,7 @@ body {
     font-size: 2rem;
     font-weight: 900;
     line-height: 0.9;
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
     text-transform: uppercase;
   }
 
@@ -1184,7 +1184,7 @@ body {
     transform: translateY(-2px);
   }
 
-  .uki-metric-tile:nth-child(3n + 1) svg { color: var(--uki-cyan); }
+  .uki-metric-tile:nth-child(3n + 1) svg { color: var(--uki-lilac); }
   .uki-metric-tile:nth-child(3n + 2) svg { color: var(--uki-gold); }
   .uki-metric-tile:nth-child(3n) svg { color: #f19bff; }
 
@@ -1203,8 +1203,8 @@ body {
     flex-shrink: 0;
     place-items: center;
     border-radius: 999px;
-    border: 1px solid var(--uki-cyan);
-    color: var(--uki-cyan);
+    border: 1px solid var(--uki-lilac);
+    color: var(--uki-lilac);
     font-size: 1rem;
     font-weight: 900;
   }
@@ -1217,15 +1217,15 @@ body {
 
   .uki-buy-asm-card .uki-panel-core {
     background:
-      radial-gradient(circle at 8% 0%, rgba(68, 237, 214, 0.18), transparent 34%),
+      radial-gradient(circle at 8% 0%, rgba(228, 92, 255, 0.18), transparent 34%),
       linear-gradient(135deg, rgba(19, 10, 31, 0.92), rgba(8, 35, 34, 0.84));
   }
 
   .uki-step-number-featured {
     height: 2.6rem;
     width: 2.6rem;
-    background: rgba(68, 237, 214, 0.1);
-    box-shadow: 0 0 22px rgba(68, 237, 214, 0.22);
+    background: rgba(228, 92, 255, 0.1);
+    box-shadow: 0 0 22px rgba(228, 92, 255, 0.22);
   }
 
   .uki-buy-steps > article {
@@ -1249,7 +1249,7 @@ body {
     height: 1.5rem;
     width: 1.5rem;
     transform: translateY(-50%);
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
   }
 
   .uki-token-coin {
@@ -1284,7 +1284,7 @@ body {
     font-size: 2rem;
   }
 
-  .uki-token-cyan {
+  .uki-token-lilac {
     background: radial-gradient(circle at 32% 26%, #b9fff6, #e45cff 46%, #3d1460 100%);
   }
 
@@ -1369,8 +1369,8 @@ body {
   }
 
   .uki-social-link:hover {
-    border-color: var(--uki-cyan);
-    color: var(--uki-cyan);
+    border-color: var(--uki-lilac);
+    color: var(--uki-lilac);
     transform: translateY(-1px);
   }
 
@@ -1576,7 +1576,7 @@ body {
   .uki-node-mint { color: #f19bff; background: linear-gradient(135deg, rgba(72, 24, 104, 0.72), rgba(22, 12, 38, 0.68)); }
   .uki-node-gold { color: #ffd97a; background: linear-gradient(135deg, rgba(58, 42, 16, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-lavender { color: #dfc6ff; background: linear-gradient(135deg, rgba(60, 30, 96, 0.74), rgba(22, 12, 38, 0.68)); }
-  .uki-node-cyan { color: #f19bff; background: linear-gradient(135deg, rgba(72, 24, 104, 0.76), rgba(6, 16, 22, 0.68)); }
+  .uki-node-lilac { color: #f19bff; background: linear-gradient(135deg, rgba(72, 24, 104, 0.76), rgba(6, 16, 22, 0.68)); }
   .uki-node-violet { color: #c7a6ff; background: linear-gradient(135deg, rgba(46, 24, 75, 0.76), rgba(22, 12, 38, 0.68)); }
   .uki-node-red { color: #ffb0bf; background: linear-gradient(135deg, rgba(59, 20, 32, 0.76), rgba(6, 16, 22, 0.68)); }
 
@@ -1860,7 +1860,7 @@ body {
     width: 0.9rem;
     border-radius: 999px;
     background:
-      radial-gradient(circle, var(--uki-cyan) 0 32%, rgba(228, 92, 255, 0.24) 33% 64%, transparent 65%);
+      radial-gradient(circle, var(--uki-lilac) 0 32%, rgba(228, 92, 255, 0.24) 33% 64%, transparent 65%);
     box-shadow: 0 0 18px rgba(228, 92, 255, 0.36);
     transform: translateX(-50%);
     transition: transform 720ms var(--uki-ease);
@@ -1886,7 +1886,7 @@ body {
   }
 
   .uki-timeline-card.is-active {
-    border-color: var(--uki-cyan);
+    border-color: var(--uki-lilac);
     background: rgba(8, 42, 50, 0.7);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -1947,7 +1947,7 @@ body {
     width: fit-content;
     border-bottom: 1px solid currentColor;
     padding-bottom: 0.34rem;
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
     font-family: var(--font-headline), var(--font-space-grotesk), sans-serif;
     font-size: clamp(0.95rem, 1.12vw, 1.18rem);
     font-weight: 900;
@@ -2599,7 +2599,7 @@ body {
       radial-gradient(circle at 45% 38%, #fff 0 7%, transparent 8%),
       radial-gradient(circle at 66% 38%, #fff 0 7%, transparent 8%),
       radial-gradient(circle at 54% 64%, rgba(2, 9, 13, 0.72) 0 10%, transparent 11%),
-      radial-gradient(circle at 50% 50%, var(--uki-cyan), #7f55ff 72%);
+      radial-gradient(circle at 50% 50%, var(--uki-lilac), #7f55ff 72%);
     box-shadow: 0 0 16px rgba(174, 106, 255, 0.35);
   }
 
@@ -2802,7 +2802,7 @@ body {
     border-radius: 999px;
     border: 1px solid rgba(255, 242, 220, 0.18);
     background: rgba(2, 9, 13, 0.68);
-    color: var(--uki-cyan);
+    color: var(--uki-lilac);
     backdrop-filter: blur(12px);
   }
 
@@ -2828,8 +2828,7 @@ body {
     z-index: 0;
   }
 
-  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #d953ff, transparent); }
-  .uki-future-cyan .uki-panel-core::after { background: linear-gradient(0deg, #e45cff, transparent); }
+  .uki-future-lilac .uki-panel-core::after { background: linear-gradient(0deg, #e45cff, transparent); }
   .uki-future-gold .uki-panel-core::after { background: linear-gradient(0deg, #f5c34d, transparent); }
   .uki-future-vault .uki-panel-core::after { background: linear-gradient(0deg, #ffbd4b, transparent); }
 
