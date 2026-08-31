@@ -205,7 +205,7 @@ describe('CukiePoolStatusPanel', () => {
     render(<CukiePoolStatusPanel />);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Conecta y autentica tu wallet EVM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Conecta tu wallet para depositar o recuperar Cukies/i)).toBeInTheDocument();
     expect(screen.getByText('Recuperación de emergencia')).toBeInTheDocument();
   });
 
@@ -429,8 +429,7 @@ describe('CukiePoolStatusPanel', () => {
 
     expect(await screen.findByText('Próximo corte y activación')).toBeInTheDocument();
     expect(screen.getByText(/15 ago 2026, 18:30 UTC/i)).toBeInTheDocument();
-    expect(screen.getByText('Calendario de depósito v7')).toBeInTheDocument();
-    expect(screen.queryByText(/Calendario de salida/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Calendario de depósito/i)).not.toBeInTheDocument();
   });
 
   it('shows the API withdrawal cutoff and the calendar version locked by the exit request', async () => {
@@ -459,8 +458,8 @@ describe('CukiePoolStatusPanel', () => {
     expect(await screen.findByText('Próximo corte y retirada')).toBeInTheDocument();
     expect(screen.getByText(/16 ago 2026, 21:45 UTC/i)).toBeInTheDocument();
     expect(screen.getByText(/Puede seguir prestándose hasta ese corte/i)).toBeInTheDocument();
-    expect(screen.getByText('Calendario de depósito v7')).toBeInTheDocument();
-    expect(screen.getByText('Calendario de salida v9')).toBeInTheDocument();
+    expect(screen.queryByText(/Calendario de depósito/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Calendario de salida/i)).not.toBeInTheDocument();
   });
 
   it('blocks every signature when API and client vault identities differ', async () => {
@@ -483,6 +482,6 @@ describe('CukiePoolStatusPanel', () => {
     render(<CukiePoolStatusPanel />);
 
     expect(await screen.findByRole('button', { name: /Solicitar salida/i })).toBeDisabled();
-    expect(screen.getByText(/configuración servida por la API no coincide/i)).toBeInTheDocument();
+    expect(screen.getByText(/El Pool de Cukies no está disponible ahora/i)).toBeInTheDocument();
   });
 });

@@ -43,7 +43,7 @@ describe('GET /api/dashboard/v1/summary', () => {
     process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID = '97';
     mockReadWalletSession.mockResolvedValue(session());
     mockFindUser.mockResolvedValue({ username: 'tester' });
-    mockGetDashboardSummary.mockResolvedValue({ schemaVersion: 'dashboard-staging-v1' } as never);
+    mockGetDashboardSummary.mockResolvedValue({ schemaVersion: 'dashboard-v1' } as never);
   });
 
   it('exige una sesión EVM firmada', async () => {
@@ -65,7 +65,7 @@ describe('GET /api/dashboard/v1/summary', () => {
     expect(mockFindUser).not.toHaveBeenCalled();
   });
 
-  it('falla cerrado fuera de Stage y chain 97', async () => {
+  it('falla cerrado cuando entorno y red no coinciden', async () => {
     process.env.NEXT_PUBLIC_UKI_CHAIN_ID = '56';
 
     const response = await GET();
@@ -90,7 +90,26 @@ describe('GET /api/dashboard/v1/summary', () => {
     });
     expect(await response.json()).toEqual({
       status: 'ok',
-      data: { schemaVersion: 'dashboard-staging-v1' },
+      data: { schemaVersion: 'dashboard-v1' },
+    });
+  });
+
+  it('usa el mismo endpoint y esquema en producción', async () => {
+    process.env.APP_ENV = 'production';
+    process.env.NEXT_PUBLIC_APP_ENV = 'production';
+    process.env.STAGING_ONLY_GUARD = 'false';
+    process.env.NEXT_PUBLIC_UKI_CHAIN_ID = '56';
+    process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID = '56';
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(mockGetDashboardSummary).toHaveBeenCalledWith(expect.objectContaining({
+      runtime: { environment: 'production', chainId: 56 },
+    }));
+    expect(await response.json()).toEqual({
+      status: 'ok',
+      data: { schemaVersion: 'dashboard-v1' },
     });
   });
 

@@ -115,7 +115,7 @@ function summary(overrides: Partial<DashboardSummary['modules']> = {}): Dashboar
       }]
   ));
   return {
-    schemaVersion: 'dashboard-staging-v1',
+    schemaVersion: 'dashboard-v1',
     generatedAt: '2026-08-30T12:00:00.000Z',
     overallState: alerts.length === 0 ? 'ready' : 'partial',
     identity: {
@@ -151,11 +151,11 @@ describe('DashboardOverviewPanel', () => {
 
     render(<DashboardOverviewPanel />);
 
-    expect(screen.getByText('Conecta y firma una wallet EVM')).toBeInTheDocument();
+    expect(screen.getAllByText('Conecta tu wallet').length).toBeGreaterThanOrEqual(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('consume una sola API agregada y muestra identidad, módulos y freshness', async () => {
+  it('consume una sola API agregada y muestra identidad, módulos y actualización', async () => {
     render(<DashboardOverviewPanel />);
 
     expect(await screen.findByText('tester')).toBeInTheDocument();
@@ -167,7 +167,7 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.getByText('0x1111…1111')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getAllByText(/Fuente: .* UTC/).length).toBeGreaterThanOrEqual(7);
+    expect(screen.getAllByText(/Actualizado/).length).toBeGreaterThanOrEqual(7);
   });
 
   it('conserva módulos válidos cuando otra fuente queda indisponible', async () => {
@@ -182,18 +182,18 @@ describe('DashboardOverviewPanel', () => {
 
     render(<DashboardOverviewPanel />);
 
-    expect(await screen.findByText('Lectura parcial')).toBeInTheDocument();
+    expect(await screen.findByText('Algunos datos no están disponibles')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getAllByText('No disponible').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Los demás módulos siguen siendo válidos/)).toBeInTheDocument();
+    expect(screen.getByText(/Puedes seguir usando el resto de tu cuenta/)).toBeInTheDocument();
   });
 
-  it('detecta la chain del navegador y permite cambiar a Testnet 97', async () => {
+  it('detecta la red del navegador y permite cambiar a la configurada', async () => {
     mockUseAccount.mockReturnValue({ chainId: 56, isConnected: true } as ReturnType<typeof useAccount>);
 
     render(<DashboardOverviewPanel />);
 
-    const button = await screen.findByRole('button', { name: 'Cambiar a chain 97' });
+    const button = await screen.findByRole('button', { name: 'Cambiar de red' });
     fireEvent.click(button);
     expect(switchChain).toHaveBeenCalledWith({ chainId: 97 });
   });
@@ -203,7 +203,7 @@ describe('DashboardOverviewPanel', () => {
 
     render(<DashboardOverviewPanel />);
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Dashboard no disponible'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora'));
     expect(screen.queryByText('200')).not.toBeInTheDocument();
   });
 
@@ -214,7 +214,7 @@ describe('DashboardOverviewPanel', () => {
 
     render(<DashboardOverviewPanel />);
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Dashboard no disponible'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora'));
     expect(screen.queryByText('200')).not.toBeInTheDocument();
   });
 });

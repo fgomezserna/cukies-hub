@@ -24,7 +24,7 @@ jest.mock('@/components/legacy-marketplace/marketplace-client', () => ({
 }));
 
 describe('separación del marketplace', () => {
-  it('presenta UKI como mercado principal y Legacy como sección independiente', () => {
+  it('presenta UKI como mercado principal y conserva el mercado anterior aparte', () => {
     render(<MarketplacePage />);
 
     expect(screen.getByTestId('uki-marketplace')).toBeInTheDocument();
@@ -34,10 +34,10 @@ describe('separación del marketplace', () => {
       'href',
       '#marketplace-uki',
     );
-    expect(screen.getByRole('link', { name: 'Marketplace Legacy' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Mercado anterior' })).toHaveAttribute(
       'href',
       '#marketplace-legacy',
     );
-    expect(screen.getByText('Marketplace Legacy · BNB y TRX')).toBeInTheDocument();
+    expect(screen.getByText('Mercado anterior · BNB y TRX')).toBeInTheDocument();
   });
 });

@@ -193,7 +193,7 @@ describe('zona vendedor marketplace UKI', () => {
     existingActiveOrder = true;
     render(<UkiMarketplaceSellerPanel />);
 
-    const cancelButton = await screen.findByRole('button', { name: 'Cancelar on-chain' });
+    const cancelButton = await screen.findByRole('button', { name: 'Cancelar anuncio' });
     fireEvent.click(cancelButton);
 
     await waitFor(() => {

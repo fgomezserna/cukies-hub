@@ -60,7 +60,7 @@ jest.mock('@/components/launch/info-page', () => ({
   ),
 }));
 jest.mock('@/components/landing/sale-config', () => ({
-  UKI_PRESALE_CHAIN_LABEL: 'BNB Smart Chain Testnet',
+  UKI_PRESALE_CHAIN_LABEL: 'BNB Smart Chain',
 }));
 
 describe('CukieMasterPage', () => {
@@ -82,7 +82,8 @@ describe('CukieMasterPage', () => {
     expect(container.querySelector('main')).toHaveAttribute('data-variant', 'workspace');
     expect(screen.getByText('Workspace personal')).toBeInTheDocument();
     expect(screen.getByText('Workspace personal')).toHaveAttribute('data-testnet-only', 'true');
-    expect(screen.getByText(/Área de pruebas · BNB Smart Chain Testnet/i)).toBeInTheDocument();
+    expect(screen.getByText('Tu acceso Cukie Master')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/Stage|Staging|Testnet|chain 97/i);
     expect(screen.getByRole('heading', { level: 1, name: 'Conviértete en Cukie Master' })).toBeInTheDocument();
     expect(screen.getByText(/20.000 UKI computables equivalen inicialmente a 1 Cukie Master/i)).toBeInTheDocument();
     expect(screen.getByText(/Capacidad inicial: 500/i)).toBeInTheDocument();
@@ -97,7 +98,6 @@ describe('CukieMasterPage', () => {
     expect(screen.getByText('¿Cuántos cupos de Cukie Master hay disponibles mediante UKI?')).toBeInTheDocument();
     expect(screen.getByText(/El requisito no sube automáticamente/i)).toBeInTheDocument();
     expect(screen.getByText(/no equivalen ni garantizan 100 UKI/i)).toBeInTheDocument();
-    expect(screen.getByText(/votaciones o gobernanza todavía no está habilitada/i)).toBeInTheDocument();
     expect(container).not.toHaveTextContent('La UI debe');
   });
 

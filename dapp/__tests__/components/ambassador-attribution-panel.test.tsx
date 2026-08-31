@@ -78,7 +78,7 @@ describe('AmbassadorAttributionPanel', () => {
 
     render(<AmbassadorAttributionPanel />);
 
-    expect(screen.getByText('Firma una wallet EVM')).toBeInTheDocument();
+    expect(screen.getByText('Conecta tu wallet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Conectar wallet' })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -93,7 +93,7 @@ describe('AmbassadorAttributionPanel', () => {
 
     const input = await screen.findByLabelText('Wallet de tu embajador');
     expect(input).toHaveValue(ambassador);
-    fireEvent.click(screen.getByRole('button', { name: 'Fijar embajador' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar embajador' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(fetchMock.mock.calls[1]).toEqual([
@@ -104,7 +104,7 @@ describe('AmbassadorAttributionPanel', () => {
         body: JSON.stringify({ ambassadorWalletAddress: ambassador }),
       }),
     ]);
-    expect(await screen.findByText('Atribución inmutable activa')).toBeInTheDocument();
+    expect(await screen.findByText('Embajador confirmado')).toBeInTheDocument();
     expect(screen.getByText('5% · 1 nivel')).toBeInTheDocument();
   });
 
@@ -113,9 +113,9 @@ describe('AmbassadorAttributionPanel', () => {
 
     render(<AmbassadorAttributionPanel />);
 
-    expect(await screen.findByText(/Sponsor conservado desde la preventa/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Embajador conservado desde la preventa/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Wallet de tu embajador')).not.toBeInTheDocument();
-    expect(screen.getByText('Atribución inmutable activa')).toBeInTheDocument();
+    expect(screen.getByText('Embajador confirmado')).toBeInTheDocument();
   });
 
   it('rechaza la autoatribución antes de llamar a la API', async () => {
@@ -125,7 +125,7 @@ describe('AmbassadorAttributionPanel', () => {
 
     const input = await screen.findByLabelText('Wallet de tu embajador');
     fireEvent.change(input, { target: { value: wallet } });
-    fireEvent.click(screen.getByRole('button', { name: 'Fijar embajador' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar embajador' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no puede asignarse a sí misma/i);
     expect(fetchMock).toHaveBeenCalledTimes(1);

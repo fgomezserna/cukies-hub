@@ -1,4 +1,4 @@
-import { assertDashboardStagingRuntime } from '@/lib/dashboard/runtime';
+import { assertDashboardRuntime } from '@/lib/dashboard/runtime';
 
 function environment(overrides: Record<string, string | undefined> = {}) {
   return {
@@ -11,23 +11,35 @@ function environment(overrides: Record<string, string | undefined> = {}) {
   };
 }
 
-describe('dashboard Stage runtime', () => {
-  it('acepta únicamente Stage aislado sobre BSC Testnet 97', () => {
-    expect(assertDashboardStagingRuntime(environment())).toEqual({
+describe('dashboard runtime', () => {
+  it('acepta staging aislado sobre BSC Testnet 97', () => {
+    expect(assertDashboardRuntime(environment())).toEqual({
       environment: 'staging',
       chainId: 97,
     });
   });
 
+  it('acepta producción sobre BSC Mainnet 56 con el mismo contrato de datos', () => {
+    expect(assertDashboardRuntime(environment({
+      APP_ENV: 'production',
+      NEXT_PUBLIC_APP_ENV: 'production',
+      STAGING_ONLY_GUARD: 'false',
+      NEXT_PUBLIC_UKI_CHAIN_ID: '56',
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '56',
+    }))).toEqual({
+      environment: 'production',
+      chainId: 56,
+    });
+  });
+
   it.each([
-    ['APP_ENV', 'production'],
     ['NEXT_PUBLIC_APP_ENV', 'production'],
     ['STAGING_ONLY_GUARD', 'false'],
     ['NEXT_PUBLIC_UKI_CHAIN_ID', '56'],
     ['CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID', '56'],
-  ])('rechaza %s fuera de la frontera Stage/Testnet', (key, value) => {
-    expect(() => assertDashboardStagingRuntime(environment({ [key]: value }))).toThrow(
-      'DASHBOARD_STAGING_RUNTIME_REQUIRED',
+  ])('rechaza una configuración incoherente en %s', (key, value) => {
+    expect(() => assertDashboardRuntime(environment({ [key]: value }))).toThrow(
+      'DASHBOARD_RUNTIME_INVALID',
     );
   });
 });

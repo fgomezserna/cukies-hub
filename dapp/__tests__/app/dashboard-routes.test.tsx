@@ -1,6 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
-
 import DashboardPage, { metadata } from '@/app/(app)/dashboard/page';
 import WalletLegacyPage from '@/app/wallet/page';
 
@@ -8,21 +6,6 @@ const mockRedirect = jest.fn();
 
 jest.mock('next/navigation', () => ({
   redirect: (...args: unknown[]) => mockRedirect(...args),
-}));
-
-jest.mock('@/components/launch/info-page', () => ({
-  LaunchInfoPage: ({
-    title,
-    beforeSections,
-  }: {
-    title: string;
-    beforeSections?: ReactNode;
-  }) => (
-    <main>
-      <h1>{title}</h1>
-      {beforeSections}
-    </main>
-  ),
 }));
 
 jest.mock('@/components/wallet/dashboard-workspace', () => ({
@@ -37,9 +20,10 @@ describe('rutas canónicas del dashboard', () => {
   it('renderiza el dashboard operativo en la ruta canónica', () => {
     render(<DashboardPage />);
 
-    expect(screen.getByRole('heading', { name: 'Dashboard UKI' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument();
+    expect(screen.getByText(/Consulta tus créditos, Cukies y premios/)).toBeInTheDocument();
     expect(screen.getByText('Workspace económico')).toBeInTheDocument();
-    expect(metadata.title).toBe('Dashboard UKI | Cukies World');
+    expect(metadata.title).toBe('Mi cuenta | Cukies World');
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 

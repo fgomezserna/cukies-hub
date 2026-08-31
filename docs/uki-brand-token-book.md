@@ -267,21 +267,20 @@ Estos tokens son propuesta inicial. Deben trasladarse despues a CSS variables/Ta
 
 ```css
 :root {
-  --cw-ink-980: #07100e;
-  --cw-ink-950: #0b1513;
-  --cw-ink-900: #101d1a;
-  --cw-ink-850: #162622;
-  --cw-moss-800: #253533;
+  --cw-ink-980: #04030a;
+  --cw-ink-950: #0b0810;
+  --cw-ink-900: #0d0b24;
+  --cw-ink-850: #161128;
 
   --cw-paper-100: #f7f2e6;
   --cw-paper-200: #ebe2cf;
   --cw-ash-300: #b8c7c1;
   --cw-ash-500: #71847d;
 
-  --cw-teal-300: #77fff0;
-  --cw-teal-400: #44edd6;
-  --cw-teal-600: #00a79d;
-  --cw-teal-700: #008080;
+  --cw-lilac-300: #f5a7ff;
+  --cw-lilac-400: #e45cff;
+  --cw-lilac-600: #ad1ecc;
+  --cw-lilac-700: #8e1aa5;
 
   --cw-uki-300: #ffe08a;
   --cw-uki-400: #ffc94a;
@@ -305,15 +304,15 @@ Estos tokens son propuesta inicial. Deben trasladarse despues a CSS variables/Ta
 :root {
   --color-bg: var(--cw-ink-950);
   --color-bg-elevated: var(--cw-ink-900);
-  --color-bg-panel: #12221f;
-  --color-bg-soft: #1b2c28;
+  --color-bg-panel: #0d0b24;
+  --color-bg-soft: #161128;
 
   --color-text: var(--cw-paper-100);
   --color-text-muted: var(--cw-ash-300);
   --color-text-subtle: var(--cw-ash-500);
 
-  --color-primary: var(--cw-teal-400);
-  --color-primary-strong: var(--cw-teal-600);
+  --color-primary: var(--cw-lilac-400);
+  --color-primary-strong: var(--cw-lilac-600);
   --color-token: var(--cw-uki-400);
   --color-token-strong: var(--cw-uki-500);
   --color-accent: var(--cw-petal-400);
@@ -321,7 +320,7 @@ Estos tokens son propuesta inicial. Deben trasladarse despues a CSS variables/Ta
   --color-success: var(--cw-leaf-400);
   --color-warning: var(--cw-uki-400);
   --color-danger: var(--cw-ruby-500);
-  --color-info: var(--cw-teal-300);
+  --color-info: var(--cw-lilac-300);
 }
 ```
 
@@ -329,10 +328,10 @@ Estos tokens son propuesta inicial. Deben trasladarse despues a CSS variables/Ta
 
 - Background principal: `cw-ink-950`.
 - Paneles: `cw-ink-900` o `color-bg-panel`.
-- CTA principal preventa: UKI gold o teal segun contexto.
+- CTA principal preventa: UKI gold o lila segun contexto.
 - Gold se reserva para UKI, valor, token, rewards.
-- Teal se reserva para acciones, BSC, estados activos y sistema.
-- Magenta se usa solo como acento Cukies, no como color principal de botones financieros.
+- Lila es el unico color primario de acciones, foco y estados activos.
+- Cyan y teal quedan eliminados del producto y no se usan como alternativa por entorno.
 - Verde/leaf se usa para rarezas, disponible, success.
 - Violeta puede aparecer en rarezas/Cukies, no como fondo dominante.
 
@@ -458,12 +457,12 @@ Rules:
 ```css
 :root {
   --border-soft: rgba(247, 242, 230, 0.10);
-  --border-teal: rgba(68, 237, 214, 0.28);
+  --border-lilac: rgba(228, 92, 255, 0.28);
   --border-gold: rgba(255, 201, 74, 0.34);
 
   --shadow-panel: 0 20px 60px rgba(0, 0, 0, 0.28);
   --shadow-token: 0 18px 44px rgba(244, 173, 34, 0.22);
-  --shadow-teal: 0 16px 40px rgba(68, 237, 214, 0.12);
+  --shadow-lilac: 0 16px 40px rgba(228, 92, 255, 0.12);
 }
 ```
 
@@ -522,8 +521,8 @@ Materiales:
 Rules:
 
 - CTA de preventa: gold si se trata de comprar UKI.
-- CTA de app/sistema: teal.
-- No usar magenta para accion financiera principal.
+- CTA de app/sistema: lila.
+- Gold queda reservado para valor economico y acciones directamente ligadas a UKI.
 - El texto del boton debe decir que obtiene el usuario.
 
 ### Sale panel
@@ -710,7 +709,7 @@ Cada prompt debe declarar:
 Usar:
 
 - premium game economy,
-- dark teal vault UI,
+- dark violet vault UI,
 - cute Cukies elevated into a serious token launch,
 - UKI gold as economic focus,
 - real landing/product interface,

@@ -1,7 +1,7 @@
 # UKI dapp sitemap
 
-Estado: arquitectura aprobada e implementacion local en curso; el styling final
-sigue pendiente del gate visual.
+Estado: arquitectura corregida e implementacion local en curso; requiere
+validacion visual local antes de desplegar en staging.
 
 - Issue ejecutable: #289 `UKI-031.0`.
 - Epic: #72 `UKI-031`.
@@ -38,8 +38,8 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
   acepta otra wallet por query o body.
 - Cada modulo publica `ready`, `degraded` o `unavailable`, su timestamp y sus
   incidencias. Un fallo conserva los demas datos y nunca se convierte en cero.
-- La UI muestra identidad, chain requerida/actual, freshness, alertas y cambio
-  explicito a BSC Testnet 97.
+- La UI muestra identidad, disponibilidad, ultima actualizacion, alertas y un
+  cambio de red expresado con lenguaje de cliente.
 - La home ya comunica el estado posterior a la preventa, la liquidez, el
   staking y el torneo.
 - `/vesting` ya consulta la posicion on-chain de la wallet sin exigir una
@@ -48,9 +48,8 @@ no configura pools, no decide elegibilidad y no calcula rewards en cliente.
   `/cukie-master`, ahora dentro del app shell privado.
 - El Cukie Pool se opera en `/cukie-hodler#mi-cukie-pool`, tambien dentro del
   app shell privado.
-- Marketplace, inventario, juego y ranking tienen rutas propias y ya aparecen
-  agrupados en la navegacion operativa. `/premios` permanece como historico
-  publico y no se mezcla con rewards vigentes.
+- Marketplace, inventario, juego y ranking tienen rutas propias. El ranking
+  permanece dentro de Jugar y los premios vigentes se resumen en Dashboard.
 - El workspace ya no duplica el header publico ni anida un segundo `main`
   dentro del app shell.
 - El recorrido local responsive se ha validado en navegador real para
@@ -99,7 +98,7 @@ La autenticacion del Dashboard debe derivar la wallet de una sesion EVM
 firmada. No se aceptara una wallet arbitraria por query o body para consultar
 datos economicos privados.
 
-## Navegacion propuesta
+## Navegacion aprobable
 
 ### Header publico
 
@@ -116,17 +115,30 @@ ocupa la responsabilidad del Dashboard.
 
 ### App shell autenticado
 
-| Grupo | Destino | Funcion |
+| Etiqueta | Destino | Funcion |
 | --- | --- | --- |
-| Resumen | `/dashboard` | Salud de wallet y acciones prioritarias. |
-| Jugar | `/games/treasure-hunt` | Preparar recursos y entrar al juego. |
-| Recursos | `/cukie-master` | Slots, staking UKI/NFT y configuracion diaria de creditos. |
-| Recursos | `/cukie-hodler#mi-cukie-pool` | Gestionar el pool de Cukies. |
-| Activos | `/cukies` | Ver Cukies y su estado operativo. |
-| Activos | `/marketplace` | Comprar, vender y revisar listings. |
-| Recompensas | `/games/treasure-hunt/rankings` | Ranking vigente e historico. |
-| Recompensas | `/rewards` | Pending, claimable y claimed cuando exista batch/proof. |
-| Externo | `/vesting` | Consultar y reclamar el vesting de preventa. |
+| Inicio | `/dashboard` | Resumen y acciones prioritarias. |
+| Jugar | `/games/treasure-hunt` | Entrar al juego; el ranking vive dentro de este flujo. |
+| Cukie Master | `/cukie-master` | Cupos y staking UKI/NFT. |
+| Creditos | `/cukie-master#competition-credits` | Usar o aportar creditos. |
+| Pool de Cukies | `/cukie-hodler#mi-cukie-pool` | Gestionar el pool. |
+| Mis Cukies | `/cukies` | Ver Cukies y su estado. |
+| Marketplace | `/marketplace` | Comprar, vender y revisar anuncios. |
+| Premios | `/dashboard#rewards-summary` | Consultar premios reclamables actuales. |
+| Vesting | `/vesting` | Consultar y reclamar el vesting de preventa. |
+
+No se usan grupos decorativos en el menu. No se crea `/rewards` hasta que
+exista una pantalla completa de cobro; el enlace actual nunca apunta a una
+ruta ficticia.
+
+## Regla de promocion entre entornos
+
+- Staging y produccion comparten rutas, layout, menu, componentes y copy.
+- Solo cambian variables de entorno, direcciones de contratos y servicios.
+- La interfaz no muestra `stage`, `staging`, `testnet`, IDs de chain, batches,
+  endpoints, colecciones ni otros conceptos operativos internos.
+- El contrato del Dashboard es `dashboard-v1` en ambos entornos; staging usa
+  BSC 97 y produccion BSC 56 mediante validacion de runtime.
 
 En una fase posterior, creditos y Cukie Pool pueden separarse en
 `/pools/credits` y `/pools/cukies`. Para el MVP se reutilizan las superficies

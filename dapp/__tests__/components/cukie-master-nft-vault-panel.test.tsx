@@ -278,7 +278,7 @@ describe('CukieMasterNftVaultPanel', () => {
 
     render(<CukieMasterNftVaultPanel />);
 
-    expect(await screen.findByText('6 Cukies Originales o posiciones custodiadas · 6 con una acción disponible')).toBeInTheDocument();
+    expect(await screen.findByText('6 Cukies Originales disponibles o depositados · 6 con una acción disponible')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Hacer staking/i })).toHaveLength(6);
     expect(screen.queryByText('Cukie #98000007')).not.toBeInTheDocument();
     expect(screen.queryByText('Solo cuentan Cukies Originales')).not.toBeInTheDocument();
@@ -311,7 +311,7 @@ describe('CukieMasterNftVaultPanel', () => {
 
       render(<CukieMasterNftVaultPanel />);
 
-      expect(await screen.findByText(/Estamos sincronizando los eventos y metadatos NFT/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Estamos actualizando tus Cukies/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeDisabled();
 
       await act(async () => {
@@ -320,7 +320,7 @@ describe('CukieMasterNftVaultPanel', () => {
       });
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      await waitFor(() => expect(screen.queryByText(/Estamos sincronizando los eventos y metadatos NFT/i)).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByText(/Estamos actualizando tus Cukies/i)).not.toBeInTheDocument());
       expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeEnabled();
     } finally {
       jest.useRealTimers();
@@ -338,8 +338,7 @@ describe('CukieMasterNftVaultPanel', () => {
         .mockResolvedValueOnce(response(status()));
 
       render(<CukieMasterNftVaultPanel />);
-      await act(async () => { await Promise.resolve(); });
-      expect(screen.getByText(/Reintentaremos automáticamente/i)).toBeInTheDocument();
+      expect(await screen.findByText(/No hemos podido actualizar tus Cukies/i)).toBeInTheDocument();
 
       await act(async () => {
         jest.advanceTimersByTime(750);
@@ -361,7 +360,7 @@ describe('CukieMasterNftVaultPanel', () => {
         .mockReturnValueOnce(new Promise(() => undefined));
 
       const { unmount } = render(<CukieMasterNftVaultPanel />);
-      expect(await screen.findByText(/Estamos sincronizando los eventos y metadatos NFT/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Estamos actualizando tus Cukies/i)).toBeInTheDocument();
 
       await act(async () => {
         jest.advanceTimersByTime(10_000);
@@ -383,7 +382,7 @@ describe('CukieMasterNftVaultPanel', () => {
     fetchMock.mockResolvedValueOnce(response(status({ indexer: 'unavailable' })));
     render(<CukieMasterNftVaultPanel />);
 
-    expect(await screen.findByText(/índice NFT tiene una avería/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No podemos actualizar tus Cukies ahora/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeDisabled();
     expect(screen.getByText('Recuperación on-chain')).toBeInTheDocument();
   });
@@ -416,7 +415,7 @@ describe('CukieMasterNftVaultPanel', () => {
 
     render(<CukieMasterNftVaultPanel />);
 
-    expect(screen.getByText(/Conecta y autentica tu wallet EVM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Conecta tu wallet para consultar tus Cukies/i)).toBeInTheDocument();
     expect(screen.queryByText(/configuración pública y la del servidor no coinciden/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/No hay Cukies Originales/i)).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();

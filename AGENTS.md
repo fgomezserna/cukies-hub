@@ -112,9 +112,10 @@ Uses NextAuth v5 with:
 ## Design System
 
 ### Colors
-- Primary: Teal (#008080)
-- Background: Dark gray (#253533)
-- Accent: Neon green (#44edd6)
+- Primary: Lila (#e45cff)
+- Background: Ink violet (#04030a)
+- Token/value accent: Gold (#f2c34b)
+- Cyan and teal are not part of the current product UI and must not be reintroduced.
 - Reference: https://cukiesworld.com/
 
 ### Typography
@@ -125,6 +126,14 @@ Uses NextAuth v5 with:
 - Radix UI primitives with custom styling
 - Collapsible sidebar navigation
 - Dark theme with glow effects
+
+## Fire rule: staging and production UX
+
+- Staging and production use the same routes, component tree, layout, navigation and customer copy.
+- Promotion between environments changes only validated environment variables and external service/contract addresses.
+- Never show `stage`, `staging`, `testnet`, chain IDs, collection names, jobs, batches, internal endpoints or deployment state in customer-facing copy.
+- Environment-specific branches are allowed only in runtime configuration and safety guards, never to maintain two visual products.
+- Validate environment-sensitive work against both supported pairs: `staging + BSC 97` and `production + BSC 56`.
 
 ## Environment Setup
 

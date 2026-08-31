@@ -128,7 +128,7 @@ describe('dashboard default dependencies', () => {
   });
 
   it('proyecta todos los dominios sin perder el modo custodial del Cukie Pool', async () => {
-    const dependencies = dashboardSummaryDependencies();
+    const dependencies = dashboardSummaryDependencies({ environment: 'staging', chainId: 97 });
     dependencies.now = () => now;
     const result = await buildDashboardSummary({
       identity: {
@@ -168,7 +168,7 @@ describe('dashboard default dependencies', () => {
 
   it('aísla un fallo de rewards sin ocultar los demás dominios', async () => {
     mockRewards.mockRejectedValue(new Error('reward db unavailable'));
-    const dependencies = dashboardSummaryDependencies();
+    const dependencies = dashboardSummaryDependencies({ environment: 'staging', chainId: 97 });
     dependencies.now = () => now;
 
     const result = await buildDashboardSummary({
@@ -184,10 +184,28 @@ describe('dashboard default dependencies', () => {
 
   it('rechaza una lectura de vesting que proceda de mainnet', async () => {
     mockVesting.mockResolvedValue({ chainId: 56 } as never);
-    const dependencies = dashboardSummaryDependencies();
+    const dependencies = dashboardSummaryDependencies({ environment: 'staging', chainId: 97 });
 
     await expect(dependencies.loadVesting(wallet, now)).rejects.toThrow(
       'DASHBOARD_VESTING_CHAIN_MISMATCH',
     );
+  });
+
+  it('acepta vesting mainnet cuando producción configura chain 56', async () => {
+    mockVesting.mockResolvedValue({
+      chainId: 56,
+      configFrozen: true,
+      hasPosition: false,
+      totalAmountRaw: '0',
+      releasedAmountRaw: '0',
+      releasableRaw: '0',
+      lockedAmountRaw: '0',
+      progressBps: 0,
+    } as never);
+    const dependencies = dashboardSummaryDependencies({ environment: 'production', chainId: 56 });
+
+    await expect(dependencies.loadVesting(wallet, now)).resolves.toMatchObject({
+      data: { chainId: 56 },
+    });
   });
 });

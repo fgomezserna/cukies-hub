@@ -225,13 +225,13 @@ describe('checkout comprador marketplace UKI', () => {
     }));
   });
 
-  it('falla cerrado si BNB está configurado en la UI pero bloqueado on-chain', async () => {
+  it('falla cerrado si BNB está configurado pero temporalmente bloqueado', async () => {
     nativePaymentsAllowed = false;
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'BNB' }));
 
-    expect(await screen.findByText('El pago con BNB está deshabilitado on-chain en este Stage.'))
+    expect(await screen.findByText('El pago con BNB no está disponible ahora.'))
       .toBeInTheDocument();
     expect(writeContractAsync).not.toHaveBeenCalledWith(expect.objectContaining({
       functionName: 'buyWithNative',

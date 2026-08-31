@@ -37,7 +37,7 @@ describe('Marketplace UKI público', () => {
     jest.clearAllMocks();
   });
 
-  it('muestra únicamente el feed UKI validado por la API pública de Stage', async () => {
+  it('muestra únicamente el mercado UKI disponible', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
@@ -58,7 +58,7 @@ describe('Marketplace UKI público', () => {
     );
   });
 
-  it('no sustituye el mercado UKI por datos Legacy si falta la identidad Testnet', async () => {
+  it('no sustituye el mercado UKI por el mercado anterior si el servicio no está disponible', async () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 503,
@@ -69,7 +69,7 @@ describe('Marketplace UKI público', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('El marketplace UKI aún no está activo en este Stage'),
+        screen.getByText('El marketplace UKI no está disponible ahora'),
       ).toBeInTheDocument();
     });
     expect(screen.queryByText('Cukie #73')).not.toBeInTheDocument();

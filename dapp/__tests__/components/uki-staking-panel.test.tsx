@@ -34,7 +34,7 @@ jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
 }));
 jest.mock('@/components/landing/sale-config', () => ({
   UKI_PRESALE_CHAIN_ID: 97,
-  UKI_PRESALE_CHAIN_LABEL: 'BNB Smart Chain Testnet',
+  UKI_PRESALE_CHAIN_LABEL: 'BNB Smart Chain',
 }));
 jest.mock('@/lib/contracts/uki-sale', () => ({
   erc20Abi: [],
@@ -217,10 +217,10 @@ describe('UkiStakingPanel', () => {
     expect(screen.getByText(/Tendrías 45\.000 UKI en staking y 4\/5 Cukie Masters/i)).toBeInTheDocument();
     expect(screen.getByText(/Te faltarían 15\.000 UKI para el siguiente Cukie Master/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('10');
-    expect(screen.getByText(/Concedidas por el backend: 12/i)).toBeInTheDocument();
+    expect(screen.getByText(/Concedidas: 12/i)).toBeInTheDocument();
     expect(screen.getByText(/Usadas: 2/i)).toBeInTheDocument();
     expect(screen.queryByText('Pasos de la operación')).not.toBeInTheDocument();
-    expect(screen.getByText(/El backend concede 1 partida por cada 2\.?000 UKI/i)).toBeInTheDocument();
+    expect(screen.getByText(/Recibes 1 partida por cada 2\.?000 UKI/i)).toBeInTheDocument();
     expect(screen.getByText(/Cukie Master se calcula por separado/i)).toBeInTheDocument();
     expect(screen.getAllByText('Depositar')).toHaveLength(1);
   });
@@ -257,7 +257,7 @@ describe('UkiStakingPanel', () => {
 
     expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('—');
     expect(screen.getByText(/Conecta y firma esta wallet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Concedidas por el backend/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Concedidas:/i)).not.toBeInTheDocument();
   });
 
   it('shows zero and explains a tournament disqualification', () => {
@@ -295,7 +295,7 @@ describe('UkiStakingPanel', () => {
     render(<UkiStakingPanel />);
 
     expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('—');
-    expect(screen.getByText(/indexador todavía no ha confirmado/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aún estamos confirmando el estado de esta wallet/i)).toBeInTheDocument();
   });
 
   it('requests a signed session when the backend has no wallet eligibility', () => {
@@ -335,7 +335,7 @@ describe('UkiStakingPanel', () => {
     expect(screen.queryByText(/Total computable:/i)).not.toBeInTheDocument();
   });
 
-  it('switches explicitly to BSC Testnet when the wallet is on another chain', () => {
+  it('switches explicitly to the configured network when the wallet is on another chain', () => {
     mockUseAccount.mockReturnValue({
       address: walletAddress,
       chainId: 56,
@@ -343,7 +343,7 @@ describe('UkiStakingPanel', () => {
     } as never);
 
     render(<UkiStakingPanel />);
-    fireEvent.click(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain Testnet/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain/i }));
 
     expect(switchChain).toHaveBeenCalledWith(
       { chainId: 97 },
@@ -384,7 +384,7 @@ describe('UkiStakingPanel', () => {
     expect(queryEnabled.get('stakedBalance')).toBe(true);
     expect(screen.getByText('50.000')).toBeInTheDocument();
     expect(screen.getByText('25.000')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain Testnet/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain/i })).toBeEnabled();
     expect(writeContract).not.toHaveBeenCalled();
   });
 
@@ -444,14 +444,14 @@ describe('UkiStakingPanel', () => {
     } as never);
 
     render(<UkiStakingPanel />);
-    fireEvent.click(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain Testnet/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Cambiar a BNB Smart Chain/i }));
 
     const switchOptions = switchChain.mock.calls[0]?.[1] as { onError?: () => void } | undefined;
     switchOptions?.onError?.();
 
     expect(toast).toHaveBeenCalledWith({
       title: 'No se pudo cambiar la red',
-      description: 'Abre tu wallet y acepta el cambio a BNB Smart Chain Testnet.',
+      description: 'Abre tu wallet y acepta el cambio a BNB Smart Chain.',
       variant: 'destructive',
     });
   });
@@ -506,7 +506,7 @@ describe('UkiStakingPanel', () => {
     await waitFor(() => expect(tournamentRefresh).toHaveBeenCalledTimes(1));
     expect(toast).toHaveBeenCalledWith({
       title: 'Staking confirmado',
-      description: 'Tus UKI ya constan en el contrato de staking. Estamos actualizando tus partidas del torneo.',
+      description: 'Tu staking de UKI está confirmado. Estamos actualizando tus partidas del torneo.',
     });
     window.removeEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
   });
@@ -545,7 +545,7 @@ describe('UkiStakingPanel', () => {
     render(<UkiStakingPanel />);
 
     expect(screen.getByRole('button', { name: 'Aprobar UKI exactos' })).toBeDisabled();
-    expect(screen.getByText(/token y contrato coincidan/i)).toBeInTheDocument();
+    expect(screen.getByText(/No podemos verificar el staking ahora/i)).toBeInTheDocument();
     expect(writeContract).not.toHaveBeenCalled();
   });
 });

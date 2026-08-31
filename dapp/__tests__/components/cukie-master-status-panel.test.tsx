@@ -6,8 +6,8 @@ import type { User } from '@/types';
 
 jest.mock('@/providers/auth-provider');
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
-  LandingWalletConnectButton: ({ evmOnly }: { evmOnly?: boolean }) => (
-    <button type="button" data-evm-only={String(Boolean(evmOnly))}>Conectar wallet EVM</button>
+  LandingWalletConnectButton: ({ evmOnly, label }: { evmOnly?: boolean; label?: string }) => (
+    <button type="button" data-evm-only={String(Boolean(evmOnly))}>{label}</button>
   ),
 }));
 jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
@@ -98,7 +98,7 @@ describe('CukieMasterStatusPanel', () => {
     render(<CukieMasterStatusPanel />);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Conecta una wallet EVM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Conecta tu wallet/i)).toBeInTheDocument();
   });
 
   it('simplifica la vista a vesting, staking y cinco plazas de la ruta UKI', async () => {

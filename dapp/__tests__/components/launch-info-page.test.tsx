@@ -49,6 +49,7 @@ describe('LaunchInfoPage shell', () => {
 
     expect(screen.queryByText('Cabecera pública')).not.toBeInTheDocument();
     expect(container.querySelector('main')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Imagen de prueba' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Título' })).toBeInTheDocument();
   });
 });

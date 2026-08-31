@@ -87,7 +87,7 @@ describe('dashboard aggregate summary', () => {
     const result = await buildDashboardSummary(input(runtimeDependencies));
 
     expect(result).toMatchObject({
-      schemaVersion: 'dashboard-staging-v1',
+      schemaVersion: 'dashboard-v1',
       generatedAt: now.toISOString(),
       overallState: 'ready',
       identity: { username: 'tester', walletNormalized: wallet },

@@ -55,7 +55,7 @@ Ruta: `/`.
 Prompt propuesto:
 
 ```text
-Pantalla web horizontal para Cukies World UKI launch, Phase 0 compra cerrada. Landing navegable, no deck. Hero con modulo real de preventa en estado coming soon, precio 0.01 USD, compra principal con ASM, BNB Smart Chain, vesting 9 meses y listing minimo 0.012. Visual premium gaming-finance, oscuro verdoso con acentos gold/teal controlados, Cukie como identidad jugable y UKI coin/vault como senal de token. Secciones visibles: sale facts, como comprar, token trust, Cukie Master coming next, Treasure Hunt primer juego. Sin promesas de rentabilidad, sin claims activos, sin dashboard completo, sin composicion de presentacion.
+Pantalla web horizontal para Cukies World UKI launch, Phase 0 compra cerrada. Landing navegable, no deck. Hero con modulo real de preventa en estado coming soon, precio 0.01 USD, compra principal con ASM, BNB Smart Chain, vesting 9 meses y listing minimo 0.012. Visual premium gaming-finance, oscuro violeta con acentos lila/gold controlados, Cukie como identidad jugable y UKI coin/vault como senal de token. Secciones visibles: sale facts, como comprar, token trust, Cukie Master coming next, Treasure Hunt primer juego. Sin promesas de rentabilidad, sin claims activos, sin dashboard completo, sin composicion de presentacion.
 ```
 
 Debe mostrar:
@@ -81,7 +81,7 @@ Ruta: `/presale`.
 Prompt propuesto:
 
 ```text
-Pantalla de preventa UKI para una dapp en BNB Smart Chain, estado compra cerrada o prelaunch. Interfaz funcional, no landing generica. Panel principal ASM -> UKI con wallet desconectada y chain status, precio 0.01 USD, ratio ASM/UKI pendiente de fijar al inicio, duracion 1 mes, vesting comprador 9 meses lineal sin cliff, liquidez intermedia con 50% del ASM a `0,012 USD/UKI` y LP bloqueado 180 días. Layout denso pero claro, controles reales de connect wallet, approve ASM deshabilitado, buy UKI deshabilitado hasta apertura, resumen de tokenomics y enlaces BscScan/config. Dark mode teal/gold sobrio, sin promesas de rentabilidad.
+Pantalla de preventa UKI para una dapp en BNB Smart Chain, estado compra cerrada o prelaunch. Interfaz funcional, no landing generica. Panel principal ASM -> UKI con wallet desconectada y chain status, precio 0.01 USD, ratio ASM/UKI pendiente de fijar al inicio, duracion 1 mes, vesting comprador 9 meses lineal sin cliff, liquidez intermedia con 50% del ASM a `0,012 USD/UKI` y LP bloqueado 180 días. Layout denso pero claro, controles reales de connect wallet, approve ASM deshabilitado, buy UKI deshabilitado hasta apertura, resumen de tokenomics y enlaces BscScan/config. Dark mode lila/gold sobrio, sin promesas de rentabilidad.
 ```
 
 Debe mostrar:
@@ -106,7 +106,7 @@ Ruta canonica: `/dashboard` (`/wallet` queda como alias legacy).
 Prompt propuesto:
 
 ```text
-Dashboard autenticado y operativo de Cukies World para BSC Testnet, no landing. App shell navegable con sidebar compacto y cabecera de identidad/wallet. Primera zona: alertas priorizadas y siguientes acciones. Debajo, modulos densos pero legibles para UKI en vesting/staking, slots Cukie Master separados en ruta UKI y ruta NFT, creditos propios/pool/proximo corte, Cukies por estado canonico, disponibilidad de juego/ranking y rewards pending/claimable/claimed. Cada modulo muestra freshness, estados partial/stale y CTA a su pantalla especializada. Dark gaming-finance con el sistema visual UKI aprobado, teal/magenta/gold, tablas compactas y badges funcionales. Sin hero ilustrado, sin copy de preventa, sin infografia, sin cifras ficticias y sin claims finales si no existe batch/proof.
+Dashboard autenticado y operativo de Cukies World, no landing. La misma interfaz sirve en staging y produccion; la red se resuelve mediante configuracion y no aparece como copy interno. App shell navegable con sidebar compacto y cabecera de identidad/wallet. Primera zona: alertas priorizadas y siguientes acciones. Debajo, modulos densos pero legibles para UKI en vesting/staking, slots Cukie Master separados en ruta UKI y ruta NFT, creditos propios/pool/proximo corte, Cukies por estado, disponibilidad de juego/ranking y premios pendientes/reclamables/cobrados. Cada modulo comunica disponibilidad y ultima actualizacion con lenguaje de cliente. Dark gaming-finance con lila como unico color primario y gold para valor. Sin hero ilustrado, sin copy de preventa, sin infografia, sin cifras ficticias ni terminos internos como staging, testnet, chain, batch, proof o freshness.
 ```
 
 Debe mostrar:
@@ -133,7 +133,7 @@ Ruta: `/cukie-master`.
 Prompt propuesto:
 
 ```text
-Pantalla Cukie Master para Cukies World UKI, fase coming next. Dos rutas de cupos: staking UKI y puntos de Cukies Originales. Mostrar 500 cupos iniciales por ruta, maximo 5 cupos por ruta y 10 agregados por wallet, requisito 20,000 UKI por cupo, 3 puntos de Cukies Originales, UKI con vesting cuenta para cupos, espera 24h para creditos diarios y aviso de requisito dinamico con ventana 48h. UI operativa con contadores, sliders/inputs de stake, tabla de rarezas, alertas claras, dark mode teal/gold. Sin ranking completo, sin partida concreta, sin prometer recompensas economicas.
+Pantalla Cukie Master para Cukies World UKI, fase coming next. Dos rutas de cupos: staking UKI y puntos de Cukies Originales. Mostrar 500 cupos iniciales por ruta, maximo 5 cupos por ruta y 10 agregados por wallet, requisito 20,000 UKI por cupo, 3 puntos de Cukies Originales, UKI con vesting cuenta para cupos, espera 24h para creditos diarios y aviso de requisito dinamico con ventana 48h. UI operativa con contadores, sliders/inputs de stake, tabla de rarezas, alertas claras, dark mode lila/gold. Sin ranking completo, sin partida concreta, sin prometer recompensas economicas.
 ```
 
 Debe mostrar:

@@ -47,9 +47,10 @@ jest.mock('lucide-react', () => ({
   Cookie: () => null,
   Layers3: () => null,
   Store: () => null,
-  Trophy: () => null,
   LockKeyhole: () => null,
   Crown: () => null,
+  Coins: () => null,
+  Gift: () => null,
 }));
 
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
@@ -73,14 +74,10 @@ describe('AppLayout launch navigation', () => {
     });
   });
 
-  it('shows the operational launch map and leaves historic prizes out of the app shell', () => {
+  it('muestra una navegación plana orientada a tareas', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
-    for (const groupLabel of ['Resumen', 'Recursos', 'Activos', 'Recompensas', 'Externo']) {
-      expect(screen.getByText(groupLabel)).toBeInTheDocument();
-    }
-
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Inicio' })).toHaveAttribute(
       'href',
       '/dashboard',
     );
@@ -92,24 +89,32 @@ describe('AppLayout launch navigation', () => {
       'href',
       '/cukie-master',
     );
+    expect(screen.getByRole('link', { name: 'Créditos' })).toHaveAttribute(
+      'href',
+      '/cukie-master#competition-credits',
+    );
     expect(screen.getByRole('link', { name: 'Pool de Cukies' })).toHaveAttribute(
       'href',
       '/cukie-hodler#mi-cukie-pool',
     );
-    expect(screen.getByRole('link', { name: 'Cukies' })).toHaveAttribute('href', '/cukies');
+    expect(screen.getByRole('link', { name: 'Mis Cukies' })).toHaveAttribute('href', '/cukies');
     expect(screen.getByRole('link', { name: 'Marketplace' })).toHaveAttribute(
       'href',
       '/marketplace',
     );
-    expect(screen.getByRole('link', { name: 'Ranking' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Premios' })).toHaveAttribute(
       'href',
-      '/games/treasure-hunt/rankings',
+      '/dashboard#rewards-summary',
     );
     expect(screen.getByRole('link', { name: 'Vesting' })).toHaveAttribute('href', '/vesting');
-    expect(screen.queryByRole('link', { name: 'Premios' })).not.toBeInTheDocument();
 
     for (const hiddenLabel of [
-      'Inicio',
+      'Resumen',
+      'Recursos',
+      'Activos',
+      'Recompensas',
+      'Externo',
+      'Ranking',
       'Preventa UKI',
       'Juegos',
       'Misiones',
@@ -125,13 +130,13 @@ describe('AppLayout launch navigation', () => {
     expect(document.querySelector('[data-app-ambient-effects]')).not.toBeInTheDocument();
   });
 
-  it('separates the game and ranking active states', () => {
+  it('mantiene Jugar activo también dentro del ranking', () => {
     mockUsePathname.mockReturnValue('/games/treasure-hunt/rankings/weekly');
 
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
-    expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute('data-active', 'false');
-    expect(screen.getByRole('link', { name: 'Ranking' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute('data-active', 'true');
+    expect(screen.queryByRole('link', { name: 'Ranking' })).not.toBeInTheDocument();
   });
 
   it('keeps the app header on mobile rankings but reserves immersive mode for the game', () => {

@@ -20,12 +20,12 @@ jest.mock('lucide-react', () => ({
 }));
 
 describe('Cukies bridge client safety', () => {
-  it('no monta ninguna operacion on-chain cuando el runtime bridge esta desactivado', () => {
+  it('no monta operaciones cuando el bridge está desactivado', () => {
     render(<BridgeClient />);
 
     expect(screen.getByTestId('cukies-bridge-disabled')).toBeInTheDocument();
-    expect(screen.getByText('Bridge Testnet desactivado de forma segura')).toBeInTheDocument();
-    expect(screen.getByText(/Stage no usara los contratos legacy de mainnet/i)).toBeInTheDocument();
+    expect(screen.getByText('Bridge no disponible')).toBeInTheDocument();
+    expect(screen.getByText(/Las transferencias están desactivadas/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Start bridge/i })).not.toBeInTheDocument();
   });
 });
