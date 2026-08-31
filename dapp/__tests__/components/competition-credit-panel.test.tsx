@@ -6,10 +6,20 @@ import type { User } from '@/types';
 
 jest.mock('@/providers/auth-provider');
 jest.mock('lucide-react', () => ({
-  AlertTriangle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
-  CheckCircle2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
-  Loader2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
-  Save: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ArrowRight: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Lock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+}));
+jest.mock('@phosphor-icons/react', () => ({
+  CheckCircle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Coin: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Diamond: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  FloppyDisk: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  GameController: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Minus: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Plus: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  SpinnerGap: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Trophy: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Warning: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
@@ -88,11 +98,13 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
-    await waitFor(() => expect(screen.getByText('Disponibles')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Lo que ya tienes hoy')).toBeInTheDocument());
     expect(screen.getAllByText('80').length).toBeGreaterThan(0);
-    const select = screen.getByLabelText('Créditos al pool para slot-1');
-    fireEvent.change(select, { target: { value: '30' } });
-    fireEvent.click(screen.getByRole('button', { name: /Guardar/i }));
+    expect(screen.queryByText('credits-v1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Aumentar aportación al pool de UKI, cupo 1',
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar 1 cambio' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     const [, post] = fetchMock.mock.calls;
@@ -104,7 +116,7 @@ describe('CompetitionCreditPanel', () => {
       poolCreditsPerSlot: 30,
     });
     expect(post[1].headers['idempotency-key']).toMatch(/^credit-config:slot-1:/);
-    expect(await screen.findByText(/Configuración registrada/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument();
   });
 
   it('fails closed without balances or controls when the ledger is unavailable', async () => {
@@ -115,8 +127,8 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
-    expect(await screen.findByText(/no está disponible con garantías/i)).toBeInTheDocument();
-    expect(screen.queryByText('Disponibles')).not.toBeInTheDocument();
+    expect(await screen.findByText(/no están disponibles ahora/i)).toBeInTheDocument();
+    expect(screen.queryByText('Para jugar')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Guardar/i })).not.toBeInTheDocument();
   });
 
@@ -143,22 +155,35 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
-    const ukiSelect = await screen.findByLabelText('Créditos al pool para slot-1');
-    const nftSelect = screen.getByLabelText('Créditos al pool para slot-nft-1');
-    expect(ukiSelect).toBeEnabled();
-    expect(nftSelect).toBeDisabled();
-    expect(screen.getByText(/bloqueada solo en Ruta Cukies/i)).toBeInTheDocument();
+    const ukiIncrease = await screen.findByRole('button', {
+      name: 'Aumentar aportación al pool de UKI, cupo 1',
+    });
+    const nftIncrease = screen.getByLabelText('Aumentar aportación al pool de Cukies, cupo 1');
+    expect(ukiIncrease).toBeEnabled();
+    expect(nftIncrease).toBeDisabled();
+    expect(screen.getByText(/asignación de tus cupos de Cukies está temporalmente pausada/i)).toBeInTheDocument();
 
-    fireEvent.change(ukiSelect, { target: { value: '30' } });
-    const buttons = screen.getAllByRole('button', { name: /Guardar/i });
-    expect(buttons[0]).toBeEnabled();
-    expect(buttons[1]).toBeDisabled();
-    fireEvent.click(buttons[0]);
+    fireEvent.click(ukiIncrease);
+    const saveButton = screen.getByRole('button', { name: 'Guardar 1 cambio' });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
       slotId: 'slot-1',
       poolCreditsPerSlot: 30,
     });
+  });
+
+  it('aplica un reparto visual a todos los cupos sin desplegables', async () => {
+    fetchMock.mockResolvedValueOnce(statusResponse());
+
+    render(<CompetitionCreditPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Todo al pool/i }));
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar 1 cambio' })).toBeEnabled();
+    expect(screen.getAllByText('100').length).toBeGreaterThan(0);
   });
 });
