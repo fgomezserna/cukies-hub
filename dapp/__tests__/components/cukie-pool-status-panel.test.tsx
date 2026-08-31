@@ -27,15 +27,23 @@ jest.mock('@/lib/contracts/uki-nft-vaults', () => ({
     mode: { cukieMaster: 'legacy', cukiePool: 'legacy' },
   },
 }));
+jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
+  CukiImage: ({ alt, src }: { alt: string; src?: string | null }) => (
+    <span role="img" aria-label={alt} data-src={src ?? 'fallback'} />
+  ),
+}));
 jest.mock('lucide-react', () => ({
   AlertTriangle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   ArrowRight: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   CheckCircle2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Clock3: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Gamepad2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Loader2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Lock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   LogOut: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  RefreshCw: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Unlock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  WalletCards: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
@@ -97,6 +105,7 @@ function availableAsset(tokenId = '7') {
     chainId: 97,
     collectionAddress,
     tokenId,
+    imageUrl: `https://example.com/cukies/${tokenId}.png`,
     generation: 'original',
     rarity: 'rare',
     custody: 'wallet',
@@ -125,6 +134,9 @@ function position(input?: {
     chainId: 97,
     collectionAddress,
     tokenId,
+    imageUrl: `https://example.com/cukies/${tokenId}.png`,
+    generation: 'original',
+    rarity: 'rare',
     vaultAddress,
     beneficiaryNormalized: walletAddress,
     depositEpoch: '1',
@@ -210,6 +222,38 @@ describe('CukiePoolStatusPanel', () => {
     expect(screen.queryByText('Recuperación de emergencia')).not.toBeInTheDocument();
   });
 
+  it('explains the two useful totals and shows artwork for wallet and pool Cukies', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      availableAssets: [availableAsset('8')],
+      positions: [position({ tokenId: '7', status: 'active' })],
+    })));
+
+    render(<CukiePoolStatusPanel />);
+
+    expect(await screen.findByText('1 Cukie está disponible para partidas')).toBeInTheDocument();
+    expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
+    expect(screen.getByText(/Todo al día/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Cukie #7' })).toHaveAttribute(
+      'data-src',
+      'https://example.com/cukies/7.png',
+    );
+    expect(screen.getByRole('img', { name: 'Cukie #8' })).toHaveAttribute(
+      'data-src',
+      'https://example.com/cukies/8.png',
+    );
+  });
+
   it('approves and deposits on-chain before accepting the canonical projection', async () => {
     configureVault();
     mockUseAuth.mockReturnValue(authValue(user, 'evm'));
@@ -233,7 +277,7 @@ describe('CukiePoolStatusPanel', () => {
       .mockResolvedValueOnce(successfulResponse(poolStatus({ positions: [position({ status: 'pending' })] })));
 
     render(<CukiePoolStatusPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: /Añadir al pool/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
       'Depósito confirmado en BSC',
@@ -282,7 +326,7 @@ describe('CukiePoolStatusPanel', () => {
     const secondCard = screen.getByText('Cukie #8').closest('article');
     expect(firstCard).not.toBeNull();
     expect(secondCard).not.toBeNull();
-    const firstButton = within(firstCard!).getByRole('button', { name: 'Añadir al pool' });
+    const firstButton = within(firstCard!).getByRole('button', { name: 'Aportar este Cukie' });
     await waitFor(() => expect(firstButton).toBeEnabled());
     fireEvent.click(firstButton);
 
@@ -290,7 +334,7 @@ describe('CukiePoolStatusPanel', () => {
       'ya puedes operar con otro',
     ));
     expect(within(firstCard!).getByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
-    expect(within(secondCard!).getByRole('button', { name: 'Añadir al pool' })).toBeEnabled();
+    expect(within(secondCard!).getByRole('button', { name: 'Aportar este Cukie' })).toBeEnabled();
     expect(writeContractAsync).toHaveBeenCalledTimes(1);
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(1);
   });
@@ -317,7 +361,7 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    expect(await screen.findByRole('button', { name: /Dejar el pool/i })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: /Solicitar devolución/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Retirar a mi wallet/i })).toBeEnabled();
     expect(screen.getByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
   });
@@ -341,7 +385,7 @@ describe('CukiePoolStatusPanel', () => {
     render(<CukiePoolStatusPanel />);
 
     expect((await screen.findAllByText('Activándose')).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Aún no participa/i)).toBeInTheDocument();
+    expect(screen.getByText(/todavía no puede entrar en partidas/i)).toBeInTheDocument();
     expect(screen.queryByText(/Opta al reparto cuando se use/i)).not.toBeInTheDocument();
   });
 
@@ -364,9 +408,9 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /Dejar el pool/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Solicitar devolución/i }));
     expect(writeContractAsync).not.toHaveBeenCalled();
-    expect(screen.getByText(/La salida no se puede cancelar/i)).toBeInTheDocument();
+    expect(screen.getByText(/La devolución no se puede cancelar/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Confirmar salida/i }));
     await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -406,7 +450,7 @@ describe('CukiePoolStatusPanel', () => {
       });
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      expect(await screen.findByRole('button', { name: /Añadir al pool/i })).toBeEnabled();
+      expect(await screen.findByRole('button', { name: /Aportar este Cukie/i })).toBeEnabled();
       expect(screen.queryByText(/Los depósitos están bloqueados/i)).not.toBeInTheDocument();
     } finally {
       jest.useRealTimers();
@@ -536,7 +580,7 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    expect(await screen.findByRole('button', { name: /Dejar el pool/i })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /Solicitar devolución/i })).toBeDisabled();
     expect(screen.getByText(/El Pool de Cukies no está disponible ahora/i)).toBeInTheDocument();
   });
 });

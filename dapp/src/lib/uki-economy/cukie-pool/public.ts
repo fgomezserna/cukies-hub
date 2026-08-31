@@ -1,7 +1,15 @@
 import 'server-only';
 
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
+import {
+  normalizeCukiesInventoryDocument,
+  type CukiesInventoryDocument,
+} from '@/lib/nft-inventory';
 import type { NftAssetLockDocument } from '@/lib/nft-inventory/lock-types';
+import {
+  getLegacyMarketplaceNftImageUrl,
+  normalizeLegacyMarketplaceNftImageUrl,
+} from '@/lib/legacy-marketplace/config';
 
 import { DomainValidationError, SchemaNotReadyError } from '../errors';
 import { normalizePoolWallet } from './rules';
@@ -60,6 +68,17 @@ type CukiePoolNftVaultPositionDocument = {
   lastLogIndex?: unknown;
 };
 
+type CukiePoolPositionMediaDocument = CukiesInventoryDocument & {
+  chainId?: unknown;
+  collectionAddressNormalized?: unknown;
+};
+
+type CukiePoolPositionMedia = {
+  imageUrl: string | null;
+  generation: 'original' | 'second_generation' | null;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'goat' | null;
+};
+
 function invalidVaultProjection(message: string): never {
   throw new SchemaNotReadyError(`Proyeccion custodial de Cukie Pool invalida: ${message}`);
 }
@@ -115,6 +134,46 @@ function projectionAddress(value: unknown, field: string) {
     return invalidVaultProjection(`${field} no es una direccion BSC normalizada.`);
   }
   return address;
+}
+
+function optionalText(value: unknown) {
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function positionMedia(
+  document: CukiePoolPositionMediaDocument,
+  expected: { chainId: 56 | 97; collectionAddresses: Set<string>; now: Date },
+) {
+  const tokenId = optionalText(document.tokenId);
+  const collectionAddress = optionalText(document.collectionAddressNormalized)?.toLowerCase() ?? null;
+  if (
+    !tokenId
+    || document.chainId !== expected.chainId
+    || !collectionAddress
+    || !expected.collectionAddresses.has(collectionAddress)
+  ) return null;
+
+  const normalized = normalizeCukiesInventoryDocument(document, [], expected.now);
+  const generation = normalized.generation === 'original' || normalized.generation === 'second_generation'
+    ? normalized.generation
+    : null;
+  const rarity = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'goat'].includes(normalized.rarity)
+    ? normalized.rarity as CukiePoolPositionMedia['rarity']
+    : null;
+
+  return {
+    identity: `${collectionAddress}:${tokenId}`,
+    media: {
+      imageUrl: normalizeLegacyMarketplaceNftImageUrl(
+        tokenId,
+        typeof document.img === 'string' ? document.img : null,
+      ),
+      generation,
+      rarity,
+    } satisfies CukiePoolPositionMedia,
+  };
 }
 
 function projectVaultPosition(
@@ -372,6 +431,25 @@ export async function listCukiePoolWalletPositions(input: {
         availableAssets = [];
       }
     }
+    const mediaRows = page.length === 0 || indexerStatus !== 'ready'
+      ? []
+      : await db.collection<CukiePoolPositionMediaDocument>('cukies').find({
+          network: { $in: ['BSC', 'bsc'] },
+          chainId,
+          collectionAddressNormalized: { $in: collectionAddresses },
+          tokenId: { $in: [...new Set(page.map((position) => String(position.tokenId)))] },
+        }).toArray();
+    const mediaByIdentity = new Map<string, CukiePoolPositionMedia>();
+    for (const row of mediaRows) {
+      const resolved = positionMedia(row, {
+        chainId,
+        collectionAddresses: new Set(collectionAddresses),
+        now,
+      });
+      if (resolved && !mediaByIdentity.has(resolved.identity)) {
+        mediaByIdentity.set(resolved.identity, resolved.media);
+      }
+    }
     return {
       mode: 'custodial_vault' as const,
       sourceCollection: CUKIE_POOL_NFT_VAULT_POSITIONS,
@@ -383,10 +461,19 @@ export async function listCukiePoolWalletPositions(input: {
         collectionAddresses,
         indexer: { status: indexerStatus },
       },
-      positions: page.map((position) => ({
-        ...projectVaultPosition(position, expected),
-        sourceHealthy: true,
-      })),
+      positions: page.map((position) => {
+        const projected = projectVaultPosition(position, expected);
+        const media = mediaByIdentity.get(
+          `${projected.collectionAddress}:${projected.tokenId}`,
+        );
+        return {
+          ...projected,
+          imageUrl: media?.imageUrl ?? getLegacyMarketplaceNftImageUrl(projected.tokenId),
+          generation: media?.generation ?? null,
+          rarity: media?.rarity ?? null,
+          sourceHealthy: true,
+        };
+      }),
       availableAssets,
       nextCursor: positions.length > limit ? page.at(-1)?._id ?? null : null,
       sourceHealthy: indexerStatus === 'ready',

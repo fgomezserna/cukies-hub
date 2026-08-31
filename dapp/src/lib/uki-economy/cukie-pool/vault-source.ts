@@ -8,6 +8,7 @@ import {
   type CukiesInventoryDocument,
   type NftAssetLockDocument,
 } from '@/lib/nft-inventory';
+import { normalizeLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 
 import { SchemaNotReadyError } from '../errors';
 import { gamesQuota, poolPriority } from './rules';
@@ -82,6 +83,7 @@ export type PublicCukiePoolAvailableAsset = {
   chainId: 56 | 97;
   collectionAddress: string;
   tokenId: string;
+  imageUrl: string | null;
   generation: CukiePoolGeneration;
   rarity: CukiePoolRarity;
   custody: 'wallet';
@@ -922,6 +924,10 @@ export async function listAvailableCukiePoolVaultAssets(
       chainId: config.chainId,
       collectionAddress: item.collection,
       tokenId: item.normalized.tokenId!,
+      imageUrl: normalizeLegacyMarketplaceNftImageUrl(
+        item.normalized.tokenId!,
+        typeof item.document.img === 'string' ? item.document.img : null,
+      ),
       generation: item.normalized.generation as CukiePoolGeneration,
       rarity: item.normalized.rarity as CukiePoolRarity,
       custody: 'wallet' as const,

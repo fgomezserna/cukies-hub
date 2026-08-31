@@ -288,6 +288,9 @@ describe('Cukie Pool public source health', () => {
       chainId: 97,
       collectionAddress: COLLECTION,
       tokenId: '1',
+      imageUrl: expect.stringContaining('/1.png'),
+      generation: null,
+      rarity: null,
       assetId: `97:${COLLECTION}:1`,
       vaultAddress: VAULT,
       depositedAt: new Date((NOW_SECONDS - 1_000) * 1_000),
@@ -390,6 +393,7 @@ describe('Cukie Pool public source health', () => {
       collectionAddressNormalized: COLLECTION,
       rarity: index + 1,
       generation: index === 2 ? 2 : 1,
+      img: tokenId === '10' ? 'https://cdn.example.com/cukie-10.png' : undefined,
     }));
     const asset = (tokenId: string) => `97:${COLLECTION}:${tokenId}`;
     const open = (tokenId: string, alias: string, vaultAddress: string) => ({
@@ -440,6 +444,7 @@ describe('Cukie Pool public source health', () => {
       chainId: 97,
       collectionAddress: COLLECTION,
       tokenId: '10',
+      imageUrl: 'https://cdn.example.com/cukie-10.png',
       generation: 'original',
       rarity: 'common',
       custody: 'wallet',

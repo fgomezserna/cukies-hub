@@ -7,15 +7,19 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock3,
+  Gamepad2,
   Loader2,
   Lock,
   LogOut,
+  RefreshCw,
   Unlock,
+  WalletCards,
 } from 'lucide-react';
 import { isAddress, type Address, type Hash } from 'viem';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { Panel } from '@/components/landing/primitives';
+import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
 import {
   cukiePoolNftVaultAbi,
   ukiNftVaults,
@@ -50,6 +54,7 @@ type AvailableAsset = {
   chainId: 56 | 97;
   collectionAddress: string;
   tokenId: string;
+  imageUrl: string | null;
   generation: PoolGeneration;
   rarity: PoolRarity;
   custody: 'wallet';
@@ -65,6 +70,9 @@ type CustodialPosition = {
   chainId: 56 | 97;
   collectionAddress: string;
   tokenId: string;
+  imageUrl: string | null;
+  generation: PoolGeneration | null;
+  rarity: PoolRarity | null;
   vaultAddress: string;
   beneficiaryNormalized: string;
   depositEpoch: string;
@@ -238,16 +246,16 @@ function scheduleSummary(position: CustodialPosition) {
 function PositionSchedule({ position }: { position: CustodialPosition }) {
   const schedule = scheduleSummary(position);
   return (
-    <div className="mt-3 rounded-[7px] border border-white/10 bg-white/[0.03] p-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-          {schedule.label}
-        </p>
-        <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">
-          {utcLabel(schedule.timestamp)} UTC
-        </p>
-        <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-          {schedule.detail}
-        </p>
+    <div className="mt-4 border-t border-white/10 pt-3">
+      <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
+        {schedule.label}
+      </p>
+      <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">
+        {utcLabel(schedule.timestamp)} UTC
+      </p>
+      <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
+        {schedule.detail}
+      </p>
     </div>
   );
 }
@@ -792,37 +800,53 @@ export function CukiePoolStatusPanel() {
               </p>
             ) : null}
 
-            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
-              <section className="min-w-0 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
-                <div className="flex min-w-0 items-end justify-between gap-4">
+            <div className="grid min-w-0 gap-px overflow-hidden rounded-[12px] border border-white/10 bg-white/10 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+              <section className="min-w-0 bg-[#120a1c] p-5 sm:p-6">
+                <div className="flex items-start gap-4">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] text-[var(--uki-lilac)]">
+                    <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+                  </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tus Cukies aportados</p>
-                    <h3 className="mt-1 text-sm font-bold text-[var(--uki-cream)]">Qué está ocurriendo con ellos</h3>
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
+                      En el pool · {openPositions.length} en total
+                    </p>
+                    <h3 className="mt-2 text-balance font-headline text-2xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
+                      {activeCount === 0
+                        ? 'Ningún Cukie puede entrar en partidas ahora'
+                        : `${activeCount} ${activeCount === 1 ? 'Cukie está disponible' : 'Cukies están disponibles'} para partidas`}
+                    </h3>
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                      {activeCount === 0
+                        ? 'Revisa si están activándose, saliendo o listos para volver a tu wallet.'
+                        : 'Pueden ser elegidos para jugar y optan al reparto de su generación cuando se utilizan en partidas válidas.'}
+                    </p>
                   </div>
-                  <p className="shrink-0 font-headline text-3xl font-black tabular-nums text-[var(--uki-lilac)]">
-                    {openPositions.length}
-                  </p>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border border-white/10 bg-white/10 sm:grid-cols-4">
-                  <PoolStateMetric label="Disponibles" value={activeCount} />
-                  <PoolStateMetric label="Activándose" value={activatingCount} />
-                  <PoolStateMetric label="Saliendo" value={leavingCount} />
-                  <PoolStateMetric label="Para retirar" value={withdrawableCount} />
                 </div>
               </section>
 
-              <section className="min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:p-5">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Listos para aportar</p>
-                <p className="mt-2 font-headline text-3xl font-black tabular-nums text-[var(--uki-cream)]">
-                  {status.availableAssets.length}
-                </p>
-                <div className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs font-semibold text-[var(--uki-muted)]">
-                  <p className="flex items-center justify-between gap-3"><span>Originales</span><strong className="text-[var(--uki-cream)]">{availableOriginalCount}</strong></p>
-                  <p className="flex items-center justify-between gap-3"><span>Segunda Generación</span><strong className="text-[var(--uki-cream)]">{availableSecondGenerationCount}</strong></p>
+              <section className="min-w-0 bg-[#0d0914] p-5 sm:p-6">
+                <div className="flex items-start gap-4">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-[var(--uki-lilac)]">
+                    <WalletCards className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">En tu wallet</p>
+                    <h3 className="mt-2 font-headline text-2xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
+                      {status.availableAssets.length} {status.availableAssets.length === 1 ? 'Cukie para aportar' : 'Cukies para aportar'}
+                    </h3>
+                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                      {availableOriginalCount} {availableOriginalCount === 1 ? 'Original' : 'Originales'} · {availableSecondGenerationCount} de Segunda Generación
+                    </p>
+                  </div>
                 </div>
               </section>
             </div>
+
+            <PoolMovements
+              activating={activatingCount}
+              leaving={leavingCount}
+              withdrawable={withdrawableCount}
+            />
 
             <section className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
               <p className="text-xs font-black text-[var(--uki-lilac)]">Tu siguiente paso</p>
@@ -893,48 +917,62 @@ export function CukiePoolStatusPanel() {
                     : 'Mostraremos tu inventario cuando termine la actualización.'}
                 </p>
               ) : (
-                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   {status.availableAssets.map((asset) => {
                     const working = mutatingAssetId === asset.assetId;
                     const pending = pendingByAsset[asset.assetId];
                     const pendingLocked = Boolean(pending && pending.phase !== 'approval_confirmed');
                     const gamesPerDay = dailyGamesCapacity(asset.generation, asset.rarity);
                     return (
-                    <article key={asset.assetId} className="grid min-w-0 gap-4 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-                      <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] font-headline text-sm font-black text-[var(--uki-lilac)]">
-                        #{asset.tokenId.slice(-2)}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-bold text-[var(--uki-cream)]">Cukie #{asset.tokenId}</p>
-                        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                          {generationLabel(asset.generation)} · {rarityLabel(asset.rarity)}
-                        </p>
-                        <p className="mt-2 text-xs font-bold text-[var(--uki-lilac)]">
-                          Hasta {gamesPerDay} {gamesPerDay === 1 ? 'partida' : 'partidas'} por periodo diario
-                        </p>
+                    <article key={asset.assetId} className="min-w-0 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914] transition-transform duration-200 active:scale-[0.99] sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]">
+                      <div className="relative aspect-[4/3] min-w-0 overflow-hidden border-b border-white/10 bg-[#160d21] sm:aspect-auto sm:min-h-[13.5rem] sm:border-b-0 sm:border-r">
+                        <CukiImage
+                          src={asset.imageUrl}
+                          alt={`Cukie #${asset.tokenId}`}
+                          sizes="(min-width: 1024px) 176px, (min-width: 640px) 35vw, 92vw"
+                          className="object-contain p-3"
+                        />
+                        <span className="absolute left-3 top-3 rounded-full border border-[var(--uki-lilac-border)] bg-[#160a22]/95 px-2.5 py-1 text-[11px] font-black text-[var(--uki-lilac)]">
+                          {generationLabel(asset.generation)}
+                        </span>
                       </div>
-                      <div className="sm:text-right">
+
+                      <div className="flex min-w-0 flex-col p-4">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h4 className="truncate font-headline text-lg font-black text-[var(--uki-cream)]">Cukie #{asset.tokenId}</h4>
+                            <p className="mt-1 text-xs font-bold text-[var(--uki-muted)]">Rareza {rarityLabel(asset.rarity)}</p>
+                          </div>
+                          <span className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-black text-[var(--uki-text)]">
+                            {gamesPerDay} {gamesPerDay === 1 ? 'partida' : 'partidas'}/día
+                          </span>
+                        </div>
+
+                        <p className="mt-3 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
+                          Al aportarlo quedará protegido y empezará a estar disponible para partidas en el siguiente periodo.
+                        </p>
+
                         <button
                           type="button"
                           disabled={Boolean(mutatingAssetId) || pendingLocked || !pendingHydrated || !depositsReady}
                           onClick={() => void deposit(asset)}
-                          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
+                          className="mt-auto inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {working || pendingLocked ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
+                          {working || pendingLocked ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                           {working && phase === 'approving'
                             ? 'Aprobando'
                             : working && phase === 'depositing'
                               ? 'Añadiendo'
                               : pending
                                 ? pendingLabel(pending)
-                                : 'Añadir al pool'}
+                                : 'Aportar este Cukie'}
                         </button>
                         {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
                           <a
                             href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
+                            className="mt-2 block text-center text-xs font-black text-[var(--uki-lilac)] underline"
                           >
                             Ver transacción
                           </a>
@@ -965,66 +1003,78 @@ export function CukiePoolStatusPanel() {
               {openPositions.length === 0 ? (
                 <p className="mt-4 text-sm font-semibold text-[var(--uki-muted)]">Todavía no has aportado ningún Cukie al pool.</p>
               ) : (
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 grid gap-4 xl:grid-cols-2">
                   {openPositions.map((position) => {
                     const working = mutatingAssetId === position.assetId;
                     const pending = pendingByAsset[position.assetId];
                     const confirmingExit = exitConfirmationId === position.positionId;
                     return (
-                    <article key={position.positionId} className="grid min-w-0 gap-4 rounded-[10px] border border-white/10 bg-black/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.48fr)] lg:items-start">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="font-bold text-[var(--uki-cream)]">Cukie #{position.tokenId}</p>
-                            <p className={`mt-1 text-xs font-black ${position.status === 'active' || position.status === 'withdrawable' ? 'text-[var(--uki-lilac)]' : 'text-amber-300'}`}>
-                              {statusLabel(position.status)}
-                            </p>
-                          </div>
-                          {position.status === 'active' ? <CheckCircle2 className="h-5 w-5 text-[var(--uki-lilac)]" aria-hidden="true" /> : null}
-                          {position.status === 'pending' || position.status === 'exit_requested' ? <Clock3 className="h-5 w-5 text-amber-300" aria-hidden="true" /> : null}
-                          {position.status === 'withdrawable' ? <Unlock className="h-5 w-5 text-[var(--uki-lilac)]" aria-hidden="true" /> : null}
+                    <article key={position.positionId} className="min-w-0 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914]">
+                      <div className="grid min-w-0 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
+                        <div className="relative aspect-[4/3] min-w-0 overflow-hidden border-b border-white/10 bg-[#160d21] sm:aspect-auto sm:min-h-[15.5rem] sm:border-b-0 sm:border-r">
+                          <CukiImage
+                            src={position.imageUrl}
+                            alt={`Cukie #${position.tokenId}`}
+                            sizes="(min-width: 1280px) 168px, (min-width: 640px) 30vw, 92vw"
+                            className="object-contain p-3"
+                          />
+                          <span className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black ${positionStatusClass(position.status)}`}>
+                            {position.status === 'active' ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {position.status === 'pending' || position.status === 'exit_requested' ? <Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {position.status === 'withdrawable' ? <Unlock className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {statusLabel(position.status)}
+                          </span>
                         </div>
-                        <PositionSchedule position={position} />
+
+                        <div className="min-w-0 p-4 sm:p-5">
+                          <h4 className="truncate font-headline text-lg font-black text-[var(--uki-cream)]">Cukie #{position.tokenId}</h4>
+                          <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                            {position.generation && position.rarity
+                              ? `${generationLabel(position.generation)} · ${rarityLabel(position.rarity)}`
+                              : 'NFT de tu colección'}
+                          </p>
+                          <PositionSchedule position={position} />
+                        </div>
                       </div>
 
-                      <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.025] p-4">
+                      <div className="min-w-0 border-t border-white/10 bg-white/[0.025] p-4 sm:p-5">
                         {position.status === 'active' && position.ownerRewardEligible ? (
-                          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                            Opta al reparto cuando se use en partidas válidas. El importe no es fijo y depende de lo generado por su grupo.
+                          <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Está disponible para partidas. Si se utiliza en una partida válida, optará al reparto de su generación.
                           </p>
                         ) : position.status === 'pending' ? (
-                          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                            Aún no participa. Se activará automáticamente en la fecha indicada.
+                          <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Está protegido, pero todavía no puede entrar en partidas. Se activará automáticamente.
                           </p>
                         ) : position.status === 'exit_requested' ? (
-                          <p className="text-xs font-semibold leading-relaxed text-amber-200">
-                            La salida ya está confirmada. No repitas la operación; espera hasta que se habilite la retirada.
+                          <p className="text-sm font-semibold leading-relaxed text-amber-200">
+                            La devolución ya está solicitada. No tienes que hacer nada hasta la fecha indicada.
                           </p>
                         ) : (
-                          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                            Ya puedes devolver este Cukie a tu wallet.
+                          <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                            La espera terminó. Retira este Cukie para que vuelva a tu wallet.
                           </p>
                         )}
 
                         {position.lifecycleOpen && (position.status === 'pending' || position.status === 'active') ? (
                           confirmingExit ? (
-                            <div className="mt-4 border-t border-amber-300/20 pt-4">
-                              <p className="text-xs font-semibold leading-relaxed text-amber-200">
-                                La salida no se puede cancelar. Desde que la confirmes, este Cukie deja de optar al reparto del periodo actual.
+                            <div className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-300/[0.06] p-3">
+                              <p className="text-sm font-semibold leading-relaxed text-amber-100">
+                                La devolución no se puede cancelar. Al confirmarla, este Cukie dejará de optar al reparto del periodo actual.
                               </p>
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-3 grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   onClick={() => setExitConfirmationId(null)}
-                                  className="min-h-10 rounded-[7px] border border-white/15 px-3 text-xs font-black text-[var(--uki-text)]"
+                                  className="min-h-11 rounded-[7px] border border-white/15 px-3 text-xs font-black text-[var(--uki-text)] transition-transform active:scale-[0.98]"
                                 >
-                                  Volver
+                                  Mantener en el pool
                                 </button>
                                 <button
                                   type="button"
                                   disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
                                   onClick={() => void mutatePosition(position, 'request_exit')}
-                                  className="inline-flex min-h-10 items-center gap-1.5 rounded-[7px] border border-amber-300/40 bg-amber-300/10 px-3 text-xs font-black text-amber-100 disabled:opacity-50"
+                                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[7px] border border-amber-300/40 bg-amber-300/10 px-3 text-xs font-black text-amber-100 transition-transform active:scale-[0.98] disabled:opacity-50"
                                 >
                                   {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
                                   {pending ? pendingLabel(pending) : working ? 'Confirmando salida' : 'Confirmar salida'}
@@ -1036,10 +1086,10 @@ export function CukiePoolStatusPanel() {
                               type="button"
                               disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
                               onClick={() => setExitConfirmationId(position.positionId)}
-                              className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-[7px] border border-white/15 px-3 text-xs font-black text-[var(--uki-text)] disabled:opacity-50"
+                              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-white/15 px-4 text-xs font-black text-[var(--uki-text)] transition-colors hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] active:scale-[0.99] disabled:opacity-50"
                             >
                               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-                              {pending ? pendingLabel(pending) : position.status === 'pending' ? 'Cancelar aportación' : 'Dejar el pool'}
+                              {pending ? pendingLabel(pending) : position.status === 'pending' ? 'Cancelar aportación' : 'Solicitar devolución'}
                             </button>
                           )
                         ) : position.lifecycleOpen && position.status === 'withdrawable' ? (
@@ -1047,7 +1097,7 @@ export function CukiePoolStatusPanel() {
                             type="button"
                             disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
                             onClick={() => void mutatePosition(position, 'withdraw')}
-                            className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-4 text-xs font-black uppercase text-black disabled:opacity-50"
+                            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-4 text-xs font-black uppercase text-black transition-transform active:scale-[0.98] disabled:opacity-50"
                           >
                             {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
                             {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar a mi wallet'}
@@ -1058,7 +1108,7 @@ export function CukiePoolStatusPanel() {
                             href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
+                            className="mt-3 block text-center text-xs font-black text-[var(--uki-lilac)] underline"
                           >
                             Ver transacción
                           </a>
@@ -1085,12 +1135,70 @@ export function CukiePoolStatusPanel() {
   );
 }
 
-function PoolStateMetric({ label, value }: { label: string; value: number }) {
+function positionStatusClass(status: PoolPositionStatus) {
+  if (status === 'active' || status === 'withdrawable') {
+    return 'border-[var(--uki-lilac-border)] bg-[#160a22]/95 text-[var(--uki-lilac)]';
+  }
+  return 'border-amber-300/30 bg-[#21170d]/95 text-amber-200';
+}
+
+function PoolMovements({
+  activating,
+  leaving,
+  withdrawable,
+}: {
+  activating: number;
+  leaving: number;
+  withdrawable: number;
+}) {
+  const movements = [
+    {
+      key: 'activating',
+      value: activating,
+      label: 'Activándose',
+      detail: 'Entrarán en partidas en la fecha indicada.',
+    },
+    {
+      key: 'leaving',
+      value: leaving,
+      label: 'Devolución solicitada',
+      detail: 'Esperan a que se habilite la retirada.',
+    },
+    {
+      key: 'withdrawable',
+      value: withdrawable,
+      label: 'Listos para retirar',
+      detail: 'Necesitan que los devuelvas a tu wallet.',
+    },
+  ].filter((movement) => movement.value > 0);
+
+  if (movements.length === 0) {
+    return (
+      <div className="flex items-start gap-3 border-t border-white/10 pt-4 text-sm font-semibold text-[var(--uki-muted)]">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
+        <p><strong className="text-[var(--uki-text)]">Todo al día.</strong> No tienes Cukies esperando activación, devolución o retirada.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-w-0 bg-[#0d0914] px-3 py-3 text-center">
-      <p className="font-headline text-xl font-black tabular-nums text-[var(--uki-cream)]">{value}</p>
-      <p className="mt-1 truncate text-[11px] font-bold text-[var(--uki-muted)]">{label}</p>
-    </div>
+    <section className="border-t border-white/10 pt-4">
+      <div className="flex items-center gap-2">
+        <RefreshCw className="h-4 w-4 text-[var(--uki-lilac)]" aria-hidden="true" />
+        <h3 className="text-sm font-black text-[var(--uki-cream)]">Movimientos pendientes</h3>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {movements.map((movement) => (
+          <div key={movement.key} className="flex min-w-0 items-start gap-3 rounded-[8px] border border-white/10 bg-white/[0.025] p-3">
+            <span className="font-headline text-xl font-black tabular-nums text-[var(--uki-lilac)]">{movement.value}</span>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-[var(--uki-text)]">{movement.label}</p>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{movement.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
