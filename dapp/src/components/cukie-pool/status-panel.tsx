@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   Clock3,
   Loader2,
@@ -14,7 +16,6 @@ import { isAddress, type Address, type Hash } from 'viem';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { Panel } from '@/components/landing/primitives';
-import { NftVaultRecoveryPanel } from '@/components/nft-vault/recovery-panel';
 import {
   cukiePoolNftVaultAbi,
   ukiNftVaults,
@@ -136,10 +137,29 @@ function generationLabel(value: PoolGeneration) {
   return value === 'original' ? 'Original' : 'Segunda generación';
 }
 
+function rarityLabel(value: PoolRarity) {
+  return ({
+    common: 'Común',
+    uncommon: 'No común',
+    rare: 'Raro',
+    epic: 'Épico',
+    legendary: 'Legendario',
+    goat: 'Goat',
+  } as const)[value];
+}
+
+function dailyGamesCapacity(generation: PoolGeneration, rarity: PoolRarity) {
+  const quota = {
+    original: { common: 2, uncommon: 4, rare: 6, epic: 8, legendary: 10, goat: 12 },
+    second_generation: { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5, goat: 6 },
+  } as const;
+  return quota[generation][rarity];
+}
+
 function statusLabel(value: PoolPositionStatus) {
-  if (value === 'pending') return 'Pendiente del próximo periodo';
-  if (value === 'active') return 'Activo en el pool';
-  if (value === 'exit_requested') return 'Salida solicitada';
+  if (value === 'pending') return 'Activándose';
+  if (value === 'active') return 'Disponible para partidas';
+  if (value === 'exit_requested') return 'Salida programada';
   if (value === 'withdrawable') return 'Listo para retirar';
   return 'Retirado';
 }
@@ -182,23 +202,23 @@ function projectionMatchesPoolOperation(
 function scheduleSummary(position: CustodialPosition) {
   if (position.status === 'pending') {
     return {
-      label: 'Próximo corte y activación',
+      label: 'Disponible para partidas desde',
       timestamp: position.activationAt,
-      detail: 'Desde ese corte podrá prestarse y empezará su primer periodo elegible.',
+      detail: 'Hasta entonces permanece protegido, pero todavía no puede usarse ni generar reparto.',
     };
   }
   if (position.status === 'active') {
     return {
-      label: 'Activo desde el corte',
+      label: 'Participando desde',
       timestamp: position.activationAt,
-      detail: 'Ya puede prestarse y participa en el reparto mientras siga elegible.',
+      detail: 'Puede entrar en partidas. Si se usa en partidas válidas, opta al reparto de su generación.',
     };
   }
   if (position.status === 'exit_requested') {
     return {
-      label: 'Próximo corte y retirada',
+      label: 'Podrás retirarlo desde',
       timestamp: position.withdrawableAt,
-      detail: 'Puede seguir prestándose hasta ese corte, pero ya no participa en el reparto del periodo.',
+      detail: 'Sigue disponible para partidas hasta ese momento, pero ya no opta al reparto de este periodo.',
     };
   }
   if (position.status === 'withdrawable') {
@@ -232,6 +252,16 @@ function PositionSchedule({ position }: { position: CustodialPosition }) {
   );
 }
 
+function JourneyStep({ number, label }: { number: string; label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-headline text-sm font-black text-[var(--uki-lilac)]">{number}</span>
+      <span className="h-px w-8 bg-[var(--uki-lilac)]/45" aria-hidden="true" />
+      <p className="text-sm font-bold text-[var(--uki-text)]">{label}</p>
+    </div>
+  );
+}
+
 async function requestPoolStatus(walletAddress: string, signal?: AbortSignal) {
   const response = await fetch(
     `/api/economy/v1/cukie-pool?walletAddress=${encodeURIComponent(walletAddress)}`,
@@ -254,6 +284,7 @@ export function CukiePoolStatusPanel() {
   const [phase, setPhase] = useState<MutationPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [exitConfirmationId, setExitConfirmationId] = useState<string | null>(null);
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
@@ -626,6 +657,7 @@ export function CukiePoolStatusPanel() {
     ) return;
     walletOperationLockRef.current = true;
     operationLocksRef.current.add(position.assetId);
+    setExitConfirmationId(null);
     setMutatingAssetId(position.assetId);
     setError(null);
     setNotice(null);
@@ -661,14 +693,24 @@ export function CukiePoolStatusPanel() {
     }
   }
 
+  const custodialStatus = status?.mode === 'custodial_vault' ? status : null;
+  const openPositions = custodialStatus?.positions.filter((item) => item.lifecycleOpen) ?? [];
+  const activeCount = openPositions.filter((item) => item.status === 'active' && item.ownerRewardEligible).length;
+  const activatingCount = openPositions.filter((item) => item.status === 'pending').length;
+  const leavingCount = openPositions.filter((item) => item.status === 'exit_requested').length;
+  const withdrawableCount = openPositions.filter((item) => item.status === 'withdrawable').length;
+  const availableOriginalCount = custodialStatus?.availableAssets.filter((item) => item.generation === 'original').length ?? 0;
+  const availableSecondGenerationCount = (custodialStatus?.availableAssets.length ?? 0) - availableOriginalCount;
+
   return (
-    <section id="mi-cukie-pool" className="relative z-[2] w-full pb-10">
-      <Panel innerClassName="p-5 sm:p-7">
+    <section id="mi-cukie-pool" className="relative z-[2] w-full pb-10 pt-7">
+      <JourneyStep number="01" label="Comprueba tu posición" />
+      <Panel className="mt-4" innerClassName="p-5 sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="uki-label">Pool de Cukies</p>
-            <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">
-              Mis Cukies en el pool
+            <p className="uki-label">Tu estado personal</p>
+            <h2 className="mt-2 font-headline text-2xl font-black text-[var(--uki-cream)]">
+              Tu pool de un vistazo
             </h2>
           </div>
           {status ? (
@@ -691,7 +733,7 @@ export function CukiePoolStatusPanel() {
 
         {!authLoading && loadState === 'idle' ? (
           <p className="mt-6 text-sm font-semibold text-[var(--uki-text)]">
-            Conecta tu wallet para depositar o recuperar Cukies.
+            Conecta tu wallet para ver qué Cukies puedes aportar y cuáles están ya en el pool.
           </p>
         ) : null}
 
@@ -750,58 +792,154 @@ export function CukiePoolStatusPanel() {
               </p>
             ) : null}
 
-            <div>
+            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+              <section className="min-w-0 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
+                <div className="flex min-w-0 items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tus Cukies aportados</p>
+                    <h3 className="mt-1 text-sm font-bold text-[var(--uki-cream)]">Qué está ocurriendo con ellos</h3>
+                  </div>
+                  <p className="shrink-0 font-headline text-3xl font-black tabular-nums text-[var(--uki-lilac)]">
+                    {openPositions.length}
+                  </p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border border-white/10 bg-white/10 sm:grid-cols-4">
+                  <PoolStateMetric label="Disponibles" value={activeCount} />
+                  <PoolStateMetric label="Activándose" value={activatingCount} />
+                  <PoolStateMetric label="Saliendo" value={leavingCount} />
+                  <PoolStateMetric label="Para retirar" value={withdrawableCount} />
+                </div>
+              </section>
+
+              <section className="min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Listos para aportar</p>
+                <p className="mt-2 font-headline text-3xl font-black tabular-nums text-[var(--uki-cream)]">
+                  {status.availableAssets.length}
+                </p>
+                <div className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs font-semibold text-[var(--uki-muted)]">
+                  <p className="flex items-center justify-between gap-3"><span>Originales</span><strong className="text-[var(--uki-cream)]">{availableOriginalCount}</strong></p>
+                  <p className="flex items-center justify-between gap-3"><span>Segunda Generación</span><strong className="text-[var(--uki-cream)]">{availableSecondGenerationCount}</strong></p>
+                </div>
+              </section>
+            </div>
+
+            <section className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
+              <p className="text-xs font-black text-[var(--uki-lilac)]">Tu siguiente paso</p>
+              {withdrawableCount > 0 ? (
+                <NextAction
+                  title={`${withdrawableCount === 1 ? 'Tienes un Cukie listo' : `Tienes ${withdrawableCount} Cukies listos`} para volver a tu wallet`}
+                  description="La espera ya terminó. Retíralo desde la sección de Cukies aportados."
+                  href="#mis-cukies-aportados"
+                  label="Ir a retirar"
+                />
+              ) : leavingCount > 0 ? (
+                <NextAction
+                  title="Tu salida está programada"
+                  description="No tienes que repetir la operación. En cada Cukie verás la fecha exacta desde la que podrás retirarlo."
+                  href="#mis-cukies-aportados"
+                  label="Ver la salida"
+                />
+              ) : activatingCount > 0 ? (
+                <NextAction
+                  title="Tienes Cukies preparándose para entrar"
+                  description="No necesitas hacer nada. Empezarán a estar disponibles para partidas en la fecha indicada."
+                  href="#mis-cukies-aportados"
+                  label="Ver activación"
+                />
+              ) : status.availableAssets.length > 0 ? (
+                <NextAction
+                  title={`Puedes aportar ${status.availableAssets.length === 1 ? 'un Cukie' : `${status.availableAssets.length} Cukies`}`}
+                  description="Elige uno y revisa su generación, rareza y capacidad diaria antes de confirmar el depósito."
+                  href="#cukies-disponibles"
+                  label="Elegir Cukie"
+                />
+              ) : activeCount > 0 ? (
+                <NextAction
+                  title="Tus Cukies ya están disponibles para partidas"
+                  description="Optarán al reparto de su generación cuando se utilicen en partidas válidas."
+                  href="#mis-cukies-aportados"
+                  label="Ver mis Cukies"
+                />
+              ) : (
+                <NextAction
+                  title="No tienes Cukies disponibles para aportar"
+                  description="Puedes revisar tu colección o volver a actualizar el estado de esta pantalla."
+                  href="/cukies"
+                  label="Ver mi colección"
+                />
+              )}
+            </section>
+
+            <div id="cukies-disponibles" className="scroll-mt-24 border-t border-white/10 pt-6">
+              <JourneyStep number="02" label="Elige qué Cukies quieres aportar" />
               <div className="flex items-center justify-between gap-3">
-                <h3 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">
-                  Disponibles en tu wallet
-                </h3>
-                <span className="text-xs font-bold text-[var(--uki-muted)]">
-                  {status.availableAssets.length} NFT
+                <div className="mt-4">
+                  <h3 className="font-headline text-xl font-black text-[var(--uki-cream)]">
+                    Cukies listos para aportar
+                  </h3>
+                  <p className="mt-1 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    Al añadir uno, sale de tu wallet y queda protegido en el pool hasta que completes su salida.
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-bold text-[var(--uki-muted)]">
+                  {status.availableAssets.length} disponibles
                 </span>
               </div>
               {status.availableAssets.length === 0 ? (
-                <p className="mt-3 text-sm font-semibold text-[var(--uki-muted)]">
+                <p className="mt-4 text-sm font-semibold text-[var(--uki-muted)]">
                   {status.nftCustody.indexer.status === 'ready'
-                    ? 'No hay Cukies elegibles disponibles para depositar.'
-                    : 'Inventario oculto hasta recuperar una proyección saludable.'}
+                    ? 'Ahora mismo no tienes Cukies que puedan añadirse al pool.'
+                    : 'Mostraremos tu inventario cuando termine la actualización.'}
                 </p>
               ) : (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
                   {status.availableAssets.map((asset) => {
                     const working = mutatingAssetId === asset.assetId;
                     const pending = pendingByAsset[asset.assetId];
                     const pendingLocked = Boolean(pending && pending.phase !== 'approval_confirmed');
+                    const gamesPerDay = dailyGamesCapacity(asset.generation, asset.rarity);
                     return (
-                    <article key={asset.assetId} className="rounded-[8px] border border-white/10 bg-black/20 p-4">
-                      <p className="font-bold text-[var(--uki-cream)]">Cukie #{asset.tokenId}</p>
-                      <p className="mt-1 text-xs font-semibold capitalize text-[var(--uki-muted)]">
-                        {generationLabel(asset.generation)} · {asset.rarity}
-                      </p>
-                      <button
-                        type="button"
-                        disabled={Boolean(mutatingAssetId) || pendingLocked || !pendingHydrated || !depositsReady}
-                        onClick={() => void deposit(asset)}
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
-                      >
-                        {working || pendingLocked ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
-                        {working && phase === 'approving'
-                          ? 'Aprobando'
-                          : working && phase === 'depositing'
-                            ? 'Depositando'
-                            : pending
-                              ? pendingLabel(pending)
-                              : 'Depositar'}
-                      </button>
-                      {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
-                        <a
-                          href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
+                    <article key={asset.assetId} className="grid min-w-0 gap-4 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+                      <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] font-headline text-sm font-black text-[var(--uki-lilac)]">
+                        #{asset.tokenId.slice(-2)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-[var(--uki-cream)]">Cukie #{asset.tokenId}</p>
+                        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                          {generationLabel(asset.generation)} · {rarityLabel(asset.rarity)}
+                        </p>
+                        <p className="mt-2 text-xs font-bold text-[var(--uki-lilac)]">
+                          Hasta {gamesPerDay} {gamesPerDay === 1 ? 'partida' : 'partidas'} por periodo diario
+                        </p>
+                      </div>
+                      <div className="sm:text-right">
+                        <button
+                          type="button"
+                          disabled={Boolean(mutatingAssetId) || pendingLocked || !pendingHydrated || !depositsReady}
+                          onClick={() => void deposit(asset)}
+                          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
                         >
-                          Ver transacción de esta operación
-                        </a>
-                      ) : null}
+                          {working || pendingLocked ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
+                          {working && phase === 'approving'
+                            ? 'Aprobando'
+                            : working && phase === 'depositing'
+                              ? 'Añadiendo'
+                              : pending
+                                ? pendingLabel(pending)
+                                : 'Añadir al pool'}
+                        </button>
+                        {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
+                          <a
+                            href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
+                          >
+                            Ver transacción
+                          </a>
+                        ) : null}
+                      </div>
                     </article>
                     );
                   })}
@@ -809,82 +947,177 @@ export function CukiePoolStatusPanel() {
               )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">
-                  Cukies depositados
-                </h3>
-                <span className="text-xs font-bold text-[var(--uki-muted)]">
-                  {status.positions.filter((item) => item.lifecycleOpen).length} activos
+            <div id="mis-cukies-aportados" className="scroll-mt-24 border-t border-white/10 pt-6">
+              <JourneyStep number="03" label="Gestiona los Cukies que ya aportaste" />
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-headline text-xl font-black text-[var(--uki-cream)]">
+                    Tus Cukies en el pool
+                  </h3>
+                  <p className="mt-1 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    Cada estado te indica si el Cukie puede entrar en partidas y cuándo puedes recuperarlo.
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-bold text-[var(--uki-muted)]">
+                  {openPositions.length} en el pool
                 </span>
               </div>
-              {status.positions.length === 0 ? (
-                <p className="mt-3 text-sm font-semibold text-[var(--uki-muted)]">Todavía no tienes Cukies depositados en el pool.</p>
+              {openPositions.length === 0 ? (
+                <p className="mt-4 text-sm font-semibold text-[var(--uki-muted)]">Todavía no has aportado ningún Cukie al pool.</p>
               ) : (
-                <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  {status.positions.map((position) => {
+                <div className="mt-4 space-y-3">
+                  {openPositions.map((position) => {
                     const working = mutatingAssetId === position.assetId;
                     const pending = pendingByAsset[position.assetId];
+                    const confirmingExit = exitConfirmationId === position.positionId;
                     return (
-                    <article key={position.positionId} className="rounded-[8px] border border-white/10 bg-black/20 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="font-bold text-[var(--uki-cream)]">Cukie #{position.tokenId}</p>
-                          <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                            Periodo {position.depositEpoch} · {statusLabel(position.status)}
-                          </p>
+                    <article key={position.positionId} className="grid min-w-0 gap-4 rounded-[10px] border border-white/10 bg-black/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.48fr)] lg:items-start">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-bold text-[var(--uki-cream)]">Cukie #{position.tokenId}</p>
+                            <p className={`mt-1 text-xs font-black ${position.status === 'active' || position.status === 'withdrawable' ? 'text-[var(--uki-lilac)]' : 'text-amber-300'}`}>
+                              {statusLabel(position.status)}
+                            </p>
+                          </div>
+                          {position.status === 'active' ? <CheckCircle2 className="h-5 w-5 text-[var(--uki-lilac)]" aria-hidden="true" /> : null}
+                          {position.status === 'pending' || position.status === 'exit_requested' ? <Clock3 className="h-5 w-5 text-amber-300" aria-hidden="true" /> : null}
+                          {position.status === 'withdrawable' ? <Unlock className="h-5 w-5 text-[var(--uki-lilac)]" aria-hidden="true" /> : null}
                         </div>
-                        {position.status === 'active' ? <CheckCircle2 className="h-5 w-5 text-[var(--uki-lilac)]" /> : null}
-                        {position.status === 'pending' || position.status === 'exit_requested' ? <Clock3 className="h-5 w-5 text-amber-300" /> : null}
-                        {position.status === 'withdrawable' ? <Unlock className="h-5 w-5 text-[var(--uki-lilac)]" /> : null}
+                        <PositionSchedule position={position} />
                       </div>
-                      <PositionSchedule position={position} />
-                      {position.ownerRewardEligible ? (
-                        <p className="mt-3 text-xs font-semibold text-[var(--uki-lilac)]">Participa en el reparto mientras complete partidas válidas.</p>
-                      ) : position.lifecycleOpen ? (
-                        <p className="mt-3 text-xs font-semibold text-amber-300">No participa en el reparto del periodo de salida.</p>
-                      ) : null}
-                      {position.lifecycleOpen && (position.status === 'pending' || position.status === 'active') ? (
-                        <button
-                          type="button"
-                          disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
-                          onClick={() => void mutatePosition(position, 'request_exit')}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] border border-white/15 px-3 py-2 text-xs font-black uppercase text-[var(--uki-text)] disabled:opacity-50"
-                        >
-                          {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-                          {pending ? pendingLabel(pending) : working ? 'Confirmando salida' : 'Solicitar salida'}
-                        </button>
-                      ) : position.lifecycleOpen && position.status === 'withdrawable' ? (
-                        <button
-                          type="button"
-                          disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
-                          onClick={() => void mutatePosition(position, 'withdraw')}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
-                        >
-                          {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
-                          {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar NFT'}
-                        </button>
-                      ) : null}
-                      {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
-                        <a
-                          href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
-                        >
-                          Ver transacción de esta operación
-                        </a>
-                      ) : null}
+
+                      <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.025] p-4">
+                        {position.status === 'active' && position.ownerRewardEligible ? (
+                          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Opta al reparto cuando se use en partidas válidas. El importe no es fijo y depende de lo generado por su grupo.
+                          </p>
+                        ) : position.status === 'pending' ? (
+                          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Aún no participa. Se activará automáticamente en la fecha indicada.
+                          </p>
+                        ) : position.status === 'exit_requested' ? (
+                          <p className="text-xs font-semibold leading-relaxed text-amber-200">
+                            La salida ya está confirmada. No repitas la operación; espera hasta que se habilite la retirada.
+                          </p>
+                        ) : (
+                          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Ya puedes devolver este Cukie a tu wallet.
+                          </p>
+                        )}
+
+                        {position.lifecycleOpen && (position.status === 'pending' || position.status === 'active') ? (
+                          confirmingExit ? (
+                            <div className="mt-4 border-t border-amber-300/20 pt-4">
+                              <p className="text-xs font-semibold leading-relaxed text-amber-200">
+                                La salida no se puede cancelar. Desde que la confirmes, este Cukie deja de optar al reparto del periodo actual.
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setExitConfirmationId(null)}
+                                  className="min-h-10 rounded-[7px] border border-white/15 px-3 text-xs font-black text-[var(--uki-text)]"
+                                >
+                                  Volver
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
+                                  onClick={() => void mutatePosition(position, 'request_exit')}
+                                  className="inline-flex min-h-10 items-center gap-1.5 rounded-[7px] border border-amber-300/40 bg-amber-300/10 px-3 text-xs font-black text-amber-100 disabled:opacity-50"
+                                >
+                                  {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+                                  {pending ? pendingLabel(pending) : working ? 'Confirmando salida' : 'Confirmar salida'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
+                              onClick={() => setExitConfirmationId(position.positionId)}
+                              className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-[7px] border border-white/15 px-3 text-xs font-black text-[var(--uki-text)] disabled:opacity-50"
+                            >
+                              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+                              {pending ? pendingLabel(pending) : position.status === 'pending' ? 'Cancelar aportación' : 'Dejar el pool'}
+                            </button>
+                          )
+                        ) : position.lifecycleOpen && position.status === 'withdrawable' ? (
+                          <button
+                            type="button"
+                            disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
+                            onClick={() => void mutatePosition(position, 'withdraw')}
+                            className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-4 text-xs font-black uppercase text-black disabled:opacity-50"
+                          >
+                            {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
+                            {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar a mi wallet'}
+                          </button>
+                        ) : null}
+                        {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
+                          <a
+                            href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
+                          >
+                            Ver transacción
+                          </a>
+                        ) : null}
+                      </div>
                     </article>
                     );
                   })}
                 </div>
               )}
             </div>
+
+            <div className="border-t border-white/10 pt-5 text-sm font-semibold text-[var(--uki-muted)]">
+              ¿Depositaste un Cukie y no aparece aquí?{' '}
+              <Link href="/cukie-hodler/recuperar" className="font-black text-[var(--uki-lilac)] hover:underline">
+                Abrir la herramienta de recuperación
+              </Link>
+            </div>
+
           </div>
         ) : null}
-        <NftVaultRecoveryPanel kind="cukie_pool" />
       </Panel>
     </section>
+  );
+}
+
+function PoolStateMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="min-w-0 bg-[#0d0914] px-3 py-3 text-center">
+      <p className="font-headline text-xl font-black tabular-nums text-[var(--uki-cream)]">{value}</p>
+      <p className="mt-1 truncate text-[11px] font-bold text-[var(--uki-muted)]">{label}</p>
+    </div>
+  );
+}
+
+function NextAction({
+  description,
+  href,
+  label,
+  title,
+}: {
+  description: string;
+  href: string;
+  label: string;
+  title: string;
+}) {
+  return (
+    <div className="mt-2 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h3 className="text-balance font-headline text-xl font-black text-[var(--uki-cream)] sm:text-2xl">{title}</h3>
+        <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">{description}</p>
+      </div>
+      <a
+        href={href}
+        className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-4 text-xs font-black uppercase text-black"
+      >
+        {label}
+        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </a>
+    </div>
   );
 }

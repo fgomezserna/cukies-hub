@@ -29,6 +29,7 @@ jest.mock('@/lib/contracts/uki-nft-vaults', () => ({
 }));
 jest.mock('lucide-react', () => ({
   AlertTriangle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ArrowRight: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   CheckCircle2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Clock3: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Loader2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
@@ -205,8 +206,8 @@ describe('CukiePoolStatusPanel', () => {
     render(<CukiePoolStatusPanel />);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Conecta tu wallet para depositar o recuperar Cukies/i)).toBeInTheDocument();
-    expect(screen.getByText('Recuperación de emergencia')).toBeInTheDocument();
+    expect(screen.getByText(/Conecta tu wallet para ver qué Cukies puedes aportar/i)).toBeInTheDocument();
+    expect(screen.queryByText('Recuperación de emergencia')).not.toBeInTheDocument();
   });
 
   it('approves and deposits on-chain before accepting the canonical projection', async () => {
@@ -232,7 +233,7 @@ describe('CukiePoolStatusPanel', () => {
       .mockResolvedValueOnce(successfulResponse(poolStatus({ positions: [position({ status: 'pending' })] })));
 
     render(<CukiePoolStatusPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: /Depositar/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Añadir al pool/i }));
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
       'Depósito confirmado en BSC',
@@ -281,7 +282,7 @@ describe('CukiePoolStatusPanel', () => {
     const secondCard = screen.getByText('Cukie #8').closest('article');
     expect(firstCard).not.toBeNull();
     expect(secondCard).not.toBeNull();
-    const firstButton = within(firstCard!).getByRole('button', { name: 'Depositar' });
+    const firstButton = within(firstCard!).getByRole('button', { name: 'Añadir al pool' });
     await waitFor(() => expect(firstButton).toBeEnabled());
     fireEvent.click(firstButton);
 
@@ -289,7 +290,7 @@ describe('CukiePoolStatusPanel', () => {
       'ya puedes operar con otro',
     ));
     expect(within(firstCard!).getByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
-    expect(within(secondCard!).getByRole('button', { name: 'Depositar' })).toBeEnabled();
+    expect(within(secondCard!).getByRole('button', { name: 'Añadir al pool' })).toBeEnabled();
     expect(writeContractAsync).toHaveBeenCalledTimes(1);
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(1);
   });
@@ -316,9 +317,63 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    expect(await screen.findByRole('button', { name: /Solicitar salida/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Retirar NFT/i })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: /Dejar el pool/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Retirar a mi wallet/i })).toBeEnabled();
     expect(screen.getByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
+  });
+
+  it('explains a pending Cukie without presenting it as reward eligible', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      positions: [position({ status: 'pending' })],
+    })));
+
+    render(<CukiePoolStatusPanel />);
+
+    expect((await screen.findAllByText('Activándose')).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Aún no participa/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Opta al reparto cuando se use/i)).not.toBeInTheDocument();
+  });
+
+  it('requires an explicit confirmation before requesting an irreversible exit', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      positions: [position({ status: 'active' })],
+    })));
+
+    render(<CukiePoolStatusPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Dejar el pool/i }));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+    expect(screen.getByText(/La salida no se puede cancelar/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar salida/i }));
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: vaultAddress,
+      functionName: 'requestExit',
+      args: [collectionAddress, BigInt(7)],
+    })));
   });
 
   it('retries automatically until the indexer becomes ready', async () => {
@@ -351,7 +406,7 @@ describe('CukiePoolStatusPanel', () => {
       });
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      expect(await screen.findByRole('button', { name: /Depositar/i })).toBeEnabled();
+      expect(await screen.findByRole('button', { name: /Añadir al pool/i })).toBeEnabled();
       expect(screen.queryByText(/Los depósitos están bloqueados/i)).not.toBeInTheDocument();
     } finally {
       jest.useRealTimers();
@@ -427,7 +482,7 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    expect(await screen.findByText('Próximo corte y activación')).toBeInTheDocument();
+    expect(await screen.findByText('Disponible para partidas desde')).toBeInTheDocument();
     expect(screen.getByText(/15 ago 2026, 18:30 UTC/i)).toBeInTheDocument();
     expect(screen.queryByText(/Calendario de depósito/i)).not.toBeInTheDocument();
   });
@@ -455,9 +510,9 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    expect(await screen.findByText('Próximo corte y retirada')).toBeInTheDocument();
+    expect(await screen.findByText('Podrás retirarlo desde')).toBeInTheDocument();
     expect(screen.getByText(/16 ago 2026, 21:45 UTC/i)).toBeInTheDocument();
-    expect(screen.getByText(/Puede seguir prestándose hasta ese corte/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sigue disponible para partidas hasta ese momento/i)).toBeInTheDocument();
     expect(screen.queryByText(/Calendario de depósito/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Calendario de salida/i)).not.toBeInTheDocument();
   });
@@ -481,7 +536,7 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
 
-    expect(await screen.findByRole('button', { name: /Solicitar salida/i })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /Dejar el pool/i })).toBeDisabled();
     expect(screen.getByText(/El Pool de Cukies no está disponible ahora/i)).toBeInTheDocument();
   });
 });
