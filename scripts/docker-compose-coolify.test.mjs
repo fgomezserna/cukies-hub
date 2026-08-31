@@ -18,6 +18,16 @@ const guardedWorkers = [
   'cuki-card-worker',
 ];
 
+const sharedDappRuntimeWorkers = [
+  'cukie-master-scheduler',
+  'competition-credit-scheduler',
+  'game-economy-scheduler',
+  'cukie-pool-scheduler',
+  'weekly-ranking-scheduler',
+  'reward-accounting-scheduler',
+  'reward-batch-publisher',
+];
+
 const resourceScopedDappAlias = 'dapp-${COOLIFY_RESOURCE_UUID:?Coolify must expose the resource UUID}';
 const internalResourceDappUrl = 'http://dapp-${COOLIFY_RESOURCE_UUID}:3000';
 
@@ -81,6 +91,26 @@ test('dapp exposes a Docker alias scoped to its Coolify resource', () => {
 
   assert.ok(definition.includes(`          - ${resourceScopedDappAlias}`));
 });
+
+test('dapp owns the single shared runtime image build', () => {
+  const definition = serviceDefinition('dapp');
+
+  assert.ok(compose.includes('x-dapp-runtime: &dapp-runtime'));
+  assert.ok(compose.includes('image: "cukies-hub-dapp-runtime-${COOLIFY_RESOURCE_UUID:-local}:latest"'));
+  assert.ok(compose.includes('pull_policy: never'));
+  assert.ok(definition.includes('    <<: *dapp-runtime'));
+  assert.match(definition, /    build:\n/);
+});
+
+for (const serviceName of sharedDappRuntimeWorkers) {
+  test(`${serviceName} reuses the dapp runtime without rebuilding Next.js`, () => {
+    const definition = serviceDefinition(serviceName);
+
+    assert.ok(definition.includes('    <<: *dapp-runtime'));
+    assert.doesNotMatch(definition, /    build:\n/);
+    assert.doesNotMatch(definition, /CUKIES_SERVICE: dapp/);
+  });
+}
 
 test('dapp injects the public environment identity and optional liquidity links', () => {
   const definition = serviceDefinition('dapp');

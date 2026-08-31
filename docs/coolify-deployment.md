@@ -7,8 +7,18 @@ Los despliegues de staging y produccion deben usar `docker-compose.coolify.yml` 
 - `dapp`: Next.js publico. Es el unico servicio con dominio, proxy y puerto HTTP.
 - `chain-indexer`: worker interno. Lee blockchain, procesa historicos/live y proyecta en Mongo.
 - `cuki-card-worker`: worker interno. Genera cards PNG, las sube a S3 y actualiza `cukies.img`.
+- Los schedulers de Cukie Master, creditos, juego, pool, ranking y rewards son procesos
+  internos que reutilizan la imagen de `dapp` con comandos diferentes.
+- `staging-mongo` pertenece exclusivamente al perfil aislado `staging-runtime`. La base
+  de datos de produccion es externa y nunca debe construirse ni gestionarse desde este
+  compose.
 
 Los workers no necesitan dominio ni Traefik. Deben quedar con `restart: unless-stopped`.
+
+`dapp` es el unico servicio que construye la imagen compartida
+`cukies-hub-dapp-runtime-${COOLIFY_RESOURCE_UUID}:latest`. Los siete schedulers no deben
+declarar `build`: consumen esa imagen con `pull_policy: never`. Esto mantiene una sola
+compilacion de Next.js por despliegue y evita mezclar imagenes entre recursos de Coolify.
 
 ## Auto deploy
 

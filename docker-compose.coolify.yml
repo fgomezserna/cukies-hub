@@ -1,3 +1,7 @@
+x-dapp-runtime: &dapp-runtime
+  image: "cukies-hub-dapp-runtime-${COOLIFY_RESOURCE_UUID:-local}:latest"
+  pull_policy: never
+
 x-dapp-build-args: &dapp-build-args
   CUKIES_SERVICE: dapp
   NEXT_PUBLIC_UKI_CHAIN_ID: ${NEXT_PUBLIC_UKI_CHAIN_ID:-56}
@@ -63,6 +67,7 @@ services:
           - cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg
 
   dapp:
+    <<: *dapp-runtime
     build:
       context: .
       dockerfile: Dockerfile
@@ -359,13 +364,9 @@ services:
       - coolify
 
   cukie-master-scheduler:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -402,13 +403,9 @@ services:
       - coolify
 
   competition-credit-scheduler:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -444,13 +441,9 @@ services:
       - coolify
 
   game-economy-scheduler:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -486,13 +479,9 @@ services:
       - coolify
 
   cukie-pool-scheduler:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -528,13 +517,9 @@ services:
       - coolify
 
   weekly-ranking-scheduler:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -570,13 +555,9 @@ services:
       - coolify
 
   reward-accounting-scheduler:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -618,13 +599,9 @@ services:
       - coolify
 
   reward-batch-publisher:
+    <<: *dapp-runtime
     profiles:
       - staging-runtime
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
