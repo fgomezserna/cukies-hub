@@ -293,7 +293,7 @@ export function PremiosContent() {
               <div className="mt-5 rounded-[16px] border border-white/10 bg-black/25 p-7">
                 <Sparkles className="h-7 w-7 text-[var(--uki-lilac)]" />
                 <h3 className="mt-4 font-headline text-xl font-black text-[var(--uki-cream)]">No tienes premios pendientes de cobro</h3>
-                <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">Los premios asignados aparecerán aquí cuando se publique su cobro en blockchain.</p>
+                <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">Los premios asignados aparecerán aquí cuando estén listos para cobrar.</p>
               </div>
             )}
           </section>

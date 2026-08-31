@@ -113,7 +113,7 @@ export function MyCukiesPanel() {
           {[
             ['Disponibles', summary.available, 'Listos para usar'],
             ['En venta', summary.onSale, 'Con anuncio activo'],
-            ['En uso', summary.inUse, 'Pool, bridge o breeding'],
+            ['En uso', summary.inUse, 'Aportados, transfiriéndose o en crianza'],
           ].map(([label, value, helper]) => (
             <div key={String(label)} className="border-t border-white/10 p-5 sm:border-l sm:border-t-0 sm:p-6">
               <p className="font-headline text-3xl font-black text-[var(--uki-lilac)]">{value}</p>
