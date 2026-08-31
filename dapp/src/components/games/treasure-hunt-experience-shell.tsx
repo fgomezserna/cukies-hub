@@ -82,7 +82,10 @@ export default function TreasureHuntExperienceShell({
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030c0c] text-[#f2eee7]"
     >
       <header className="relative z-40 shrink-0 border-b border-[#2ce8dc]/20 bg-[#030c0c]/95">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          data-treasure-hunt-header-art
+          className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block"
+        >
           <Image
             src="/brand/generated/uki-treasure-hunt-reference-scene.png"
             alt=""
