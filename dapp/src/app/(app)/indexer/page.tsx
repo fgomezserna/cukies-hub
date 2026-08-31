@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import type { Sort } from 'mongodb';
 import { AlertTriangle, Database, RefreshCw, Search } from 'lucide-react';
 
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { isAllowedAdminWalletSession } from '@/lib/admin-wallet-access';
 import {
   Table,
   TableBody,
@@ -21,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getIndexerDb, getIndexerDbName } from '@/lib/indexer-db/mongodb';
+import { readWalletSession } from '@/lib/wallet-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,6 +150,12 @@ async function getViewerData(collectionName: string, q: string, limit: number) {
 }
 
 export default async function IndexerPage({ searchParams }: PageProps) {
+  const session = await readWalletSession();
+
+  if (!isAllowedAdminWalletSession(session)) {
+    notFound();
+  }
+
   const params = (await searchParams) ?? {};
   const collection = params.collection ?? 'chain_events';
   const q = params.q ?? '';

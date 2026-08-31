@@ -216,6 +216,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `CUKIES_DATABASE_URL` | Mongo legacy staging | Mongo legacy production | Usar replica sanitizada de `cukies`, no produccion directa. |
 | `NEXTAUTH_URL` | URL staging | URL production | Debe coincidir con OAuth callbacks. |
 | `NEXTAUTH_SECRET` | Secret staging | Secret production | Distinto por entorno. |
+| `ADMIN_WALLET_ALLOWLIST` | Wallets EVM admin separadas por coma | Wallets EVM admin separadas por coma | `/indexer` devuelve 404 sin sesion firmada allowlisted; vacio falla cerrado y no abre Mongo. |
 | `DISCORD_CLIENT_ID` | OAuth staging/dev app | OAuth production app | Callbacks separados. |
 | `DISCORD_CLIENT_SECRET` | Secret staging | Secret production | No reutilizar si se puede evitar. |
 | `DISCORD_GUILD_ID` | Guild staging o real segun QA | Guild production | Definir antes de QA. |
