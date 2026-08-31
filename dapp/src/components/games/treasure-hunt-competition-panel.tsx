@@ -565,7 +565,7 @@ export default function TreasureHuntCompetitionPanel() {
             <div role="alert" className="bg-red-950/25 px-4 py-3 text-sm text-red-100 sm:col-span-4">
               {status.eligibility.disqualified
                 ? 'Esta wallet retiró UKI durante la campaña y ha quedado descalificada.'
-                : 'Esperando una confirmación saludable del indexador de staking.'}
+                : 'Esperando la confirmación de tu staking.'}
             </div>
           ) : null}
         </div>

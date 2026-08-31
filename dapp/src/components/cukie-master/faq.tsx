@@ -29,7 +29,7 @@ const FAQS = [
     answer: [
       'Cada cupo que haya madurado al menos 24 horas recibe 100 créditos en el corte diario correspondiente.',
       'Puedes reservar esos créditos para jugar o aportar una parte al pool de créditos. Los créditos no equivalen ni garantizan 100 UKI: el resultado depende de partidas válidas y de las reglas económicas vigentes.',
-      'La participación en votaciones o gobernanza todavía no está habilitada en esta fase de Stage.',
+      'La participación en votaciones o gobernanza todavía no está disponible.',
     ],
   },
   {
@@ -46,7 +46,7 @@ export function CukieMasterFaq() {
     <section
       id="preguntas-cukie-master"
       aria-labelledby="preguntas-cukie-master-title"
-      className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-14"
+      className="relative z-[2] w-full min-w-0 scroll-mt-24 pb-14"
     >
       <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
         <p className="uki-label">Antes de hacer staking</p>
@@ -57,8 +57,8 @@ export function CukieMasterFaq() {
           Preguntas frecuentes
         </h2>
         <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-          Reglas vigentes de la ruta UKI en Stage. Las cifras personales siempre proceden del
-          estado verificado, no de una estimación del navegador.
+          Consulta las reglas vigentes de la ruta UKI. Tus cifras personales se comprueban
+          antes de mostrarse y nunca se sustituyen por estimaciones.
         </p>
 
         <div className="mt-6 divide-y divide-white/10 overflow-hidden rounded-[10px] border border-white/10 bg-black/20">
@@ -69,7 +69,7 @@ export function CukieMasterFaq() {
                   {item.question}
                 </span>
                 <ChevronDown
-                  className="h-5 w-5 shrink-0 text-[var(--uki-cyan)] transition-transform group-open:rotate-180"
+                  className="h-5 w-5 shrink-0 text-[var(--uki-lilac)] transition-transform group-open:rotate-180"
                   aria-hidden="true"
                 />
               </summary>

@@ -117,7 +117,8 @@ export function UkiMarketplaceBuyerCheckout({
   onPurchased: () => void;
 }) {
   const { address, chainId, isConnected } = useAccount();
-  const publicClient = usePublicClient({ chainId: 97 });
+  const expectedChainId = ukiMarketplacePublicConfig.chainId;
+  const publicClient = usePublicClient({ chainId: expectedChainId ?? undefined });
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const [currency, setCurrency] = useState<UkiMarketplacePaymentCurrency>('UKI');
@@ -133,7 +134,7 @@ export function UkiMarketplaceBuyerCheckout({
   const configReady = ukiMarketplacePublicConfig.ready
     && ukiMarketplacePublicConfig.checkoutReady
     && ukiMarketplacePublicConfig.ukiPaymentReady
-    && ukiMarketplacePublicConfig.chainId === 97
+    && expectedChainId !== null
     && Boolean(ukiMarketplacePublicConfig.marketplaceAddress)
     && Boolean(ukiMarketplacePublicConfig.ukiTokenAddress)
     && Boolean(ukiMarketplacePublicConfig.routerAddress)
@@ -241,7 +242,7 @@ export function UkiMarketplaceBuyerCheckout({
       || !sameAddress(onchainRouter, configuredRouter)
       || !sameAddress(onchainWrappedNative, configuredWrappedNative)
     ) {
-      throw new Error('La identidad on-chain del marketplace no coincide con Stage.');
+      throw new Error('No podemos comprobar la configuración del marketplace.');
     }
     if (paused) throw new Error('El marketplace está pausado temporalmente.');
     if (!collectionAllowed) throw new Error('La colección ya no está habilitada.');
@@ -271,7 +272,7 @@ export function UkiMarketplaceBuyerCheckout({
 
     if (currency === 'BNB') {
       if (!ukiMarketplacePublicConfig.bnbPaymentReady) {
-        throw new Error('El pago con BNB no está habilitado en este Stage.');
+        throw new Error('El pago con BNB no está disponible ahora.');
       }
       tokenAddress = null;
       path = ukiMarketplacePublicConfig.bnbPaymentPath;
@@ -282,7 +283,7 @@ export function UkiMarketplaceBuyerCheckout({
         || !sameAddress(path[0], configuredWrappedNative)
         || !sameAddress(path.at(-1) as Address, configuredUki)
       ) {
-        throw new Error('La ruta BNB → UKI no coincide con el contrato de Stage.');
+        throw new Error('No podemos preparar el cambio de BNB a UKI.');
       }
       const [nativePaymentAllowed, amounts] = await Promise.all([
         publicClient.readContract({
@@ -298,7 +299,7 @@ export function UkiMarketplaceBuyerCheckout({
         }),
       ]);
       if (!nativePaymentAllowed) {
-        throw new Error('El pago con BNB está deshabilitado on-chain en este Stage.');
+        throw new Error('El pago con BNB no está disponible ahora.');
       }
       if (
         amounts.length !== path.length
@@ -310,7 +311,7 @@ export function UkiMarketplaceBuyerCheckout({
       quotedPaymentRaw = amounts[0];
     } else if (currency === 'USDT') {
       if (!ukiMarketplacePublicConfig.usdtPaymentReady || !configuredUsdt) {
-        throw new Error('El pago con USDT no está habilitado en este Stage.');
+        throw new Error('El pago con USDT no está disponible ahora.');
       }
       tokenAddress = configuredUsdt;
       path = ukiMarketplacePublicConfig.usdtPaymentPath;
@@ -320,7 +321,7 @@ export function UkiMarketplaceBuyerCheckout({
         || !sameAddress(path[0], configuredUsdt)
         || !sameAddress(path.at(-1) as Address, configuredUki)
       ) {
-        throw new Error('La ruta USDT → UKI no coincide con el contrato de Stage.');
+        throw new Error('No podemos preparar el cambio de USDT a UKI.');
       }
       const [allowed, amounts, tokenDecimals, tokenSymbol] = await Promise.all([
         publicClient.readContract({
@@ -441,10 +442,10 @@ export function UkiMarketplaceBuyerCheckout({
   }, [configReady, readQuote, reloadKey]);
 
   async function writeAndConfirm(input: Parameters<typeof writeContractAsync>[0]) {
-    if (!publicClient) throw new Error('No se puede verificar BSC Testnet.');
+    if (!publicClient) throw new Error('No podemos comprobar la red ahora.');
     const hash = await writeContractAsync(input);
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== 'success') throw new Error('La transacción revirtió on-chain.');
+    if (receipt.status !== 'success') throw new Error('La operación no se ha completado.');
     return hash;
   }
 
@@ -456,7 +457,7 @@ export function UkiMarketplaceBuyerCheckout({
     if (quote.allowanceRaw > BigInt(0)) {
       setTransactionState({ kind: 'approving', message: `Restableciendo autorización de ${quote.symbol}…` });
       await writeAndConfirm({
-        chainId: 97,
+        chainId: expectedChainId!,
         address: quote.tokenAddress,
         abi: ukiMarketplaceErc20Abi,
         functionName: 'approve',
@@ -465,7 +466,7 @@ export function UkiMarketplaceBuyerCheckout({
     }
     setTransactionState({ kind: 'approving', message: `Autorizando el máximo exacto en ${quote.symbol}…` });
     await writeAndConfirm({
-      chainId: 97,
+      chainId: expectedChainId!,
       address: quote.tokenAddress,
       abi: ukiMarketplaceErc20Abi,
       functionName: 'approve',
@@ -478,7 +479,8 @@ export function UkiMarketplaceBuyerCheckout({
     if (
       !isConnected
       || !address
-      || chainId !== 97
+      || expectedChainId === null
+      || chainId !== expectedChainId
       || !marketplaceAddress
       || !publicClient
     ) return;
@@ -517,7 +519,7 @@ export function UkiMarketplaceBuyerCheckout({
       let hash: Hash;
       if (freshQuote.currency === 'UKI') {
         hash = await writeAndConfirm({
-          chainId: 97,
+          chainId: expectedChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithUki',
@@ -525,7 +527,7 @@ export function UkiMarketplaceBuyerCheckout({
         });
       } else if (freshQuote.currency === 'USDT' && freshQuote.tokenAddress) {
         hash = await writeAndConfirm({
-          chainId: 97,
+          chainId: expectedChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithToken',
@@ -539,7 +541,7 @@ export function UkiMarketplaceBuyerCheckout({
         });
       } else {
         hash = await writeAndConfirm({
-          chainId: 97,
+          chainId: expectedChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithNative',
@@ -592,14 +594,14 @@ export function UkiMarketplaceBuyerCheckout({
     || transactionState.kind === 'verifying';
 
   return (
-    <div className="border-t border-cyan-200/15 bg-[#081210] px-4 py-5 sm:px-5">
+    <div className="border-t border-lilac-200/15 bg-[#0d0914] px-4 py-5 sm:px-5">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.75fr)]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-lilac-100">
                 <ShoppingCart aria-hidden className="h-4 w-4" weight="duotone" />
-                Compra protegida · BSC Testnet
+                Compra protegida
               </p>
               <h4 className="mt-1 font-headline text-xl font-bold text-white">
                 Elige cómo pagar el Cukie #{order.tokenId}
@@ -638,7 +640,7 @@ export function UkiMarketplaceBuyerCheckout({
                 onClick={() => setCurrency(item)}
                 disabled={busy}
                 className={currency === item
-                  ? 'rounded-[8px] border border-cyan-200/45 bg-cyan-200/[0.12] px-3 py-2 text-sm font-bold text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-300 ease-out active:scale-[0.98]'
+                  ? 'rounded-[8px] border border-lilac-200/45 bg-lilac-200/[0.12] px-3 py-2 text-sm font-bold text-lilac-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-300 ease-out active:scale-[0.98]'
                   : 'rounded-[8px] border border-white/10 bg-white/[0.025] px-3 py-2 text-sm font-semibold text-slate-400 transition duration-300 ease-out hover:border-white/20 hover:text-white active:scale-[0.98]'}
               >
                 {item}
@@ -652,11 +654,11 @@ export function UkiMarketplaceBuyerCheckout({
               <div className="rounded-[8px] border border-amber-200/20 bg-amber-200/[0.06] p-4">
                 <p className="flex items-center gap-2 font-semibold text-amber-100">
                   <WarningCircle aria-hidden className="h-5 w-5" weight="duotone" />
-                  El checkout aún no está configurado en este Stage
+                  La compra no está disponible ahora
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-400">
                   El anuncio puede consultarse, pero no se habilitará una firma hasta que
-                  marketplace, router, UKI y WBNB coincidan con el contrato Testnet.
+                  todos los datos necesarios estén disponibles.
                   BNB y USDT se habilitan por separado cuando sus rutas están verificadas.
                 </p>
               </div>
@@ -695,11 +697,11 @@ export function UkiMarketplaceBuyerCheckout({
                   </strong>
                 </div>
                 <div className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-lilac-100">
                     <LockKey aria-hidden className="h-4 w-4" />
                     Máximo autorizado
                   </span>
-                  <strong className="font-mono text-base tabular-nums text-cyan-50">
+                  <strong className="font-mono text-base tabular-nums text-lilac-50">
                     {formatAmount(quote.budget.maxTotalRaw, quote.decimals)} {quote.symbol}
                   </strong>
                 </div>
@@ -711,17 +713,17 @@ export function UkiMarketplaceBuyerCheckout({
         <aside className="min-w-0 border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <div className="grid gap-3 text-sm text-slate-400">
             <p className="flex items-start gap-2">
-              <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" weight="duotone" />
+              <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-lilac-100" weight="duotone" />
               Se vuelven a comprobar orden, propietario, permisos, precio, nonce y caducidad antes de pagar.
             </p>
             <p className="flex items-start gap-2">
-              <HourglassMedium aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" weight="duotone" />
+              <HourglassMedium aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-lilac-100" weight="duotone" />
               {currency === 'UKI'
                 ? 'El total es exacto y no necesita swap.'
                 : 'El máximo incluye 1 % de protección y la cotización caduca en 10 minutos.'}
             </p>
             <p className="flex items-start gap-2">
-              <Coins aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" weight="duotone" />
+              <Coins aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-lilac-100" weight="duotone" />
               El sobrante del máximo se devuelve; nunca se cambia el precio UKI del vendedor.
             </p>
           </div>
@@ -729,22 +731,22 @@ export function UkiMarketplaceBuyerCheckout({
           <div className="mt-5">
             {!isConnected ? (
               <LandingWalletConnectButton className="w-full justify-center" label="Conectar wallet para comprar" />
-            ) : chainId !== 97 ? (
+            ) : expectedChainId !== null && chainId !== expectedChainId ? (
               <Button
                 type="button"
-                onClick={() => switchChain({ chainId: 97 })}
+                onClick={() => switchChain({ chainId: expectedChainId })}
                 disabled={isSwitchingChain}
                 className="w-full active:scale-[0.98]"
               >
                 <Wallet aria-hidden className="mr-2 h-4 w-4" />
-                {isSwitchingChain ? 'Cambiando red…' : 'Cambiar a BSC Testnet'}
+                {isSwitchingChain ? 'Cambiando red…' : 'Cambiar de red'}
               </Button>
             ) : (
               <Button
                 type="button"
                 onClick={buy}
                 disabled={!quote || busy || ownOrder || insufficientBalance}
-                className="w-full bg-cyan-200 text-[#071110] hover:bg-cyan-100 active:scale-[0.98]"
+                className="w-full bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
               >
                 <ShoppingCart aria-hidden className="mr-2 h-4 w-4" weight="fill" />
                 {transactionState.kind === 'approving'
@@ -772,7 +774,7 @@ export function UkiMarketplaceBuyerCheckout({
             </p>
           )}
           {transactionState.kind === 'approving' && (
-            <p aria-live="polite" className="mt-3 text-sm leading-5 text-cyan-100">
+            <p aria-live="polite" className="mt-3 text-sm leading-5 text-lilac-100">
               {transactionState.message}
             </p>
           )}
@@ -795,7 +797,7 @@ export function UkiMarketplaceBuyerCheckout({
                   href={`${ukiMarketplacePublicConfig.explorerBaseUrl}/tx/${transactionState.hash}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-2 inline-flex font-mono text-xs text-cyan-100 underline decoration-cyan-200/30 underline-offset-4"
+                  className="mt-2 inline-flex font-mono text-xs text-lilac-100 underline decoration-lilac-200/30 underline-offset-4"
                 >
                   Ver transacción {transactionState.hash.slice(0, 10)}…
                 </a>

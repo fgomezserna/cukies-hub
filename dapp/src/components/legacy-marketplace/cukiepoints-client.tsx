@@ -68,7 +68,7 @@ function TransactionRow({ item }: { item: LegacyCukiePointsTransaction }) {
   return (
     <div className="grid gap-3 border-b border-white/10 px-4 py-3 text-sm last:border-b-0 lg:grid-cols-[8rem_7rem_8rem_minmax(0,1fr)_8rem_2rem] lg:items-center">
       <div className="flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-cyan-300" />
+        <span className="h-2 w-2 rounded-full bg-lilac-300" />
         <span className="font-semibold text-white">{item.type}</span>
       </div>
       <span className="font-mono font-semibold text-emerald-200">
@@ -84,7 +84,7 @@ function TransactionRow({ item }: { item: LegacyCukiePointsTransaction }) {
           href={item.explorerUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 transition hover:border-cyan-200/60"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 text-lilac-100 transition hover:border-lilac-200/60"
           aria-label="Open transaction"
         >
           <ArrowUpRight className="h-4 w-4" />
@@ -304,14 +304,14 @@ export function CukiePointsClient() {
     <div className="grid gap-6">
       {!legacyMarketplaceRuntime.legacyMainnetEnabled && (
         <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100">
-          {legacyMarketplaceRuntime.reason} Los totales y movimientos que ves debajo
-          proceden exclusivamente del indice aislado de Stage; no se consulta mainnet.
+          Puedes consultar tus puntos y movimientos. Las acciones están pausadas
+          temporalmente mientras completamos la actualización del servicio.
         </div>
       )}
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-4">
-            <Wallet className="mb-4 h-5 w-5 text-cyan-200" />
+            <Wallet className="mb-4 h-5 w-5 text-lilac-200" />
             <p className="text-xs uppercase tracking-wide text-slate-500">
               BSC wallet balance
             </p>
@@ -358,7 +358,7 @@ export function CukiePointsClient() {
                 {formatPointValue(pointsSummary?.totalPoints)}
               </p>
             </div>
-            <Database className="h-5 w-5 text-cyan-200" />
+            <Database className="h-5 w-5 text-lilac-200" />
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
@@ -385,7 +385,7 @@ export function CukiePointsClient() {
 
       <section className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 md:grid-cols-4">
         <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-          <Sparkles className="mb-3 h-4 w-4 text-cyan-200" />
+          <Sparkles className="mb-3 h-4 w-4 text-lilac-200" />
           <p className="text-xs uppercase tracking-wide text-slate-500">
             BSC emitted
           </p>
@@ -436,7 +436,7 @@ export function CukiePointsClient() {
             variant="outline"
             disabled={isLoadingPoints}
             onClick={() => void refreshPoints()}
-            className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+            className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
           >
             {isLoadingPoints ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -456,7 +456,7 @@ export function CukiePointsClient() {
                 onClick={() => setScope(item)}
                 className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
                   effectiveScope === item
-                    ? 'bg-cyan-300 text-slate-950'
+                    ? 'bg-lilac-300 text-slate-950'
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
               >

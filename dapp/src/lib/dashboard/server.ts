@@ -10,7 +10,7 @@ import {
 
 export function getDashboardSummary(
   input: { identity: DashboardIdentity; runtime: DashboardRuntime },
-  dependencies: DashboardSummaryDependencies = dashboardSummaryDependencies(),
+  dependencies: DashboardSummaryDependencies = dashboardSummaryDependencies(input.runtime),
 ) {
   return buildDashboardSummary({ ...input, dependencies });
 }

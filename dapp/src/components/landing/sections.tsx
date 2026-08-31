@@ -99,7 +99,7 @@ function HeroSection({ network }: { network: LandingNetworkConfig }) {
       <div className="uki-container uki-hero-layout">
         <ScrollReveal animation="left" duration={900} className="uki-hero-content">
           <p className="uki-launch-badge">
-            {network.appEnv === 'staging' ? `UKI · ${network.networkLabel}` : copy.badge}
+            {copy.badge}
           </p>
           <h1 className="uki-hero-title max-w-[13ch] text-balance">
             <span className="uki-hero-title-line">{copy.title}</span>
@@ -119,7 +119,7 @@ function HeroSection({ network }: { network: LandingNetworkConfig }) {
               href={network.swapUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
             >
               {copy.buy}
               <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
@@ -145,8 +145,8 @@ function LaunchOverview({ network }: { network: LandingNetworkConfig }) {
   const copy = landingCopyByLocale[locale].hero;
 
   const rows = [
-    { icon: ShieldCheck, label: copy.pool, value: network.liquidityPairAddress ? 'ASM / UKI' : copy.unavailable, tone: 'text-[var(--uki-cyan)]' },
-    { icon: Crown, label: copy.staking, value: network.stakingAddress ? network.networkLabel : copy.unavailable, tone: 'text-[var(--uki-gold)]' },
+    { icon: ShieldCheck, label: copy.pool, value: network.liquidityPairAddress ? 'ASM / UKI' : copy.unavailable, tone: 'text-[var(--uki-lilac)]' },
+    { icon: Crown, label: copy.staking, value: network.stakingAddress ? copy.network : copy.unavailable, tone: 'text-[var(--uki-gold)]' },
     { icon: LockKeyhole, label: copy.lock, value: network.liquidityLockerAddress ? network.liquidityUnlockLabel ?? copy.lockValue : copy.unavailable, tone: 'text-[#f19bff]' },
   ];
 
@@ -155,13 +155,13 @@ function LaunchOverview({ network }: { network: LandingNetworkConfig }) {
       className="uki-launch-overview"
       innerClassName="relative overflow-hidden p-5 sm:p-6 lg:p-7"
     >
-      <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--uki-cyan)]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />
       <div className="relative">
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
           <div>
             <p className="uki-label">{copy.live}</p>
             <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-cream)]">
-              {network.liquidityPairAddress ? 'ASM / UKI' : network.networkLabel}
+              {network.liquidityPairAddress ? 'ASM / UKI' : copy.unavailable}
             </p>
           </div>
           <div className="flex items-center -space-x-2" aria-label="Par oficial ASM y UKI">
@@ -193,7 +193,7 @@ function LaunchOverview({ network }: { network: LandingNetworkConfig }) {
             href={network.swapUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)] transition hover:bg-[var(--uki-cyan)]/15 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+            className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:bg-[var(--uki-lilac)]/15 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
           >
             <span>{copy.buy}</span>
             <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
@@ -214,14 +214,14 @@ function LaunchStatusStrip({ network }: { network: LandingNetworkConfig }) {
   const copy = landingCopyByLocale[locale].hero;
   const items: Array<[string, string, boolean]> = [
     [copy.pool, network.liquidityPairAddress ? 'PancakeSwap V2' : copy.unavailable, Boolean(network.liquidityPairAddress)],
-    [copy.staking, network.stakingAddress ? network.networkLabel : copy.unavailable, Boolean(network.stakingAddress)],
+    [copy.staking, network.stakingAddress ? copy.network : copy.unavailable, Boolean(network.stakingAddress)],
     [copy.lock, network.liquidityLockerAddress ? network.liquidityUnlockLabel ?? copy.lockValue : copy.unavailable, Boolean(network.liquidityLockerAddress)],
   ];
 
   return (
     <section aria-label={copy.live} className="uki-container uki-facts-section">
       <ScrollReveal animation="fade" duration={700}>
-        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#0d0b24]/82 sm:grid-cols-3">
+        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-lilac-border)] bg-[#0d0b24]/82 sm:grid-cols-3">
           {items.map(([label, value, active]) => (
             <article key={label} className="flex items-center gap-3 border-b border-white/10 px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
               <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${active ? 'bg-[#65e2a2] shadow-[0_0_14px_rgba(101,226,162,0.55)]' : 'bg-white/25'}`} />
@@ -249,7 +249,7 @@ function ParticipationFlow({ network }: { network: LandingNetworkConfig }) {
           eyebrow={copy.eyebrow}
           title={copy.title}
           subtitle={copy.subtitle}
-          tone="cyan"
+          tone="lilac"
           withRule
         />
       </ScrollReveal>
@@ -257,10 +257,10 @@ function ParticipationFlow({ network }: { network: LandingNetworkConfig }) {
       <div className="mt-7 grid gap-4 lg:grid-cols-3">
         {steps.map(({ icon: Icon, ...step }, index) => (
           <ScrollReveal key={step.number} animation="up" delay={index * 120} className="h-full">
-            <article className="group flex h-full min-h-[19rem] flex-col overflow-hidden rounded-[14px] border border-white/10 bg-[#0c0b20]/88 p-5 transition duration-300 hover:-translate-y-1 hover:border-[var(--uki-cyan-border)] sm:p-6">
+            <article className="group flex h-full min-h-[19rem] flex-col overflow-hidden rounded-[14px] border border-white/10 bg-[#0c0b20]/88 p-5 transition duration-300 hover:-translate-y-1 hover:border-[var(--uki-lilac-border)] sm:p-6">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-black tracking-[0.2em] text-[var(--uki-muted)]">{step.number}</span>
-                <Icon className="h-10 w-10 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+                <Icon className="h-10 w-10 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 p-2.5 text-[var(--uki-lilac)]" strokeWidth={1.8} />
               </div>
               <h3 className="mt-8 max-w-[13ch] text-balance font-headline text-3xl font-black leading-none text-[var(--uki-cream)]">
                 {step.title}
@@ -273,7 +273,7 @@ function ParticipationFlow({ network }: { network: LandingNetworkConfig }) {
                   href={step.href}
                   target={step.external ? '_blank' : undefined}
                   rel={step.external ? 'noreferrer' : undefined}
-                  className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+                  className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
                 >
                   {step.action}
                   {step.external ? <ExternalLink className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
@@ -325,7 +325,7 @@ function CompetitionSpotlight() {
   return (
     <section id="torneo" className="uki-container uki-home-section">
       <ScrollReveal animation="up" duration={900}>
-        <div className="relative overflow-hidden rounded-[18px] border border-[var(--uki-cyan-border)] bg-[#071312]">
+        <div className="relative overflow-hidden rounded-[18px] border border-[var(--uki-lilac-border)] bg-[#0d0914]">
           <Image
             src="/brand/generated/uki-treasure-hunt-cukie-scene-v1.png"
             alt=""
@@ -379,7 +379,7 @@ function CompetitionSpotlight() {
               ].map(([label, value]) => (
                 <div key={label} className="bg-[#081614]/95 px-5 py-5 sm:px-6">
                   <dt className="uki-label">{label}</dt>
-                  <dd className="mt-2 truncate font-mono text-xl font-black text-[var(--uki-cyan)] sm:text-2xl" title={value}>
+                  <dd className="mt-2 truncate font-mono text-xl font-black text-[var(--uki-lilac)] sm:text-2xl" title={value}>
                     {value}
                   </dd>
                 </div>
@@ -456,7 +456,7 @@ function UtilitySection() {
           eyebrow={copy.eyebrow}
           title={copy.title}
           subtitle={copy.subtitle}
-          tone="cyan"
+          tone="lilac"
           withRule
         />
       </ScrollReveal>
@@ -615,7 +615,7 @@ function TransparencySection({ network }: { network: LandingNetworkConfig }) {
           eyebrow={copy.eyebrow}
           title={copy.title}
           subtitle={copy.subtitle}
-          tone="cyan"
+          tone="lilac"
           withRule
         />
       </ScrollReveal>
@@ -626,10 +626,10 @@ function TransparencySection({ network }: { network: LandingNetworkConfig }) {
               href={item.href}
               target="_blank"
               rel="noreferrer"
-              className="group grid min-h-[9rem] grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[12px] border border-white/10 bg-[#0b0a1c]/82 p-5 transition duration-300 hover:border-[var(--uki-cyan-border)] hover:bg-[#100e29] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+              className="group grid min-h-[9rem] grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[12px] border border-white/10 bg-[#0b0a1c]/82 p-5 transition duration-300 hover:border-[var(--uki-lilac-border)] hover:bg-[#100e29] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
               aria-label={`${item.label}: ${copy.open}`}
             >
-              <Icon className="h-10 w-10 rounded-[9px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+              <Icon className="h-10 w-10 rounded-[9px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 p-2.5 text-[var(--uki-lilac)]" strokeWidth={1.8} />
               <div className="min-w-0">
                 <p className="uki-label">{item.label}</p>
                 <p className="mt-2 truncate font-mono text-sm font-black text-[var(--uki-cream)] sm:text-base" title={item.value}>
@@ -659,7 +659,7 @@ function FaqAndCta() {
   return (
     <section id="faq" className="uki-container uki-home-section">
       <ScrollReveal animation="fade">
-        <SectionHeading eyebrow={copy.eyebrow} title={copy.title} tone="cyan" withRule />
+        <SectionHeading eyebrow={copy.eyebrow} title={copy.title} tone="lilac" withRule />
       </ScrollReveal>
       <div className="mt-7 grid gap-4 md:grid-cols-2">
         {faqs.map((faq, index) => (
@@ -675,7 +675,7 @@ function FaqAndCta() {
       </div>
 
       <ScrollReveal animation="up" delay={100}>
-        <div className="mt-5 grid gap-6 overflow-hidden rounded-[16px] border border-[var(--uki-cyan-border)] bg-[radial-gradient(circle_at_80%_20%,rgba(56,239,226,0.12),transparent_34%),#0c0b20] p-5 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:p-10">
+        <div className="mt-5 grid gap-6 overflow-hidden rounded-[16px] border border-[var(--uki-lilac-border)] bg-[radial-gradient(circle_at_80%_20%,rgba(228, 92, 255,0.12),transparent_34%),#0c0b20] p-5 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:p-10">
           <div>
             <h2 className="max-w-[18ch] text-balance font-headline text-3xl font-black leading-tight text-[var(--uki-cream)] sm:text-4xl">
               {copy.ctaTitle}

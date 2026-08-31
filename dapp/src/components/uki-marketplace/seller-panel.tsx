@@ -143,9 +143,8 @@ export function UkiMarketplaceSellerPanel() {
   const { address, chainId, connector, isConnected } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient({
-    chainId: ukiMarketplacePublicConfig.chainId ?? undefined,
-  });
+  const expectedChainId = ukiMarketplacePublicConfig.chainId;
+  const publicClient = usePublicClient({ chainId: expectedChainId ?? undefined });
   const [dataState, setDataState] = useState<SellerDataState>({ kind: 'idle' });
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [ukiPrice, setUkiPrice] = useState('');
@@ -159,7 +158,7 @@ export function UkiMarketplaceSellerPanel() {
   const requestIdRef = useRef(0);
 
   const configReady = ukiMarketplacePublicConfig.ready
-    && ukiMarketplacePublicConfig.chainId === 97
+    && expectedChainId !== null
     && Boolean(ukiMarketplacePublicConfig.marketplaceAddress);
   const authenticatedWallet = Boolean(
     hasMounted
@@ -285,12 +284,12 @@ export function UkiMarketplaceSellerPanel() {
     : null;
 
   async function writeAndConfirm(input: Parameters<typeof writeContractAsync>[0]) {
-    if (!publicClient) throw new Error('MARKETPLACE_UI:No hay RPC de BSC Testnet disponible.');
+    if (!publicClient) throw new Error('MARKETPLACE_UI:No podemos comprobar la red ahora.');
     const hash = await writeContractAsync(input);
     setLatestTxHash(hash);
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== 'success') {
-      throw new Error('MARKETPLACE_UI:La transacción fue revertida en BSC Testnet.');
+      throw new Error('MARKETPLACE_UI:La operación no se ha completado.');
     }
     return hash;
   }
@@ -313,7 +312,6 @@ export function UkiMarketplaceSellerPanel() {
 
   async function publishSelectedAsset() {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
-    const expectedChainId = ukiMarketplacePublicConfig.chainId;
     if (
       !selectedAsset
       || !selectedAsset.listingEligible
@@ -321,7 +319,7 @@ export function UkiMarketplaceSellerPanel() {
       || !validation.valid
       || !address
       || !marketplaceAddress
-      || expectedChainId !== 97
+      || expectedChainId === null
       || !correctChain
       || !publicClient
       || busy
@@ -371,7 +369,7 @@ export function UkiMarketplaceSellerPanel() {
         throw new Error('MARKETPLACE_UI:La wallet ya no es propietaria de este Cukie.');
       }
       if (collectionAllowed !== true) {
-        throw new Error('MARKETPLACE_UI:La colección no está habilitada en el contrato UKI de Stage.');
+        throw new Error('MARKETPLACE_UI:Esta colección no está habilitada para publicar.');
       }
       if (activeOrderId !== zeroHash) {
         const currentState = await publicClient.readContract({
@@ -401,7 +399,7 @@ export function UkiMarketplaceSellerPanel() {
           args: [tokenId],
         });
         if (!sameAddress(confirmedApproval, marketplaceAddress)) {
-          throw new Error('MARKETPLACE_UI:La aprobación no quedó confirmada on-chain.');
+          throw new Error('MARKETPLACE_UI:No hemos podido confirmar el permiso del Cukie.');
         }
       }
 
@@ -423,12 +421,12 @@ export function UkiMarketplaceSellerPanel() {
         throw new Error('MARKETPLACE_UI:La publicación se confirmó, pero no se pudo verificar su order ID.');
       }
       setPhase('syncing');
-      setNotice(`Orden ${shortIdentity(orderId)} confirmada en BSC Testnet. Actualizando el índice privado…`);
+      setNotice(`Anuncio ${shortIdentity(orderId)} confirmado. Actualizando tu historial…`);
       window.dispatchEvent(new Event('cukies:uki-marketplace:refresh'));
       const indexed = await pollIndexedOrder(orderId, 'present');
       setNotice(indexed
         ? `Orden ${shortIdentity(orderId)} confirmada y visible en tu historial.`
-        : `Orden ${shortIdentity(orderId)} confirmada on-chain. El indexador aún la está incorporando; no la repitas.`);
+        : `Anuncio ${shortIdentity(orderId)} confirmado. Puede tardar unos instantes en aparecer.`);
       setUkiPrice('');
       setExpiresAt(defaultUkiMarketplaceExpiry());
     } catch (reason) {
@@ -441,14 +439,13 @@ export function UkiMarketplaceSellerPanel() {
 
   async function cancelOrder(order: UkiMarketplaceOrderView) {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
-    const expectedChainId = ukiMarketplacePublicConfig.chainId;
     if (
       busy
       || order.status !== 'active'
       || !address
       || !sameAddress(address, order.seller)
       || !marketplaceAddress
-      || expectedChainId !== 97
+      || expectedChainId === null
       || !correctChain
       || !publicClient
     ) return;
@@ -465,7 +462,7 @@ export function UkiMarketplaceSellerPanel() {
         args: [order.orderId],
       });
       if (currentState !== 1) {
-        throw new Error('MARKETPLACE_UI:La orden ya no está activa on-chain. Actualiza el historial.');
+        throw new Error('MARKETPLACE_UI:El anuncio ya no está activo. Actualiza tu historial.');
       }
       setPhase('cancelling');
       await writeAndConfirm({
@@ -481,7 +478,7 @@ export function UkiMarketplaceSellerPanel() {
       const indexed = await pollIndexedOrder(order.orderId, 'closed');
       setNotice(indexed
         ? 'Orden cancelada y reflejada en tu historial.'
-        : 'Orden cancelada on-chain. El índice aún está actualizándose; no repitas la operación.');
+        : 'Anuncio cancelado. Puede tardar unos instantes en reflejarse.');
     } catch (reason) {
       setError(transactionError(reason));
     } finally {
@@ -492,7 +489,6 @@ export function UkiMarketplaceSellerPanel() {
 
   async function renewOrderApproval(order: UkiMarketplaceOrderView) {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
-    const expectedChainId = ukiMarketplacePublicConfig.chainId;
     if (
       busy
       || order.status !== 'requires_attention'
@@ -500,7 +496,7 @@ export function UkiMarketplaceSellerPanel() {
       || !address
       || !sameAddress(address, order.seller)
       || !marketplaceAddress
-      || expectedChainId !== 97
+      || expectedChainId === null
       || !correctChain
       || !publicClient
     ) return;
@@ -558,7 +554,7 @@ export function UkiMarketplaceSellerPanel() {
       const indexed = await pollIndexedOrder(order.orderId, 'active');
       setNotice(indexed
         ? 'Aprobación restaurada; la orden vuelve a estar activa.'
-        : 'Aprobación restaurada on-chain. El estado público se actualizará al validarse de nuevo.');
+        : 'Permiso restaurado. El anuncio puede tardar unos instantes en actualizarse.');
     } catch (reason) {
       setError(transactionError(reason));
     } finally {
@@ -589,9 +585,9 @@ export function UkiMarketplaceSellerPanel() {
         <div className="flex max-w-3xl gap-3">
           <WarningCircle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" weight="duotone" />
           <div>
-            <h2 className="font-headline text-xl font-bold text-white">Publicación UKI bloqueada en este Stage</h2>
+            <h2 className="font-headline text-xl font-bold text-white">El marketplace no está disponible</h2>
             <p className="mt-1 text-sm leading-6 text-slate-400">
-              Falta una identidad coherente de chain 97, contrato o colecciones permitidas. No se habilitan firmas con una configuración parcial.
+              Falta parte de la configuración necesaria. Por seguridad, no puedes firmar operaciones ahora.
             </p>
           </div>
         </div>
@@ -612,10 +608,10 @@ export function UkiMarketplaceSellerPanel() {
     return (
       <section className="grid gap-5 border-y border-white/10 px-4 py-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Zona privada del vendedor</p>
-          <h2 className="mt-1 font-headline text-2xl font-bold text-white">Firma con tu wallet EVM</h2>
+          <p className="text-xs font-semibold uppercase tracking-wide text-lilac-100">Zona privada del vendedor</p>
+          <h2 className="mt-1 font-headline text-2xl font-bold text-white">Conecta tu wallet para vender</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-            La firma vincula el inventario privado con la wallet que enviará las transacciones. No mueve fondos ni NFTs.
+            Podrás ver tus Cukies disponibles y publicar uno sin moverlo de tu wallet.
           </p>
         </div>
         <LandingWalletConnectButton
@@ -633,16 +629,18 @@ export function UkiMarketplaceSellerPanel() {
       <section className="grid gap-5 border-y border-white/10 px-4 py-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Red incorrecta</p>
-          <h2 className="mt-1 font-headline text-2xl font-bold text-white">Cambia a BSC Testnet</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">Este bloque solo firma en chain 97. Mainnet permanece fuera de alcance.</p>
+          <h2 className="mt-1 font-headline text-2xl font-bold text-white">Cambia a la red correcta</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">La cambiaremos desde tu wallet para que puedas continuar.</p>
         </div>
         <Button
           type="button"
-          onClick={() => switchChain({ chainId: 97 })}
+          onClick={() => {
+            if (expectedChainId) switchChain({ chainId: expectedChainId });
+          }}
           disabled={isSwitchingChain}
           className="active:scale-[0.98]"
         >
-          {isSwitchingChain ? 'Cambiando red…' : 'Cambiar a chain 97'}
+          {isSwitchingChain ? 'Cambiando red…' : 'Cambiar de red'}
         </Button>
       </section>
     );
@@ -681,7 +679,7 @@ export function UkiMarketplaceSellerPanel() {
             <h2 className="font-headline text-xl font-bold text-white">
               {dataState.kind === 'unavailable' ? 'La zona de vendedor aún no está activa' : 'No se pudo cargar tu zona de vendedor'}
             </h2>
-            <p className="mt-1 text-sm leading-6 text-slate-400">No se permite publicar sin inventario canónico e identidad de contrato verificables.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">Tus Cukies permanecen protegidos mientras el servicio no esté disponible.</p>
           </div>
           <Button type="button" variant="outline" onClick={() => void refresh()} className="active:scale-[0.98]">
             <ArrowClockwise aria-hidden className="mr-2 h-4 w-4" /> Reintentar
@@ -692,12 +690,12 @@ export function UkiMarketplaceSellerPanel() {
   }
 
   return (
-    <section className="border-y border-white/10 bg-[#081311]/70">
+    <section className="border-y border-white/10 bg-[#0d0914]/70">
       <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
         <div className="min-w-0 px-4 py-6 sm:px-5 lg:border-r lg:border-white/10">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-lilac-100">
                 <Storefront aria-hidden className="h-4 w-4" weight="duotone" /> Zona privada del vendedor
               </p>
               <h2 className="mt-1 font-headline text-2xl font-bold text-white">Publicar un Cukie en UKI</h2>
@@ -721,14 +719,14 @@ export function UkiMarketplaceSellerPanel() {
             </p>
           ) : null}
           {latestTxUrl ? (
-            <a href={latestTxUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex font-mono text-xs text-cyan-100 underline decoration-cyan-200/40 underline-offset-4">
+            <a href={latestTxUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex font-mono text-xs text-lilac-100 underline decoration-lilac-200/40 underline-offset-4">
               Ver última transacción {shortIdentity(latestTxHash ?? '')}
             </a>
           ) : null}
 
           {dataState.inventory.length === 0 ? (
             <div className="mt-6 border-t border-white/10 py-10 text-center">
-              <Storefront aria-hidden className="mx-auto h-8 w-8 text-cyan-100" weight="duotone" />
+              <Storefront aria-hidden className="mx-auto h-8 w-8 text-lilac-100" weight="duotone" />
               <h3 className="mt-3 font-headline text-lg font-bold text-white">No hay Cukies libres en esta wallet</h3>
               <p className="mt-1 text-sm text-slate-400">Los NFTs en staking, pool u otra custodia no pueden publicarse desde aquí.</p>
             </div>
@@ -743,7 +741,7 @@ export function UkiMarketplaceSellerPanel() {
                       key={item.assetId}
                       type="button"
                       onClick={() => setSelectedAssetId(item.assetId)}
-                      className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition duration-300 ease-out active:scale-[0.98] ${selected ? 'border-cyan-200/45 bg-cyan-200/[0.08]' : 'border-white/10 bg-white/[0.025] hover:border-white/20'}`}
+                      className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition duration-300 ease-out active:scale-[0.98] ${selected ? 'border-lilac-200/45 bg-lilac-200/[0.08]' : 'border-white/10 bg-white/[0.025] hover:border-white/20'}`}
                     >
                       <div className="relative aspect-square overflow-hidden rounded-[6px] bg-black/25">
                         <CukiImage src={item.imageUrl} alt={`Cukie #${item.tokenId}`} sizes="72px" className="object-contain p-1" />
@@ -771,7 +769,7 @@ export function UkiMarketplaceSellerPanel() {
                     onChange={(event) => setUkiPrice(event.target.value)}
                     placeholder="1250"
                     disabled={busy}
-                    className="h-11 rounded-[8px] border border-white/10 bg-black/25 px-3 font-mono text-white outline-none transition focus:border-cyan-200/50 disabled:opacity-60"
+                    className="h-11 rounded-[8px] border border-white/10 bg-black/25 px-3 font-mono text-white outline-none transition focus:border-lilac-200/50 disabled:opacity-60"
                   />
                   <span className="text-xs font-normal leading-5 text-slate-500">Recibes exactamente este importe en UKI.</span>
                   {!validation.valid && validation.priceError && ukiPrice ? <span className="text-xs font-normal text-amber-200">{validation.priceError}</span> : null}
@@ -784,7 +782,7 @@ export function UkiMarketplaceSellerPanel() {
                     value={expiresAt}
                     onChange={(event) => setExpiresAt(event.target.value)}
                     disabled={busy}
-                    className="h-11 rounded-[8px] border border-white/10 bg-black/25 px-3 font-mono text-white outline-none transition focus:border-cyan-200/50 disabled:opacity-60"
+                    className="h-11 rounded-[8px] border border-white/10 bg-black/25 px-3 font-mono text-white outline-none transition focus:border-lilac-200/50 disabled:opacity-60"
                   />
                   <span className="text-xs font-normal leading-5 text-slate-500">Entre 5 minutos y 90 días; por defecto, 7 días.</span>
                   {!validation.valid && validation.expiryError ? <span className="text-xs font-normal text-amber-200">{validation.expiryError}</span> : null}
@@ -793,7 +791,7 @@ export function UkiMarketplaceSellerPanel() {
 
               <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-xl text-xs leading-5 text-slate-400">
-                  <p>El comprador paga la comisión en la moneda elegida. {currentFeeBps === null ? 'La comisión actual se confirmará en el contrato.' : `Comisión actual: ${(currentFeeBps / 100).toLocaleString('es-ES')}%.`}</p>
+                  <p>El comprador paga la comisión en la moneda elegida. {currentFeeBps === null ? 'La comisión actual se mostrará antes de confirmar.' : `Comisión actual: ${(currentFeeBps / 100).toLocaleString('es-ES')}%.`}</p>
                   <p className="mt-1">Si falta permiso, la wallet pedirá primero aprobar este NFT y después publicar la orden.</p>
                 </div>
                 <Button
@@ -805,7 +803,7 @@ export function UkiMarketplaceSellerPanel() {
                   <ShieldCheck aria-hidden className="mr-2 h-4 w-4" weight="duotone" />
                   {activeOperationId === selectedAsset?.assetId && phase !== 'idle'
                     ? ({
-                        verifying: 'Verificando on-chain…',
+                        verifying: 'Comprobando…',
                         approving: 'Confirmando aprobación…',
                         publishing: 'Confirmando publicación…',
                         cancelling: 'Cancelando…',
@@ -861,7 +859,7 @@ export function UkiMarketplaceSellerPanel() {
                           className="border-rose-300/20 bg-rose-300/[0.06] text-rose-100 hover:bg-rose-300/10 active:scale-[0.98]"
                         >
                           <XCircle aria-hidden className="mr-1.5 h-4 w-4" />
-                          {working ? 'Cancelando…' : 'Cancelar on-chain'}
+                          {working ? 'Cancelando…' : 'Cancelar anuncio'}
                         </Button>
                       ) : null}
                       {order.status === 'requires_attention' && order.attentionReason === 'approval_required' ? (

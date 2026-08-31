@@ -1,7 +1,7 @@
 import { getAddress } from 'viem';
 import { NextResponse } from 'next/server';
 
-import { assertDashboardStagingRuntime } from '@/lib/dashboard/runtime';
+import { assertDashboardRuntime } from '@/lib/dashboard/runtime';
 import { getDashboardSummary } from '@/lib/dashboard/server';
 import { prisma } from '@/lib/prisma';
 import { isValidEvmWalletAddress, readWalletSession } from '@/lib/wallet-auth';
@@ -28,7 +28,7 @@ export async function GET() {
 
   let runtime;
   try {
-    runtime = assertDashboardStagingRuntime(process.env);
+    runtime = assertDashboardRuntime(process.env);
   } catch {
     return response({ status: 'error', code: 'DASHBOARD_RUNTIME_UNAVAILABLE' }, 503);
   }

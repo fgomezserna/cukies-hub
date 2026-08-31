@@ -100,8 +100,8 @@ export function getParticipationSteps(
         action: network.swapUrl
           ? step.action
           : locale === 'es'
-            ? 'Compra no habilitada en este entorno'
-            : 'Purchase unavailable in this environment',
+            ? 'Compra no disponible ahora'
+            : 'Purchase unavailable right now',
         text: network.swapUrl
           ? step.text
           : locale === 'es'
@@ -120,7 +120,7 @@ export const utilityCardsByLocale: Record<
       icon: WalletCards,
       title: 'Staking verificable',
       text: 'Tus depósitos y retiradas quedan registrados en BNB Smart Chain.',
-      tone: 'text-[var(--uki-cyan)]',
+      tone: 'text-[var(--uki-lilac)]',
     },
     {
       icon: Gamepad2,
@@ -146,7 +146,7 @@ export const utilityCardsByLocale: Record<
       icon: WalletCards,
       title: 'Verifiable staking',
       text: 'Your deposits and withdrawals are recorded on BNB Smart Chain.',
-      tone: 'text-[var(--uki-cyan)]',
+      tone: 'text-[var(--uki-lilac)]',
     },
     {
       icon: Gamepad2,
@@ -237,18 +237,18 @@ export const landingCopyByLocale = {
       badge: 'UKI · BNB Smart Chain',
       title: 'UKI ya está activo',
       lead: 'Compra UKI, haz staking y participa en el Torneo Lanzamiento de Treasure Hunt.',
-      leadUnavailable: 'En esta red de pruebas no hay compra habilitada. Puedes verificar el staking y probar el torneo.',
+      leadUnavailable: 'La compra no está disponible ahora. Puedes gestionar el staking y entrar al torneo.',
       play: 'Entrar al torneo',
       stake: 'Hacer staking',
       buy: 'Comprar UKI con ASM',
-      buyUnavailable: 'Compra no habilitada en este entorno',
+      buyUnavailable: 'Compra no disponible ahora',
       live: 'Ecosistema operativo',
       pool: 'Pool oficial V2',
       staking: 'Staking activo',
       lock: 'LP bloqueados',
       lockValue: 'Hasta 23 feb 2027',
       network: 'BNB Smart Chain',
-      unavailable: 'No configurado en este entorno',
+      unavailable: 'No disponible ahora',
     },
     flow: {
       eyebrow: 'Empieza aquí',
@@ -333,18 +333,18 @@ export const landingCopyByLocale = {
       badge: 'UKI · BNB Smart Chain',
       title: 'UKI is now live',
       lead: 'Buy UKI, stake it, and join the Treasure Hunt Launch Tournament.',
-      leadUnavailable: 'Purchases are not enabled on this test network. You can verify staking and test the tournament.',
+      leadUnavailable: 'Purchases are unavailable right now. You can manage staking and enter the tournament.',
       play: 'Enter tournament',
       stake: 'Stake UKI',
       buy: 'Buy UKI with ASM',
-      buyUnavailable: 'Purchase unavailable in this environment',
+      buyUnavailable: 'Purchase unavailable right now',
       live: 'Ecosystem live',
       pool: 'Official V2 pool',
       staking: 'Staking live',
       lock: 'LP locked',
       lockValue: 'Until 23 Feb 2027',
       network: 'BNB Smart Chain',
-      unavailable: 'Not configured in this environment',
+      unavailable: 'Unavailable right now',
     },
     flow: {
       eyebrow: 'Start here',
@@ -434,11 +434,11 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
     },
     {
       question: '¿Por qué la compra directa se realiza con ASM?',
-      answer: 'En BSC Testnet, el pool verificado es ASM/UKI. No existe una ruta demostrada desde BNB o USDT, por lo que la única entrada habilitada en Stage es ASM.',
+      answer: 'El pool oficial es ASM/UKI. Comprueba el par y las direcciones antes de confirmar cualquier operación.',
     },
     {
       question: '¿Cómo consigo intentos para el torneo?',
-      answer: 'Cada 2.000 UKI completos en staking conceden un intento. El saldo debe estar confirmado e indexado antes de que aparezca en Treasure Hunt.',
+      answer: 'Cada 2.000 UKI completos en staking conceden un intento. El saldo debe quedar confirmado antes de que aparezca en Treasure Hunt.',
     },
     {
       question: '¿Qué resultados entran en el ranking?',
@@ -460,7 +460,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
     },
     {
       question: 'Why is the direct purchase made with ASM?',
-      answer: 'On BSC Testnet, the verified pool is ASM/UKI. No route from BNB or USDT has been proven, so ASM is the only entry asset enabled in Stage.',
+      answer: 'The official pool is ASM/UKI. Check the pair and token addresses before confirming any transaction.',
     },
     {
       question: 'How do I get tournament attempts?',

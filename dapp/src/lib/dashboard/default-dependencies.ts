@@ -13,6 +13,7 @@ import { listSellerUkiMarketplaceOrders } from '@/lib/uki-marketplace';
 import type {
   DashboardLoaderResult,
   DashboardModulePayloads,
+  DashboardRuntime,
   DashboardSummaryDependencies,
 } from './summary';
 
@@ -146,9 +147,10 @@ async function loadMarketplace(
 
 async function loadVesting(
   walletAddress: string,
+  expectedChainId: DashboardRuntime['chainId'],
 ): Promise<DashboardLoaderResult<DashboardModulePayloads['vesting']>> {
   const status = await readWalletVestingStatus(walletAddress);
-  if (status.chainId !== 97) throw new TypeError('DASHBOARD_VESTING_CHAIN_MISMATCH');
+  if (status.chainId !== expectedChainId) throw new TypeError('DASHBOARD_VESTING_CHAIN_MISMATCH');
   return {
     data: {
       chainId: status.chainId,
@@ -218,7 +220,7 @@ async function loadGame(
   };
 }
 
-export function dashboardSummaryDependencies(): DashboardSummaryDependencies {
+export function dashboardSummaryDependencies(runtime: DashboardRuntime): DashboardSummaryDependencies {
   return {
     now: () => new Date(),
     loadCukieMaster,
@@ -226,7 +228,7 @@ export function dashboardSummaryDependencies(): DashboardSummaryDependencies {
     loadCukiePool,
     loadRewards,
     loadMarketplace,
-    loadVesting,
+    loadVesting: (walletAddress) => loadVesting(walletAddress, runtime.chainId),
     loadGame,
   };
 }

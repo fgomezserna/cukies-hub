@@ -105,7 +105,7 @@ export function AmbassadorAttributionPanel() {
         setAttribution(null);
         setPolicy(undefined);
         setState('unavailable');
-        setError('No se puede verificar la atribución con garantías. No se ha guardado ningún cambio.');
+        setError('Ahora no podemos comprobar tu embajador. No hemos guardado cambios.');
       });
     return () => controller.abort();
   }, [authLoading, walletAddress, walletType]);
@@ -142,8 +142,8 @@ export function AmbassadorAttributionPanel() {
       setState('ready');
       setError(
         caught instanceof Error && caught.message === 'CONFLICT'
-          ? 'Esta wallet ya tiene otro embajador fijado. La atribución no puede modificarse.'
-          : 'No se ha podido fijar el embajador. No se ha guardado ningún cambio.',
+          ? 'Esta wallet ya confirmó otro embajador y no puede cambiarlo.'
+          : 'No hemos podido confirmar tu embajador. No hemos guardado cambios.',
       );
     }
   }
@@ -160,23 +160,23 @@ export function AmbassadorAttributionPanel() {
   }
 
   return (
-    <section id="ambassador-program" className="uki-container relative z-[2] pb-5">
+    <section id="ambassador-program" className="relative z-[2] w-full pb-5">
       <Panel innerClassName="p-5 sm:p-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-2xl">
             <p className="uki-label">Programa de embajadores</p>
             <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">
-              Invita y conserva tu atribución
+              Invita y gana premios
             </h2>
             <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              El embajador directo recibe el 5% de los rewards elegibles que genere su invitado.
-              La relación es de un nivel, no es retroactiva y queda fijada de forma inmutable.
+              El embajador directo recibe el 5% de los premios elegibles que genere su invitado.
+              La relación es de un nivel, no es retroactiva y se confirma una sola vez.
             </p>
           </div>
           {policy ? (
-            <div className="rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 px-4 py-3 text-right">
+            <div className="rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/20 px-4 py-3 text-right">
               <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Política activa</p>
-              <p className="mt-1 font-headline text-xl font-black text-[var(--uki-cyan)]">
+              <p className="mt-1 font-headline text-xl font-black text-[var(--uki-lilac)]">
                 {(policy.commissionBps / 100).toLocaleString('es-ES')}% · {policy.levels} nivel
               </p>
             </div>
@@ -185,19 +185,19 @@ export function AmbassadorAttributionPanel() {
 
         {authLoading || state === 'loading' ? (
           <div className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" />
-            Verificando la atribución canónica…
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-lilac)]" />
+            Comprobando tu embajador…
           </div>
         ) : null}
 
         {!authLoading && state === 'idle' ? (
           <div className="mt-6 rounded-[8px] border border-white/10 bg-black/20 p-5">
             <div className="flex gap-3">
-              <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-cyan)]" />
+              <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" />
               <div>
-                <p className="font-black text-[var(--uki-cream)]">Firma una wallet EVM</p>
+                <p className="font-black text-[var(--uki-cream)]">Conecta tu wallet</p>
                 <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                  No hace falta comprar para invitar o quedar atribuido. La firma solo acredita qué wallet acepta la relación.
+                  Confirma quién te invitó o comparte tu propio enlace con otros jugadores.
                 </p>
               </div>
             </div>
@@ -216,23 +216,23 @@ export function AmbassadorAttributionPanel() {
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             <div className="rounded-[8px] border border-white/10 bg-black/20 p-5">
               <div className="flex items-center gap-3">
-                <ShieldCheck className="h-5 w-5 text-[var(--uki-cyan)]" />
+                <ShieldCheck className="h-5 w-5 text-[var(--uki-lilac)]" />
                 <h3 className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Mi embajador</h3>
               </div>
               {attribution ? (
                 <div className="mt-4">
-                  <p className="font-mono text-lg font-black text-[var(--uki-cyan)]">
+                  <p className="font-mono text-lg font-black text-[var(--uki-lilac)]">
                     {shortWallet(attribution.ambassadorWalletNormalized)}
                   </p>
                   <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
                     {attribution.source === 'presale_locked'
-                      ? 'Sponsor conservado desde la preventa.'
-                      : 'Atribución aceptada mediante sesión de wallet firmada.'}
-                    {' '}Fijada el {acceptedAtLabel(attribution.acceptedAt)} UTC.
+                      ? 'Embajador conservado desde la preventa.'
+                      : 'Embajador confirmado con tu wallet.'}
+                    {' '}Confirmado el {acceptedAtLabel(attribution.acceptedAt)}.
                   </p>
-                  <div className="mt-4 flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-cyan)]">
+                  <div className="mt-4 flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]">
                     <CheckCircle2 className="h-4 w-4" />
-                    Atribución inmutable activa
+                    Embajador confirmado
                   </div>
                 </div>
               ) : (
@@ -251,7 +251,7 @@ export function AmbassadorAttributionPanel() {
                     placeholder="0x…"
                     autoComplete="off"
                     spellCheck={false}
-                    className="mt-2 w-full rounded-[6px] border border-white/15 bg-black/40 px-3 py-3 font-mono text-sm text-[var(--uki-cream)] outline-none focus:border-[var(--uki-cyan)]"
+                    className="mt-2 w-full rounded-[6px] border border-white/15 bg-black/40 px-3 py-3 font-mono text-sm text-[var(--uki-cream)] outline-none focus:border-[var(--uki-lilac)]"
                   />
                   <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
                     Revisa la dirección antes de confirmar: después no podrá sustituirse.
@@ -263,7 +263,7 @@ export function AmbassadorAttributionPanel() {
                     className="uki-wallet-button mt-4 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {state === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                    Fijar embajador
+                    Confirmar embajador
                   </button>
                 </div>
               )}

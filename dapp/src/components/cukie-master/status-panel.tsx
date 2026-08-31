@@ -331,7 +331,7 @@ export function CukieMasterStatusPanel({
     : 0;
 
   return (
-    <section id="mi-estado" className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-8">
+    <section id="mi-estado" className="relative z-[2] w-full min-w-0 scroll-mt-24 pb-8">
       <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
@@ -354,7 +354,7 @@ export function CukieMasterStatusPanel({
                 type="button"
                 disabled={isRefreshing}
                 onClick={() => setReloadNonce((value) => value + 1)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-[7px] border border-white/10 px-3 text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-cyan-border)] hover:text-[var(--uki-cyan)] disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-[7px] border border-white/10 px-3 text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] disabled:cursor-wait disabled:opacity-60"
               >
                 {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                 {isRefreshing ? 'Actualizando' : 'Actualizar estado'}
@@ -365,15 +365,15 @@ export function CukieMasterStatusPanel({
 
         {authLoading || state === 'loading' ? (
           <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
             Verificando tus UKI…
           </div>
         ) : null}
 
         {!authLoading && state === 'idle' ? (
-          <div className="mt-6 grid min-w-0 gap-4 rounded-[10px] border border-[var(--uki-cyan-border)] bg-black/20 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="mt-6 grid min-w-0 gap-4 rounded-[10px] border border-[var(--uki-lilac-border)] bg-black/20 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="min-w-0">
-              <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Conecta una wallet EVM</p>
+              <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Conecta tu wallet</p>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                 Firma el acceso para consultar tu posición y tus saldos.
               </p>
@@ -381,7 +381,7 @@ export function CukieMasterStatusPanel({
             <LandingWalletConnectButton
               className="min-h-11 justify-center"
               evmOnly
-              label="Conectar wallet EVM"
+              label="Conectar wallet"
               compactLabel="Conectar"
               showCompactText={false}
             />
@@ -428,7 +428,7 @@ export function CukieMasterStatusPanel({
                 label="Cupos activos"
                 value={`${totalCounts.active}/${status.totals.maxPotentialSlots}`}
                 helper={`${visibleAllocatedSlots} asignados entre las dos rutas`}
-                tone="cyan"
+                tone="lilac"
               />
               <StatusMetric
                 label="En validación"
@@ -458,7 +458,7 @@ export function CukieMasterStatusPanel({
 
               <TabsContent value="uki" className="mt-4 min-w-0">
                 <RouteDetail label="Ruta UKI" route={status.routes.uki} />
-                <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-black text-[var(--uki-cream)]">¿Te faltan UKI para el siguiente cupo?</p>
                     <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">El vesting ya está incluido. Deposita únicamente el déficit que quieras cubrir.</p>
@@ -470,9 +470,9 @@ export function CukieMasterStatusPanel({
               <TabsContent value="nft" className="mt-4 min-w-0">
                 <RouteDetail label="Ruta Cukies" route={status.routes.nft} />
                 {status.nftCustody?.mode === 'custodial' ? (
-                  <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-black text-[var(--uki-cream)]">El staking NFT se gestiona en el vault custodial</p>
+                      <p className="text-sm font-black text-[var(--uki-cream)]">Gestiona tus Cukies depositados desde esta misma página</p>
                       <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
                         Elige y deposita tus Cukies Originales en el apartado siguiente. Los de Segunda Generación no aparecen como disponibles; una posición ya custodiada seguirá visible para que puedas retirarla.
                       </p>
@@ -530,13 +530,13 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
           label="Total computable"
           value={breakdown?.total ?? 'No disponible'}
           helper="Vesting y staking"
-          tone="cyan"
+          tone="lilac"
         />
         <StatusMetric
           label="Tus Cukie Masters"
           value={`${displayedSlots}/${MAX_ROUTE_SLOTS}`}
           helper="Preventa pendiente + staking · máximo 5"
-          tone="cyan"
+          tone="lilac"
         />
       </div>
 
@@ -554,7 +554,7 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
           <span
-            className="block h-full rounded-full bg-[var(--uki-cyan)]"
+            className="block h-full rounded-full bg-[var(--uki-lilac)]"
             style={{ width: `${Math.min(100, displayedSlots * 20)}%` }}
           />
         </span>
@@ -573,10 +573,10 @@ function StatusMetric({
   label: string;
   value: string;
   helper: string;
-  tone?: 'cyan' | 'warning' | 'neutral';
+  tone?: 'lilac' | 'warning' | 'neutral';
 }) {
-  const valueClass = tone === 'cyan'
-    ? 'text-[var(--uki-cyan)]'
+  const valueClass = tone === 'lilac'
+    ? 'text-[var(--uki-lilac)]'
     : tone === 'warning'
       ? 'text-amber-300'
       : 'text-[var(--uki-cream)]';
@@ -596,15 +596,15 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
   return (
     <TabsTrigger
       value={value}
-      className="group min-h-[7.5rem] min-w-0 whitespace-normal rounded-[10px] border border-white/10 bg-black/20 p-4 text-left text-[var(--uki-text)] shadow-none data-[state=active]:border-[var(--uki-cyan)] data-[state=active]:bg-[var(--uki-cyan-soft)] data-[state=active]:text-[var(--uki-cream)]"
+      className="group min-h-[7.5rem] min-w-0 whitespace-normal rounded-[10px] border border-white/10 bg-black/20 p-4 text-left text-[var(--uki-text)] shadow-none data-[state=active]:border-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)]"
     >
       <span className="block min-w-0 w-full">
         <span className="flex items-center justify-between gap-3">
           <span className="font-headline text-lg font-black uppercase">{label}</span>
           {route.source.complete
             ? route.synchronizing
-              ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
-              : <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--uki-cyan)]" aria-hidden="true" />
+              ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+              : <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
             : <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />}
         </span>
         <span className="mt-2 flex items-end justify-between gap-3">
@@ -624,7 +624,7 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
           aria-valuetext={`${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ' detectados, sincronizando' : ''}`}
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
-          <span className="block h-full rounded-full bg-[var(--uki-cyan)]" style={{ width: `${Math.min(100, displayed * 20)}%` }} />
+          <span className="block h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: `${Math.min(100, displayed * 20)}%` }} />
         </span>
       </span>
     </TabsTrigger>
@@ -654,22 +654,22 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
           ) : (
             <>
               {route.synchronizing ? (
-                <div role="status" className="mt-4 flex gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-3">
-                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
+                <div role="status" className="mt-4 flex gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-3">
+                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
                   <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                    Hemos detectado el cambio on-chain. Estamos asignando los cupos y su periodo de validación; no repitas la operación.
+                    Hemos detectado el cambio. Estamos actualizando tus cupos y su periodo de validación; no repitas la operación.
                   </p>
                 </div>
               ) : null}
               {ukiBreakdown ? (
-                <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+                <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">UKI que ya cuentan</p>
                   <p className="mt-2 break-words text-base font-black text-[var(--uki-cream)]">
                     {ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
                   </p>
                 </div>
               ) : (
-                <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+                <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Puntos que ya cuentan</p>
                   <p className="mt-2 text-2xl font-black text-[var(--uki-gold)]">{route.source.originalCukiePoints ?? 0} puntos</p>
                 </div>
@@ -766,7 +766,7 @@ function NftInventory({
       </div>
 
       {mutationError ? <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">{mutationError}</p> : null}
-      {mutatingAsset ? <p role="status" aria-live="polite" className="mt-3 text-xs font-semibold text-[var(--uki-cyan)]">Actualizando el inventario de forma segura…</p> : null}
+      {mutatingAsset ? <p role="status" aria-live="polite" className="mt-3 text-xs font-semibold text-[var(--uki-lilac)]">Actualizando el inventario de forma segura…</p> : null}
 
       <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {assets.length === 0 ? (
@@ -783,7 +783,7 @@ function NftInventory({
                   {rarityLabel(asset.rarity)}
                 </span>
                 {asset.contributesToCukieMaster ? (
-                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[var(--uki-cyan-border)] bg-[#160a22]/90 px-2.5 py-1 text-xs font-black text-[var(--uki-cyan)]">
+                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[var(--uki-lilac-border)] bg-[#160a22]/90 px-2.5 py-1 text-xs font-black text-[var(--uki-lilac)]">
                     <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> En uso
                   </span>
                 ) : null}
@@ -801,10 +801,10 @@ function NftInventory({
 
                 <div className={`mt-3 flex min-h-11 items-center gap-2 rounded-[7px] border p-3 text-xs font-semibold ${
                   asset.contributesToCukieMaster
-                    ? 'border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] text-[var(--uki-text)]'
+                    ? 'border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] text-[var(--uki-text)]'
                     : 'border-white/10 text-[var(--uki-muted)]'
                 }`}>
-                  <Sparkles className="h-4 w-4 shrink-0 text-[var(--uki-cyan)]" aria-hidden="true" />
+                  <Sparkles className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
                   {asset.contributesToCukieMaster
                     ? `Aporta ${pointsLabel(asset.contributionPoints)} a tu ruta`
                     : points === null
@@ -820,7 +820,7 @@ function NftInventory({
                     disabled={Boolean(mutatingAsset)}
                     onClick={() => void onMutate(asset, 'soft_stake')}
                     aria-label={`Usar ${name} para Cukie Master`}
-                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-cyan-border)] px-3 py-2 text-center text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-lilac-border)] px-3 py-2 text-center text-xs font-black uppercase text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isMutating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Lock className="h-4 w-4" aria-hidden="true" />}
                     Usar para Cukie Master
@@ -914,7 +914,7 @@ function rarityClass(rarity: string) {
   return ({
     common: 'border-white/20 bg-black/70 text-[var(--uki-text)]',
     uncommon: 'border-emerald-300/30 bg-emerald-950/80 text-emerald-200',
-    rare: 'border-cyan-300/30 bg-cyan-950/80 text-cyan-200',
+    rare: 'border-lilac-300/30 bg-lilac-950/80 text-lilac-200',
     epic: 'border-purple-300/30 bg-purple-950/80 text-purple-200',
     legendary: 'border-amber-300/30 bg-amber-950/80 text-amber-200',
     goat: 'border-pink-300/30 bg-pink-950/80 text-pink-200',

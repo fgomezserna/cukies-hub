@@ -101,7 +101,7 @@ function blockerLabel(blocker?: string) {
     in_pool: 'Ya está depositado en el Cukie Pool',
     assigned_to_game: 'Está asignado temporalmente a una partida',
     invalidated: 'Requiere revisión del inventario',
-    owner_mismatch: 'La propiedad on-chain no coincide con esta wallet',
+    owner_mismatch: 'El Cukie no aparece en esta wallet',
     unknown_owner: 'Propietario pendiente de verificar',
   } as Record<string, string>)[blocker ?? ''] ?? 'Este Cukie no es apto para la ruta Cukie Master';
 }
@@ -467,7 +467,7 @@ export function CukieMasterNftVaultPanel() {
       || !ukiNftVaults.cukieMasterNftVaultAddress
       || !ukiNftVaults.chainId
     ) {
-      setError('La identidad on-chain no es verificable; la operación permanece bloqueada.');
+      setError('No podemos comprobar el Cukie; la operación permanece bloqueada.');
       return;
     }
 
@@ -518,7 +518,7 @@ export function CukieMasterNftVaultPanel() {
         }, asset, 'withdraw');
       }
       setPhase('syncing');
-      setNotice('Transacción confirmada en BSC. Actualizando el estado indexado…');
+      setNotice('Operación confirmada. Actualizando el estado de tu Cukie…');
       const nextStatus = await refresh(undefined, true);
       window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
       const persisted = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
@@ -557,46 +557,46 @@ export function CukieMasterNftVaultPanel() {
   if (ukiNftVaults.mode.cukieMaster === 'legacy') return null;
 
   return (
-    <section id="cukie-master-nft-staking" className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-8">
+    <section id="cukie-master-nft-staking" className="relative z-[2] w-full min-w-0 scroll-mt-24 pb-8">
       <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
-        <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Custodia NFT</p>
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Cukies Originales</p>
         <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
           Staking de Cukies para Cukie Master
         </h2>
         <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-          Solo puedes depositar Cukies Originales. El NFT entra físicamente en el contrato y deja de poder venderse, transferirse o jugarse; la retirada es inmediata y los créditos ya ganados se conservan.
+          Solo puedes depositar Cukies Originales. Mientras estén depositados no podrás venderlos, transferirlos ni usarlos para jugar; puedes retirarlos y conservar los créditos ya ganados.
         </p>
         {status ? (
           <p className="mt-3 text-xs font-semibold text-[var(--uki-muted)]">
-            {assets.length} Cukies Originales o posiciones custodiadas · {eligibleAssetCount} con una acción disponible
+            {assets.length} Cukies Originales disponibles o depositados · {eligibleAssetCount} con una acción disponible
           </p>
         ) : null}
 
         {serverConfig && !configMatches ? (
           <p role="alert" className="mt-5 flex gap-2 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100">
             <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
-            La configuración pública y la del servidor no coinciden. Los depósitos están bloqueados.
+            El servicio no está disponible ahora. Los depósitos permanecen bloqueados por seguridad.
           </p>
         ) : null}
         {serverConfig?.indexer.status === 'syncing' && !indexerSyncRetryExhausted ? (
-          <p role="status" aria-live="polite" className="mt-4 flex gap-2 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
-            Estamos sincronizando los eventos y metadatos NFT. Reintentaremos automáticamente; mientras tanto no se habilitan nuevos depósitos. Las posiciones custodiadas siguen visibles y podrás retirarlas cuando la wallet, la red y la identidad del contrato estén verificadas.
+          <p role="status" aria-live="polite" className="mt-4 flex gap-2 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 text-sm font-semibold text-[var(--uki-text)]">
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+            Estamos actualizando tus Cukies. Reintentaremos automáticamente; mientras tanto no se habilitan nuevos depósitos y tus posiciones siguen visibles.
           </p>
         ) : null}
         {serverConfig?.indexer.status === 'unavailable' || indexerSyncRetryExhausted ? (
           <p role="alert" className="mt-4 flex gap-2 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100">
             <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
             {indexerSyncRetryExhausted
-              ? 'No hemos podido completar la sincronización del índice NFT tras varios intentos. Los depósitos siguen bloqueados; las posiciones custodiadas siguen visibles y la recuperación on-chain sigue disponible.'
-              : 'El índice NFT tiene una avería o una configuración que no podemos verificar. No se permiten nuevos depósitos; las posiciones custodiadas siguen visibles y la recuperación on-chain sigue disponible.'}
+              ? 'No hemos podido completar la actualización. Los depósitos siguen bloqueados y tus posiciones permanecen visibles.'
+              : 'No podemos actualizar tus Cukies ahora. No se permiten nuevos depósitos y tus posiciones permanecen visibles.'}
           </p>
         ) : null}
         {configMatches && !walletMatches ? (
-          <p className="mt-4 text-sm font-semibold text-[var(--uki-text)]">Conecta en EVM la misma wallet autenticada para operar.</p>
+          <p className="mt-4 text-sm font-semibold text-[var(--uki-text)]">Conecta la misma wallet con la que has iniciado sesión.</p>
         ) : null}
         {walletMatches && !correctChain ? (
-          <p className="mt-4 text-sm font-semibold text-amber-200">Cambia tu wallet a BSC Testnet para operar.</p>
+          <p className="mt-4 text-sm font-semibold text-amber-200">Cambia tu wallet a la red correcta para continuar.</p>
         ) : null}
         {notice ? (
           <p role="status" className="mt-4 flex gap-2 rounded-[8px] border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm font-semibold text-emerald-100">
@@ -608,17 +608,17 @@ export function CukieMasterNftVaultPanel() {
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {authLoading || loading ? (
             <p role="status" className="flex items-center gap-2 text-sm font-semibold text-[var(--uki-text)]">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando inventario custodial…
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando tus Cukies…
             </p>
           ) : !user?.walletAddress ? (
             <p className="text-sm font-semibold text-[var(--uki-text)]">
-              Conecta y autentica tu wallet EVM para consultar tus Cukies y gestionar el staking NFT.
+              Conecta tu wallet para consultar tus Cukies y gestionar el staking.
             </p>
           ) : status && assets.length === 0 ? (
-            <p className="text-sm font-semibold text-[var(--uki-muted)]">No tienes Cukies Originales disponibles ni posiciones custodiadas para esta wallet. Los Cukies de Segunda Generación que permanezcan en tu wallet no se muestran en esta ruta.</p>
+            <p className="text-sm font-semibold text-[var(--uki-muted)]">No tienes Cukies Originales disponibles ni depositados con esta wallet. Los Cukies de Segunda Generación no se muestran en esta sección.</p>
           ) : !status ? (
             <p role="alert" className="text-sm font-semibold text-amber-200">
-              No se pudo verificar el inventario custodial. Reintentaremos automáticamente; los depósitos permanecen bloqueados y la recuperación on-chain sigue disponible.
+              No hemos podido actualizar tus Cukies. Reintentaremos automáticamente; los depósitos permanecen bloqueados y las posiciones conocidas siguen protegidas.
             </p>
           ) : assets.map((asset) => {
             const working = activeAssetId === asset.assetId;
@@ -643,7 +643,7 @@ export function CukieMasterNftVaultPanel() {
                       {pendingLabel(pending)}
                     </button>
                   ) : asset.canDeposit ? (
-                    <button type="button" disabled={!depositsReady || !pendingHydrated || Boolean(activeAssetId)} onClick={() => void mutate(asset, 'deposit')} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-cyan-border)] px-3 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-50">
+                    <button type="button" disabled={!depositsReady || !pendingHydrated || Boolean(activeAssetId)} onClick={() => void mutate(asset, 'deposit')} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-lilac-border)] px-3 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-50">
                       {working ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <LockKeyhole className="h-4 w-4" aria-hidden="true" />}
                       {working && phase === 'approving'
                         ? 'Aprobando'
@@ -664,7 +664,7 @@ export function CukieMasterNftVaultPanel() {
                     </p>
                   )}
                   {pending?.txHash && serverConfig?.explorerBaseUrl ? (
-                    <a href={`${serverConfig.explorerBaseUrl}/tx/${pending.txHash}`} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-black text-[var(--uki-cyan)] underline">
+                    <a href={`${serverConfig.explorerBaseUrl}/tx/${pending.txHash}`} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-black text-[var(--uki-lilac)] underline">
                       Ver transacción de esta operación
                     </a>
                   ) : null}
@@ -680,7 +680,7 @@ export function CukieMasterNftVaultPanel() {
               <p key={pending.assetId}>
                 Cukie #{pending.tokenId}: {pendingLabel(pending)}. Sigue bloqueado mientras confirmamos su estado.
                 {serverConfig?.explorerBaseUrl ? (
-                  <> {' '}<a href={`${serverConfig.explorerBaseUrl}/tx/${pending.txHash}`} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-cyan)] underline">Ver transacción</a></>
+                  <> {' '}<a href={`${serverConfig.explorerBaseUrl}/tx/${pending.txHash}`} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-lilac)] underline">Ver transacción</a></>
                 ) : null}
               </p>
             ))}
@@ -688,7 +688,7 @@ export function CukieMasterNftVaultPanel() {
         ) : null}
 
         {latestTxHash && serverConfig?.explorerBaseUrl ? (
-          <a href={`${serverConfig.explorerBaseUrl}/tx/${latestTxHash}`} target="_blank" rel="noreferrer" className="mt-4 inline-block text-sm font-black text-[var(--uki-cyan)] underline">
+          <a href={`${serverConfig.explorerBaseUrl}/tx/${latestTxHash}`} target="_blank" rel="noreferrer" className="mt-4 inline-block text-sm font-black text-[var(--uki-lilac)] underline">
             Ver última transacción
           </a>
         ) : null}

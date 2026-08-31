@@ -50,9 +50,8 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
       <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-5 text-amber-50">
         <h2 className="font-headline text-xl font-bold">Marketplace en modo seguro</h2>
         <p className="mt-2 text-sm text-amber-100/80">
-          {legacyMarketplaceRuntime.reason} El inventario indexado se puede revisar,
-          pero las operaciones se habilitaran cuando exista un contrato de marketplace
-          configurado en Testnet.
+          Puedes revisar el inventario. Comprar y vender volverá a estar disponible
+          cuando termine la actualización del servicio.
         </p>
       </div>
     );
@@ -329,7 +328,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
               {cuki.network} · owner {shortWallet(cuki.owner)}
             </p>
           </div>
-          <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+          <span className="rounded-full border border-lilac-300/25 bg-lilac-300/10 px-3 py-1 text-xs font-semibold text-lilac-100">
             {formatLegacyPrice(cuki)}
           </span>
         </div>
@@ -353,7 +352,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
               void connectBscWallet();
             }}
             disabled={disabled}
-            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+            className="bg-lilac-400 text-slate-950 hover:bg-lilac-300"
           >
             <Wallet className="mr-2 h-4 w-4" />
             {isConnectingWallet
@@ -368,7 +367,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           <Button
             onClick={() => void ensureTron()}
             disabled={disabled}
-            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+            className="bg-lilac-400 text-slate-950 hover:bg-lilac-300"
           >
             <Wallet className="mr-2 h-4 w-4" />
             Connect TronLink
@@ -380,7 +379,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             onClick={isBsc ? approveBsc : () => void approveTron()}
             disabled={disabled}
             variant="outline"
-            className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+            className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
           >
             <Check className="mr-2 h-4 w-4" />
             {isBsc && isApprovedForAll ? 'Marketplace approved' : 'Approve marketplace'}
@@ -449,7 +448,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         )}
 
         {status && (
-          <div className="rounded-[8px] border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-100">
+          <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-3 text-sm text-lilac-100">
             {status}
           </div>
         )}

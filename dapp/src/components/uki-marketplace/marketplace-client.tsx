@@ -73,7 +73,7 @@ function EmptyFeed() {
   return (
     <div className="grid min-h-56 place-items-center px-6 py-12 text-center">
       <div className="max-w-md">
-        <Cube aria-hidden className="mx-auto h-8 w-8 text-cyan-200" weight="duotone" />
+        <Cube aria-hidden className="mx-auto h-8 w-8 text-lilac-200" weight="duotone" />
         <h3 className="mt-4 font-headline text-xl font-bold text-white">
           Todavía no hay Cukies publicados en UKI
         </h3>
@@ -99,8 +99,8 @@ function OrderRow({
 }) {
   return (
     <div>
-      <article className="grid gap-4 px-4 py-5 transition duration-300 ease-out hover:bg-cyan-300/[0.035] sm:grid-cols-[4rem_minmax(0,1fr)_minmax(12rem,auto)] sm:items-center sm:px-5">
-        <div className="grid h-16 w-16 place-items-center rounded-[8px] border border-cyan-200/15 bg-cyan-200/[0.055] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+      <article className="grid gap-4 px-4 py-5 transition duration-300 ease-out hover:bg-lilac-300/[0.035] sm:grid-cols-[4rem_minmax(0,1fr)_minmax(12rem,auto)] sm:items-center sm:px-5">
+        <div className="grid h-16 w-16 place-items-center rounded-[8px] border border-lilac-200/15 bg-lilac-200/[0.055] text-lilac-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <Cube aria-hidden className="h-7 w-7" weight="duotone" />
         </div>
 
@@ -109,7 +109,7 @@ function OrderRow({
             <h3 className="font-headline text-lg font-bold text-white">
               Cukie #{order.tokenId}
             </h3>
-            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200/20 bg-cyan-200/[0.06] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+            <span className="inline-flex items-center gap-1 rounded-full border border-lilac-200/20 bg-lilac-200/[0.06] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-lilac-100">
               <CheckCircle aria-hidden className="h-3.5 w-3.5" weight="fill" />
               Validado en vivo
             </span>
@@ -128,7 +128,7 @@ function OrderRow({
             Precio del vendedor
           </p>
           <p className="mt-1 font-mono text-xl font-bold tabular-nums text-white">
-            {formatUkiAmount(order.ukiPriceRaw)} <span className="text-sm text-cyan-100">UKI</span>
+            {formatUkiAmount(order.ukiPriceRaw)} <span className="text-sm text-lilac-100">UKI</span>
           </p>
           <p className="mt-1 text-xs text-slate-500">Pago: UKI, BNB o USDT</p>
           <Button
@@ -136,7 +136,7 @@ function OrderRow({
             size="sm"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="mt-3 min-w-32 bg-cyan-200 text-[#071110] hover:bg-cyan-100 active:scale-[0.98]"
+            className="mt-3 min-w-32 bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
           >
             {expanded ? 'Cerrar compra' : 'Comprar'}
             <CaretDown
@@ -198,9 +198,9 @@ export function UkiMarketplaceClient() {
     <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#0c1514]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-lilac-100">
             <ShieldCheck aria-hidden className="h-4 w-4" weight="duotone" />
-            BSC Testnet · chain 97
+            Compra segura
           </div>
           <h2 className="mt-1 font-headline text-2xl font-bold text-white">
             Marketplace UKI
@@ -242,15 +242,14 @@ export function UkiMarketplaceClient() {
       {(state.kind === 'unavailable' || state.kind === 'error') && (
         <div className="grid min-h-56 place-items-center px-6 py-12 text-center">
           <div className="max-w-lg">
-            <ShieldCheck aria-hidden className="mx-auto h-8 w-8 text-cyan-200" weight="duotone" />
+            <ShieldCheck aria-hidden className="mx-auto h-8 w-8 text-lilac-200" weight="duotone" />
             <h3 className="mt-4 font-headline text-xl font-bold text-white">
               {state.kind === 'unavailable'
-                ? 'El marketplace UKI aún no está activo en este Stage'
+                ? 'El marketplace UKI no está disponible ahora'
                 : 'No se pudo consultar el marketplace UKI'}
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              No se publica inventario si falta la dirección verificada del contrato o
-              no puede comprobarse el estado on-chain. El mercado Legacy permanece separado.
+              Tus activos permanecen protegidos. Inténtalo de nuevo dentro de unos instantes.
             </p>
           </div>
         </div>

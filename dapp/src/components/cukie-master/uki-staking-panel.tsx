@@ -271,7 +271,7 @@ export function UkiStakingPanel({
       window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Staking confirmado',
-        description: 'Tus UKI ya constan en el contrato de staking. Estamos actualizando tus partidas del torneo.',
+        description: 'Tu staking de UKI está confirmado. Estamos actualizando tus partidas del torneo.',
       });
     } else if (lastAction === 'unstake') {
       setAmount(DEFAULT_AMOUNT);
@@ -342,7 +342,7 @@ export function UkiStakingPanel({
     }
   }
 
-  function switchToStagingNetwork() {
+  function switchToConfiguredNetwork() {
     switchChain(
       { chainId: UKI_PRESALE_CHAIN_ID },
       {
@@ -398,7 +398,7 @@ export function UkiStakingPanel({
             : 'Retirar UKI';
 
   return (
-    <section id="uki-staking" className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-8">
+    <section id="uki-staking" className="relative z-[2] w-full min-w-0 scroll-mt-24 pb-8">
       <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
         <div className="grid min-w-0 gap-8 lg:grid-cols-[0.78fr_1.22fr]">
           <div className="min-w-0">
@@ -407,7 +407,7 @@ export function UkiStakingPanel({
               Staking de UKI
             </h2>
             <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Deposita o retira UKI desde el contrato de staking.
+              Deposita o retira UKI y consulta tu saldo desde un único lugar.
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
@@ -419,7 +419,7 @@ export function UkiStakingPanel({
               />
             </div>
 
-            <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/20 p-4">
+            <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/20 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
@@ -431,7 +431,7 @@ export function UkiStakingPanel({
                 </div>
                 <span
                   aria-label="Partidas disponibles"
-                  className="font-headline text-3xl font-black leading-none text-[var(--uki-cyan)]"
+                  className="font-headline text-3xl font-black leading-none text-[var(--uki-lilac)]"
                 >
                   {isCompetitionLoading && !competitionStatus ? '···' : availableAttempts}
                 </span>
@@ -439,7 +439,7 @@ export function UkiStakingPanel({
 
               {isCompetitionEligibilityReady && competitionEligibility ? (
                 <p className="mt-3 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                  Concedidas por el backend: {competitionEligibility.attemptsGranted.toLocaleString('es-ES')}
+                  Concedidas: {competitionEligibility.attemptsGranted.toLocaleString('es-ES')}
                   {' · '}Usadas: {competitionEligibility.attemptsUsed.toLocaleString('es-ES')}
                 </p>
               ) : null}
@@ -450,7 +450,7 @@ export function UkiStakingPanel({
                 </p>
               ) : isAuthenticatedEvm && !competitionEligibility?.ready && competitionEligibility ? (
                 <p className="mt-3 text-xs font-semibold leading-relaxed text-amber-200">
-                  El indexador todavía no ha confirmado el estado de esta wallet.
+                  Aún estamos confirmando el estado de esta wallet.
                 </p>
               ) : !isCompetitionLoading && (!isAuthenticatedEvm || !competitionEligibility) && !competitionError ? (
                 <p className="mt-3 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
@@ -466,7 +466,7 @@ export function UkiStakingPanel({
                   <button
                     type="button"
                     onClick={reloadCompetition}
-                    className="inline-flex min-h-8 items-center gap-2 rounded-[8px] border border-white/15 px-3 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-cream)] transition hover:border-[var(--uki-cyan-border)]"
+                    className="inline-flex min-h-8 items-center gap-2 rounded-[8px] border border-white/15 px-3 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac-border)]"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                     Reintentar cupo
@@ -476,8 +476,8 @@ export function UkiStakingPanel({
 
               <p className="mt-3 border-t border-white/10 pt-3 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
                 {stakePerAttempt === '--'
-                  ? 'El backend calcula el cupo con los UKI completos en staking y descuenta las partidas utilizadas.'
-                  : `El backend concede 1 partida por cada ${stakePerAttempt} UKI completos en staking y descuenta las ya utilizadas.`}
+                  ? 'Las partidas se calculan con los UKI completos en staking y se descuentan a medida que juegas.'
+                  : `Recibes 1 partida por cada ${stakePerAttempt} UKI completos en staking; las partidas usadas se descuentan automáticamente.`}
               </p>
             </div>
 
@@ -505,7 +505,7 @@ export function UkiStakingPanel({
             <label htmlFor="uki-staking-amount" className="mt-5 block text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
               Cantidad de UKI
             </label>
-            <div className="mt-2 flex min-w-0 overflow-hidden rounded-[8px] border border-white/15 bg-[#02090d] focus-within:border-[var(--uki-cyan)]">
+            <div className="mt-2 flex min-w-0 overflow-hidden rounded-[8px] border border-white/15 bg-[#09070e] focus-within:border-[var(--uki-lilac)]">
               <input
                 id="uki-staking-amount"
                 inputMode="decimal"
@@ -532,7 +532,7 @@ export function UkiStakingPanel({
             </p>
 
             {outcomePreview ? (
-              <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+              <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                 <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Resultado estimado</p>
                 <p className="mt-2 text-sm font-black leading-relaxed text-[var(--uki-cream)]">{outcomePreview.summary}</p>
                 <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{outcomePreview.detail}</p>
@@ -544,11 +544,11 @@ export function UkiStakingPanel({
             ) : null}
 
             {isUnsafeStagingChain ? (
-              <InlineWarning text="Configuración bloqueada: el entorno staging exige BNB Smart Chain Testnet (chain 97)." />
+              <InlineWarning text="La red configurada no es válida. Las operaciones están bloqueadas por seguridad." />
             ) : !hasContractConfig ? (
-              <InlineWarning text="El contrato de staking no está configurado para este entorno." />
+              <InlineWarning text="El staking no está disponible ahora." />
             ) : protocolReadFailed ? (
-              <InlineWarning text="No se ha podido verificar que token y contrato coincidan. Las operaciones están bloqueadas." />
+              <InlineWarning text="No podemos verificar el staking ahora. Las operaciones están bloqueadas." />
             ) : operation === 'stake' && isPaused ? (
               <InlineWarning text="Los nuevos depósitos están pausados en el contrato. Las retiradas siguen disponibles." />
             ) : walletReadFailed ? (
@@ -568,7 +568,7 @@ export function UkiStakingPanel({
                 type="button"
                 disabled={isRetryingReads}
                 onClick={() => void retryContractReads()}
-                className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-[8px] border border-white/15 px-3 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-cream)] transition hover:border-[var(--uki-cyan-border)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-[8px] border border-white/15 px-3 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac-border)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isRetryingReads ? 'animate-spin' : ''}`} />
                 <span>{isRetryingReads ? 'Reintentando lecturas' : 'Reintentar lecturas'}</span>
@@ -582,7 +582,7 @@ export function UkiStakingPanel({
                   disabled
                   className="uki-button uki-button-primary w-full justify-center cursor-not-allowed opacity-40"
                 >
-                  Staging bloqueado por configuración
+                  Operaciones no disponibles
                 </button>
               ) : !hasMounted || !isConnected ? (
                 <LandingWalletConnectButton
@@ -596,7 +596,7 @@ export function UkiStakingPanel({
                 <button
                   type="button"
                   disabled={isSwitching}
-                  onClick={switchToStagingNetwork}
+                  onClick={switchToConfiguredNetwork}
                   className="uki-button uki-button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span>{isSwitching ? 'Cambiando red' : `Cambiar a ${UKI_PRESALE_CHAIN_LABEL}`}</span>
@@ -647,7 +647,7 @@ export function UkiStakingPanel({
                 href={txUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase text-[var(--uki-cyan)] hover:underline"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase text-[var(--uki-lilac)] hover:underline"
               >
                 Ver última transacción <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -686,7 +686,7 @@ function OperationButton({
       onClick={onClick}
       className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[7px] border px-4 py-3 text-xs font-black uppercase transition-colors ${
         active
-          ? 'border-[var(--uki-cyan)] bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]'
+          ? 'border-[var(--uki-lilac)] bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]'
           : 'border-white/10 text-[var(--uki-muted)] hover:border-white/25 hover:text-[var(--uki-text)]'
       }`}
     >
@@ -710,7 +710,7 @@ function QuickAmountButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-[7px] border border-white/10 px-2 text-center text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-cyan-border)] hover:text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-[7px] border border-white/10 px-2 text-center text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-40"
     >
       {label}
     </button>

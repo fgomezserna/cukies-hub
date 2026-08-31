@@ -521,7 +521,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const explorerTxUrl = latestTxHash ? getNftVaultExplorerTxUrl(latestTxHash) : null;
 
   return (
-    <details className="group mt-6 rounded-[8px] border border-[var(--uki-cyan-border)] bg-black/25 p-5">
+    <details className="group mt-6 rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/25 p-5">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
         <span>
           <span className="uki-label">Recuperación de emergencia</span>
@@ -529,15 +529,15 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             {kind === 'cukie_master' ? 'Recuperar un Cukie depositado' : 'Recuperar un Cukie del Pool'}
           </span>
         </span>
-        <span aria-hidden="true" className="text-xl font-black text-[var(--uki-cyan)] transition-transform group-open:rotate-45">
+        <span aria-hidden="true" className="text-xl font-black text-[var(--uki-lilac)] transition-transform group-open:rotate-45">
           +
         </span>
       </summary>
 
       <div className="mt-4 border-t border-white/10 pt-4">
         <p className="text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-          Usa esta opción solo si un NFT que ya depositaste no aparece o si el servicio o el indexador fallan.
-          Consulta y opera el vault directamente, sin autenticación ni API. No sirve para depositar un NFT.
+          Usa esta opción solo si un Cukie que ya depositaste no aparece en tu cuenta.
+          Te permite comprobar la posición y recuperar el Cukie, pero no realizar nuevos depósitos.
         </p>
 
       {!publicConfigReady ? (
@@ -601,7 +601,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
           type="button"
           disabled={!canInspect}
           onClick={() => void inspectPosition()}
-          className="h-11 rounded-[7px] border border-[var(--uki-cyan-border)] px-4 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:opacity-50"
+          className="h-11 rounded-[7px] border border-[var(--uki-lilac-border)] px-4 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:opacity-50"
         >
           {phase === 'checking' ? 'Comprobando…' : 'Comprobar posición'}
         </button>
@@ -639,7 +639,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 type="button"
                 disabled={phase !== 'idle' || !correctChain || !connectedWalletReady || Boolean(selectedPending)}
                 onClick={() => void execute('withdraw')}
-                className="rounded-[7px] bg-[var(--uki-cyan)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
+                className="rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
               >
                 {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie ahora'}
               </button>
@@ -650,16 +650,16 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('request_exit')}
                 className="rounded-[7px] border border-white/15 px-4 py-2 text-xs font-black uppercase text-[var(--uki-text)] disabled:opacity-50"
               >
-                {phase === 'requesting_exit' ? 'Solicitando…' : 'Solicitar salida on-chain'}
+                {phase === 'requesting_exit' ? 'Solicitando…' : 'Solicitar salida'}
               </button>
             ) : withdrawalReady ? (
               <button
                 type="button"
                 disabled={phase !== 'idle' || !correctChain || !connectedWalletReady || Boolean(selectedPending)}
                 onClick={() => void execute('withdraw')}
-                className="rounded-[7px] bg-[var(--uki-cyan)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
+                className="rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
               >
-                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar NFT on-chain'}
+                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie'}
               </button>
             ) : (
               <span className="max-w-xs text-right text-xs font-black uppercase text-amber-300">
@@ -677,7 +677,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
           {Object.values(pendingByAsset).map((pending) => (
             <p key={pending.assetId}>
               Cukie #{pending.tokenId}: operación enviada y bloqueada hasta comprobar su resultado.
-              {' '}<a href={getNftVaultExplorerTxUrl(pending.txHash) ?? '#'} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-cyan)] underline">Ver transacción</a>.
+              {' '}<a href={getNftVaultExplorerTxUrl(pending.txHash) ?? '#'} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-lilac)] underline">Ver transacción</a>.
               {' '}Introduce ese Token ID y pulsa «Comprobar posición» para reconciliarla.
             </p>
           ))}
@@ -685,7 +685,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       ) : null}
 
       {notice ? (
-        <p role="status" className="mt-4 text-sm font-semibold text-[var(--uki-cyan)]">
+        <p role="status" className="mt-4 text-sm font-semibold text-[var(--uki-lilac)]">
           {notice}
           {explorerTxUrl ? (
             <> {' '}<a href={explorerTxUrl} target="_blank" rel="noreferrer" className="underline">Ver transacción</a></>

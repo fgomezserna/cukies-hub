@@ -53,7 +53,7 @@ export type DashboardModulePayloads = {
     attentionListings: number;
   };
   vesting: {
-    chainId: 97;
+    chainId: 56 | 97;
     configFrozen: boolean;
     hasPosition: boolean;
     totalAmountRaw: string;
@@ -95,6 +95,9 @@ export type DashboardSummaryDependencies = {
 export type DashboardRuntime = {
   environment: 'staging';
   chainId: 97;
+} | {
+  environment: 'production';
+  chainId: 56;
 };
 
 export type DashboardIdentity = {
@@ -124,7 +127,7 @@ export type DashboardModule<K extends DashboardModuleId> =
   | UnavailableDashboardModule;
 
 export type DashboardSummary = {
-  schemaVersion: 'dashboard-staging-v1';
+  schemaVersion: 'dashboard-v1';
   generatedAt: string;
   overallState: 'ready' | 'partial';
   identity: DashboardIdentity;
@@ -216,7 +219,7 @@ export async function buildDashboardSummary(input: {
     }];
   });
   return {
-    schemaVersion: 'dashboard-staging-v1',
+    schemaVersion: 'dashboard-v1',
     generatedAt: now.toISOString(),
     overallState: alerts.length === 0 ? 'ready' : 'partial',
     identity: input.identity,

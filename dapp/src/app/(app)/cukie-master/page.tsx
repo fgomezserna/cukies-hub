@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { CukieMasterFaq } from '@/components/cukie-master/faq';
 import { CukieMasterWorkspace } from '@/components/cukie-master/workspace';
 import { LaunchInfoPage } from '@/components/launch/info-page';
-import { UKI_PRESALE_CHAIN_LABEL } from '@/components/landing/sale-config';
 
 export const metadata: Metadata = {
   title: 'Cukie Master por UKI | Cukies World',
@@ -17,7 +16,7 @@ export default function CukieMasterPage() {
   return (
     <LaunchInfoPage
       variant="workspace"
-      eyebrow={`${isStaging ? 'Área de pruebas' : 'Red configurada'} · ${UKI_PRESALE_CHAIN_LABEL}`}
+      eyebrow="Tu acceso Cukie Master"
       title="Conviértete en Cukie Master"
       subtitle="20.000 UKI computables equivalen inicialmente a 1 Cukie Master. Consulta tu vesting, gestiona el staking y comprueba tu progreso en la ruta UKI."
       heroImage="/brand/generated/uki-cukie-master-scene-v2.png"
@@ -69,7 +68,7 @@ export default function CukieMasterPage() {
           ],
         },
       ]}
-      note={`Comprueba siempre ${UKI_PRESALE_CHAIN_LABEL}, la cantidad y el contrato antes de confirmar. Ser Cukie Master, aportar al pool o hacer staking no garantiza rentabilidad.`}
+      note="Comprueba siempre la red, la cantidad y los detalles de la operación antes de confirmar. Ser Cukie Master, aportar al pool o hacer staking no garantiza rentabilidad."
     />
   );
 }

@@ -154,7 +154,7 @@ export function CompetitionCreditPanel() {
   if (!authLoading && state === 'idle') return null;
 
   return (
-    <section id="competition-credits" className="uki-container relative z-[2] scroll-mt-28 pb-14">
+    <section id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
       <Panel innerClassName="p-5 sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -172,7 +172,7 @@ export function CompetitionCreditPanel() {
 
         {authLoading || state === 'loading' ? (
           <div className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-lilac)]" />
             Leyendo ledger y configuración vigente…
           </div>
         ) : null}
@@ -209,7 +209,7 @@ export function CompetitionCreditPanel() {
 
             {unavailableRoutes.length < 2 ? (
               <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-[var(--uki-muted)]">
-                <CheckCircle2 className="h-4 w-4 text-[var(--uki-cyan)]" />
+                <CheckCircle2 className="h-4 w-4 text-[var(--uki-lilac)]" />
                 Regla {status.rule.version}: las rutas saludables permiten aportar en múltiplos de 10.
               </div>
             ) : null}
@@ -258,7 +258,7 @@ export function CompetitionCreditPanel() {
                       disabled={!canConfigureRoute || savingSlot !== null ||
                         drafts[configuration.slotId] === configuration.poolCreditsPerSlot}
                       onClick={() => save(configuration)}
-                      className="inline-flex items-center justify-center gap-2 rounded-[6px] border border-[var(--uki-cyan-border)] px-4 py-2 text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex items-center justify-center gap-2 rounded-[6px] border border-[var(--uki-lilac-border)] px-4 py-2 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {savingSlot === configuration.slotId
                         ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -271,7 +271,7 @@ export function CompetitionCreditPanel() {
             </div>
 
             {saveResult === 'saved' ? (
-              <p className="mt-4 text-xs font-semibold text-[var(--uki-cyan)]">
+              <p className="mt-4 text-xs font-semibold text-[var(--uki-lilac)]">
                 Configuración registrada de forma idempotente.
               </p>
             ) : saveResult === 'error' ? (

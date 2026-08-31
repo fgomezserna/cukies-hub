@@ -218,8 +218,7 @@ function scheduleSummary(position: CustodialPosition) {
 function PositionSchedule({ position }: { position: CustodialPosition }) {
   const schedule = scheduleSummary(position);
   return (
-    <>
-      <div className="mt-3 rounded-[7px] border border-white/10 bg-white/[0.03] p-3">
+    <div className="mt-3 rounded-[7px] border border-white/10 bg-white/[0.03] p-3">
         <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
           {schedule.label}
         </p>
@@ -229,20 +228,7 @@ function PositionSchedule({ position }: { position: CustodialPosition }) {
         <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
           {schedule.detail}
         </p>
-      </div>
-      <dl className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-[var(--uki-muted)]">
-        <div className="rounded-full border border-white/10 px-2.5 py-1">
-          <dt className="sr-only">Versión del calendario de depósito</dt>
-          <dd>Calendario de depósito v{position.depositCalendarVersion}</dd>
-        </div>
-        {position.exitCalendarVersion ? (
-          <div className="rounded-full border border-white/10 px-2.5 py-1">
-            <dt className="sr-only">Versión del calendario de salida</dt>
-            <dd>Calendario de salida v{position.exitCalendarVersion}</dd>
-          </div>
-        ) : null}
-      </dl>
-    </>
+    </div>
   );
 }
 
@@ -676,11 +662,11 @@ export function CukiePoolStatusPanel() {
   }
 
   return (
-    <section id="mi-cukie-pool" className="uki-container relative z-[2] pb-10">
+    <section id="mi-cukie-pool" className="relative z-[2] w-full pb-10">
       <Panel innerClassName="p-5 sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="uki-label">Staking custodial NFT</p>
+            <p className="uki-label">Pool de Cukies</p>
             <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">
               Mis Cukies en el pool
             </h2>
@@ -689,7 +675,7 @@ export function CukiePoolStatusPanel() {
             <button
               type="button"
               onClick={refreshStatus}
-              className="text-xs font-black uppercase text-[var(--uki-cyan)]"
+              className="text-xs font-black uppercase text-[var(--uki-lilac)]"
             >
               Actualizar estado
             </button>
@@ -698,14 +684,14 @@ export function CukiePoolStatusPanel() {
 
         {authLoading || loadState === 'loading' ? (
           <p className="mt-6 flex items-center gap-2 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-cyan)]" />
-            Verificando wallet, vault y proyección…
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" />
+            Comprobando tu cuenta y tus Cukies…
           </p>
         ) : null}
 
         {!authLoading && loadState === 'idle' ? (
           <p className="mt-6 text-sm font-semibold text-[var(--uki-text)]">
-            Conecta y autentica tu wallet EVM para depositar o recuperar Cukies.
+            Conecta tu wallet para depositar o recuperar Cukies.
           </p>
         ) : null}
 
@@ -713,7 +699,7 @@ export function CukiePoolStatusPanel() {
           <div className="mt-6 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
             <p className="text-sm font-semibold text-[var(--uki-text)]">
-              No se puede consultar el estado custodial con garantías. No se habilitarán depósitos ni firmas basadas en datos incompletos.
+              No podemos actualizar tus Cukies ahora. No se habilitarán operaciones hasta que la información esté completa.
             </p>
           </div>
         ) : null}
@@ -722,7 +708,7 @@ export function CukiePoolStatusPanel() {
           <div className="mt-6 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
             <p className="text-sm font-semibold text-[var(--uki-text)]">
-              El vault custodial todavía no está configurado en este entorno. El flujo Mongo anterior permanece visible solo como compatibilidad y no se ofrece como staking definitivo.
+              El Pool de Cukies no está disponible ahora. Tus Cukies no se moverán hasta que puedas completar la operación con seguridad.
             </p>
           </div>
         ) : null}
@@ -731,27 +717,27 @@ export function CukiePoolStatusPanel() {
           <div className="mt-6 space-y-5">
             {!configMatches ? (
               <p role="alert" className="text-sm font-semibold text-amber-300">
-                La configuración servida por la API no coincide con la incluida en la DApp. Todas las firmas están bloqueadas.
+                El Pool de Cukies no está disponible ahora. Las operaciones permanecen bloqueadas por seguridad.
               </p>
             ) : null}
             {status.nftCustody.indexer.status !== 'ready' ? (
               <p role="alert" className="text-sm font-semibold text-amber-300">
-                El indexador no está saludable. Los depósitos están bloqueados; solicitar salida o retirar una posición ya conocida sigue disponible on-chain.
+                Estamos actualizando tus Cukies. Los depósitos están bloqueados; aún puedes solicitar la salida o retirar una posición conocida.
               </p>
             ) : null}
             {!walletMatches ? (
               <p role="alert" className="text-sm font-semibold text-amber-300">
-                La wallet EVM conectada debe coincidir con la wallet autenticada.
+                Conecta la misma wallet con la que has iniciado sesión.
               </p>
             ) : null}
             {walletMatches && !correctChain ? (
               <p role="alert" className="text-sm font-semibold text-amber-300">
-                Cambia tu wallet a la red BSC configurada para operar.
+                Cambia tu wallet a la red correcta para continuar.
               </p>
             ) : null}
             {error ? <p role="alert" className="text-sm font-semibold text-amber-300">{error}</p> : null}
             {notice ? (
-              <p role="status" className="text-sm font-semibold text-[var(--uki-cyan)]">
+              <p role="status" className="text-sm font-semibold text-[var(--uki-lilac)]">
                 {notice}
                 {latestTxHash && status.nftCustody.vaultAddress && ukiNftVaults.explorerBaseUrl ? (
                   <> {' '}<a
@@ -795,7 +781,7 @@ export function CukiePoolStatusPanel() {
                         type="button"
                         disabled={Boolean(mutatingAssetId) || pendingLocked || !pendingHydrated || !depositsReady}
                         onClick={() => void deposit(asset)}
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-cyan)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
                       >
                         {working || pendingLocked ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
                         {working && phase === 'approving'
@@ -811,7 +797,7 @@ export function CukiePoolStatusPanel() {
                           href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-2 block text-xs font-black text-[var(--uki-cyan)] underline"
+                          className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
                         >
                           Ver transacción de esta operación
                         </a>
@@ -826,14 +812,14 @@ export function CukiePoolStatusPanel() {
             <div>
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">
-                  Posiciones del vault
+                  Cukies depositados
                 </h3>
                 <span className="text-xs font-bold text-[var(--uki-muted)]">
-                  {status.positions.filter((item) => item.lifecycleOpen).length} abiertas
+                  {status.positions.filter((item) => item.lifecycleOpen).length} activos
                 </span>
               </div>
               {status.positions.length === 0 ? (
-                <p className="mt-3 text-sm font-semibold text-[var(--uki-muted)]">Todavía no tienes posiciones en este vault.</p>
+                <p className="mt-3 text-sm font-semibold text-[var(--uki-muted)]">Todavía no tienes Cukies depositados en el pool.</p>
               ) : (
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {status.positions.map((position) => {
@@ -845,16 +831,16 @@ export function CukiePoolStatusPanel() {
                         <div>
                           <p className="font-bold text-[var(--uki-cream)]">Cukie #{position.tokenId}</p>
                           <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                            Epoch {position.depositEpoch} · {statusLabel(position.status)}
+                            Periodo {position.depositEpoch} · {statusLabel(position.status)}
                           </p>
                         </div>
-                        {position.status === 'active' ? <CheckCircle2 className="h-5 w-5 text-[var(--uki-cyan)]" /> : null}
+                        {position.status === 'active' ? <CheckCircle2 className="h-5 w-5 text-[var(--uki-lilac)]" /> : null}
                         {position.status === 'pending' || position.status === 'exit_requested' ? <Clock3 className="h-5 w-5 text-amber-300" /> : null}
-                        {position.status === 'withdrawable' ? <Unlock className="h-5 w-5 text-[var(--uki-cyan)]" /> : null}
+                        {position.status === 'withdrawable' ? <Unlock className="h-5 w-5 text-[var(--uki-lilac)]" /> : null}
                       </div>
                       <PositionSchedule position={position} />
                       {position.ownerRewardEligible ? (
-                        <p className="mt-3 text-xs font-semibold text-[var(--uki-cyan)]">Participa en el reparto mientras complete partidas válidas.</p>
+                        <p className="mt-3 text-xs font-semibold text-[var(--uki-lilac)]">Participa en el reparto mientras complete partidas válidas.</p>
                       ) : position.lifecycleOpen ? (
                         <p className="mt-3 text-xs font-semibold text-amber-300">No participa en el reparto del periodo de salida.</p>
                       ) : null}
@@ -873,7 +859,7 @@ export function CukiePoolStatusPanel() {
                           type="button"
                           disabled={Boolean(mutatingAssetId) || Boolean(pending) || !pendingHydrated || !identityReady}
                           onClick={() => void mutatePosition(position, 'withdraw')}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-cyan)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--uki-lilac)] px-3 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
                         >
                           {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
                           {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar NFT'}
@@ -884,7 +870,7 @@ export function CukiePoolStatusPanel() {
                           href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-2 block text-xs font-black text-[var(--uki-cyan)] underline"
+                          className="mt-2 block text-xs font-black text-[var(--uki-lilac)] underline"
                         >
                           Ver transacción de esta operación
                         </a>
