@@ -135,14 +135,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   ];
 
   return (
-    <div className="relative flex h-screen h-dvh min-h-0 w-full overflow-hidden bg-background">
+    <div className="relative flex h-screen h-dvh min-h-0 w-full overflow-hidden bg-[#0b0810]">
       <SidebarProvider
         className={cn(isMobileTreasureHunt && 'h-full min-h-0 overflow-hidden')}
       >
         {!isMobileTreasureHunt && (
-        <Sidebar collapsible="icon" className="border-r border-lilac-400/20 bg-[#0b0810]/95 shadow-2xl shadow-black/30" style={{
+        <Sidebar collapsible="icon" className="border-r-0 bg-[#0b0810] shadow-none" style={{
             "--sidebar-background": "#0b0810",
-            "--sidebar-border": "rgba(228, 92, 255, 0.22)",
+            "--sidebar-border": "transparent",
           } as React.CSSProperties}>
           <SidebarHeader className="flex h-16 items-center border-b border-lilac-400/15 bg-black/10">
             <SidebarLogo />
@@ -172,9 +172,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           </SidebarContent>
         </Sidebar>
         )}
-        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Main background with gradients and textures */}
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-lilac-950/15 to-[#0d0914]"></div>
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#0b0810]">
+          {/* Shared application surface: starts with the same tone as the sidebar. */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(228,92,255,0.055),transparent_28rem),linear-gradient(110deg,#0b0810_0%,#0e0a14_58%,#0d0914_100%)]"></div>
           
           {/* Subtle grid pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{

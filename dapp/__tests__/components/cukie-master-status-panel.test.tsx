@@ -27,6 +27,10 @@ jest.mock('lucide-react', () => ({
   Sparkles: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Unlock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
 }));
+jest.mock('@phosphor-icons/react', () => ({
+  Coins: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Diamond: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+}));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const fetchMock = jest.fn();
@@ -135,8 +139,11 @@ describe('CukieMasterStatusPanel', () => {
     render(<CukieMasterStatusPanel overview />);
 
     expect(await screen.findByRole('heading', { name: 'Tienes 3 cupos Cukie Master' })).toBeInTheDocument();
-    expect(screen.getByText('Tus cupos').parentElement).toHaveTextContent('3/10');
-    expect(screen.getByText('Tus cupos').parentElement).toHaveTextContent('2 con UKI · 1 con Cukies');
+    expect(screen.getByRole('region', { name: 'De dónde vienen tus cupos' })).toHaveTextContent('3de 10');
+    expect(screen.getByRole('progressbar', { name: 'Con UKI: 2 de 5 cupos' })).toHaveAttribute('aria-valuenow', '2');
+    expect(screen.getByRole('progressbar', { name: 'Con Cukies Originales: 1 de 5 cupos' })).toHaveAttribute('aria-valuenow', '1');
+    expect(screen.getByText('Con UKI').parentElement?.parentElement).toHaveTextContent('2de 5');
+    expect(screen.getByText('Con Cukies Originales').parentElement?.parentElement).toHaveTextContent('1de 5');
     expect(screen.getByText('Estado actual').parentElement).toHaveTextContent('2 activos');
     expect(screen.getByText('Estado actual').parentElement).toHaveTextContent('1 validando · 0 en gracia');
     expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('200');

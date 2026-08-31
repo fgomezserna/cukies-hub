@@ -14,7 +14,7 @@ export default function CukieMasterPage() {
   const isStaging = process.env.APP_ENV?.trim().toLowerCase() === 'staging';
 
   return (
-    <div className="uki-landing min-h-full w-full overflow-x-clip bg-transparent text-[var(--uki-cream)]">
+    <div className="uki-landing min-h-full w-full overflow-x-clip [background:transparent] text-[var(--uki-cream)]">
       <CukieMasterWorkspace testnetOnly={isStaging} />
       <CukieMasterFaq />
     </div>

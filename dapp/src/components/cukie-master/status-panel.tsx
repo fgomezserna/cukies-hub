@@ -11,6 +11,7 @@ import {
   Sparkles,
   Unlock,
 } from 'lucide-react';
+import { Coins, Diamond } from '@phosphor-icons/react';
 import { formatUnits } from 'viem';
 
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
@@ -547,10 +548,9 @@ export function CukieMasterStatusPanel({
 function CukieMasterOverviewSkeleton() {
   return (
     <div role="status" aria-live="polite" aria-label="Cargando tu resumen Cukie Master" className="mt-6 space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="h-28 animate-pulse rounded-[8px] bg-white/[0.06]" />
-        ))}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+        <div className="h-44 animate-pulse rounded-[10px] bg-white/[0.06]" />
+        <div className="h-44 animate-pulse rounded-[10px] bg-white/[0.05]" />
       </div>
       <div className="h-32 animate-pulse rounded-[10px] bg-white/[0.06]" />
     </div>
@@ -645,23 +645,42 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
 
   return (
     <div className="mt-6 min-w-0" data-cukie-master-overview>
-      <div className="grid min-w-0 gap-3 sm:grid-cols-3 lg:grid-cols-[1.2fr_0.9fr_0.9fr]">
-        <OverviewMetric
-          label="Tus cupos"
-          value={`${totalSlots}/${status.totals.maxPotentialSlots}`}
-          helper={`${ukiSlots} con UKI · ${nftSlots} con Cukies`}
-          emphasized
-        />
-        <OverviewMetric
-          label="Estado actual"
-          value={`${counts.active} activos`}
-          helper={`${counts.qualifying} validando · ${counts.grace} en gracia`}
-        />
-        <OverviewMetric
-          label="Créditos diarios"
-          value={dailyCredits.toLocaleString('es-ES')}
-          helper={`${CUKIE_MASTER_DAILY_CREDITS_PER_SLOT} por cada cupo activo`}
-        />
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+        <section
+          aria-labelledby="slot-origin-title"
+          className="min-w-0 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5"
+        >
+          <div className="flex min-w-0 items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tus cupos</p>
+              <h3 id="slot-origin-title" className="mt-1 text-sm font-bold text-[var(--uki-cream)]">
+                De dónde vienen tus cupos
+              </h3>
+            </div>
+            <p className="shrink-0 font-headline text-3xl font-black tabular-nums text-[var(--uki-lilac)]">
+              {totalSlots}
+              <span className="ml-1.5 text-sm font-bold text-[var(--uki-muted)]">de {status.totals.maxPotentialSlots}</span>
+            </p>
+          </div>
+
+          <div className="mt-4 grid min-w-0 divide-y divide-white/10 border-y border-white/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <SlotSource source="uki" value={ukiSlots} />
+            <SlotSource source="nft" value={nftSlots} />
+          </div>
+        </section>
+
+        <div className="grid min-w-0 divide-y divide-white/10 overflow-hidden rounded-[10px] border border-white/10 bg-black/20 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-1 lg:divide-x-0 lg:divide-y">
+          <OverviewMetric
+            label="Estado actual"
+            value={`${counts.active} activos`}
+            helper={`${counts.qualifying} validando · ${counts.grace} en gracia`}
+          />
+          <OverviewMetric
+            label="Créditos diarios"
+            value={dailyCredits.toLocaleString('es-ES')}
+            helper={`${CUKIE_MASTER_DAILY_CREDITS_PER_SLOT} por cada cupo activo`}
+          />
+        </div>
       </div>
 
       <div className={`mt-4 grid min-w-0 gap-5 rounded-[10px] border p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center ${
@@ -693,27 +712,59 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
   );
 }
 
+function SlotSource({ source, value }: { source: RouteKey; value: number }) {
+  const maxSlots = MAX_ROUTE_SLOTS;
+  const normalizedValue = Math.min(maxSlots, Math.max(0, value));
+  const isUki = source === 'uki';
+  const Icon = isUki ? Coins : Diamond;
+  const label = isUki ? 'Con UKI' : 'Con Cukies Originales';
+
+  return (
+    <div className="min-w-0 py-4 first:pt-3 last:pb-3 sm:px-5 sm:py-3 sm:first:pl-0 sm:last:pr-0" data-slot-source={source}>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-black/20 text-[var(--uki-lilac)]">
+            <Icon aria-hidden="true" size={19} weight="duotone" />
+          </span>
+          <p className="truncate text-sm font-black text-[var(--uki-cream)]">{label}</p>
+        </div>
+        <p className="shrink-0 font-headline text-xl font-black tabular-nums text-[var(--uki-cream)]">
+          {normalizedValue}<span className="ml-1 text-xs font-bold text-[var(--uki-muted)]">de {maxSlots}</span>
+        </p>
+      </div>
+      <span
+        role="progressbar"
+        aria-label={`${label}: ${normalizedValue} de ${maxSlots} cupos`}
+        aria-valuemin={0}
+        aria-valuemax={maxSlots}
+        aria-valuenow={normalizedValue}
+        className="mt-3 grid grid-cols-5 gap-1.5"
+      >
+        {Array.from({ length: maxSlots }, (_, index) => (
+          <span
+            key={index}
+            aria-hidden="true"
+            className={`h-1.5 rounded-full ${index < normalizedValue ? 'bg-[var(--uki-lilac)]' : 'bg-white/10'}`}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function OverviewMetric({
-  emphasized = false,
   helper,
   label,
   value,
 }: {
-  emphasized?: boolean;
   helper: string;
   label: string;
   value: string;
 }) {
   return (
-    <div className={`min-w-0 rounded-[8px] p-4 ${
-      emphasized
-        ? 'border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)]'
-        : 'border border-white/10 bg-black/20'
-    }`}>
-      <p className="text-sm font-semibold text-[var(--uki-muted)]">{label}</p>
-      <p className={`mt-2 font-headline text-3xl font-black tabular-nums ${
-        emphasized ? 'text-[var(--uki-lilac)]' : 'text-[var(--uki-cream)]'
-      }`}>{value}</p>
+    <div className="flex min-w-0 flex-col justify-center p-4 sm:p-5">
+      <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">{label}</p>
+      <p className="mt-1.5 font-headline text-2xl font-black tabular-nums text-[var(--uki-cream)]">{value}</p>
       <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{helper}</p>
     </div>
   );
