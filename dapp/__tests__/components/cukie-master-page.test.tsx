@@ -32,7 +32,7 @@ jest.mock('@/components/launch/info-page', () => ({
     beforeSections?: ReactNode;
     afterSections?: ReactNode;
     metrics: Array<{ label: string; value: string; helper?: string }>;
-    primaryCta: { label: string; href: string };
+    primaryCta?: { label: string; href: string };
     secondaryCta?: { label: string; href: string };
     sections: Array<{ title: string; text?: string; bullets?: string[] }>;
     note?: string;
@@ -44,7 +44,7 @@ jest.mock('@/components/launch/info-page', () => ({
       {metrics.map((metric) => (
         <p key={metric.label}>{metric.label}: {metric.value} · {metric.helper}</p>
       ))}
-      <a href={primaryCta.href}>{primaryCta.label}</a>
+      {primaryCta ? <a href={primaryCta.href}>{primaryCta.label}</a> : null}
       {secondaryCta ? <a href={secondaryCta.href}>{secondaryCta.label}</a> : null}
       {beforeSections}
       {sections.map((section) => (
@@ -74,7 +74,7 @@ describe('CukieMasterPage', () => {
     else process.env.APP_ENV = previousAppEnv;
   });
 
-  it('presenta UKI primero y conserva Cukies, créditos y pool en staging', () => {
+  it('abre con el resumen personal y conserva las dos vías, créditos y pool en staging', () => {
     process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'false';
     process.env.APP_ENV = 'staging';
     const { container } = render(<CukieMasterPage />);
@@ -82,14 +82,19 @@ describe('CukieMasterPage', () => {
     expect(container.querySelector('main')).toHaveAttribute('data-variant', 'workspace');
     expect(screen.getByText('Workspace personal')).toBeInTheDocument();
     expect(screen.getByText('Workspace personal')).toHaveAttribute('data-testnet-only', 'true');
-    expect(screen.getByText('Tu acceso Cukie Master')).toBeInTheDocument();
+    expect(screen.getByText('Tu cuenta')).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/Stage|Staging|Testnet|chain 97/i);
-    expect(screen.getByRole('heading', { level: 1, name: 'Conviértete en Cukie Master' })).toBeInTheDocument();
-    expect(screen.getByText(/20.000 UKI computables equivalen inicialmente a 1 Cukie Master/i)).toBeInTheDocument();
-    expect(screen.getByText(/Capacidad inicial: 500/i)).toBeInTheDocument();
-    expect(screen.getByText(/Capacidad máxima: 2.500/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Gestionar staking UKI' })).toHaveAttribute('href', '#uki-staking');
-    expect(screen.getByRole('link', { name: 'Stakear Cukies Originales' })).toHaveAttribute('href', '#cukie-master-nft-staking');
+    expect(screen.getByRole('heading', { level: 1, name: 'Cukie Master' })).toBeInTheDocument();
+    expect(screen.getByText(/Consulta tus cupos, descubre qué te falta/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cada 20.000 UKI computables conceden inicialmente 1 cupo Cukie Master/i)).toBeInTheDocument();
+    expect(screen.getByText((_, element) => (
+      element?.tagName === 'P' && element.textContent?.startsWith('Capacidad inicial: 500 ·') === true
+    ))).toBeInTheDocument();
+    expect(screen.getByText((_, element) => (
+      element?.tagName === 'P' && element.textContent?.startsWith('Capacidad máxima: 2.500 ·') === true
+    ))).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Gestionar staking UKI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Stakear Cukies Originales' })).not.toBeInTheDocument();
     expect(screen.getByText('Cómo funciona la ruta UKI')).toBeInTheDocument();
     expect(screen.getByText(/asignación de preventa pendiente de vesting.*staking se suman/i)).toBeInTheDocument();
     expect(screen.getByText('Créditos propios o pool')).toBeInTheDocument();

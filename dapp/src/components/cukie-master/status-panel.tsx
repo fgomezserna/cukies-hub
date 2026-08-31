@@ -19,6 +19,7 @@ import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useAuth } from '@/providers/auth-provider';
+import { CUKIE_MASTER_DAILY_CREDITS_PER_SLOT } from '@/lib/uki-economy/rules';
 
 const MAX_ROUTE_SLOTS = 5;
 const CUKIE_MASTER_REFRESH_EVENT = 'cukies:cukie-master:refresh';
@@ -124,11 +125,35 @@ function slotCounts(route: PublicRoute) {
   );
 }
 
+function visibleRouteSlots(route: PublicRoute) {
+  if (route.source.complete) {
+    return route.balanceQualifiedSlots
+      ?? route.previewSlots
+      ?? route.position?.allocatedSlots
+      ?? 0;
+  }
+  return route.position?.allocatedSlots ?? 0;
+}
+
+function summarySlotCounts(route: PublicRoute) {
+  const counts = slotCounts(route);
+  const knownSlots = counts.active + counts.qualifying + counts.grace + counts.inactive;
+  if (knownSlots > 0 || !route.position?.allocatedSlots) return counts;
+
+  const fallback = { ...counts };
+  if (route.position.status === 'active') fallback.active = route.position.allocatedSlots;
+  else if (route.position.status === 'qualifying') fallback.qualifying = route.position.allocatedSlots;
+  else if (route.position.status === 'grace') fallback.grace = route.position.allocatedSlots;
+  return fallback;
+}
+
 export function CukieMasterStatusPanel({
   onUkiRouteData,
+  overview = false,
   ukiOnly = false,
 }: {
   onUkiRouteData?: (preview: UkiRoutePreview | null) => void;
+  overview?: boolean;
   ukiOnly?: boolean;
 } = {}) {
   const { user, isLoading: authLoading } = useAuth();
@@ -329,6 +354,21 @@ export function CukieMasterStatusPanel({
     ? (status.routes.uki.position?.allocatedSlots ?? 0)
       + (status.routes.nft.position?.allocatedSlots ?? 0)
     : 0;
+  const visibleOverviewSlots = status
+    ? visibleRouteSlots(status.routes.uki) + visibleRouteSlots(status.routes.nft)
+    : 0;
+  const overviewHeading = state === 'ready' || state === 'stale'
+    ? visibleOverviewSlots > 0
+      ? `Tienes ${visibleOverviewSlots} ${visibleOverviewSlots === 1 ? 'cupo' : 'cupos'} Cukie Master`
+      : 'Consigue tu primer cupo'
+    : state === 'loading'
+      ? 'Estamos comprobando tu posición'
+      : 'Comprueba tu posición';
+  const overviewDescription = state === 'ready' || state === 'stale'
+    ? visibleOverviewSlots > 0
+      ? 'Aquí ves qué cupos ya cuentan, cuáles están validándose y qué puedes hacer ahora.'
+      : 'Puedes conseguir cupos depositando UKI o usando tus Cukies Originales.'
+    : 'Conecta y firma tu wallet para ver tus cupos, créditos y siguiente acción.';
 
   return (
     <section id="mi-estado" className="relative z-[2] w-full min-w-0 scroll-mt-24 pb-8">
@@ -337,10 +377,12 @@ export function CukieMasterStatusPanel({
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tu estado personal</p>
             <h2 className="mt-2 break-words font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
-              Tu posición Cukie Master
+              {overview ? overviewHeading : 'Tu posición Cukie Master'}
             </h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              {ukiOnly
+              {overview
+                ? overviewDescription
+                : ukiOnly
                 ? 'Tus UKI de preventa pendientes y tus UKI en staking se suman automáticamente.'
                 : 'Revisamos vesting, staking e inventario antes de recomendarte ninguna acción.'}
             </p>
@@ -364,18 +406,20 @@ export function CukieMasterStatusPanel({
         </div>
 
         {authLoading || state === 'loading' ? (
-          <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
-            Verificando tus UKI…
-          </div>
+          overview ? <CukieMasterOverviewSkeleton /> : (
+            <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+              Verificando tus UKI…
+            </div>
+          )
         ) : null}
 
         {!authLoading && state === 'idle' ? (
           <div className="mt-6 grid min-w-0 gap-4 rounded-[10px] border border-[var(--uki-lilac-border)] bg-black/20 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="min-w-0">
-              <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Conecta tu wallet</p>
+              <p className="font-headline text-lg font-black text-[var(--uki-cream)]">Conecta tu wallet</p>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                Firma el acceso para consultar tu posición y tus saldos.
+                Usa una wallet EVM y firma el acceso para consultar tu posición y tus saldos.
               </p>
             </div>
             <LandingWalletConnectButton
@@ -419,7 +463,9 @@ export function CukieMasterStatusPanel({
         ) : null}
 
         {(state === 'ready' || state === 'stale') && status && totalCounts ? (
-          ukiOnly ? (
+          overview ? (
+            <CukieMasterOverview status={status} />
+          ) : ukiOnly ? (
             <UkiOnlyStatus route={status.routes.uki} />
           ) : (
             <>
@@ -495,6 +541,181 @@ export function CukieMasterStatusPanel({
         ) : null}
       </Panel>
     </section>
+  );
+}
+
+function CukieMasterOverviewSkeleton() {
+  return (
+    <div role="status" aria-live="polite" aria-label="Cargando tu resumen Cukie Master" className="mt-6 space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="h-28 animate-pulse rounded-[8px] bg-white/[0.06]" />
+        ))}
+      </div>
+      <div className="h-32 animate-pulse rounded-[10px] bg-white/[0.06]" />
+    </div>
+  );
+}
+
+function CukieMasterOverview({ status }: { status: PublicStatus }) {
+  const ukiSlots = visibleRouteSlots(status.routes.uki);
+  const nftSlots = visibleRouteSlots(status.routes.nft);
+  const totalSlots = ukiSlots + nftSlots;
+  const ukiCounts = summarySlotCounts(status.routes.uki);
+  const nftCounts = summarySlotCounts(status.routes.nft);
+  const counts = {
+    active: ukiCounts.active + nftCounts.active,
+    qualifying: ukiCounts.qualifying + nftCounts.qualifying,
+    grace: ukiCounts.grace + nftCounts.grace,
+  };
+  const dailyCredits = counts.active * CUKIE_MASTER_DAILY_CREDITS_PER_SLOT;
+  const isSynchronizing = Boolean(
+    status.routes.uki.synchronizing || status.routes.nft.synchronizing,
+  );
+  const preserveDeficit = status.routes.uki.deficitToPreserveSlots
+    ?? status.routes.nft.deficitToPreserveSlots;
+  const nextUkiDeficit = status.routes.uki.deficitToNextSlot;
+
+  const nextAction = (() => {
+    if (counts.grace > 0) {
+      return {
+        eyebrow: 'Necesita atención',
+        title: `Protege ${counts.grace === 1 ? 'tu cupo' : 'tus cupos'} en gracia`,
+        description: preserveDeficit
+          ? `Añade ${requirementLabel(preserveDeficit)} antes de que termine el periodo de gracia.`
+          : 'Revisa la vía afectada y ajusta tus activos antes de que termine el periodo de gracia.',
+        primary: preserveDeficit?.route === 'nft'
+          ? { href: '#cukie-master-nft-staking', label: 'Gestionar Cukies' }
+          : { href: '#uki-staking', label: 'Gestionar staking UKI' },
+        secondary: { href: '#competition-credits', label: 'Ver mis créditos' },
+        warning: true,
+      };
+    }
+    if (isSynchronizing) {
+      return {
+        eyebrow: 'Actualizando',
+        title: 'Estamos confirmando tus últimos cambios',
+        description: 'No repitas ninguna operación. Tu resumen se actualizará automáticamente cuando termine la comprobación.',
+        primary: { href: '#uki-staking', label: 'Ver staking UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
+        warning: false,
+      };
+    }
+    if (totalSlots === 0) {
+      return {
+        eyebrow: 'Siguiente paso',
+        title: 'Consigue tu primer cupo',
+        description: 'Deposita UKI o usa puntos de rareza de tus Cukies Originales. Puedes combinar ambas vías sin perder sus límites independientes.',
+        primary: { href: '#uki-staking', label: 'Conseguirlo con UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Usar mis Cukies' },
+        warning: false,
+      };
+    }
+    if (counts.active === 0 && counts.qualifying > 0) {
+      return {
+        eyebrow: 'En validación',
+        title: `${counts.qualifying === 1 ? 'Tu cupo está' : 'Tus cupos están'} madurando`,
+        description: 'Cada cupo empieza a generar créditos cuando completa sus primeras 24 horas y llega al siguiente corte diario.',
+        primary: { href: '#competition-credits', label: 'Ver mis créditos' },
+        secondary: { href: '#uki-staking', label: 'Revisar staking' },
+        warning: false,
+      };
+    }
+    if (totalSlots >= status.totals.maxPotentialSlots) {
+      return {
+        eyebrow: 'Máximo alcanzado',
+        title: 'Ya tienes todos tus cupos disponibles',
+        description: 'Revisa tus créditos y decide cuánto quieres conservar para jugar y cuánto aportar al pool.',
+        primary: { href: '#competition-credits', label: 'Gestionar créditos' },
+        secondary: { href: '#uki-staking', label: 'Revisar staking' },
+        warning: false,
+      };
+    }
+    return {
+      eyebrow: 'Siguiente paso',
+      title: nextUkiDeficit?.route === 'uki'
+        ? `Te faltan ${requirementLabel(nextUkiDeficit)} para otro cupo`
+        : 'Puedes aumentar tus cupos',
+      description: 'Tu vesting ya está incluido. Deposita únicamente la cantidad que quieras añadir a tu posición.',
+      primary: { href: '#uki-staking', label: 'Gestionar staking UKI' },
+      secondary: { href: '#competition-credits', label: 'Gestionar créditos' },
+      warning: false,
+    };
+  })();
+
+  return (
+    <div className="mt-6 min-w-0" data-cukie-master-overview>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-3 lg:grid-cols-[1.2fr_0.9fr_0.9fr]">
+        <OverviewMetric
+          label="Tus cupos"
+          value={`${totalSlots}/${status.totals.maxPotentialSlots}`}
+          helper={`${ukiSlots} con UKI · ${nftSlots} con Cukies`}
+          emphasized
+        />
+        <OverviewMetric
+          label="Estado actual"
+          value={`${counts.active} activos`}
+          helper={`${counts.qualifying} validando · ${counts.grace} en gracia`}
+        />
+        <OverviewMetric
+          label="Créditos diarios"
+          value={dailyCredits.toLocaleString('es-ES')}
+          helper={`${CUKIE_MASTER_DAILY_CREDITS_PER_SLOT} por cada cupo activo`}
+        />
+      </div>
+
+      <div className={`mt-4 grid min-w-0 gap-5 rounded-[10px] border p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center ${
+        nextAction.warning
+          ? 'border-amber-300/30 bg-amber-300/10'
+          : 'border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)]'
+      }`}>
+        <div className="min-w-0">
+          <p className={`text-xs font-black tracking-[0.08em] ${nextAction.warning ? 'text-amber-200' : 'text-[var(--uki-lilac)]'}`}>
+            {nextAction.eyebrow}
+          </p>
+          <h3 className="mt-2 text-balance font-headline text-xl font-black text-[var(--uki-cream)] sm:text-2xl">
+            {nextAction.title}
+          </h3>
+          <p className="mt-2 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+            {nextAction.description}
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row lg:flex-col lg:items-stretch">
+          <LandingButton href={nextAction.primary.href} className="justify-center">
+            {nextAction.primary.label}
+          </LandingButton>
+          <LandingButton href={nextAction.secondary.href} variant="secondary" className="justify-center">
+            {nextAction.secondary.label}
+          </LandingButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OverviewMetric({
+  emphasized = false,
+  helper,
+  label,
+  value,
+}: {
+  emphasized?: boolean;
+  helper: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className={`min-w-0 rounded-[8px] p-4 ${
+      emphasized
+        ? 'border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)]'
+        : 'border border-white/10 bg-black/20'
+    }`}>
+      <p className="text-sm font-semibold text-[var(--uki-muted)]">{label}</p>
+      <p className={`mt-2 font-headline text-3xl font-black tabular-nums ${
+        emphasized ? 'text-[var(--uki-lilac)]' : 'text-[var(--uki-cream)]'
+      }`}>{value}</p>
+      <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{helper}</p>
+    </div>
   );
 }
 

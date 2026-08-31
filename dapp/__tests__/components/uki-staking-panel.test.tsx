@@ -11,7 +11,6 @@ import {
 import { UkiStakingPanel } from '@/components/cukie-master/uki-staking-panel';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
-import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
 import { useAuth } from '@/providers/auth-provider';
 
 jest.mock('wagmi', () => ({
@@ -23,12 +22,11 @@ jest.mock('wagmi', () => ({
 }));
 jest.mock('@/hooks/use-has-mounted');
 jest.mock('@/hooks/use-toast');
-jest.mock('@/hooks/use-treasure-hunt-competition-overview');
 jest.mock('@/providers/auth-provider');
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
-  LandingWalletConnectButton: ({ evmOnly }: { evmOnly?: boolean }) => (
+  LandingWalletConnectButton: ({ evmOnly, label }: { evmOnly?: boolean; label?: string }) => (
     <button type="button" data-evm-only={String(Boolean(evmOnly))}>
-      Conectar wallet para gestionar staking
+      {label}
     </button>
   ),
 }));
@@ -66,9 +64,6 @@ const mockUseWaitForTransactionReceipt = useWaitForTransactionReceipt as jest.Mo
 const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useWriteContract>;
 const mockUseHasMounted = useHasMounted as jest.MockedFunction<typeof useHasMounted>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
-const mockUseTreasureHuntCompetitionOverview = useTreasureHuntCompetitionOverview as jest.MockedFunction<
-  typeof useTreasureHuntCompetitionOverview
->;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 const walletAddress = '0x3333333333333333333333333333333333333333';
@@ -78,7 +73,6 @@ const writeContract = jest.fn();
 const switchChain = jest.fn();
 const reset = jest.fn();
 const toast = jest.fn();
-const reloadCompetition = jest.fn();
 const routePreview = {
   currentRequirementRaw: parseUnits('20000', 18).toString(),
   presaleLockedRaw: parseUnits('40000', 18).toString(),
@@ -89,7 +83,6 @@ const routePreview = {
 let allowance = BigInt(0);
 let stakingToken = tokenAddress;
 let stakingPaused = false;
-let competitionOverview: ReturnType<typeof useTreasureHuntCompetitionOverview>;
 
 function readResult(data: unknown, isError = false) {
   return {
@@ -124,56 +117,6 @@ describe('UkiStakingPanel', () => {
       isSuccess: false,
     } as never);
     mockUseToast.mockReturnValue({ toast } as never);
-    competitionOverview = {
-      status: {
-        success: true,
-        configured: true,
-        enabled: true,
-        phase: 'active',
-        campaign: {
-          campaignId: 'uki-staking-testnet-2026-08',
-          eligibilityKind: 'uki_staking',
-          startsAt: '2026-08-27T00:00:00.000Z',
-          endsAt: '2026-09-15T00:00:00.000Z',
-          stakePerAttemptRaw: parseUnits('2000', 18).toString(),
-          topAttemptsPerWallet: 10,
-          pointsPerTicket: 100,
-          basePrizeUkiRaw: '0',
-          stakePrizeBps: 1000,
-          prizePerWinnerUkiRaw: '0',
-          maxWinsPerWallet: 1,
-          poolBps: 2500,
-          playerRewardBps: 1000,
-          sponsorRewardBps: 2500,
-          maxWinningAttemptsPerWallet: 10,
-          cliffMonths: 9,
-          vestingMonths: 6,
-        },
-        participant: null,
-        eligibility: {
-          ready: true,
-          stakedUkiRaw: parseUnits('25000', 18).toString(),
-          totalStakedUkiRaw: parseUnits('25000', 18).toString(),
-          indexedThroughBlock: 123,
-          indexedAt: '2026-08-29T12:00:00.000Z',
-          disqualified: false,
-          disqualificationEvidence: null,
-          issues: [],
-          attemptsGranted: 12,
-          attemptsUsed: 2,
-          attemptsRemaining: 10,
-          topAttemptsCount: 2,
-          totalTickets: 0,
-          provisionalTickets: 0,
-        },
-      },
-      leaderboard: [],
-      leaderboardMeta: null,
-      isLoading: false,
-      error: null,
-      reload: reloadCompetition,
-    };
-    mockUseTreasureHuntCompetitionOverview.mockReturnValue(competitionOverview);
     mockUseAuth.mockReturnValue({
       user: { walletAddress },
       isLoading: false,
@@ -204,133 +147,34 @@ describe('UkiStakingPanel', () => {
 
     render(<UkiStakingPanel />);
 
-    expect(screen.getByRole('button', { name: /Conectar wallet para gestionar staking/i }))
+    expect(screen.getByRole('button', { name: /Conectar wallet EVM/i }))
       .toHaveAttribute('data-evm-only', 'true');
     expect(writeContract).not.toHaveBeenCalled();
   });
 
-  it('separates Cukie Master previews from the backend tournament allowance', () => {
+  it('mantiene el staking centrado en Cukie Master y no muestra datos de partidas', () => {
     render(<UkiStakingPanel routePreview={routePreview} />);
 
     fireEvent.click(screen.getByRole('button', { name: '20.000' }));
     expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('20000');
     expect(screen.getByText(/Tendrías 45\.000 UKI en staking y 4\/5 Cukie Masters/i)).toBeInTheDocument();
     expect(screen.getByText(/Te faltarían 15\.000 UKI para el siguiente Cukie Master/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('10');
-    expect(screen.getByText(/Concedidas: 12/i)).toBeInTheDocument();
-    expect(screen.getByText(/Usadas: 2/i)).toBeInTheDocument();
-    expect(screen.queryByText('Pasos de la operación')).not.toBeInTheDocument();
-    expect(screen.getByText(/Recibes 1 partida por cada 2\.?000 UKI/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cukie Master se calcula por separado/i)).toBeInTheDocument();
-    expect(screen.getAllByText('Depositar')).toHaveLength(1);
-  });
-
-  it('shows the backend remainder instead of deriving attempts from the contract balance', () => {
-    render(<UkiStakingPanel />);
-
-    expect(screen.getByText('25.000')).toBeInTheDocument();
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('10');
-  });
-
-  it('shows a loading state before the backend returns the wallet eligibility', () => {
-    mockUseTreasureHuntCompetitionOverview.mockReturnValue({
-      ...competitionOverview,
-      status: null,
-      isLoading: true,
-    } as never);
-
-    render(<UkiStakingPanel />);
-
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('···');
-  });
-
-  it('does not expose stale eligibility when the signed session belongs to another wallet', () => {
-    mockUseAuth.mockReturnValue({
-      user: { walletAddress: '0x4444444444444444444444444444444444444444' },
-      isLoading: false,
-      isWaitingForApproval: false,
-      walletType: 'evm',
-      fetchUser: jest.fn(),
-    } as never);
-
-    render(<UkiStakingPanel />);
-
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('—');
-    expect(screen.getByText(/Conecta y firma esta wallet/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Partidas disponibles')).not.toBeInTheDocument();
     expect(screen.queryByText(/Concedidas:/i)).not.toBeInTheDocument();
-  });
-
-  it('shows zero and explains a tournament disqualification', () => {
-    mockUseTreasureHuntCompetitionOverview.mockReturnValue({
-      ...competitionOverview,
-      status: competitionOverview.status ? {
-        ...competitionOverview.status,
-        eligibility: competitionOverview.status.eligibility ? {
-          ...competitionOverview.status.eligibility,
-          disqualified: true,
-          attemptsRemaining: 0,
-        } : null,
-      } : null,
-    } as never);
-
-    render(<UkiStakingPanel />);
-
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('0');
-    expect(screen.getByText(/wallet está descalificada del torneo/i)).toBeInTheDocument();
-  });
-
-  it('does not invent an allowance while the indexer is pending', () => {
-    mockUseTreasureHuntCompetitionOverview.mockReturnValue({
-      ...competitionOverview,
-      status: competitionOverview.status ? {
-        ...competitionOverview.status,
-        eligibility: competitionOverview.status.eligibility ? {
-          ...competitionOverview.status.eligibility,
-          ready: false,
-          attemptsRemaining: 99,
-        } : null,
-      } : null,
-    } as never);
-
-    render(<UkiStakingPanel />);
-
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('—');
-    expect(screen.getByText(/Aún estamos confirmando el estado de esta wallet/i)).toBeInTheDocument();
-  });
-
-  it('requests a signed session when the backend has no wallet eligibility', () => {
-    mockUseTreasureHuntCompetitionOverview.mockReturnValue({
-      ...competitionOverview,
-      status: competitionOverview.status
-        ? { ...competitionOverview.status, eligibility: null }
-        : null,
-    } as never);
-
-    render(<UkiStakingPanel />);
-
-    expect(screen.getByLabelText('Partidas disponibles')).toHaveTextContent('—');
-    expect(screen.getByText(/Conecta y firma esta wallet/i)).toBeInTheDocument();
-  });
-
-  it('offers a backend allowance retry after a competition refresh error', () => {
-    mockUseTreasureHuntCompetitionOverview.mockReturnValue({
-      ...competitionOverview,
-      error: 'No se pudo consultar el estado de la competición.',
-    } as never);
-
-    render(<UkiStakingPanel />);
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar cupo' }));
-
-    expect(reloadCompetition).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/No se ha podido actualizar el cupo del torneo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Usadas:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Torneo/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Pasos de la operación')).not.toBeInTheDocument();
+    expect(screen.getByText(/Los UKI pendientes de vesting ya cuentan para tus cupos/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Depositar')).toHaveLength(1);
   });
 
   it('ofrece cantidades simples sin exponer cálculos internos de la plaza', () => {
     render(<UkiStakingPanel routePreview={routePreview} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '2.000' }));
+    fireEvent.click(screen.getByRole('button', { name: '40.000' }));
 
-    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('2000');
+    expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('40000');
+    expect(screen.queryByRole('button', { name: '2.000' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Lo necesario' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Total computable:/i)).not.toBeInTheDocument();
   });
@@ -419,7 +263,7 @@ describe('UkiStakingPanel', () => {
     expect(writeContract).not.toHaveBeenCalled();
   });
 
-  it('blocks contract writes until the connected EVM wallet has authenticated', () => {
+  it('delega la conexión principal al resumen cuando todavía no hay sesión', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: false,
@@ -430,9 +274,9 @@ describe('UkiStakingPanel', () => {
 
     render(<UkiStakingPanel />);
 
-    expect(screen.getByText(/Firma el acceso con esta wallet/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Conectar wallet para gestionar staking/i }))
-      .toHaveAttribute('data-evm-only', 'true');
+    expect(screen.getByText(/Conecta tu wallet en el resumen superior/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Cantidad de UKI')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Conectar wallet/i })).not.toBeInTheDocument();
     expect(writeContract).not.toHaveBeenCalled();
   });
 
@@ -479,13 +323,15 @@ describe('UkiStakingPanel', () => {
       chainId: 97,
       address: stakingAddress,
       functionName: 'stake',
-      args: [parseUnits('2000', 18)],
+      args: [parseUnits('20000', 18)],
     }));
   });
 
-  it('refreshes tournament attempts after a confirmed staking transaction', async () => {
+  it('refresca el resumen económico tras un staking confirmado', async () => {
     allowance = parseUnits('50000', 18);
+    const cukieMasterRefresh = jest.fn();
     const tournamentRefresh = jest.fn();
+    window.addEventListener('cukies:cukie-master:refresh', cukieMasterRefresh);
     window.addEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
     const { rerender } = render(<UkiStakingPanel />);
 
@@ -503,11 +349,13 @@ describe('UkiStakingPanel', () => {
     } as never);
     rerender(<UkiStakingPanel />);
 
-    await waitFor(() => expect(tournamentRefresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(cukieMasterRefresh).toHaveBeenCalledTimes(1));
+    expect(tournamentRefresh).toHaveBeenCalledTimes(1);
     expect(toast).toHaveBeenCalledWith({
       title: 'Staking confirmado',
-      description: 'Tu staking de UKI está confirmado. Estamos actualizando tus partidas del torneo.',
+      description: 'Tu staking está confirmado. Estamos actualizando tus cupos Cukie Master.',
     });
+    window.removeEventListener('cukies:cukie-master:refresh', cukieMasterRefresh);
     window.removeEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
   });
 
@@ -520,7 +368,7 @@ describe('UkiStakingPanel', () => {
       chainId: 97,
       address: stakingAddress,
       functionName: 'unstake',
-      args: [parseUnits('2000', 18)],
+      args: [parseUnits('20000', 18)],
     }));
 
     fireEvent.change(screen.getByLabelText('Cantidad de UKI'), { target: { value: '30000' } });

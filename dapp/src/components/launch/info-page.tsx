@@ -30,7 +30,7 @@ type InfoPageProps = {
   heroAlt: string;
   metrics: InfoMetric[];
   sections: InfoSection[];
-  primaryCta: { label: string; href: string };
+  primaryCta?: { label: string; href: string };
   secondaryCta?: { label: string; href: string };
   beforeSections?: ReactNode;
   afterSections?: ReactNode;
@@ -73,10 +73,12 @@ export function LaunchInfoPage({
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
             {subtitle}
           </p>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <LandingButton href={primaryCta.href}>{primaryCta.label}</LandingButton>
-            {secondaryCta ? <LandingButton href={secondaryCta.href} variant="secondary">{secondaryCta.label}</LandingButton> : null}
-          </div>
+          {primaryCta || secondaryCta ? (
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              {primaryCta ? <LandingButton href={primaryCta.href}>{primaryCta.label}</LandingButton> : null}
+              {secondaryCta ? <LandingButton href={secondaryCta.href} variant="secondary">{secondaryCta.label}</LandingButton> : null}
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="uki-container relative z-[2] grid min-h-[34rem] min-w-0 gap-6 pb-12 pt-36 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
@@ -84,10 +86,12 @@ export function LaunchInfoPage({
             <p className="uki-launch-badge">{eyebrow}</p>
             <h1 className="mt-5 max-w-4xl font-headline text-5xl font-black uppercase leading-[0.94] text-[var(--uki-cream)] sm:text-6xl lg:text-7xl">{title}</h1>
             <p className="mt-4 max-w-2xl text-lg leading-relaxed text-[var(--uki-text)]">{subtitle}</p>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <LandingButton href={primaryCta.href}>{primaryCta.label}</LandingButton>
-              {secondaryCta ? <LandingButton href={secondaryCta.href} variant="secondary">{secondaryCta.label}</LandingButton> : null}
-            </div>
+            {primaryCta || secondaryCta ? (
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                {primaryCta ? <LandingButton href={primaryCta.href}>{primaryCta.label}</LandingButton> : null}
+                {secondaryCta ? <LandingButton href={secondaryCta.href} variant="secondary">{secondaryCta.label}</LandingButton> : null}
+              </div>
+            ) : null}
           </div>
           <div className="relative min-h-[22rem] min-w-0 overflow-hidden rounded-[14px] border border-[var(--uki-lilac-border)] bg-[#09070e] lg:min-h-[31rem]">
           <Image src={heroImage} alt={heroAlt} fill className="object-cover" sizes="(min-width: 1024px) 52vw, 100vw" priority />

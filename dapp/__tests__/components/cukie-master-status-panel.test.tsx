@@ -95,10 +95,54 @@ describe('CukieMasterStatusPanel', () => {
   it('does not query or estimate slots without an authenticated wallet', () => {
     mockUseAuth.mockReturnValue(authValue(null));
 
-    render(<CukieMasterStatusPanel />);
+    render(<CukieMasterStatusPanel overview />);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByText(/Conecta tu wallet/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Conectar wallet' })).toHaveLength(1);
+  });
+
+  it('resume cupos, estado, créditos diarios y siguiente acción entre las dos vías', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    const baseStatus = ukiOnlyStatusData(2);
+    const status = {
+      ...baseStatus,
+      routes: {
+        ...baseStatus.routes,
+        nft: {
+          position: {
+            status: 'qualifying',
+            desiredSlots: 1,
+            allocatedSlots: 1,
+            protectedSlots: 0,
+            graceEndsAt: null,
+          },
+          currentRequirement: { route: 'nft', nftPoints: 3 },
+          pendingRequirement: null,
+          requirementGraceEndsAt: null,
+          deficitToNextSlot: { route: 'nft', nftPoints: 2 },
+          deficitToPreserveSlots: null,
+          slots: [],
+          source: { complete: true, status: 'available' },
+        },
+      },
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', data: status }),
+    });
+
+    render(<CukieMasterStatusPanel overview />);
+
+    expect(await screen.findByRole('heading', { name: 'Tienes 3 cupos Cukie Master' })).toBeInTheDocument();
+    expect(screen.getByText('Tus cupos').parentElement).toHaveTextContent('3/10');
+    expect(screen.getByText('Tus cupos').parentElement).toHaveTextContent('2 con UKI · 1 con Cukies');
+    expect(screen.getByText('Estado actual').parentElement).toHaveTextContent('2 activos');
+    expect(screen.getByText('Estado actual').parentElement).toHaveTextContent('1 validando · 0 en gracia');
+    expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('200');
+    expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('100 por cada cupo activo');
+    expect(screen.getByRole('link', { name: 'Gestionar staking UKI' })).toHaveAttribute('href', '#uki-staking');
+    expect(screen.getByRole('link', { name: 'Gestionar créditos' })).toHaveAttribute('href', '#competition-credits');
   });
 
   it('simplifica la vista a vesting, staking y cinco plazas de la ruta UKI', async () => {

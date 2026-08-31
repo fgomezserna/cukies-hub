@@ -4,8 +4,8 @@ import { CukieMasterWorkspace } from '@/components/cukie-master/workspace';
 import { LaunchInfoPage } from '@/components/launch/info-page';
 
 export const metadata: Metadata = {
-  title: 'Cukie Master por UKI | Cukies World',
-  description: 'Consulta tus cupos Cukie Master, gestiona el staking de UKI y decide cómo usar tus créditos diarios.',
+  title: 'Cukie Master | Cukies World',
+  description: 'Consulta tus cupos Cukie Master, descubre tu siguiente paso y gestiona el staking de UKI y Cukies Originales.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -16,13 +16,11 @@ export default function CukieMasterPage() {
   return (
     <LaunchInfoPage
       variant="workspace"
-      eyebrow="Tu acceso Cukie Master"
-      title="Conviértete en Cukie Master"
-      subtitle="20.000 UKI computables equivalen inicialmente a 1 Cukie Master. Consulta tu vesting, gestiona el staking y comprueba tu progreso en la ruta UKI."
+      eyebrow="Tu cuenta"
+      title="Cukie Master"
+      subtitle="Consulta tus cupos, descubre qué te falta y gestiona las dos formas de convertirte en Cukie Master."
       heroImage="/brand/generated/uki-cukie-master-scene-v2.png"
       heroAlt="Escena Cukie Master con token UKI y bóveda"
-      primaryCta={{ label: 'Gestionar staking UKI', href: '#uki-staking' }}
-      secondaryCta={{ label: 'Stakear Cukies Originales', href: '#cukie-master-nft-staking' }}
       metrics={[
         { label: 'Por cupo UKI', value: '20.000 UKI', helper: 'Requisito inicial computable' },
         { label: 'Capacidad inicial', value: '500', helper: 'Cupos globales de la ruta UKI' },

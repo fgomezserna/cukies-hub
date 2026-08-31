@@ -33,9 +33,13 @@ jest.mock('@/hooks/use-mobile-game-shell', () => ({
 
 jest.mock('@/components/layout/header', () => ({
   __esModule: true,
-  default: () => {
+  default: ({ hideDisconnectedWalletTrigger }: { hideDisconnectedWalletTrigger?: boolean }) => {
     const { SidebarTrigger } = jest.requireActual('@/components/ui/sidebar');
-    return <header><SidebarTrigger /></header>;
+    return (
+      <header data-hide-disconnected-wallet-trigger={String(Boolean(hideDisconnectedWalletTrigger))}>
+        <SidebarTrigger />
+      </header>
+    );
   },
 }));
 
@@ -177,5 +181,14 @@ describe('AppLayout launch navigation', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
     expect(document.querySelector('[data-app-ambient-effects]')).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toHaveAttribute('data-hide-disconnected-wallet-trigger', 'false');
+  });
+
+  it('deja una única conexión visible dentro de Cukie Master', () => {
+    mockUsePathname.mockReturnValue('/cukie-master');
+
+    render(<AppLayout><div>Cukie Master</div></AppLayout>);
+
+    expect(screen.getByRole('banner')).toHaveAttribute('data-hide-disconnected-wallet-trigger', 'true');
   });
 });

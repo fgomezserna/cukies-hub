@@ -50,10 +50,14 @@ const getRank = (xp: number): string => {
 };
 
 interface HeaderProps {
+  hideDisconnectedWalletTrigger?: boolean;
   variant?: 'default' | 'game-overlay';
 }
 
-export default function Header({ variant = 'default' }: HeaderProps) {
+export default function Header({
+  hideDisconnectedWalletTrigger = false,
+  variant = 'default',
+}: HeaderProps) {
   const isGameOverlay = variant === 'game-overlay';
   const { toggleSidebar, state, isMobile } = useSidebar();
   const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
@@ -299,7 +303,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        ) : (
+        ) : hideDisconnectedWalletTrigger ? null : (
           <>
             <Button 
               onClick={() => !isWaitingForApproval && setIsWalletDialogOpen(true)} 

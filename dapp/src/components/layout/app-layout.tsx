@@ -216,7 +216,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           )}
           
-          {!isTreasureHuntGameView ? <Header variant="default" /> : null}
+          {!isTreasureHuntGameView ? (
+            <Header
+              variant="default"
+              hideDisconnectedWalletTrigger={pathname.startsWith('/cukie-master')}
+            />
+          ) : null}
           <main
             data-app-main
             className={cn(
