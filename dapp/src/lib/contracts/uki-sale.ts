@@ -314,7 +314,10 @@ const envSchema = z.object({
   NEXT_PUBLIC_UKI_STAKING_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
-  NEXT_PUBLIC_BSCSCAN_BASE_URL: z.string().url().default('https://bscscan.com'),
+  NEXT_PUBLIC_BSCSCAN_BASE_URL: z.preprocess(
+    (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+    z.string().url().default('https://bscscan.com'),
+  ),
 });
 
 const env = envSchema.parse({

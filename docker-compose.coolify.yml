@@ -365,7 +365,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -408,7 +408,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -450,7 +450,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -492,7 +492,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -534,7 +534,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -576,7 +576,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c
@@ -624,7 +624,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        <<: *dapp-build-args
+        CUKIES_SERVICE: dapp
     command:
       - sh
       - -c

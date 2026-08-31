@@ -20,16 +20,6 @@ const guardedWorkers = [
 
 const resourceScopedDappAlias = 'dapp-${COOLIFY_RESOURCE_UUID:?Coolify must expose the resource UUID}';
 const internalResourceDappUrl = 'http://dapp-${COOLIFY_RESOURCE_UUID}:3000';
-const dappImageServices = [
-  'dapp',
-  'cukie-master-scheduler',
-  'competition-credit-scheduler',
-  'game-economy-scheduler',
-  'cukie-pool-scheduler',
-  'weekly-ranking-scheduler',
-  'reward-accounting-scheduler',
-  'reward-batch-publisher',
-];
 
 function serviceDefinition(serviceName) {
   const startMarker = `  ${serviceName}:\n`;
@@ -57,14 +47,6 @@ for (const serviceName of guardedWorkers) {
       definition,
       /      COOLIFY_RESOURCE_UUID: \$\{COOLIFY_RESOURCE_UUID:\?Coolify must expose the staging resource UUID\}/,
     );
-  });
-}
-
-for (const serviceName of dappImageServices) {
-  test(`${serviceName} builds the dapp with the complete public environment`, () => {
-    const definition = serviceDefinition(serviceName);
-
-    assert.match(definition, /      args:\n        <<: \*dapp-build-args/);
   });
 }
 
