@@ -1,116 +1,42 @@
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
 
 import CukieMasterPage from '@/app/(app)/cukie-master/page';
 
 jest.mock('lucide-react', () => ({
+  Check: () => <svg aria-hidden="true" />,
   ChevronDown: () => <svg aria-hidden="true" />,
 }));
 jest.mock('@/components/cukie-master/workspace', () => ({
   CukieMasterWorkspace: ({ testnetOnly }: { testnetOnly?: boolean }) => (
-    <div data-testnet-only={String(Boolean(testnetOnly))}>Workspace personal</div>
+    <div data-testnet-only={String(Boolean(testnetOnly))}>Experiencia Cukie Master</div>
   ),
-}));
-jest.mock('@/components/launch/info-page', () => ({
-  LaunchInfoPage: ({
-    eyebrow,
-    title,
-    subtitle,
-    variant,
-    beforeSections,
-    afterSections,
-    metrics,
-    primaryCta,
-    secondaryCta,
-    sections,
-    note,
-  }: {
-    eyebrow: string;
-    title: string;
-    subtitle: string;
-    variant?: string;
-    beforeSections?: ReactNode;
-    afterSections?: ReactNode;
-    metrics: Array<{ label: string; value: string; helper?: string }>;
-    primaryCta?: { label: string; href: string };
-    secondaryCta?: { label: string; href: string };
-    sections: Array<{ title: string; text?: string; bullets?: string[] }>;
-    note?: string;
-  }) => (
-    <main data-variant={variant}>
-      <p>{eyebrow}</p>
-      <h1>{title}</h1>
-      <p>{subtitle}</p>
-      {metrics.map((metric) => (
-        <p key={metric.label}>{metric.label}: {metric.value} · {metric.helper}</p>
-      ))}
-      {primaryCta ? <a href={primaryCta.href}>{primaryCta.label}</a> : null}
-      {secondaryCta ? <a href={secondaryCta.href}>{secondaryCta.label}</a> : null}
-      {beforeSections}
-      {sections.map((section) => (
-        <section key={section.title}>
-          <h2>{section.title}</h2>
-          <p>{section.text}</p>
-          {section.bullets?.map((bullet) => <p key={bullet}>{bullet}</p>)}
-        </section>
-      ))}
-      <p>{note}</p>
-      {afterSections}
-    </main>
-  ),
-}));
-jest.mock('@/components/landing/sale-config', () => ({
-  UKI_PRESALE_CHAIN_LABEL: 'BNB Smart Chain',
 }));
 
 describe('CukieMasterPage', () => {
-  const previousFlag = process.env.COMPETITION_CREDITS_RUNTIME_ENABLED;
   const previousAppEnv = process.env.APP_ENV;
 
   afterEach(() => {
-    if (previousFlag === undefined) delete process.env.COMPETITION_CREDITS_RUNTIME_ENABLED;
-    else process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = previousFlag;
     if (previousAppEnv === undefined) delete process.env.APP_ENV;
     else process.env.APP_ENV = previousAppEnv;
   });
 
-  it('abre con el resumen personal y conserva las dos vías, créditos y pool en staging', () => {
-    process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'false';
+  it('usa la experiencia propia y mantiene la seguridad de red en staging', () => {
     process.env.APP_ENV = 'staging';
     const { container } = render(<CukieMasterPage />);
 
-    expect(container.querySelector('main')).toHaveAttribute('data-variant', 'workspace');
-    expect(screen.getByText('Workspace personal')).toBeInTheDocument();
-    expect(screen.getByText('Workspace personal')).toHaveAttribute('data-testnet-only', 'true');
-    expect(screen.getByText('Tu cuenta')).toBeInTheDocument();
+    expect(screen.getByText('Experiencia Cukie Master')).toHaveAttribute('data-testnet-only', 'true');
+    expect(screen.getByText('Reglas y preguntas frecuentes')).toBeInTheDocument();
+    expect(screen.getByText('Cada cupo necesita 24 horas antes de su primera entrega de créditos.')).toBeInTheDocument();
+    expect(screen.getByText('¿Cómo funciona la vía con Cukies Originales?')).toBeInTheDocument();
+    expect(container.firstChild).toHaveClass('uki-landing');
     expect(container).not.toHaveTextContent(/Stage|Staging|Testnet|chain 97/i);
-    expect(screen.getByRole('heading', { level: 1, name: 'Cukie Master' })).toBeInTheDocument();
-    expect(screen.getByText(/Consulta tus cupos, descubre qué te falta/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cada 20.000 UKI computables conceden inicialmente 1 cupo Cukie Master/i)).toBeInTheDocument();
-    expect(screen.getByText((_, element) => (
-      element?.tagName === 'P' && element.textContent?.startsWith('Capacidad inicial: 500 ·') === true
-    ))).toBeInTheDocument();
-    expect(screen.getByText((_, element) => (
-      element?.tagName === 'P' && element.textContent?.startsWith('Capacidad máxima: 2.500 ·') === true
-    ))).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Gestionar staking UKI' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Stakear Cukies Originales' })).not.toBeInTheDocument();
-    expect(screen.getByText('Cómo funciona la ruta UKI')).toBeInTheDocument();
-    expect(screen.getByText(/asignación de preventa pendiente de vesting.*staking se suman/i)).toBeInTheDocument();
-    expect(screen.getByText('Créditos propios o pool')).toBeInTheDocument();
-    expect(screen.getByText('La ruta con Cukies sigue disponible')).toBeInTheDocument();
-    expect(screen.getByText(/3 puntos de rareza depositados conceden inicialmente 1 cupo/i)).toBeInTheDocument();
-    expect(screen.getByText('¿Cuántos cupos de Cukie Master hay disponibles mediante UKI?')).toBeInTheDocument();
-    expect(screen.getByText(/El requisito no sube automáticamente/i)).toBeInTheDocument();
-    expect(screen.getByText(/no equivalen ni garantizan 100 UKI/i)).toBeInTheDocument();
-    expect(container).not.toHaveTextContent('La UI debe');
   });
 
-  it('mantiene el workspace completo independientemente del gate operativo del scheduler', () => {
-    process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'true';
+  it('no depende de un gate del scheduler para mostrar el recorrido completo', () => {
+    process.env.APP_ENV = 'production';
     render(<CukieMasterPage />);
 
-    expect(screen.getByText('Workspace personal')).toBeInTheDocument();
-    expect(screen.getByText('Créditos propios o pool')).toBeInTheDocument();
+    expect(screen.getByText('Experiencia Cukie Master')).toHaveAttribute('data-testnet-only', 'false');
+    expect(screen.getByText('Reglas y preguntas frecuentes')).toBeInTheDocument();
   });
 });
