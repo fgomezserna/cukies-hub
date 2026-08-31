@@ -13,7 +13,7 @@ const navItems = [
   { label: { es: 'Inicio', en: 'Home' }, href: '/' },
   { label: { es: 'Mi dashboard', en: 'My dashboard' }, href: '/dashboard' },
   { label: { es: 'Staking', en: 'Staking' }, href: '/cukie-master' },
-  { label: { es: 'Jugar', en: 'Play' }, href: '/games/treasure-hunt' },
+  { label: { es: 'Jugar', en: 'Play' }, href: '/games' },
   { label: { es: 'Vesting', en: 'Vesting' }, href: '/vesting' },
 ];
 

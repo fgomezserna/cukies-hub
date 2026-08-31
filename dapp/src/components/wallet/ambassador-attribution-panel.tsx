@@ -175,7 +175,7 @@ export function AmbassadorAttributionPanel() {
           </div>
           {policy ? (
             <div className="rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/20 px-4 py-3 text-right">
-              <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Política activa</p>
+              <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Tu recompensa por invitar</p>
               <p className="mt-1 font-headline text-xl font-black text-[var(--uki-lilac)]">
                 {(policy.commissionBps / 100).toLocaleString('es-ES')}% · {policy.levels} nivel
               </p>
@@ -274,7 +274,7 @@ export function AmbassadorAttributionPanel() {
 
             <div className="rounded-[8px] border border-white/10 bg-black/20 p-5">
               <div className="flex items-center gap-3">
-                <Link2 className="h-5 w-5 text-[var(--uki-gold)]" />
+                <Link2 className="h-5 w-5 text-[var(--uki-lilac)]" />
                 <h3 className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Mi enlace de invitación</h3>
               </div>
               <p className="mt-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">

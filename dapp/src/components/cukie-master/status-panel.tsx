@@ -587,7 +587,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
         primary: preserveDeficit?.route === 'nft'
           ? { href: '#cukie-master-nft-staking', label: 'Gestionar Cukies' }
           : { href: '#uki-staking', label: 'Gestionar staking UKI' },
-        secondary: { href: '#competition-credits', label: 'Ver mis créditos' },
+        secondary: { href: '/credits', label: 'Ver mis créditos' },
         warning: true,
       };
     }
@@ -616,7 +616,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
         eyebrow: 'En validación',
         title: `${counts.qualifying === 1 ? 'Tu cupo está' : 'Tus cupos están'} madurando`,
         description: 'Cada cupo empieza a generar créditos cuando completa sus primeras 24 horas y llega al siguiente corte diario.',
-        primary: { href: '#competition-credits', label: 'Ver mis créditos' },
+        primary: { href: '/credits', label: 'Ver mis créditos' },
         secondary: { href: '#uki-staking', label: 'Revisar staking' },
         warning: false,
       };
@@ -626,7 +626,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
         eyebrow: 'Máximo alcanzado',
         title: 'Ya tienes todos tus cupos disponibles',
         description: 'Revisa tus créditos y decide cuánto quieres conservar para jugar y cuánto aportar al pool.',
-        primary: { href: '#competition-credits', label: 'Gestionar créditos' },
+        primary: { href: '/credits', label: 'Gestionar créditos' },
         secondary: { href: '#uki-staking', label: 'Revisar staking' },
         warning: false,
       };
@@ -638,7 +638,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
         : 'Puedes aumentar tus cupos',
       description: 'Tu vesting ya está incluido. Deposita únicamente la cantidad que quieras añadir a tu posición.',
       primary: { href: '#uki-staking', label: 'Gestionar staking UKI' },
-      secondary: { href: '#competition-credits', label: 'Gestionar créditos' },
+      secondary: { href: '/credits', label: 'Gestionar créditos' },
       warning: false,
     };
   })();

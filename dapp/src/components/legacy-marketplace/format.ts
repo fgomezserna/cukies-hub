@@ -15,7 +15,7 @@ export function getCukiDisplayName(cuki: LegacyMarketplaceCukiItem) {
 }
 
 export function formatLegacyPrice(cuki: LegacyMarketplaceCukiItem) {
-  if (cuki.state !== 'onSale') return 'Not listed';
+  if (cuki.state !== 'onSale') return 'No está en venta';
 
   if (cuki.priceOriginal) {
     try {
@@ -33,7 +33,7 @@ export function formatLegacyPrice(cuki: LegacyMarketplaceCukiItem) {
         )} TRX`;
       }
     } catch {
-      return cuki.price !== null ? `${cuki.price.toLocaleString()} raw` : '-';
+      return cuki.price !== null ? cuki.price.toLocaleString('es-ES') : 'Precio no disponible';
     }
   }
 
@@ -43,28 +43,34 @@ export function formatLegacyPrice(cuki: LegacyMarketplaceCukiItem) {
 export function getTypeLabel(type: LegacyMarketplaceCukiItem['type']) {
   switch (String(type)) {
     case '1':
-      return 'Common';
+      return 'Común';
     case '2':
-      return 'Uncommon';
+      return 'No común';
     case '3':
-      return 'Rare';
+      return 'Raro';
     case '4':
-      return 'Epic';
+      return 'Épico';
     case '5':
-      return 'Legendary';
+      return 'Legendario';
     case '6':
       return 'Goat';
     default:
-      return type === null ? '-' : `Type ${type}`;
+      return type === null ? '-' : `Tipo ${type}`;
   }
 }
 
 export function getStateLabel(state: string) {
   switch (state) {
     case 'onSale':
-      return 'On sale';
+      return 'En venta';
     case 'inBridge':
-      return 'In bridge';
+      return 'En transferencia';
+    case 'available':
+      return 'Disponible';
+    case 'staking':
+      return 'En Cukie Master';
+    case 'breeding':
+      return 'En crianza';
     default:
       return state;
   }
@@ -73,7 +79,7 @@ export function getStateLabel(state: string) {
 export function formatLegacyDate(timestamp?: number | null) {
   if (!timestamp) return '-';
 
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat('es-ES', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

@@ -155,7 +155,7 @@ describe('DashboardOverviewPanel', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('consume una sola API agregada y muestra identidad, módulos y actualización', async () => {
+  it('consume una sola API agregada y muestra identidad y módulos sin detalles técnicos', async () => {
     render(<DashboardOverviewPanel />);
 
     expect(await screen.findByText('tester')).toBeInTheDocument();
@@ -167,7 +167,9 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.getByText('0x1111…1111')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getAllByText(/Actualizado/).length).toBeGreaterThanOrEqual(7);
+    expect(screen.queryByText(/Actualizado/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Usar o aportar/i })).toHaveAttribute('href', '/credits');
+    expect(screen.getByRole('link', { name: /Ver mis premios/i })).toHaveAttribute('href', '/premios');
   });
 
   it('conserva módulos válidos cuando otra fuente queda indisponible', async () => {

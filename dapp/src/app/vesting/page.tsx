@@ -138,7 +138,6 @@ export default function PublicVestingPage() {
     : 0;
 
   const vestingStart = scheduleField(schedule, 'start', 2);
-  const vestingCliff = scheduleField(schedule, 'cliff', 3);
   const vestingDuration = scheduleField(schedule, 'duration', 4);
   const configuredVestingStart = presaleVestingStart as bigint | undefined;
   const effectiveVestingStart = vestingStart && vestingStart > BigInt(0)
@@ -148,9 +147,8 @@ export default function PublicVestingPage() {
   const vestingEnd = effectiveStartDate && vestingDuration && vestingDuration > BigInt(0)
     ? (effectiveVestingStart ?? BigInt(0)) + vestingDuration
     : undefined;
-  const vestingStartLabel = formatVestingDate(effectiveVestingStart) ?? 'En TGE';
+  const vestingStartLabel = formatVestingDate(effectiveVestingStart) ?? 'Pendiente de inicio';
   const vestingEndLabel = formatVestingDate(vestingEnd) ?? 'Pendiente de calendario';
-  const vestingCliffLabel = formatVestingDate(vestingCliff) ?? 'Sin cliff para comprador';
 
   const hasGlobalReadError =
     isTotalAllocatedError || isTotalReleasedError || isUnallocatedError || isPresaleVestingStartError;
@@ -178,49 +176,43 @@ export default function PublicVestingPage() {
     <div className="uki-landing min-h-full w-full overflow-hidden bg-transparent text-[var(--uki-cream)]">
       <section className="relative z-[2] w-full pb-6">
         <div className="relative overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/20 bg-[#070817]/90 p-5 shadow-[0_0_52px_rgba(228,92,255,0.12)] sm:p-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(228,92,255,0.20),transparent_24rem),radial-gradient(circle_at_18%_78%,rgba(242,195,75,0.11),transparent_18rem)]" aria-hidden="true" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(228,92,255,0.20),transparent_24rem)]" aria-hidden="true" />
           <div className="relative grid gap-8 xl:grid-cols-[1.08fr_0.92fr] xl:items-end">
             <div>
               <p className="uki-launch-badge inline-flex items-center gap-2">
                 <LockKeyhole className="h-3.5 w-3.5" />
-                Vesting UKI
+                Tus UKI
               </p>
               <h1 className="mt-5 max-w-3xl font-headline text-4xl font-black uppercase leading-[0.95] text-[var(--uki-cream)] sm:text-6xl">
-                Consulta tus UKI de preventa
+                Tu vesting
               </h1>
               <p className="mt-5 max-w-2xl text-base font-semibold leading-relaxed text-[var(--uki-text)]">
-                Revisa la asignación creada para tu cartera, cuánto queda bloqueado y qué parte puedes reclamar cuando el calendario de vesting empiece a liberar UKI.
+                Consulta cuánto tienes asignado, qué parte sigue bloqueada y cuántos UKI puedes enviar ahora a tu wallet.
               </p>
-              <div className="mt-6 flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.12em]">
-                <span className="rounded-[7px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 px-3 py-2 text-[var(--uki-lilac)]">
-                  Cadena BNB
-                </span>
-                <span className="rounded-[7px] border border-white/10 bg-white/5 px-3 py-2 text-[var(--uki-text)]">
-                  Bóveda {isConfigured ? 'configurada' : 'pendiente'}
-                </span>
-                <span className="rounded-[7px] border border-white/10 bg-white/5 px-3 py-2 text-[var(--uki-text)]">
-                  Cartera {isConnected ? formatShortAddress(address) : 'no conectada'}
-                </span>
-              </div>
+              <p className="mt-6 text-sm font-black text-[var(--uki-lilac)]">
+                {isConnected ? `Wallet ${formatShortAddress(address)}` : 'Conecta tu wallet para consultar tu posición'}
+              </p>
             </div>
 
             <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#0d0b24]/82 p-5 shadow-[0_0_34px_rgba(228,92,255,0.1)]">
               <div className="flex items-center gap-3">
-                <Sparkles className="h-5 w-5 text-[var(--uki-gold)]" />
-                <p className="font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">Inicio de vesting</p>
+                <Sparkles className="h-5 w-5 text-[var(--uki-lilac)]" />
+                <p className="font-headline text-sm font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">Disponible ahora</p>
               </div>
-              <p className="mt-4 font-headline text-4xl font-black uppercase leading-none text-[var(--uki-cream)]">{vestingStartLabel}</p>
+              <p className="mt-4 font-headline text-4xl font-black leading-none text-[var(--uki-cream)]">{formatToken(claimableAmount)} UKI</p>
               <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                Mientras la fecha exacta no esté definida en contrato, se muestra “En TGE” como referencia operativa.
+                {hasPosition
+                  ? 'Esta es la cantidad que puedes reclamar con la wallet conectada.'
+                  : 'Cuando tengas una asignación y se liberen UKI, aparecerán aquí.'}
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Fin estimado</p>
-                  <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingEndLabel}</p>
+                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Inicio</p>
+                  <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingStartLabel}</p>
                 </div>
                 <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Cliff</p>
-                  <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingCliffLabel}</p>
+                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Final</p>
+                  <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingEndLabel}</p>
                 </div>
               </div>
             </div>
@@ -246,9 +238,9 @@ export default function PublicVestingPage() {
         <div className="rounded-[14px] border border-[var(--uki-lilac)]/22 bg-[#070817]/90 p-5 shadow-[0_0_44px_rgba(228,92,255,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">Mi vesting de preventa</h2>
+              <h2 className="font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">Mi calendario</h2>
               <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
-                {isConnected ? address : 'Conecta una cartera para leer tu calendario en vivo.'}
+                {isConnected ? formatShortAddress(address) : 'Conecta una wallet para consultar tu calendario.'}
               </p>
             </div>
             <Button
@@ -281,7 +273,7 @@ export default function PublicVestingPage() {
             </div>
             <div className="flex flex-col justify-center gap-5">
               <div className="h-3 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-gradient-to-r from-[var(--uki-lilac)] to-[#f2c34b]" style={{ width: `${Math.min(unlockProgress, 100)}%` }} />
+                <div className="h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: `${Math.min(unlockProgress, 100)}%` }} />
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
@@ -297,9 +289,9 @@ export default function PublicVestingPage() {
                   <div className="mt-1 font-headline text-lg font-black text-[var(--uki-cream)]">{formatToken(releasedAmount)} UKI</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 rounded-[10px] border border-[#f2c34b]/25 bg-[#2b1d08]/42 px-3 py-2 text-sm font-semibold text-[#ffe2a0]">
+              <div className="flex items-center gap-2 rounded-[10px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 px-3 py-2 text-sm font-semibold text-[var(--uki-text)]">
                 <CalendarClock className="h-4 w-4" />
-                Ventana de vesting: {vestingStartLabel} - {vestingEndLabel}
+                Periodo de liberación: {vestingStartLabel} - {vestingEndLabel}
               </div>
             </div>
           </div>
@@ -310,19 +302,18 @@ export default function PublicVestingPage() {
             </p>
           ) : isConfigured && isConnected && !hasWalletReadError ? (
             <p className="mt-5 rounded-[10px] border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              No se ha encontrado un calendario de vesting para esta cartera. Después de una compra correcta, aquí aparecerá la asignación UKI creada por el contrato de preventa.
+              No hay una asignación de vesting para esta wallet. Si recibes UKI sujetos a liberación gradual, el calendario aparecerá aquí automáticamente.
             </p>
           ) : null}
         </div>
 
         <aside className="rounded-[14px] border border-[var(--uki-lilac)]/18 bg-[#0d0b24]/82 p-5 shadow-[0_0_36px_rgba(228,92,255,0.07)]">
-          <h2 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">Qué pasa después de comprar</h2>
+          <h2 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">Cómo funciona tu vesting</h2>
           <div className="mt-4 space-y-3">
             {[
-              ['1', 'Compra registrada', 'La preventa guarda cuánto ASM gastó esta cartera y cuántos UKI compró.'],
-              ['2', 'Asignación creada', 'Los UKI quedan asignados a esta cartera dentro de la bóveda de vesting.'],
-              ['3', 'Liberación gradual', 'La parte reclamable crece según la ventana de vesting configurada.'],
-              ['4', 'Reclamación disponible', 'Usa esta pantalla para liberar los UKI desbloqueados a la cartera conectada.'],
+              ['1', 'Asignación registrada', 'Los UKI sujetos a vesting quedan asociados a tu wallet.'],
+              ['2', 'Liberación gradual', 'La parte disponible aumenta según tu calendario.'],
+              ['3', 'Cobro en tu wallet', 'Cuando haya UKI disponibles, puedes reclamarlos desde esta pantalla.'],
             ].map(([step, title, body]) => (
               <div key={step} className="grid grid-cols-[2rem_1fr] gap-3 rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[var(--uki-lilac)] text-sm font-black text-white">{step}</div>
@@ -343,9 +334,7 @@ export default function PublicVestingPage() {
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="font-semibold text-red-50">Los datos de vesting no están disponibles ahora mismo.</p>
-                <p className="mt-1 text-red-100/80">
-                  La lectura on-chain falló en la red {ukiSaleContracts.chainId}. Revisa RPC, dirección de contrato y red seleccionada antes de tratar estos valores como definitivos.
-                </p>
+                <p className="mt-1 text-red-100/80">Vuelve a intentarlo en unos instantes. No mostraremos cantidades parciales como si fueran definitivas.</p>
               </div>
             </div>
           </div>
@@ -354,14 +343,12 @@ export default function PublicVestingPage() {
 
       {!isConfigured ? (
         <section className="relative z-[2] w-full pb-6">
-          <div className="rounded-[12px] border border-[#f2c34b]/30 bg-[#2b1d08]/48 p-4 text-sm text-[#ffe2a0]">
+          <div className="rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 p-4 text-sm text-[var(--uki-text)]">
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
-                <p className="font-semibold text-[#fff2dc]">El contrato de vesting todavía no está configurado.</p>
-                <p className="mt-1 text-[#ffe2a0]/80">
-                  Falta configurar `NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS` y las direcciones de preventa antes de validar el flujo posterior a compra.
-                </p>
+                <p className="font-semibold text-[var(--uki-cream)]">El vesting no está disponible ahora mismo.</p>
+                <p className="mt-1 text-[var(--uki-muted)]">La consulta y el cobro permanecerán desactivados hasta que el servicio esté disponible.</p>
               </div>
             </div>
           </div>

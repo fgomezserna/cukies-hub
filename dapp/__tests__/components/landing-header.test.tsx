@@ -45,7 +45,7 @@ describe('components/landing/LandingHeader', () => {
     expect(screen.getAllByRole('link', { name: 'Inicio' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Jugar' })).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ href: expect.stringContaining('/games/treasure-hunt') }),
+        expect.objectContaining({ href: expect.stringMatching(/\/games$/) }),
       ]),
     );
     expect(screen.getAllByRole('link', { name: 'Mi dashboard' })).toEqual(

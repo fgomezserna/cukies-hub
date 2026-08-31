@@ -109,7 +109,7 @@ function HeroSection({ network }: { network: LandingNetworkConfig }) {
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+            <LandingButton href="/games">{copy.play}</LandingButton>
             <LandingButton href="/cukie-master" variant="secondary">
               {copy.stake}
             </LandingButton>

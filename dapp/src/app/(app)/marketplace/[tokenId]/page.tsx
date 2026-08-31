@@ -11,7 +11,6 @@ import {
   Shield,
   Sparkles,
   Users,
-  Wallet,
   Zap,
 } from 'lucide-react';
 
@@ -44,17 +43,17 @@ type MarketplaceDetailPageProps = {
 };
 
 const skillLabels = [
-  ['miner', 'Miner'],
-  ['engineer', 'Engineer'],
-  ['farmer', 'Farmer'],
-  ['gatherer', 'Gatherer'],
-  ['scout', 'Scout'],
-  ['breeder', 'Breeder'],
+  ['miner', 'Minería'],
+  ['engineer', 'Ingeniería'],
+  ['farmer', 'Cultivo'],
+  ['gatherer', 'Recolección'],
+  ['scout', 'Exploración'],
+  ['breeder', 'Crianza'],
 ] as const;
 
 const vitalLabels = [
-  ['life', 'Life'],
-  ['energy', 'Energy'],
+  ['life', 'Vida'],
+  ['energy', 'Energía'],
 ] as const;
 
 function getExplorerUrl(network: string, tokenId: string) {
@@ -70,7 +69,7 @@ function getExplorerUrl(network: string, tokenId: string) {
 }
 
 function getOriginAction(cuki: LegacyMarketplaceCukiItem) {
-  return cuki.origin === 'mint' ? 'Mint' : 'Birth';
+  return cuki.origin === 'mint' ? 'Creación' : 'Nacimiento';
 }
 
 function getOriginDate(cuki: LegacyMarketplaceCukiItem) {
@@ -102,21 +101,21 @@ function getHistoryLabel(entry: LegacyMarketplaceCukiHistoryEntry) {
   switch (entry.type.toLowerCase()) {
     case 'putonsale':
     case 'tokenonsale':
-      return 'Put on sale';
+      return 'Puesto a la venta';
     case 'cancelsale':
     case 'markettokensalecancelled':
-      return 'Sale cancelled';
+      return 'Venta cancelada';
     case 'buy':
     case 'tokenbought':
-      return 'Bought';
+      return 'Comprado';
     case 'breed':
     case 'breedfinish':
-      return 'Bred';
+      return 'Criado';
     case 'mint':
-      return 'Minted';
+      return 'Creado';
     case 'bridge':
     case 'jumpoutbridge':
-      return 'Bridge';
+      return 'Cambio de red';
     default:
       return entry.type;
   }
@@ -144,34 +143,34 @@ function getHistorySummary(entry: LegacyMarketplaceCukiHistoryEntry) {
 
   if (type === 'putonsale' || type === 'tokenonsale') {
     return price !== '-'
-      ? `Listed for ${price}${from ? ` by ${from}` : ''}.`
-      : `Listed on marketplace${from ? ` by ${from}` : ''}.`;
+      ? `Puesto a la venta por ${price}${from ? ` · ${from}` : ''}.`
+      : `Publicado en el marketplace${from ? ` por ${from}` : ''}.`;
   }
 
   if (type === 'cancelsale' || type === 'markettokensalecancelled') {
-    return 'Removed from marketplace.';
+    return 'Retirado del marketplace.';
   }
 
   if (type === 'buy' || type === 'tokenbought') {
-    const actor = [from ? `from ${from}` : null, to ? `to ${to}` : null]
+    const actor = [from ? `de ${from}` : null, to ? `a ${to}` : null]
       .filter(Boolean)
       .join(' ');
-    return `Bought${actor ? ` ${actor}` : ''}${price !== '-' ? ` for ${price}` : ''}.`;
+    return `Comprado${actor ? ` ${actor}` : ''}${price !== '-' ? ` por ${price}` : ''}.`;
   }
 
   if (type === 'breed' || type === 'breedfinish') {
-    return `Created by breeding${to ? ` for ${to}` : ''}.`;
+    return `Creado mediante crianza${to ? ` para ${to}` : ''}.`;
   }
 
   if (type === 'mint') {
-    return `Minted${to ? ` to ${to}` : ''}.`;
+    return `Creado${to ? ` para ${to}` : ''}.`;
   }
 
   if (type === 'bridge' || type === 'jumpoutbridge') {
-    return `Moved through bridge${to ? ` to ${to}` : ''}.`;
+    return `Trasladado a otra red${to ? ` para ${to}` : ''}.`;
   }
 
-  return 'Indexed blockchain event.';
+  return 'Movimiento registrado para este Cukie.';
 }
 
 function InfoRow({
@@ -253,7 +252,7 @@ function RelationCard({
             : relation.tokenId}
         </p>
         <p className="mt-1 text-xs text-slate-400">
-          {relation.network ?? '-'} · Gen {relation.generation ?? '-'}
+          {relation.network ?? '-'} · Generación {relation.generation ?? '-'}
         </p>
         <p className="mt-1 text-xs text-slate-500">
           {getStateLabel(relation.state ?? '-')}
@@ -279,22 +278,22 @@ export default async function MarketplaceDetailPage({
     (a, b) => (b.date ?? 0) - (a.date ?? 0),
   );
   const detailStats = [
-    { label: 'Price', value: formatLegacyPrice(cuki), Icon: Sparkles },
-    { label: 'Type', value: getTypeLabel(cuki.type), Icon: Shield },
-    { label: 'Generation', value: String(cuki.skills.generation ?? '-'), Icon: Zap },
-    { label: 'Children', value: String(cuki.childrenCount ?? '-'), Icon: Users },
+    { label: 'Precio', value: formatLegacyPrice(cuki), Icon: Sparkles },
+    { label: 'Tipo', value: getTypeLabel(cuki.type), Icon: Shield },
+    { label: 'Generación', value: String(cuki.skills.generation ?? '-'), Icon: Zap },
+    { label: 'Descendientes', value: String(cuki.childrenCount ?? '-'), Icon: Users },
   ];
   const explorerUrl = getExplorerUrl(cuki.network, cuki.tokenId);
 
   return (
-    <div className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground">
+    <div className="uki-landing mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-[var(--uki-cream)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/marketplace"
           className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to marketplace
+          Volver al marketplace
         </Link>
         {explorerUrl && (
           <a
@@ -303,7 +302,7 @@ export default async function MarketplaceDetailPage({
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-[8px] border border-lilac-300/25 bg-lilac-300/10 px-3 py-2 text-sm font-semibold text-lilac-100 transition hover:bg-lilac-300/20"
           >
-            Explorer
+            Ver en el explorador
             <ExternalLink className="h-4 w-4" />
           </a>
         )}
@@ -335,7 +334,7 @@ export default async function MarketplaceDetailPage({
               {getCukiDisplayName(cuki)}
             </h1>
             <p className="mt-2 break-all font-mono text-sm text-slate-400">
-              Token {cuki.tokenId}
+              Cukie {cuki.tokenId}
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
@@ -349,30 +348,30 @@ export default async function MarketplaceDetailPage({
             <div className="mb-2 flex items-center gap-2">
               <Activity className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
-                General info
+                Información principal
               </h2>
             </div>
-            <InfoRow label="Type" value={getTypeLabel(cuki.type)} />
+            <InfoRow label="Tipo" value={getTypeLabel(cuki.type)} />
             <InfoRow
-              label={`${originAction} date`}
+              label={`Fecha de ${originAction.toLowerCase()}`}
               value={formatLegacyDate(originDate)}
             />
             <InfoRow
-              label={`${originAction} network`}
+              label={`Red de ${originAction.toLowerCase()}`}
               value={cuki.birthNetwork ?? '-'}
             />
-            <InfoRow label="Owner" value={cuki.owner ?? '-'} mono />
-            <InfoRow label="Current network" value={cuki.network} />
-            <InfoRow label="Origin" value={cuki.origin ?? '-'} />
-            <InfoRow label="State" value={getStateLabel(cuki.state)} />
-            <InfoRow label="Token ID" value={cuki.tokenId} mono />
+            <InfoRow label="Propietario" value={cuki.owner ?? '-'} mono />
+            <InfoRow label="Red actual" value={cuki.network} />
+            <InfoRow label="Origen" value={cuki.origin === 'mint' ? 'Original' : 'Crianza'} />
+            <InfoRow label="Estado" value={getStateLabel(cuki.state)} />
+            <InfoRow label="Identificador" value={cuki.tokenId} mono />
           </div>
 
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
             <div className="mb-4 flex items-center gap-2">
               <Zap className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
-                Skills
+                Habilidades
               </h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -422,7 +421,7 @@ export default async function MarketplaceDetailPage({
               })}
               <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
                 <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Generation
+                  Generación
                 </p>
                 <p className="mt-1 font-mono text-lg font-semibold text-white">
                   {cuki.skills.generation ?? '-'}
@@ -436,11 +435,11 @@ export default async function MarketplaceDetailPage({
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-lilac-200" />
                 <h2 className="font-headline text-2xl font-bold text-white">
-                  Family
+                  Familia
                 </h2>
               </div>
               <div className="text-right text-xs text-slate-400">
-                <p>{cuki.childrenCount ?? 0} children</p>
+                <p>{cuki.childrenCount ?? 0} descendientes</p>
                 <p>
                   TRON {cuki.childrenCountTron ?? 0} · BSC{' '}
                   {cuki.childrenCountBsc ?? 0}
@@ -450,11 +449,11 @@ export default async function MarketplaceDetailPage({
             <div className="grid gap-3 md:grid-cols-2">
               <RelationCard
                 relation={cuki.parents[0]}
-                emptyLabel="Original Cukie"
+                emptyLabel="Cukie Original"
               />
               <RelationCard
                 relation={cuki.parents[1]}
-                emptyLabel="Original Cukie"
+                emptyLabel="Cukie Original"
               />
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -463,12 +462,12 @@ export default async function MarketplaceDetailPage({
                   <RelationCard
                     key={child.tokenId}
                     relation={child}
-                    emptyLabel="No child"
+                    emptyLabel="Sin descendiente"
                   />
                 ))
               ) : (
                 <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-slate-400 md:col-span-2">
-                  No children registered
+                  No hay descendientes registrados
                 </div>
               )}
             </div>
@@ -478,7 +477,7 @@ export default async function MarketplaceDetailPage({
             <div className="mb-4 flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-lilac-200" />
               <h2 className="font-headline text-2xl font-bold text-white">
-                History
+                Historial
               </h2>
             </div>
             <div className="grid gap-3">
@@ -532,26 +531,12 @@ export default async function MarketplaceDetailPage({
                 })
               ) : (
                 <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-slate-400">
-                  No history registered
+                  Todavía no hay movimientos registrados
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-[8px] border border-white/10 bg-black/30 p-5 backdrop-blur">
-            <div className="mb-3 flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-lilac-200" />
-              <h2 className="font-headline text-2xl font-bold text-white">
-                Marketplace data
-              </h2>
-            </div>
-            <InfoRow label="Display price" value={formatLegacyPrice(cuki)} />
-            <InfoRow label="Raw price" value={cuki.priceOriginal ?? '-'} mono />
-            <InfoRow
-              label="Indexed at"
-              value={cuki.timestamp ? formatLegacyDate(cuki.timestamp * 1000) : '-'}
-            />
-          </div>
         </section>
       </div>
     </div>

@@ -149,7 +149,7 @@ describe('CukieMasterStatusPanel', () => {
     expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('200');
     expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('100 por cada cupo activo');
     expect(screen.getByRole('link', { name: 'Gestionar staking UKI' })).toHaveAttribute('href', '#uki-staking');
-    expect(screen.getByRole('link', { name: 'Gestionar créditos' })).toHaveAttribute('href', '#competition-credits');
+    expect(screen.getByRole('link', { name: 'Gestionar créditos' })).toHaveAttribute('href', '/credits');
   });
 
   it('simplifica la vista a vesting, staking y cinco plazas de la ruta UKI', async () => {

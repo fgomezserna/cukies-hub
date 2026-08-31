@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react';
 
 import { Panel } from '@/components/landing/primitives';
+import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { useAuth } from '@/providers/auth-provider';
 
 type CreditConfiguration = {
@@ -231,7 +232,32 @@ export function CompetitionCreditPanel() {
     }
   }
 
-  if (!authLoading && state === 'idle') return null;
+  if (!authLoading && state === 'idle' && !walletAddress) {
+    return (
+      <section id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
+        <Panel innerClassName="p-5 sm:p-7 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="max-w-2xl">
+              <p className="uki-label">Tu reparto diario</p>
+              <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
+                Conecta tu wallet para ver tus créditos
+              </h2>
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                Te mostraremos el saldo disponible y los cupos que puedes repartir entre juego y pool.
+              </p>
+            </div>
+            <LandingWalletConnectButton
+              evmOnly
+              className="min-h-12 w-fit px-5"
+              label="Conectar wallet"
+              compactLabel="Conectar wallet"
+              showCompactText={false}
+            />
+          </div>
+        </Panel>
+      </section>
+    );
+  }
 
   return (
     <section id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
@@ -497,7 +523,7 @@ function CurrentBalance({ label, value }: { label: string; value: number }) {
   return (
     <div className="border-b border-white/10 p-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(3)]:border-b-0 sm:[&:nth-child(4)]:border-b-0 lg:border-b-0 lg:border-r-0">
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">{label}</p>
-      <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-gold)]">{value}</p>
+      <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-lilac)]">{value}</p>
     </div>
   );
 }

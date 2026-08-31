@@ -88,7 +88,7 @@ describe('AppLayout launch navigation', () => {
     expect(screen.getByRole('link', { name: 'Volver a la landing' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute(
       'href',
-      '/games/treasure-hunt',
+      '/games',
     );
     expect(screen.getByRole('link', { name: 'Cukie Master' })).toHaveAttribute(
       'href',
@@ -96,7 +96,7 @@ describe('AppLayout launch navigation', () => {
     );
     expect(screen.getByRole('link', { name: 'Créditos' })).toHaveAttribute(
       'href',
-      '/cukie-master#competition-credits',
+      '/credits',
     );
     expect(screen.getByRole('link', { name: 'Pool de Cukies' })).toHaveAttribute(
       'href',
@@ -109,7 +109,7 @@ describe('AppLayout launch navigation', () => {
     );
     expect(screen.getByRole('link', { name: 'Premios' })).toHaveAttribute(
       'href',
-      '/dashboard#rewards-summary',
+      '/premios',
     );
     expect(screen.getByRole('link', { name: 'Vesting' })).toHaveAttribute('href', '/vesting');
 

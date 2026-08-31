@@ -48,10 +48,6 @@ jest.mock('@/components/cukie-master/uki-staking-panel', () => ({
 jest.mock('@/components/cukie-master/nft-vault-panel', () => ({
   CukieMasterNftVaultPanel: () => <div>Herramienta Cukies</div>,
 }));
-jest.mock('@/components/cukie-master/credit-panel', () => ({
-  CompetitionCreditPanel: () => <div>Créditos propios y pool</div>,
-}));
-
 describe('CukieMasterWorkspace', () => {
   beforeEach(() => {
     mockUseAuth.mockReturnValue({ user: null, isLoading: false });
@@ -84,7 +80,7 @@ describe('CukieMasterWorkspace', () => {
     expect(screen.getByText('Resumen personal')).toHaveAttribute('data-uki-only', 'false');
     expect(screen.getByText('Herramienta UKI')).toHaveAttribute('data-testnet-only', 'true');
     expect(screen.queryByText('Herramienta Cukies')).not.toBeInTheDocument();
-    expect(screen.getByText('Créditos propios y pool')).toBeInTheDocument();
+    expect(screen.queryByText('Créditos propios y pool')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: /Deposita Cukies Originales/i }));
 

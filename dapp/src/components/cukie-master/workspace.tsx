@@ -11,7 +11,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
 import { CukieMasterNftVaultPanel } from '@/components/cukie-master/nft-vault-panel';
 import { CukieMasterStatusPanel } from '@/components/cukie-master/status-panel';
 import type { UkiRoutePreview } from '@/components/cukie-master/types';
@@ -88,7 +87,7 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
               Consulta tu posición y gestiona el siguiente paso
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-              Primero revisa tus cupos. Después elige si quieres gestionar UKI o Cukies y, por último, decide qué hacer con tus créditos.
+              Primero revisa tus cupos. Después elige si quieres gestionar UKI o Cukies. Tus créditos tienen su propio apartado para que puedas decidir con calma cómo usarlos.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-3 border-l-2 border-[var(--uki-lilac)] pl-4">
@@ -131,8 +130,6 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
         )}
       </div>
 
-      <JourneyStep number="03" label="Gestiona los créditos de tus cupos" />
-      <CompetitionCreditPanel />
     </div>
   );
 }

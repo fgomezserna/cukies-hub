@@ -31,7 +31,7 @@ type MarketplaceClientProps = {
 };
 
 export function MarketplaceClient({
-  heading = 'Cukies marketplace',
+  heading = 'Cukies disponibles',
   description,
 }: MarketplaceClientProps = {}) {
   const [data, setData] = useState<LegacyMarketplaceListResponse>(initialData);
@@ -116,7 +116,7 @@ export function MarketplaceClient({
                 setSearch(event.target.value);
                 setOffset(0);
               }}
-              placeholder="Search token ID, number, owner or type"
+              placeholder="Busca un Cukie"
               className="pl-9"
             />
           </div>
@@ -129,7 +129,7 @@ export function MarketplaceClient({
             }}
             className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
           >
-            <option value="all">All networks</option>
+            <option value="all">Todas las redes</option>
             {data.facets.networks.map((facet) => (
               <option key={facet.value} value={facet.value}>
                 {facet.value} ({facet.count})
@@ -145,10 +145,10 @@ export function MarketplaceClient({
             }}
             className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
           >
-            <option value="all">All types</option>
+            <option value="all">Todos los tipos</option>
             {data.facets.types.map((facet) => (
               <option key={facet.value} value={facet.value}>
-                Type {facet.value} ({facet.count})
+                Tipo {facet.value} ({facet.count})
               </option>
             ))}
           </select>
@@ -161,10 +161,10 @@ export function MarketplaceClient({
             }}
             className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
           >
-            <option value="all">All generations</option>
+            <option value="all">Todas las generaciones</option>
             {data.facets.generations.map((facet) => (
               <option key={facet.value} value={facet.value}>
-                Gen {facet.value} ({facet.count})
+                Generación {facet.value} ({facet.count})
               </option>
             ))}
           </select>
@@ -177,11 +177,11 @@ export function MarketplaceClient({
             }}
             className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
           >
-            <option value="newest">Newest</option>
-            <option value="number-asc">Number asc</option>
-            <option value="number-desc">Number desc</option>
-            <option value="price-asc">Price asc</option>
-            <option value="price-desc">Price desc</option>
+            <option value="newest">Más recientes</option>
+            <option value="number-asc">Número: menor a mayor</option>
+            <option value="number-desc">Número: mayor a menor</option>
+            <option value="price-asc">Precio: menor a mayor</option>
+            <option value="price-desc">Precio: mayor a menor</option>
           </select>
 
           <Button
@@ -190,7 +190,7 @@ export function MarketplaceClient({
             className="border-white/10 bg-white/[0.03]"
           >
             <Filter className="mr-2 h-4 w-4" />
-            Reset
+            Limpiar filtros
           </Button>
         </div>
       </div>
@@ -202,10 +202,10 @@ export function MarketplaceClient({
           </h2>
           <p className="text-sm text-slate-400">
             {isLoading
-              ? 'Loading indexed inventory...'
+              ? 'Cargando Cukies…'
               : description
-                ? `${data.total.toLocaleString()} results · ${description}`
-                : `${data.total.toLocaleString()} results · source ${data.source}`}
+                ? `${data.total.toLocaleString('es-ES')} resultados · ${description}`
+                : `${data.total.toLocaleString('es-ES')} resultados`}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -215,7 +215,7 @@ export function MarketplaceClient({
             variant="outline"
             className="border-white/10 bg-white/[0.03]"
           >
-            Previous
+            Anterior
           </Button>
           <span className="min-w-24 text-center">
             {currentPage} / {totalPages}
@@ -226,7 +226,7 @@ export function MarketplaceClient({
             variant="outline"
             className="border-white/10 bg-white/[0.03]"
           >
-            Next
+            Siguiente
           </Button>
         </div>
       </div>
@@ -254,7 +254,7 @@ export function MarketplaceClient({
         </div>
       ) : (
         <div className="rounded-[8px] border border-white/10 bg-black/30 p-8 text-center text-slate-400">
-          No Cukies match these filters.
+          No hay Cukies que coincidan con estos filtros.
         </div>
       )}
 
@@ -269,7 +269,7 @@ export function MarketplaceClient({
           className="text-slate-400 hover:text-white"
         >
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh data
+          Actualizar
         </Button>
       </div>
     </section>

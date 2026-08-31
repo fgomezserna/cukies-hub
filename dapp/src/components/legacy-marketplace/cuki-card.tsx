@@ -44,7 +44,7 @@ export function CukiCard({ cuki }: CukiCardProps) {
               {getCukiDisplayName(cuki)}
             </h3>
             <p className="mt-1 text-xs text-slate-400">
-              {getTypeLabel(cuki.type)} · Gen {cuki.skills.generation ?? '-'}
+              {getTypeLabel(cuki.type)} · Generación {cuki.skills.generation ?? '-'}
             </p>
           </div>
           <ArrowUpRight className="h-4 w-4 shrink-0 text-lilac-200 opacity-70 transition group-hover:opacity-100" />
@@ -52,13 +52,13 @@ export function CukiCard({ cuki }: CukiCardProps) {
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
-            <p className="uppercase tracking-wide text-slate-500">Price</p>
+            <p className="uppercase tracking-wide text-slate-500">Precio</p>
             <p className="mt-1 truncate font-semibold text-white">
               {formatLegacyPrice(cuki)}
             </p>
           </div>
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
-            <p className="uppercase tracking-wide text-slate-500">Owner</p>
+            <p className="uppercase tracking-wide text-slate-500">Propietario</p>
             <p className="mt-1 truncate font-mono font-semibold text-white">
               {shortWallet(cuki.owner)}
             </p>

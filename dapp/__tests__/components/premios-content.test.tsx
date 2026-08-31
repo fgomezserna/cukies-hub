@@ -1,163 +1,155 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { parseUnits } from 'viem';
-import { useAccount, useReadContract } from 'wagmi';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi';
 
-import { UKI_PRESALE_CHAIN_ID } from '@/components/landing/sale-config';
 import { PremiosContent } from '@/components/premios/premios-content';
+import { useAuth } from '@/providers/auth-provider';
+import type { User } from '@/types';
 
+jest.mock('@/providers/auth-provider');
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
-  useReadContract: jest.fn(),
+  usePublicClient: jest.fn(),
+  useSwitchChain: jest.fn(),
+  useWriteContract: jest.fn(),
 }));
-jest.mock('lucide-react', () => ({
-  CheckCircle2: () => null,
-  Crown: () => null,
-  Gift: () => null,
-  Lock: () => null,
-  Sparkles: () => null,
-  Star: () => null,
-  Ticket: () => null,
-  Trophy: () => null,
-  Users: () => null,
+jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
+  LandingWalletConnectButton: () => <button type="button">Conectar wallet</button>,
 }));
+jest.mock('lucide-react', () => {
+  const Icon = (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />;
+  return {
+    ArrowRight: Icon,
+    CalendarClock: Icon,
+    CheckCircle2: Icon,
+    Gift: Icon,
+    Loader2: Icon,
+    RefreshCw: Icon,
+    Sparkles: Icon,
+    Trophy: Icon,
+    Wallet: Icon,
+  };
+});
 
-jest.mock('@/components/landing/header', () => ({ LandingHeader: () => null }));
-jest.mock('@/components/landing/footer', () => ({ LandingFooter: () => null }));
-jest.mock('@/components/landing/presale-referral-link-panel', () => ({
-  PresaleReferralLinkPanel: () => null,
-}));
-jest.mock('@/components/landing/scroll-reveal', () => ({
-  ScrollReveal: ({ children }: { children: React.ReactNode }) => children,
-}));
-jest.mock('@/providers/public-locale-provider', () => ({
-  usePublicLocale: () => ({ locale: 'es', setLocale: jest.fn() }),
-}));
-jest.mock('@/lib/contracts/uki-sale', () => ({
-  presaleAbi: [],
-  ukiSaleContracts: {
-    presaleAddress: '0x1111111111111111111111111111111111111111',
-  },
-}));
-
-const WALLET_ADDRESS = '0x2222222222222222222222222222222222222222';
-const PRESALE_ADDRESS = '0x1111111111111111111111111111111111111111';
+const wallet = '0x2222222222222222222222222222222222222222';
+const batchId = ('0x' + 'a'.repeat(64)) as `0x${string}`;
+const distributor = '0x1111111111111111111111111111111111111111';
+const transactionHash = ('0x' + 'b'.repeat(64)) as `0x${string}`;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
-const mockUseReadContract = useReadContract as jest.MockedFunction<typeof useReadContract>;
-const refetchPurchasedUki = jest.fn();
+const mockUsePublicClient = usePublicClient as jest.MockedFunction<typeof usePublicClient>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useWriteContract>;
+const fetchMock = jest.fn();
+const switchChain = jest.fn();
+const writeContractAsync = jest.fn();
+const waitForTransactionReceipt = jest.fn();
 
-function mockAccount(address?: `0x${string}`, isConnected = Boolean(address)) {
-  mockUseAccount.mockReturnValue({
-    address,
-    isConnected,
-  } as ReturnType<typeof useAccount>);
+function authValue(user: User | null = { walletAddress: wallet } as User) {
+  return {
+    user,
+    isLoading: false,
+    isWaitingForApproval: false,
+    walletType: user ? 'evm' as const : null,
+    fetchUser: jest.fn(),
+  };
 }
 
-function mockPurchaseRead(data?: bigint, isError = false) {
-  mockUseReadContract.mockReturnValue({
-    data,
-    isError,
-    refetch: refetchPurchasedUki,
-  } as unknown as ReturnType<typeof useReadContract>);
-}
-
-function getPurchaseProgressSection() {
-  const section = document.querySelector('#progreso-cukie-master');
-  expect(section).not.toBeNull();
-  return within(section as HTMLElement);
+function rewardStatus() {
+  return {
+    walletNormalized: wallet,
+    allocations: [{
+      allocationId: 'allocation-1',
+      periodId: '2026-08-31',
+      category: 'player',
+      amountRaw: '2000000000000000000',
+      status: 'allocated',
+      createdAt: '2026-08-31T12:00:00.000Z',
+    }],
+    claims: [],
+    pageAllocatedRaw: '2000000000000000000',
+    claimableRaw: '1000000000000000000',
+    claimPublished: true,
+    claimables: [{
+      batch: {
+        batchId,
+        periodId: '2026-08-31',
+        chainId: 97,
+        distributorAddress: distributor,
+        amountRaw: '1000000000000000000',
+        startsAt: '2026-08-31T12:00:00.000Z',
+        expiresAt: '2026-09-30T12:00:00.000Z',
+      },
+      proof: { siblings: [] },
+      onChainStatus: 'claimable',
+    }],
+    publishedRewards: [],
+    blockedAllocations: 0,
+    healthy: true,
+  };
 }
 
 describe('PremiosContent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAccount();
-    mockPurchaseRead();
+    global.fetch = fetchMock;
+    mockUseAuth.mockReturnValue(authValue());
+    mockUseAccount.mockReturnValue({ chainId: 97 } as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({ waitForTransactionReceipt } as unknown as ReturnType<typeof usePublicClient>);
+    mockUseSwitchChain.mockReturnValue({ switchChain, isPending: false } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUseWriteContract.mockReturnValue({ writeContractAsync } as unknown as ReturnType<typeof useWriteContract>);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'ok', data: rewardStatus() }) });
+    writeContractAsync.mockResolvedValue(transactionHash);
+    waitForTransactionReceipt.mockResolvedValue({ status: 'success' });
   });
 
-  it('pide conectar la wallet sin mostrar rangos inventados si wagmi aún no expone una dirección', () => {
-    mockAccount(undefined, true);
-
+  it('pide conectar la wallet y no consulta datos privados sin sesión', () => {
+    mockUseAuth.mockReturnValue(authValue(null));
     render(<PremiosContent />);
 
-    const progress = getPurchaseProgressSection();
-    expect(progress.getByRole('heading', {
-      level: 2,
-      name: 'Conecta tu wallet para ver tu progreso Cukie Master',
-    })).toBeInTheDocument();
-    expect(progress.queryByRole('listitem')).not.toBeInTheDocument();
-    expect(mockUseReadContract).toHaveBeenCalledWith(expect.objectContaining({
-      functionName: 'ukiPurchased',
-      args: undefined,
-      query: expect.objectContaining({ enabled: false }),
-    }));
+    expect(screen.getByRole('heading', { name: 'Consulta y cobra tus recompensas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conectar wallet' })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('lee ukiPurchased en BSC y muestra dos objetivos alcanzados con 40.000 UKI', () => {
-    mockAccount(WALLET_ADDRESS);
-    mockPurchaseRead(parseUnits('40000', 18));
-
+  it('explica el saldo, la fecha límite y el origen sin mencionar la preventa', async () => {
     render(<PremiosContent />);
 
-    const progress = getPurchaseProgressSection();
-    expect(progress.getByRole('heading', { level: 2, name: 'Has comprado 40.000 UKI' })).toBeInTheDocument();
-    expect(progress.getAllByText('Alcanzado')).toHaveLength(2);
-    expect(progress.getByRole('progressbar', {
-      name: 'Rangos de Cukie Master alcanzados',
-    })).toHaveAttribute('aria-valuenow', '2');
-    expect(mockUseReadContract).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: UKI_PRESALE_CHAIN_ID,
-      address: PRESALE_ADDRESS,
-      functionName: 'ukiPurchased',
-      args: [WALLET_ADDRESS],
-      query: expect.objectContaining({ enabled: true, staleTime: 15_000 }),
-    }));
+    expect(await screen.findByRole('heading', { name: 'Premios disponibles' })).toBeInTheDocument();
+    expect(screen.getAllByText('1 UKI').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Premio de partida')).toBeInTheDocument();
+    expect(screen.getByText(/No pierdes un premio por no entrar durante una semana/)).toBeInTheDocument();
+    expect(screen.queryByText(/preventa/i)).not.toBeInTheDocument();
   });
 
-  it('trata 0n como una lectura válida y no como un estado de carga', () => {
-    mockAccount(WALLET_ADDRESS);
-    mockPurchaseRead(BigInt(0));
-
+  it('solicita el cambio de red antes de habilitar el cobro', async () => {
+    mockUseAccount.mockReturnValue({ chainId: 56 } as ReturnType<typeof useAccount>);
     render(<PremiosContent />);
 
-    const progress = getPurchaseProgressSection();
-    expect(progress.getByRole('heading', { level: 2, name: 'Has comprado 0 UKI' })).toBeInTheDocument();
-    expect(progress.getByText('En progreso')).toBeInTheDocument();
-    expect(progress.queryByRole('status')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar de red para cobrar' }));
+    expect(switchChain).toHaveBeenCalledWith({ chainId: 97 });
+    expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
-  it('mantiene el tramo de 20.000 UKI pendiente hasta el último wei', () => {
-    mockAccount(WALLET_ADDRESS);
-    mockPurchaseRead(parseUnits('20000', 18) - BigInt(1));
-
+  it('cobra con el batch y la prueba publicados y refresca al confirmar', async () => {
     render(<PremiosContent />);
 
-    const bronzeTier = screen.getByText('Tier Bronce').closest('article');
-    expect(bronzeTier).not.toBeNull();
-    expect(within(bronzeTier as HTMLElement).getByText('Siguiente tramo')).toBeInTheDocument();
-    expect(within(bronzeTier as HTMLElement).queryByText('Conseguido')).not.toBeInTheDocument();
-    expect(getPurchaseProgressSection().getByRole('progressbar', {
-      name: 'Porcentaje completado hacia el siguiente tramo de sorteo',
-    })).toHaveAttribute('aria-valuetext', '99% completado');
+    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar premio' }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      chainId: 97,
+      address: distributor,
+      functionName: 'claim',
+      args: [batchId, BigInt('1000000000000000000'), []],
+    })));
+    expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: transactionHash });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
-  it('muestra un estado de carga mientras la lectura on-chain está pendiente', () => {
-    mockAccount(WALLET_ADDRESS);
-
+  it('falla con un mensaje de cliente si el servicio no responde', async () => {
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({ status: 'error' }) });
     render(<PremiosContent />);
 
-    expect(getPurchaseProgressSection().getByRole('status')).toHaveTextContent(
-      'Consultando tus compras de preventa…',
-    );
-  });
-
-  it('expone el error de lectura y permite reintentar', () => {
-    mockAccount(WALLET_ADDRESS);
-    mockPurchaseRead(undefined, true);
-
-    render(<PremiosContent />);
-
-    const progress = getPurchaseProgressSection();
-    expect(progress.getByRole('alert')).toHaveTextContent('No hemos podido leer tus UKI comprados.');
-    fireEvent.click(progress.getByRole('button', { name: 'Reintentar' }));
-    expect(refetchPurchasedUki).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('alert')).toHaveTextContent('No podemos cargar tus premios ahora');
+    expect(screen.queryByText(/Mongo|staging|contrato/i)).not.toBeInTheDocument();
   });
 });

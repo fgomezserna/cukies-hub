@@ -36,8 +36,8 @@ const bscTokenAddress = legacyMarketplaceContracts.bsc.contracts.token;
 const tronMarketplaceAddress =
   legacyMarketplaceContracts.tron.contracts.marketplace;
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Unknown transaction error';
+function getErrorMessage(_error: unknown) {
+  return 'La wallet ha rechazado o no ha podido completar la operación.';
 }
 
 function isSameWallet(left?: string | null, right?: string | null) {
@@ -117,12 +117,12 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   async function connectBscWallet() {
     if (!evmConnector) {
-      setStatus('Instala una wallet EVM como MetaMask para operar en BSC.');
+      setStatus('Instala una wallet compatible, como MetaMask, para continuar.');
       return false;
     }
 
     try {
-      setStatus('Abriendo wallet EVM...');
+      setStatus('Abriendo tu wallet...');
       const result = await connectAsync({ connector: evmConnector });
       const connectedChainId = result.chainId ?? chainId;
 
@@ -132,10 +132,10 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         return false;
       }
 
-      setStatus('Wallet EVM conectada en BSC. Ya puedes continuar.');
+      setStatus('Wallet conectada. Ya puedes continuar.');
       return true;
     } catch (error) {
-      setStatus(`No se pudo conectar la wallet EVM: ${getErrorMessage(error)}`);
+      setStatus(`No se pudo conectar la wallet: ${getErrorMessage(error)}`);
       return false;
     }
   }
@@ -143,7 +143,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   function ensureBsc() {
     if (!isBsc) return false;
     if (!isConnected) {
-      setStatus('Conecta una wallet EVM antes de continuar.');
+      setStatus('Conecta tu wallet antes de continuar.');
       return false;
     }
     if (chainId !== 56) {
@@ -156,7 +156,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   function approveBsc() {
     if (!ensureBsc()) return;
-    setStatus('Enviando approval del marketplace BSC...');
+    setStatus('Solicitando permiso para gestionar este Cukie...');
     writeContract({
       address: bscTokenAddress,
       abi: legacyMarketplaceBscAbis.token,
@@ -167,7 +167,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   function buyBsc() {
     if (!ensureBsc() || !cuki.priceOriginal) return;
-    setStatus('Enviando compra en BSC...');
+    setStatus('Confirma la compra en tu wallet...');
     writeContract({
       address: bscMarketplaceAddress,
       abi: legacyMarketplaceBscAbis.marketplace,
@@ -179,7 +179,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   function sellBsc() {
     if (!ensureBsc() || !sellPrice) return;
-    setStatus('Listando Cukie en BSC...');
+    setStatus('Publicando tu Cukie...');
     writeContract({
       address: bscMarketplaceAddress,
       abi: legacyMarketplaceBscAbis.marketplace,
@@ -191,7 +191,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   function cancelBscSale() {
     if (!ensureBsc()) return;
-    setStatus('Cancelando venta en BSC...');
+    setStatus('Retirando el anuncio...');
     writeContract({
       address: bscMarketplaceAddress,
       abi: legacyMarketplaceBscAbis.marketplace,
@@ -203,7 +203,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   function changeBscPrice() {
     if (!ensureBsc() || !sellPrice) return;
-    setStatus('Actualizando precio en BSC...');
+    setStatus('Actualizando el precio...');
     writeContract({
       address: bscMarketplaceAddress,
       abi: legacyMarketplaceBscAbis.marketplace,
@@ -224,7 +224,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
       return false;
     }
     if (!window.tronWeb) {
-      setStatus('TronLink no ha expuesto tronWeb todavia.');
+      setStatus('TronLink todavía no está listo. Vuelve a intentarlo.');
       return false;
     }
     return true;
@@ -235,7 +235,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     setStatus(label);
     try {
       const tx = await action();
-      setStatus(`Transaccion enviada: ${String(tx).slice(0, 18)}...`);
+      setStatus(`Operación enviada: ${String(tx).slice(0, 18)}...`);
     } catch (error) {
       setStatus(getErrorMessage(error));
     } finally {
@@ -254,7 +254,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           [tronMarketplaceAddress, true],
           { feeLimit: 800_000_000, shouldPollResponse: false },
         ),
-      'Enviando approval del marketplace TRON...',
+      'Solicitando permiso para gestionar este Cukie...',
     );
   }
 
@@ -273,7 +273,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             shouldPollResponse: false,
           },
         ),
-      'Enviando compra en TRON...',
+      'Confirma la compra en tu wallet...',
     );
   }
 
@@ -288,7 +288,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           [cuki.tokenId, Math.round(Number(sellPrice) * 1_000_000)],
           { feeLimit: 800_000_000, shouldPollResponse: false },
         ),
-      'Listando Cukie en TRON...',
+      'Publicando tu Cukie...',
     );
   }
 
@@ -311,21 +311,21 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           shouldPollResponse: false,
         },
       );
-    }, 'Cancelando venta en TRON...');
+    }, 'Retirando el anuncio...');
   }
 
   const disabled = isWriting || isSwitchingChain || isTronPending || isConnectingWallet;
 
   return (
-    <div className="rounded-[8px] border border-white/10 bg-[#101b19]/90 p-5 shadow-xl shadow-black/25">
+    <div className="rounded-[12px] border border-[var(--uki-lilac)]/20 bg-[#080712]/92 p-5 shadow-[0_0_32px_rgba(228,92,255,0.08)]">
       <div className="flex flex-col gap-3 border-b border-white/10 pb-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-headline text-2xl font-bold text-white">
-              Operaciones
+              Qué puedes hacer
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              {cuki.network} · owner {shortWallet(cuki.owner)}
+              {cuki.network} · propietario {shortWallet(cuki.owner)}
             </p>
           </div>
           <span className="rounded-full border border-lilac-300/25 bg-lilac-300/10 px-3 py-1 text-xs font-semibold text-lilac-100">
@@ -334,7 +334,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         </div>
         {isBsc && feeCancelPrice !== undefined && (
           <p className="text-xs text-slate-500">
-            Cancel fee {formatEther(feeCancelPrice as bigint)} BNB · Change fee{' '}
+            Retirar el anuncio cuesta {formatEther(feeCancelPrice as bigint)} BNB · Cambiar el precio cuesta{' '}
             {formatEther((feeChangePrice as bigint | undefined) ?? BigInt(0))} BNB
           </p>
         )}
@@ -356,10 +356,10 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           >
             <Wallet className="mr-2 h-4 w-4" />
             {isConnectingWallet
-              ? 'Connecting wallet...'
+              ? 'Conectando wallet...'
               : isConnected
-                ? 'Switch to BSC'
-                : 'Connect EVM wallet'}
+                ? 'Cambiar a BNB Smart Chain'
+                : 'Conectar wallet'}
           </Button>
         )}
 
@@ -370,7 +370,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             className="bg-lilac-400 text-slate-950 hover:bg-lilac-300"
           >
             <Wallet className="mr-2 h-4 w-4" />
-            Connect TronLink
+            Conectar TronLink
           </Button>
         )}
 
@@ -382,7 +382,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
           >
             <Check className="mr-2 h-4 w-4" />
-            {isBsc && isApprovedForAll ? 'Marketplace approved' : 'Approve marketplace'}
+            {isBsc && isApprovedForAll ? 'Permiso concedido' : 'Dar permiso para operar'}
           </Button>
         )}
 
@@ -390,10 +390,10 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           <Button
             onClick={isBsc ? buyBsc : () => void buyTron()}
             disabled={disabled || !cuki.priceOriginal}
-            className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+            className="bg-[var(--uki-lilac)] text-[#100516] hover:bg-[#f19bff]"
           >
             <CircleDollarSign className="mr-2 h-4 w-4" />
-            Buy Cukie
+            Comprar Cukie
           </Button>
         )}
 
@@ -401,7 +401,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           <div className="grid gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
             <Input
               inputMode="decimal"
-              placeholder={isBsc ? 'Price in BNB' : 'Price in TRX'}
+              placeholder={isBsc ? 'Precio en BNB' : 'Precio en TRX'}
               value={sellPrice}
               onChange={(event) => setSellPrice(event.target.value)}
             />
@@ -414,7 +414,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
                     className="bg-white text-slate-950 hover:bg-slate-200"
                   >
                     <Tag className="mr-2 h-4 w-4" />
-                    Update price
+                    Actualizar precio
                   </Button>
                   <Button
                     onClick={isBsc ? cancelBscSale : () => void cancelTronSale()}
@@ -423,7 +423,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
                     className="border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
                   >
                     <RotateCcw className="mr-2 h-4 w-4" />
-                    Cancel sale
+                    Retirar de la venta
                   </Button>
                 </>
               ) : (
@@ -433,7 +433,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
                   className="bg-white text-slate-950 hover:bg-slate-200 sm:col-span-2"
                 >
                   <Tag className="mr-2 h-4 w-4" />
-                  Put on sale
+                  Poner a la venta
                 </Button>
               )}
             </div>
@@ -442,7 +442,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
         {!isOwner && cuki.state !== 'onSale' && (
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-sm text-slate-400">
-            Este Cukie no esta listado. Las acciones de venta aparecen cuando
+            Este Cukie no está a la venta. Las acciones aparecen cuando
             conectas la wallet propietaria.
           </div>
         )}

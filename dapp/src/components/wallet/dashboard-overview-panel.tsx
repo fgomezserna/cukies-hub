@@ -193,16 +193,6 @@ function ukiLabel(raw: string | null | undefined) {
   }
 }
 
-function timestampLabel(sourceObservedAt: string | null, generatedAt: string) {
-  const value = sourceObservedAt ?? generatedAt;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Actualización no disponible';
-  return `Actualizado ${new Intl.DateTimeFormat('es-ES', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date)}`;
-}
-
 function moduleData<K extends DashboardModuleId>(module: DashboardModule<K>) {
   return module.state === 'unavailable' ? null : module.data;
 }
@@ -275,7 +265,7 @@ export function DashboardOverviewPanel() {
               Todo en un vistazo
             </h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Revisa tus cupos, créditos, Cukies, premios, vesting y actividad de juego.
+              Revisa tus cupos, créditos, Cukies, premios, liberación de UKI y actividad de juego.
             </p>
           </div>
           {hasSignedEvmSession ? (
@@ -319,14 +309,14 @@ export function DashboardOverviewPanel() {
 
         {summary ? (
           <>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <IdentityFact label="Cuenta" value={summary.identity.username || 'Sin nombre visible'} />
-              <IdentityFact label="Wallet" value={shortWallet(summary.identity.walletNormalized)} />
-              <IdentityFact
-                label="Red"
-                value={wrongChain ? 'Cambia de red para continuar' : 'BNB Smart Chain'}
-                warning={wrongChain}
-              />
+            <div className="mt-6 flex flex-col gap-2 rounded-[10px] border border-white/10 bg-black/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-black text-[var(--uki-cream)]">
+                {summary.identity.username || 'Tu cuenta'}
+                <span className="ml-2 font-semibold text-[var(--uki-muted)]">{shortWallet(summary.identity.walletNormalized)}</span>
+              </p>
+              <p className={wrongChain ? 'text-xs font-black text-amber-200' : 'text-xs font-semibold text-[var(--uki-muted)]'}>
+                {wrongChain ? 'Cambia de red para continuar' : 'BNB Smart Chain'}
+              </p>
             </div>
 
             {wrongChain ? (
@@ -356,14 +346,14 @@ export function DashboardOverviewPanel() {
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <DashboardCard
                 icon={Crown}
                 title="Cukie Master"
                 module={summary.modules.cukieMaster}
                 href="/cukie-master#mi-estado"
                 action="Gestionar cupos"
-                value={master ? `${integerLabel(master.allocatedSlots)} / ${integerLabel(master.maxPotentialSlots)}` : null}
+                value={master ? integerLabel(master.allocatedSlots) : null}
                 label="cupos activos"
                 details={master ? [
                   `${integerLabel(master.routes.uki.allocatedSlots)} por UKI`,
@@ -374,7 +364,7 @@ export function DashboardOverviewPanel() {
                 icon={Coins}
                 title="Créditos"
                 module={summary.modules.credits}
-                href="/cukie-master#competition-credits"
+                href="/credits"
                 action="Usar o aportar"
                 value={credits ? integerLabel(credits.availableCredits) : null}
                 label="créditos disponibles"
@@ -392,8 +382,8 @@ export function DashboardOverviewPanel() {
                 value={pool ? integerLabel(pool.activePositions) : null}
                 label="posiciones activas"
                 details={pool ? [
-                  `${integerLabel(pool.positions)} posiciones visibles`,
-                  `${integerLabel(pool.gamesRemaining)} partidas disponibles`,
+                  `${integerLabel(pool.activePositions)} disponibles para partidas`,
+                  `${integerLabel(pool.positions)} Cukies aportados en total`,
                 ] : []}
               />
               <DashboardCard
@@ -401,6 +391,8 @@ export function DashboardOverviewPanel() {
                 icon={Gift}
                 title="Premios"
                 module={summary.modules.rewards}
+                href="/premios"
+                action="Ver mis premios"
                 value={rewards ? ukiLabel(rewards.claimableRaw) : null}
                 label="reclamables confirmados"
                 details={rewards ? [
@@ -414,7 +406,7 @@ export function DashboardOverviewPanel() {
                 icon={Store}
                 title="Marketplace"
                 module={summary.modules.marketplace}
-                href="/marketplace#marketplace-uki"
+                href="/marketplace"
                 action="Abrir marketplace"
                 value={marketplace ? integerLabel(marketplace.inventory) : null}
                 label="Cukies en tu inventario"
@@ -459,15 +451,6 @@ export function DashboardOverviewPanel() {
         ) : null}
       </Panel>
     </section>
-  );
-}
-
-function IdentityFact({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
-  return (
-    <div className={`rounded-[8px] border p-4 ${warning ? 'border-amber-300/30 bg-amber-400/10' : 'border-white/10 bg-black/20'}`}>
-      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">{label}</p>
-      <p className={`mt-1 break-all text-sm font-black ${warning ? 'text-amber-200' : 'text-[var(--uki-cream)]'}`}>{value}</p>
-    </div>
   );
 }
 
@@ -517,11 +500,8 @@ function DashboardCard<K extends DashboardModuleId>({
           <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Inténtalo de nuevo más tarde.</p>
         </div>
       )}
-      <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)]">
-        {timestampLabel(module.sourceObservedAt, module.generatedAt)}
-      </p>
       {href && action ? (
-        <Link href={href} className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-gold)]">
+        <Link href={href} className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]">
           {action}
           <ArrowRight className="h-4 w-4" />
         </Link>

@@ -71,6 +71,7 @@ SidebarNavigationLink.displayName = 'SidebarNavigationLink';
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isMobileGameShell = useMobileGameShell();
+  const isGamesSection = pathname.startsWith('/games');
   const isTreasureHunt = pathname.startsWith('/games/treasure-hunt');
   const isTreasureHuntGameView = pathname === '/games/treasure-hunt';
   const isMobileTreasureHunt =
@@ -85,10 +86,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       active: false,
     },
     {
-      href: '/games/treasure-hunt',
+      href: '/games',
       label: 'Jugar',
       Icon: Gamepad2,
-      active: isTreasureHunt,
+      active: isGamesSection,
     },
     {
       href: '/cukie-master',
@@ -97,10 +98,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       active: pathname.startsWith('/cukie-master'),
     },
     {
-      href: '/cukie-master#competition-credits',
+      href: '/credits',
       label: 'Créditos',
       Icon: Coins,
-      active: false,
+      active: pathname.startsWith('/credits'),
     },
     {
       href: '/cukie-hodler#mi-cukie-pool',
@@ -121,10 +122,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       active: pathname.startsWith('/marketplace'),
     },
     {
-      href: '/dashboard#rewards-summary',
+      href: '/premios',
       label: 'Premios',
       Icon: Gift,
-      active: false,
+      active: pathname.startsWith('/premios'),
     },
     {
       href: '/vesting',
