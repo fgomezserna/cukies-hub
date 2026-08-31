@@ -79,8 +79,9 @@ describe('AppLayout launch navigation', () => {
 
     expect(screen.getByRole('link', { name: 'Inicio' })).toHaveAttribute(
       'href',
-      '/dashboard',
+      '/',
     );
+    expect(screen.getByRole('link', { name: 'Volver a la landing' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute(
       'href',
       '/games/treasure-hunt',

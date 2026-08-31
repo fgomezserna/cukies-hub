@@ -119,3 +119,29 @@ test('staging y producción comparten el contrato estable del dashboard', () => 
   assert.match(summary, /schemaVersion: 'dashboard-v1'/);
   assert.doesNotMatch(summary, /dashboard-staging-v1/);
 });
+
+test('la landing es la portada y los apartados usan el app shell', () => {
+  const home = readFileSync(join(root, 'dapp/src/app/page.tsx'), 'utf8');
+  const appLayout = readFileSync(join(root, 'dapp/src/components/layout/app-layout.tsx'), 'utf8');
+
+  assert.match(home, /<CukiesLanding\s*\/>/);
+  assert.doesNotMatch(home, /AppLayout/);
+  assert.match(appLayout, /href:\s*'\/'[\s\S]{0,80}label:\s*'Inicio'/);
+  assert.doesNotMatch(appLayout, /href:\s*'\/dashboard'[\s\S]{0,80}label:\s*'Inicio'/);
+
+  for (const route of ['como-jugar', 'premios', 'vesting']) {
+    const layout = readFileSync(join(root, `dapp/src/app/${route}/layout.tsx`), 'utf8');
+    assert.match(layout, /<AppLayout>\{children\}<\/AppLayout>/);
+  }
+
+  for (const file of [
+    'dapp/src/app/premios/page.tsx',
+    'dapp/src/app/vesting/page.tsx',
+    'dapp/src/components/premios/premios-content.tsx',
+  ]) {
+    const source = readFileSync(join(root, file), 'utf8');
+    assert.doesNotMatch(source, /Landing(?:Header|Footer)/);
+    assert.doesNotMatch(source, /uki-container/);
+    assert.doesNotMatch(source, /<main\b/);
+  }
+});

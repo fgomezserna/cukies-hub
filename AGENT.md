@@ -1,5 +1,8 @@
 # AGENT.md - Reglas para Agentes de Código
 
+> **Legacy/Fallback:** la fuente de verdad vigente es `AGENTS.md`. Este archivo
+> solo conserva contexto historico y nunca prevalece cuando ambos difieren.
+
 Este archivo define las reglas y convenciones que los agentes de código deben seguir al trabajar en el proyecto **Cukies Hub**.
 
 ## 🚨 Reglas Críticas
@@ -156,9 +159,10 @@ dapp/__tests__/
 ## 🎨 Diseño
 
 ### Paleta de Colores
-- **Primary**: Teal (#008080)
-- **Background**: Dark gray (#253533)
-- **Accent**: Neon green (#44edd6)
+- **Primary**: Lila (#e45cff)
+- **Background**: Ink violet (#04030a)
+- **Accent de valor/token**: Gold (#f2c34b)
+- Cyan, teal y celeste no forman parte de la interfaz vigente.
 - Referencia: https://cukiesworld.com/
 
 ### Tipografía

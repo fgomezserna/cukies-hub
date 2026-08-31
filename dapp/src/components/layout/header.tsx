@@ -178,9 +178,13 @@ export default function Header({ variant = 'default' }: HeaderProps) {
       )}
 
       {!isGameOverlay && (isMobile || state === 'collapsed') && (
-        <div className="flex items-center gap-2 group h-full">
+        <Link
+          href="/"
+          aria-label="Volver a la landing"
+          className="group flex h-full items-center gap-2"
+        >
           <Image src="/Cukie_logo_first.png" alt="Cukies World" width={140} height={40} className="object-contain max-h-[48px] w-auto" />
-        </div>
+        </Link>
       )}
 
       {!isGameOverlay && <div className="flex-1" />}

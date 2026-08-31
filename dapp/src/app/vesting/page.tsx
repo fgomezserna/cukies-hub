@@ -14,8 +14,6 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import { LandingFooter } from '@/components/landing/footer';
-import { LandingHeader } from '@/components/landing/header';
 import { Button } from '@/components/ui/button';
 import { getBscScanTxUrl, ukiSaleContracts, vestingVaultAbi } from '@/lib/contracts/uki-sale';
 
@@ -177,12 +175,8 @@ export default function PublicVestingPage() {
   }
 
   return (
-    <main className="uki-landing min-h-screen overflow-hidden bg-[var(--uki-bg)] text-[var(--uki-cream)]">
-      <div className="uki-noise" />
-      <div className="uki-grid-bg" />
-      <LandingHeader />
-
-      <section className="uki-container relative z-[2] pt-28 pb-6">
+    <div className="uki-landing min-h-full w-full overflow-hidden bg-transparent text-[var(--uki-cream)]">
+      <section className="relative z-[2] w-full pb-6">
         <div className="relative overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/20 bg-[#070817]/90 p-5 shadow-[0_0_52px_rgba(228,92,255,0.12)] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(228,92,255,0.20),transparent_24rem),radial-gradient(circle_at_18%_78%,rgba(242,195,75,0.11),transparent_18rem)]" aria-hidden="true" />
           <div className="relative grid gap-8 xl:grid-cols-[1.08fr_0.92fr] xl:items-end">
@@ -234,7 +228,7 @@ export default function PublicVestingPage() {
         </div>
       </section>
 
-      <section className="uki-container relative z-[2] pb-6">
+      <section className="relative z-[2] w-full pb-6">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
             <div key={metric.label} className="rounded-[12px] border border-[var(--uki-lilac)]/18 bg-[#070817]/86 p-4 shadow-[0_0_28px_rgba(228,92,255,0.07)]">
@@ -248,7 +242,7 @@ export default function PublicVestingPage() {
         </div>
       </section>
 
-      <section className="uki-container relative z-[2] grid gap-6 pb-14 xl:grid-cols-[1.35fr_0.85fr]">
+      <section className="relative z-[2] grid w-full gap-6 pb-14 xl:grid-cols-[1.35fr_0.85fr]">
         <div className="rounded-[14px] border border-[var(--uki-lilac)]/22 bg-[#070817]/90 p-5 shadow-[0_0_44px_rgba(228,92,255,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -343,7 +337,7 @@ export default function PublicVestingPage() {
       </section>
 
       {hasVestingReadError ? (
-        <section className="uki-container relative z-[2] pb-6">
+        <section className="relative z-[2] w-full pb-6">
           <div className="rounded-[12px] border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -359,7 +353,7 @@ export default function PublicVestingPage() {
       ) : null}
 
       {!isConfigured ? (
-        <section className="uki-container relative z-[2] pb-6">
+        <section className="relative z-[2] w-full pb-6">
           <div className="rounded-[12px] border border-[#f2c34b]/30 bg-[#2b1d08]/48 p-4 text-sm text-[#ffe2a0]">
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -373,8 +367,6 @@ export default function PublicVestingPage() {
           </div>
         </section>
       ) : null}
-
-      <LandingFooter />
-    </main>
+    </div>
   );
 }

@@ -66,6 +66,7 @@ candidato agrupado con los datos y servicios reales de Stage/Testnet.
 
 ### Ruta canonica
 
+- `/` es la landing publica y la unica portada sin app shell.
 - `/dashboard` es la ruta canonica del resumen autenticado.
 - `/wallet` es un alias de compatibilidad que redirige a `/dashboard`.
 - No se mantendran dos dashboards con datos o responsabilidades distintas.
@@ -74,18 +75,17 @@ candidato agrupado con los datos y servicios reales de Stage/Testnet.
 
 ```text
 Publico, sin login
-├── /                         Inicio e informacion vigente
-├── /como-jugar              Explicacion del flujo
-├── /vesting                 Vesting de preventa por wallet
-├── /premios                 Historico de preventa/competicion
-└── /games/treasure-hunt/rules
+└── /                         Landing e informacion vigente
 
-Area operativa autenticada
+Modo app con header y sidebar
 ├── /dashboard               Resumen, alertas y siguientes acciones
+├── /como-jugar              Explicacion del flujo
 ├── /cukie-master            Slots, staking UKI/NFT y creditos
 ├── /cukie-hodler            Cukie Pool
 ├── /cukies                  Inventario y herramientas de Cukies
 ├── /marketplace             Marketplace
+├── /vesting                 Vesting por wallet
+├── /premios                 Informacion y progreso de premios
 ├── /games/treasure-hunt     Juego y recursos reservados
 ├── /games/treasure-hunt/rankings
 └── /rewards                 Rewards pending/claimable/claimed (objetivo)
@@ -103,11 +103,10 @@ datos economicos privados.
 ### Header publico
 
 - Inicio.
-- Como jugar.
-- Staking / Cukie Master.
+- Mi dashboard.
+- Staking.
 - Jugar.
 - Vesting.
-- Entrar / Dashboard.
 
 El header publico no debe volver a presentar la preventa terminada como una
 compra activa. La compra actual de UKI puede enlazar al pool oficial, pero no
@@ -117,7 +116,7 @@ ocupa la responsabilidad del Dashboard.
 
 | Etiqueta | Destino | Funcion |
 | --- | --- | --- |
-| Inicio | `/dashboard` | Resumen y acciones prioritarias. |
+| Inicio | `/` | Volver a la landing publica. |
 | Jugar | `/games/treasure-hunt` | Entrar al juego; el ranking vive dentro de este flujo. |
 | Cukie Master | `/cukie-master` | Cupos y staking UKI/NFT. |
 | Creditos | `/cukie-master#competition-credits` | Usar o aportar creditos. |
@@ -130,6 +129,10 @@ ocupa la responsabilidad del Dashboard.
 No se usan grupos decorativos en el menu. No se crea `/rewards` hasta que
 exista una pantalla completa de cobro; el enlace actual nunca apunta a una
 ruta ficticia.
+
+`/como-jugar`, `/premios` y `/vesting` tambien usan el app shell aunque no
+tengan una entrada propia en el menu lateral. Ninguna de esas pantallas repite
+el header publico, el footer ni el contenedor exterior de la landing.
 
 ## Regla de promocion entre entornos
 

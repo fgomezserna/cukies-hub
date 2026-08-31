@@ -135,6 +135,13 @@ Uses NextAuth v5 with:
 - Environment-specific branches are allowed only in runtime configuration and safety guards, never to maintain two visual products.
 - Validate environment-sensitive work against both supported pairs: `staging + BSC 97` and `production + BSC 56`.
 
+## Fire rule: landing and app shell
+
+- `/` is the public landing and must not render `AppLayout`, the dashboard header or the sidebar.
+- Product sections render inside the app shell. This includes Dashboard, Cukie Master, games, Cukie Pool, Cukies, Marketplace, Vesting, Premios and Como jugar.
+- `Inicio` and every Cukies logo inside the app shell return to `/`; `/dashboard` is a section, not the public home.
+- Never nest `LandingHeader`, `LandingFooter`, `uki-container` or a second full-page `main` inside `AppLayout`. The shell owns navigation and outer spacing.
+
 ## Environment Setup
 
 Required environment variables in `dapp/.env.local`:

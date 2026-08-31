@@ -17,8 +17,6 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAccount, useReadContract } from 'wagmi';
-import { LandingHeader } from '@/components/landing/header';
-import { LandingFooter } from '@/components/landing/footer';
 import { PresaleReferralLinkPanel } from '@/components/landing/presale-referral-link-panel';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { UKI_PRESALE_CHAIN_ID } from '@/components/landing/sale-config';
@@ -283,9 +281,7 @@ export function PremiosContent() {
 
   return (
     <>
-      <LandingHeader />
-
-      <section className="uki-container relative z-[2] pb-12 pt-24">
+      <section className="relative z-[2] w-full pb-12">
         <ScrollReveal animation="fade" duration={900} className="w-full">
           <div className="uki-premios-page-hero">
             <Image
@@ -319,7 +315,7 @@ export function PremiosContent() {
       </section>
 
       {/* Sección: Progreso de compra de la wallet conectada */}
-      <section id="progreso-cukie-master" className="uki-container relative z-[2] scroll-mt-24 pb-6">
+      <section id="progreso-cukie-master" className="relative z-[2] w-full scroll-mt-24 pb-6">
         <ScrollReveal animation="up" duration={700} className="w-full">
             {!isConnected || !address ? (
               <div className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 p-5">
@@ -454,7 +450,7 @@ export function PremiosContent() {
         </ScrollReveal>
       </section>
 
-      <section className="uki-container relative z-[2] pb-12">
+      <section className="relative z-[2] w-full pb-12">
         <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#070817]/82 p-4 shadow-[0_0_44px_rgba(228,92,255,0.06)] sm:p-6">
           <div className="grid gap-8 lg:grid-cols-[0.34fr_0.66fr]">
             <ScrollReveal animation="left" duration={800} className="flex flex-col justify-between gap-6">
@@ -568,7 +564,7 @@ export function PremiosContent() {
         </div>
       </section>
 
-      <section className="uki-container relative z-[2] pb-12">
+      <section className="relative z-[2] w-full pb-12">
         <ScrollReveal animation="fade" className="w-full">
           <div className="rounded-[14px] border border-[#d953ff]/32 bg-[#06101d]/88 p-4 sm:p-6">
             <div className="grid gap-6">
@@ -653,7 +649,7 @@ export function PremiosContent() {
         </ScrollReveal>
       </section>
 
-      <section id="progreso-referidos" className="uki-container relative z-[2] scroll-mt-28 pb-14">
+      <section id="progreso-referidos" className="relative z-[2] w-full scroll-mt-28 pb-14">
         <ScrollReveal animation="scale" className="w-full">
           <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#070817]/82 p-4 shadow-[0_0_48px_rgba(228,92,255,0.08)] sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[0.36fr_0.64fr]">
@@ -673,7 +669,7 @@ export function PremiosContent() {
       </section>
 
       {/* CTA Final */}
-      <section className="uki-container pb-14 relative z-[2]">
+      <section className="relative z-[2] w-full pb-14">
         <ScrollReveal animation="scale" className="w-full">
           <div className="rounded-[14px] border border-[#e45cff]/30 bg-[#070817]/82 overflow-hidden relative min-h-[16rem] flex flex-col justify-center p-6 sm:p-8 shadow-[0_0_48px_rgba(228,92,255,0.1)]">
             <div className="absolute inset-0 bg-cover bg-center opacity-15" style={{ backgroundImage: 'url("/brand/generated/uki-final-cta-scene-v2.png")' }} />
@@ -696,8 +692,6 @@ export function PremiosContent() {
           </div>
         </ScrollReveal>
       </section>
-
-      <LandingFooter />
     </>
   );
 }

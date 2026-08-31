@@ -33,7 +33,11 @@ import { cn } from '@/lib/utils';
 
 const SidebarLogo = () => {
   return (
-    <div className="flex items-center justify-center w-full h-full px-2 py-1">
+    <Link
+      href="/"
+      aria-label="Volver a la landing"
+      className="flex h-full w-full items-center justify-center px-2 py-1"
+    >
       <Image 
         src={CukieLogoFirst} 
         alt="Cukies World" 
@@ -41,7 +45,7 @@ const SidebarLogo = () => {
         height={48}
         className="object-contain max-w-[200px] max-h-[56px] w-auto h-auto"
       />
-    </div>
+    </Link>
   );
 };
 
@@ -75,10 +79,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   const navigationItems = [
     {
-      href: '/dashboard',
+      href: '/',
       label: 'Inicio',
       Icon: LayoutDashboard,
-      active: pathname === '/dashboard',
+      active: false,
     },
     {
       href: '/games/treasure-hunt',

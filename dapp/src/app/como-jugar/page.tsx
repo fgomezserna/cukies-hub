@@ -16,6 +16,7 @@ export default function ComoJugarPage() {
       heroAlt="Escena de Treasure Hunt en jungla con cofre"
       primaryCta={{ label: 'Ver juegos', href: '/games' }}
       secondaryCta={{ label: 'Ver dashboard', href: '/dashboard' }}
+      variant="workspace"
       metrics={[
         { label: 'Entrada', value: '10 créditos', helper: 'Por partida' },
         { label: 'Pool semanal', value: '2.5 créditos', helper: 'Van al bote semanal' },
