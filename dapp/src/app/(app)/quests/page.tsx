@@ -791,7 +791,7 @@ function DiscordJoinTask({ task, onVerify, disabled, isLoading = false, user }: 
 
 function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }: { task: Task; onVerify: (taskId: string, payload: { type: string, value?: any }) => void; disabled: boolean; isLoading?: boolean; user: UserType | null; }) {
   const [isVerifying, setIsVerifying] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState('');
+  const [verificationCommand, setVerificationCommand] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
@@ -800,6 +800,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
     title: string;
     inviteLink: string | null;
     fallbackLink: string | null;
+    botLink: string | null;
   } | null>(null);
   const { toast } = useToast();
 
@@ -813,7 +814,8 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
           setTelegramGroupInfo({
             title: data.chatInfo.title,
             inviteLink: data.inviteLink,
-            fallbackLink: data.fallbackLink
+            fallbackLink: data.fallbackLink,
+            botLink: data.botLink,
           });
         }
       } catch (error) {
@@ -837,14 +839,14 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
       }
 
       const data = await response.json();
-      setGeneratedCode(data.verificationCode);
+      setVerificationCommand(data.verificationCommand || `/verify ${data.verificationCode}`);
       setCodeSent(false);
       setShowCodeModal(true);
       setCodeCopied(false);
       
       toast({
-        title: 'Code Generated!',
-        description: `Your verification code is: ${data.verificationCode}`,
+        title: 'Verification Command Generated',
+        description: 'Send it only in a private chat with our Telegram bot.',
       });
     } catch (error) {
       console.error('Error generating code:', error);
@@ -860,11 +862,11 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
 
   const copyCodeToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(generatedCode);
+      await navigator.clipboard.writeText(verificationCommand);
       setCodeCopied(true);
       toast({
-        title: 'Code Copied!',
-        description: 'Verification code copied to clipboard',
+        title: 'Command Copied!',
+        description: 'Verification command copied to clipboard',
       });
       setTimeout(() => setCodeCopied(false), 2000);
     } catch (err) {
@@ -877,10 +879,10 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
   };
 
   const handleVerifyMembership = async () => {
-    if (!generatedCode.trim()) {
+    if (!verificationCommand.trim()) {
       toast({
-        title: 'No Code Generated',
-        description: 'Please generate a code first',
+        title: 'No Command Generated',
+        description: 'Please generate a verification command first',
         variant: 'destructive',
       });
       return;
@@ -888,7 +890,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
 
     setIsVerifying(true);
     try {
-      onVerify(task.id, { type: 'telegram_join', value: generatedCode.trim() });
+      onVerify(task.id, { type: 'telegram_join' });
     } catch (error) {
       console.error('Telegram verification error:', error);
       toast({
@@ -947,7 +949,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
               onClick={generateVerificationCode}
               disabled={disabled || isGeneratingCode || isLoading}
               size="sm"
-              variant={generatedCode || codeSent ? "outline" : "default"}
+              variant={verificationCommand || codeSent ? "outline" : "default"}
               className="text-xs"
             >
               {isGeneratingCode ? (
@@ -956,12 +958,12 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
                   Generating...
                 </>
               ) : (
-                generatedCode || codeSent ? 'Generate New Code' : 'Generate Code'
+                verificationCommand || codeSent ? 'Generate New Command' : 'Generate Command'
               )}
             </Button>
 
             {/* Show Code Button - only when code exists but modal is closed */}
-            {generatedCode && !codeSent && (
+            {verificationCommand && !codeSent && (
               <Button
                 onClick={() => setShowCodeModal(true)}
                 disabled={disabled}
@@ -969,12 +971,12 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
                 variant="outline"
                 className="text-xs"
               >
-                Show Code
+                Show Command
               </Button>
             )}
 
             {/* Verify Button - only when code has been sent */}
-            {(generatedCode || codeSent) && (
+            {(verificationCommand || codeSent) && (
               <Button
                 onClick={handleVerifyMembership}
                 disabled={disabled || isVerifying || isLoading}
@@ -995,24 +997,24 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
         </div>
       </div>
 
-      {/* Code Modal */}
-      <Dialog open={showCodeModal && !!generatedCode && !task.completed} onOpenChange={() => setShowCodeModal(false)}>
+      {/* Verification command modal */}
+      <Dialog open={showCodeModal && !!verificationCommand && !task.completed} onOpenChange={() => setShowCodeModal(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Verification Code</DialogTitle>
+            <DialogTitle>Telegram Verification</DialogTitle>
             <DialogDescription>
-              Send this code to our Telegram group to verify your membership.
+              Join the group, then send this command only in a private chat with our bot.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
               <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                Step 1: Copy this code
+                Copy the complete command
               </p>
               <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded border">
                 <div className="font-mono text-center text-xl font-bold flex-1 select-all">
-                  {generatedCode}
+                  {verificationCommand}
                 </div>
                 <Button
                   onClick={copyCodeToClipboard}
@@ -1028,18 +1030,25 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
                 </Button>
               </div>
               <p className="text-xs text-blue-700 dark:text-blue-300">
-                Copy this code and send it as a message in our Telegram group.
+                This command is a temporary secret. Do not post it in the group or share it.
               </p>
             </div>
 
             <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
               <p className="text-xs text-amber-800 dark:text-amber-200">
-                <strong>Step 2:</strong> After sending the code, close this modal and click &quot;Verify&quot; to complete the task.
+                <strong>Next:</strong> Open the bot privately, send the command, then click &quot;Verify&quot; to complete the task.
               </p>
             </div>
           </div>
           
           <DialogFooter>
+            {telegramGroupInfo?.botLink && (
+              <Button asChild variant="secondary" className="flex-1">
+                <a href={telegramGroupInfo.botLink} target="_blank" rel="noopener noreferrer">
+                  Open Bot
+                </a>
+              </Button>
+            )}
             <Button 
               onClick={() => {
                 setShowCodeModal(false);
@@ -1048,7 +1057,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
               variant="outline"
               className="flex-1"
             >
-              Generate New Code
+              Generate New
             </Button>
             <Button 
               onClick={() => {
@@ -1057,7 +1066,7 @@ function TelegramJoinTask({ task, onVerify, disabled, isLoading = false, user }:
               }}
               className="flex-1"
             >
-              Code Sent
+              Command Sent
             </Button>
           </DialogFooter>
         </DialogContent>

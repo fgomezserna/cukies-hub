@@ -1,30 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processTelegramMessage } from '@/lib/telegram-chat-utils';
+import {
+  consumeTelegramLinkChallenge,
+  extractTelegramVerificationToken,
+  isTelegramVerificationAttempt,
+  isValidTelegramWebhookSecret,
+  type TelegramLinkSender,
+} from '@/lib/telegram-linking';
+
+interface TelegramWebhookMessage {
+  text?: unknown;
+  from?: TelegramLinkSender;
+  chat?: {
+    id?: number | string;
+    type?: string;
+  };
+}
 
 export async function POST(request: NextRequest) {
+  const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!configuredSecret) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+
+  const providedSecret = request.headers.get('x-telegram-bot-api-secret-token');
+  if (!isValidTelegramWebhookSecret(providedSecret, configuredSecret)) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
   try {
     const update = await request.json();
-    
-    // Log the incoming update for debugging
-    console.log('Received Telegram update:', JSON.stringify(update, null, 2));
+    const message = update?.message as TelegramWebhookMessage | undefined;
 
-    // Check if this is a message update
-    if (update.message) {
-      await processTelegramMessage(update.message);
+    if (message && isTelegramVerificationAttempt(message.text)) {
+      const sender = message.from;
+      const token = extractTelegramVerificationToken(message.text);
+      const isPrivateSenderChat = Boolean(
+        sender
+          && message.chat?.type === 'private'
+          && String(message.chat.id) === String(sender.id),
+      );
+
+      if (sender && token && isPrivateSenderChat) {
+        await consumeTelegramLinkChallenge(token, sender);
+      }
+
+      // Verification commands are bearer material and never enter the chat bridge.
+      return NextResponse.json({ ok: true });
     }
 
-    // Always return 200 OK to acknowledge receipt
+    if (message) {
+      await processTelegramMessage(message as Parameters<typeof processTelegramMessage>[0]);
+    }
+
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error('Error processing Telegram webhook:', error);
-    
-    // Still return 200 OK to prevent Telegram from retrying
+  } catch {
+    // Authenticated malformed updates are acknowledged without reflecting details.
     return NextResponse.json({ ok: true });
   }
 }
 
-export async function GET(request: NextRequest) {
-  // This endpoint can be used to verify webhook setup
+export async function GET() {
   return NextResponse.json({ 
     message: 'Telegram webhook endpoint is active',
     timestamp: new Date().toISOString(),

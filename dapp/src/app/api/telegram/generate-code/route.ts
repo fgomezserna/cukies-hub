@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { randomBytes } from 'node:crypto';
+
 import { prisma } from '@/lib/prisma';
 import { verifyWalletAuth } from '@/lib/auth-utils';
+import { hashTelegramVerificationToken } from '@/lib/telegram-linking';
 
-// Generate a unique 6-digit code
-function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+const CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 export async function POST(request: Request) {
   try {
@@ -14,45 +15,53 @@ export async function POST(request: Request) {
     if (!walletAddress) {
       return NextResponse.json({ 
         error: 'Wallet address is required' 
-      }, { status: 400 });
+      }, { status: 400, headers: NO_STORE_HEADERS });
     }
 
     const authenticatedUser = await verifyWalletAuth(walletAddress);
+    const verificationCode = randomBytes(32).toString('base64url');
+    const tokenHash = hashTelegramVerificationToken(verificationCode);
+    const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
 
-    // Find the user
-    const user = await prisma.user.findUnique({
-      where: { id: authenticatedUser.id }
+    // Only the hash is durable; generating another command invalidates the previous one.
+    await prisma.telegramLinkChallenge.upsert({
+      where: { userId: authenticatedUser.id },
+      create: {
+        userId: authenticatedUser.id,
+        tokenHash,
+        expiresAt,
+      },
+      update: {
+        tokenHash,
+        expiresAt,
+        consumedAt: null,
+        consumedTelegramUserId: null,
+        consumedTelegramUsername: null,
+        consumedTelegramDisplay: null,
+      },
     });
 
-    if (!user) {
-      return NextResponse.json({ 
-        error: 'User not found' 
-      }, { status: 404 });
-    }
-
-    // Generate a unique verification code
-    const verificationCode = generateVerificationCode();
-
-    // Store the code in the database (you might want to add a TelegramVerification model)
-    // For now, we'll use a simple approach with a temporary storage
-    // In production, you should create a proper table for this
+    const verificationCommand = `/verify ${verificationCode}`;
     
-    return NextResponse.json({
-      success: true,
-      verificationCode,
-      instructions: [
-        "1. Join our Telegram group if you haven't already",
-        `2. Send this message to the group: /verify ${verificationCode}`,
-        "3. Come back and click 'Check Verification' below",
-        "4. The code expires in 10 minutes"
-      ],
-      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        verificationCode,
+        verificationCommand,
+        instructions: [
+          "1. Join our Telegram group if you haven't already",
+          `2. Send this command in a private chat with our bot: ${verificationCommand}`,
+          "3. Come back and click 'Check Verification' below",
+          "4. The code expires in 10 minutes"
+        ],
+        expiresAt: expiresAt.getTime(),
+      },
+      { headers: NO_STORE_HEADERS },
+    );
 
-  } catch (error) {
-    console.error('Error generating verification code:', error);
+  } catch {
     return NextResponse.json({ 
       error: 'Internal server error' 
-    }, { status: 500 });
+    }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

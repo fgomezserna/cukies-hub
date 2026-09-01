@@ -24,6 +24,24 @@ export async function GET() {
     }
 
     const chatInfo = await chatInfoResponse.json();
+
+    // Resolve the public bot username for the private verification conversation.
+    let botUsername: string | null = null;
+    try {
+      const botInfoResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+      });
+      if (botInfoResponse.ok) {
+        const botInfo = await botInfoResponse.json();
+        if (botInfo.ok && typeof botInfo.result?.username === 'string') {
+          botUsername = botInfo.result.username;
+        }
+      }
+    } catch {
+      // Group invite remains usable even when Telegram cannot resolve getMe.
+    }
     
     // Try to get the invite link from chat info
     let inviteLink = chatInfo.result.invite_link;
@@ -61,7 +79,9 @@ export async function GET() {
       },
       inviteLink: inviteLink || null,
       // Create a fallback link if we have the username
-      fallbackLink: chatInfo.result.username ? `https://t.me/${chatInfo.result.username}` : null
+      fallbackLink: chatInfo.result.username ? `https://t.me/${chatInfo.result.username}` : null,
+      botUsername,
+      botLink: botUsername ? `https://t.me/${botUsername}` : null,
     });
 
   } catch (error) {
