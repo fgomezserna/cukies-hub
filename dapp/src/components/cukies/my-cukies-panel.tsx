@@ -6,61 +6,102 @@ import { ArrowRight, Cookie, Layers3, Loader2, RefreshCw, Store } from 'lucide-r
 
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
-import { getCukiDisplayName, getStateLabel, getTypeLabel } from '@/components/legacy-marketplace/format';
-import type { LegacyMarketplaceCukiItem, LegacyMarketplaceListResponse } from '@/lib/legacy-marketplace/types';
+import type {
+  MyCukieCollectionData,
+  MyCukieCollectionItem,
+  MyCukieCollectionResponse,
+} from '@/lib/cukies-data/my-collection-types';
 import { useAuth } from '@/providers/auth-provider';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
 
-function generationLabel(cukie: LegacyMarketplaceCukiItem) {
-  const generation = cukie.skills.generation;
-  if (generation === null || generation === undefined) return 'Generación sin identificar';
-  if (generation <= 1) return 'Original';
-  return String(generation) + '.ª generación';
+function generationLabel(cukie: MyCukieCollectionItem) {
+  if (cukie.generation === 'original') return 'Original';
+  if (cukie.generation === 'second_generation') return 'Segunda generación';
+  return 'Generación sin identificar';
 }
 
-function countByState(items: LegacyMarketplaceCukiItem[], state: string) {
-  return items.filter((item) => item.state === state).length;
+function rarityLabel(cukie: MyCukieCollectionItem) {
+  return ({
+    common: 'Común',
+    uncommon: 'No común',
+    rare: 'Raro',
+    epic: 'Épico',
+    legendary: 'Legendario',
+    goat: 'Goat',
+    unknown: 'Rareza sin identificar',
+  } as const)[cukie.rarity];
+}
+
+function stateLabel(cukie: MyCukieCollectionItem) {
+  if (cukie.state === 'cukie_master') return 'En Cukie Master';
+  if (cukie.state === 'in_pool') {
+    if (cukie.poolStatus === 'pending') return 'Activándose en el pool';
+    if (cukie.poolStatus === 'exit_requested') return 'Saliendo del pool';
+    if (cukie.poolStatus === 'withdrawable') return 'Listo para retirar';
+    return 'Disponible para partidas';
+  }
+  return ({
+    available: 'Disponible',
+    listed: 'En venta',
+    bridging: 'En transferencia',
+    soft_staked: 'En staking',
+    assigned_to_game: 'En una partida',
+    invalidated: 'No disponible',
+    unknown: 'Estado pendiente',
+  } as const)[cukie.state] ?? 'En uso';
+}
+
+function itemAction(cukie: MyCukieCollectionItem) {
+  if (cukie.custody === 'cukie_pool') {
+    return { href: '/cukie-hodler#mis-cukies-aportados', label: 'Gestionar en el pool' };
+  }
+  if (cukie.custody === 'cukie_master') {
+    return { href: '/cukie-master#cukie-master-nft-staking', label: 'Gestionar Cukie Master' };
+  }
+  if (cukie.state === 'available') {
+    return { href: '/cukie-hodler#cukies-disponibles', label: 'Aportar al pool' };
+  }
+  return { href: `/marketplace/${cukie.tokenId}`, label: 'Ver ficha' };
 }
 
 export function MyCukiesPanel() {
   const { user, isLoading: authLoading } = useAuth();
   const walletAddress = user?.walletAddress ?? null;
   const [state, setState] = useState<LoadState>('idle');
-  const [items, setItems] = useState<LegacyMarketplaceCukiItem[]>([]);
+  const [collection, setCollection] = useState<MyCukieCollectionData | null>(null);
+  const items = useMemo(() => collection?.items ?? [], [collection]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     if (!walletAddress) return;
     setState('loading');
-    const params = new URLSearchParams({ owner: walletAddress, limit: '100', sort: 'number-asc' });
-    const response = await fetch('/api/cukies?' + params.toString(), { cache: 'no-store', signal });
-    const body = await response.json() as LegacyMarketplaceListResponse;
-    if (!response.ok || body.error) throw new Error('CUKIES_UNAVAILABLE');
-    setItems(body.items);
+    const params = new URLSearchParams({ walletAddress });
+    const response = await fetch('/api/cukies/mine?' + params.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal,
+    });
+    const body = await response.json() as MyCukieCollectionResponse;
+    if (!response.ok || body.status !== 'ok') throw new Error('CUKIES_UNAVAILABLE');
+    setCollection(body.data);
     setState('ready');
   }, [walletAddress]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!walletAddress) {
-      setItems([]);
+      setCollection(null);
       setState('idle');
       return;
     }
     const controller = new AbortController();
     load(controller.signal).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      setItems([]);
+      setCollection(null);
       setState('unavailable');
     });
     return () => controller.abort();
   }, [authLoading, load, walletAddress]);
-
-  const summary = useMemo(() => ({
-    available: countByState(items, 'available'),
-    onSale: countByState(items, 'onSale'),
-    inUse: items.filter((item) => !['available', 'onSale'].includes(String(item.state))).length,
-  }), [items]);
 
   if (authLoading) {
     return (
@@ -107,13 +148,13 @@ export function MyCukiesPanel() {
         <div className="grid overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.07] sm:grid-cols-[1.25fr_repeat(3,0.75fr)]">
           <div className="p-5 sm:p-6">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">Tu colección</p>
-            <h2 id="collection-summary-title" className="mt-2 font-headline text-3xl font-black text-[var(--uki-cream)]">{items.length} Cukies</h2>
-            <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">El estado indica qué puedes hacer ahora con cada uno.</p>
+            <h2 id="collection-summary-title" className="mt-2 font-headline text-3xl font-black text-[var(--uki-cream)]">{collection?.summary.total ?? 0} Cukies</h2>
+            <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Total real entre tu wallet, el pool y Cukie Master.</p>
           </div>
           {[
-            ['Disponibles', summary.available, 'Listos para usar'],
-            ['En venta', summary.onSale, 'Con anuncio activo'],
-            ['En uso', summary.inUse, 'Aportados, transfiriéndose o en crianza'],
+            ['En tu wallet', collection?.summary.inWallet ?? 0, `${collection?.summary.available ?? 0} disponibles${collection?.summary.onSale ? ` · ${collection.summary.onSale} en venta` : ''}`],
+            ['En el pool', collection?.summary.inPool ?? 0, 'Aportados para participar en partidas'],
+            ['Cukie Master', collection?.summary.inCukieMaster ?? 0, 'Depositados para generar cupos'],
           ].map(([label, value, helper]) => (
             <div key={String(label)} className="border-t border-white/10 p-5 sm:border-l sm:border-t-0 sm:p-6">
               <p className="font-headline text-3xl font-black text-[var(--uki-lilac)]">{value}</p>
@@ -152,17 +193,18 @@ export function MyCukiesPanel() {
           </div>
           <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {items.map((cukie) => (
-              <article key={cukie.tokenId} className="group overflow-hidden rounded-[16px] border border-white/10 bg-black/25">
+              <article key={cukie.assetId} className="group overflow-hidden rounded-[16px] border border-white/10 bg-black/25">
                 <div className="relative aspect-[4/5] bg-[#0d0914]">
-                  <CukiImage src={cukie.imageUrl} alt={getCukiDisplayName(cukie)} sizes="(min-width: 1280px) 30vw, (min-width: 640px) 50vw, 100vw" className="object-contain p-3 transition-transform duration-300 group-hover:scale-[1.015]" />
-                  <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/75 px-3 py-1 text-xs font-black text-[var(--uki-cream)] backdrop-blur">{cukie.network}</span>
-                  <span className="absolute right-3 top-3 rounded-full border border-[var(--uki-lilac)]/35 bg-[#130b19]/85 px-3 py-1 text-xs font-black text-[var(--uki-lilac)] backdrop-blur">{getStateLabel(String(cukie.state))}</span>
+                  <CukiImage src={cukie.imageUrl} alt={`Cukie #${cukie.tokenId}`} sizes="(min-width: 1280px) 30vw, (min-width: 640px) 50vw, 100vw" className="object-contain p-3 transition-transform duration-300 group-hover:scale-[1.015]" />
+                  <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/75 px-3 py-1 text-xs font-black text-[var(--uki-cream)] backdrop-blur">BSC</span>
+                  <span className="absolute right-3 top-3 rounded-full border border-[var(--uki-lilac)]/35 bg-[#130b19]/85 px-3 py-1 text-xs font-black text-[var(--uki-lilac)] backdrop-blur">{stateLabel(cukie)}</span>
                 </div>
                 <div className="p-5">
-                  <h3 className="font-headline text-xl font-black text-[var(--uki-cream)]">{getCukiDisplayName(cukie)}</h3>
-                  <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">{generationLabel(cukie)} · {getTypeLabel(cukie.type)}</p>
-                  <Link href={'/marketplace/' + cukie.tokenId} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-4 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
-                    Ver ficha <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                  <h3 className="font-headline text-xl font-black text-[var(--uki-cream)]">Cukie #{cukie.tokenId}</h3>
+                  <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">{generationLabel(cukie)} · {rarityLabel(cukie)}</p>
+                  <p className="mt-3 text-xs font-bold text-[var(--uki-lilac)]">{stateLabel(cukie)}</p>
+                  <Link href={itemAction(cukie).href} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-4 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                    {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
                   </Link>
                 </div>
               </article>

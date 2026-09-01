@@ -842,6 +842,12 @@ export function CukiePoolStatusPanel() {
               </section>
             </div>
 
+            <p className="text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+              Este resumen muestra solo los Cukies que puedes gestionar desde el pool: los que ya
+              aportaste y los que están disponibles en tu wallet. Los depositados en Cukie Master
+              aparecen en <Link href="/cukies" className="font-black text-[var(--uki-lilac)] underline decoration-[var(--uki-lilac)]/45 underline-offset-4">Mis Cukies</Link>.
+            </p>
+
             <PoolMovements
               activating={activatingCount}
               leaving={leavingCount}
