@@ -1,0 +1,224 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  ClockCounterClockwise,
+  Coin,
+  GameController,
+  SpinnerGap,
+  Stack,
+  Trophy,
+  Warning,
+} from '@phosphor-icons/react';
+
+import { useTreasureHuntCreditAccess } from '@/hooks/use-treasure-hunt-credit-access';
+
+function CreditMetric({
+  label,
+  value,
+  detail,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly detail: string;
+}) {
+  return (
+    <div className="min-w-0 px-4 py-3.5 sm:px-5">
+      <dt className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">
+        {label}
+      </dt>
+      <dd className="mt-1 font-headline text-lg font-black tabular-nums text-[var(--uki-cream)]">
+        {value}
+      </dd>
+      <p className="mt-0.5 text-xs font-semibold text-[var(--uki-muted)]">{detail}</p>
+    </div>
+  );
+}
+
+export function TreasureHuntCreditModeBanner() {
+  const access = useTreasureHuntCreditAccess();
+  const costLabel = access.costCredits === null ? '—' : `${access.costCredits} créditos`;
+  const balanceLabel = !access.walletConnected
+    ? 'Conecta tu wallet'
+    : access.availableCredits === null
+      ? '—'
+      : `${access.availableCredits} créditos`;
+
+  return (
+    <section
+      aria-labelledby="treasure-hunt-credit-mode-title"
+      className="overflow-hidden rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#100817]/96 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+    >
+      <div className="grid gap-5 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0 border-l-2 border-[var(--uki-lilac)] pl-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--uki-lilac)]">
+            Modo actual · Créditos
+          </p>
+          <h2
+            id="treasure-hunt-credit-mode-title"
+            className="mt-1.5 font-headline text-2xl font-black text-[var(--uki-cream)]"
+          >
+            Juega con tus créditos
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+            Cada partida usa el coste vigente de tu saldo. Al empezar se asigna un Cukie y tu mejor resultado entra en el ranking semanal.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <Link
+            href="/games/treasure-hunt/rankings"
+            className="inline-flex min-h-10 items-center gap-2 rounded-[7px] border border-white/15 px-3.5 text-xs font-black text-[var(--uki-cream)] transition-colors hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] active:scale-[0.98]"
+          >
+            <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
+            Torneos pasados
+          </Link>
+          <Link
+            href="/credits"
+            className="inline-flex min-h-10 items-center gap-2 rounded-[7px] bg-[var(--uki-lilac)] px-3.5 text-xs font-black text-[#100817] transition-transform hover:brightness-105 active:scale-[0.98]"
+          >
+            Gestionar créditos
+            <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+
+      <dl className="grid border-t border-white/10 bg-white/[0.025] sm:grid-cols-3 sm:divide-x sm:divide-white/10">
+        <CreditMetric label="Coste por partida" value={costLabel} detail="Se descuenta al iniciar" />
+        <CreditMetric
+          label="Tu saldo para jugar"
+          value={access.isLoading ? 'Comprobando…' : balanceLabel}
+          detail={access.walletConnected ? 'Créditos disponibles ahora' : 'Necesario para consultar el saldo'}
+        />
+        <CreditMetric label="Cukie de la partida" value="Asignación automática" detail="Propio o disponible en el pool" />
+      </dl>
+
+      {access.isError ? (
+        <div role="alert" className="flex items-start gap-3 border-t border-amber-300/25 bg-amber-300/10 px-5 py-3 text-sm font-semibold text-amber-100">
+          <Warning className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" weight="bold" aria-hidden="true" />
+          No hemos podido comprobar el saldo. No se iniciará ni cobrará ninguna partida mientras siga sin estar disponible.
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SidebarRow({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly value: string;
+  readonly detail: string;
+}) {
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-white/10 px-4 py-3.5 last:border-b-0">
+      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] text-[var(--uki-lilac)]">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold text-[var(--uki-muted)]">{label}</dt>
+        <dd className="mt-0.5 text-sm font-black text-[var(--uki-cream)]">{value}</dd>
+        <p className="mt-0.5 text-[11px] font-semibold leading-snug text-[var(--uki-muted)]">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
+export function TreasureHuntCreditModeSidebar({
+  onStartSinglePlayer,
+}: {
+  readonly onStartSinglePlayer: () => void;
+}) {
+  const access = useTreasureHuntCreditAccess();
+  const connectedUnavailable = access.walletConnected && (
+    access.isLoading || access.isError || access.blocked || !access.ready
+  );
+  const disabled = connectedUnavailable || (access.walletConnected && !access.canPlay);
+  const actionLabel = !access.walletConnected
+    ? 'Conectar wallet para jugar'
+    : access.isLoading
+      ? 'Comprobando tus créditos'
+      : access.isError || access.blocked || !access.ready
+        ? 'Créditos no disponibles'
+        : access.canPlay
+          ? `Jugar por ${access.costCredits} créditos`
+          : `Te faltan ${access.missingCredits} créditos`;
+
+  return (
+    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#100817]/96 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">
+        Partida individual
+      </p>
+      <h2 className="mt-1.5 font-headline text-2xl font-black text-[var(--uki-cream)]">
+        Juega con créditos
+      </h2>
+      <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+        El torneo terminó. Tus nuevas partidas usan créditos y cuentan para el ranking y los premios semanales.
+      </p>
+
+      <dl className="mt-5 overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.025]">
+        <SidebarRow
+          icon={<Coin className="h-4 w-4" weight="fill" aria-hidden="true" />}
+          label="Coste"
+          value={access.costCredits === null ? 'Pendiente de consultar' : `${access.costCredits} créditos`}
+          detail="Solo se descuentan si la partida queda creada"
+        />
+        <SidebarRow
+          icon={access.isLoading
+            ? <SpinnerGap className="h-4 w-4 animate-spin" weight="bold" aria-hidden="true" />
+            : <GameController className="h-4 w-4" weight="fill" aria-hidden="true" />}
+          label="Disponibles para jugar"
+          value={!access.walletConnected
+            ? 'Conecta tu wallet'
+            : access.availableCredits === null
+              ? 'No disponible'
+              : `${access.availableCredits} créditos`}
+          detail={access.reservedCredits
+            ? `${access.reservedCredits} reservados en partidas abiertas`
+            : 'Saldo libre en este momento'}
+        />
+        <SidebarRow
+          icon={<Stack className="h-4 w-4" weight="fill" aria-hidden="true" />}
+          label="Cukie"
+          value="Se asigna al empezar"
+          detail="Se usa uno propio o disponible en el pool"
+        />
+        <SidebarRow
+          icon={<Trophy className="h-4 w-4" weight="fill" aria-hidden="true" />}
+          label="Resultado"
+          value="Ranking semanal"
+          detail="Tu mejor puntuación participa en los premios"
+        />
+      </dl>
+
+      <button
+        type="button"
+        onClick={onStartSinglePlayer}
+        disabled={disabled}
+        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[8px] bg-[var(--uki-lilac)] px-4 text-sm font-black uppercase text-[#100817] transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-[var(--uki-muted)]"
+      >
+        {actionLabel}
+        {!access.isLoading ? <ArrowRight className="h-5 w-5" weight="bold" aria-hidden="true" /> : null}
+      </button>
+
+      {access.walletConnected && !access.isLoading && !access.isError && !access.blocked && !access.canPlay ? (
+        <p role="status" className="mt-3 text-center text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
+          Necesitas créditos disponibles para iniciar. Puedes conservar más en el próximo reparto diario.
+        </p>
+      ) : null}
+
+      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">
+        Gestionar créditos <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
+      </Link>
+      <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center justify-center gap-2 text-sm font-semibold text-[var(--uki-muted)] hover:text-[var(--uki-cream)]">
+        Ver torneos pasados <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
+      </Link>
+    </aside>
+  );
+}

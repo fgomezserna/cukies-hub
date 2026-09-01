@@ -3,6 +3,21 @@ import { render, screen } from '@testing-library/react';
 import TreasureHuntCompetitionBanner from '@/components/games/treasure-hunt-competition-banner';
 
 let mockDisqualified = false;
+let mockPhase = 'active';
+
+const mockCreditAccess = {
+  walletConnected: true,
+  isLoading: false,
+  isError: false,
+  blocked: false,
+  ready: true,
+  costCredits: 10,
+  availableCredits: 480,
+  reservedCredits: 0,
+  canPlay: true,
+  missingCredits: 0,
+  reload: jest.fn(),
+};
 
 jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
@@ -11,6 +26,21 @@ jest.mock('lucide-react', () => ({
   Medal: () => null,
   Trophy: () => null,
   X: () => null,
+}));
+
+jest.mock('@phosphor-icons/react', () => ({
+  ArrowRight: () => null,
+  ClockCounterClockwise: () => null,
+  Coin: () => null,
+  GameController: () => null,
+  SpinnerGap: () => null,
+  Stack: () => null,
+  Trophy: () => null,
+  Warning: () => null,
+}));
+
+jest.mock('@/hooks/use-treasure-hunt-credit-access', () => ({
+  useTreasureHuntCreditAccess: () => mockCreditAccess,
 }));
 
 jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
@@ -25,7 +55,7 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   },
   useTreasureHuntCompetitionOverview: () => ({
     status: {
-      phase: 'active',
+      phase: mockPhase,
       campaign: {
         startsAt: '2026-08-27T00:00:00.000Z',
         endsAt: '2026-09-15T15:00:00.000Z',
@@ -66,6 +96,25 @@ jest.mock('@/hooks/use-treasure-hunt-prize-pool', () => ({
 describe('TreasureHuntCompetitionBanner', () => {
   beforeEach(() => {
     mockDisqualified = false;
+    mockPhase = 'active';
+  });
+
+  it('sustituye el torneo cerrado por el modo de juego con créditos', () => {
+    mockPhase = 'closed';
+    render(<TreasureHuntCompetitionBanner />);
+
+    expect(screen.getByText('Juega con tus créditos')).toBeInTheDocument();
+    expect(screen.getByText('10 créditos')).toBeInTheDocument();
+    expect(screen.getByText('480 créditos')).toBeInTheDocument();
+    expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Torneos pasados/ })).toHaveAttribute(
+      'href',
+      '/games/treasure-hunt/rankings',
+    );
+    expect(screen.getByRole('link', { name: /Gestionar créditos/ })).toHaveAttribute(
+      'href',
+      '/credits',
+    );
   });
 
   it('separa intentos disponibles de resultados que cuentan y enlaza a reglas y rankings', () => {

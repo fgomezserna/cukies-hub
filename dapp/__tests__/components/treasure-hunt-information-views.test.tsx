@@ -6,6 +6,21 @@ import TreasureHuntRulesView from '@/components/games/treasure-hunt-rules-view';
 import TreasureHuntProfile from '@/components/profile/treasure-hunt-profile';
 
 let mockDisqualified = false;
+let mockPhase = 'active';
+
+const mockCreditAccess = {
+  walletConnected: true,
+  isLoading: false,
+  isError: false,
+  blocked: false,
+  ready: true,
+  costCredits: 10,
+  availableCredits: 480,
+  reservedCredits: 0,
+  canPlay: true,
+  missingCredits: 0,
+  reload: jest.fn(),
+};
 
 jest.mock('lucide-react', () => ({
   Archive: () => null,
@@ -29,6 +44,21 @@ jest.mock('lucide-react', () => ({
   Trophy: () => null,
   UserRound: () => null,
   Wallet: () => null,
+}));
+
+jest.mock('@phosphor-icons/react', () => ({
+  ArrowRight: () => null,
+  ClockCounterClockwise: () => null,
+  Coin: () => null,
+  GameController: () => null,
+  SpinnerGap: () => null,
+  Stack: () => null,
+  Trophy: () => null,
+  Warning: () => null,
+}));
+
+jest.mock('@/hooks/use-treasure-hunt-credit-access', () => ({
+  useTreasureHuntCreditAccess: () => mockCreditAccess,
 }));
 
 jest.mock('@/providers/auth-provider', () => ({
@@ -77,7 +107,7 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
   },
   useTreasureHuntCompetitionOverview: () => ({
     status: {
-      phase: 'active',
+      phase: mockPhase,
       participant: {
         alias: 'CukiePlayer',
       },
@@ -160,6 +190,19 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 describe('vistas UX de Treasure Hunt', () => {
   beforeEach(() => {
     mockDisqualified = false;
+    mockPhase = 'active';
+    Object.assign(mockCreditAccess, {
+      walletConnected: true,
+      isLoading: false,
+      isError: false,
+      blocked: false,
+      ready: true,
+      costCredits: 10,
+      availableCredits: 480,
+      reservedCredits: 0,
+      canPlay: true,
+      missingCredits: 0,
+    });
   });
 
   it('muestra por defecto la clasificación activa con las métricas del torneo', () => {
@@ -216,6 +259,33 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByRole('link', { name: /Gestionar staking UKI/ })).toHaveAttribute('href', '/cukie-master');
     expect(screen.getByRole('link', { name: /Ver reglas/ })).toBeInTheDocument();
     expect(screen.queryByText(/Si clasificas/)).not.toBeInTheDocument();
+  });
+
+  it('permite iniciar una partida por créditos cuando el torneo ha terminado', () => {
+    mockPhase = 'closed';
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Jugar por 10 créditos' }));
+
+    expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('480 créditos')).toBeInTheDocument();
+    expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
+  });
+
+  it('explica cuánto falta y bloquea la partida si no hay créditos suficientes', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      availableCredits: 4,
+      canPlay: false,
+      missingCredits: 6,
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByRole('button', { name: 'Te faltan 6 créditos' })).toBeDisabled();
+    expect(screen.getByText('4 créditos')).toBeInTheDocument();
+    expect(onStartSinglePlayer).not.toHaveBeenCalled();
   });
 
   it('muestra intentos disponibles y bloquea el juego de una wallet descalificada', () => {

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { TreasureHuntCompetitionCountdown } from '@/components/games/treasure-hunt-competition-countdown';
+import { TreasureHuntCreditModeSidebar } from '@/components/games/treasure-hunt-credit-mode';
 import {
   TREASURE_HUNT_FALLBACK_RULES,
   useTreasureHuntCompetitionOverview,
@@ -23,6 +24,11 @@ export default function TreasureHuntPlaySidebar({
   readonly onStartSinglePlayer: () => void;
 }) {
   const { status, leaderboard, isLoading } = useTreasureHuntCompetitionOverview();
+
+  if (!isLoading && status?.phase === 'closed') {
+    return <TreasureHuntCreditModeSidebar onStartSinglePlayer={onStartSinglePlayer} />;
+  }
+
   const rules = status?.campaign ?? TREASURE_HUNT_FALLBACK_RULES;
   const eligibility = status?.eligibility;
   const attemptsUsed = eligibility?.attemptsUsed ?? leaderboard.filter((entry) => entry.isMe).length;

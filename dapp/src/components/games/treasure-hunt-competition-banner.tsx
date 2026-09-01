@@ -4,10 +4,15 @@ import Link from 'next/link';
 import { BookOpenText, Medal } from 'lucide-react';
 
 import { TreasureHuntCompetitionSummary } from '@/components/games/treasure-hunt-competition-summary';
+import { TreasureHuntCreditModeBanner } from '@/components/games/treasure-hunt-credit-mode';
 import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
 
 export default function TreasureHuntCompetitionBanner() {
   const { status, leaderboardMeta, isLoading } = useTreasureHuntCompetitionOverview();
+
+  if (!isLoading && status?.phase === 'closed') {
+    return <TreasureHuntCreditModeBanner />;
+  }
 
   return (
     <TreasureHuntCompetitionSummary

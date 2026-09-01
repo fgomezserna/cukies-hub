@@ -189,6 +189,11 @@ export async function getCompetitionCreditWalletStatus(
       creditsPerSlot: rule.creditsPerSlot,
       cutoffHourUtc: rule.cutoffHourUtc,
       cutoffMinuteUtc: rule.cutoffMinuteUtc,
+      costs: rule.costs.map((cost) => ({
+        costCode: cost.costCode,
+        credits: exactCredits(cost.credits, `rule.costs.${cost.costCode}.credits`),
+        active: cost.active,
+      })),
     },
     period,
     balance,
