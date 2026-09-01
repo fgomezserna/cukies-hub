@@ -3,11 +3,12 @@ import type { Address } from 'viem';
 import {
   BSC_MAINNET_SWAP_TOKENS,
   PANCAKE_V2_ROUTER_BY_CHAIN,
+  applyMaximumSlippageBps,
   applySlippageBps,
   buildUkiSwapConfig,
   createSwapDeadline,
+  formatEditableSwapAmount,
   formatSwapAmount,
-  routeLabel,
 } from '@/lib/uki-swap';
 
 const ASM = '0x707F0f4a39a4a26239F7D00463B15AB5656861f9' as Address;
@@ -18,7 +19,7 @@ describe('uki-swap', () => {
     const config = buildUkiSwapConfig({ chainId: 56, asmAddress: ASM, ukiAddress: UKI });
 
     expect(config?.routerAddress).toBe(PANCAKE_V2_ROUTER_BY_CHAIN[56]);
-    expect(config?.sources.map((source) => source.symbol)).toEqual(['BNB', 'USDT', 'ASM']);
+    expect(config?.sources.map((source) => source.symbol)).toEqual(['BNB', 'USDT', 'USDC', 'ASM']);
     expect(config?.sources[0].path).toEqual([
       BSC_MAINNET_SWAP_TOKENS.wbnb,
       BSC_MAINNET_SWAP_TOKENS.usdt,
@@ -30,8 +31,13 @@ describe('uki-swap', () => {
       ASM,
       UKI,
     ]);
-    expect(config?.sources[2].path).toEqual([ASM, UKI]);
-    expect(routeLabel(config!.sources[0])).toBe('BNB → USDT → ASM → UKI');
+    expect(config?.sources[2].path).toEqual([
+      BSC_MAINNET_SWAP_TOKENS.usdc,
+      BSC_MAINNET_SWAP_TOKENS.usdt,
+      ASM,
+      UKI,
+    ]);
+    expect(config?.sources[3].path).toEqual([ASM, UKI]);
   });
 
   it('limita staging a la ruta de prueba ASM/UKI', () => {
@@ -49,12 +55,17 @@ describe('uki-swap', () => {
 
   it('calcula mínimo recibido y deadline sin redondeos de coma flotante', () => {
     expect(applySlippageBps(BigInt(100_000), 50)).toBe(BigInt(99_500));
+    expect(applyMaximumSlippageBps(BigInt(100_000), 50)).toBe(BigInt(100_500));
+    expect(applyMaximumSlippageBps(BigInt(1), 50)).toBe(BigInt(2));
     expect(createSwapDeadline(1_000_000, 20)).toBe(BigInt(2_200));
     expect(formatSwapAmount(BigInt('44941404224589360000'))).toBe('44,941404');
+    expect(formatEditableSwapAmount(BigInt('44941404224589360000'))).toBe('44.94140422');
   });
 
   it('rechaza tolerancias inválidas', () => {
     expect(() => applySlippageBps(BigInt(1), -1)).toThrow();
     expect(() => applySlippageBps(BigInt(1), 10_000)).toThrow();
+    expect(() => applyMaximumSlippageBps(BigInt(1), -1)).toThrow();
+    expect(() => applyMaximumSlippageBps(BigInt(1), 10_000)).toThrow();
   });
 });
