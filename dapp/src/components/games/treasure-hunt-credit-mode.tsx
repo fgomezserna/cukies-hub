@@ -71,11 +71,11 @@ export function TreasureHuntCreditModeBanner() {
   return (
     <section
       aria-labelledby="treasure-hunt-credit-mode-title"
-      className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+      className="overflow-hidden rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#0d0914]/94 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
     >
       <div className="grid gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[minmax(12rem,0.8fr)_minmax(0,1.4fr)] lg:items-center xl:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.55fr)_auto]">
-        <div className="min-w-0 border-l-2 border-[#35eee2] pl-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#35eee2]">
+        <div className="min-w-0 border-l-2 border-[var(--uki-lilac)] pl-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--uki-lilac)]">
             Partidas semanales · Créditos
           </p>
           <h2
@@ -102,14 +102,14 @@ export function TreasureHuntCreditModeBanner() {
         <div className="grid grid-cols-2 gap-2 lg:col-span-2 xl:col-span-1 xl:grid-cols-1 2xl:grid-cols-2">
           <Link
             href="/games/treasure-hunt/rankings"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-white/20 px-3 text-xs font-black text-[#f2eee7] transition-colors hover:border-[#35eee2]/55 hover:text-[#35eee2] active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-white/20 px-3 text-xs font-black text-[var(--uki-cream)] transition-colors hover:border-[var(--uki-lilac)]/55 hover:text-[var(--uki-lilac)] active:scale-[0.98]"
           >
             <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
             Ver semana actual
           </Link>
           <Link
             href="/credits"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-[#35eee2]/55 bg-[#0d5d57] px-3 text-xs font-black text-white transition-transform hover:bg-[#137069] active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-[var(--uki-lilac)]/55 bg-[var(--uki-lilac)] px-3 text-xs font-black text-[#120716] transition-transform hover:brightness-110 active:scale-[0.98]"
           >
             Gestionar créditos
             <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
@@ -140,7 +140,7 @@ function SidebarRow({
 }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-white/10 px-4 py-3.5 last:border-b-0">
-      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-full border border-[#35eee2]/35 bg-[#35eee2]/10 text-[#35eee2]">
+      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-full border border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
         {icon}
       </span>
       <div className="min-w-0">
@@ -185,8 +185,8 @@ export function TreasureHuntCreditModeSidebar({
           : 'No hay saldo suficiente para crear una nueva partida.';
 
   return (
-    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#35eee2]">
+    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#0d0914]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">
         {isPoolGame ? 'Competición semanal' : 'Partida individual'}
       </p>
       <h2 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">
@@ -239,7 +239,7 @@ export function TreasureHuntCreditModeSidebar({
         type="button"
         onClick={onStartSinglePlayer}
         disabled={disabled}
-        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[7px] border border-[#47f4e9] bg-[linear-gradient(180deg,#1ca9a2,#0e6d68)] px-4 text-sm font-black uppercase text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-[#969994] disabled:shadow-none"
+        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[7px] border border-[var(--uki-lilac)] bg-[var(--uki-lilac)] px-4 text-sm font-black uppercase text-[#120716] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_rgba(228,92,255,0.16)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-[#969994] disabled:shadow-none"
       >
         {actionLabel}
         {!access.isLoading ? <ArrowRight className="h-5 w-5" weight="bold" aria-hidden="true" /> : null}
@@ -251,7 +251,7 @@ export function TreasureHuntCreditModeSidebar({
         </p>
       ) : null}
 
-      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[#35eee2] hover:text-white">
+      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[var(--uki-lilac)] hover:text-white">
         Gestionar créditos <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
       </Link>
       <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center justify-center gap-2 text-sm font-semibold text-[#aaa8a2] hover:text-white">

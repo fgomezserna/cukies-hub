@@ -1335,14 +1335,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [matchResult, multiplayer, releaseMultiplayerSession, resetGame]);
   const advantageBar = isMultiplayerMode && multiplayer.opponent ? (
     <div className="w-full mt-3 space-y-2 lg:pr-[300px] xl:pr-[360px]" style={{ width: BASE_GAME_WIDTH }}>
-      <div className="flex justify-between text-xs font-pixellari uppercase tracking-wide text-cyan-100/80">
+      <div className="flex justify-between text-xs font-pixellari uppercase tracking-wide text-fuchsia-100/80">
         <span>Tu score: {localScore}</span>
         <span>Objetivo: {advantageTarget}</span>
         <span>Rival: {opponentScore}</span>
       </div>
-      <div className="relative h-4 rounded-full border border-cyan-500/60 bg-slate-900/80 shadow-inner shadow-cyan-500/20 overflow-hidden">
+      <div className="relative h-4 rounded-full border border-fuchsia-500/60 bg-slate-900/80 shadow-inner shadow-fuchsia-500/20 overflow-hidden">
         <div className="absolute inset-0 transition-all duration-500" style={{ background: advantageGradient }} />
-        <div className="absolute inset-y-0 left-1/2 w-[1px] bg-cyan-200/60" />
+        <div className="absolute inset-y-0 left-1/2 w-[1px] bg-fuchsia-200/60" />
         <div className="absolute inset-0 flex items-center justify-between px-3 text-[11px] font-pixellari uppercase tracking-wide">
           <span className="text-emerald-200">{scoreDifference >= 0 ? `+${scoreDifference}` : scoreDifference} pts</span>
           <span className="text-rose-200">{scoreDifference <= 0 ? `+${Math.abs(scoreDifference)}` : `-${scoreDifference}`} pts</span>
@@ -1357,7 +1357,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           )}
         </div>
       ) : (
-        <div className="flex justify-between text-[11px] font-pixellari uppercase tracking-wide text-cyan-100/70">
+        <div className="flex justify-between text-[11px] font-pixellari uppercase tracking-wide text-fuchsia-100/70">
           <span>Ventaja actual: {scoreDifference >= 0 ? `+${scoreDifference}` : scoreDifference}</span>
           <span>Hearts rival: {opponentHearts}</span>
         </div>
@@ -1454,9 +1454,9 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const waitingOverlay = isMultiplayerMode && showWaitingOverlay ? (
     <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm px-6 text-center">
-      <div className="rounded-xl border border-cyan-500/60 bg-slate-900/90 px-6 py-5 shadow-2xl shadow-cyan-500/20 space-y-4">
-        <p className="text-2xl font-pixellari text-cyan-100">Buscando oponente...</p>
-        <p className="text-sm font-pixellari text-cyan-200/70">
+      <div className="rounded-xl border border-fuchsia-500/60 bg-slate-900/90 px-6 py-5 shadow-2xl shadow-fuchsia-500/20 space-y-4">
+        <p className="text-2xl font-pixellari text-fuchsia-100">Buscando oponente...</p>
+        <p className="text-sm font-pixellari text-fuchsia-200/70">
           Comparte el enlace de la partida o espera a que otro jugador se conecte.
         </p>
         {lobbySeconds !== null ? (
@@ -1511,10 +1511,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 if (button) {
                   const originalText = button.textContent;
                   button.textContent = '¡Copiado!';
-                  button.className = button.className.replace('border-cyan-500/50', 'border-emerald-500/50');
+                  button.className = button.className.replace('border-fuchsia-500/50', 'border-emerald-500/50');
                   setTimeout(() => {
                     button.textContent = originalText;
-                    button.className = button.className.replace('border-emerald-500/50', 'border-cyan-500/50');
+                    button.className = button.className.replace('border-emerald-500/50', 'border-fuchsia-500/50');
                   }, 2000);
                 }
               };
@@ -1561,10 +1561,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           
           {multiplayer.roomCode && (
             <div className="space-y-2">
-              <p className="text-xs text-cyan-200/60">
+              <p className="text-xs text-fuchsia-200/60">
                 El segundo jugador debe abrir este enlace en un perfil diferente del navegador
               </p>
-              <p className="text-xs text-cyan-300/80 font-mono">
+              <p className="text-xs text-fuchsia-300/80 font-mono">
                 ID de sala: {multiplayer.roomCode}
               </p>
             </div>
@@ -1604,14 +1604,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const resultOverlay = isMultiplayerMode && matchResult ? (
     <div className="absolute inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-sm px-4">
-      <div className="w-full max-w-md rounded-2xl border border-cyan-500/50 bg-slate-900/95 p-6 text-center shadow-[0_30px_80px_rgba(8,145,178,0.35)] space-y-4">
+      <div className="w-full max-w-md rounded-2xl border border-fuchsia-500/50 bg-slate-900/95 p-6 text-center shadow-[0_30px_80px_rgba(162,28,175,0.35)] space-y-4">
         <h3 className={`text-2xl font-pixellari ${localIsWinner === true ? 'text-emerald-300' : localIsWinner === false ? 'text-rose-300' : 'text-amber-200'}`}>
           {resultTitle}
         </h3>
-        <div className="space-y-2 text-sm font-pixellari text-cyan-100">
+        <div className="space-y-2 text-sm font-pixellari text-fuchsia-100">
           <p>Tu puntuación: {localFinalScore}</p>
           <p>Puntuación rival: {opponentFinalScore}</p>
-          <p className="text-cyan-200/70 capitalize">Motivo: {matchResult.reason.replace('_', ' ')}</p>
+          <p className="text-fuchsia-200/70 capitalize">Motivo: {matchResult.reason.replace('_', ' ')}</p>
         </div>
         {resultExitError ? (
           <p role="alert" className="text-sm font-pixellari text-rose-300">
@@ -1665,15 +1665,15 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         height={60}
         className="game-img"
       />
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-pixellari text-shadow text-cyan-100">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-pixellari text-shadow text-fuchsia-100">
         <span className="text-primary text-base">
           {multiplayer.opponent ? `Rival: ${opponentScore}` : 'Rival: ---'}
         </span>
-        <span className="text-cyan-200/80 uppercase tracking-wide mt-1">
+        <span className="text-fuchsia-200/80 uppercase tracking-wide mt-1">
           Estado: {opponentStatusLabel}
         </span>
         {multiplayer.opponent && (
-          <span className="text-cyan-200/70 uppercase tracking-wide mt-1">
+          <span className="text-fuchsia-200/70 uppercase tracking-wide mt-1">
             Hearts: {opponentHearts}
           </span>
         )}
@@ -3386,7 +3386,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 <HudMetric
                   label={isMultiplayerMode ? 'Tu botín' : 'Botín'}
                   value={numberFormatter.format(localScore)}
-                  tone={gameState.scoreMultiplier > 1 ? 'teal' : 'default'}
+                  tone={gameState.scoreMultiplier > 1 ? 'lilac' : 'default'}
                   icon={<span>◆</span>}
                 />
                 {isMultiplayerMode ? (
@@ -3812,7 +3812,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               <button
                 type="button"
                 onClick={retryMultiplayerJoin}
-                className="rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-4 py-2 font-pixellari text-cyan-100"
+                className="rounded-lg border border-fuchsia-400/60 bg-fuchsia-500/20 px-4 py-2 font-pixellari text-fuchsia-100"
               >
                 Reintentar
               </button>
@@ -4375,7 +4375,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                     width: '250px',
                     height: '250px',
                     transition: 'none', // Removemos transition CSS para usar cálculo manual
-                    filter: 'drop-shadow(0 0 15px rgba(0, 191, 255, 0.8))' // Azul cyan para diferenciarlo de jeff
+                    filter: 'drop-shadow(0 0 15px rgba(228, 92, 255, 0.8))' // Lila para diferenciarlo de Jeff
                   }}
                 >
                   <img 

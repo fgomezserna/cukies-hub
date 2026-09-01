@@ -76,7 +76,7 @@ function InactiveRow({
       className="grid min-h-[98px] grid-cols-[6.5rem_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-white/20 bg-[#0d0914]/88 text-[#aaa9a4] sm:grid-cols-[7.75rem_minmax(0,1fr)_15rem]"
     >
       <div className="flex items-center justify-center bg-[radial-gradient(circle,rgba(184,189,185,0.12),transparent_68%)]">
-        <span className="inline-flex h-[70px] w-[70px] items-center justify-center rounded-full border border-white/10 bg-[#111b19] text-[#777d79] shadow-[inset_0_0_20px_rgba(255,255,255,0.04)]">
+        <span className="inline-flex h-[70px] w-[70px] items-center justify-center rounded-full border border-white/10 bg-[#120a1c] text-[#777d79] shadow-[inset_0_0_20px_rgba(255,255,255,0.04)]">
           <Icon className="h-9 w-9" />
         </span>
       </div>
@@ -158,7 +158,7 @@ export default function TreasureHuntCompetitionsView() {
                   <span className={cn(
                     'rounded-[4px] border px-2 py-1 text-[10px] font-bold tracking-[0.12em]',
                     isActive
-                      ? 'border-[#2de9dd]/55 bg-[#07302e] text-[#49f2e7]'
+                      ? 'border-[var(--uki-lilac)]/55 bg-[var(--uki-lilac-soft)] text-[var(--uki-lilac)]'
                       : 'border-white/20 bg-white/5 text-[#aaa8a2]',
                   )}>
                     {isLoading ? 'CONSULTANDO' : isActive ? 'EN CURSO' : 'INACTIVO'}
@@ -197,7 +197,7 @@ export default function TreasureHuntCompetitionsView() {
 
             <div className="flex flex-col gap-3 border-t border-[#be8c2d]/45 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#37eee2]">Tu participación</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--uki-lilac)]">Tu participación</p>
                 <p className="mt-0.5 text-sm text-[#f0eee7]">
                   {eligibility?.attemptsRemaining ?? 0} intentos disponibles · {eligibility?.provisionalTickets ?? 0} tickets
                 </p>
@@ -205,14 +205,14 @@ export default function TreasureHuntCompetitionsView() {
               <div className="flex flex-wrap items-center gap-3">
                 <Link
                   href="/games/treasure-hunt"
-                  className="inline-flex min-h-11 items-center gap-3 rounded-[6px] border border-[#2de9dd]/65 bg-[#0d4d49] px-8 text-sm font-bold text-white transition hover:bg-[#11625d]"
+                  className="inline-flex min-h-11 items-center gap-3 rounded-[6px] border border-[var(--uki-lilac)]/65 bg-[var(--uki-lilac)] px-8 text-sm font-black text-[#120716] transition hover:brightness-110 active:scale-[0.98]"
                 >
                   <Gamepad2 className="h-4 w-4" /> Jugar torneo <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link href="/cukie-master" className="inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-[#ffc240] hover:text-white">
                   Gestionar staking <ArrowRight className="h-4 w-4" />
                 </Link>
-                <Link href="/games/treasure-hunt/rules" className="inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-[#35eee2] hover:text-white">
+                <Link href="/games/treasure-hunt/rules" className="inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-[var(--uki-lilac)] hover:text-white">
                   Ver reglas y ranking <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -231,7 +231,7 @@ export default function TreasureHuntCompetitionsView() {
           </h3>
 
           <div className="mt-4 space-y-3">
-            <Link href="/games/treasure-hunt/rankings" className="grid grid-cols-[54px_1fr_auto] items-center gap-3 rounded-[7px] border border-[#d09a36]/45 bg-[#0b1816] p-3 transition hover:border-[#d09a36]/75">
+            <Link href="/games/treasure-hunt/rankings" className="grid grid-cols-[54px_1fr_auto] items-center gap-3 rounded-[7px] border border-[#d09a36]/45 bg-[#120a1c] p-3 transition hover:border-[#d09a36]/75">
               <Image src="/brand/official/uki-token-cukies-world-coin.png" alt="" width={54} height={54} className="h-[54px] w-[54px] object-contain" />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold text-[#f0eee8]">{TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}</span>
@@ -242,8 +242,8 @@ export default function TreasureHuntCompetitionsView() {
             </Link>
 
             {inactiveCompetitions.map(({ title, Icon }) => (
-              <div key={title} aria-disabled="true" className="grid grid-cols-[52px_1fr] items-center gap-3 rounded-[7px] border border-white/15 bg-[#0a1514] p-3 text-[#8e918d]">
-                <span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/10 bg-[#101a18]">
+              <div key={title} aria-disabled="true" className="grid grid-cols-[52px_1fr] items-center gap-3 rounded-[7px] border border-white/15 bg-[#0d0914] p-3 text-[#8e918d]">
+                <span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/10 bg-[#160d21]">
                   <Icon className="h-7 w-7" />
                 </span>
                 <span>
@@ -254,14 +254,14 @@ export default function TreasureHuntCompetitionsView() {
             ))}
           </div>
 
-          <Link href="/games/treasure-hunt/rankings" className="mt-4 flex items-center justify-center gap-2 py-2 text-sm font-semibold text-[#35eee2]">
+          <Link href="/games/treasure-hunt/rankings" className="mt-4 flex items-center justify-center gap-2 py-2 text-sm font-semibold text-[var(--uki-lilac)]">
             Ver todas <ArrowRight className="h-4 w-4" />
           </Link>
         </aside>
       </div>
 
       <details className="mt-5 rounded-[8px] border border-white/15 bg-[#0d0914]/80">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[#35eee2]">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[var(--uki-lilac)]">
           Administrar nombre y participación
         </summary>
         <div className="border-t border-white/10 p-3 sm:p-4">

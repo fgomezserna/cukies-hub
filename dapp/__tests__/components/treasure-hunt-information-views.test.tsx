@@ -276,17 +276,23 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
   });
 
-  it('presenta las cinco secciones del reglamento aprobado en el PDF', () => {
+  it('presenta el reglamento semanal vigente y separa el torneo especial archivado', () => {
     const { container } = render(<TreasureHuntRulesView />);
 
-    expect(screen.getByText('Cómo participar')).toBeInTheDocument();
-    expect(screen.getByText('Pool de premios')).toBeInTheDocument();
-    expect(screen.getByText('¿Cómo se eligen los ganadores?')).toBeInTheDocument();
-    expect(screen.getByText('Entrega de los Premios')).toBeInTheDocument();
-    expect(screen.getByText('Descalificación')).toBeInTheDocument();
-    expect(screen.getByText(/Cada 2\.000 UKI que deposites en staking/i)).toBeInTheDocument();
-    expect(screen.getByText(/250.000 UKI de bote = 25 ganadores/i)).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
+    expect(screen.getByRole('heading', { name: 'Reglas de Treasure Hunt' })).toBeInTheDocument();
+    expect(screen.getByText('Qué necesitas para jugar')).toBeInTheDocument();
+    expect(screen.getByText('Créditos personales o créditos del pool')).toBeInTheDocument();
+    expect(screen.getByText('Cómo se calcula la recompensa de cada partida')).toBeInTheDocument();
+    expect(screen.getByText('Cómo funciona la clasificación semanal')).toBeInTheDocument();
+    expect(screen.getByText('Cómo se reparte el bote semanal')).toBeInTheDocument();
+    expect(screen.getByText('Abandonos, fallos y torneos especiales')).toBeInTheDocument();
+    expect(screen.getAllByText('10 créditos').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Solo cuentan las partidas pagadas con créditos del pool/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cada partida válida añade 2 UKI al bote/i)).toBeInTheDocument();
+    expect(screen.getByText(/Empiezas en #5/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Torneo Lanzamiento UKI/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cada 2\.000 UKI que deposites en staking/i)).not.toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[72rem]');
   });
 
   it('hace operativo el CTA principal de la preparación 1P', () => {

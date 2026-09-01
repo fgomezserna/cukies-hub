@@ -66,8 +66,8 @@ export function TreasureHuntCompetitionSummary({
       )}
     >
       <div className="px-3 py-3 sm:px-4 lg:px-5">
-        <div data-competition-title className="min-w-0 border-l-2 border-[#35eee2] pl-3 sm:pl-4">
-          <p className="font-mono text-[0.66rem] font-black uppercase tracking-[0.2em] text-[#35eee2]">
+        <div data-competition-title className="min-w-0 border-l-2 border-[var(--uki-lilac)] pl-3 sm:pl-4">
+          <p className="font-mono text-[0.66rem] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">
             {isPresale ? 'Competición oficial · Preventa UKI' : 'Competición oficial · Lanzamiento UKI'}
           </p>
           <h2
@@ -99,12 +99,12 @@ export function TreasureHuntCompetitionSummary({
             )}
           >
             {metrics.map(([label, value]) => (
-              <div key={label} className="min-w-0 bg-[#091513] px-1.5 py-2 text-center sm:px-3">
+              <div key={label} className="min-w-0 bg-[#0d0914] px-1.5 py-2 text-center sm:px-3">
                 <dt className="text-[0.48rem] font-bold uppercase leading-tight tracking-[0.035em] text-[#969994] min-[390px]:text-[0.52rem] sm:text-[0.62rem] sm:tracking-[0.08em]">
                   {label}
                 </dt>
                 <dd
-                  className="mt-1 truncate font-mono text-[0.68rem] font-black text-[#35eee2] min-[390px]:text-xs sm:text-base"
+                  className="mt-1 truncate font-mono text-[0.68rem] font-black text-[var(--uki-lilac)] min-[390px]:text-xs sm:text-base"
                   title={value}
                 >
                   {value}

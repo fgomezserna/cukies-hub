@@ -73,17 +73,17 @@ export default function TreasureHuntPlaySidebar({
         className="mt-2"
       />
 
-      <dl className="mt-4 overflow-hidden rounded-[8px] border border-white/20 bg-[#091513]">
+      <dl className="mt-4 overflow-hidden rounded-[8px] border border-white/20 bg-[#0d0914]">
         {[
           { label: 'Modo', value: '1P', Icon: Gamepad2, tone: 'text-[#ffc240]' },
           { label: 'Competición', value: TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME, Icon: Trophy, tone: 'text-[#ffc240]' },
-          { label: 'Intentos disponibles', value: String(attemptsRemaining), Icon: Medal, tone: eligibility?.disqualified ? 'text-red-300' : 'text-[#35eee2]' },
+          { label: 'Intentos disponibles', value: String(attemptsRemaining), Icon: Medal, tone: eligibility?.disqualified ? 'text-red-300' : 'text-[var(--uki-lilac)]' },
           { label: 'Uso de intentos', value: `${attemptsUsed} usado${attemptsUsed === 1 ? '' : 's'} · ${attemptsGranted} concedidos`, Icon: Medal, tone: 'text-[#f2eee7]' },
           { label: 'UKI en staking', value: eligibility ? formatTreasureHuntUkiRaw(eligibility.stakedUkiRaw) : 'Conecta tu wallet', Icon: Medal, tone: 'text-[#f2eee7]' },
           { label: 'Estado', value: statusLabel, Icon: CheckCircle2, tone: eligibility?.disqualified ? 'text-red-300' : 'text-[#61e598]' },
         ].map(({ label, value, Icon, tone }) => (
           <div key={label} className="flex min-h-[52px] items-center gap-3 border-b border-white/15 px-4 last:border-0">
-            <Icon className="h-5 w-5 shrink-0 text-[#35eee2]" />
+            <Icon className="h-5 w-5 shrink-0 text-[var(--uki-lilac)]" />
             <dt className="text-sm text-[#b6b5b0]">{label}</dt>
             <dd className={`ml-auto text-right text-sm font-bold ${tone}`}>{value}</dd>
           </div>
@@ -94,7 +94,7 @@ export default function TreasureHuntPlaySidebar({
         type="button"
         onClick={onStartSinglePlayer}
         disabled={!canStart}
-        className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-4 rounded-[7px] border border-[#47f4e9] bg-[linear-gradient(180deg,#1ca9a2,#0e6d68)] px-5 text-base font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-[#969994] disabled:shadow-none"
+        className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-4 rounded-[7px] border border-[var(--uki-lilac)] bg-[var(--uki-lilac)] px-5 text-base font-black text-[#120716] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_rgba(228,92,255,0.16)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-[#969994] disabled:shadow-none"
       >
         {actionLabel}
         <ArrowRight className="h-5 w-5" />
@@ -104,7 +104,7 @@ export default function TreasureHuntPlaySidebar({
         Gestionar staking UKI <ArrowRight className="h-4 w-4" />
       </Link>
 
-      <Link href="/games/treasure-hunt/rules" className="inline-flex min-h-11 items-center justify-center gap-3 text-sm font-semibold text-[#35eee2] hover:text-white">
+      <Link href="/games/treasure-hunt/rules" className="inline-flex min-h-11 items-center justify-center gap-3 text-sm font-semibold text-[var(--uki-lilac)] hover:text-white">
         Ver reglas <ArrowRight className="h-4 w-4" />
       </Link>
     </aside>

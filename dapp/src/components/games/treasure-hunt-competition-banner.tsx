@@ -26,14 +26,14 @@ export default function TreasureHuntCompetitionBanner() {
         <>
           <Link
             href="/games/treasure-hunt/rules"
-            className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-white/20 px-3 py-2 text-xs font-black text-[#f2eee7] transition hover:border-[#35eee2]/55"
+            className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-white/20 px-3 py-2 text-xs font-black text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac)]/55"
           >
             <BookOpenText className="h-3.5 w-3.5" aria-hidden="true" />
             Ver reglas
           </Link>
           <Link
             href="/games/treasure-hunt/rankings"
-            className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-[#35eee2]/45 bg-[#35eee2]/10 px-3 py-2 text-xs font-black text-[#35eee2] transition hover:bg-[#35eee2]/15"
+            className="inline-flex min-h-9 items-center gap-2 rounded-[6px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 py-2 text-xs font-black text-[var(--uki-lilac)] transition hover:bg-[var(--uki-lilac)]/15"
           >
             <Medal className="h-3.5 w-3.5" aria-hidden="true" />
             Rankings

@@ -79,9 +79,9 @@ export default function TreasureHuntExperienceShell({
   return (
     <section
       data-treasure-hunt-shell
-      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030c0c] text-[#f2eee7]"
+      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#09060f] text-[var(--uki-cream)]"
     >
-      <header className="relative z-40 shrink-0 border-b border-[#2ce8dc]/20 bg-[#030c0c]/95">
+      <header className="relative z-40 shrink-0 border-b border-[var(--uki-lilac)]/20 bg-[#09060f]/95">
         <div
           data-treasure-hunt-header-art
           className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block"
@@ -98,13 +98,13 @@ export default function TreasureHuntExperienceShell({
 
         <div className="relative w-full px-3 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-4 lg:px-8 lg:pb-5">
           <p className="text-xs font-medium text-[#aaa8a2] sm:text-sm">
-            <Link href="/games" className="transition hover:text-[#37eee2]">Juegos</Link>
+            <Link href="/games" className="transition hover:text-[var(--uki-lilac)]">Juegos</Link>
             <span className="mx-3 text-[#6f7470]">/</span>
-            <span className="text-[#37eee2]">Treasure Hunt</span>
+            <span className="text-[var(--uki-lilac)]">Treasure Hunt</span>
           </p>
 
           <div className="mt-2 flex min-w-0 items-center gap-3 pr-12 sm:mt-3 sm:gap-5 sm:pr-0">
-            <div className="relative hidden h-[74px] w-[74px] shrink-0 overflow-hidden rounded-[14px] border border-[#bd8f32]/25 bg-[#10201c] shadow-[inset_0_0_24px_rgba(210,159,55,0.12)] lg:block">
+            <div className="relative hidden h-[74px] w-[74px] shrink-0 overflow-hidden rounded-[14px] border border-[var(--uki-lilac-border)] bg-[#160d21] shadow-[inset_0_0_24px_rgba(228,92,255,0.12)] lg:block">
               <Image
                 src="/brand/official/uki-token-cukies-world-coin.png"
                 alt=""
@@ -138,7 +138,7 @@ export default function TreasureHuntExperienceShell({
 
         <nav
           aria-label="Secciones de Treasure Hunt"
-          className="border-t border-[#2ce8dc]/16 bg-[#0d0914]/88"
+          className="border-t border-[var(--uki-lilac)]/16 bg-[#0d0914]/88"
         >
           <div className="flex min-w-max overflow-x-auto px-1 sm:px-6 lg:px-8">
             {tabs.map(({ href, label }) => {
@@ -151,13 +151,13 @@ export default function TreasureHuntExperienceShell({
                   className={cn(
                     'relative inline-flex min-h-[46px] min-w-[5.25rem] flex-1 items-center justify-center border-r border-[#d9e4df]/10 px-3 text-xs font-semibold transition-colors first:border-l sm:min-w-[10rem] sm:px-5 sm:text-sm',
                     active
-                      ? 'text-[#35eee2]'
+                      ? 'text-[var(--uki-lilac)]'
                       : 'text-[#aaa8a2] hover:text-[#f3efe7]',
                   )}
                 >
                   {label}
                   {active ? (
-                    <span className="absolute inset-x-0 bottom-0 h-[2px] bg-[#35eee2] shadow-[0_0_12px_rgba(53,238,226,0.55)]" />
+                    <span className="absolute inset-x-0 bottom-0 h-[2px] bg-[var(--uki-lilac)] shadow-[0_0_12px_rgba(228,92,255,0.55)]" />
                   ) : null}
                 </Link>
               );

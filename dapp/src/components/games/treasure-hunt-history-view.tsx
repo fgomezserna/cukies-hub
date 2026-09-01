@@ -111,7 +111,7 @@ function ArchiveEntries({
             <div className="flex items-center gap-3">
               <span className="font-mono font-black text-[#ffc240]">#{entry.rank}</span>
               <p className="min-w-0 flex-1 truncate font-bold text-[#f2eee7]">{entry.playerAlias}</p>
-              <p className="font-mono text-lg font-black text-[#35eee2]">
+              <p className="font-mono text-lg font-black text-[var(--uki-lilac)]">
                 <span className="sr-only">Puntuación: </span>
                 {entry.score.toLocaleString('es-ES')}
               </p>
@@ -149,7 +149,7 @@ function ArchiveEntries({
               <tr key={entry.publicEntryId}>
                 <td className="px-5 py-4 font-mono font-black text-[#ffc240]">#{entry.rank}</td>
                 <td className="px-5 py-4 font-bold text-[#f2eee7]">{entry.playerAlias}</td>
-                <td className="px-5 py-4 text-right font-mono font-black text-[#35eee2]">
+                <td className="px-5 py-4 text-right font-mono font-black text-[var(--uki-lilac)]">
                   {entry.score.toLocaleString('es-ES')}
                 </td>
                 <td className="px-5 py-4 text-right font-mono text-[#aaa8a2]">
@@ -210,7 +210,7 @@ export default function TreasureHuntHistoryView() {
         <button
           type="button"
           onClick={reloadList}
-          className="min-h-10 rounded-[5px] px-2 font-bold text-[#35eee2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
+          className="min-h-10 rounded-[5px] px-2 font-bold text-[var(--uki-lilac)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
         >
           Reintentar
         </button>
@@ -221,7 +221,7 @@ export default function TreasureHuntHistoryView() {
   if (archives.length === 0) {
     return (
       <div className="flex min-h-56 flex-col items-center justify-center px-5 py-10 text-center">
-        <Archive className="h-8 w-8 text-[#35eee2]" aria-hidden="true" />
+        <Archive className="h-8 w-8 text-[var(--uki-lilac)]" aria-hidden="true" />
         <h3 className="mt-4 font-headline text-lg font-black text-[#f2eee7]">Aún no hay ediciones publicadas</h3>
         <p className="mt-2 max-w-md text-sm text-[#969994]">
           Las clasificaciones cerradas aparecerán aquí cuando estén disponibles.
@@ -240,7 +240,7 @@ export default function TreasureHuntHistoryView() {
           id="competition-archive"
           value={selectedCampaignId ?? ''}
           onChange={(event) => handleCampaignChange(event.target.value)}
-          className="mt-2 min-h-11 w-full rounded-[6px] border border-white/20 bg-[#0d0914] px-3 text-sm font-bold text-[#f2eee7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
+          className="mt-2 min-h-11 w-full rounded-[6px] border border-white/20 bg-[#0d0914] px-3 text-sm font-bold text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
         >
           {archives.map((item) => (
             <option key={item.campaignId} value={item.campaignId}>
@@ -258,7 +258,7 @@ export default function TreasureHuntHistoryView() {
           <button
             type="button"
             onClick={reloadDetail}
-            className="min-h-10 rounded-[5px] px-2 font-bold text-[#35eee2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]"
+            className="min-h-10 rounded-[5px] px-2 font-bold text-[var(--uki-lilac)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
           >
             Reintentar
           </button>
@@ -270,7 +270,7 @@ export default function TreasureHuntHistoryView() {
           <header className="border-b border-white/15 px-4 py-5 sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] font-black uppercase tracking-[0.15em] text-[#35eee2]">
+                <p className="font-mono text-[10px] font-black uppercase tracking-[0.15em] text-[var(--uki-lilac)]">
                   Edición cerrada
                 </p>
                 <h3 className="mt-1 font-headline text-xl font-black tracking-[-0.02em] text-[#f1eee8] sm:text-2xl">
@@ -282,7 +282,7 @@ export default function TreasureHuntHistoryView() {
                 'rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]',
                 archive.stage === 'provisional'
                   ? 'border-[#ffc240]/45 bg-[#ffc240]/10 text-[#ffc240]'
-                  : 'border-[#35eee2]/45 bg-[#35eee2]/10 text-[#35eee2]',
+                  : 'border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]',
               )}>
                 {archive.stage === 'provisional' ? 'Provisional' : 'Final'}
               </span>
@@ -302,7 +302,7 @@ export default function TreasureHuntHistoryView() {
             ] as const).map(([label, value]) => (
               <div key={label} className="min-w-0 bg-[#0d0914] px-4 py-3 sm:px-5 sm:py-4">
                 <dt className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#969994]">{label}</dt>
-                <dd className="mt-1 truncate font-mono text-base font-black text-[#35eee2] sm:text-lg" title={value}>
+                <dd className="mt-1 truncate font-mono text-base font-black text-[var(--uki-lilac)] sm:text-lg" title={value}>
                   {value}
                 </dd>
               </div>
@@ -311,7 +311,7 @@ export default function TreasureHuntHistoryView() {
 
           {entries.length === 0 ? (
             <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
-              <Archive className="h-8 w-8 text-[#35eee2]" aria-hidden="true" />
+              <Archive className="h-8 w-8 text-[var(--uki-lilac)]" aria-hidden="true" />
               <h3 className="mt-4 font-headline text-lg font-black text-[#f2eee7]">Esta edición no tiene entradas clasificadas</h3>
             </div>
           ) : (
@@ -328,7 +328,7 @@ export default function TreasureHuntHistoryView() {
                   type="button"
                   disabled={pagination.page <= 1}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  className="min-h-10 shrink-0 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="min-h-10 shrink-0 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[var(--uki-cream)] hover:border-[var(--uki-lilac)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   Anterior
                 </button>
@@ -340,10 +340,10 @@ export default function TreasureHuntHistoryView() {
                     aria-label={`Página ${pageNumber}`}
                     onClick={() => setPage(pageNumber)}
                     className={cn(
-                      'min-h-10 min-w-10 shrink-0 rounded-[5px] border px-2 font-mono text-xs font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2]',
+                      'min-h-10 min-w-10 shrink-0 rounded-[5px] border px-2 font-mono text-xs font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]',
                       pagination.page === pageNumber
-                        ? 'border-[#35eee2]/60 bg-[#35eee2]/15 text-[#35eee2]'
-                        : 'border-white/15 text-[#aaa8a2] hover:border-[#35eee2]/45',
+                        ? 'border-[var(--uki-lilac)]/60 bg-[var(--uki-lilac)]/15 text-[var(--uki-lilac)]'
+                        : 'border-white/15 text-[#aaa8a2] hover:border-[var(--uki-lilac)]/45',
                     )}
                   >
                     {pageNumber}
@@ -353,7 +353,7 @@ export default function TreasureHuntHistoryView() {
                   type="button"
                   disabled={pagination.page >= pagination.totalPages}
                   onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
-                  className="min-h-10 shrink-0 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[#f2eee7] hover:border-[#35eee2]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#35eee2] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="min-h-10 shrink-0 rounded-[5px] border border-white/15 px-3 text-xs font-bold text-[var(--uki-cream)] hover:border-[var(--uki-lilac)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   Siguiente
                 </button>

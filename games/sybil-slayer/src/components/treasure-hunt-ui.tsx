@@ -41,7 +41,7 @@ interface HudMetricProps {
   label: string;
   value: React.ReactNode;
   icon?: React.ReactNode;
-  tone?: 'default' | 'teal' | 'warning' | 'danger' | 'success';
+  tone?: 'default' | 'lilac' | 'warning' | 'danger' | 'success';
   className?: string;
 }
 

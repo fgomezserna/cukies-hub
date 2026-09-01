@@ -4,7 +4,7 @@ import TreasureHuntRulesView from '@/components/games/treasure-hunt-rules-view';
 
 export const metadata: Metadata = {
   title: 'Reglas de Treasure Hunt | Cukies World',
-  description: 'Reglas, elegibilidad y recompensas de la competición de Treasure Hunt.',
+  description: 'Coste por partida, uso de créditos, clasificación y reparto semanal de Treasure Hunt.',
 };
 
 export default function TreasureHuntRulesPage() {

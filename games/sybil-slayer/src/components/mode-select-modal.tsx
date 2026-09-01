@@ -145,7 +145,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             textAlign: 'center',
           }}
         >
-          <p className="th-screen-kicker">Torneo Lanzamiento UKI</p>
+          <p className="th-screen-kicker">Torneo especial</p>
           <h2
             id="treasure-no-attempts-title"
             className="th-screen-title"
@@ -283,11 +283,11 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
             style={{
               ...cardStyle,
               borderColor:
-                highlightedMode === 'single' ? 'var(--th-teal)' : 'rgba(215, 163, 67, 0.55)',
+                highlightedMode === 'single' ? 'var(--th-lilac)' : 'rgba(215, 163, 67, 0.55)',
               boxShadow:
                 highlightedMode === 'single'
-                  ? 'inset 0 0 40px rgba(33, 221, 212, 0.08), 0 0 24px rgba(33, 221, 212, 0.13)'
-                  : 'inset 0 0 28px rgba(33, 221, 212, 0.025)',
+                  ? 'inset 0 0 40px rgba(228, 92, 255, 0.08), 0 0 24px rgba(228, 92, 255, 0.13)'
+                  : 'inset 0 0 28px rgba(228, 92, 255, 0.025)',
               transform: highlightedMode === 'single' ? 'translateY(-2px)' : 'none',
             }}
           >
@@ -302,13 +302,13 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               <div>
                 <span
                   style={{
-                    color: 'var(--th-teal)',
+                    color: 'var(--th-lilac)',
                     font: "800 15px/20px var(--th-font-ui)",
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
                   }}
                 >
-                  Preventa UKI
+                  Partida individual
                 </span>
                 <h3
                   id="single-mode-title"
@@ -332,8 +332,8 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   flex: '0 0 auto',
                   color: 'var(--th-cream)',
                   font: "800 22px/1 var(--th-font-ui)",
-                  border: '2px solid var(--th-teal)',
-                  background: 'rgba(33, 221, 212, 0.12)',
+                  border: '2px solid var(--th-lilac)',
+                  background: 'rgba(228, 92, 255, 0.12)',
                   transform: 'rotate(45deg)',
                 }}
               >
@@ -357,7 +357,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   width: 230,
                   height: 130,
                   borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(33, 221, 212, 0.18), transparent 68%)',
+                  background: 'radial-gradient(circle, rgba(228, 92, 255, 0.18), transparent 68%)',
                 }}
               />
               <Image
@@ -416,12 +416,12 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               ...cardStyle,
               borderColor:
                 highlightedMode === 'multiplayer'
-                  ? 'var(--th-teal)'
+                  ? 'var(--th-lilac)'
                   : 'rgba(215, 163, 67, 0.55)',
               boxShadow:
                 highlightedMode === 'multiplayer'
-                  ? 'inset 0 0 40px rgba(33, 221, 212, 0.08), 0 0 24px rgba(33, 221, 212, 0.13)'
-                  : 'inset 0 0 28px rgba(33, 221, 212, 0.025)',
+                  ? 'inset 0 0 40px rgba(228, 92, 255, 0.08), 0 0 24px rgba(228, 92, 255, 0.13)'
+                  : 'inset 0 0 28px rgba(228, 92, 255, 0.025)',
               transform: highlightedMode === 'multiplayer' ? 'translateY(-2px)' : 'none',
             }}
           >
@@ -436,13 +436,13 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
               <div>
                 <span
                   style={{
-                    color: multiplayerInteractive ? 'var(--th-teal)' : 'var(--th-gold-light)',
+                    color: multiplayerInteractive ? 'var(--th-lilac)' : 'var(--th-gold-light)',
                     font: "800 15px/20px var(--th-font-ui)",
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
                   }}
                 >
-                  1 contra 1 · staging
+                  {multiplayerInteractive ? 'Duelo entre jugadores' : 'Modo no disponible'}
                 </span>
                 <h3
                   id="multiplayer-mode-title"
@@ -466,9 +466,9 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   flex: '0 0 auto',
                   color: 'var(--th-cream)',
                   font: "800 22px/1 var(--th-font-ui)",
-                  border: `2px solid ${multiplayerInteractive ? 'var(--th-teal)' : 'var(--th-gold)'}`,
+                  border: `2px solid ${multiplayerInteractive ? 'var(--th-lilac)' : 'var(--th-gold)'}`,
                   background: multiplayerInteractive
-                    ? 'rgba(33, 221, 212, 0.12)'
+                    ? 'rgba(228, 92, 255, 0.12)'
                     : 'rgba(215, 163, 67, 0.1)',
                   transform: 'rotate(45deg)',
                 }}
