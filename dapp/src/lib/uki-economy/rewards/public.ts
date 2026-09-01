@@ -233,6 +233,7 @@ function assertClaimProjectionUnsafe(input: {
   if (
     !batch
     || (batch.status !== 'published' && batch.status !== 'closed')
+    || (batch.chainId !== 56 && batch.chainId !== 97)
     || batch.batchId.toLowerCase() !== claim.batchId.toLowerCase()
     || batch.distributorAddress.toLowerCase() !== claim.contractAddress.toLowerCase()
     || !proof
@@ -289,6 +290,131 @@ function validCursor(value?: string | null) {
     throw new DomainValidationError('cursor no es valido.');
   }
   return cursor;
+}
+
+type WalletAmountSummary = {
+  allocatedCount: number;
+  blockedCount: number;
+  allocatedRaw: { toString(): string };
+  blockedRaw: { toString(): string };
+  invalidCount: number;
+};
+
+type WalletClaimSummary = {
+  claimCount: number;
+  claimedRaw: { toString(): string };
+  invalidCount: number;
+};
+
+function amountSummaryPipeline(walletNormalized: string) {
+  return [
+    { $match: { walletNormalized } },
+    {
+      $project: {
+        status: 1,
+        amountDecimal: {
+          $convert: { input: '$amountRaw', to: 'decimal', onError: null, onNull: null },
+        },
+        validAmount: {
+          $and: [
+            { $eq: [{ $type: '$amountRaw' }, 'string'] },
+            {
+              $regexMatch: {
+                input: { $convert: { input: '$amountRaw', to: 'string', onError: '' } },
+                regex: '^(0|[1-9][0-9]*)$',
+              },
+            },
+          ],
+        },
+        validStatus: { $in: ['$status', ['allocated', 'blocked']] },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        allocatedCount: { $sum: { $cond: [{ $eq: ['$status', 'allocated'] }, 1, 0] } },
+        blockedCount: { $sum: { $cond: [{ $eq: ['$status', 'blocked'] }, 1, 0] } },
+        allocatedRaw: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', 'allocated'] },
+              { $ifNull: ['$amountDecimal', 0] },
+              0,
+            ],
+          },
+        },
+        blockedRaw: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', 'blocked'] },
+              { $ifNull: ['$amountDecimal', 0] },
+              0,
+            ],
+          },
+        },
+        invalidCount: {
+          $sum: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$amountDecimal', null] },
+                  { $eq: ['$validAmount', false] },
+                  { $eq: ['$validStatus', false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ];
+}
+
+function claimSummaryPipeline(walletNormalized: string) {
+  return [
+    { $match: { walletNormalized } },
+    {
+      $project: {
+        amountDecimal: {
+          $convert: { input: '$amountRaw', to: 'decimal', onError: null, onNull: null },
+        },
+        validAmount: {
+          $and: [
+            { $eq: [{ $type: '$amountRaw' }, 'string'] },
+            {
+              $regexMatch: {
+                input: { $convert: { input: '$amountRaw', to: 'string', onError: '' } },
+                regex: '^[1-9][0-9]*$',
+              },
+            },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        claimCount: { $sum: 1 },
+        claimedRaw: { $sum: { $ifNull: ['$amountDecimal', 0] } },
+        invalidCount: {
+          $sum: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$amountDecimal', null] },
+                  { $eq: ['$validAmount', false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ];
 }
 
 export function assertRewardAllocationManifestBindings(
@@ -352,7 +478,13 @@ export async function listWalletRewardStatus(input: {
     throw new DomainConflictError('La vista de rewards contiene una allocation manipulada.');
   }
   const sourceIds = [...new Set(page.map((allocation) => allocation.sourceId))];
-  const [claims, openIncidents, sourceManifests] = await Promise.all([
+  const [
+    claims,
+    openIncidents,
+    sourceManifests,
+    allocationSummaryRows,
+    claimSummaryRows,
+  ] = await Promise.all([
     db.collection<RewardClaim>('reward_claims')
       .find({ walletNormalized })
       .sort({ indexedAt: -1, _id: -1 })
@@ -369,7 +501,20 @@ export async function listWalletRewardStatus(input: {
       : db.collection<RewardSourceManifest>('reward_source_manifests')
         .find({ sourceId: { $in: sourceIds } })
         .toArray(),
+    db.collection<RewardAllocation>('reward_allocations')
+      .aggregate<WalletAmountSummary>(amountSummaryPipeline(walletNormalized))
+      .toArray(),
+    db.collection<RewardClaim>('reward_claims')
+      .aggregate<WalletClaimSummary>(claimSummaryPipeline(walletNormalized))
+      .toArray(),
   ]);
+  const allocationSummary = allocationSummaryRows[0];
+  const claimSummary = claimSummaryRows[0];
+  if ((allocationSummary?.invalidCount ?? 0) > 0 || (claimSummary?.invalidCount ?? 0) > 0) {
+    throw new DomainConflictError('El resumen de rewards contiene importes no canonicos.');
+  }
+  const totalAllocatedRaw = BigInt(allocationSummary?.allocatedRaw.toString() ?? '0');
+  const totalClaimedRaw = BigInt(claimSummary?.claimedRaw.toString() ?? '0');
   assertRewardAllocationManifestBindings(page, sourceManifests);
   const batchIds = [...new Set(claims.map((claim) => claim.batchId))] as `0x${string}`[];
   const claimIds = claims.map((claim) => claim.eventId);
@@ -480,6 +625,10 @@ export async function listWalletRewardStatus(input: {
     })];
   });
   const claimables = publishedRewards.filter((reward) => reward.onChainStatus === 'claimable');
+  const scheduledRewards = publishedRewards.filter(
+    (reward) => reward.onChainStatus === 'scheduled',
+  );
+  const expiredRewards = publishedRewards.filter((reward) => reward.onChainStatus === 'expired');
   let allocatedRaw = BigInt(0);
   for (const allocation of page) {
     if (!/^(0|[1-9][0-9]*)$/.test(allocation.amountRaw)) {
@@ -487,7 +636,15 @@ export async function listWalletRewardStatus(input: {
     }
     if (allocation.status === 'allocated') allocatedRaw += BigInt(allocation.amountRaw);
   }
-  const blockedAllocations = page.filter((allocation) => allocation.status === 'blocked').length;
+  const publishedOutstandingRaw = publishedRewards.reduce(
+    (sum, reward) => sum + BigInt(reward.batch.amountRaw),
+    BigInt(0),
+  );
+  const accountedRaw = totalClaimedRaw + publishedOutstandingRaw;
+  const pendingRaw = totalAllocatedRaw > accountedRaw
+    ? totalAllocatedRaw - accountedRaw
+    : BigInt(0);
+  const blockedAllocations = allocationSummary?.blockedCount ?? 0;
   return {
     walletNormalized,
     allocations: page.map((allocation) => ({
@@ -501,16 +658,30 @@ export async function listWalletRewardStatus(input: {
     })),
     claims: claims.map((claim) => ({
       batchId: claim.batchId,
+      chainId: batchById.get(claim.batchId.toLowerCase())!.chainId as 56 | 97,
       amountRaw: claim.amountRaw,
       transactionHash: claim.transactionHash,
       blockNumber: claim.blockNumber,
       indexedAt: claim.indexedAt,
     })),
     pageAllocatedRaw: allocatedRaw.toString(),
+    totalAllocatedRaw: totalAllocatedRaw.toString(),
+    totalClaimedRaw: totalClaimedRaw.toString(),
+    pendingRaw: pendingRaw.toString(),
     claimableRaw: claimables.reduce(
       (sum, claimable) => sum + BigInt(claimable.batch.amountRaw),
       BigInt(0),
     ).toString(),
+    scheduledRaw: scheduledRewards.reduce(
+      (sum, reward) => sum + BigInt(reward.batch.amountRaw),
+      BigInt(0),
+    ).toString(),
+    expiredRaw: expiredRewards.reduce(
+      (sum, reward) => sum + BigInt(reward.batch.amountRaw),
+      BigInt(0),
+    ).toString(),
+    allocationCount: allocationSummary?.allocatedCount ?? 0,
+    claimCount: claimSummary?.claimCount ?? 0,
     claimPublished: publishedRewards.length > 0,
     claimables,
     publishedRewards,

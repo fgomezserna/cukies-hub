@@ -158,6 +158,19 @@ describe('public reward claimable', () => {
                 ? [subject.publicationEvent]
                 : [],
         ),
+        aggregate: () => cursor(
+          name === 'reward_allocations'
+            ? [{
+              allocatedCount: 2,
+              blockedCount: 1,
+              allocatedRaw: '10000',
+              blockedRaw: '500',
+              invalidCount: 0,
+            }]
+            : name === 'reward_claims'
+              ? [{ claimCount: 1, claimedRaw: '2500', invalidCount: 0 }]
+              : [],
+        ),
         countDocuments: async () => 0,
       }),
     });
@@ -165,6 +178,12 @@ describe('public reward claimable', () => {
     try {
       const result = await listWalletRewardStatus({ walletAddress: WALLET });
       expect(result).toMatchObject({
+        totalAllocatedRaw: '10000',
+        totalClaimedRaw: '2500',
+        pendingRaw: '0',
+        allocationCount: 2,
+        claimCount: 1,
+        blockedAllocations: 1,
         claimableRaw: '7500',
         claimPublished: true,
         claimables: [{
