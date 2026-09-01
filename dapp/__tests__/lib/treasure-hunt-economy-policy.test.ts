@@ -7,6 +7,7 @@ import {
   isTreasureHuntLowScore,
   reserveTreasureHuntPoolQuota,
   shouldReplaceTreasureHuntWeeklyBest,
+  treasureHuntResultEligibility,
   treasureHuntScoreOrderKey,
   validateTreasureHuntEvidence,
 } from "@/lib/uki-economy/game-economy/treasure-hunt-policy";
@@ -141,6 +142,33 @@ describe("Treasure Hunt economy policy", () => {
     expect(treasureHuntScoreOrderKey("100")).toEqual({
       scoreDigits: 3,
       scoreRaw: "100",
+    });
+  });
+
+  it("only ranks settled games paid with pool credits", () => {
+    expect(treasureHuntResultEligibility({
+      status: "settled",
+      creditSource: "pool",
+    })).toEqual({
+      leaderboardEligible: true,
+      rewardEligible: true,
+      jackpotEligible: true,
+    });
+    expect(treasureHuntResultEligibility({
+      status: "settled",
+      creditSource: "own",
+    })).toEqual({
+      leaderboardEligible: false,
+      rewardEligible: true,
+      jackpotEligible: false,
+    });
+    expect(treasureHuntResultEligibility({
+      status: "forfeited",
+      creditSource: "pool",
+    })).toEqual({
+      leaderboardEligible: false,
+      rewardEligible: false,
+      jackpotEligible: false,
     });
   });
 

@@ -107,7 +107,7 @@ describe('TreasureHuntCompetitionBanner', () => {
     expect(screen.getByText('10 créditos')).toBeInTheDocument();
     expect(screen.getByText('480 créditos')).toBeInTheDocument();
     expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Torneos pasados/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Ver semana actual/ })).toHaveAttribute(
       'href',
       '/games/treasure-hunt/rankings',
     );

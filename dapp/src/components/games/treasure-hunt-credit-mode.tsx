@@ -26,13 +26,13 @@ function CreditMetric({
 }) {
   return (
     <div className="min-w-0 px-4 py-3.5 sm:px-5">
-      <dt className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">
+      <dt className="text-[10px] font-black uppercase tracking-[0.14em] text-[#969994]">
         {label}
       </dt>
-      <dd className="mt-1 font-headline text-lg font-black tabular-nums text-[var(--uki-cream)]">
+      <dd className="mt-1 font-headline text-lg font-black tabular-nums text-[#f2eee7]">
         {value}
       </dd>
-      <p className="mt-0.5 text-xs font-semibold text-[var(--uki-muted)]">{detail}</p>
+      <p className="mt-0.5 text-xs font-semibold text-[#969994]">{detail}</p>
     </div>
   );
 }
@@ -49,35 +49,35 @@ export function TreasureHuntCreditModeBanner() {
   return (
     <section
       aria-labelledby="treasure-hunt-credit-mode-title"
-      className="overflow-hidden rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#100817]/96 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+      className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
     >
       <div className="grid gap-5 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0 border-l-2 border-[var(--uki-lilac)] pl-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--uki-lilac)]">
-            Modo actual · Créditos
+        <div className="min-w-0 border-l-2 border-[#35eee2] pl-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#35eee2]">
+            Partidas semanales · Créditos
           </p>
           <h2
             id="treasure-hunt-credit-mode-title"
-            className="mt-1.5 font-headline text-2xl font-black text-[var(--uki-cream)]"
+            className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]"
           >
             Juega con tus créditos
           </h2>
-          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-            Cada partida usa el coste vigente de tu saldo. Al empezar se asigna un Cukie y tu mejor resultado entra en el ranking semanal.
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[#aaa8a2]">
+            Cada partida genera su reparto. Si usa créditos del pool, además tu mejor puntuación entra en la competición semanal.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Link
             href="/games/treasure-hunt/rankings"
-            className="inline-flex min-h-10 items-center gap-2 rounded-[7px] border border-white/15 px-3.5 text-xs font-black text-[var(--uki-cream)] transition-colors hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center gap-2 rounded-[6px] border border-white/20 px-3.5 text-xs font-black text-[#f2eee7] transition-colors hover:border-[#35eee2]/55 hover:text-[#35eee2] active:scale-[0.98]"
           >
             <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
-            Torneos pasados
+            Ver semana actual
           </Link>
           <Link
             href="/credits"
-            className="inline-flex min-h-10 items-center gap-2 rounded-[7px] bg-[var(--uki-lilac)] px-3.5 text-xs font-black text-[#100817] transition-transform hover:brightness-105 active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center gap-2 rounded-[6px] border border-[#35eee2]/55 bg-[#0d5d57] px-3.5 text-xs font-black text-white transition-transform hover:bg-[#137069] active:scale-[0.98]"
           >
             Gestionar créditos
             <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
@@ -85,7 +85,7 @@ export function TreasureHuntCreditModeBanner() {
         </div>
       </div>
 
-      <dl className="grid border-t border-white/10 bg-white/[0.025] sm:grid-cols-3 sm:divide-x sm:divide-white/10">
+      <dl className="grid border-t border-white/15 bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-white/15">
         <CreditMetric label="Coste por partida" value={costLabel} detail="Se descuenta al iniciar" />
         <CreditMetric
           label="Tu saldo para jugar"
@@ -118,13 +118,13 @@ function SidebarRow({
 }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-white/10 px-4 py-3.5 last:border-b-0">
-      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] text-[var(--uki-lilac)]">
+      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-full border border-[#35eee2]/35 bg-[#35eee2]/10 text-[#35eee2]">
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="text-xs font-semibold text-[var(--uki-muted)]">{label}</dt>
-        <dd className="mt-0.5 text-sm font-black text-[var(--uki-cream)]">{value}</dd>
-        <p className="mt-0.5 text-[11px] font-semibold leading-snug text-[var(--uki-muted)]">{detail}</p>
+        <dt className="text-xs font-semibold text-[#969994]">{label}</dt>
+        <dd className="mt-0.5 text-sm font-black text-[#f2eee7]">{value}</dd>
+        <p className="mt-0.5 text-[11px] font-semibold leading-snug text-[#969994]">{detail}</p>
       </div>
     </div>
   );
@@ -151,18 +151,18 @@ export function TreasureHuntCreditModeSidebar({
           : `Te faltan ${access.missingCredits} créditos`;
 
   return (
-    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#100817]/96 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">
+    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#35eee2]">
         Partida individual
       </p>
-      <h2 className="mt-1.5 font-headline text-2xl font-black text-[var(--uki-cream)]">
+      <h2 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">
         Juega con créditos
       </h2>
-      <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-        El torneo terminó. Tus nuevas partidas usan créditos y cuentan para el ranking y los premios semanales.
+      <p className="mt-2 text-sm font-semibold leading-relaxed text-[#aaa8a2]">
+        Cada partida genera reparto. Solo las que usan créditos del pool entran también en el ranking semanal.
       </p>
 
-      <dl className="mt-5 overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.025]">
+      <dl className="mt-5 overflow-hidden rounded-[8px] border border-white/15 bg-black/10">
         <SidebarRow
           icon={<Coin className="h-4 w-4" weight="fill" aria-hidden="true" />}
           label="Coste"
@@ -192,8 +192,8 @@ export function TreasureHuntCreditModeSidebar({
         <SidebarRow
           icon={<Trophy className="h-4 w-4" weight="fill" aria-hidden="true" />}
           label="Resultado"
-          value="Ranking semanal"
-          detail="Tu mejor puntuación participa en los premios"
+          value="Recompensa confirmada al terminar"
+          detail="El ranking depende del origen de los créditos"
         />
       </dl>
 
@@ -201,23 +201,23 @@ export function TreasureHuntCreditModeSidebar({
         type="button"
         onClick={onStartSinglePlayer}
         disabled={disabled}
-        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[8px] bg-[var(--uki-lilac)] px-4 text-sm font-black uppercase text-[#100817] transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-[var(--uki-muted)]"
+        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[7px] border border-[#47f4e9] bg-[linear-gradient(180deg,#1ca9a2,#0e6d68)] px-4 text-sm font-black uppercase text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-[#969994] disabled:shadow-none"
       >
         {actionLabel}
         {!access.isLoading ? <ArrowRight className="h-5 w-5" weight="bold" aria-hidden="true" /> : null}
       </button>
 
       {access.walletConnected && !access.isLoading && !access.isError && !access.blocked && !access.canPlay ? (
-        <p role="status" className="mt-3 text-center text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
+        <p role="status" className="mt-3 text-center text-xs font-semibold leading-relaxed text-[#969994]">
           Necesitas créditos disponibles para iniciar. Puedes conservar más en el próximo reparto diario.
         </p>
       ) : null}
 
-      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">
+      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[#35eee2] hover:text-white">
         Gestionar créditos <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
       </Link>
-      <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center justify-center gap-2 text-sm font-semibold text-[var(--uki-muted)] hover:text-[var(--uki-cream)]">
-        Ver torneos pasados <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
+      <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center justify-center gap-2 text-sm font-semibold text-[#aaa8a2] hover:text-white">
+        Ver competición semanal <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
       </Link>
     </aside>
   );

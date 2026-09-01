@@ -27,9 +27,11 @@ jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
   BarChart3: () => null,
   BookOpenText: () => null,
+  CalendarClock: () => null,
   CalendarDays: () => null,
   CheckCircle2: () => null,
   CircleDollarSign: () => null,
+  Coins: () => null,
   Clock3: () => null,
   Flag: () => null,
   Gamepad2: () => null,
@@ -59,6 +61,38 @@ jest.mock('@phosphor-icons/react', () => ({
 
 jest.mock('@/hooks/use-treasure-hunt-credit-access', () => ({
   useTreasureHuntCreditAccess: () => mockCreditAccess,
+}));
+
+jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
+  useTreasureHuntWeeklyOverview: () => ({
+    data: {
+      period: {
+        periodId: 'th-week:2026-08-31T14:00:00.000Z',
+        startsAt: '2026-08-31T14:00:00.000Z',
+        endsAt: '2026-09-07T14:00:00.000Z',
+      },
+      poolUkiRaw: '2000000000000000000',
+      totalRankedWallets: 21,
+      entries: [{
+        rank: 1,
+        alias: 'CukiePlayer',
+        scoreRaw: '12500',
+        achievedAt: '2026-09-01T12:00:00.000Z',
+        cukieSource: 'own',
+        isMe: true,
+      }],
+      pagination: { page: 1, pageSize: 20, totalEntries: 21, totalPages: 2 },
+      participation: {
+        ownCreditRuns: 1,
+        poolCreditRuns: 1,
+        bestPoolScoreRaw: '12500',
+      },
+      latestResult: null,
+    },
+    isLoading: false,
+    error: null,
+    reload: jest.fn(),
+  }),
 }));
 
 jest.mock('@/providers/auth-provider', () => ({
@@ -205,32 +239,27 @@ describe('vistas UX de Treasure Hunt', () => {
     });
   });
 
-  it('muestra por defecto la clasificación activa con las métricas del torneo', () => {
+  it('muestra por defecto la competición semanal automática', () => {
     const { container } = render(<TreasureHuntRankingsView />);
 
     expect(screen.getByText('Rankings de Treasure Hunt')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'En curso' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Finalizadas' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByText('Mis partidas')).toBeInTheDocument();
-    expect(screen.getByText('71.484 UKI')).toBeInTheDocument();
-    expect(screen.getByText('Intentos disponibles')).toBeInTheDocument();
-    expect(screen.getByText('Resultados que cuentan')).toBeInTheDocument();
-    expect(screen.getByText('Premio acumulado')).toBeInTheDocument();
-    expect(screen.queryByText('N.º de ganadores')).not.toBeInTheDocument();
-    expect(screen.queryByText(/El número de ganadores es provisional/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/validado/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Semana actual' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Torneos especiales' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('Mi posición')).toBeInTheDocument();
+    expect(screen.getByText('2 UKI')).toBeInTheDocument();
+    expect(screen.getByText('Periodo actual')).toBeInTheDocument();
+    expect(screen.getByText('Bote acumulado')).toBeInTheDocument();
+    expect(screen.getByText('Participantes clasificados')).toBeInTheDocument();
+    expect(screen.getByText(/No hay que abrir ni archivar torneos manualmente/i)).toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
-    expect(headers).toEqual(['Pos.', 'Jugador', 'Puntuación', 'Tiempo', 'Tickets']);
+    expect(headers).toEqual(['Pos.', 'Jugador', 'Situación', 'Cukie usado', 'Mejor puntuación']);
     expect(headers).not.toContain('Partida');
     expect(headers).not.toContain('Score');
     expect(container.firstElementChild).toHaveClass('mx-auto', 'max-w-[68rem]');
 
-    const playLink = screen.getByRole('link', { name: /Jugar 1P/ });
+    const playLink = screen.getByRole('link', { name: /^Jugar/ });
     expect(playLink).toHaveAttribute('href', '/games/treasure-hunt');
-    expect(screen.getByText('Intentos disponibles').closest('dl')).toHaveClass(
-      'grid-cols-3',
-    );
     expect(screen.getByRole('navigation', { name: 'Paginación del ranking' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Página 2' })).toBeInTheDocument();
   });
@@ -299,16 +328,13 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByRole('button', { name: 'Wallet descalificada' })).toBeDisabled();
   });
 
-  it('explica la descalificación en rankings y no presenta la partida como computable', () => {
+  it('no mezcla la descalificación del torneo especial con la semana activa', () => {
     mockDisqualified = true;
     render(<TreasureHuntRankingsView />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Wallet descalificada');
-    expect(screen.getByRole('alert')).toHaveTextContent('20.000 UKI');
-    expect(screen.getByText('0/10')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Mis partidas' }));
-    expect(screen.getByText('Tus partidas han quedado fuera de clasificación')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tu mejor partida con créditos del pool' })).toBeInTheDocument();
+    expect(screen.getByText('Mejor puntuación clasificada: 12.500')).toBeInTheDocument();
   });
 
   it('reduce el perfil al alias público y la wallet', () => {

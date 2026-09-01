@@ -476,6 +476,26 @@ La recompensa por ranking se aplica sobre la parte del jugador que queda despues
 
 ## Treasure Hunt
 
+### Ciclo de competicion
+
+- El modo normal no es un torneo manual: es una competicion semanal continua.
+- Cada periodo empieza el lunes a las 14:00 UTC y termina el lunes siguiente a
+  la misma hora. El identificador, las fechas y la lectura de la clasificacion
+  se calculan desde el reloj del servidor; no requieren cambiar variables de
+  entorno, desplegar ni editar copies.
+- Al cambiar de periodo, la nueva semana queda activa automaticamente. Los
+  resultados del periodo anterior permanecen inmutables y el scheduler de
+  cierre puede sellar su reparto sin bloquear el comienzo de la siguiente.
+- La vista `Semana actual` solo lee el periodo semanal vigente y nunca reutiliza
+  el estado de una campaña especial ya cerrada.
+- Los torneos especiales son excepciones separadas con ciclo
+  `scheduled -> active -> closed -> archived`. Al cerrarlos se congela una sola
+  vez su ranking y se muestran en `Torneos especiales`; nunca vuelven a aparecer
+  como competición activa.
+- El Torneo Lanzamiento UKI de staging queda tratado como torneo especial
+  cerrado y archivado. Las partidas posteriores pertenecen al sistema semanal
+  de créditos.
+
 - Una partida requiere 10 creditos de competicion y un Cukie con partidas disponibles.
 - Cada partida valida tiene un presupuesto nominal maximo de 10 UKI:
   - 7.5 UKI, el 75%, forman el tramo de rendimiento diario dependiente del score.
@@ -548,7 +568,9 @@ del jugador pasa tambien a `undistributed_pending`.
 
 - Los 2 UKI reservados por cada partida valida alimentan el bote semanal de mejores jugadores.
 - El leaderboard conserva una unica mejor puntuacion raw por wallet, sin tope
-  de 3,000 puntos. Solo reemplaza el resultado si la nueva puntuacion es mayor;
+  de 3,000 puntos y solo acepta partidas pagadas con creditos del pool. Las
+  partidas con creditos propios conservan su reparto directo pero no pueden
+  crear ni sustituir la mejor puntuacion semanal. Solo reemplaza el resultado si la nueva puntuacion es mayor;
   en empate queda primero quien la logro antes. `winningGameId` identifica la
   partida exacta que origina cualquier reparto.
 - El 60% se reparte entre el Top 10 con porcentajes

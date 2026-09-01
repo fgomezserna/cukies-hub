@@ -132,6 +132,11 @@ export type TreasureHuntEconomyResultResponse = {
   runId: string;
   status: "settled" | "forfeited";
   scoreRaw: string;
+  creditSource: TreasureHuntCreditSource;
+  cukieSource: TreasureHuntCukieSource;
+  cukieAssetId: string;
+  weeklyPeriodId: string;
+  weeklyPeriodEndsAt: string;
   leaderboardEligible: boolean;
   rewardEligible: boolean;
   jackpotEligible: boolean;

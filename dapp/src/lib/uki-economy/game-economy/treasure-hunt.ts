@@ -26,6 +26,7 @@ import {
   reserveTreasureHuntPoolQuota,
   shouldReplaceTreasureHuntWeeklyBest,
   treasureHuntScoreOrderKey,
+  treasureHuntResultEligibility,
   validateTreasureHuntEvidence,
 } from "./treasure-hunt-policy";
 import type {
@@ -169,13 +170,20 @@ function resultResponse(run: TreasureHuntEconomyRun): TreasureHuntEconomyResultR
   if (run.status !== "settled" && run.status !== "forfeited") {
     throw new DomainConflictError(`El run ${run.runId} aun no es terminal.`);
   }
+  const eligibility = treasureHuntResultEligibility({
+    status: run.status,
+    creditSource: run.creditSource,
+  });
   return {
     runId: run.runId,
     status: run.status,
     scoreRaw: run.scoreRaw ?? "0",
-    leaderboardEligible: run.status === "settled",
-    rewardEligible: run.status === "settled",
-    jackpotEligible: run.status === "settled",
+    creditSource: run.creditSource,
+    cukieSource: run.cukieSource,
+    cukieAssetId: run.cukieAssetId,
+    weeklyPeriodId: run.weeklyPeriodId,
+    weeklyPeriodEndsAt: run.weeklyPeriodEndsAt.toISOString(),
+    ...eligibility,
   };
 }
 
@@ -806,7 +814,7 @@ async function finalizeTreasureHuntRun(input: {
       scoreRaw: current.scoreRaw ?? "0",
       now: input.now,
     });
-    if (input.terminalStatus === "settled") {
+    if (input.terminalStatus === "settled" && current.creditSource === "pool") {
       const key = treasureHuntScoreOrderKey(current.scoreRaw ?? "0");
       const weekly = db.collection<TreasureHuntWeeklyBest>("treasure_hunt_weekly_bests");
       const currentBest = await weekly.findOne({
@@ -815,7 +823,7 @@ async function finalizeTreasureHuntRun(input: {
         gameId: "treasure-hunt",
       }, { session: mongoSession });
       const achievedAt = current.achievedAt ?? input.now;
-      if (!currentBest || shouldReplaceTreasureHuntWeeklyBest({
+      if (!currentBest || currentBest.creditSource !== "pool" || shouldReplaceTreasureHuntWeeklyBest({
         currentScoreRaw: currentBest.scoreRaw,
         currentAchievedAt: currentBest.achievedAt,
         candidateScoreRaw: key.scoreRaw,

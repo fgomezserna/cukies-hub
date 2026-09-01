@@ -5,9 +5,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameLayout from '@/components/layout/GameLayout';
 import TreasureHuntCompetitionBanner from '@/components/games/treasure-hunt-competition-banner';
 import TreasureHuntPlaySidebar from '@/components/games/treasure-hunt-play-sidebar';
+import TreasureHuntLatestResult from '@/components/games/treasure-hunt-latest-result';
 import GameLoadingSkeleton from '@/components/ui/game-loading-skeleton';
 import { useGameData } from '@/hooks/use-game-data';
 import { usePusherGameConnection } from '@/hooks/use-pusher-game-connection';
+import { useToast } from '@/hooks/use-toast';
 import {
   CompetitionClientError,
   createCompetitionAttemptCoordinator,
@@ -99,6 +101,7 @@ function removePendingSessionClear(sessionId: string, resultId: string) {
 
 export default function TreasureHuntGameView() {
   const { user, isLoading } = useAuth();
+  const { toast } = useToast();
   const { gameConfig, gameStats, leaderboardData, loading, error, refetch } =
     useGameData(GAME_ID);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -290,6 +293,14 @@ export default function TreasureHuntGameView() {
         currentScore: 0,
         validSessions: previous.validSessions + (result.isValid ? 1 : 0),
       }));
+      toast({
+        title: result.isValid
+          ? `Partida confirmada: ${result.finalScore.toLocaleString('es-ES')} puntos`
+          : 'Partida cerrada sin recompensa',
+        description: result.isValid
+          ? 'El reparto se está calculando. El detalle aparecerá en “Tu última partida”.'
+          : 'El resultado no entra en reparto ni en la clasificación semanal.',
+      });
 
       if (result.isValid) {
         try {
@@ -298,9 +309,7 @@ export default function TreasureHuntGameView() {
           // Stats refresh is secondary; never strand an already durable result.
         }
       }
-      if (result.source === 'competition' && result.status === 'review') {
-        setCompetitionPanelRefreshKey((key) => key + 1);
-      }
+      setCompetitionPanelRefreshKey((key) => key + 1);
 
       if (
         latestWalletUserIdRef.current !== endingSession.ownerUserId ||
@@ -318,7 +327,7 @@ export default function TreasureHuntGameView() {
           : undefined,
       );
     },
-    [activeParentGameSession, refetch, rotateParentSession],
+    [activeParentGameSession, refetch, rotateParentSession, toast],
   );
 
   const onHoneypotDetected = useCallback((event: string) => {
@@ -949,6 +958,7 @@ export default function TreasureHuntGameView() {
       desktopSidebar={(
         <TreasureHuntPlaySidebar onStartSinglePlayer={startSinglePlayerFromHub} />
       )}
+      desktopFooter={<TreasureHuntLatestResult key={competitionPanelRefreshKey} />}
       mobileFocus
       mobileLayoutFlipEnabled
     />

@@ -136,6 +136,19 @@ export function treasureHuntScoreOrderKey(scoreRaw: string) {
   return { scoreDigits: canonical.length, scoreRaw: canonical };
 }
 
+export function treasureHuntResultEligibility(input: {
+  status: "settled" | "forfeited";
+  creditSource: "own" | "pool";
+}) {
+  const rewardEligible = input.status === "settled";
+  const weeklyEligible = rewardEligible && input.creditSource === "pool";
+  return {
+    leaderboardEligible: weeklyEligible,
+    rewardEligible,
+    jackpotEligible: weeklyEligible,
+  };
+}
+
 function validCounter(value: number, label: string) {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new TypeError(`${label} debe ser un entero no negativo.`);

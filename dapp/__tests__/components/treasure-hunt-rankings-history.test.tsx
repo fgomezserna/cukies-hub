@@ -11,8 +11,32 @@ let mockActiveEligibilityKind: 'presale' | 'uki_staking' = 'uki_staking';
 jest.mock('lucide-react', () => ({
   Archive: () => null,
   ArrowRight: () => null,
+  CalendarClock: () => null,
   Clock3: () => null,
+  Coins: () => null,
   Medal: () => null,
+  Trophy: () => null,
+}));
+
+jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
+  useTreasureHuntWeeklyOverview: () => ({
+    data: {
+      period: {
+        periodId: 'th-week:2026-08-31T14:00:00.000Z',
+        startsAt: '2026-08-31T14:00:00.000Z',
+        endsAt: '2026-09-07T14:00:00.000Z',
+      },
+      poolUkiRaw: '2000000000000000000',
+      totalRankedWallets: 0,
+      entries: [],
+      pagination: { page: 1, pageSize: 20, totalEntries: 0, totalPages: 1 },
+      participation: null,
+      latestResult: null,
+    },
+    isLoading: false,
+    error: null,
+    reload: jest.fn(),
+  }),
 }));
 
 jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
@@ -166,15 +190,15 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     jest.restoreAllMocks();
   });
 
-  it('mantiene En curso inicialmente y carga lista y detalle solo al elegir Finalizadas', async () => {
+  it('mantiene la semana actual inicialmente y carga el archivo solo al elegir torneos especiales', async () => {
     const fetchMock = installSuccessfulHistoryFetch();
     render(<TreasureHuntRankingsView />);
 
-    expect(screen.getByRole('button', { name: 'En curso' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Semana actual' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('General')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     expect(await screen.findByRole('combobox', { name: 'Edición finalizada' })).toHaveValue(
       manifest.campaignId,
@@ -215,17 +239,14 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     expect(await screen.findAllByText('Player21')).toHaveLength(2);
   });
 
-  it('no aplica semántica de staking ni slots a una competición activa de preventa', () => {
+  it('no reutiliza una competición especial como semana activa', () => {
     mockActiveEligibilityKind = 'presale';
     render(<TreasureHuntRankingsView />);
 
-    expect(screen.getByRole('heading', { name: 'Treasure Hunt · Torneo de preventa' })).toBeInTheDocument();
-    expect(screen.getByText('Premio acumulado')).toBeInTheDocument();
-    expect(screen.queryByText('Premios disponibles')).not.toBeInTheDocument();
-    expect(screen.queryByText('Bote provisional')).not.toBeInTheDocument();
-    expect(screen.queryByText('Tus tickets')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tu mejor partida con créditos del pool' })).toBeInTheDocument();
+    expect(screen.getByText('Bote acumulado')).toBeInTheDocument();
+    expect(screen.queryByText('Treasure Hunt · Torneo de preventa')).not.toBeInTheDocument();
     expect(screen.queryByText(/Staking UKI/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/genera un ticket/)).not.toBeInTheDocument();
   });
 
   it('muestra el estado vacío del histórico', async () => {
@@ -236,7 +257,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     })) as typeof fetch;
     render(<TreasureHuntRankingsView />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     expect(await screen.findByText('Aún no hay ediciones publicadas')).toBeInTheDocument();
   });
@@ -249,7 +270,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     global.fetch = jest.fn(() => pendingList) as typeof fetch;
     render(<TreasureHuntRankingsView />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     expect(screen.getByRole('status', {
       name: 'Cargando histórico de clasificaciones',
@@ -292,7 +313,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     });
     global.fetch = fetchMock as typeof fetch;
     render(<TreasureHuntRankingsView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     const selector = await screen.findByRole('combobox', { name: 'Edición finalizada' });
     expect(selector).toHaveValue(manifest.campaignId);
@@ -340,7 +361,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     });
     global.fetch = fetchMock as typeof fetch;
     render(<TreasureHuntRankingsView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
     expect(await screen.findAllByText('CukieLegend')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
@@ -410,7 +431,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     });
     global.fetch = fetchMock as typeof fetch;
     render(<TreasureHuntRankingsView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
     expect(await screen.findAllByText('CukieLegend')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
@@ -464,7 +485,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
         })
     )) as typeof fetch;
     render(<TreasureHuntRankingsView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     expect(await screen.findByText('Final')).toBeInTheDocument();
     expect(screen.getByText(/Resultados definitivos de la edición/)).toBeInTheDocument();
@@ -495,7 +516,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
         })
     )) as typeof fetch;
     render(<TreasureHuntRankingsView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     expect(await screen.findByText('Esta edición no tiene entradas clasificadas')).toBeInTheDocument();
   });
@@ -523,7 +544,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     global.fetch = fetchMock as typeof fetch;
     render(<TreasureHuntRankingsView />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('No se pudieron cargar las ediciones finalizadas.');
 
@@ -554,7 +575,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     });
     global.fetch = fetchMock as typeof fetch;
     render(<TreasureHuntRankingsView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Finalizadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torneos especiales' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('No se pudo cargar la clasificación de esta edición.');

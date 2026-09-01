@@ -68,6 +68,12 @@ function resultResponse(value: unknown): TreasureHuntEconomyResultResponse {
     (result.status !== "settled" && result.status !== "forfeited") ||
     typeof result.scoreRaw !== "string" ||
     !/^(0|[1-9][0-9]*)$/.test(result.scoreRaw) ||
+    (result.creditSource !== "own" && result.creditSource !== "pool") ||
+    (result.cukieSource !== "own" && result.cukieSource !== "pool") ||
+    !nonEmptyText(result.cukieAssetId) ||
+    !nonEmptyText(result.weeklyPeriodId) ||
+    !nonEmptyText(result.weeklyPeriodEndsAt) ||
+    Number.isNaN(Date.parse(result.weeklyPeriodEndsAt)) ||
     typeof result.leaderboardEligible !== "boolean" ||
     typeof result.rewardEligible !== "boolean" ||
     typeof result.jackpotEligible !== "boolean" ||
