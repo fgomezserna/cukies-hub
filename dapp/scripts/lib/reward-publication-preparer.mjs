@@ -34,15 +34,28 @@ async function existingPlan(db, accountingId, session) {
   return plan ? assertRewardPublicationPlanIntegrity(plan) : null;
 }
 
+export function buildRewardPublicationCandidatePipeline(now, maxCandidates) {
+  return [
+    { $match: { status: 'allocated_offchain', availableAt: { $lte: now } } },
+    { $sort: { availableAt: 1, accountingId: 1, _id: 1 } },
+    {
+      $group: {
+        _id: '$accountingId',
+        accountingKind: { $first: '$accountingKind' },
+        availableAt: { $first: '$availableAt' },
+      },
+    },
+    { $sort: { availableAt: 1, _id: 1 } },
+    { $limit: maxCandidates },
+  ];
+}
+
 export async function prepareNextRewardPublicationPlan(input) {
   const now = validNow(input.now ?? new Date());
   const maxCandidates = validMaxCandidates(input.maxCandidates ?? 50);
-  const candidates = await input.db.collection('reward_accounting_allocations').aggregate([
-    { $match: { status: 'allocated_offchain', availableAt: { $lte: now } } },
-    { $sort: { availableAt: 1, accountingId: 1, _id: 1 } },
-    { $group: { _id: '$accountingId', accountingKind: { $first: '$accountingKind' } } },
-    { $limit: maxCandidates },
-  ]).toArray();
+  const candidates = await input.db.collection('reward_accounting_allocations').aggregate(
+    buildRewardPublicationCandidatePipeline(now, maxCandidates),
+  ).toArray();
 
   for (const candidate of candidates) {
     if (await existingPlan(input.db, candidate._id)) continue;

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { buildRewardPublisherCanaryFixture } from './reward-batch-publisher-canary-fixture.mjs';
-import { prepareNextRewardPublicationPlan } from './reward-publication-preparer.mjs';
+import {
+  buildRewardPublicationCandidatePipeline,
+  prepareNextRewardPublicationPlan,
+} from './reward-publication-preparer.mjs';
 
 const DISTRIBUTOR = '0x6666666666666666666666666666666666666666';
 const TOKEN = '0x7777777777777777777777777777777777777777';
@@ -140,6 +143,23 @@ function prepare(input) {
     now: NOW,
   });
 }
+
+test('ordena los cierres despues de agrupar para publicar primero el mas antiguo', () => {
+  const pipeline = buildRewardPublicationCandidatePipeline(NOW, 50);
+  assert.deepEqual(pipeline, [
+    { $match: { status: 'allocated_offchain', availableAt: { $lte: NOW } } },
+    { $sort: { availableAt: 1, accountingId: 1, _id: 1 } },
+    {
+      $group: {
+        _id: '$accountingId',
+        accountingKind: { $first: '$accountingKind' },
+        availableAt: { $first: '$availableAt' },
+      },
+    },
+    { $sort: { availableAt: 1, _id: 1 } },
+    { $limit: 50 },
+  ]);
+});
 
 test('persiste un draft preview-only y un plan sin autorizar ni firmar', async () => {
   const context = setup();
