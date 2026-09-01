@@ -14,6 +14,7 @@
     "init-chat-rooms": "node scripts/init-chat-rooms-with-env.mjs",
     "competition:archive:import": "tsx scripts/import-competition-ranking-archive.ts",
     "competition:staking:reset": "tsx scripts/reset-staking-competition-wallet.ts",
+    "ambassadors:migrate:presale": "tsx scripts/materialize-presale-ambassadors.ts",
     "verify:tokenomics:local": "node scripts/verify-staging-tokenomics-mongo.mjs",
     "test": "jest",
     "test:schedulers": "node --test scripts/*scheduler-policy.test.mjs",

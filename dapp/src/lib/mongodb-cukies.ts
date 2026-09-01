@@ -104,9 +104,6 @@ export const cukiesDb = {
   points: () => getCukiesCollection('points'),
   txPoints: () => getCukiesCollection('tx_points'),
   
-  // Referrals collection
-  referrals: () => getCukiesCollection('referrals'),
-  
   // Transactions collections
   txNfts: () => getCukiesCollection('tx_nfts'),
   txMarketplace: () => getCukiesCollection('txMarketplace'),

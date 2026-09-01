@@ -1,5 +1,9 @@
 import { DomainConflictError } from "../errors";
-import { createMongoAmbassadorAttributionRepository } from "./repository";
+import {
+  createMongoAmbassadorAttributionRepository,
+  findMongoAmbassadorByInvitationCode,
+  getOrCreateMongoAmbassadorProfile,
+} from "./repository";
 import {
   assertAmbassadorAttribution,
   buildAmbassadorAttribution,
@@ -157,4 +161,41 @@ export async function acceptCanonicalAmbassadorAttribution(input: {
       input,
     ),
   );
+}
+
+export async function acceptCanonicalAmbassadorInvitation(input: {
+  referredWallet: string;
+  invitationCode: string;
+  signedSessionEvidenceHash: string;
+  now?: Date;
+}) {
+  const { withEconomyTransaction } = await import("@/lib/indexer-db/mongodb");
+  return withEconomyTransaction(async (db, session) => {
+    const profile = await findMongoAmbassadorByInvitationCode(
+      db,
+      input.invitationCode,
+      session,
+    );
+    if (!profile) {
+      const { DomainNotFoundError } = await import("../errors");
+      throw new DomainNotFoundError("El codigo de invitacion no existe.");
+    }
+    return acceptDirectAmbassadorAttribution(
+      createMongoAmbassadorAttributionRepository(db, session),
+      {
+        referredWallet: input.referredWallet,
+        ambassadorWallet: profile.walletNormalized,
+        signedSessionEvidenceHash: input.signedSessionEvidenceHash,
+        now: input.now,
+      },
+    );
+  });
+}
+
+export async function getCanonicalAmbassadorProfile(
+  wallet: string,
+  now = new Date(),
+) {
+  const { getEconomyDb } = await import("@/lib/indexer-db/mongodb");
+  return getOrCreateMongoAmbassadorProfile(await getEconomyDb(), wallet, now);
 }

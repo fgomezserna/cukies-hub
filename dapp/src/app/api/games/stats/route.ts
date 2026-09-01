@@ -186,7 +186,6 @@ async function getUserOverallStats(userId: string) {
       where: { id: userId },
       select: {
         xp: true,
-        referralRewards: true
       }
     }),
 
@@ -228,7 +227,6 @@ async function getUserOverallStats(userId: string) {
 
   return {
     totalXp: userInfo?.xp || 0,
-    referralRewards: userInfo?.referralRewards || 0,
     rank: userRank,
     totalSessions: gameResults.length,
     gameResults: gameResultsMap

@@ -5,12 +5,30 @@ import {
 
 describe("ambassador economy index definitions", () => {
   it("mantiene una sola atribucion canonica por wallet referida", () => {
-    expect(AMBASSADOR_ECONOMY_COLLECTIONS).toEqual(["ambassador_attributions"]);
+    expect(AMBASSADOR_ECONOMY_COLLECTIONS).toEqual([
+      "ambassador_attributions",
+      "ambassador_profiles",
+    ]);
     expect(AMBASSADOR_ECONOMY_INDEX_DEFINITIONS).toContainEqual({
       collection: "ambassador_attributions",
       keys: { referredWalletNormalized: 1 },
       options: { unique: true, name: "ambassador_referred_wallet_unique" },
     });
+  });
+
+  it("impide reutilizar wallets o codigos de invitacion", () => {
+    expect(AMBASSADOR_ECONOMY_INDEX_DEFINITIONS).toEqual(expect.arrayContaining([
+      {
+        collection: "ambassador_profiles",
+        keys: { walletNormalized: 1 },
+        options: { unique: true, name: "ambassador_profile_wallet_unique" },
+      },
+      {
+        collection: "ambassador_profiles",
+        keys: { invitationCode: 1 },
+        options: { unique: true, name: "ambassador_invitation_code_unique" },
+      },
+    ]));
   });
 
   it("permite auditar invitados directos y la politica capturada", () => {

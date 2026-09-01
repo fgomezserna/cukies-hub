@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 
 import { readWalletSession } from "@/lib/wallet-auth";
 import {
-  acceptCanonicalAmbassadorAttribution,
+  acceptCanonicalAmbassadorInvitation,
   getCanonicalAmbassadorAttribution,
 } from "@/lib/uki-economy/ambassadors/service";
 import {
-  assertAmbassadorStagingRuntime,
+  assertAmbassadorRuntime,
   stableAmbassadorHash,
   validAmbassadorWallet,
 } from "@/lib/uki-economy/ambassadors/rules";
@@ -82,7 +82,7 @@ function errorResponse(error: unknown) {
   }
   if (
     error instanceof TypeError &&
-    error.message === "AMBASSADOR_STAGING_RUNTIME_REQUIRED"
+    error.message === "AMBASSADOR_RUNTIME_MISCONFIGURED"
   ) {
     return json({ status: "error", code: error.message }, 400);
   }
@@ -92,7 +92,7 @@ function errorResponse(error: unknown) {
 
 export async function GET() {
   try {
-    assertAmbassadorStagingRuntime(process.env);
+    assertAmbassadorRuntime(process.env);
     const identity = await signedIdentity();
     if (!identity) return json({ status: "error", code: "AUTH_REQUIRED" }, 401);
     const attribution = await getCanonicalAmbassadorAttribution(identity.walletAddress);
@@ -108,16 +108,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    assertAmbassadorStagingRuntime(process.env);
+    assertAmbassadorRuntime(process.env);
     const identity = await signedIdentity();
     if (!identity) return json({ status: "error", code: "AUTH_REQUIRED" }, 401);
     const body = await readBody(request);
-    if (typeof body?.ambassadorWalletAddress !== "string") {
-      return json({ status: "error", code: "INVALID_AMBASSADOR_WALLET" }, 400);
+    if (typeof body?.invitationCode !== "string") {
+      return json({ status: "error", code: "INVALID_INVITATION_CODE" }, 400);
     }
-    const attribution = await acceptCanonicalAmbassadorAttribution({
+    const attribution = await acceptCanonicalAmbassadorInvitation({
       referredWallet: identity.walletAddress,
-      ambassadorWallet: body.ambassadorWalletAddress,
+      invitationCode: body.invitationCode,
       signedSessionEvidenceHash: identity.signedSessionEvidenceHash,
     });
     return json({

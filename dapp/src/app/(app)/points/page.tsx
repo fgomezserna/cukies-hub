@@ -601,14 +601,13 @@ function PointsView() {
                                                 <TableHead className="w-[80px] text-center">Rank</TableHead>
                                                 <TableHead>Hyppie Player</TableHead>
                                                 <TableHead className="text-right">Points (XP)</TableHead>
-                                                <TableHead className="text-right">Referral Points</TableHead>
                                                 <TableHead className="text-right">Total Points</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {playersToDisplay.length === 0 && !isLoadingPlayers ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                                                         {searchTerm ? 'No players found matching your search.' : 'No players found.'}
                                                     </TableCell>
                                                 </TableRow>
@@ -635,14 +634,13 @@ function PointsView() {
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="text-right font-mono">{player.points.toLocaleString('en-US')}</TableCell>
-                                                        <TableCell className="text-right font-mono">{player.referralPoints.toLocaleString('en-US')}</TableCell>
                                                         <TableCell className="text-right font-mono text-primary font-bold">{player.totalPoints.toLocaleString('en-US')}</TableCell>
                                                     </TableRow>
                                                 ))
                                             )}
                                             {!searchTerm && hasMorePlayers && (
                                                   <TableRow>
-                                                      <TableCell colSpan={5} className="text-center p-0">
+                                                      <TableCell colSpan={4} className="text-center p-0">
                                                           <div ref={leaderboardObserver} className="flex justify-center items-center py-4">
                                                               {isLoadingPlayers && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
                                                           </div>

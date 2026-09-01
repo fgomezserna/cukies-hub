@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { distributeReferralXp } from '@/lib/referrals';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 
 // Helper to check if two dates are on the same calendar day
@@ -118,14 +117,6 @@ export async function POST(request: Request) {
     ]);
 
     const updatedUser = result[0];
-
-    // Distribute referral XP after daily login
-    try {
-      await distributeReferralXp(user.id, amount);
-    } catch (error) {
-      console.error('Error distributing referral XP:', error);
-      // Don't fail the daily claim if referral distribution fails
-    }
 
     return NextResponse.json({
       success: true,

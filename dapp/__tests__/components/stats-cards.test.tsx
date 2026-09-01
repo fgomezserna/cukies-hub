@@ -29,9 +29,6 @@ describe('components/home/StatsCards', () => {
     twitterHandle: null,
     discordUsername: null,
     telegramUsername: null,
-    referralCode: null,
-    referredById: null,
-    referralRewards: 0,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     lastCheckIn: null,
@@ -57,7 +54,6 @@ describe('components/home/StatsCards', () => {
         totalXpDistributed: 1234567,
         userStats: {
           totalXp: 1500,
-          referralRewards: 0,
           rank: 1234,
           totalSessions: 10,
         },

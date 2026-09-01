@@ -594,22 +594,36 @@ del jugador pasa tambien a `undistributed_pending`.
 
 ## Programa de embajadores
 
-- La politica inicial de staging es `ambassador-direct-staging-v1`: un unico
+- La politica vigente es `ambassador-direct-v1` en todos los entornos: un unico
   nivel directo y una comision de 500 bps, el 5% del pago final del referido.
-- La wallet referida acepta a su embajador mediante una sesion EVM firmada. La
-  vinculacion no exige compra, se guarda en `ambassador_attributions` y es
-  inmutable; un replay identico es idempotente y un sponsor distinto falla
-  cerrado.
-- Un sponsor que quedo bloqueado por una compra confirmada durante la preventa
-  tiene precedencia, se materializa en la coleccion canonica y no puede ser
-  sustituido. Un sponsor provisional de preventa que nunca fue bloqueado no se
-  convierte en atribucion economica sin la firma actual de la wallet referida.
+  Staging y produccion ejecutan el mismo codigo; solo cambian las variables de
+  entorno y la red autorizada. La version `ambassador-direct-staging-v1` se
+  conserva exclusivamente para validar filas historicas ya creadas.
+- Todo sponsor directo que quedo bloqueado por una compra confirmada durante la
+  preventa se convierte automaticamente en atribucion de embajador. La
+  migracion conserva la fecha y evidencia de preventa, es idempotente y no
+  exige que la wallet referida vuelva a aceptar, firmar ni realizar ningun
+  tramite. Tiene precedencia y no puede ser sustituido.
+- Fuera del historico bloqueado de preventa, la wallet referida acepta una
+  invitacion con codigo opaco mediante una sesion EVM firmada. La vinculacion
+  no exige compra, se guarda en `ambassador_attributions` y es inmutable; un
+  replay identico es idempotente y un sponsor distinto falla cerrado. Un
+  sponsor provisional de preventa que nunca llego a bloquearse no se convierte
+  automaticamente.
+- Cada wallet embajadora tiene un perfil en `ambassador_profiles` y un codigo
+  opaco unico. La URL publica no contiene la direccion completa. El panel de
+  Embajadores muestra referidos de preventa y nuevos, total generado, estados
+  de cada comision y acceso al cobro desde Premios.
 - Treasure Hunt captura la atribucion vigente al abrir cada run. Los pools de
   creditos y Cukies la capturan en el corte economico del periodo. Una
   atribucion posterior no modifica rewards ya generadas.
 - La comision se materializa en el mismo cierre diario, semanal o de tramo que
   el pago del referido. Las asignaciones del propio embajador no vuelven a
   generar comision.
+- El antiguo sistema de referidos basado en XP queda retirado: no participa en
+  login, quests, bonus diario, perfiles, rankings, rutas ni calculos economicos.
+  Los campos historicos que aun existan fisicamente en Mongo son datos inertes,
+  no una fuente de verdad de la aplicacion.
 
 ## UKI no distribuidos
 

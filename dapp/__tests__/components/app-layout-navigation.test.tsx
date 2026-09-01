@@ -55,6 +55,7 @@ jest.mock('lucide-react', () => ({
   Crown: () => null,
   Coins: () => null,
   Gift: () => null,
+  UsersRound: () => null,
 }));
 
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
@@ -97,6 +98,10 @@ describe('AppLayout launch navigation', () => {
     expect(screen.getByRole('link', { name: 'Créditos' })).toHaveAttribute(
       'href',
       '/credits',
+    );
+    expect(screen.getByRole('link', { name: 'Embajadores' })).toHaveAttribute(
+      'href',
+      '/embajadores',
     );
     expect(screen.getByRole('link', { name: 'Pool de Cukies' })).toHaveAttribute(
       'href',

@@ -62,6 +62,7 @@ export const ECONOMY_COLLECTIONS = [
   'game_economy_runtime_state',
   'game_economy_runtime_runs',
   'ambassador_attributions',
+  'ambassador_profiles',
   'reward_rule_state',
   'reward_emission_budget_state',
   'reward_emission_budget_days',
@@ -713,6 +714,16 @@ const CORE_ECONOMY_INDEXES: EconomyIndexDefinition[] = [
     collection: 'ambassador_attributions',
     keys: { source: 1, policyVersion: 1, acceptedAt: -1 },
     options: { name: 'ambassador_policy_audit' },
+  },
+  {
+    collection: 'ambassador_profiles',
+    keys: { walletNormalized: 1 },
+    options: { unique: true, name: 'ambassador_profile_wallet_unique' },
+  },
+  {
+    collection: 'ambassador_profiles',
+    keys: { invitationCode: 1 },
+    options: { unique: true, name: 'ambassador_invitation_code_unique' },
   },
   {
     collection: 'game_economy_events',

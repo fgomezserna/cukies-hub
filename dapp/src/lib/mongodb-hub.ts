@@ -115,9 +115,6 @@ export async function createUserDirectly(data: {
     twitterId: null,
     discordUsername: null,
     telegramUsername: null,
-    referralCode: null,
-    referredById: null,
-    referralRewards: 0,
     createdAt: now,
     updatedAt: now,
   };

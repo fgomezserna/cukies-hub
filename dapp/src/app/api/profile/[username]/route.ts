@@ -79,15 +79,6 @@ export async function GET(
           },
           take: 20
         },
-        // Referral stats
-        referrals: {
-          select: {
-            id: true,
-            username: true,
-            createdAt: true,
-          }
-        },
-        referralRewards: true,
       },
     });
 
@@ -140,8 +131,6 @@ export async function GET(
         favoriteGame,
         questsCompleted: user.completedQuests.length,
         tasksCompleted: user.completedTasks.length,
-        totalReferrals: user.referrals.length,
-        referralRewards: user.referralRewards,
       },
       recentActivity: user.gameSessions.slice(0, 5).map(session => ({
         gameId: session.gameId,

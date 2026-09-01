@@ -2,6 +2,8 @@ import type { ClientSession, Db } from "mongodb";
 
 import { DomainConflictError } from "../errors";
 import {
+  ambassadorInvitationCode,
+  assertAmbassadorInvitationCode,
   assertAmbassadorAttribution,
   buildAmbassadorAttribution,
   stableAmbassadorHash,
@@ -9,6 +11,7 @@ import {
 } from "./rules";
 import type {
   AmbassadorAttribution,
+  AmbassadorProfile,
   AmbassadorAttributionRepository,
   LockedPresaleAmbassador,
 } from "./types";
@@ -211,4 +214,133 @@ export async function resolveMongoAmbassadorAttribution(
     session,
     materializedAt,
   )).get(walletNormalized) ?? null;
+}
+
+export async function getOrCreateMongoAmbassadorProfile(
+  db: Db,
+  wallet: string,
+  now = new Date(),
+  session?: ClientSession,
+) {
+  const walletNormalized = validAmbassadorWallet(wallet);
+  const invitationCode = ambassadorInvitationCode(walletNormalized);
+  const profile: AmbassadorProfile = {
+    _id: `ambassador-profile:${walletNormalized}`,
+    walletNormalized,
+    invitationCode,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const collection = db.collection<AmbassadorProfile>("ambassador_profiles");
+  const options = session ? { session } : {};
+  try {
+    await collection.updateOne(
+      { _id: profile._id },
+      {
+        $setOnInsert: profile,
+        $set: { updatedAt: now },
+      },
+      { ...options, upsert: true },
+    );
+  } catch (error) {
+    if (!duplicateKey(error)) throw error;
+  }
+  const stored = await collection.findOne({ _id: profile._id }, options);
+  if (
+    !stored
+    || stored.walletNormalized !== walletNormalized
+    || stored.invitationCode !== invitationCode
+  ) {
+    throw new DomainConflictError("El codigo de invitacion entra en conflicto con otro embajador.");
+  }
+  return stored;
+}
+
+export async function findMongoAmbassadorByInvitationCode(
+  db: Db,
+  code: string,
+  session?: ClientSession,
+) {
+  const invitationCode = assertAmbassadorInvitationCode(code);
+  const row = await db.collection<AmbassadorProfile>("ambassador_profiles").findOne(
+    { invitationCode },
+    session ? { session } : {},
+  );
+  if (!row) return null;
+  return {
+    ...row,
+    walletNormalized: validAmbassadorWallet(row.walletNormalized),
+    invitationCode: assertAmbassadorInvitationCode(row.invitationCode),
+  };
+}
+
+export async function materializeLockedPresaleAmbassadorAttributions(
+  db: Db,
+  input: {
+    ambassadorWallet?: string;
+    now?: Date;
+    session?: ClientSession;
+  } = {},
+) {
+  const now = input.now ?? new Date();
+  const ambassadorWalletNormalized = input.ambassadorWallet
+    ? validAmbassadorWallet(input.ambassadorWallet)
+    : null;
+  const options = input.session ? { session: input.session } : {};
+  const query: Record<string, unknown> = {
+    lockedSponsorWalletAddress: { $type: "string" },
+  };
+  if (ambassadorWalletNormalized) {
+    query.lockedSponsorWalletAddress = { $regex: `^${ambassadorWalletNormalized}$`, $options: "i" };
+  }
+  const presaleRows = await db.collection<PresaleParticipant>("presale_participants")
+    .find(query, {
+      ...options,
+      projection: {
+        _id: 0,
+        normalizedWalletAddress: 1,
+        lockedSponsorWalletAddress: 1,
+        sponsorLockedAt: 1,
+        firstPurchaseAt: 1,
+      },
+    })
+    .toArray();
+  const candidates = presaleRows.map((row) => {
+    const locked = lockedPresaleAmbassador(row);
+    if (!locked) throw new DomainConflictError("Un referido confirmado de preventa no pudo normalizarse.");
+    return buildAmbassadorAttribution({
+      referredWallet: locked.referredWalletNormalized,
+      ambassadorWallet: locked.ambassadorWalletNormalized,
+      source: "presale_locked",
+      sourceReferenceHash: locked.sourceReferenceHash,
+      acceptedAt: locked.lockedAt,
+      now,
+    });
+  });
+  if (candidates.length === 0) return { scanned: 0, materialized: 0 };
+  const attributions = db.collection<AmbassadorAttribution>("ambassador_attributions");
+  const result = await attributions.bulkWrite(
+    candidates.map((attribution) => ({
+      updateOne: {
+        filter: { referredWalletNormalized: attribution.referredWalletNormalized },
+        update: { $setOnInsert: attribution },
+        upsert: true,
+      },
+    })),
+    { ...options, ordered: false },
+  );
+  const stored = await attributions.find(
+    { referredWalletNormalized: { $in: candidates.map((row) => row.referredWalletNormalized) } },
+    options,
+  ).toArray();
+  const expectedByWallet = new Map(candidates.map((row) => [row.referredWalletNormalized, row]));
+  for (const row of stored) {
+    const expected = expectedByWallet.get(row.referredWalletNormalized);
+    if (!expected || row.ambassadorWalletNormalized !== expected.ambassadorWalletNormalized) {
+      throw new DomainConflictError(
+        `La atribucion existente contradice la preventa para ${row.referredWalletNormalized}.`,
+      );
+    }
+  }
+  return { scanned: candidates.length, materialized: result.upsertedCount };
 }

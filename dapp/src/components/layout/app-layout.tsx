@@ -23,6 +23,7 @@ import {
   Crown,
   Coins,
   Gift,
+  UsersRound,
 } from 'lucide-react';
 import Header from './header';
 import Image from 'next/image';
@@ -102,6 +103,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       label: 'Créditos',
       Icon: Coins,
       active: pathname.startsWith('/credits'),
+    },
+    {
+      href: '/embajadores',
+      label: 'Embajadores',
+      Icon: UsersRound,
+      active: pathname.startsWith('/embajadores'),
     },
     {
       href: '/cukie-hodler#mi-cukie-pool',

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { AMBASSADOR_ATTRIBUTION_POLICY } from "../ambassadors/types";
 import { DomainConflictError, DomainValidationError } from "../errors";
 import { formatRawAmount, mulDiv, parseRawAmount, sumRawAmounts } from "../money";
 import { getIsoWeekPeriodId } from "../periods";
@@ -36,6 +37,7 @@ import { calculateCukiePoolDistribution } from "./calculation";
 import type { RewardRule } from "./types";
 
 const BPS = BigInt(10_000);
+const AMBASSADOR_COMMISSION_BPS = BigInt(AMBASSADOR_ATTRIBUTION_POLICY.commissionBps);
 const TOKEN = BigInt("1000000000000000000");
 const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -544,7 +546,7 @@ export function calculateDailyRewardSettlement(input: {
       if (ambassador) {
         const commission = mulDiv(
           canonicalRaw(allocation.amountRaw, "player.amountRaw"),
-          BigInt(500),
+          AMBASSADOR_COMMISSION_BPS,
           BPS,
         );
         ordinaryCommission += commission;
@@ -594,7 +596,7 @@ export function calculateDailyRewardSettlement(input: {
   for (const [wallet, amount] of ordinaryBeneficiary) {
     const ambassador = ambassadorByParticipantWallet.get(wallet);
     if (!ambassador) continue;
-    const commission = mulDiv(amount, BigInt(500), BPS);
+    const commission = mulDiv(amount, AMBASSADOR_COMMISSION_BPS, BPS);
     ordinaryCommission += commission;
     append({
       walletNormalized: ambassador,
@@ -607,7 +609,7 @@ export function calculateDailyRewardSettlement(input: {
   for (const [wallet, amount] of priorBeneficiary) {
     const ambassador = ambassadorByParticipantWallet.get(wallet);
     if (!ambassador) continue;
-    const commission = mulDiv(amount, BigInt(500), BPS);
+    const commission = mulDiv(amount, AMBASSADOR_COMMISSION_BPS, BPS);
     weeklyCommission += commission;
     append({
       walletNormalized: ambassador,
@@ -929,7 +931,7 @@ export function calculateWeeklyPrize(input: {
   const sourceDailyAccountingIds = expectedDailyAccountingIds;
   const poolTrancheSchedule = Array.from({ length: 7 }, (_, index) =>
     new Date(payoutMonday.getTime() + (index + 1) * DAY_MS + 16 * 60 * 60_000));
-  if (ambassadorReserve !== mulDiv(pot, BigInt(500), BPS)) {
+  if (ambassadorReserve !== mulDiv(pot, AMBASSADOR_COMMISSION_BPS, BPS)) {
     throw new DomainConflictError("La reserva ambassador weekly debe ser exactamente 5% del bote.");
   }
   if (sealedAt.getTime() < payoutAt.getTime()) {
@@ -1083,7 +1085,7 @@ export function calculateWeeklyPrize(input: {
     .sort(([left], [right]) => compareRewardText(left, right))
     .map(([pool, value]) => {
       const amountRaw = formatRawAmount(value.amount);
-      const ambassadorReserveRaw = formatRawAmount(mulDiv(value.amount, BigInt(500), BPS));
+      const ambassadorReserveRaw = formatRawAmount(mulDiv(value.amount, AMBASSADOR_COMMISSION_BPS, BPS));
       const amountTranches = splitIntoSevenTranches(amountRaw);
       const ambassadorTranches = splitIntoSevenTranches(ambassadorReserveRaw);
       return {
@@ -1106,8 +1108,8 @@ export function calculateWeeklyPrize(input: {
       ambassadorWallet,
       playerWallet: winner.walletNormalized,
       winningGameId: winner.winningGameId,
-      amountRaw: formatRawAmount(mulDiv(parseRawAmount(winner.playerRaw), BigInt(500), BPS)),
-      commissionBps: 500 as const,
+      amountRaw: formatRawAmount(mulDiv(parseRawAmount(winner.playerRaw), AMBASSADOR_COMMISSION_BPS, BPS)),
+      commissionBps: AMBASSADOR_ATTRIBUTION_POLICY.commissionBps,
       source: "weekly_player_prize" as const,
     }];
   });
@@ -1279,7 +1281,7 @@ export function assertWeeklyPrizeAccountingIntegrity(
     );
     if (
       amount === BigInt(0)
-      || ambassador !== mulDiv(amount, BigInt(500), BPS)
+      || ambassador !== mulDiv(amount, AMBASSADOR_COMMISSION_BPS, BPS)
       || reservation.sourceWinningGameIds.length === 0
       || new Set(reservation.sourceWinningGameIds).size !== reservation.sourceWinningGameIds.length
       || reservation.sourceWinningGameIds.some((id, index) =>
@@ -1451,7 +1453,7 @@ export function calculatePoolTranche(input: {
     : BigInt(0);
   const payment = base > guaranteed ? base : guaranteed;
   const topup = payment - base;
-  const commission = ambassadorWallet ? mulDiv(payment, BigInt(500), BPS) : BigInt(0);
+  const commission = ambassadorWallet ? mulDiv(payment, AMBASSADOR_COMMISSION_BPS, BPS) : BigInt(0);
   const payload = {
     periodId: validRewardText(input.periodId, "periodId"),
     ruleVersion: input.rule.version,

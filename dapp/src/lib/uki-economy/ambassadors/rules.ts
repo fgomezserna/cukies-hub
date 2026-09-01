@@ -56,22 +56,56 @@ function validHash(value: unknown, label: string) {
   return value;
 }
 
-export function assertAmbassadorStagingRuntime(
+export function assertAmbassadorRuntime(
   environment: Record<string, string | undefined>,
 ) {
-  if (
-    environment.APP_ENV !== "staging" ||
-    environment.STAGING_ONLY_GUARD !== "true" ||
-    environment.NEXT_PUBLIC_UKI_CHAIN_ID !== "97" ||
-    environment.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID !== "97"
-  ) {
-    throw new TypeError("AMBASSADOR_STAGING_RUNTIME_REQUIRED");
+  const appEnvironment = environment.APP_ENV?.trim().toLowerCase();
+  const publicChainId = Number(environment.NEXT_PUBLIC_UKI_CHAIN_ID);
+  const indexerChainId = Number(environment.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID);
+  if (appEnvironment === "staging") {
+    if (
+      environment.STAGING_ONLY_GUARD !== "true"
+      || publicChainId !== 97
+      || indexerChainId !== 97
+    ) throw new TypeError("AMBASSADOR_RUNTIME_MISCONFIGURED");
+    return {
+      environment: "staging" as const,
+      chainId: 97 as const,
+      policy: AMBASSADOR_ATTRIBUTION_POLICY,
+    };
   }
-  return {
-    environment: "staging" as const,
-    chainId: 97 as const,
-    policy: AMBASSADOR_ATTRIBUTION_POLICY,
-  };
+  if (appEnvironment === "production") {
+    if (
+      environment.STAGING_ONLY_GUARD === "true"
+      || publicChainId !== 56
+      || indexerChainId !== 56
+    ) throw new TypeError("AMBASSADOR_RUNTIME_MISCONFIGURED");
+    return {
+      environment: "production" as const,
+      chainId: 56 as const,
+      policy: AMBASSADOR_ATTRIBUTION_POLICY,
+    };
+  }
+  throw new TypeError("AMBASSADOR_RUNTIME_MISCONFIGURED");
+}
+
+export function assertAmbassadorInvitationCode(value: unknown) {
+  if (typeof value !== "string") {
+    throw new DomainValidationError("El codigo de invitacion no es valido.");
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!/^cw-[0-9a-f]{12}$/.test(normalized)) {
+    throw new DomainValidationError("El codigo de invitacion no es valido.");
+  }
+  return normalized;
+}
+
+export function ambassadorInvitationCode(wallet: string) {
+  const walletNormalized = validAmbassadorWallet(wallet);
+  return `cw-${stableAmbassadorHash({
+    kind: "ambassador-invitation-code-v1",
+    walletNormalized,
+  }).slice(0, 12)}`;
 }
 
 export function buildAmbassadorAttribution(input: {

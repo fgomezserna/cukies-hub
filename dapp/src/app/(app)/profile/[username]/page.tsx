@@ -16,7 +16,6 @@ import {
   Trophy, 
   Star, 
   Clock, 
-  Users,
   Loader2,
   ArrowLeft,
   Calendar,
@@ -41,8 +40,6 @@ interface UserProfile {
     favoriteGame: string;
     questsCompleted: number;
     tasksCompleted: number;
-    totalReferrals: number;
-    referralRewards: number;
   };
   recentActivity: Array<{
     gameId: string;
@@ -334,7 +331,7 @@ export default function ProfilePage() {
           </TabsContent>
 
           <TabsContent value="achievements" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6">
               <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -359,29 +356,6 @@ export default function ProfilePage() {
                       No quests completed yet
                     </div>
                   )}
-                </CardContent>
-              </Card>
-
-              <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-blue-400" />
-                    Referral Stats
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Referrals</span>
-                      <span className="text-2xl font-bold">{profile.stats.totalReferrals}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Referral Rewards</span>
-                      <span className="text-2xl font-bold text-pink-500">
-                        {profile.stats.referralRewards}
-                      </span>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </div>

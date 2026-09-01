@@ -35,9 +35,6 @@ export type User = {
   twitterHandle: string | null;
   discordUsername: string | null;
   telegramUsername: string | null;
-  referralCode: string | null;
-  referredById: string | null;
-  referralRewards: number;
   createdAt: string;
   updatedAt: string;
   lastCheckIn: Streak | null; // Added field
@@ -49,7 +46,6 @@ export type PointTransactionType =
   | 'DAILY_LOGIN'
   | 'GAME_PLAY'
   | 'GAME_WIN'
-  | 'REFERRAL_BONUS'
   | 'PURCHASE'
   | 'MANUAL_ADJUSTMENT'
   | 'OTHER';
@@ -70,7 +66,6 @@ export type UserStats = {
     walletAddress: string;
     username: string | null;
     xp: number;
-    referralPoints: number;
     totalPoints: number;
   };
   stats: {
@@ -88,8 +83,7 @@ export type LeaderboardPlayer = {
   avatar: string;
   hint: string;
   points: number;
-  referralPoints: number;
   totalPoints: number;
   walletAddress: string;
   username: string | null;
-} 
+}

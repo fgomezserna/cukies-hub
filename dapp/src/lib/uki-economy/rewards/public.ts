@@ -19,6 +19,7 @@ import type {
   RewardClaimProof,
   RewardSourceManifest,
 } from './types';
+import type { RewardAccountingAllocationDocument } from './accounting-types';
 
 const BYTES32 = /^0x[0-9a-f]{64}$/i;
 const RAW = /^(0|[1-9][0-9]*)$/;
@@ -484,6 +485,7 @@ export async function listWalletRewardStatus(input: {
     sourceManifests,
     allocationSummaryRows,
     claimSummaryRows,
+    ambassadorAllocations,
   ] = await Promise.all([
     db.collection<RewardClaim>('reward_claims')
       .find({ walletNormalized })
@@ -506,6 +508,14 @@ export async function listWalletRewardStatus(input: {
       .toArray(),
     db.collection<RewardClaim>('reward_claims')
       .aggregate<WalletClaimSummary>(claimSummaryPipeline(walletNormalized))
+      .toArray(),
+    db.collection<RewardAccountingAllocationDocument>('reward_accounting_allocations')
+      .find({
+        walletNormalized,
+        category: { $in: ['ambassador_ordinary', 'ambassador_weekly'] },
+      })
+      .sort({ availableAt: -1, _id: -1 })
+      .limit(100)
       .toArray(),
   ]);
   const allocationSummary = allocationSummaryRows[0];
@@ -654,6 +664,15 @@ export async function listWalletRewardStatus(input: {
       amountRaw: allocation.amountRaw,
       status: allocation.status,
       ruleVersion: allocation.ruleVersion,
+      createdAt: allocation.createdAt,
+    })),
+    ambassadorAllocations: ambassadorAllocations.map((allocation) => ({
+      allocationId: allocation.allocationId,
+      periodId: allocation.periodId,
+      category: allocation.category,
+      amountRaw: allocation.amountRaw,
+      status: allocation.status,
+      availableAt: allocation.availableAt,
       createdAt: allocation.createdAt,
     })),
     claims: claims.map((claim) => ({

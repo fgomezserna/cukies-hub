@@ -34,13 +34,6 @@ model User {
   dailyCheckIns DailyCheckIn[]
   lastCheckIn   Streak?
 
-  // Referrals
-  referralCode    String?
-  referredById    String? @db.ObjectId
-  referredBy      User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  referrals       User[]  @relation("Referrals")
-  referralRewards Int     @default(0)
-
   // Point transactions history
   pointTransactions PointTransaction[]
 
@@ -236,25 +229,12 @@ model PointTransaction {
   userId      String             @db.ObjectId
   user        User               @relation(fields: [userId], references: [id])
   amount      Int                // Positive for earned, negative for spent
-  type        PointTransactionType
+  type        String
   reason      String             // Description of why points were gained/lost
   metadata    Json?              // Additional data (quest id, game id, etc.)
   createdAt   DateTime           @default(now())
 
   @@index([userId, createdAt])
-}
-
-enum PointTransactionType {
-  QUEST_COMPLETION
-  DAILY_LOGIN
-  GAME_PLAY
-  GAME_WIN
-  REFERRAL_BONUS
-  REFERRAL_LEVEL_1
-  REFERRAL_LEVEL_2
-  PURCHASE
-  MANUAL_ADJUSTMENT
-  OTHER
 }
 
 /// --- NEXTAUTH MODELS (required for Prisma Adapter) ---

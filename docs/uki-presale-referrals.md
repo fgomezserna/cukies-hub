@@ -6,6 +6,12 @@ Crear un sistema de referidos nuevo para la preventa UKI, independiente del sist
 
 El sistema legacy queda fuera del flujo de preventa. No debe usarse para atribucion, desbloqueo de links, calculo de rewards ni reporting de compras.
 
+Tras el cierre de la preventa, cada sponsor directo que quedo bloqueado en una
+compra confirmada se materializa automaticamente como embajador directo en
+`ambassador_attributions`. La wallet referida no repite el tramite ni firma de
+nuevo. Los niveles 2 y 3 permanecen como evidencia historica de la campana de
+preventa y no se convierten en niveles del programa de embajadores.
+
 El sistema de preventa es off-chain: no premia en el momento de la compra, no reparte comisiones automaticas y no necesita bloquear logica de premios en blockchain. Solo registra compras atribuidas por red de referidos para calcular rankings o valores acumulados al final de la campana. Los premios finales pueden ser Cukies asignados manual u operativamente segun el ranking/valor resultante.
 
 ## Comportamiento de producto
@@ -272,8 +278,14 @@ Esto no entrega premio en ese momento. El volumen bruto por nivel se conserva, y
 
 ## Cambios previos realizados
 
-- La entrada legacy `Referidos` se oculta de la navegacion principal.
-- `/referrals` queda oculto y responde como pagina no encontrada.
-- `/r/[code]` deja de capturar referidos legacy.
-- `/api/referral/[code]` limpia la cookie legacy y redirige a home.
-- El login deja de procesar `referrerUsername` y no asigna `referredById` ni XP legacy.
+- La entrada legacy `Referidos`, `/referrals`, `/r/[code]`, `/api/referral/[code]`
+  y `/api/referrals` se han eliminado del codigo.
+- El login no procesa `referrerUsername` ni asigna `referredById` o XP legacy.
+- Quests y bonus diario no distribuyen XP a referidores; perfiles, rankings y
+  estadisticas tampoco exponen `referralRewards`.
+- Los campos de referral XP se han retirado del esquema Prisma y de los tipos
+  de aplicacion. Las filas historicas de puntos usan un tipo string para poder
+  leerse, pero ya no se generan ni intervienen en ningun calculo.
+- La migracion operativa del sponsor directo bloqueado se ejecuta con
+  `pnpm ambassadors:migrate:presale` y exige el confirmador explicito
+  `AMBASSADOR_PRESALE_MIGRATION_CONFIRM=MATERIALIZE_LOCKED_PRESALE_AMBASSADORS`.

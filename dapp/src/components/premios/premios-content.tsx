@@ -64,6 +64,15 @@ type PublishedReward = {
 type RewardStatus = {
   walletNormalized: string;
   allocations: RewardAllocation[];
+  ambassadorAllocations?: Array<{
+    allocationId: string;
+    periodId: string;
+    category: 'ambassador_ordinary' | 'ambassador_weekly';
+    amountRaw: string;
+    status: 'allocated_offchain';
+    availableAt: string;
+    createdAt: string;
+  }>;
   claims: RewardClaim[];
   pageAllocatedRaw: string;
   totalAllocatedRaw: string;
@@ -141,6 +150,10 @@ function rewardLabel(category: string) {
       return 'Pool de Cukies Originales';
     case 'cukie_pool_second_plus_distribution':
       return 'Pool de Cukies';
+    case 'ambassador_ordinary':
+      return 'Comisión de embajador';
+    case 'ambassador_weekly':
+      return 'Comisión semanal de embajador';
     case 'treasury':
       return 'Tesorería';
     case 'marketing':
@@ -199,6 +212,12 @@ export function PremiosContent() {
   const [claimFeedback, setClaimFeedback] = useState<ClaimFeedback | null>(
     null,
   );
+  const [ambassadorOnly, setAmbassadorOnly] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setAmbassadorOnly(new URLSearchParams(window.location.search).get('category') === 'ambassador');
+  }, []);
 
   const load = useCallback(
     async (options?: { cursor?: string; append?: boolean }) => {
@@ -300,6 +319,19 @@ export function PremiosContent() {
           allocation.status === 'blocked'
             ? ('warning' as const)
             : ('earned' as const),
+        category: 'reward' as const,
+        transactionHash: null,
+        transactionChainId: null,
+      })),
+      ...(status.ambassadorAllocations ?? []).map((allocation) => ({
+        id: `ambassador-allocation:${allocation.allocationId}`,
+        date: allocation.createdAt,
+        title: rewardLabel(allocation.category),
+        helper: periodLabel(allocation.periodId),
+        amountRaw: allocation.amountRaw,
+        state: 'Comisión registrada' as const,
+        kind: 'earned' as const,
+        category: 'ambassador' as const,
         transactionHash: null,
         transactionChainId: null,
       })),
@@ -311,14 +343,15 @@ export function PremiosContent() {
         amountRaw: claim.amountRaw,
         state: 'Cobrado' as const,
         kind: 'claimed' as const,
+        category: 'claim' as const,
         transactionHash: claim.transactionHash,
         transactionChainId: claim.chainId,
       })),
-    ].sort(
+    ].filter((item) => !ambassadorOnly || item.category === 'ambassador' || item.category === 'claim').sort(
       (left, right) =>
         new Date(right.date).getTime() - new Date(left.date).getTime(),
     );
-  }, [status]);
+  }, [ambassadorOnly, status]);
 
   async function refreshRewards() {
     setClaimFeedback(null);
@@ -868,6 +901,19 @@ export function PremiosContent() {
                 <History className="hidden h-6 w-6 text-[var(--uki-lilac)] sm:block" />
               ) : null}
             </div>
+            {activity.length > 0 ? (
+              ambassadorOnly ? (
+                <div className="mt-5 flex flex-col gap-3 rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-black text-[var(--uki-cream)]">Mostrando comisiones de embajador</p>
+                    <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">Los cobros confirmados pueden agrupar varios tipos de premio en una misma transacción.</p>
+                  </div>
+                  <button type="button" onClick={() => setAmbassadorOnly(false)} className="text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]">
+                    Ver todo el historial
+                  </button>
+                </div>
+              ) : null
+            ) : null}
             {activity.length > 0 ? (
               <div className="mt-5 overflow-hidden rounded-[14px] border border-white/10 bg-black/25">
                 <div className="divide-y divide-white/10">

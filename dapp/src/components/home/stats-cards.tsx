@@ -12,7 +12,6 @@ interface PlatformStats {
     totalXpDistributed: number;
     userStats?: {
         totalXp: number;
-        referralRewards: number;
         rank: number;
         totalSessions: number;
     };

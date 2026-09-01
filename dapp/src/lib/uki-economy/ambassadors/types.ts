@@ -1,4 +1,11 @@
 export const AMBASSADOR_ATTRIBUTION_POLICIES = Object.freeze({
+  "ambassador-direct-v1": Object.freeze({
+    version: "ambassador-direct-v1",
+    commissionBps: 500,
+    levels: 1,
+  }),
+  // Las filas históricas creadas antes de la política neutral por entorno
+  // siguen siendo legibles. Las nuevas usan siempre ambassador-direct-v1.
   "ambassador-direct-staging-v1": Object.freeze({
     version: "ambassador-direct-staging-v1",
     commissionBps: 500,
@@ -10,7 +17,7 @@ export type AmbassadorAttributionPolicyVersion =
   keyof typeof AMBASSADOR_ATTRIBUTION_POLICIES;
 
 export const AMBASSADOR_ATTRIBUTION_POLICY =
-  AMBASSADOR_ATTRIBUTION_POLICIES["ambassador-direct-staging-v1"];
+  AMBASSADOR_ATTRIBUTION_POLICIES["ambassador-direct-v1"];
 
 export type AmbassadorAttributionSource =
   | "presale_locked"
@@ -37,6 +44,14 @@ export type LockedPresaleAmbassador = {
   ambassadorWalletNormalized: string;
   lockedAt: Date;
   sourceReferenceHash: string;
+};
+
+export type AmbassadorProfile = {
+  _id: string;
+  walletNormalized: string;
+  invitationCode: string;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export interface AmbassadorAttributionRepository {

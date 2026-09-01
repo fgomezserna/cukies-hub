@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 
 import {
+  materializeLockedPresaleAmbassadorAttributions,
   resolveMongoAmbassadorAttributionsForWallets,
 } from "@/lib/uki-economy/ambassadors/repository";
 import {
@@ -12,6 +13,7 @@ import type { AmbassadorAttribution } from "@/lib/uki-economy/ambassadors/types"
 const REFERRED = "0x1111111111111111111111111111111111111111";
 const AMBASSADOR = "0x2222222222222222222222222222222222222222";
 const OTHER = "0x3333333333333333333333333333333333333333";
+const NOW = new Date("2026-08-30T12:00:00.000Z");
 
 type PresaleRow = {
   normalizedWalletAddress: string;
@@ -24,7 +26,9 @@ type FakeFilter = {
   referredWalletNormalized?: { $in: string[] };
   normalizedWalletAddress?: { $in: string[] };
   acceptedAt?: { $lte: Date };
-  lockedSponsorWalletAddress?: { $type: "string" };
+  lockedSponsorWalletAddress?:
+    | { $type: "string" }
+    | { $regex: string; $options: string };
 };
 
 function fakeDb(input: {
@@ -40,6 +44,7 @@ function fakeDb(input: {
         return {
           async toArray() {
             return rows.filter((row) => {
+              const sponsorFilter = filter.lockedSponsorWalletAddress;
               const wallet = "referredWalletNormalized" in row
                 ? row.referredWalletNormalized
                 : row.normalizedWalletAddress;
@@ -51,20 +56,39 @@ function fakeDb(input: {
                   (!("acceptedAt" in row) || row.acceptedAt > filter.acceptedAt.$lte)) {
                 return false;
               }
-              if (filter.lockedSponsorWalletAddress?.$type === "string" &&
+              if (sponsorFilter && "$type" in sponsorFilter && sponsorFilter.$type === "string" &&
                   (!("lockedSponsorWalletAddress" in row) ||
                     typeof row.lockedSponsorWalletAddress !== "string")) return false;
+              if (sponsorFilter && "$regex" in sponsorFilter &&
+                  (!("lockedSponsorWalletAddress" in row) ||
+                    typeof row.lockedSponsorWalletAddress !== "string" ||
+                    !new RegExp(
+                      sponsorFilter.$regex,
+                      sponsorFilter.$options,
+                    ).test(row.lockedSponsorWalletAddress))) return false;
               return true;
             });
           },
         };
       },
-      async bulkWrite(operations: Array<{ updateOne: { filter: { _id: string }; update: { $setOnInsert: AmbassadorAttribution } } }>) {
+      async bulkWrite(operations: Array<{
+        updateOne: {
+          filter: { _id?: string; referredWalletNormalized?: string };
+          update: { $setOnInsert: AmbassadorAttribution };
+        };
+      }>) {
+        let upsertedCount = 0;
         for (const operation of operations) {
-          if (!attributions.some((row) => row._id === operation.updateOne.filter._id)) {
+          const { _id, referredWalletNormalized } = operation.updateOne.filter;
+          if (!attributions.some((row) =>
+            (_id && row._id === _id)
+            || (referredWalletNormalized && row.referredWalletNormalized === referredWalletNormalized)
+          )) {
             attributions.push(operation.updateOne.update.$setOnInsert);
+            upsertedCount += 1;
           }
         }
+        return { upsertedCount };
       },
     };
   };
@@ -128,6 +152,28 @@ describe("Mongo ambassador canonical resolution", () => {
       levelsSnapshot: 1,
     });
     expect(attributions).toHaveLength(1);
+  });
+
+  it("migra todos los sponsors bloqueados sin nueva firma y permite reejecutar", async () => {
+    const lockedAt = new Date("2026-03-31T00:00:00.000Z");
+    const { db, attributions } = fakeDb({
+      presale: [{
+        normalizedWalletAddress: REFERRED,
+        lockedSponsorWalletAddress: AMBASSADOR,
+        sponsorLockedAt: lockedAt,
+      }],
+    });
+
+    await expect(materializeLockedPresaleAmbassadorAttributions(db, { now: NOW }))
+      .resolves.toEqual({ scanned: 1, materialized: 1 });
+    await expect(materializeLockedPresaleAmbassadorAttributions(db, { now: NOW }))
+      .resolves.toEqual({ scanned: 1, materialized: 0 });
+    expect(attributions).toHaveLength(1);
+    expect(attributions[0]).toMatchObject({
+      source: "presale_locked",
+      acceptedAt: lockedAt,
+      policyVersion: "ambassador-direct-v1",
+    });
   });
 
   it("falla cerrado si una proyeccion contradice preventa", async () => {

@@ -94,7 +94,6 @@ async function getGameSpecificLeaderboard(gameId: string, period: string, limit:
     avatar: result.user.profilePictureUrl || "https://placehold.co/40x40.png",
     hint: result.user.username ? "user avatar" : "wallet avatar",
     points: result.finalScore,
-    referralPoints: 0, // Not applicable for game-specific leaderboards
     totalPoints: result.finalScore,
     walletAddress: result.user.walletAddress,
     username: result.user.username,
@@ -167,7 +166,6 @@ async function getGeneralGameResultsLeaderboard(period: string, limit: number, o
       userAggregatedScores.set(userId, {
         user: result.user,
         totalScore: 0,
-        totalXpEarned: 0,
         gamesPlayed: 0,
         bestScore: 0,
         lastPlayedAt: result.createdAt,
@@ -176,7 +174,6 @@ async function getGeneralGameResultsLeaderboard(period: string, limit: number, o
     
     const userStats = userAggregatedScores.get(userId);
     userStats.totalScore += result.finalScore;
-    userStats.totalXpEarned += result.xpEarned;
     userStats.gamesPlayed += 1;
     userStats.bestScore = Math.max(userStats.bestScore, result.finalScore);
     
@@ -200,8 +197,7 @@ async function getGeneralGameResultsLeaderboard(period: string, limit: number, o
     avatar: result.user.profilePictureUrl || "https://placehold.co/40x40.png",
     hint: result.user.username ? "user avatar" : "wallet avatar",
     points: result.totalScore,
-    referralPoints: result.totalXpEarned, // Using XP earned as secondary metric
-    totalPoints: result.totalScore + result.totalXpEarned,
+    totalPoints: result.totalScore,
     walletAddress: result.user.walletAddress,
     username: result.user.username,
     gamesPlayed: result.gamesPlayed,
@@ -215,4 +211,4 @@ async function getGeneralGameResultsLeaderboard(period: string, limit: number, o
     hasMore: offset + limit < totalCount,
     period,
   });
-} 
+}

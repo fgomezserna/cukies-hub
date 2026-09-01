@@ -3,7 +3,9 @@ import {
   resolveAmbassadorAttribution,
 } from "@/lib/uki-economy/ambassadors/service";
 import {
+  ambassadorInvitationCode,
   assertAmbassadorAttribution,
+  assertAmbassadorInvitationCode,
   buildAmbassadorAttribution,
   stableAmbassadorHash,
 } from "@/lib/uki-economy/ambassadors/rules";
@@ -42,6 +44,14 @@ function sessionEvidence(suffix = "initial") {
 }
 
 describe("ambassador attribution", () => {
+  it("genera un codigo estable que no expone la wallet", () => {
+    const code = ambassadorInvitationCode(AMBASSADOR);
+
+    expect(code).toMatch(/^cw-[0-9a-f]{12}$/);
+    expect(code).not.toContain(AMBASSADOR.slice(2));
+    expect(assertAmbassadorInvitationCode(code.toUpperCase())).toBe(code);
+  });
+
   it("vincula sin compra mediante la wallet referida y sella 500 bps/un nivel", async () => {
     const repository = new MemoryAmbassadorRepository();
     const attribution = await acceptDirectAmbassadorAttribution(repository, {
@@ -55,7 +65,7 @@ describe("ambassador attribution", () => {
       referredWalletNormalized: REFERRED,
       ambassadorWalletNormalized: AMBASSADOR,
       source: "signed_wallet_session",
-      policyVersion: "ambassador-direct-staging-v1",
+      policyVersion: "ambassador-direct-v1",
       commissionBpsSnapshot: 500,
       levelsSnapshot: 1,
       acceptedAt: NOW,

@@ -20,8 +20,6 @@ export function getPointTransactionIcon(type: PointTransactionType): string {
     case 'GAME_PLAY':
     case 'GAME_WIN':
       return '🎮';
-    case 'REFERRAL_BONUS':
-      return '👥';
     case 'PURCHASE':
       return '🛒';
     case 'MANUAL_ADJUSTMENT':

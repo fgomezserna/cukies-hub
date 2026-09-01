@@ -139,6 +139,15 @@ describe('public reward claimable', () => {
 
   it('materializa claimableRaw y devuelve el batch/proof publicado desde Mongo', async () => {
     const subject = fixture();
+    const ambassadorAllocation = {
+      allocationId: 'ambassador:daily:1',
+      periodId: '2026-07-10',
+      category: 'ambassador_ordinary',
+      amountRaw: '375',
+      status: 'allocated_offchain',
+      availableAt: STARTS_AT,
+      createdAt: STARTS_AT,
+    };
     const cursor = (documents: unknown[]) => {
       const value = {
         sort: () => value,
@@ -156,6 +165,8 @@ describe('public reward claimable', () => {
               ? [subject.batch]
               : name === 'chain_events'
                 ? [subject.publicationEvent]
+                : name === 'reward_accounting_allocations'
+                  ? [ambassadorAllocation]
                 : [],
         ),
         aggregate: () => cursor(
@@ -190,6 +201,11 @@ describe('public reward claimable', () => {
           batch: { batchId: subject.batch.batchId, amountRaw: '7500' },
           proof: { proofId: subject.proof.proofId },
           onChainStatus: 'claimable',
+        }],
+        ambassadorAllocations: [{
+          allocationId: ambassadorAllocation.allocationId,
+          category: 'ambassador_ordinary',
+          amountRaw: '375',
         }],
       });
     } finally {

@@ -19,7 +19,6 @@ export async function GET(request: Request) {
         walletAddress: true,
         username: true,
         xp: true,
-        referralRewards: true,
       },
     });
 
@@ -30,8 +29,9 @@ export async function GET(request: Request) {
     // Get total number of users for ranking calculation
     const totalUsers = await prisma.user.count();
 
-    // Get user ranking based on total points (xp + referralRewards)
-    const totalPoints = user.xp + user.referralRewards;
+    // XP remains the only legacy points source. Ambassador commissions live in
+    // the UKI economy ledger and must never be mixed into this ranking.
+    const totalPoints = user.xp;
     const usersAbove = await prisma.user.count({
       where: {
         xp: {
@@ -54,7 +54,6 @@ export async function GET(request: Request) {
         walletAddress: user.walletAddress,
         username: user.username,
         xp: user.xp,
-        referralPoints: user.referralRewards,
         totalPoints,
       },
       stats: {
@@ -70,4 +69,4 @@ export async function GET(request: Request) {
     console.error('Failed to fetch user stats:', error);
     return NextResponse.json({ error: 'Failed to fetch user stats' }, { status: 500 });
   }
-} 
+}
