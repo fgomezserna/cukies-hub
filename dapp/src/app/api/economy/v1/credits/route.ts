@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyWalletAuth } from '@/lib/auth-utils';
 import {
   competitionCreditService,
+  CREDIT_HISTORY_PAGE_SIZE,
+  getCompetitionCreditWalletHistory,
   getCompetitionCreditWalletStatus,
 } from '@/lib/uki-economy/credits';
 import { UkiEconomyError } from '@/lib/uki-economy/errors';
@@ -18,6 +20,13 @@ function noStore(response: NextResponse) {
 
 function errorResponse(code: string, status: number) {
   return noStore(NextResponse.json({ status: 'error', code }, { status }));
+}
+
+function historyPage(request: NextRequest) {
+  const raw = request.nextUrl.searchParams.get('historyPage') ?? '0';
+  if (!/^\d{1,3}$/.test(raw)) return null;
+  const page = Number(raw);
+  return Number.isSafeInteger(page) && page >= 0 && page <= 100 ? page : null;
 }
 
 async function requireWallet(walletAddress: string | null) {
@@ -72,10 +81,24 @@ function mapDomainError(error: UkiEconomyError) {
 
 export async function GET(request: NextRequest) {
   const walletAddress = request.nextUrl.searchParams.get('walletAddress')?.trim() ?? null;
+  const requestedHistoryPage = historyPage(request);
+  if (requestedHistoryPage === null) return errorResponse('INVALID_CREDIT_HISTORY_PAGE', 400);
   try {
     await requireWallet(walletAddress);
     const status = await getCompetitionCreditWalletStatus(walletAddress!);
-    return noStore(NextResponse.json({ status: 'ok', data: status }));
+    const history = await getCompetitionCreditWalletHistory(
+      walletAddress!,
+      requestedHistoryPage,
+    ).then((data) => ({ available: true as const, ...data })).catch(() => ({
+      available: false as const,
+      page: requestedHistoryPage,
+      pageSize: CREDIT_HISTORY_PAGE_SIZE,
+      hasMore: false,
+      totals: null,
+      nextExpiry: null,
+      entries: [],
+    }));
+    return noStore(NextResponse.json({ status: 'ok', data: { ...status, history } }));
   } catch (error) {
     if (error instanceof Error && error.message === 'INVALID_WALLET') {
       return errorResponse('INVALID_WALLET', 400);

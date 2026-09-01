@@ -16,6 +16,10 @@ import {
 
 import { Panel } from '@/components/landing/primitives';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
+import {
+  CompetitionCreditHistory,
+  type CreditHistoryData,
+} from '@/components/cukie-master/credit-history';
 import { useAuth } from '@/providers/auth-provider';
 
 type CreditConfiguration = {
@@ -54,6 +58,7 @@ type CreditStatus = {
   configurations: CreditConfiguration[];
   activeReservations: number;
   grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
+  history: CreditHistoryData;
 };
 
 type SaveResult = 'idle' | 'saved' | 'error';
@@ -94,6 +99,9 @@ export function CompetitionCreditPanel() {
   const [drafts, setDrafts] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<SaveResult>('idle');
+  const [history, setHistory] = useState<CreditHistoryData | null>(null);
+  const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
+  const [historyLoadError, setHistoryLoadError] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal, silent = false) => {
     if (!walletAddress) return;
@@ -105,6 +113,8 @@ export function CompetitionCreditPanel() {
     const body = await response.json() as { data?: CreditStatus };
     if (!response.ok || !body.data) throw new Error('CREDIT_STATUS_UNAVAILABLE');
     setStatus(body.data);
+    setHistory(body.data.history);
+    setHistoryLoadError(false);
     setDrafts(Object.fromEntries(
       body.data.configurations.map((configuration) => [
         configuration.slotId,
@@ -118,6 +128,7 @@ export function CompetitionCreditPanel() {
     if (authLoading) return;
     if (!walletAddress) {
       setStatus(null);
+      setHistory(null);
       setState('idle');
       return;
     }
@@ -125,6 +136,7 @@ export function CompetitionCreditPanel() {
     load(controller.signal).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setStatus(null);
+      setHistory(null);
       setState('unavailable');
     });
     return () => controller.abort();
@@ -232,6 +244,39 @@ export function CompetitionCreditPanel() {
     }
   }
 
+  async function loadMoreHistory() {
+    if (!walletAddress || !history?.available || !history.hasMore || isLoadingMoreHistory) return;
+    setIsLoadingMoreHistory(true);
+    setHistoryLoadError(false);
+    try {
+      const nextPage = history.page + 1;
+      const response = await fetch(
+        `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}&historyPage=${nextPage}`,
+        { cache: 'no-store', credentials: 'same-origin' },
+      );
+      const body = await response.json() as { data?: CreditStatus };
+      const nextHistory = body.data?.history;
+      if (!response.ok || !nextHistory?.available || nextHistory.page !== nextPage) {
+        throw new Error('CREDIT_HISTORY_UNAVAILABLE');
+      }
+      setHistory((current) => {
+        if (!current?.available) return nextHistory;
+        const eventIds = new Set(current.entries.map((entry) => entry.eventId));
+        return {
+          ...nextHistory,
+          entries: [
+            ...current.entries,
+            ...nextHistory.entries.filter((entry) => !eventIds.has(entry.eventId)),
+          ],
+        };
+      });
+    } catch {
+      setHistoryLoadError(true);
+    } finally {
+      setIsLoadingMoreHistory(false);
+    }
+  }
+
   if (!authLoading && state === 'idle' && !walletAddress) {
     return (
       <section id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
@@ -260,7 +305,7 @@ export function CompetitionCreditPanel() {
   }
 
   return (
-    <section id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
+    <div id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
       <Panel innerClassName="p-5 sm:p-7 lg:p-8">
         <div className="flex flex-col gap-4 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -316,7 +361,7 @@ export function CompetitionCreditPanel() {
               <CurrentBalance label="Para jugar" value={status.balance.availableCredits} />
               <CurrentBalance label="En partidas" value={status.balance.reservedCredits} />
               <CurrentBalance label="Ya usados" value={status.balance.spentCredits} />
-              <CurrentBalance label="Aportados al pool" value={status.pool.availableCredits} />
+              <CurrentBalance label="Aportados al pool" value={status.balance.poolDepositedCredits} />
             </div>
 
             {unavailableRoutes.length > 0 ? (
@@ -515,7 +560,16 @@ export function CompetitionCreditPanel() {
           </>
         ) : null}
       </Panel>
-    </section>
+      {state === 'ready' && status ? (
+        <CompetitionCreditHistory
+          history={history}
+          isLoadingMore={isLoadingMoreHistory}
+          loadMoreError={historyLoadError}
+          onLoadMore={loadMoreHistory}
+          onRetry={() => load(undefined, true).catch(() => setHistoryLoadError(true))}
+        />
+      ) : null}
+    </div>
   );
 }
 

@@ -11,6 +11,8 @@ jest.mock('lucide-react', () => ({
 }));
 jest.mock('@phosphor-icons/react', () => ({
   CheckCircle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ArrowCounterClockwise: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ClockCountdown: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Coin: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Diamond: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   FloppyDisk: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
@@ -78,6 +80,40 @@ function statusResponse() {
         }],
         activeReservations: 1,
         grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+        history: {
+          available: true,
+          page: 0,
+          pageSize: 20,
+          hasMore: false,
+          totals: {
+            receivedCredits: 500,
+            spentCredits: 10,
+            poolContributedCredits: 100,
+            expiredCredits: 0,
+          },
+          nextExpiry: { credits: 80, at: '2026-07-11T12:00:00.000Z' },
+          entries: [{
+            eventId: 'grant:own:item-1',
+            operation: 'grant',
+            bucket: 'own',
+            amountCredits: 100,
+            route: 'uki',
+            slotOrdinal: 1,
+            occurredAt: '2026-07-10T12:01:00.000Z',
+            expiresAt: '2026-07-11T12:00:00.000Z',
+            periodId: 'period-1',
+          }, {
+            eventId: 'spend:own:reservation-1',
+            operation: 'spend',
+            bucket: 'own',
+            amountCredits: 10,
+            route: 'uki',
+            slotOrdinal: 1,
+            occurredAt: '2026-07-10T14:30:00.000Z',
+            expiresAt: '2026-07-11T12:00:00.000Z',
+            periodId: 'period-1',
+          }],
+        },
       },
     }),
   };
@@ -100,6 +136,12 @@ describe('CompetitionCreditPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Lo que ya tienes hoy')).toBeInTheDocument());
     expect(screen.getAllByText('80').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'Historial de créditos' })).toBeInTheDocument();
+    expect(screen.getByText('Créditos recibidos')).toBeInTheDocument();
+    expect(screen.getByText('Partida jugada')).toBeInTheDocument();
+    expect(screen.getByText('Próxima caducidad')).toBeInTheDocument();
+    const [currentPoolBalance] = screen.getAllByText('Aportados al pool');
+    expect(currentPoolBalance.parentElement).toHaveTextContent('20');
     expect(screen.queryByText('credits-v1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {
       name: 'Aumentar aportación al pool de UKI, cupo 1',
@@ -185,5 +227,18 @@ describe('CompetitionCreditPanel', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Guardar 1 cambio' })).toBeEnabled();
     expect(screen.getAllByText('100').length).toBeGreaterThan(0);
+  });
+
+  it('filters the ledger without exposing technical operation names', async () => {
+    fetchMock.mockResolvedValueOnce(statusResponse());
+
+    render(<CompetitionCreditPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gastados' }));
+
+    expect(screen.getByText('Partida jugada')).toBeInTheDocument();
+    expect(screen.queryByText('Créditos recibidos')).not.toBeInTheDocument();
+    expect(screen.queryByText('grant')).not.toBeInTheDocument();
+    expect(screen.queryByText('spend')).not.toBeInTheDocument();
   });
 });
