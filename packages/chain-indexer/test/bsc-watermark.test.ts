@@ -495,3 +495,55 @@ test('does not seal an existing UKI cursor whose coverage starts after deploymen
   );
   assert.deepEqual(updates, []);
 });
+
+test('rejects config drift in an already sealed cursor before reading new logs', async () => {
+  const address = `0x${'3'.repeat(40)}` as const;
+  const deploymentTxHash = `0x${'4'.repeat(64)}`;
+  const bytecode = '0x60006000' as const;
+  const identity = {
+    alias: 'UKI_STAKING' as const,
+    chainId: 97 as const,
+    address,
+    startBlock: 105,
+    deploymentBlock: 105,
+    deploymentTxHash,
+    runtimeCodeHash: keccak256(bytecode),
+    configHash: `0x${'5'.repeat(64)}`,
+  };
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({
+    host: 'testnet.test',
+    chainId: 97,
+    bytecode,
+    receipt: { contractAddress: address, blockNumber: 105n, status: 'success' },
+    logCalls,
+  });
+  const { store, updates } = fakeStore({
+    contractAddress: address,
+    nextBlock: 111,
+    processedFromBlock: 105,
+    processedFromTimestampMs: 1_050_000,
+    bootstrapStatus: 'verified',
+    bootstrapStartBlock: 105,
+    bootstrapVerifiedAt: new Date('2026-08-27T00:00:00.000Z'),
+    verifiedChainId: 97,
+    contractCodeHash: identity.runtimeCodeHash,
+    contractDeploymentBlock: 105,
+    contractDeploymentTxHash: deploymentTxHash,
+    contractConfigHash: `0x${'f'.repeat(64)}`,
+  });
+
+  await assert.rejects(
+    ingestBscOnce(store, config({
+      bscExpectedChainId: 97,
+      contractAliases: ['UKI_STAKING'],
+      ukiStakingAddress: address,
+      ukiStakingStartBlock: 105,
+      verifiedBscContracts: { UKI_STAKING: identity },
+    }), { rpcClients: [client] }),
+    /Config drift en bootstrap UKI_STAKING:Staked/,
+  );
+
+  assert.deepEqual(logCalls, []);
+  assert.deepEqual(updates, []);
+});
