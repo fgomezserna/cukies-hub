@@ -11,7 +11,7 @@ import { usePublicLocale } from '@/providers/public-locale-provider';
 
 const navItems = [
   { label: { es: 'Inicio', en: 'Home' }, href: '/' },
-  { label: { es: 'Comprar UKI', en: 'Buy UKI' }, href: '/#comprar' },
+  { label: { es: 'Comprar UKI', en: 'Buy UKI' }, href: '/#comprar-uki' },
   { label: { es: 'Staking', en: 'Staking' }, href: '/cukie-master' },
   { label: { es: 'Jugar', en: 'Play' }, href: '/games/treasure-hunt' },
   { label: { es: 'Vesting', en: 'Vesting' }, href: '/vesting' },

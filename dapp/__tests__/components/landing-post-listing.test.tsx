@@ -1,10 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 
 import { CukiesLanding } from '@/components/landing/sections';
-import {
-  PANCAKESWAP_UKI_URL,
-  UKI_MAINNET_ADDRESSES,
-} from '@/components/landing/data';
+import { UKI_MAINNET_ADDRESSES } from '@/components/landing/data';
 
 let mockLocale: 'es' | 'en' = 'es';
 let mockCompetitionError: string | null = null;
@@ -46,6 +43,15 @@ jest.mock('@/components/landing/footer', () => ({
 }));
 jest.mock('@/components/landing/hero-background-video', () => ({
   HeroBackgroundVideo: () => null,
+}));
+jest.mock('@/components/landing/uki-swap-panel', () => ({
+  UkiSwapPanel: () => (
+    <form aria-label="Comprar UKI">
+      <button type="button">BNB</button>
+      <button type="button">USDT</button>
+      <button type="button">ASM</button>
+    </form>
+  ),
 }));
 jest.mock('@/components/landing/scroll-reveal', () => ({
   ScrollReveal: ({ children }: { children: React.ReactNode }) => children,
@@ -132,10 +138,11 @@ describe('home post-listing de UKI', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'UKI ya está activo' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Entrar al torneo' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Hacer staking' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Comprar UKI con ASM' })[0]).toHaveAttribute(
-      'href',
-      PANCAKESWAP_UKI_URL,
-    );
+    expect(screen.getByRole('form', { name: 'Comprar UKI' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Comprar UKI' })[0]).toHaveAttribute('href', '#comprar-uki');
+    expect(screen.getByRole('button', { name: 'BNB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'USDT' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ASM' })).toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: 'De UKI a la competición' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Torneo Lanzamiento UKI' })).toBeInTheDocument();
