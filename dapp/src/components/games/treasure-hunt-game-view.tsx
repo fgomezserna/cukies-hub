@@ -959,6 +959,7 @@ export default function TreasureHuntGameView() {
         <TreasureHuntPlaySidebar onStartSinglePlayer={startSinglePlayerFromHub} />
       )}
       desktopFooter={<TreasureHuntLatestResult key={competitionPanelRefreshKey} />}
+      desktopGameFirst
       mobileFocus
       mobileLayoutFlipEnabled
     />

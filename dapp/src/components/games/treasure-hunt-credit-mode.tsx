@@ -25,14 +25,14 @@ function CreditMetric({
   readonly detail: string;
 }) {
   return (
-    <div className="min-w-0 px-4 py-3.5 sm:px-5">
-      <dt className="text-[10px] font-black uppercase tracking-[0.14em] text-[#969994]">
+    <div className="min-w-0 px-3 py-2.5 sm:px-4">
+      <dt className="text-[9px] font-black uppercase tracking-[0.14em] text-[#969994]">
         {label}
       </dt>
-      <dd className="mt-1 font-headline text-lg font-black tabular-nums text-[#f2eee7]">
+      <dd className="mt-0.5 font-headline text-base font-black tabular-nums text-[#f2eee7]">
         {value}
       </dd>
-      <p className="mt-0.5 text-xs font-semibold text-[#969994]">{detail}</p>
+      <p className="mt-0.5 text-[11px] font-semibold leading-snug text-[#969994]">{detail}</p>
     </div>
   );
 }
@@ -51,49 +51,49 @@ export function TreasureHuntCreditModeBanner() {
       aria-labelledby="treasure-hunt-credit-mode-title"
       className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
     >
-      <div className="grid gap-5 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <div className="grid gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[minmax(12rem,0.8fr)_minmax(0,1.4fr)] lg:items-center xl:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.55fr)_auto]">
         <div className="min-w-0 border-l-2 border-[#35eee2] pl-4">
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#35eee2]">
             Partidas semanales · Créditos
           </p>
           <h2
             id="treasure-hunt-credit-mode-title"
-            className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]"
+            className="mt-1 font-headline text-xl font-black text-[#f2eee7]"
           >
             Juega con tus créditos
           </h2>
-          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[#aaa8a2]">
-            Cada partida genera su reparto. Si usa créditos del pool, además tu mejor puntuación entra en la competición semanal.
+          <p className="mt-1 max-w-md text-xs font-semibold leading-relaxed text-[#aaa8a2]">
+            Todas generan reparto; con créditos del pool también compites esta semana.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 lg:justify-end">
+        <dl className="grid overflow-hidden rounded-[7px] border border-white/15 bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-white/15">
+          <CreditMetric label="Coste" value={costLabel} detail="Al iniciar" />
+          <CreditMetric
+            label="Saldo para jugar"
+            value={access.isLoading ? 'Comprobando…' : balanceLabel}
+            detail={access.walletConnected ? 'Disponible ahora' : 'Conecta para consultarlo'}
+          />
+          <CreditMetric label="Cukie" value="Automático" detail="Propio o del pool" />
+        </dl>
+
+        <div className="grid grid-cols-2 gap-2 lg:col-span-2 xl:col-span-1 xl:grid-cols-1 2xl:grid-cols-2">
           <Link
             href="/games/treasure-hunt/rankings"
-            className="inline-flex min-h-10 items-center gap-2 rounded-[6px] border border-white/20 px-3.5 text-xs font-black text-[#f2eee7] transition-colors hover:border-[#35eee2]/55 hover:text-[#35eee2] active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-white/20 px-3 text-xs font-black text-[#f2eee7] transition-colors hover:border-[#35eee2]/55 hover:text-[#35eee2] active:scale-[0.98]"
           >
             <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
             Ver semana actual
           </Link>
           <Link
             href="/credits"
-            className="inline-flex min-h-10 items-center gap-2 rounded-[6px] border border-[#35eee2]/55 bg-[#0d5d57] px-3.5 text-xs font-black text-white transition-transform hover:bg-[#137069] active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-[#35eee2]/55 bg-[#0d5d57] px-3 text-xs font-black text-white transition-transform hover:bg-[#137069] active:scale-[0.98]"
           >
             Gestionar créditos
             <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
           </Link>
         </div>
       </div>
-
-      <dl className="grid border-t border-white/15 bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-white/15">
-        <CreditMetric label="Coste por partida" value={costLabel} detail="Se descuenta al iniciar" />
-        <CreditMetric
-          label="Tu saldo para jugar"
-          value={access.isLoading ? 'Comprobando…' : balanceLabel}
-          detail={access.walletConnected ? 'Créditos disponibles ahora' : 'Necesario para consultar el saldo'}
-        />
-        <CreditMetric label="Cukie de la partida" value="Asignación automática" detail="Propio o disponible en el pool" />
-      </dl>
 
       {access.isError ? (
         <div role="alert" className="flex items-start gap-3 border-t border-amber-300/25 bg-amber-300/10 px-5 py-3 text-sm font-semibold text-amber-100">

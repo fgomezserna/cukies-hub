@@ -276,7 +276,7 @@ describe('GameLayout fullscreen and desktop viewport', () => {
     ).toBeInTheDocument();
   });
 
-  it('constrains the desktop game above the fold when the competition banner is present', () => {
+  it('reserves the desktop play stage for the game and moves the result below it', () => {
     mockUseMobileGameShell.mockReturnValue(false);
     render(
       <GameLayout
@@ -284,10 +284,15 @@ describe('GameLayout fullscreen and desktop viewport', () => {
         mobileFocus
         desktopBanner={<div>Banner compacto</div>}
         desktopSidebar={<div>Preparación 1P</div>}
+        desktopFooter={<div>Último resultado</div>}
+        desktopGameFirst
       />,
     );
 
     const viewport = document.querySelector('[data-game-viewport]');
+    const layout = document.querySelector('[data-game-desktop-priority]');
+    const stage = document.querySelector<HTMLElement>('[data-game-desktop-stage]');
+    const footer = document.querySelector<HTMLElement>('[data-game-desktop-footer]');
     expect(viewport).toHaveClass(
       'aspect-[11/8]',
       'w-full',
@@ -297,6 +302,13 @@ describe('GameLayout fullscreen and desktop viewport', () => {
       'lg:max-w-full',
       'lg:self-center',
     );
+    expect(layout).toHaveAttribute('data-game-desktop-priority', 'game-first');
+    expect(stage).toHaveClass('lg:h-full');
+    expect(stage).not.toContainElement(footer);
+    expect(stage?.compareDocumentPosition(footer as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.getByText('Banner compacto')).toBeInTheDocument();
+    expect(screen.getByText('Último resultado')).toBeInTheDocument();
   });
 });
