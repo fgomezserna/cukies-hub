@@ -68,7 +68,9 @@ export function normalizeDomainEvent(
     return toJsonRecord({
       ...base,
       rarity: getNumber(args.rarity),
+      rarityRaw: getString(args.rarity),
       generation: getNumber(args.generation),
+      generationRaw: getString(args.generation),
       txType: eventName,
     });
   }
@@ -258,7 +260,7 @@ export function normalizeDomainEvent(
     return toJsonRecord({
       beneficiary,
       beneficiaryNormalized: normalizeAddress(chain, beneficiary),
-      scheduleId: getString(args.scheduleId),
+      scheduleId: getString(args.scheduleId)?.toLowerCase() ?? null,
       amountRaw: getString(args.amount),
       allocatedAmountRaw: eventName === 'VestingCreated' ? getString(args.amount) : '0',
       releasedAmountRaw: eventName === 'TokensReleased' ? getString(args.amount) : '0',
@@ -271,10 +273,10 @@ export function normalizeDomainEvent(
 
   if (eventName === 'BatchPublished') {
     return toJsonRecord({
-      batchId: getString(args.batchId),
-      merkleRoot: getString(args.merkleRoot),
-      inputHash: getString(args.inputHash),
-      metadataHash: getString(args.metadataHash),
+      batchId: getString(args.batchId)?.toLowerCase() ?? null,
+      merkleRoot: getString(args.merkleRoot)?.toLowerCase() ?? null,
+      inputHash: getString(args.inputHash)?.toLowerCase() ?? null,
+      metadataHash: getString(args.metadataHash)?.toLowerCase() ?? null,
       totalAllocatedRaw: getString(args.totalAllocated),
       startsAtRaw: getString(args.startsAt),
       expiresAtRaw: getString(args.expiresAt),
@@ -285,7 +287,7 @@ export function normalizeDomainEvent(
   if (eventName === 'RewardClaimed') {
     const account = getString(args.account);
     return toJsonRecord({
-      batchId: getString(args.batchId),
+      batchId: getString(args.batchId)?.toLowerCase() ?? null,
       account,
       accountNormalized: normalizeAddress(chain, account),
       amountRaw: getString(args.amount),
@@ -295,7 +297,7 @@ export function normalizeDomainEvent(
 
   if (eventName === 'BatchClosed') {
     return toJsonRecord({
-      batchId: getString(args.batchId),
+      batchId: getString(args.batchId)?.toLowerCase() ?? null,
       unclaimedAmountRaw: getString(args.unclaimedAmount),
       txType: eventName,
     });

@@ -24,6 +24,7 @@
     "import:legacy-metadata": "tsx src/cli.ts import-legacy-metadata",
     "project:once": "tsx src/cli.ts project-once",
     "test": "node --import tsx --test test/*.test.ts src/projectors/*.test.ts",
+    "test:normalize": "tsx --test \"src/normalize.test.ts\"",
     "test:economy": "tsx --test \"src/storage/*economy*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
