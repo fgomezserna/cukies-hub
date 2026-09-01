@@ -68,6 +68,15 @@ jest.mock('@/components/landing/footer', () => ({
 jest.mock('@/components/landing/hero-background-video', () => ({
   HeroBackgroundVideo: () => null,
 }));
+jest.mock('@/components/landing/uki-swap-panel', () => ({
+  UkiSwapPanel: () => (
+    <form aria-label="Comprar UKI">
+      <button type="button">BNB</button>
+      <button type="button">USDT</button>
+      <button type="button">ASM</button>
+    </form>
+  ),
+}));
 jest.mock('@/components/landing/scroll-reveal', () => ({
   ScrollReveal: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -157,10 +166,11 @@ describe('home post-listing de UKI', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'UKI ya está activo' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Entrar al torneo' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Hacer staking' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Comprar UKI con ASM' })[0]).toHaveAttribute(
-      'href',
-      PRODUCTION_NETWORK.swapUrl ?? undefined,
-    );
+    expect(screen.getByRole('form', { name: 'Comprar UKI' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Comprar UKI' })[0]).toHaveAttribute('href', '#comprar-uki');
+    expect(screen.getByRole('button', { name: 'BNB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'USDT' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ASM' })).toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: 'De UKI a la competición' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Torneo Lanzamiento UKI' })).toBeInTheDocument();
@@ -253,20 +263,13 @@ describe('home post-listing de UKI', () => {
     if (!STAGING_NETWORK.swapUrl) throw new Error('Stage debe tener un swap ASM/UKI verificado.');
 
     expect(screen.getByText('UKI · BNB Smart Chain')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Comprar UKI con ASM' })[0]).toHaveAttribute(
-      'href',
-      STAGING_NETWORK.swapUrl,
-    );
+    expect(screen.getByRole('form', { name: 'Comprar UKI' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Comprar UKI' })[0]).toHaveAttribute('href', '#comprar-uki');
     expect(screen.getByRole('link', { name: 'Pool ASM / UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
       `https://testnet.bscscan.com/address/${STAGING_NETWORK.liquidityPairAddress}`,
     );
     expect(screen.queryByRole('link', { name: 'Liquidez bloqueada: Abrir en BscScan' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('img', { name: 'UKI' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('img', { name: 'UKI' })[0]).toHaveAttribute(
-      'src',
-      expect.stringContaining('uki-token-cukies-world-coin.png'),
-    );
     expect(screen.getByRole('link', { name: 'Token UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
       `https://testnet.bscscan.com/token/${STAGING_NETWORK.ukiTokenAddress}`,

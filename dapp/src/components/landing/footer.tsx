@@ -80,7 +80,7 @@ export function LandingFooter() {
 
         <div className="uki-footer-links">
           <Link href="/" className="hover:text-[var(--uki-lilac)]">{copy.home}</Link>
-          <Link href="/#comprar" className="hover:text-[var(--uki-lilac)]">{copy.buy}</Link>
+          <Link href="/#comprar-uki" className="hover:text-[var(--uki-lilac)]">{copy.buy}</Link>
           <Link href="/cukie-master" className="hover:text-[var(--uki-lilac)]">{copy.staking}</Link>
           <Link href="/games" className="hover:text-[var(--uki-lilac)]">{copy.play}</Link>
           <Link href="/vesting" className="hover:text-[var(--uki-lilac)]">{copy.vesting}</Link>

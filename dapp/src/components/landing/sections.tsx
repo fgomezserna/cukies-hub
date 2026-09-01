@@ -11,8 +11,6 @@ import {
   Crown,
   ExternalLink,
   Gamepad2,
-  LockKeyhole,
-  ShieldCheck,
   Trophy,
   Users,
 } from 'lucide-react';
@@ -29,7 +27,7 @@ import { LandingHeader } from './header';
 import { HeroBackgroundVideo } from './hero-background-video';
 import { LandingButton, Panel, SectionHeading } from './primitives';
 import { ScrollReveal } from './scroll-reveal';
-import { UKI_TOKEN_ICON_SRC } from './sale-config';
+import { UkiSwapPanel } from './uki-swap-panel';
 import {
   type TreasureHuntCompetitionCampaign,
   type TreasureHuntCompetitionPhase,
@@ -116,13 +114,11 @@ function HeroSection({ network }: { network: LandingNetworkConfig }) {
           </div>
           {network.swapUrl ? (
             <a
-              href={network.swapUrl}
-              target="_blank"
-              rel="noreferrer"
+              href="#comprar-uki"
               className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
             >
               {copy.buy}
-              <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
+              <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
             </a>
           ) : (
             <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-muted)]" aria-disabled="true">
@@ -133,79 +129,10 @@ function HeroSection({ network }: { network: LandingNetworkConfig }) {
         </ScrollReveal>
 
         <ScrollReveal animation="right" duration={900} className="uki-hero-overview-wrap w-full">
-          <LaunchOverview network={network} />
+          <UkiSwapPanel />
         </ScrollReveal>
       </div>
     </section>
-  );
-}
-
-function LaunchOverview({ network }: { network: LandingNetworkConfig }) {
-  const { locale } = usePublicLocale();
-  const copy = landingCopyByLocale[locale].hero;
-
-  const rows = [
-    { icon: ShieldCheck, label: copy.pool, value: network.liquidityPairAddress ? 'ASM / UKI' : copy.unavailable, tone: 'text-[var(--uki-lilac)]' },
-    { icon: Crown, label: copy.staking, value: network.stakingAddress ? copy.network : copy.unavailable, tone: 'text-[var(--uki-gold)]' },
-    { icon: LockKeyhole, label: copy.lock, value: network.liquidityLockerAddress ? network.liquidityUnlockLabel ?? copy.lockValue : copy.unavailable, tone: 'text-[#f19bff]' },
-  ];
-
-  return (
-    <Panel
-      className="uki-launch-overview"
-      innerClassName="relative overflow-hidden p-5 sm:p-6 lg:p-7"
-    >
-      <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />
-      <div className="relative">
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
-          <div>
-            <p className="uki-label">{copy.live}</p>
-            <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-cream)]">
-              {network.liquidityPairAddress ? 'ASM / UKI' : copy.unavailable}
-            </p>
-          </div>
-          <div className="flex items-center -space-x-2" aria-label="Par oficial ASM y UKI">
-            <span className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#0d0b24] bg-white">
-              <Image src="/brand/official/asm-token-coingecko.png" alt="ASM" fill sizes="48px" className="object-contain" />
-            </span>
-            <span className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#0d0b24] bg-white">
-              <Image src={UKI_TOKEN_ICON_SRC} alt="UKI" fill sizes="48px" className="object-contain" />
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-3 divide-y divide-white/10">
-          {rows.map(({ icon: Icon, label, value, tone }) => (
-            <div key={label} className="flex items-center justify-between gap-4 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <Icon className={`h-5 w-5 shrink-0 ${tone}`} strokeWidth={1.8} />
-                <span className="text-sm font-semibold text-[var(--uki-muted)]">{label}</span>
-              </div>
-              <span className="text-right font-mono text-xs font-black text-[var(--uki-cream)] sm:text-sm">
-                {value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {network.swapUrl ? (
-          <a
-            href={network.swapUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:bg-[var(--uki-lilac)]/15 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
-          >
-            <span>{copy.buy}</span>
-            <ExternalLink className="h-4 w-4" strokeWidth={1.8} />
-          </a>
-        ) : (
-          <span className="mt-3 flex min-h-12 items-center justify-between rounded-[8px] border border-white/10 bg-white/[0.03] px-4 font-headline text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]" aria-disabled="true">
-            <span>{copy.buyUnavailable}</span>
-            <CircleAlert className="h-4 w-4" strokeWidth={1.8} />
-          </span>
-        )}
-      </div>
-    </Panel>
   );
 }
 
