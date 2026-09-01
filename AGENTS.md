@@ -188,6 +188,130 @@ Operational rules:
 - Validate post-deploy with `/api/health`, `/indexer?collection=chain_indexer_runs`, `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`.
 - Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
 
+## Branch and Release Governance
+
+This section is the authoritative branch policy for the active Coolify topology. It overrides older repository documentation that still describes `main -> staging` or `production -> live`.
+
+### Active Topology and Branch Roles
+
+| Branch | Role | Deployment rule |
+| --- | --- | --- |
+| `codex/issue-<number>-<slug>` | One isolated issue or task. | Create from current `origin/staging`; open a PR to `staging`. Never deploy to production. |
+| `staging` | Shared integration and QA branch. | Deploys to `game-hub-staging` / `https://cukieshub.eurekand.com`, BSC Testnet and staging databases. |
+| `main` | Production/live branch. | Deploys to `game-hub` / `https://cukies.world`, BSC mainnet and production data. It is not a development branch. |
+| `hotfix/*` | Emergency exception created from current `origin/main`. | May target `main` only with formal incident evidence, approvals, checks and rollback. |
+| `sync/main-<sha>` | Mandatory ancestry sync after every merge to `main`. | Targets `staging` and must use a merge commit. It never substitutes staging validation. |
+
+Legacy/Fallback:
+
+- The remote `production` branch is a historical placeholder and is not the active production source. Do not branch from it, merge into it or deploy it unless the user explicitly changes the topology.
+- `master`, `versionmovil1`, `cambios-*`, old `feat/*`, `feature/*` and old game `*/dev` branches are historical. Do not reuse them for new work.
+- The checked-in versions of `docs/release-workflow.md` and `docs/deployment-environments.md` still contain the superseded `main -> staging` / `production -> live` model. Use this section and the latest coordination for issue `#232` until the reviewed replacement is merged.
+
+### Current Enforcement Status
+
+- As verified on 2026-08-28, GitHub branch protection is not active on `main` or `staging`.
+- PRs `#236`, `#238` and `#239` contain the draft release gate, CI gate and security stack; draft code or passing preview checks do not mean those controls are active.
+- Until protection is applied, treat both branches as manually protected: no direct push, force-push, reset, rebase, deletion or merge outside this policy, even if GitHub technically allows it.
+- Before any merge to `staging` or `main`, inspect the current base, checks and protection instead of trusting this dated observation.
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 && git fetch origin --prune
+source ~/.zshrc >/dev/null 2>&1 && gh api repos/fgomezserna/cukies-hub/branches/main/protection
+source ~/.zshrc >/dev/null 2>&1 && gh api repos/fgomezserna/cukies-hub/branches/staging/protection
+```
+
+Absence of protection is a blocker to automatic or unattended merges, not permission to bypass review.
+
+### Starting Work
+
+1. Fetch and prune before choosing a base. Inspect the current branch, dirty files and registered worktrees.
+2. Never start new work from a stale local `main`, stale local `staging`, another feature branch or an old worktree.
+3. Create one branch per leaf issue from the exact current `origin/staging` commit:
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 && git fetch origin --prune
+git switch -c codex/issue-<number>-<slug> --no-track origin/staging
+```
+
+4. If the current checkout has unrelated or uncommitted work, create a separate worktree instead of switching or stashing another person's changes:
+
+```bash
+git worktree add <safe-sibling-path> -b codex/issue-<number>-<slug> origin/staging
+```
+
+5. At the first meaningful commit, push with upstream and open a draft PR to `staging`. Do not leave durable work on a local-only branch:
+
+```bash
+git push -u origin codex/issue-<number>-<slug>
+gh pr create --repo fgomezserna/cukies-hub --base staging --head codex/issue-<number>-<slug> --draft
+```
+
+6. Stacked branches are exceptional. Document the dependency and PR bases explicitly; never build an undocumented chain of feature branches.
+
+### Normal Promotion: Feature to Staging to Main
+
+1. A normal feature PR targets `staging`, never `main`.
+2. Before marking it ready, update it from current `origin/staging`, run the checks for the touched area and record results in the PR.
+3. Merge an approved feature PR to `staging` using squash merge and delete its remote branch.
+4. Deploy the exact `staging` SHA. Record full SHA, deploy/run ID, `/api/health`, smoke results and any testnet evidence.
+5. A staging validation belongs to one immutable SHA. Any later merge into `staging` invalidates the previous release evidence and requires redeploy plus validation.
+6. Before promotion, audit the entire delta. Every commit and PR in `origin/main..origin/staging` must belong to the approved release; one unapproved change blocks the whole promotion.
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 && git fetch origin --prune
+git log --oneline --decorate origin/main..origin/staging
+git diff --stat origin/main..origin/staging
+gh pr list --repo fgomezserna/cukies-hub --base staging --state merged
+```
+
+7. Production promotion is one PR from `staging` to `main`. Do not cherry-pick a feature, retarget a feature PR or open `codex/issue-* -> main`.
+8. Merge to `main` requires explicit user/release authority, approved staging evidence, required checks, resolved review comments, rollback plan and a reviewed production diff.
+9. After the live merge, verify the exact production SHA and run the production health/smoke checks before declaring success.
+10. After every merge to `main`, create `sync/main-<short-sha>` from `main` and merge it to `staging` using **Create a merge commit**. Do not squash or rebase this sync, because `main` must remain an ancestor of `staging`.
+11. A release is incomplete while the `main -> staging` sync PR or post-deploy verification remains pending.
+
+If `staging` contains an unready change, block promotion. Revert or finish that change in `staging`; never bypass staging by moving only the desired feature directly to `main`.
+
+### Hotfix Exception
+
+Use a hotfix only for a production incident that cannot wait for the normal staging cycle.
+
+1. Create `hotfix/<issue-or-incident>-<slug>` from the exact current `origin/main`.
+2. Open the PR directly to `main` and add the `hotfix` label as a visible signal. The authorization record must include incident, impact, urgency, why staging cannot wait, validation performed and rollback. Label and PR body alone never authorize the merge; when the release gate is active, its commit-bound manifest is the source of authorization.
+3. A hotfix still requires explicit approval, relevant checks and a reviewed production diff. It bypasses prior staging evidence only; it does not bypass review or verification.
+4. After merge, immediately create the `sync/main-<sha> -> staging` PR and merge it with a merge commit.
+5. Deploy and smoke-test staging after the sync. Do not close the incident or delete the local recovery branch until production verification and staging backport are complete.
+
+### Branch and Worktree Hygiene
+
+- Never commit directly on `main` or `staging`; local copies only mirror their remotes through fast-forward updates.
+- Never rewrite shared history. Rebase is allowed only on a local, unpublished branch; never force-push without explicit user approval.
+- One issue maps to one branch and one PR. Split oversized work instead of accumulating unrelated changes.
+- A branch that must survive the current session needs an upstream and a draft PR or an explicit WIP handoff with branch, SHA, dirty state and next action.
+- Delete the source branch immediately after its PR is merged and verified. Do not keep branches as archives; GitHub PRs, tags and merge history are the archive.
+- Remove a worktree only after `git status --short` is empty or its changes have an explicitly verified backup.
+- After branch deletion, prune remote refs and stale worktree metadata:
+
+```bash
+git fetch --all --prune
+git worktree prune
+```
+
+- At the start and end of issue work, inspect branch/worktree hygiene:
+
+```bash
+git status --short --branch
+git branch -vv
+git worktree list --porcelain
+gh pr list --repo fgomezserna/cukies-hub --state open --limit 100
+```
+
+- An upstream marked `[gone]` must be resolved during the same cleanup pass: delete it if the PR is merged/equivalent and no worktree uses it, or push/reconnect it if it contains active work.
+- Never delete a branch solely because `git branch --merged` says it is unmerged or merged; squash merges make ancestry misleading. Before deletion, check PR state, `git cherry`, unique commits, upstream, worktrees and dirty files.
+- A branch with unique commits and no open PR is a manual-review blocker. Preserve it and report its branch name and SHAs instead of guessing.
+- Never run broad branch deletion loops against unresolved targets. Produce the exact candidate list first and preserve active PR heads, protected branches and every branch checked out in a worktree.
+
 ## Testing
 
 The main dapp has comprehensive Jest tests covering:
@@ -280,9 +404,10 @@ For each issue you take:
 
 1. Confirm the scope, acceptance criteria, dependencies and affected apps/packages.
 2. Check the working tree and never overwrite unrelated user changes.
-3. Create a focused branch:
+3. Fetch and create a focused branch from the exact current `origin/staging`:
 ```bash
-git switch -c codex/issue-<number>-short-slug
+source ~/.zshrc >/dev/null 2>&1 && git fetch origin --prune
+git switch -c codex/issue-<number>-short-slug --no-track origin/staging
 ```
 4. Comment on the issue before substantial work:
 ```text
@@ -373,7 +498,7 @@ Push the branch and open a draft PR unless the user explicitly asked for a ready
 
 ```bash
 git push -u origin codex/issue-<number>-short-slug
-gh pr create --repo fgomezserna/cukies-hub --draft --title "<title>" --body "<summary>"
+gh pr create --repo fgomezserna/cukies-hub --base staging --head codex/issue-<number>-short-slug --draft --title "<title>" --body "<summary>"
 ```
 
 PR body must include:
@@ -390,12 +515,18 @@ Do not merge unless all of these are true:
 2. Required checks pass or failures are understood and accepted.
 3. The PR fully satisfies the linked issue acceptance criteria.
 4. No unresolved review comments remain.
+5. The source and target comply with `Branch and Release Governance`.
 
-Preferred merge style is squash merge unless the repository/user specifies otherwise:
+Merge strategy depends on the branch role:
 
 ```bash
+# Normal feature PR: codex/issue-* -> staging
 gh pr merge <number> --squash --delete-branch
 ```
+
+- `staging -> main`: use only the reviewed release/promotion method allowed by the active gate.
+- `sync/main-* -> staging`: use **Create a merge commit**; never squash or rebase it.
+- `hotfix/* -> main`: follow the formal hotfix exception and mandatory sync back to `staging`.
 
 ### Issue Comments and Closure
 

@@ -1,13 +1,14 @@
 name: Release candidate
-description: Agrupa issues, validacion, responsables y decision go/no-go para una release UKI.
+description: Agrupa el SHA exacto de staging, validacion y decision para promover a main/live.
 title: "[RC] UKI <fase> <YYYY-MM-DD>"
 labels: ["area:ops", "area:security"]
 body:
   - type: markdown
     attributes:
       value: |
-        Usa esta plantilla para congelar una release candidate antes de promover cambios entre entornos.
-        Produccion requiere aprobacion explicita de tech, producto/QA y ops.
+        Usa esta plantilla para congelar el SHA exacto desplegado desde `staging`.
+        `main`/live solo recibe un PR desde `staging` tras deploy, QA y aprobacion explicita.
+        Mainnet y preventa permanecen congeladas; abrir esta RC no autoriza una promocion.
 
   - type: input
     id: release_name
@@ -24,9 +25,8 @@ body:
       label: Entorno objetivo
       description: Donde se quiere validar o publicar esta RC.
       options:
-        - Staging
-        - Production
-        - Staging y despues production
+        - Staging (deploy y QA)
+        - Main/live (promocion desde staging)
     validations:
       required: true
 
@@ -34,8 +34,8 @@ body:
     id: source_ref
     attributes:
       label: Ref origen
-      description: Rama, tag o commit que contiene los cambios.
-      placeholder: "main, release/staging-2026-05-13 o <sha>"
+      description: Rama staging y SHA completo exacto que contiene los cambios.
+      placeholder: "staging@0123456789abcdef0123456789abcdef01234567"
     validations:
       required: true
 
@@ -43,8 +43,8 @@ body:
     id: target_ref
     attributes:
       label: Ref destino
-      description: Rama, tag o deploy target esperado.
-      placeholder: "main, production, staging-20260513.1 o prod-20260513.1"
+      description: Destino controlado del candidato.
+      placeholder: "main (y tag prod-YYYYMMDD.N si aplica al mismo SHA)"
     validations:
       required: true
 
@@ -155,7 +155,7 @@ body:
       placeholder: |
         - Se cierran al merge:
         - Se cierran tras staging validado:
-        - Se cierran tras production validado:
+        - Se cierran tras main/live validado:
         - Permanecen abiertas/bloqueadas:
     validations:
       required: true
@@ -164,7 +164,7 @@ body:
     id: go_no_go
     attributes:
       label: Decision go/no-go
-      description: Completar o actualizar antes de publicar production.
+      description: Completar o actualizar antes de promover staging a main/live.
       value: |
         | Rol | Responsable | Decision | Fecha/hora | Nota |
         | --- | --- | --- | --- | --- |
@@ -183,5 +183,7 @@ body:
       options:
         - label: La RC tiene alcance cerrado y no mezcla trabajo fuera de la lista incluida.
           required: true
-        - label: Entiendo que production no se publica sin go explicito de tech, producto/QA y ops.
+        - label: Entiendo que main/live no se promueve sin go explicito de tech, producto/QA y ops.
+          required: true
+        - label: Si el destino es main, el PR incluira promotion.json ligado al PR/base SHA y el merge volvera por sync/main-* a staging.
           required: true

@@ -1,0 +1,251 @@
+name: Main promotion gate
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: main-promotion-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  promotion-gate:
+    name: release/promotion-gate-runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: Release Gate
+      url: ${{ github.event.pull_request.html_url }}
+    steps:
+      # actions/create-github-app-token v2, pinned. The private key exists only in the protected
+      # Release Gate environment, so an arbitrary branch workflow cannot mint this identity.
+      - name: Mint the dedicated release status token
+        id: release_app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.RELEASE_GATE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_GATE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-statuses: write
+
+      - name: Load the live pull request and immutable promotion manifest
+        id: live_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          raw_path="$RUNNER_TEMP/live-pr-${PR_NUMBER}.json"
+          event_path="$RUNNER_TEMP/live-pr-event-${PR_NUMBER}.json"
+          for attempt in {1..12}; do
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$raw_path"
+            if jq -e --argjson pr_number "$PR_NUMBER" '
+              select(.number == $pr_number)
+              | select(.state == "open")
+              | select(.base.ref == "main")
+              | select(.head.sha | (type == "string" and test("^[0-9a-f]{40}$")))
+              | select(.head.ref | (type == "string" and length > 0))
+              | select(.mergeable == true)
+              | select(.merge_commit_sha | (type == "string" and test("^[0-9a-f]{40}$")))
+            ' "$raw_path" >/dev/null; then
+              break
+            fi
+            if [[ "$attempt" == '12' ]]; then
+              echo 'GitHub did not produce a mergeable, stable test merge commit.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          head_sha="$(jq -r '.head.sha' "$raw_path")"
+          head_ref="$(jq -r '.head.ref' "$raw_path")"
+          merge_sha="$(jq -r '.merge_commit_sha' "$raw_path")"
+          base_sha="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            --jq '.object.sha')"
+          merge_ref_sha="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge" \
+            --jq '.object.sha')"
+          if [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'The live refs/heads/main SHA is invalid.' >&2
+            exit 1
+          fi
+          if [[ ! "$merge_ref_sha" =~ ^[0-9a-f]{40}$ || "$merge_ref_sha" != "$merge_sha" ]]; then
+            echo 'The live refs/pull test-merge SHA does not match the pull request payload.' >&2
+            exit 1
+          fi
+          manifest_path="$RUNNER_TEMP/promotion-${PR_NUMBER}-${head_sha}.json"
+          gh api \
+            -H 'Accept: application/vnd.github.raw+json' \
+            "repos/${GITHUB_REPOSITORY}/contents/.github/release/promotion.json?ref=${head_sha}" \
+            > "$manifest_path"
+          jq -c --arg base_sha "$base_sha" \
+            '.base.sha = $base_sha | { pull_request: . }' \
+            "$raw_path" > "$event_path"
+          printf 'head_sha=%s\n' "$head_sha" >> "$GITHUB_OUTPUT"
+          printf 'head_ref=%s\n' "$head_ref" >> "$GITHUB_OUTPUT"
+          printf 'base_sha=%s\n' "$base_sha" >> "$GITHUB_OUTPUT"
+          printf 'merge_sha=%s\n' "$merge_sha" >> "$GITHUB_OUTPUT"
+          if [[ "$head_ref" == 'staging' ]]; then
+            printf 'mode=normal\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'mode=hotfix\n' >> "$GITHUB_OUTPUT"
+          fi
+          printf 'event_path=%s\n' "$event_path" >> "$GITHUB_OUTPUT"
+          printf 'manifest_path=%s\n' "$manifest_path" >> "$GITHUB_OUTPUT"
+
+      - name: Publish pending promotion status on the GitHub test merge
+        env:
+          GH_TOKEN: ${{ steps.release_app.outputs.token }}
+          MERGE_SHA: ${{ steps.live_pr.outputs.merge_sha }}
+          STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MERGE_SHA}" \
+            -f state='pending' \
+            -f context='release/promotion-gate' \
+            -f description='Immutable promotion policy and release evidence are being verified.' \
+            -f target_url="$STATUS_TARGET_URL" >/dev/null
+
+      # actions/checkout v4.2.2. This is the trusted base SHA, never the PR head.
+      - name: Checkout trusted release tooling from the PR base
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ steps.live_pr.outputs.base_sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Enforce normal or hotfix promotion policy
+        env:
+          GITHUB_EVENT_PATH: ${{ steps.live_pr.outputs.event_path }}
+          PROMOTION_MANIFEST_PATH: ${{ steps.live_pr.outputs.manifest_path }}
+        run: node scripts/release/promotion-policy.mjs
+
+      - name: Verify the exact GitHub test merge and staging content parity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROMOTION_BASE_SHA: ${{ steps.live_pr.outputs.base_sha }}
+          PROMOTION_HEAD_SHA: ${{ steps.live_pr.outputs.head_sha }}
+          PROMOTION_MERGE_SHA: ${{ steps.live_pr.outputs.merge_sha }}
+          PROMOTION_MODE: ${{ steps.live_pr.outputs.mode }}
+        run: node scripts/release/verify-promotion-merge.mjs
+
+      - name: Verify the exact staging deployment for a normal promotion
+        if: steps.live_pr.outputs.head_ref == 'staging'
+        env:
+          RELEASE_CANDIDATE_SHA: ${{ steps.live_pr.outputs.head_sha }}
+          STAGING_HEALTH_URL: https://cukieshub.eurekand.com/api/health
+          DEPLOYMENT_VERIFY_TIMEOUT_MS: '120000'
+          DEPLOYMENT_VERIFY_INTERVAL_MS: '10000'
+          DEPLOYMENT_REQUEST_TIMEOUT_MS: '15000'
+        run: node scripts/release/verify-deployment.mjs
+
+      - name: Verify protected staging attestations for a normal promotion
+        if: steps.live_pr.outputs.head_ref == 'staging'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_SHA: ${{ steps.live_pr.outputs.head_sha }}
+          RELEASE_STATUS_CREATOR_LOGIN: ${{ steps.release_app.outputs.app-slug }}[bot]
+        run: node scripts/release/verify-attestations.mjs --repository "$GITHUB_REPOSITORY"
+
+      - name: Record the accepted promotion mode
+        env:
+          HEAD_REF: ${{ steps.live_pr.outputs.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_REF" == 'staging' ]]; then
+            echo 'Normal staging promotion passed immutable policy, exact health, attestations and ancestry.'
+          else
+            echo 'Formal hotfix passed immutable policy; staging attestations are intentionally bypassed.'
+          fi
+
+      - name: Revalidate the live PR and test merge binding immediately before success
+        if: success()
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.live_pr.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.live_pr.outputs.base_sha }}
+          EXPECTED_MERGE_SHA: ${{ steps.live_pr.outputs.merge_sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PROMOTION_MANIFEST_PATH: ${{ steps.live_pr.outputs.manifest_path }}
+        run: |
+          set -euo pipefail
+          raw_path="$RUNNER_TEMP/final-live-pr-${PR_NUMBER}.json"
+          event_path="$RUNNER_TEMP/final-live-pr-event-${PR_NUMBER}.json"
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$raw_path"
+          jq -e \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg head_sha "$EXPECTED_HEAD_SHA" \
+            --arg merge_sha "$EXPECTED_MERGE_SHA" '
+            select(.number == $pr_number)
+            | select(.state == "open")
+            | select(.base.ref == "main")
+            | select(.head.sha == $head_sha)
+            | select(.mergeable == true)
+            | select(.merge_commit_sha == $merge_sha)
+          ' "$raw_path" >/dev/null
+          live_base_ref="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            --jq '.object.sha')"
+          if [[ "$live_base_ref" != "$EXPECTED_BASE_SHA" ]]; then
+            echo 'The live refs/heads/main SHA changed during verification.' >&2
+            exit 1
+          fi
+          live_merge_ref="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge" \
+            --jq '.object.sha')"
+          if [[ "$live_merge_ref" != "$EXPECTED_MERGE_SHA" ]]; then
+            echo 'The live refs/pull test merge changed during verification.' >&2
+            exit 1
+          fi
+          jq -c --arg base_sha "$EXPECTED_BASE_SHA" \
+            '.base.sha = $base_sha | { pull_request: . }' \
+            "$raw_path" > "$event_path"
+          unset GH_TOKEN
+          GITHUB_EVENT_PATH="$event_path" node scripts/release/promotion-policy.mjs
+          GITHUB_TOKEN="${{ github.token }}" \
+            PROMOTION_BASE_SHA="$EXPECTED_BASE_SHA" \
+            PROMOTION_HEAD_SHA="$EXPECTED_HEAD_SHA" \
+            PROMOTION_MERGE_SHA="$EXPECTED_MERGE_SHA" \
+            PROMOTION_MODE="${{ steps.live_pr.outputs.mode }}" \
+            node scripts/release/verify-promotion-merge.mjs
+
+      - name: Publish terminal promotion status on the GitHub test merge
+        if: always() && steps.live_pr.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.release_app.outputs.token }}
+          MERGE_SHA: ${{ steps.live_pr.outputs.merge_sha }}
+          JOB_STATUS: ${{ job.status }}
+          STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          case "$JOB_STATUS" in
+            success)
+              state='success'
+              description='Dedicated release gate passed for this exact test-merge SHA.'
+              ;;
+            cancelled)
+              state='error'
+              description='Release gate was cancelled for this test-merge SHA.'
+              ;;
+            *)
+              state='failure'
+              description='Release gate failed for this test-merge SHA.'
+              ;;
+          esac
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MERGE_SHA}" \
+            -f state="$state" \
+            -f context='release/promotion-gate' \
+            -f description="$description" \
+            -f target_url="$STATUS_TARGET_URL" >/dev/null

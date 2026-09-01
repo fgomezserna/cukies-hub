@@ -1,0 +1,172 @@
+name: Sync every main merge back to staging
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: main-staging-sync-${{ github.event.pull_request.merge_commit_sha }}
+  cancel-in-progress: false
+
+jobs:
+  sync-main:
+    name: release/main-staging-sync
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: Release Gate
+      url: ${{ github.event.pull_request.html_url }}
+    steps:
+      # The repository GITHUB_TOKEN cannot create pull requests. The dedicated App key is exposed
+      # only to this trusted main workflow after Release Gate approval.
+      - name: Mint the dedicated sync token
+        id: release_app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.RELEASE_GATE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_GATE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # actions/github-script v7, pinned. It uses only trusted base workflow and event/API data.
+      - name: Create the mandatory idempotent staging sync pull request
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          github-token: ${{ steps.release_app.outputs.token }}
+          script: |
+            const pullRequest = context.payload.pull_request;
+            const mergeSha = pullRequest?.merge_commit_sha;
+            if (!/^[0-9a-f]{40}$/.test(mergeSha ?? '')) {
+              core.setFailed('Merged main PR does not expose a full merge commit SHA.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const shortSha = mergeSha.slice(0, 12);
+            const branch = `sync/main-${shortSha}`;
+            const ref = `heads/${branch}`;
+
+            const stagingComparison = await github.rest.repos.compareCommitsWithBasehead({
+              owner,
+              repo,
+              basehead: `${mergeSha}...staging`,
+            });
+            if (['ahead', 'identical'].includes(stagingComparison.data.status)) {
+              core.info(`staging already contains exact main SHA ${mergeSha}.`);
+              await core.summary
+                .addHeading('Mandatory main to staging sync')
+                .addRaw(`\`staging\` already contains exact main SHA \`${mergeSha}\`.`)
+                .write();
+              return;
+            }
+            if (!['behind', 'diverged'].includes(stagingComparison.data.status)) {
+              core.setFailed('GitHub compare returned an unknown staging ancestry state.');
+              return;
+            }
+
+            let existingRef;
+            try {
+              existingRef = await github.rest.git.getRef({ owner, repo, ref });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            if (existingRef) {
+              if (existingRef.data.object.sha !== mergeSha) {
+                core.setFailed(`Existing ${branch} does not point to the expected main merge SHA.`);
+                return;
+              }
+            } else {
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: `refs/heads/${branch}`,
+                sha: mergeSha,
+              });
+            }
+
+            const head = `${owner}:${branch}`;
+            const response = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'all',
+              head,
+              base: 'staging',
+              per_page: 100,
+            });
+            const matches = response.data.filter((candidate) =>
+              candidate.head.ref === branch && candidate.base.ref === 'staging');
+
+            if (matches.length > 1) {
+              core.setFailed(`More than one staging sync PR exists for ${branch}.`);
+              return;
+            }
+            if (matches.length === 1) {
+              const existing = matches[0];
+              if (existing.state === 'open') {
+                core.info(`Staging sync already exists: ${existing.html_url}`);
+                await core.summary
+                  .addHeading('Mandatory main to staging sync')
+                  .addLink(`PR #${existing.number}`, existing.html_url)
+                  .addRaw(` already covers exact main SHA \`${mergeSha}\`.`)
+                  .write();
+                return;
+              }
+              if (existing.merged_at) {
+                core.setFailed(
+                  `Sync PR #${existing.number} was merged without preserving exact main ancestry. `
+                  + 'Create a recovery PR and use Create a merge commit.',
+                );
+                return;
+              }
+              core.setFailed(`Existing sync PR #${existing.number} was closed without merge.`);
+              return;
+            }
+
+            let created;
+            try {
+              created = await github.rest.pulls.create({
+                owner,
+                repo,
+                head: branch,
+                base: 'staging',
+                title: `sync: main ${shortSha} back to staging`,
+                body: [
+                  `Mandatory staging sync after main PR #${pullRequest.number}.`,
+                  '',
+                  `Exact main merge SHA: \`${mergeSha}\``,
+                  `Original source branch: \`${pullRequest.head.ref}\``,
+                  '',
+                  '**Required merge method: Create a merge commit.**',
+                  'Squash or rebase would rewrite the main SHA and keep the next promotion blocked.',
+                  '',
+                  'This PR is intentionally not auto-merged. Review it and validate staging.',
+                ].join('\n'),
+                maintainer_can_modify: false,
+                draft: false,
+              });
+            } catch (error) {
+              core.setFailed(`Could not create the mandatory staging sync PR (HTTP ${error.status ?? 'unknown'}).`);
+              return;
+            }
+
+            if (!created?.data?.html_url) {
+              core.setFailed('GitHub API did not return the created staging sync PR.');
+              return;
+            }
+            core.info(`Created staging sync PR: ${created.data.html_url}`);
+            await core.summary
+              .addHeading('Mandatory main to staging sync')
+              .addLink(`PR #${created.data.number}`, created.data.html_url)
+              .addRaw(` created from exact main SHA \`${mergeSha}\` without auto-merge.`)
+              .write();
