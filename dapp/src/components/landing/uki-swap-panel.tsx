@@ -35,12 +35,13 @@ import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import { erc20Abi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
 import {
+  applyMaximumSlippageBps,
   applySlippageBps,
   buildUkiSwapConfig,
   createSwapDeadline,
+  formatEditableSwapAmount,
   formatSwapAmount,
   pancakeV2RouterAbi,
-  routeLabel,
   type UkiSwapSourceSymbol,
 } from '@/lib/uki-swap';
 import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
@@ -51,10 +52,11 @@ const SWAP_COPY = {
     eyebrow: 'Compra directa · PancakeSwap V2',
     title: 'Comprar UKI',
     payWith: 'Pagar con',
-    amount: 'Cantidad',
-    receive: 'Recibes aproximadamente',
+    amount: 'Importe a pagar',
+    receive: 'UKI que quieres recibir',
+    editEither: 'Puedes editar cualquiera de los dos importes.',
     minimum: 'Mínimo recibido',
-    route: 'Ruta ejecutada',
+    maximum: 'Máximo a pagar',
     slippage: 'Tolerancia',
     connect: 'Conectar wallet',
     switchNetwork: 'Cambiar a BNB Smart Chain',
@@ -81,10 +83,11 @@ const SWAP_COPY = {
     eyebrow: 'Direct purchase · PancakeSwap V2',
     title: 'Buy UKI',
     payWith: 'Pay with',
-    amount: 'Amount',
-    receive: 'You receive approximately',
+    amount: 'Amount to pay',
+    receive: 'UKI you want to receive',
+    editEither: 'You can edit either amount.',
     minimum: 'Minimum received',
-    route: 'Executed route',
+    maximum: 'Maximum to pay',
     slippage: 'Tolerance',
     connect: 'Connect wallet',
     switchNetwork: 'Switch to BNB Smart Chain',
@@ -110,6 +113,7 @@ const SWAP_COPY = {
 } as const;
 
 type OperationState = 'idle' | 'approving' | 'approved' | 'swapping' | 'success' | 'error';
+type QuoteDirection = 'exactInput' | 'exactOutput';
 
 function parsePositiveAmount(value: string) {
   const normalized = value.trim().replace(',', '.');
@@ -142,7 +146,9 @@ export function UkiSwapPanel() {
   const { toast } = useToast();
   const hasMounted = useHasMounted();
   const [sourceSymbol, setSourceSymbol] = useState<UkiSwapSourceSymbol>('BNB');
-  const [amount, setAmount] = useState('');
+  const [sourceAmountInput, setSourceAmountInput] = useState('');
+  const [ukiAmountInput, setUkiAmountInput] = useState('');
+  const [quoteDirection, setQuoteDirection] = useState<QuoteDirection>('exactInput');
   const [slippageBps, setSlippageBps] = useState(50);
   const [operationState, setOperationState] = useState<OperationState>('idle');
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
@@ -169,7 +175,8 @@ export function UkiSwapPanel() {
   ), [asmAddress, ukiAddress]);
   const source = swapConfig?.sources.find((item) => item.symbol === sourceSymbol)
     ?? swapConfig?.sources[0];
-  const parsedAmount = useMemo(() => parsePositiveAmount(amount), [amount]);
+  const parsedSourceInput = useMemo(() => parsePositiveAmount(sourceAmountInput), [sourceAmountInput]);
+  const parsedUkiInput = useMemo(() => parsePositiveAmount(ukiAmountInput), [ukiAmountInput]);
   const routePath = useMemo(() => source ? [...source.path] : [], [source]);
   const visibleConnectors = useMemo(
     () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
@@ -180,18 +187,40 @@ export function UkiSwapPanel() {
   const isWrongChain = Boolean(hasMounted && isConnected && chainId !== targetChainId);
 
   const {
-    data: quoteAmounts,
-    error: quoteError,
-    isFetching: isQuoteLoading,
-    refetch: refetchQuote,
+    data: exactInputQuote,
+    error: exactInputQuoteError,
+    isFetching: isExactInputQuoteLoading,
+    refetch: refetchExactInputQuote,
   } = useReadContract({
     chainId: targetChainId,
     address: swapConfig?.routerAddress,
     abi: pancakeV2RouterAbi,
     functionName: 'getAmountsOut',
-    args: parsedAmount && routePath.length > 1 ? [parsedAmount, routePath] : undefined,
+    args: quoteDirection === 'exactInput' && parsedSourceInput && routePath.length > 1
+      ? [parsedSourceInput, routePath]
+      : undefined,
     query: {
-      enabled: Boolean(swapConfig && parsedAmount && routePath.length > 1),
+      enabled: Boolean(swapConfig && quoteDirection === 'exactInput' && parsedSourceInput && routePath.length > 1),
+      staleTime: 5_000,
+      retry: 1,
+    },
+  });
+
+  const {
+    data: exactOutputQuote,
+    error: exactOutputQuoteError,
+    isFetching: isExactOutputQuoteLoading,
+    refetch: refetchExactOutputQuote,
+  } = useReadContract({
+    chainId: targetChainId,
+    address: swapConfig?.routerAddress,
+    abi: pancakeV2RouterAbi,
+    functionName: 'getAmountsIn',
+    args: quoteDirection === 'exactOutput' && parsedUkiInput && routePath.length > 1
+      ? [parsedUkiInput, routePath]
+      : undefined,
+    query: {
+      enabled: Boolean(swapConfig && quoteDirection === 'exactOutput' && parsedUkiInput && routePath.length > 1),
       staleTime: 5_000,
       retry: 1,
     },
@@ -212,8 +241,22 @@ export function UkiSwapPanel() {
     },
   });
 
-  const quotedUki = quoteAmounts?.[quoteAmounts.length - 1];
-  const minimumUki = quotedUki === undefined ? undefined : applySlippageBps(quotedUki, slippageBps);
+  const quotedSource = quoteDirection === 'exactOutput' ? exactOutputQuote?.[0] : parsedSourceInput ?? undefined;
+  const quotedUki = quoteDirection === 'exactInput'
+    ? exactInputQuote?.[exactInputQuote.length - 1]
+    : parsedUkiInput ?? undefined;
+  const minimumUki = quoteDirection === 'exactInput' && quotedUki !== undefined
+    ? applySlippageBps(quotedUki, slippageBps)
+    : undefined;
+  const maximumSource = quoteDirection === 'exactOutput' && quotedSource !== undefined
+    ? applyMaximumSlippageBps(quotedSource, slippageBps)
+    : undefined;
+  const sourceAmount = quoteDirection === 'exactInput' ? parsedSourceInput ?? undefined : maximumSource;
+  const activeInputAmount = quoteDirection === 'exactInput' ? parsedSourceInput : parsedUkiInput;
+  const quoteError = quoteDirection === 'exactInput' ? exactInputQuoteError : exactOutputQuoteError;
+  const isQuoteLoading = quoteDirection === 'exactInput'
+    ? isExactInputQuoteLoading
+    : isExactOutputQuoteLoading;
   const effectiveAllowance = source?.tokenAddress && locallyApproved?.token === source.tokenAddress
     ? locallyApproved.amount > (allowance ?? BigInt(0))
       ? locallyApproved.amount
@@ -221,11 +264,11 @@ export function UkiSwapPanel() {
     : allowance;
   const needsApproval = Boolean(
     source?.tokenAddress &&
-    parsedAmount &&
-    (effectiveAllowance === undefined || effectiveAllowance < parsedAmount),
+    sourceAmount &&
+    (effectiveAllowance === undefined || effectiveAllowance < sourceAmount),
   );
   const isBusy = operationState === 'approving' || operationState === 'swapping';
-  const canSwap = Boolean(parsedAmount && quotedUki && minimumUki !== undefined && !quoteError && swapConfig && source);
+  const canSwap = Boolean(sourceAmount && quotedUki && !quoteError && swapConfig && source);
 
   async function connectWallet(connector: Connector) {
     try {
@@ -264,7 +307,7 @@ export function UkiSwapPanel() {
       return;
     }
 
-    if (!address || !source || !swapConfig || !parsedAmount || !publicClient) return;
+    if (!address || !source || !swapConfig || !sourceAmount || !quotedUki || !publicClient) return;
 
     setOperationMessage(null);
     setLastTxHash(null);
@@ -277,10 +320,10 @@ export function UkiSwapPanel() {
           address: source.tokenAddress,
           abi: erc20Abi,
           functionName: 'approve',
-          args: [swapConfig.routerAddress, parsedAmount],
+          args: [swapConfig.routerAddress, sourceAmount],
         });
         await publicClient.waitForTransactionReceipt({ hash: approvalHash });
-        setLocallyApproved({ token: source.tokenAddress, amount: parsedAmount });
+        setLocallyApproved({ token: source.tokenAddress, amount: sourceAmount });
         await refetchAllowance();
         setOperationState('approved');
         setOperationMessage(copy.approved);
@@ -288,40 +331,93 @@ export function UkiSwapPanel() {
       }
 
       setOperationState('swapping');
-      const latestQuote = await publicClient.readContract({
-        address: swapConfig.routerAddress,
-        abi: pancakeV2RouterAbi,
-        functionName: 'getAmountsOut',
-        args: [parsedAmount, [...source.path]],
-      });
-      const latestOutput = latestQuote[latestQuote.length - 1];
-      const minimumOutput = applySlippageBps(latestOutput, slippageBps);
       const deadline = createSwapDeadline();
+      let receivedUki: bigint;
+      let swapHash: Hash;
 
-      const swapHash = source.isNative
-        ? await writeContractAsync({
+      if (quoteDirection === 'exactInput') {
+        if (!parsedSourceInput) return;
+        const latestQuote = await publicClient.readContract({
+          address: swapConfig.routerAddress,
+          abi: pancakeV2RouterAbi,
+          functionName: 'getAmountsOut',
+          args: [parsedSourceInput, [...source.path]],
+        });
+        receivedUki = latestQuote[latestQuote.length - 1];
+        const minimumOutput = applySlippageBps(receivedUki, slippageBps);
+
+        swapHash = source.isNative
+          ? await writeContractAsync({
+              chainId: targetChainId,
+              address: swapConfig.routerAddress,
+              abi: pancakeV2RouterAbi,
+              functionName: 'swapExactETHForTokens',
+              args: [minimumOutput, [...source.path], address, deadline],
+              value: parsedSourceInput,
+            })
+          : await writeContractAsync({
+              chainId: targetChainId,
+              address: swapConfig.routerAddress,
+              abi: pancakeV2RouterAbi,
+              functionName: 'swapExactTokensForTokens',
+              args: [parsedSourceInput, minimumOutput, [...source.path], address, deadline],
+            });
+      } else {
+        if (!parsedUkiInput) return;
+        const latestQuote = await publicClient.readContract({
+          address: swapConfig.routerAddress,
+          abi: pancakeV2RouterAbi,
+          functionName: 'getAmountsIn',
+          args: [parsedUkiInput, [...source.path]],
+        });
+        const latestMaximumSource = applyMaximumSlippageBps(latestQuote[0], slippageBps);
+
+        if (
+          source.tokenAddress &&
+          (effectiveAllowance === undefined || effectiveAllowance < latestMaximumSource)
+        ) {
+          setOperationState('approving');
+          const approvalHash = await writeContractAsync({
             chainId: targetChainId,
-            address: swapConfig.routerAddress,
-            abi: pancakeV2RouterAbi,
-            functionName: 'swapExactETHForTokens',
-            args: [minimumOutput, [...source.path], address, deadline],
-            value: parsedAmount,
-          })
-        : await writeContractAsync({
-            chainId: targetChainId,
-            address: swapConfig.routerAddress,
-            abi: pancakeV2RouterAbi,
-            functionName: 'swapExactTokensForTokens',
-            args: [parsedAmount, minimumOutput, [...source.path], address, deadline],
+            address: source.tokenAddress,
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [swapConfig.routerAddress, latestMaximumSource],
           });
+          await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+          setLocallyApproved({ token: source.tokenAddress, amount: latestMaximumSource });
+          await refetchAllowance();
+          setOperationState('approved');
+          setOperationMessage(copy.approved);
+          return;
+        }
+
+        receivedUki = parsedUkiInput;
+        swapHash = source.isNative
+          ? await writeContractAsync({
+              chainId: targetChainId,
+              address: swapConfig.routerAddress,
+              abi: pancakeV2RouterAbi,
+              functionName: 'swapETHForExactTokens',
+              args: [parsedUkiInput, [...source.path], address, deadline],
+              value: latestMaximumSource,
+            })
+          : await writeContractAsync({
+              chainId: targetChainId,
+              address: swapConfig.routerAddress,
+              abi: pancakeV2RouterAbi,
+              functionName: 'swapTokensForExactTokens',
+              args: [parsedUkiInput, latestMaximumSource, [...source.path], address, deadline],
+            });
+      }
 
       await publicClient.waitForTransactionReceipt({ hash: swapHash });
       setLastTxHash(swapHash);
       setOperationState('success');
       setOperationMessage(copy.success);
       setLocallyApproved(null);
-      await Promise.all([refetchQuote(), refetchAllowance()]);
-      toast({ title: copy.success, description: `${formatSwapAmount(latestOutput)} UKI` });
+      await Promise.all([refetchExactInputQuote(), refetchExactOutputQuote(), refetchAllowance()]);
+      toast({ title: copy.success, description: `${formatSwapAmount(receivedUki)} UKI` });
     } catch {
       setOperationState('error');
       setOperationMessage(copy.transactionError);
@@ -336,11 +432,36 @@ export function UkiSwapPanel() {
     setLastTxHash(null);
   }
 
+  function resetOperationFeedback() {
+    setOperationState('idle');
+    setOperationMessage(null);
+    setLastTxHash(null);
+  }
+
+  function changeSourceAmount(value: string) {
+    setSourceAmountInput(value.replace(',', '.'));
+    setQuoteDirection('exactInput');
+    resetOperationFeedback();
+  }
+
+  function changeUkiAmount(value: string) {
+    setUkiAmountInput(value.replace(',', '.'));
+    setQuoteDirection('exactOutput');
+    resetOperationFeedback();
+  }
+
+  const displayedSourceAmount = quoteDirection === 'exactInput'
+    ? sourceAmountInput
+    : formatEditableSwapAmount(quotedSource);
+  const displayedUkiAmount = quoteDirection === 'exactOutput'
+    ? ukiAmountInput
+    : formatEditableSwapAmount(quotedUki);
+
   const ctaLabel = !isConnected
     ? copy.connect
     : isWrongChain
       ? copy.switchNetwork
-      : !parsedAmount
+      : !activeInputAmount
         ? copy.enterAmount
         : isQuoteLoading
           ? copy.quoting
@@ -385,7 +506,7 @@ export function UkiSwapPanel() {
           <>
             <fieldset className="mt-4">
               <legend className="uki-label">{copy.payWith}</legend>
-              <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${swapConfig.sources.length}, minmax(0, 1fr))` }}>
+              <div className={`mt-2 grid gap-2 ${swapConfig.sources.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'}`}>
                 {swapConfig.sources.map((option) => {
                   const selected = option.symbol === source.symbol;
                   return (
@@ -410,13 +531,8 @@ export function UkiSwapPanel() {
               <span className="uki-label">{copy.amount}</span>
               <span className="mt-2 grid grid-cols-[1fr_auto] items-center overflow-hidden rounded-[9px] border border-white/12 bg-[#070817]/92 focus-within:border-[var(--uki-cyan)]">
                 <input
-                  value={amount}
-                  onChange={(event) => {
-                    setAmount(event.target.value.replace(',', '.'));
-                    setOperationState('idle');
-                    setOperationMessage(null);
-                    setLastTxHash(null);
-                  }}
+                  value={displayedSourceAmount}
+                  onChange={(event) => changeSourceAmount(event.target.value)}
                   inputMode="decimal"
                   placeholder="0.0"
                   aria-label={`${copy.amount} ${source.symbol}`}
@@ -435,15 +551,31 @@ export function UkiSwapPanel() {
             </div>
 
             <div className="rounded-[9px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/[0.055] p-3.5">
-              <div className="flex items-end justify-between gap-3">
+              <label className="block">
                 <span className="text-xs font-semibold text-[var(--uki-muted)]">{copy.receive}</span>
-                <strong className="text-right font-mono text-lg font-black text-[var(--uki-cream)]">
-                  {isQuoteLoading ? '…' : formatSwapAmount(quotedUki)} UKI
-                </strong>
-              </div>
-              <div className="mt-3 grid gap-2 border-t border-white/10 pt-3 text-[0.67rem] font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)] sm:grid-cols-[1fr_auto]">
-                <span>{copy.route}: <strong className="text-[var(--uki-cream)]">{routeLabel(source)}</strong></span>
-                <label className="flex items-center gap-2 sm:justify-end">
+                <span className="mt-2 grid grid-cols-[1fr_auto] items-center overflow-hidden rounded-[8px] border border-white/12 bg-[#070817]/78 focus-within:border-[var(--uki-cyan)]">
+                  <input
+                    value={displayedUkiAmount}
+                    onChange={(event) => changeUkiAmount(event.target.value)}
+                    inputMode="decimal"
+                    placeholder={isQuoteLoading ? '…' : '0.0'}
+                    aria-label={`${copy.amount} UKI`}
+                    className="h-12 min-w-0 bg-transparent px-3 font-mono text-lg font-black text-[var(--uki-cream)] outline-none placeholder:text-[var(--uki-muted)]/55"
+                  />
+                  <strong className="border-l border-white/10 px-3 font-mono text-sm text-[var(--uki-cream)]">UKI</strong>
+                </span>
+              </label>
+              <p className="mt-2 text-[0.68rem] font-semibold text-[var(--uki-muted)]">{copy.editEither}</p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3 text-[0.67rem] font-bold uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+                <p>
+                  {quoteDirection === 'exactInput' ? copy.minimum : copy.maximum}:{' '}
+                  <strong className="font-mono text-[var(--uki-cream)]">
+                    {quoteDirection === 'exactInput'
+                      ? `${formatSwapAmount(minimumUki)} UKI`
+                      : `${formatSwapAmount(maximumSource)} ${source.symbol}`}
+                  </strong>
+                </p>
+                <label className="flex items-center gap-2">
                   <span>{copy.slippage}</span>
                   <select
                     value={slippageBps}
@@ -456,12 +588,9 @@ export function UkiSwapPanel() {
                   </select>
                 </label>
               </div>
-              <p className="mt-2 text-[0.68rem] font-semibold text-[var(--uki-muted)]">
-                {copy.minimum}: <strong className="font-mono text-[var(--uki-cream)]">{formatSwapAmount(minimumUki)} UKI</strong>
-              </p>
             </div>
 
-            {quoteError && parsedAmount ? (
+            {quoteError && activeInputAmount ? (
               <p className="mt-3 rounded-[8px] border border-[#f2c34b]/30 bg-[#2b1d08]/42 px-3 py-2 text-xs font-semibold text-[#ffe2a0]" role="alert">
                 {copy.quoteError}
               </p>

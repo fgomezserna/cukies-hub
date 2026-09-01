@@ -42,7 +42,7 @@ export const participationStepsByLocale: Record<
       icon: Coins,
       number: '01',
       title: 'Consigue UKI',
-      text: 'Compra UKI con BNB, USDT o ASM desde el formulario directo de la portada.',
+      text: 'Compra UKI con BNB, USDT, USDC o ASM desde el formulario directo de la portada.',
       href: '/#comprar-uki',
       action: 'Comprar UKI',
     },
@@ -68,7 +68,7 @@ export const participationStepsByLocale: Record<
       icon: Coins,
       number: '01',
       title: 'Get UKI',
-      text: 'Buy UKI with BNB, USDT, or ASM through the direct form on the home page.',
+      text: 'Buy UKI with BNB, USDT, USDC, or ASM through the direct form on the home page.',
       href: '/#comprar-uki',
       action: 'Buy UKI',
     },
@@ -406,11 +406,11 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
   es: [
     {
       question: '¿Dónde puedo comprar UKI?',
-      answer: 'Puedes comprar UKI directamente desde el formulario de la portada con BNB, USDT o ASM. La operación se ejecuta en PancakeSwap V2 y siempre debes revisar la ruta antes de firmar.',
+      answer: 'Puedes comprar UKI directamente desde el formulario de la portada con BNB, USDT, USDC o ASM. La operación se ejecuta en PancakeSwap V2.',
     },
     {
-      question: '¿Cómo funciona la compra con BNB o USDT?',
-      answer: 'La portada utiliza rutas explícitas de PancakeSwap V2: BNB pasa por USDT y ASM, y USDT pasa por ASM, antes de llegar a UKI. También puedes comprar directamente con ASM.',
+      question: '¿Puedo indicar cuántos UKI quiero comprar?',
+      answer: 'Sí. Puedes escribir lo que quieres pagar o la cantidad exacta de UKI que quieres recibir; el otro importe se calcula automáticamente.',
     },
     {
       question: '¿Cómo consigo intentos para el torneo?',
@@ -432,11 +432,11 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
   en: [
     {
       question: 'Where can I buy UKI?',
-      answer: 'You can buy UKI directly from the home-page form with BNB, USDT, or ASM. The transaction executes through PancakeSwap V2; always review the route before signing.',
+      answer: 'You can buy UKI directly from the home-page form with BNB, USDT, USDC, or ASM. The transaction executes through PancakeSwap V2.',
     },
     {
-      question: 'How does buying with BNB or USDT work?',
-      answer: 'The home page uses explicit PancakeSwap V2 routes: BNB goes through USDT and ASM, while USDT goes through ASM, before reaching UKI. You can also buy directly with ASM.',
+      question: 'Can I choose how much UKI I want to buy?',
+      answer: 'Yes. Enter either what you want to pay or the exact amount of UKI you want to receive, and the other amount is calculated automatically.',
     },
     {
       question: 'How do I get tournament attempts?',
