@@ -50,7 +50,7 @@ describe('components/landing/LandingHeader', () => {
     );
     expect(screen.getAllByRole('link', { name: 'Comprar UKI' })).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ href: expect.stringContaining('/#comprar') }),
+        expect.objectContaining({ href: expect.stringContaining('/#comprar-uki') }),
       ]),
     );
     expect(screen.getAllByRole('link', { name: 'Staking' })).toEqual(

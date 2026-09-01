@@ -42,10 +42,9 @@ export const participationStepsByLocale: Record<
       icon: Coins,
       number: '01',
       title: 'Consigue UKI',
-      text: 'Cambia ASM por UKI en el pool oficial de PancakeSwap V2.',
-      href: PANCAKESWAP_UKI_URL,
-      action: 'Comprar con ASM',
-      external: true,
+      text: 'Compra UKI con BNB, USDT o ASM desde el formulario directo de la portada.',
+      href: '/#comprar-uki',
+      action: 'Comprar UKI',
     },
     {
       icon: Crown,
@@ -69,10 +68,9 @@ export const participationStepsByLocale: Record<
       icon: Coins,
       number: '01',
       title: 'Get UKI',
-      text: 'Swap ASM for UKI through the official PancakeSwap V2 pool.',
-      href: PANCAKESWAP_UKI_URL,
-      action: 'Buy with ASM',
-      external: true,
+      text: 'Buy UKI with BNB, USDT, or ASM through the direct form on the home page.',
+      href: '/#comprar-uki',
+      action: 'Buy UKI',
     },
     {
       icon: Crown,
@@ -225,7 +223,7 @@ export const landingCopyByLocale = {
       lead: 'Compra UKI, haz staking y participa en el Torneo Lanzamiento de Treasure Hunt.',
       play: 'Entrar al torneo',
       stake: 'Hacer staking',
-      buy: 'Comprar UKI con ASM',
+      buy: 'Comprar UKI',
       live: 'Ecosistema operativo',
       pool: 'Pool oficial V2',
       staking: 'Staking activo',
@@ -317,7 +315,7 @@ export const landingCopyByLocale = {
       lead: 'Buy UKI, stake it, and join the Treasure Hunt Launch Tournament.',
       play: 'Enter tournament',
       stake: 'Stake UKI',
-      buy: 'Buy UKI with ASM',
+      buy: 'Buy UKI',
       live: 'Ecosystem live',
       pool: 'Official V2 pool',
       staking: 'Staking live',
@@ -408,11 +406,11 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
   es: [
     {
       question: '¿Dónde puedo comprar UKI?',
-      answer: 'La liquidez oficial está en el par ASM/UKI de PancakeSwap V2. Comprueba siempre la dirección del token antes de firmar.',
+      answer: 'Puedes comprar UKI directamente desde el formulario de la portada con BNB, USDT o ASM. La operación se ejecuta en PancakeSwap V2 y siempre debes revisar la ruta antes de firmar.',
     },
     {
-      question: '¿Por qué la compra directa se realiza con ASM?',
-      answer: 'El pool inicial es ASM/UKI. PancakeSwap puede no encontrar todavía una ruta automática desde BNB o USDT, por lo que la entrada directa y verificable es ASM.',
+      question: '¿Cómo funciona la compra con BNB o USDT?',
+      answer: 'La portada utiliza rutas explícitas de PancakeSwap V2: BNB pasa por USDT y ASM, y USDT pasa por ASM, antes de llegar a UKI. También puedes comprar directamente con ASM.',
     },
     {
       question: '¿Cómo consigo intentos para el torneo?',
@@ -434,11 +432,11 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
   en: [
     {
       question: 'Where can I buy UKI?',
-      answer: 'Official liquidity is in the ASM/UKI PancakeSwap V2 pair. Always verify the token address before signing.',
+      answer: 'You can buy UKI directly from the home-page form with BNB, USDT, or ASM. The transaction executes through PancakeSwap V2; always review the route before signing.',
     },
     {
-      question: 'Why is the direct purchase made with ASM?',
-      answer: 'The initial pool is ASM/UKI. PancakeSwap may not yet find an automatic route from BNB or USDT, so ASM is the direct, verifiable entry asset.',
+      question: 'How does buying with BNB or USDT work?',
+      answer: 'The home page uses explicit PancakeSwap V2 routes: BNB goes through USDT and ASM, while USDT goes through ASM, before reaching UKI. You can also buy directly with ASM.',
     },
     {
       question: 'How do I get tournament attempts?',
