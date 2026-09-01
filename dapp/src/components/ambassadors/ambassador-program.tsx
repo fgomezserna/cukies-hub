@@ -293,7 +293,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   );
 
   return (
-    <div className="uki-landing mx-auto min-h-full w-full max-w-[1480px] bg-transparent pb-10 text-[var(--uki-cream)]">
+    <div className="uki-landing mx-auto min-h-full w-full max-w-[1480px] [background:transparent] pb-10 text-[var(--uki-cream)]">
       <header className="relative overflow-hidden border-b border-white/10 pb-7 pt-1 sm:pb-9">
         <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />
         <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)] lg:items-end">
