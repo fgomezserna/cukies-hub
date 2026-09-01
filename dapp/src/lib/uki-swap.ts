@@ -6,6 +6,7 @@ export const PANCAKE_V2_ROUTER_BY_CHAIN = Object.freeze({
 } satisfies Record<number, Address>);
 
 export const BSC_MAINNET_SWAP_TOKENS = Object.freeze({
+  usdc: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
   usdt: '0x55d398326f99059fF775485246999027B3197955',
   wbnb: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
 } satisfies Record<string, Address>);
@@ -17,6 +18,16 @@ export const pancakeV2RouterAbi = [
     stateMutability: 'view',
     inputs: [
       { name: 'amountIn', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+    ],
+    outputs: [{ name: 'amounts', type: 'uint256[]' }],
+  },
+  {
+    type: 'function',
+    name: 'getAmountsIn',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'amountOut', type: 'uint256' },
       { name: 'path', type: 'address[]' },
     ],
     outputs: [{ name: 'amounts', type: 'uint256[]' }],
@@ -46,9 +57,34 @@ export const pancakeV2RouterAbi = [
     ],
     outputs: [{ name: 'amounts', type: 'uint256[]' }],
   },
+  {
+    type: 'function',
+    name: 'swapETHForExactTokens',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+      { name: 'to', type: 'address' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+    outputs: [{ name: 'amounts', type: 'uint256[]' }],
+  },
+  {
+    type: 'function',
+    name: 'swapTokensForExactTokens',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'amountInMax', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+      { name: 'to', type: 'address' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+    outputs: [{ name: 'amounts', type: 'uint256[]' }],
+  },
 ] as const;
 
-export type UkiSwapSourceSymbol = 'BNB' | 'USDT' | 'ASM';
+export type UkiSwapSourceSymbol = 'BNB' | 'USDT' | 'USDC' | 'ASM';
 
 export type UkiSwapSource = {
   symbol: UkiSwapSourceSymbol;
@@ -73,7 +109,7 @@ export function buildUkiSwapConfig({
   ukiAddress: Address;
 }): UkiSwapConfig | null {
   if (chainId === 56) {
-    const { usdt, wbnb } = BSC_MAINNET_SWAP_TOKENS;
+    const { usdc, usdt, wbnb } = BSC_MAINNET_SWAP_TOKENS;
 
     return {
       chainId,
@@ -89,6 +125,12 @@ export function buildUkiSwapConfig({
           isNative: false,
           tokenAddress: usdt,
           path: [usdt, asmAddress, ukiAddress],
+        },
+        {
+          symbol: 'USDC',
+          isNative: false,
+          tokenAddress: usdc,
+          path: [usdc, usdt, asmAddress, ukiAddress],
         },
         {
           symbol: 'ASM',
@@ -126,18 +168,21 @@ export function applySlippageBps(amount: bigint, slippageBps: number) {
   return (amount * BigInt(10_000 - slippageBps)) / BigInt(10_000);
 }
 
+export function applyMaximumSlippageBps(amount: bigint, slippageBps: number) {
+  if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) {
+    throw new Error('El slippage debe expresarse en puntos básicos entre 0 y 9.999.');
+  }
+
+  const numerator = amount * BigInt(10_000 + slippageBps);
+  return (numerator + BigInt(9_999)) / BigInt(10_000);
+}
+
 export function createSwapDeadline(nowMs = Date.now(), ttlMinutes = 20) {
   if (!Number.isFinite(nowMs) || !Number.isFinite(ttlMinutes) || ttlMinutes <= 0) {
     throw new Error('No se puede calcular el límite temporal de la operación.');
   }
 
   return BigInt(Math.floor(nowMs / 1_000) + Math.floor(ttlMinutes * 60));
-}
-
-export function routeLabel(source: UkiSwapSource) {
-  if (source.symbol === 'BNB') return 'BNB → USDT → ASM → UKI';
-  if (source.symbol === 'USDT') return 'USDT → ASM → UKI';
-  return 'ASM → UKI';
 }
 
 export function formatSwapAmount(amount: bigint | undefined, maximumDecimals = 6) {
@@ -148,4 +193,12 @@ export function formatSwapAmount(amount: bigint | undefined, maximumDecimals = 6
   const integerLabel = BigInt(integer).toLocaleString('es-ES');
 
   return visibleDecimals ? `${integerLabel},${visibleDecimals}` : integerLabel;
+}
+
+export function formatEditableSwapAmount(amount: bigint | undefined, maximumDecimals = 8) {
+  if (amount === undefined) return '';
+
+  const [integer, decimals = ''] = formatUnits(amount, 18).split('.');
+  const visibleDecimals = decimals.slice(0, maximumDecimals).replace(/0+$/, '');
+  return visibleDecimals ? `${integer}.${visibleDecimals}` : integer;
 }
