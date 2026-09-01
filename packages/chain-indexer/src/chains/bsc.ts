@@ -183,6 +183,34 @@ async function getBlockTimestampMs(input: {
   return timestampMs;
 }
 
+export function assertBscDeploymentReceiptIdentity(input: {
+  alias: string;
+  address: string;
+  deploymentBlock: number;
+  deploymentTxHash: string;
+  receipt: {
+    status: string;
+    contractAddress?: string | null;
+    blockNumber: bigint;
+    transactionHash: string;
+  };
+}) {
+  const receiptBlock = Number(input.receipt.blockNumber);
+  const receiptAddress = input.receipt.contractAddress?.toLowerCase();
+  const receiptTxHash = input.receipt.transactionHash.toLowerCase();
+  if (
+    input.receipt.status !== 'success'
+    || receiptAddress !== input.address.toLowerCase()
+    || !Number.isSafeInteger(receiptBlock)
+    || receiptBlock !== input.deploymentBlock
+    || receiptTxHash !== input.deploymentTxHash.toLowerCase()
+  ) {
+    throw new Error(
+      `${input.alias} no coincide con su receipt de despliegue configurado.`,
+    );
+  }
+}
+
 async function verifyBscContractIdentity(input: {
   identity: VerifiedBscContractIdentity;
   rpcClients: BscRpcClient[];
@@ -206,17 +234,13 @@ async function verifyBscContractIdentity(input: {
       return { receipt, bytecode };
     },
   );
-  const receiptAddress = value.receipt.contractAddress?.toLowerCase();
-  const receiptBlock = Number(value.receipt.blockNumber);
-  if (
-    value.receipt.status !== 'success'
-    || receiptAddress !== input.identity.address
-    || receiptBlock !== input.identity.deploymentBlock
-  ) {
-    throw new Error(
-      `${input.identity.alias} no coincide con su receipt de despliegue configurado.`,
-    );
-  }
+  assertBscDeploymentReceiptIdentity({
+    alias: input.identity.alias,
+    address: input.identity.address,
+    deploymentBlock: input.identity.deploymentBlock,
+    deploymentTxHash: input.identity.deploymentTxHash,
+    receipt: value.receipt,
+  });
   if (!value.bytecode || value.bytecode === '0x') {
     throw new Error(`${input.identity.alias} no tiene bytecode runtime.`);
   }

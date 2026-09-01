@@ -23,7 +23,8 @@
     "import:legacy": "tsx src/cli.ts import-legacy",
     "import:legacy-metadata": "tsx src/cli.ts import-legacy-metadata",
     "project:once": "tsx src/cli.ts project-once",
-    "test": "node --import tsx --test test/*.test.ts src/projectors/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts src/chains/*.test.ts src/projectors/*.test.ts",
+    "test:bsc-identity": "node --import tsx --test src/chains/bsc-identity.test.ts",
     "test:economy": "tsx --test \"src/storage/*economy*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
