@@ -27,14 +27,14 @@ async function main() {
   try {
     await client.connect();
     const session = client.startSession();
-    let result: Awaited<ReturnType<typeof materializeLockedPresaleAmbassadorAttributions>> | null = null;
+    let result: Awaited<ReturnType<typeof materializeLockedPresaleAmbassadorAttributions>> | undefined;
     try {
-      await session.withTransaction(async () => {
-        result = await materializeLockedPresaleAmbassadorAttributions(
+      result = await session.withTransaction(async () =>
+        materializeLockedPresaleAmbassadorAttributions(
           client.db(databaseName),
           { session },
-        );
-      });
+        ),
+      );
     } finally {
       await session.endSession();
     }

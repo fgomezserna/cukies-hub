@@ -236,10 +236,7 @@ export async function getOrCreateMongoAmbassadorProfile(
   try {
     await collection.updateOne(
       { _id: profile._id },
-      {
-        $setOnInsert: profile,
-        $set: { updatedAt: now },
-      },
+      { $setOnInsert: profile },
       { ...options, upsert: true },
     );
   } catch (error) {

@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 
 import {
+  getOrCreateMongoAmbassadorProfile,
   materializeLockedPresaleAmbassadorAttributions,
   resolveMongoAmbassadorAttributionsForWallets,
 } from "@/lib/uki-economy/ambassadors/repository";
@@ -8,7 +9,10 @@ import {
   buildAmbassadorAttribution,
   stableAmbassadorHash,
 } from "@/lib/uki-economy/ambassadors/rules";
-import type { AmbassadorAttribution } from "@/lib/uki-economy/ambassadors/types";
+import type {
+  AmbassadorAttribution,
+  AmbassadorProfile,
+} from "@/lib/uki-economy/ambassadors/types";
 
 const REFERRED = "0x1111111111111111111111111111111111111111";
 const AMBASSADOR = "0x2222222222222222222222222222222222222222";
@@ -99,6 +103,44 @@ function fakeDb(input: {
 }
 
 describe("Mongo ambassador canonical resolution", () => {
+  it("crea el perfil sin actualizar una ruta incluida en setOnInsert", async () => {
+    const profiles: AmbassadorProfile[] = [];
+    const updateOne = jest.fn(async (
+      filter: { _id: string },
+      update: { $setOnInsert: AmbassadorProfile; $set?: Partial<AmbassadorProfile> },
+    ) => {
+      const overlappingPaths = Object.keys(update.$set ?? {}).filter((path) =>
+        Object.hasOwn(update.$setOnInsert, path),
+      );
+      if (overlappingPaths.length > 0) {
+        throw new Error(`Mongo update path conflict: ${overlappingPaths.join(", ")}`);
+      }
+      if (!profiles.some((profile) => profile._id === filter._id)) {
+        profiles.push(update.$setOnInsert);
+      }
+    });
+    const db = {
+      collection: () => ({
+        updateOne,
+        findOne: async (filter: { _id: string }) =>
+          profiles.find((profile) => profile._id === filter._id) ?? null,
+      }),
+    } as unknown as Db;
+
+    const profile = await getOrCreateMongoAmbassadorProfile(db, AMBASSADOR, NOW);
+
+    expect(profile).toMatchObject({
+      walletNormalized: AMBASSADOR,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: `ambassador-profile:${AMBASSADOR}` },
+      { $setOnInsert: expect.objectContaining({ walletNormalized: AMBASSADOR }) },
+      { upsert: true },
+    );
+  });
+
   it("no aplica una atribucion firmada de forma retroactiva", async () => {
     const acceptedAt = new Date("2026-08-30T13:00:00.000Z");
     const direct = buildAmbassadorAttribution({
