@@ -349,9 +349,9 @@ UKI tiene supply fijo: este proceso materializa la reserva existente, no mintea.
 
 | Variable | Valor staging | Regla |
 | --- | --- | --- |
-| `REWARD_BATCH_PUBLISHER_ENABLED` | `false` hasta cargar autoridad | Gate explícito; nunca hereda el gate contable. |
+| `REWARD_BATCH_PUBLISHER_ENABLED` | `true` desde el canary controlado del 01-09-2026 | Gate explícito; nunca hereda el gate contable. Antes de activarlo se validaron owner, chain, contratos, base y primer cierre. |
 | `REWARD_BATCH_PUBLISHER_EXPECTED_SIGNER_ADDRESS` | owner de `RewardsDistributor` | La clave debe resolver exactamente a esta address y el preflight vuelve a contrastarla on-chain. |
-| `REWARD_BATCH_PUBLISHER_PRIVATE_KEY` | secreto Coolify pendiente | Solo se inyecta en el contenedor del publicador; no en Dapp, indexer ni schedulers. |
+| `REWARD_BATCH_PUBLISHER_PRIVATE_KEY` | secreto Coolify cargado, solo runtime | Solo se inyecta en el contenedor del publicador; no es build arg y no se comparte con Dapp, indexer ni schedulers. |
 | `REWARD_BATCH_PUBLISHER_CONFIRMATIONS` | `12` | Cada operación queda firmada de forma durable antes del broadcast y confirmada antes de avanzar. |
 | `REWARD_BATCH_CLAIM_WINDOW_SECONDS` | `7776000` | Ventana inicial de 90 días para staging. |
 
@@ -373,7 +373,11 @@ El worker rechaza cualquier entorno que no sea rama `staging`, recurso
 `u4s804o4wwcckowgk0woo4wg`, base `cukieshub-new-staging` y BSC Testnet `97`.
 El canary aislado del 20-08-2026 desplegó token/distributor temporales, publicó
 el batch `0xb0ea3773...1dd7f` (`0x5d44635e...9503`) y reclamó exactamente 10
-tokens (`0xa4e92d08...e104`). Los contratos UKI activos no se tocaron.
+tokens (`0xa4e92d08...e104`). El 01-09-2026 se verificó también el primer cierre
+real de staging contra los contratos UKI activos: `reward-daily:2026-08-21`
+quedó `completed`, con 400.000 UKI a tesorería (`0xf9974402...ce57`), 50.000
+UKI a marketing/desarrollo (`0x9a23fe1c...c895`) y quema de 50.000 UKI
+(`0xd431914c...c377`), los tres receipts con estado `success`.
 
 El indexer no marca un cursor UKI como `verified` por confiar en la configuracion. En cada arranque comprueba chain ID, receipt de despliegue, address, bloque y hash del bytecode runtime; despues sella el checkpoint canonico y la identidad de configuracion en los cursores. `VestingCreated` y `TokensReleased` se guardan en un ledger inmutable y reconstruyen la posicion por wallet/schedule, de modo que un replay repara una escritura parcial sin duplicar importes.
 
@@ -426,7 +430,7 @@ Antes de considerar staging valido:
 - [ ] Ejecutar ticks manuales, de uno en uno y con gates controlados, para Cukie Master, creditos, Game Economy, Cukie Pool y ranking; comprobar fencing, idempotencia, auditoria y ausencia de escrituras fuera de staging.
 - [ ] Habilitar como maximo un scheduler, observar al menos dos ciclos y volver a apagarlo antes de avanzar al siguiente.
 - [x] Desplegar los seis schedulers economicos con gates independientes y verificar guardas, credencial limitada y ausencia de ejecucion cuando cada gate esta apagado.
-- [ ] Desplegar `reward-batch-publisher` apagado y cargar la autoridad testnet del owner `0xba84...7820` por canal secreto antes del primer batch UKI real; no reutilizar la clave del deployer mainnet.
+- [x] Desplegar `reward-batch-publisher`, cargar por canal secreto la autoridad testnet del owner `0xba84...7820`, verificar que es solo runtime y completar el primer cierre UKI real de staging con tres receipts `success` (`reward-daily:2026-08-21`, 01-09-2026).
 - [x] Retirar el card worker del arranque por defecto de staging mediante el profile `card-worker`.
 - [x] Provisionar bucket MinIO, hostname publico, prefijo y credenciales exclusivos de staging; validar setup, upload/render real y limpieza completa del fixture.
 - [x] Desplegar URLs de card inmutables (#216), repetir dos regeneraciones con hashes distintos, limpiar el fixture y activar el profile `card-worker` solo en la app 28 (PR #217; despliegue 1109).
@@ -434,7 +438,7 @@ Antes de considerar staging valido:
 - [x] Completar smoke E2E con una segunda wallet desde la UI: login firmado, cookie segura, BSC Testnet `97`, transacciones bloqueadas, APIs de competicion `200`, registro `1/1` en Mongo staging y `0/0` en la base productiva.
 - [x] Rotar preventivamente `STAGING_MONGO_REPLICA_KEY` en una ventana controlada, reiniciar solo la replica staging y repetir health/transacciones sin reutilizar ni cambiar credenciales de produccion.
 
-El siguiente bloqueo NFT es ejecutar desde una wallet QA el smoke firmado approve/deposit/withdraw de Cukie Master y el flujo deposit/request-exit/withdraw del Cukie Pool respetando el corte. Para rewards on-chain queda cargar por canal secreto la autoridad testnet exacta del owner y ejecutar el primer batch UKI real; el canary aislado ya prueba funding, publicación y claim sin tocar los contratos activos.
+El siguiente bloqueo NFT es ejecutar desde una wallet QA el smoke firmado approve/deposit/withdraw de Cukie Master y el flujo deposit/request-exit/withdraw del Cukie Pool respetando el corte. Rewards on-chain ya tiene la autoridad testnet exacta del owner y completó el primer cierre UKI real contra los contratos activos; falta observar el drenaje ordenado del backlog y ejecutar un claim de usuario sobre el distributor UKI activo cuando exista el primer cierre con beneficiarios reclamables.
 
 ## Gates para produccion
 
