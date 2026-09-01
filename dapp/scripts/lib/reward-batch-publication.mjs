@@ -323,11 +323,13 @@ function assertAccountingPayloadHash(accounting, accountingKind) {
       capacityMaterializedRaw: accounting.capacityMaterializedRaw,
       priorReservedInflowRaw: accounting.priorReservedInflowRaw,
       topupRaw: accounting.topupRaw,
+      emissionRaw: accounting.emissionRaw,
       buckets: accounting.buckets,
       undistributed: accounting.undistributed,
       priorReservedUndistributed: accounting.priorReservedUndistributed,
       destinations: accounting.destinations,
       allocations: accounting.allocations,
+      conservationRaw: accounting.conservationRaw,
     };
   } else {
     payload = {

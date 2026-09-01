@@ -76,6 +76,7 @@ function input() {
     capacityMaterializedRaw: '65',
     priorReservedInflowRaw: '0',
     topupRaw: '0',
+    emissionRaw: '100',
     buckets: {
       playersRaw: '20',
       creditPoolRaw: '10',
@@ -102,6 +103,7 @@ function input() {
       supplyReduction: REDUCTION,
     },
     allocations: sealedAllocations,
+    conservationRaw: '100',
   };
   return {
     accountingId: 'reward-daily:2026-08-19',
@@ -285,6 +287,20 @@ test('falla cerrado si cambia el configHash, la politica o un solo wei del repar
   tamperedPayload.accounting.topupRaw = '1';
   assert.throws(
     () => buildRewardPublicationArtifacts(tamperedPayload),
+    /payloadHash/,
+  );
+
+  const tamperedEmission = input();
+  tamperedEmission.accounting.emissionRaw = '101';
+  assert.throws(
+    () => buildRewardPublicationArtifacts(tamperedEmission),
+    /payloadHash/,
+  );
+
+  const tamperedConservation = input();
+  tamperedConservation.accounting.conservationRaw = '101';
+  assert.throws(
+    () => buildRewardPublicationArtifacts(tamperedConservation),
     /payloadHash/,
   );
 
