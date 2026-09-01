@@ -42,9 +42,31 @@ export function TreasureHuntCreditModeBanner() {
   const costLabel = access.costCredits === null ? '—' : `${access.costCredits} créditos`;
   const balanceLabel = !access.walletConnected
     ? 'Conecta tu wallet'
-    : access.availableCredits === null
+    : access.ownAvailableCredits === null
       ? '—'
-      : `${access.availableCredits} créditos`;
+      : `${access.ownAvailableCredits} personales`;
+  const sourceLabel = access.creditSource === 'own'
+    ? 'Personal'
+    : access.creditSource === 'pool'
+      ? 'Pool · con ranking'
+      : 'Sin saldo suficiente';
+  const sourceDetail = access.creditSource === 'own'
+    ? 'Premio directo · no clasifica'
+    : access.creditSource === 'pool'
+      ? 'Sí entra en la semana'
+      : 'No se iniciará la partida';
+  const nextGameCopy = !access.walletConnected
+    ? 'Conecta tu wallet para ver qué créditos se usarán y si la partida entrará en el ranking.'
+    : access.isLoading
+      ? 'Estamos comprobando qué saldo se utilizará en tu próxima partida.'
+      : access.creditSource === 'pool'
+        ? `Se usarán ${access.costCredits} créditos del pool y tu resultado sí entrará en el ranking semanal.`
+        : access.creditSource === 'own'
+          ? `Se descontarán ${access.costCredits} créditos personales. Recibirás el reparto directo, pero esta partida no entrará en el ranking.`
+          : 'No hay una fuente con saldo suficiente para crear la partida.';
+  const contributedDetail = access.poolContributedCredits
+    ? `${access.poolContributedCredits} aportados al pool este periodo`
+    : 'Nada aportado al pool este periodo';
 
   return (
     <section
@@ -63,18 +85,18 @@ export function TreasureHuntCreditModeBanner() {
             Juega con tus créditos
           </h2>
           <p className="mt-1 max-w-md text-xs font-semibold leading-relaxed text-[#aaa8a2]">
-            Todas generan reparto; con créditos del pool también compites esta semana.
+            {nextGameCopy}
           </p>
         </div>
 
         <dl className="grid overflow-hidden rounded-[7px] border border-white/15 bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-white/15">
           <CreditMetric label="Coste" value={costLabel} detail="Al iniciar" />
           <CreditMetric
-            label="Saldo para jugar"
+            label="Tus créditos"
             value={access.isLoading ? 'Comprobando…' : balanceLabel}
-            detail={access.walletConnected ? 'Disponible ahora' : 'Conecta para consultarlo'}
+            detail={access.walletConnected ? contributedDetail : 'Conecta para consultarlo'}
           />
-          <CreditMetric label="Cukie" value="Automático" detail="Propio o del pool" />
+          <CreditMetric label="Próxima partida" value={sourceLabel} detail={sourceDetail} />
         </dl>
 
         <div className="grid grid-cols-2 gap-2 lg:col-span-2 xl:col-span-1 xl:grid-cols-1 2xl:grid-cols-2">
@@ -140,6 +162,7 @@ export function TreasureHuntCreditModeSidebar({
     access.isLoading || access.isError || access.blocked || !access.ready
   );
   const disabled = connectedUnavailable || (access.walletConnected && !access.canPlay);
+  const isPoolGame = access.creditSource === 'pool';
   const actionLabel = !access.walletConnected
     ? 'Conectar wallet para jugar'
     : access.isLoading
@@ -147,19 +170,30 @@ export function TreasureHuntCreditModeSidebar({
       : access.isError || access.blocked || !access.ready
         ? 'Créditos no disponibles'
         : access.canPlay
-          ? `Jugar por ${access.costCredits} créditos`
+          ? isPoolGame
+            ? `Competir con ${access.costCredits} créditos del pool`
+            : `Jugar con ${access.costCredits} créditos personales`
           : `Te faltan ${access.missingCredits} créditos`;
+  const introCopy = !access.walletConnected
+    ? 'Conecta tu wallet para comprobar el coste, el saldo y si la partida entra en el ranking.'
+    : access.isLoading
+      ? 'Estamos comprobando qué créditos se utilizarán en tu próxima partida.'
+      : isPoolGame
+        ? 'Tu próxima partida usará créditos del pool: genera reparto directo y sí compite en el ranking semanal.'
+        : access.creditSource === 'own'
+          ? 'Tu próxima partida usará créditos personales: genera reparto directo, pero no compite en el ranking semanal.'
+          : 'No hay saldo suficiente para crear una nueva partida.';
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#35eee2]">
-        Partida individual
+        {isPoolGame ? 'Competición semanal' : 'Partida individual'}
       </p>
       <h2 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">
         Juega con créditos
       </h2>
       <p className="mt-2 text-sm font-semibold leading-relaxed text-[#aaa8a2]">
-        Cada partida genera reparto. Solo las que usan créditos del pool entran también en el ranking semanal.
+        {introCopy}
       </p>
 
       <dl className="mt-5 overflow-hidden rounded-[8px] border border-white/15 bg-black/10">
@@ -167,33 +201,37 @@ export function TreasureHuntCreditModeSidebar({
           icon={<Coin className="h-4 w-4" weight="fill" aria-hidden="true" />}
           label="Coste"
           value={access.costCredits === null ? 'Pendiente de consultar' : `${access.costCredits} créditos`}
-          detail="Solo se descuentan si la partida queda creada"
+          detail="Se reservan al iniciar y se descuentan al confirmar la partida"
         />
         <SidebarRow
           icon={access.isLoading
             ? <SpinnerGap className="h-4 w-4 animate-spin" weight="bold" aria-hidden="true" />
             : <GameController className="h-4 w-4" weight="fill" aria-hidden="true" />}
-          label="Disponibles para jugar"
+          label="Tus créditos personales"
           value={!access.walletConnected
             ? 'Conecta tu wallet'
-            : access.availableCredits === null
+            : access.ownAvailableCredits === null
               ? 'No disponible'
-              : `${access.availableCredits} créditos`}
-          detail={access.reservedCredits
-            ? `${access.reservedCredits} reservados en partidas abiertas`
-            : 'Saldo libre en este momento'}
-        />
-        <SidebarRow
-          icon={<Stack className="h-4 w-4" weight="fill" aria-hidden="true" />}
-          label="Cukie"
-          value="Se asigna al empezar"
-          detail="Se usa uno propio o disponible en el pool"
+              : `${access.ownAvailableCredits} créditos`}
+          detail={access.poolContributedCredits
+            ? `${access.poolContributedCredits} aportados al pool este periodo`
+            : access.reservedCredits
+              ? `${access.reservedCredits} reservados en partidas abiertas`
+              : 'Saldo libre en este momento'}
         />
         <SidebarRow
           icon={<Trophy className="h-4 w-4" weight="fill" aria-hidden="true" />}
-          label="Resultado"
-          value="Recompensa confirmada al terminar"
-          detail="El ranking depende del origen de los créditos"
+          label="Ranking de esta partida"
+          value={isPoolGame ? 'Sí, esta partida cuenta' : 'No entra en la clasificación'}
+          detail={isPoolGame
+            ? `${access.poolAvailableCredits ?? 0} créditos disponibles en el pool compartido`
+            : 'El sistema utiliza primero tus créditos personales'}
+        />
+        <SidebarRow
+          icon={<Stack className="h-4 w-4" weight="fill" aria-hidden="true" />}
+          label="Cukie de la partida"
+          value="Se asigna al empezar"
+          detail="Se usa uno propio o disponible en el pool"
         />
       </dl>
 

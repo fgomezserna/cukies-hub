@@ -19,24 +19,27 @@ export default function TreasureHuntLatestResult() {
   if (isLoading || !result) return null;
 
   const completed = result.status === 'settled';
+  const creditLabel = result.creditsSpent === null
+    ? result.creditSource === 'own' ? 'Personales' : 'Del pool'
+    : `${result.creditsSpent} ${result.creditSource === 'own' ? 'personales' : 'del pool'}`;
   return (
     <section aria-labelledby="treasure-hunt-latest-result-title" className="overflow-hidden rounded-[8px] border border-[#b68b3c]/55 bg-[#061110]/94">
       <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-4">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#35eee2]">Resultado confirmado</p>
           <h2 id="treasure-hunt-latest-result-title" className="mt-1 font-headline text-xl font-black text-[#f2eee7]">Tu última partida</h2>
-          <p className="mt-1 text-sm text-[#aaa8a2]">{completed ? 'La partida quedó registrada y su reparto está ligado a este resultado.' : 'La partida se cerró sin puntuación ni recompensa.'}</p>
+          <p className="mt-1 text-sm text-[#aaa8a2]">{completed ? 'La partida quedó registrada: aquí puedes comprobar el cargo, el ranking y el reparto.' : 'La partida se cerró sin puntuación ni recompensa.'}</p>
         </div>
         <Link href="/premios" className="inline-flex min-h-10 items-center gap-2 rounded-[6px] border border-white/20 px-3.5 text-xs font-black text-[#f2eee7] hover:border-[#35eee2]/55">Ver mis premios <ArrowRight className="h-4 w-4" /></Link>
       </div>
       <dl className="grid border-t border-white/15 sm:grid-cols-5 sm:divide-x sm:divide-white/15">
         <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><CheckCircle2 className="h-3.5 w-3.5 text-[#35eee2]" /> Puntuación</dt><dd className="mt-1 font-mono text-lg font-black text-[#35eee2]">{Number(result.scoreRaw).toLocaleString('es-ES')}</dd></div>
-        <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><Coins className="h-3.5 w-3.5 text-[#ffc240]" /> Créditos usados</dt><dd className="mt-1 text-sm font-black text-[#f2eee7]">{result.creditSource === 'own' ? 'Propios' : 'Del pool'}</dd></div>
-        <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><Medal className="h-3.5 w-3.5 text-[#35eee2]" /> Ranking semanal</dt><dd className="mt-1 text-sm font-black text-[#f2eee7]">{result.leaderboardEligible ? 'Sí, esta partida cuenta' : 'No cuenta'}</dd></div>
+        <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><Coins className="h-3.5 w-3.5 text-[#ffc240]" /> Créditos descontados</dt><dd className="mt-1 text-sm font-black text-[#f2eee7]">{creditLabel}</dd><p className="mt-0.5 text-[11px] text-[#969994]">Cargo confirmado</p></div>
+        <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><Medal className="h-3.5 w-3.5 text-[#35eee2]" /> Clasificación semanal</dt><dd className="mt-1 text-sm font-black text-[#f2eee7]">{result.leaderboardEligible ? 'Sí, esta partida cuenta' : 'Fuera del ranking'}</dd><p className="mt-0.5 text-[11px] text-[#969994]">{result.leaderboardEligible ? 'Pagada por el pool' : 'Pagada con saldo personal'}</p></div>
         <div className="px-4 py-3.5"><dt className="text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]">Cukie asignado</dt><dd className="mt-1 text-sm font-black text-[#f2eee7]">{result.cukieSource === 'own' ? 'Propio' : 'Del pool'}</dd><p className="mt-0.5 text-[11px] text-[#969994]">{result.cukieGeneration} · {result.cukieRarity}</p></div>
         <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><Clock3 className="h-3.5 w-3.5 text-[#ffc240]" /> Recompensa directa</dt><dd className="mt-1 text-sm font-black text-[#ffc240]">{rewardCopy(result.reward.status, result.reward.amountRaw)}</dd><p className="mt-0.5 text-[11px] text-[#969994]">{result.reward.status === 'processing' ? 'Se actualizará automáticamente' : 'Importe asignado al jugador'}</p></div>
       </dl>
-      {!result.leaderboardEligible && completed ? <p className="border-t border-white/10 px-5 py-3 text-xs text-[#aaa8a2]">Esta partida sí genera reparto directo. No entra en el ranking porque usó créditos propios; para competir semanalmente deben usarse créditos del pool.</p> : null}
+      {!result.leaderboardEligible && completed ? <p className="border-t border-white/10 px-5 py-3 text-xs text-[#aaa8a2]">El ranking semanal sí está activo, pero solo admite partidas financiadas por el pool. Esta usó saldo personal: conserva su recompensa directa, aunque no suma en la clasificación.</p> : null}
     </section>
   );
 }

@@ -5,6 +5,9 @@ import { getEconomyDb } from "@/lib/indexer-db/mongodb";
 import { formatRawAmount, parseRawAmount } from "@/lib/uki-economy/money";
 import { getIsoWeekPeriodId } from "@/lib/uki-economy/periods";
 import type {
+  CreditReservation,
+} from "@/lib/uki-economy/credits/types";
+import type {
   RewardAllocation,
   RewardPoolAccrual,
   RewardSourceManifest,
@@ -39,6 +42,7 @@ export type TreasureHuntWeeklyLatestResult = {
   status: "settled" | "forfeited";
   scoreRaw: string;
   achievedAt: string;
+  creditsSpent: number | null;
   creditSource: "own" | "pool";
   cukieSource: "own" | "pool";
   cukieAssetId: string;
@@ -121,12 +125,15 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
   if (!run || (run.status !== "settled" && run.status !== "forfeited")) return null;
 
   const sourceId = `game-session:${run.gameEconomySessionId}`;
-  const [manifest, allocation] = await Promise.all([
+  const [manifest, allocation, creditReservation] = await Promise.all([
     db.collection<RewardSourceManifest>("reward_source_manifests").findOne({ sourceId }),
     db.collection<RewardAllocation>("reward_allocations").findOne({
       sourceId,
       walletNormalized,
       category: "player",
+    }),
+    db.collection<CreditReservation>("competition_credit_reservations").findOne({
+      reservationId: run.creditReservationId,
     }),
   ]);
   const rewardStatus = run.status !== "settled"
@@ -143,6 +150,9 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
     status: run.status,
     scoreRaw: run.scoreRaw ?? "0",
     achievedAt: (run.achievedAt ?? run.updatedAt).toISOString(),
+    creditsSpent: creditReservation?.status === "consumed"
+      ? creditReservation.amountCredits
+      : null,
     creditSource: run.creditSource,
     cukieSource: run.cukieSource,
     cukieAssetId: run.cukieAssetId,

@@ -956,7 +956,10 @@ export default function TreasureHuntGameView() {
       onGameConnection={handleGameConnection}
       desktopBanner={<TreasureHuntCompetitionBanner key={competitionPanelRefreshKey} />}
       desktopSidebar={(
-        <TreasureHuntPlaySidebar onStartSinglePlayer={startSinglePlayerFromHub} />
+        <TreasureHuntPlaySidebar
+          key={competitionPanelRefreshKey}
+          onStartSinglePlayer={startSinglePlayerFromHub}
+        />
       )}
       desktopFooter={<TreasureHuntLatestResult key={competitionPanelRefreshKey} />}
       desktopGameFirst

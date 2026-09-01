@@ -20,6 +20,7 @@ jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
         status: 'settled',
         scoreRaw: '175',
         achievedAt: '2026-09-01T13:36:34.927Z',
+        creditsSpent: 10,
         creditSource: 'own',
         cukieSource: 'pool',
         cukieAssetId: 'asset-1',
@@ -49,11 +50,12 @@ describe('resultado económico de Treasure Hunt', () => {
 
     expect(screen.getByRole('heading', { name: 'Tu última partida' })).toBeInTheDocument();
     expect(screen.getByText('175')).toBeInTheDocument();
-    expect(screen.getByText('Propios')).toBeInTheDocument();
-    expect(screen.getByText('No cuenta')).toBeInTheDocument();
+    expect(screen.getByText('10 personales')).toBeInTheDocument();
+    expect(screen.getByText('Cargo confirmado')).toBeInTheDocument();
+    expect(screen.getByText('Fuera del ranking')).toBeInTheDocument();
     expect(screen.getByText('Del pool')).toBeInTheDocument();
     expect(screen.getByText('0,21875 UKI')).toBeInTheDocument();
-    expect(screen.getByText(/sí genera reparto directo/i)).toBeInTheDocument();
+    expect(screen.getByText(/ranking semanal sí está activo/i)).toBeInTheDocument();
   });
 
   it('indica que el cálculo sigue en curso sin inventar un premio', () => {

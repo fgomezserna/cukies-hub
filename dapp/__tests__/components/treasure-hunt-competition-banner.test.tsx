@@ -13,7 +13,13 @@ const mockCreditAccess = {
   ready: true,
   costCredits: 10,
   availableCredits: 480,
+  ownAvailableCredits: 480,
+  poolAvailableCredits: 120,
+  poolContributedCredits: 20,
+  spentCredits: 0,
+  creditSource: 'own' as const,
   reservedCredits: 0,
+  poolReservedCredits: 0,
   canPlay: true,
   missingCredits: 0,
   reload: jest.fn(),
@@ -105,7 +111,9 @@ describe('TreasureHuntCompetitionBanner', () => {
 
     expect(screen.getByText('Juega con tus créditos')).toBeInTheDocument();
     expect(screen.getByText('10 créditos')).toBeInTheDocument();
-    expect(screen.getByText('480 créditos')).toBeInTheDocument();
+    expect(screen.getByText('480 personales')).toBeInTheDocument();
+    expect(screen.getByText('20 aportados al pool este periodo')).toBeInTheDocument();
+    expect(screen.getByText('Premio directo · no clasifica')).toBeInTheDocument();
     expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver semana actual/ })).toHaveAttribute(
       'href',

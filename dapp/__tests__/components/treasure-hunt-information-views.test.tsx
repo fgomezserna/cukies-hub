@@ -16,7 +16,13 @@ const mockCreditAccess = {
   ready: true,
   costCredits: 10,
   availableCredits: 480,
+  ownAvailableCredits: 480,
+  poolAvailableCredits: 120,
+  poolContributedCredits: 20,
+  spentCredits: 0,
+  creditSource: 'own' as 'own' | 'pool' | null,
   reservedCredits: 0,
+  poolReservedCredits: 0,
   canPlay: true,
   missingCredits: 0,
   reload: jest.fn(),
@@ -233,7 +239,13 @@ describe('vistas UX de Treasure Hunt', () => {
       ready: true,
       costCredits: 10,
       availableCredits: 480,
+      ownAvailableCredits: 480,
+      poolAvailableCredits: 120,
+      poolContributedCredits: 20,
+      spentCredits: 0,
+      creditSource: 'own',
       reservedCredits: 0,
+      poolReservedCredits: 0,
       canPlay: true,
       missingCredits: 0,
     });
@@ -295,17 +307,42 @@ describe('vistas UX de Treasure Hunt', () => {
     const onStartSinglePlayer = jest.fn();
     render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Jugar por 10 créditos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Jugar con 10 créditos personales' }));
 
     expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
     expect(screen.getByText('480 créditos')).toBeInTheDocument();
+    expect(screen.getByText('20 aportados al pool este periodo')).toBeInTheDocument();
+    expect(screen.getByText('No entra en la clasificación')).toBeInTheDocument();
     expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
+  });
+
+  it('habilita el ranking cuando no quedan créditos personales y el pool puede pagar la partida', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      availableCredits: 0,
+      ownAvailableCredits: 0,
+      poolAvailableCredits: 120,
+      creditSource: 'pool',
+      canPlay: true,
+      missingCredits: 0,
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Competir con 10 créditos del pool' }));
+
+    expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Sí, esta partida cuenta')).toBeInTheDocument();
+    expect(screen.getByText('120 créditos disponibles en el pool compartido')).toBeInTheDocument();
   });
 
   it('explica cuánto falta y bloquea la partida si no hay créditos suficientes', () => {
     mockPhase = 'closed';
     Object.assign(mockCreditAccess, {
       availableCredits: 4,
+      ownAvailableCredits: 4,
+      poolAvailableCredits: 3,
+      creditSource: null,
       canPlay: false,
       missingCredits: 6,
     });
