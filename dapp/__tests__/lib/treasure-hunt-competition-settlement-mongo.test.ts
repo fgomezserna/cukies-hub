@@ -131,11 +131,25 @@ describe('Treasure Hunt competition Mongo settlement wiring', () => {
     }));
     expect(pipeline).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        $setWindowFields: expect.objectContaining({
-          partitionBy: '$__normalizedWallet',
+        $sort: expect.objectContaining({
+          __normalizedWallet: 1,
+          score: -1,
         }),
       }),
-      { $match: { __walletRank: { $lte: 5 } } },
+      {
+        $group: {
+          _id: '$__normalizedWallet',
+          __attempts: { $push: '$$ROOT' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          __attempts: { $slice: ['$__attempts', 5] },
+        },
+      },
+      { $unwind: '$__attempts' },
+      { $replaceWith: '$__attempts' },
       expect.objectContaining({
         $lookup: expect.objectContaining({ from: 'presale_game_participants' }),
       }),

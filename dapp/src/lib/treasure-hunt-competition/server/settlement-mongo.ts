@@ -374,13 +374,28 @@ export class MongoCompetitionSettlementSource implements CompetitionSettlementCl
         },
         { $set: { __normalizedWallet: { $toLower: '$walletAddress' } } },
         {
-          $setWindowFields: {
-            partitionBy: '$__normalizedWallet',
-            sortBy: { score: -1, gameTimeMs: 1, finishedAt: 1, attemptId: 1 },
-            output: { __walletRank: { $documentNumber: {} } },
+          $sort: {
+            __normalizedWallet: 1,
+            score: -1,
+            gameTimeMs: 1,
+            finishedAt: 1,
+            attemptId: 1,
           },
         },
-        { $match: { __walletRank: { $lte: input.maxWinningAttemptsPerWallet } } },
+        {
+          $group: {
+            _id: '$__normalizedWallet',
+            __attempts: { $push: '$$ROOT' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            __attempts: { $slice: ['$__attempts', input.maxWinningAttemptsPerWallet] },
+          },
+        },
+        { $unwind: '$__attempts' },
+        { $replaceWith: '$__attempts' },
         { $sort: { score: -1, gameTimeMs: 1, finishedAt: 1, attemptId: 1 } },
         {
           $lookup: {
