@@ -79,9 +79,9 @@ export default function TreasureHuntExperienceShell({
   return (
     <section
       data-treasure-hunt-shell
-      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#09060f] text-[var(--uki-cream)]"
+      className="uki-landing relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#09060f] text-[var(--uki-cream)]"
     >
-      <header className="relative z-40 shrink-0 border-b border-[var(--uki-lilac)]/20 bg-[#09060f]/95">
+      <header className="relative z-40 shrink-0 border-b border-[var(--uki-lilac-border)] bg-[#09060f]/95">
         <div
           data-treasure-hunt-header-art
           className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block"
@@ -138,7 +138,7 @@ export default function TreasureHuntExperienceShell({
 
         <nav
           aria-label="Secciones de Treasure Hunt"
-          className="border-t border-[var(--uki-lilac)]/16 bg-[#0d0914]/88"
+          className="border-t border-[var(--uki-lilac-border)] bg-[#0d0914]/88"
         >
           <div className="flex min-w-max overflow-x-auto px-1 sm:px-6 lg:px-8">
             {tabs.map(({ href, label }) => {
@@ -149,7 +149,7 @@ export default function TreasureHuntExperienceShell({
                   href={href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'relative inline-flex min-h-[46px] min-w-[5.25rem] flex-1 items-center justify-center border-r border-[#d9e4df]/10 px-3 text-xs font-semibold transition-colors first:border-l sm:min-w-[10rem] sm:px-5 sm:text-sm',
+                    'relative inline-flex min-h-[46px] min-w-[5.25rem] flex-1 items-center justify-center border-r border-[var(--uki-lilac-border)] px-3 text-xs font-semibold transition-colors first:border-l sm:min-w-[10rem] sm:px-5 sm:text-sm',
                     active
                       ? 'text-[var(--uki-lilac)]'
                       : 'text-[#aaa8a2] hover:text-[#f3efe7]',

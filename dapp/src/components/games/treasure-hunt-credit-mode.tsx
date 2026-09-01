@@ -89,7 +89,7 @@ export function TreasureHuntCreditModeBanner() {
           </p>
         </div>
 
-        <dl className="grid overflow-hidden rounded-[7px] border border-white/15 bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-white/15">
+        <dl className="grid overflow-hidden rounded-[7px] border border-[var(--uki-lilac-border)] bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-[var(--uki-lilac-border)]">
           <CreditMetric label="Coste" value={costLabel} detail="Al iniciar" />
           <CreditMetric
             label="Tus créditos"
@@ -102,7 +102,7 @@ export function TreasureHuntCreditModeBanner() {
         <div className="grid grid-cols-2 gap-2 lg:col-span-2 xl:col-span-1 xl:grid-cols-1 2xl:grid-cols-2">
           <Link
             href="/games/treasure-hunt/rankings"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-white/20 px-3 text-xs font-black text-[var(--uki-cream)] transition-colors hover:border-[var(--uki-lilac)]/55 hover:text-[var(--uki-lilac)] active:scale-[0.98]"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-[var(--uki-lilac-border)] px-3 text-xs font-black text-[var(--uki-cream)] transition-colors hover:border-[var(--uki-lilac)] hover:text-[var(--uki-lilac)] active:scale-[0.98]"
           >
             <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
             Ver semana actual
@@ -139,7 +139,7 @@ function SidebarRow({
   readonly detail: string;
 }) {
   return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-white/10 px-4 py-3.5 last:border-b-0">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-[var(--uki-lilac-border)] px-4 py-3.5 last:border-b-0">
       <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-full border border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
         {icon}
       </span>
@@ -196,7 +196,7 @@ export function TreasureHuntCreditModeSidebar({
         {introCopy}
       </p>
 
-      <dl className="mt-5 overflow-hidden rounded-[8px] border border-white/15 bg-black/10">
+      <dl className="mt-5 overflow-hidden rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/10">
         <SidebarRow
           icon={<Coin className="h-4 w-4" weight="fill" aria-hidden="true" />}
           label="Coste"
@@ -239,7 +239,7 @@ export function TreasureHuntCreditModeSidebar({
         type="button"
         onClick={onStartSinglePlayer}
         disabled={disabled}
-        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[7px] border border-[var(--uki-lilac)] bg-[var(--uki-lilac)] px-4 text-sm font-black uppercase text-[#120716] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_rgba(228,92,255,0.16)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-[#969994] disabled:shadow-none"
+        className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-3 rounded-[7px] border border-[var(--uki-lilac)] bg-[var(--uki-lilac)] px-4 text-sm font-black uppercase text-[#120716] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_rgba(228,92,255,0.16)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-[var(--uki-lilac-border)] disabled:bg-[var(--uki-lilac-soft)] disabled:text-[var(--uki-muted)] disabled:shadow-none"
       >
         {actionLabel}
         {!access.isLoading ? <ArrowRight className="h-5 w-5" weight="bold" aria-hidden="true" /> : null}
@@ -251,10 +251,10 @@ export function TreasureHuntCreditModeSidebar({
         </p>
       ) : null}
 
-      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[var(--uki-lilac)] hover:text-white">
+      <Link href="/credits" className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 text-sm font-black text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">
         Gestionar créditos <ArrowRight className="h-4 w-4" weight="bold" aria-hidden="true" />
       </Link>
-      <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center justify-center gap-2 text-sm font-semibold text-[#aaa8a2] hover:text-white">
+      <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center justify-center gap-2 text-sm font-semibold text-[#aaa8a2] hover:text-[var(--uki-lilac)]">
         Ver competición semanal <ClockCounterClockwise className="h-4 w-4" weight="bold" aria-hidden="true" />
       </Link>
     </aside>

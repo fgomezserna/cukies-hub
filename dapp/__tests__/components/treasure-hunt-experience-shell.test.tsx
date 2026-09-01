@@ -42,7 +42,7 @@ describe('TreasureHuntExperienceShell', () => {
     const viewport = document.querySelector('[data-treasure-hunt-content]');
     const headerArt = document.querySelector('[data-treasure-hunt-header-art]');
 
-    expect(shell).toHaveClass('h-full', 'min-h-0', 'overflow-hidden');
+    expect(shell).toHaveClass('uki-landing', 'h-full', 'min-h-0', 'overflow-hidden');
     expect(viewport).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
     expect(headerArt).toHaveClass('hidden', 'lg:block');
     expect(screen.queryByRole('link', { name: 'Competiciones' })).not.toBeInTheDocument();
