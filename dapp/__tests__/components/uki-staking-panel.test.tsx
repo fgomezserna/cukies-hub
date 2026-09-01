@@ -49,6 +49,7 @@ jest.mock('lucide-react', () => ({
   ArrowDownToLine: () => null,
   ArrowUpFromLine: () => null,
   Check: () => null,
+  CheckCircle2: () => null,
   ExternalLink: () => null,
   Loader2: () => null,
   RefreshCw: () => null,
@@ -95,6 +96,7 @@ function readResult(data: unknown, isError = false) {
 describe('UkiStakingPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
     allowance = BigInt(0);
     stakingToken = tokenAddress;
     stakingPaused = false;
@@ -303,7 +305,7 @@ describe('UkiStakingPanel', () => {
   it('approves only the entered UKI amount when allowance is insufficient', () => {
     render(<UkiStakingPanel />);
     fireEvent.change(screen.getByLabelText('Cantidad de UKI'), { target: { value: '21000' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Aprobar UKI exactos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Paso 1 de 2 · Autorizar 21.000 UKI' }));
 
     expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({
       chainId: 97,
@@ -317,7 +319,7 @@ describe('UkiStakingPanel', () => {
     allowance = parseUnits('50000', 18);
 
     render(<UkiStakingPanel />);
-    fireEvent.click(screen.getByRole('button', { name: 'Hacer staking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Paso 2 de 2 · Depositar 20.000 UKI' }));
 
     expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({
       chainId: 97,
@@ -335,7 +337,7 @@ describe('UkiStakingPanel', () => {
     window.addEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
     const { rerender } = render(<UkiStakingPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hacer staking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Paso 2 de 2 · Depositar 20.000 UKI' }));
     mockUseWriteContract.mockReturnValue({
       writeContract,
       data: `0x${'a'.repeat(64)}`,
@@ -359,6 +361,50 @@ describe('UkiStakingPanel', () => {
     window.removeEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
   });
 
+  it('recupera una autorización pendiente y deja claro que falta depositar', async () => {
+    allowance = parseUnits('14000', 18);
+
+    render(<UkiStakingPanel />);
+
+    await waitFor(() => expect(screen.getByLabelText('Cantidad de UKI')).toHaveValue('14000'));
+    expect(screen.getByText(/Permiso confirmado\. Falta el depósito del paso 2/i)).toBeInTheDocument();
+    expect(screen.getByText(/Hasta entonces siguen en tu wallet/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Paso 2 de 2 · Depositar 14.000 UKI' }));
+    expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({
+      chainId: 97,
+      address: stakingAddress,
+      functionName: 'stake',
+      args: [parseUnits('14000', 18)],
+    }));
+  });
+
+  it('no presenta el permiso como staking completado', async () => {
+    const { rerender } = render(<UkiStakingPanel />);
+    fireEvent.change(screen.getByLabelText('Cantidad de UKI'), { target: { value: '14000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Paso 1 de 2 · Autorizar 14.000 UKI' }));
+
+    mockUseWriteContract.mockReturnValue({
+      writeContract,
+      data: `0x${'b'.repeat(64)}`,
+      error: null,
+      isPending: false,
+      reset,
+    } as never);
+    mockUseWaitForTransactionReceipt.mockReturnValue({
+      isLoading: false,
+      isSuccess: true,
+    } as never);
+    rerender(<UkiStakingPanel />);
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith({
+      title: 'Paso 1 de 2 completado',
+      description: 'El permiso no deposita tus UKI. Firma ahora el paso 2 para completar el staking.',
+    }));
+    expect(screen.getByRole('button', { name: 'Paso 2 de 2 · Depositar 14.000 UKI' })).toBeEnabled();
+    expect(screen.getByText(/Permiso confirmado\. Falta el depósito del paso 2/i)).toBeInTheDocument();
+  });
+
   it('withdraws only up to the verified staked balance', () => {
     render(<UkiStakingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Retirar' }));
@@ -380,7 +426,7 @@ describe('UkiStakingPanel', () => {
     stakingPaused = true;
 
     render(<UkiStakingPanel />);
-    expect(screen.getByRole('button', { name: 'Aprobar UKI exactos' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Paso 1 de 2 · Autorizar 20.000 UKI' })).toBeDisabled();
     expect(screen.getByText(/nuevos depósitos están pausados/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Retirar' }));
@@ -392,7 +438,7 @@ describe('UkiStakingPanel', () => {
 
     render(<UkiStakingPanel />);
 
-    expect(screen.getByRole('button', { name: 'Aprobar UKI exactos' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Paso 1 de 2 · Autorizar 20.000 UKI' })).toBeDisabled();
     expect(screen.getByText(/No podemos verificar el staking ahora/i)).toBeInTheDocument();
     expect(writeContract).not.toHaveBeenCalled();
   });

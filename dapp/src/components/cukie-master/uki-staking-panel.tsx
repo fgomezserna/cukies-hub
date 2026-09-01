@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
+  CheckCircle2,
   ExternalLink,
   Loader2,
   RefreshCw,
@@ -34,6 +35,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '20000';
+const DEFAULT_AMOUNT_RAW = parseUnits(DEFAULT_AMOUNT, TOKEN_DECIMALS);
 const MAX_UKI_ROUTE_SLOTS = BigInt(5);
 
 type StakingOperation = 'stake' | 'unstake';
@@ -71,6 +73,10 @@ function sameAddress(left?: string, right?: string) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
+function pendingStakeStorageKey(address: string, stakingAddress: string) {
+  return `cukies:uki-staking:pending:${UKI_PRESALE_CHAIN_ID}:${address.toLowerCase()}:${stakingAddress.toLowerCase()}`;
+}
+
 export function UkiStakingPanel({
   testnetOnly = false,
   routePreview = null,
@@ -94,6 +100,8 @@ export function UkiStakingPanel({
   } = useAuth();
   const hasMounted = useHasMounted();
   const handledReceiptHashRef = useRef<string | null>(null);
+  const amountChangedByUserRef = useRef(false);
+  const resumedAllowanceKeyRef = useRef<string | null>(null);
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [operation, setOperation] = useState<StakingOperation>('stake');
   const [lastAction, setLastAction] = useState<TransactionAction>(null);
@@ -193,6 +201,12 @@ export function UkiStakingPanel({
   const needsApproval = Boolean(
     operation === 'stake' && parsedAmount && effectiveAllowance !== undefined && effectiveAllowance < parsedAmount,
   );
+  const depositReady = Boolean(
+    operation === 'stake'
+    && parsedAmount
+    && effectiveAllowance !== undefined
+    && effectiveAllowance >= parsedAmount,
+  );
   const isBusy = isPending || isConfirming;
   const canTransact = Boolean(
     hasMounted &&
@@ -227,7 +241,46 @@ export function UkiStakingPanel({
     setLastAction(null);
     setLastCompletedAction(null);
     handledReceiptHashRef.current = null;
+    amountChangedByUserRef.current = false;
+    resumedAllowanceKeyRef.current = null;
   }, [address, stakingAddress, tokenAddress]);
+
+  useEffect(() => {
+    if (
+      operation !== 'stake'
+      || !address
+      || !stakingAddress
+      || allowance === undefined
+      || allowance <= BigInt(0)
+      || liquidBalance === undefined
+      || amountChangedByUserRef.current
+      || lastAction !== null
+    ) return;
+
+    const storageKey = pendingStakeStorageKey(address, stakingAddress);
+    const storedRaw = window.localStorage.getItem(storageKey);
+    let resumableAmount: bigint | null = null;
+    if (storedRaw && /^(0|[1-9][0-9]*)$/.test(storedRaw)) {
+      const storedAmount = BigInt(storedRaw);
+      if (storedAmount > BigInt(0) && storedAmount <= allowance && storedAmount <= liquidBalance) {
+        resumableAmount = storedAmount;
+      }
+    }
+    // Existing approvals created before this resume marker existed can still be
+    // recovered safely when they are smaller than the default form amount. The
+    // contract consumes the exact allowance when the pending deposit completes.
+    if (!resumableAmount && allowance < DEFAULT_AMOUNT_RAW && allowance <= liquidBalance) {
+      resumableAmount = allowance;
+    }
+    if (!resumableAmount) return;
+
+    const allowanceKey = `${storageKey}:${resumableAmount.toString()}`;
+    if (resumedAllowanceKeyRef.current === allowanceKey) return;
+    resumedAllowanceKeyRef.current = allowanceKey;
+    setAmount(formatUnits(resumableAmount, TOKEN_DECIMALS));
+    setApprovedAmount(resumableAmount);
+    setLastCompletedAction('approve');
+  }, [address, allowance, lastAction, liquidBalance, operation, stakingAddress]);
 
   useEffect(() => {
     if (!isSuccess || !txHash || handledReceiptHashRef.current === txHash) return;
@@ -243,10 +296,13 @@ export function UkiStakingPanel({
       setApprovedAmount(parsedAmount);
       setLastCompletedAction('approve');
       toast({
-        title: 'Permiso UKI confirmado',
-        description: 'Ahora puedes confirmar el staking con una segunda firma.',
+        title: 'Paso 1 de 2 completado',
+        description: 'El permiso no deposita tus UKI. Firma ahora el paso 2 para completar el staking.',
       });
     } else if (lastAction === 'stake') {
+      if (address && stakingAddress) {
+        window.localStorage.removeItem(pendingStakeStorageKey(address, stakingAddress));
+      }
       setAmount(DEFAULT_AMOUNT);
       setApprovedAmount(null);
       setLastCompletedAction('stake');
@@ -271,11 +327,13 @@ export function UkiStakingPanel({
     isSuccess,
     lastAction,
     parsedAmount,
+    address,
     refetchAllowance,
     refetchLiquidBalance,
     refetchPaused,
     refetchStakedBalance,
     refetchStakingToken,
+    stakingAddress,
     toast,
     txHash,
   ]);
@@ -295,15 +353,19 @@ export function UkiStakingPanel({
     setAmount(DEFAULT_AMOUNT);
     setLastAction(null);
     setLastCompletedAction(null);
+    amountChangedByUserRef.current = false;
+    resumedAllowanceKeyRef.current = null;
     reset();
   }
 
   function useMaximumBalance() {
     if (availableBalance === undefined) return;
+    amountChangedByUserRef.current = true;
     setAmount(formatUnits(availableBalance, TOKEN_DECIMALS));
   }
 
   function selectQuickAmount(value: string) {
+    amountChangedByUserRef.current = true;
     setAmount(value);
     setLastCompletedAction(null);
   }
@@ -347,6 +409,12 @@ export function UkiStakingPanel({
     setLastCompletedAction(null);
 
     if (needsApproval) {
+      if (address) {
+        window.localStorage.setItem(
+          pendingStakeStorageKey(address, stakingAddress),
+          parsedAmount.toString(),
+        );
+      }
       setLastAction('approve');
       writeContract({
         chainId: UKI_PRESALE_CHAIN_ID,
@@ -369,15 +437,15 @@ export function UkiStakingPanel({
   }
 
   const actionLabel = lastAction === 'approve' && isBusy
-    ? 'Confirmando permiso'
+    ? 'Paso 1 de 2 · Confirmando permiso'
     : lastAction === 'stake' && isBusy
-      ? 'Confirmando staking'
+      ? 'Paso 2 de 2 · Confirmando depósito'
       : lastAction === 'unstake' && isBusy
         ? 'Confirmando retirada'
         : needsApproval
-          ? 'Aprobar UKI exactos'
+          ? `Paso 1 de 2 · Autorizar ${formatTokenAmount(parsedAmount ?? undefined)} UKI`
           : operation === 'stake'
-            ? 'Hacer staking'
+            ? `Paso 2 de 2 · Depositar ${formatTokenAmount(parsedAmount ?? undefined)} UKI`
             : 'Retirar UKI';
 
   if (!hasMounted || !isConnected || !isAuthenticatedEvm) {
@@ -469,6 +537,7 @@ export function UkiStakingPanel({
                 aria-describedby="uki-staking-available"
                 aria-invalid={Boolean(!parsedAmount || (availableBalance !== undefined && !hasEnoughBalance))}
                 onChange={(event) => {
+                  amountChangedByUserRef.current = true;
                   setAmount(event.target.value);
                   setLastCompletedAction(null);
                 }}
@@ -529,6 +598,30 @@ export function UkiStakingPanel({
               </button>
             ) : null}
 
+            {operation === 'stake' && parsedAmount && hasEnoughBalance ? (
+              <div
+                aria-label="Progreso del depósito"
+                className="mt-4 overflow-hidden rounded-[8px] border border-white/10 bg-black/20"
+              >
+                <DepositStep
+                  complete={!needsApproval}
+                  current={needsApproval}
+                  label="1. Autorizar UKI"
+                  detail={needsApproval
+                    ? 'Esta firma solo da permiso al contrato; todavía no deposita nada.'
+                    : 'Permiso confirmado.'}
+                />
+                <DepositStep
+                  complete={false}
+                  current={depositReady}
+                  label="2. Confirmar el depósito"
+                  detail={depositReady
+                    ? `Falta firmar el depósito de ${formatTokenAmount(parsedAmount)} UKI. Hasta entonces siguen en tu wallet.`
+                    : 'Se habilita después de confirmar el permiso.'}
+                />
+              </div>
+            ) : null}
+
             <div className="mt-5">
               {isUnsafeStagingChain ? (
                 <button
@@ -576,9 +669,11 @@ export function UkiStakingPanel({
               )}
             </div>
 
-            {needsApproval && canTransact ? (
+            {operation === 'stake' && parsedAmount && canTransact ? (
               <p className="mt-3 text-center text-xs font-semibold text-[var(--uki-muted)]">
-                Primero autorizas exactamente esta cantidad; después confirmas el staking.
+                {needsApproval
+                  ? 'Son dos firmas. El cupo solo cambia cuando completas también el depósito.'
+                  : 'El permiso ya está listo, pero los UKI todavía no están depositados. Completa el paso 2.'}
               </p>
             ) : null}
 
@@ -587,7 +682,7 @@ export function UkiStakingPanel({
                 {isConfirming
                   ? `Esperando confirmación en ${UKI_PRESALE_CHAIN_LABEL}…`
                   : lastCompletedAction === 'approve'
-                    ? 'Autorización confirmada. Ya puedes depositar.'
+                    ? 'Permiso confirmado. Falta el depósito del paso 2.'
                     : lastCompletedAction === 'stake'
                       ? 'Depósito confirmado. Actualizando tu saldo.'
                       : lastCompletedAction === 'unstake'
@@ -618,6 +713,38 @@ function BalanceCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-[8px] border border-white/10 bg-black/20 p-4">
       <p className="uki-label">{label}</p>
       <p className="mt-2 font-headline text-2xl font-black text-[var(--uki-gold)]">{value}</p>
+    </div>
+  );
+}
+
+function DepositStep({
+  complete,
+  current,
+  detail,
+  label,
+}: {
+  complete: boolean;
+  current: boolean;
+  detail: string;
+  label: string;
+}) {
+  return (
+    <div className="flex gap-3 border-b border-white/10 p-3.5 last:border-b-0">
+      <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-black ${
+        complete
+          ? 'border-[var(--uki-lilac)] bg-[var(--uki-lilac)] text-black'
+          : current
+            ? 'border-[var(--uki-lilac)] text-[var(--uki-lilac)]'
+            : 'border-white/15 text-[var(--uki-muted)]'
+      }`}>
+        {complete ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : current ? '•' : '—'}
+      </span>
+      <div className="min-w-0">
+        <p className={`text-xs font-black ${current || complete ? 'text-[var(--uki-cream)]' : 'text-[var(--uki-muted)]'}`}>
+          {label}
+        </p>
+        <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{detail}</p>
+      </div>
     </div>
   );
 }
