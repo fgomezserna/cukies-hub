@@ -34,8 +34,13 @@ const mockUseMobileGameShell = useMobileGameShell as jest.MockedFunction<
 
 describe('AppLayout launch navigation', () => {
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'true';
     mockUsePathname.mockReturnValue('/games/treasure-hunt');
     mockUseMobileGameShell.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE;
   });
 
   it('shows the launch destinations including Ambassadors and hides community links', () => {
@@ -71,5 +76,13 @@ describe('AppLayout launch navigation', () => {
     ]) {
       expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
     }
+  });
+
+  it('hides Ambassadors when public listing is disabled', () => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'false';
+
+    render(<AppLayout><div>Contenido</div></AppLayout>);
+
+    expect(screen.queryByRole('link', { name: 'Embajadores' })).not.toBeInTheDocument();
   });
 });

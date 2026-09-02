@@ -122,6 +122,7 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 
 describe('home post-listing de UKI', () => {
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'true';
     mockLocale = 'es';
     mockCompetitionError = null;
     mockWalletConnected = true;
@@ -129,6 +130,7 @@ describe('home post-listing de UKI', () => {
   });
 
   afterEach(() => {
+    delete process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE;
     cleanup();
     jest.clearAllMocks();
   });
@@ -158,6 +160,16 @@ describe('home post-listing de UKI', () => {
     expect(screen.queryByText('Aprobar ASM')).not.toBeInTheDocument();
     expect(screen.queryByText('Inicio de preventa')).not.toBeInTheDocument();
     expect(screen.queryByText('10 créditos')).not.toBeInTheDocument();
+  });
+
+  it('oculta el bloque de Embajadores sin alterar el resto de la home', () => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'false';
+
+    render(<CukiesLanding />);
+
+    expect(screen.queryByRole('heading', { name: 'Invita hoy. Recibe una parte adicional de sus futuros premios.' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Abrir mi programa' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'UKI ya está activo' })).toBeInTheDocument();
   });
 
   it('publica las direcciones oficiales y el acceso específico de participantes', () => {

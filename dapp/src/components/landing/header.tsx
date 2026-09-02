@@ -8,6 +8,7 @@ import { Menu, X } from 'lucide-react';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 import { PUBLIC_LOCALES, type PublicLocale } from '@/lib/public-locale';
 import { usePublicLocale } from '@/providers/public-locale-provider';
+import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
 const navItems = [
   { label: { es: 'Inicio', en: 'Home' }, href: '/' },
@@ -102,6 +103,9 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
   const closeMenu = () => setIsOpen(false);
   const navLabel = (item: (typeof navItems)[number]) => item.label[locale];
   const copy = headerCopy[locale];
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== '/embajadores' || isAmbassadorsPubliclyListed(),
+  );
 
   return (
     <>
@@ -119,7 +123,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
 
           {/* Menú de Desktop */}
           <div className="hidden items-center gap-6 lg:flex">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -180,7 +184,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
               </button>
             </div>
             <nav className="flex flex-col gap-4">
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link

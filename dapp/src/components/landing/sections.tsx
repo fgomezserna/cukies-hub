@@ -37,6 +37,7 @@ import {
 import { TOKENOMICS_URL_BY_LOCALE } from '@/lib/public-locale';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { usePublicLocale } from '@/providers/public-locale-provider';
+import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
 export function CukiesLanding() {
   return (
@@ -59,8 +60,12 @@ export function CukiesLanding() {
       <div className="uki-section-divider" />
       <StakingSection />
       <div className="uki-section-divider" />
-      <AmbassadorSection />
-      <div className="uki-section-divider" />
+      {isAmbassadorsPubliclyListed() ? (
+        <>
+          <AmbassadorSection />
+          <div className="uki-section-divider" />
+        </>
+      ) : null}
       <CommunityOwnership />
       <div className="uki-section-divider" />
       <PresaleParticipants />
