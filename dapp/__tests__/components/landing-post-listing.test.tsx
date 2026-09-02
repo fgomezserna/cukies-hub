@@ -27,6 +27,7 @@ jest.mock('lucide-react', () => {
     Crown: Icon,
     ExternalLink: Icon,
     Gamepad2: Icon,
+    Handshake: Icon,
     Lock: Icon,
     LockKeyhole: Icon,
     ShieldCheck: Icon,
@@ -150,6 +151,8 @@ describe('home post-listing de UKI', () => {
     expect(screen.getByText('9', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText('1/10')).toBeInTheDocument();
     expect(screen.getByText('Preventa finalizada')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Invita hoy. Recibe una parte adicional de sus futuros premios.' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Abrir mi programa' })).toHaveAttribute('href', '/embajadores');
 
     expect(screen.queryByRole('heading', { name: 'Preventa UKI' })).not.toBeInTheDocument();
     expect(screen.queryByText('Aprobar ASM')).not.toBeInTheDocument();

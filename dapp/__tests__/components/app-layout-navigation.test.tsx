@@ -24,6 +24,7 @@ jest.mock('lucide-react', () => ({
   Trophy: () => null,
   LockKeyhole: () => null,
   Crown: () => null,
+  UsersRound: () => null,
 }));
 
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
@@ -37,7 +38,7 @@ describe('AppLayout launch navigation', () => {
     mockUseMobileGameShell.mockReturnValue(false);
   });
 
-  it('shows the five launch destinations and hides community links', () => {
+  it('shows the launch destinations including Ambassadors and hides community links', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
     expect(screen.getByRole('link', { name: 'Preventa UKI' })).toHaveAttribute('href', '/');
@@ -50,6 +51,10 @@ describe('AppLayout launch navigation', () => {
     expect(screen.getByRole('link', { name: 'Cukie Master' })).toHaveAttribute(
       'href',
       '/cukie-master',
+    );
+    expect(screen.getByRole('link', { name: 'Embajadores' })).toHaveAttribute(
+      'href',
+      '/embajadores',
     );
 
     for (const hiddenLabel of [

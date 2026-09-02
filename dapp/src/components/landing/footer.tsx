@@ -9,6 +9,7 @@ const footerCopy = {
     home: 'Inicio',
     buy: 'Comprar UKI',
     staking: 'Staking',
+    ambassadors: 'Embajadores',
     play: 'Jugar',
     vesting: 'Vesting',
     rights: 'Todos los derechos reservados.',
@@ -17,6 +18,7 @@ const footerCopy = {
     home: 'Home',
     buy: 'Buy UKI',
     staking: 'Staking',
+    ambassadors: 'Ambassadors',
     play: 'Play',
     vesting: 'Vesting',
     rights: 'All rights reserved.',
@@ -82,6 +84,7 @@ export function LandingFooter() {
           <Link href="/" className="hover:text-[var(--uki-cyan)]">{copy.home}</Link>
           <Link href="/#comprar-uki" className="hover:text-[var(--uki-cyan)]">{copy.buy}</Link>
           <Link href="/cukie-master" className="hover:text-[var(--uki-cyan)]">{copy.staking}</Link>
+          <Link href="/embajadores" className="hover:text-[var(--uki-lilac)]">{copy.ambassadors}</Link>
           <Link href="/games/treasure-hunt" className="hover:text-[var(--uki-cyan)]">{copy.play}</Link>
           <Link href="/vesting" className="hover:text-[var(--uki-cyan)]">{copy.vesting}</Link>
         </div>
