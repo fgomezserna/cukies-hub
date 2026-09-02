@@ -89,6 +89,14 @@ export function assertAmbassadorRuntime(
   throw new TypeError("AMBASSADOR_RUNTIME_MISCONFIGURED");
 }
 
+export function assertAmbassadorAttributionWritesEnabled(
+  environment: Record<string, string | undefined>,
+) {
+  if (environment.AMBASSADOR_ATTRIBUTION_WRITES_ENABLED !== "true") {
+    throw new TypeError("AMBASSADOR_ATTRIBUTION_WRITES_DISABLED");
+  }
+}
+
 export function assertAmbassadorInvitationCode(value: unknown) {
   if (typeof value !== "string") {
     throw new DomainValidationError("El codigo de invitacion no es valido.");

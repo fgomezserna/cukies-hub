@@ -61,6 +61,7 @@ describe("ambassador attribution API", () => {
     process.env.STAGING_ONLY_GUARD = "true";
     process.env.NEXT_PUBLIC_UKI_CHAIN_ID = "97";
     process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID = "97";
+    process.env.AMBASSADOR_ATTRIBUTION_WRITES_ENABLED = "true";
     mockSession.mockResolvedValue({
       userId: "user-1",
       walletAddress: REFERRED,
@@ -78,6 +79,7 @@ describe("ambassador attribution API", () => {
     delete process.env.STAGING_ONLY_GUARD;
     delete process.env.NEXT_PUBLIC_UKI_CHAIN_ID;
     delete process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID;
+    delete process.env.AMBASSADOR_ATTRIBUTION_WRITES_ENABLED;
   });
 
   it("deriva la wallet referida de la sesion firmada y resuelve un codigo opaco", async () => {
@@ -137,6 +139,20 @@ describe("ambassador attribution API", () => {
     expect(await response.json()).toEqual({
       status: "error",
       code: "AMBASSADOR_RUNTIME_MISCONFIGURED",
+    });
+    expect(mockSession).not.toHaveBeenCalled();
+    expect(mockAccept).not.toHaveBeenCalled();
+  });
+
+  it("no acepta nuevas relaciones mientras el interruptor de escritura está cerrado", async () => {
+    process.env.AMBASSADOR_ATTRIBUTION_WRITES_ENABLED = "false";
+
+    const response = await POST(request({ invitationCode: INVITATION_CODE }));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "AMBASSADOR_ATTRIBUTION_WRITES_DISABLED",
     });
     expect(mockSession).not.toHaveBeenCalled();
     expect(mockAccept).not.toHaveBeenCalled();
