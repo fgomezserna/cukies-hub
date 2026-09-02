@@ -64,6 +64,15 @@ test('dapp exposes a Docker alias scoped to its Coolify resource', () => {
   assert.ok(definition.includes(`          - ${resourceScopedDappAlias}`));
 });
 
+test('dapp keeps direct ambassador attribution closed unless Coolify enables it', () => {
+  const definition = serviceDefinition('dapp');
+
+  assert.match(
+    definition,
+    /      AMBASSADOR_ATTRIBUTION_WRITES_ENABLED: \$\{AMBASSADOR_ATTRIBUTION_WRITES_ENABLED:-false\}/,
+  );
+});
+
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {
   test(`${serviceName} only calls its resource-scoped dapp alias`, () => {
     const definition = serviceDefinition(serviceName);
