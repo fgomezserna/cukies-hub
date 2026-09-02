@@ -31,6 +31,7 @@ import CukieLogoFirst from '@/assets/Cukie_logo_first.png';
 import { usePathname } from 'next/navigation';
 import { useMobileGameShell } from '@/hooks/use-mobile-game-shell';
 import { cn } from '@/lib/utils';
+import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
 const SidebarLogo = () => {
   return (
@@ -104,12 +105,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       Icon: Coins,
       active: pathname.startsWith('/credits'),
     },
-    {
-      href: '/embajadores',
-      label: 'Embajadores',
-      Icon: UsersRound,
-      active: pathname.startsWith('/embajadores'),
-    },
+    ...(isAmbassadorsPubliclyListed()
+      ? [{
+          href: '/embajadores',
+          label: 'Embajadores',
+          Icon: UsersRound,
+          active: pathname.startsWith('/embajadores'),
+        }]
+      : []),
     {
       href: '/cukie-hodler#mi-cukie-pool',
       label: 'Pool de Cukies',

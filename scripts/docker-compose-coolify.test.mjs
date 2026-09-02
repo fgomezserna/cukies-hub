@@ -101,6 +101,18 @@ test('dapp keeps direct ambassador attribution closed unless Coolify enables it'
   );
 });
 
+test('dapp controls Ambassadors listing through a build-time public flag', () => {
+  const definition = serviceDefinition('dapp');
+
+  assert.ok(compose.includes(
+    'NEXT_PUBLIC_AMBASSADORS_VISIBLE: ${NEXT_PUBLIC_AMBASSADORS_VISIBLE:-false}',
+  ));
+  assert.match(
+    definition,
+    /      NEXT_PUBLIC_AMBASSADORS_VISIBLE: \$\{NEXT_PUBLIC_AMBASSADORS_VISIBLE:-false\}/,
+  );
+});
+
 test('dapp owns the single shared runtime image build', () => {
   const definition = serviceDefinition('dapp');
 
