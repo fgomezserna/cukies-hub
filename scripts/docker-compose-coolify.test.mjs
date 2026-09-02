@@ -73,6 +73,19 @@ test('dapp keeps direct ambassador attribution closed unless Coolify enables it'
   );
 });
 
+test('dapp keeps Ambassadors hidden unless Coolify enables it at build time', () => {
+  const definition = serviceDefinition('dapp');
+
+  assert.match(
+    definition,
+    /        NEXT_PUBLIC_AMBASSADORS_VISIBLE: \$\{NEXT_PUBLIC_AMBASSADORS_VISIBLE:-false\}/,
+  );
+  assert.match(
+    definition,
+    /      NEXT_PUBLIC_AMBASSADORS_VISIBLE: \$\{NEXT_PUBLIC_AMBASSADORS_VISIBLE:-false\}/,
+  );
+});
+
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {
   test(`${serviceName} only calls its resource-scoped dapp alias`, () => {
     const definition = serviceDefinition(serviceName);

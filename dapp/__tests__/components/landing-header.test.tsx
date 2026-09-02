@@ -27,11 +27,13 @@ jest.mock('@/components/landing/wallet-connect-dynamic', () => {
 
 describe('components/landing/LandingHeader', () => {
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'true';
     window.localStorage.clear();
     document.cookie = 'cukies_public_locale=; path=/; max-age=0';
   });
 
   afterEach(() => {
+    delete process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE;
     jest.restoreAllMocks();
   });
 
@@ -74,6 +76,18 @@ describe('components/landing/LandingHeader', () => {
       expect(screen.getAllByRole('link', { name: 'Ambassadors' }).length).toBeGreaterThan(0);
       expect(window.localStorage.getItem(PUBLIC_LOCALE_STORAGE_KEY)).toBe('en');
     });
+  });
+
+  it('oculta Embajadores cuando la publicación está desactivada', () => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'false';
+
+    render(
+      <PublicLocaleProvider>
+        <LandingHeader />
+      </PublicLocaleProvider>,
+    );
+
+    expect(screen.queryByRole('link', { name: 'Embajadores' })).not.toBeInTheDocument();
   });
 
   it('mantiene el cambio de idioma aunque el navegador bloquee localStorage', async () => {

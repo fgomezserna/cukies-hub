@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePublicLocale } from '@/providers/public-locale-provider';
+import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
 const footerCopy = {
   es: {
@@ -84,7 +85,9 @@ export function LandingFooter() {
           <Link href="/" className="hover:text-[var(--uki-cyan)]">{copy.home}</Link>
           <Link href="/#comprar-uki" className="hover:text-[var(--uki-cyan)]">{copy.buy}</Link>
           <Link href="/cukie-master" className="hover:text-[var(--uki-cyan)]">{copy.staking}</Link>
-          <Link href="/embajadores" className="hover:text-[var(--uki-lilac)]">{copy.ambassadors}</Link>
+          {isAmbassadorsPubliclyListed() ? (
+            <Link href="/embajadores" className="hover:text-[var(--uki-lilac)]">{copy.ambassadors}</Link>
+          ) : null}
           <Link href="/games/treasure-hunt" className="hover:text-[var(--uki-cyan)]">{copy.play}</Link>
           <Link href="/vesting" className="hover:text-[var(--uki-cyan)]">{copy.vesting}</Link>
         </div>
