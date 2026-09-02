@@ -11,6 +11,7 @@ import {
   Crown,
   ExternalLink,
   Gamepad2,
+  Handshake,
   Trophy,
   Users,
 } from 'lucide-react';
@@ -57,6 +58,8 @@ export function CukiesLanding() {
       <UtilitySection />
       <div className="uki-section-divider" />
       <StakingSection />
+      <div className="uki-section-divider" />
+      <AmbassadorSection />
       <div className="uki-section-divider" />
       <CommunityOwnership />
       <div className="uki-section-divider" />
@@ -424,6 +427,50 @@ function StakingSection() {
             </div>
             <p className="mt-4 text-xs font-semibold text-[var(--uki-muted)]">{copy.helper}</p>
           </div>
+        </div>
+      </ScrollReveal>
+    </section>
+  );
+}
+
+function AmbassadorSection() {
+  const { locale } = usePublicLocale();
+  const copy = landingCopyByLocale[locale].ambassadors;
+
+  return (
+    <section id="embajadores" className="uki-container uki-home-section">
+      <ScrollReveal animation="up">
+        <div className="grid overflow-hidden rounded-[18px] border border-[var(--uki-lilac)]/30 bg-[#130b1d]/88 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+          <div className="flex flex-col justify-center p-5 sm:p-8 lg:p-10">
+            <p className="uki-launch-badge inline-flex w-fit items-center gap-2">
+              <Handshake className="h-4 w-4" strokeWidth={1.8} />
+              {copy.badge}
+            </p>
+            <h2 className="mt-5 max-w-[17ch] text-balance font-headline text-4xl font-black leading-[1.02] text-[var(--uki-cream)] sm:text-5xl">
+              {copy.title}
+            </h2>
+            <p className="mt-5 max-w-2xl text-base font-semibold leading-relaxed text-[var(--uki-text)]">
+              {copy.text}
+            </p>
+            <p className="mt-5 flex items-start gap-2 text-sm font-bold leading-relaxed text-[var(--uki-lilac)]">
+              <Check className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+              {copy.presale}
+            </p>
+            <div className="mt-7">
+              <LandingButton href="/embajadores">{copy.action}</LandingButton>
+            </div>
+          </div>
+
+          <dl className="grid border-t border-white/10 bg-[var(--uki-lilac)]/[0.055] sm:grid-cols-2 lg:grid-cols-1 lg:border-l lg:border-t-0">
+            <div className="flex flex-col justify-center border-b border-white/10 p-6 sm:border-b-0 sm:border-r lg:border-b lg:border-r-0 lg:p-8">
+              <dt className="uki-label">{copy.commissionLabel}</dt>
+              <dd className="mt-3 font-headline text-6xl font-black tracking-[-0.05em] text-[var(--uki-lilac)]">{copy.commission}</dd>
+            </div>
+            <div className="flex flex-col justify-center p-6 lg:p-8">
+              <dt className="uki-label">{copy.relationLabel}</dt>
+              <dd className="mt-3 font-headline text-4xl font-black tracking-[-0.04em] text-[var(--uki-cream)]">{copy.relation}</dd>
+            </div>
+          </dl>
         </div>
       </ScrollReveal>
     </section>

@@ -12,6 +12,7 @@
     "genkit:dev": "pnpm --filter dapp genkit:dev",
     "genkit:watch": "pnpm --filter dapp genkit:watch",
     "dapp": "pnpm --filter dapp",
+    "ambassadors:migrate:presale": "pnpm --filter dapp ambassadors:migrate:presale",
     "sybil-slayer": "pnpm --filter sybil-slayer",
     "hyppie-road": "pnpm --filter hyppie-road",
     "tower-builder": "pnpm --filter tower-builder",

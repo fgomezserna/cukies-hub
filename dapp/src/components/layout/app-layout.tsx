@@ -17,6 +17,7 @@ import {
   Trophy,
   LockKeyhole,
   Crown,
+  UsersRound,
 } from 'lucide-react';
 import Header from './header';
 import Image from 'next/image';
@@ -72,6 +73,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       label: 'Cukie Master',
       Icon: Crown,
       active: pathname.startsWith('/cukie-master'),
+    },
+    {
+      href: '/embajadores',
+      label: 'Embajadores',
+      Icon: UsersRound,
+      active: pathname.startsWith('/embajadores'),
     },
   ];
 

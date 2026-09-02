@@ -341,9 +341,14 @@ body {
     --uki-cyan: #e45cff;
     --uki-cyan-soft: rgba(228, 92, 255, 0.11);
     --uki-cyan-border: rgba(228, 92, 255, 0.22);
+    --uki-lilac: #e45cff;
+    --uki-lilac-soft: rgba(228, 92, 255, 0.11);
+    --uki-lilac-border: rgba(228, 92, 255, 0.22);
     --uki-gold: #f2c34b;
     --uki-cyan-strong: #e45cff;
     --uki-cyan-border-strong: rgba(228, 92, 255, 0.28);
+    --uki-lilac-strong: #e45cff;
+    --uki-lilac-border-strong: rgba(228, 92, 255, 0.28);
     --uki-ease: cubic-bezier(0.32, 0.72, 0, 1);
     position: relative;
     font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;

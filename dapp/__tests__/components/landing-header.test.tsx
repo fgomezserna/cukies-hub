@@ -58,6 +58,11 @@ describe('components/landing/LandingHeader', () => {
         expect.objectContaining({ href: expect.stringContaining('/cukie-master') }),
       ]),
     );
+    expect(screen.getAllByRole('link', { name: 'Embajadores' })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ href: expect.stringContaining('/embajadores') }),
+      ]),
+    );
     expect(screen.queryByRole('link', { name: 'Premios' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'View website in English' })[0]);
@@ -66,6 +71,7 @@ describe('components/landing/LandingHeader', () => {
       expect(screen.getAllByRole('link', { name: 'Home' }).length).toBeGreaterThan(0);
       expect(screen.getAllByRole('link', { name: 'Play' }).length).toBeGreaterThan(0);
       expect(screen.getAllByRole('link', { name: 'Buy UKI' }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('link', { name: 'Ambassadors' }).length).toBeGreaterThan(0);
       expect(window.localStorage.getItem(PUBLIC_LOCALE_STORAGE_KEY)).toBe('en');
     });
   });
