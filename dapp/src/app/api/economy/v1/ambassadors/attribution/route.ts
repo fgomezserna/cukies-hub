@@ -6,6 +6,7 @@ import {
   getCanonicalAmbassadorAttribution,
 } from "@/lib/uki-economy/ambassadors/service";
 import {
+  assertAmbassadorAttributionWritesEnabled,
   assertAmbassadorRuntime,
   stableAmbassadorHash,
   validAmbassadorWallet,
@@ -86,6 +87,12 @@ function errorResponse(error: unknown) {
   ) {
     return json({ status: "error", code: error.message }, 400);
   }
+  if (
+    error instanceof TypeError &&
+    error.message === "AMBASSADOR_ATTRIBUTION_WRITES_DISABLED"
+  ) {
+    return json({ status: "error", code: error.message }, 503);
+  }
   console.error("Ambassador attribution request failed", error);
   return json({ status: "error", code: "INTERNAL_ERROR" }, 500);
 }
@@ -109,6 +116,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     assertAmbassadorRuntime(process.env);
+    assertAmbassadorAttributionWritesEnabled(process.env);
     const identity = await signedIdentity();
     if (!identity) return json({ status: "error", code: "AUTH_REQUIRED" }, 401);
     const body = await readBody(request);
