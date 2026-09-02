@@ -67,9 +67,14 @@ describe('AppLayout launch navigation', () => {
   const originalInnerWidth = window.innerWidth;
 
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'true';
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     mockUsePathname.mockReturnValue('/games/treasure-hunt');
     mockUseMobileGameShell.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE;
   });
 
   afterAll(() => {
@@ -138,6 +143,14 @@ describe('AppLayout launch navigation', () => {
     }
 
     expect(document.querySelector('[data-app-ambient-effects]')).not.toBeInTheDocument();
+  });
+
+  it('oculta Embajadores cuando la publicación está desactivada', () => {
+    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'false';
+
+    render(<AppLayout><div>Contenido</div></AppLayout>);
+
+    expect(screen.queryByRole('link', { name: 'Embajadores' })).not.toBeInTheDocument();
   });
 
   it('mantiene Jugar activo también dentro del ranking', () => {
