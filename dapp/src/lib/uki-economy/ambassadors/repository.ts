@@ -23,6 +23,13 @@ type PresaleParticipant = {
   firstPurchaseAt?: Date | null;
 };
 
+type AmbassadorGraphState = {
+  _id: "ambassador-attribution-graph";
+  revision: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 function duplicateKey(error: unknown) {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === 11000);
 }
@@ -70,6 +77,20 @@ export function createMongoAmbassadorAttributionRepository(
   const attributions = db.collection<AmbassadorAttribution>("ambassador_attributions");
   const presale = db.collection<PresaleParticipant>("presale_participants");
   return {
+    async acquireGraphWriteFence(now) {
+      if (!session) {
+        throw new TypeError("AMBASSADOR_ATTRIBUTION_TRANSACTION_REQUIRED");
+      }
+      await db.collection<AmbassadorGraphState>("ambassador_graph_state").updateOne(
+        { _id: "ambassador-attribution-graph" },
+        {
+          $inc: { revision: 1 },
+          $set: { updatedAt: now },
+          $setOnInsert: { createdAt: now },
+        },
+        { session, upsert: true }
+      );
+    },
     async findAttribution(referredWalletNormalized) {
       const row = await attributions.findOne(
         { referredWalletNormalized },
@@ -92,6 +113,19 @@ export function createMongoAmbassadorAttributionRepository(
         },
       );
       return lockedPresaleAmbassador(row);
+    },
+    async hasPresalePurchase(referredWalletNormalized) {
+      const row = await presale.findOne(
+        {
+          normalizedWalletAddress: referredWalletNormalized,
+          firstPurchaseAt: { $exists: true, $ne: null },
+        },
+        {
+          ...options,
+          projection: { _id: 1 },
+        }
+      );
+      return Boolean(row);
     },
     async insertAttribution(attribution) {
       assertAmbassadorAttribution(attribution);

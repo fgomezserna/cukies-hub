@@ -17,6 +17,7 @@ type WalletConnectButtonProps = {
   label?: string;
   compactLabel?: string;
   showCompactText?: boolean;
+  ambassadorInvitationCode?: string;
 };
 
 export type { WalletConnectButtonProps };
@@ -37,6 +38,7 @@ export function WalletConnectButton({
   label = 'Conectar wallet',
   compactLabel = 'Wallet',
   showCompactText = true,
+  ambassadorInvitationCode,
 }: WalletConnectButtonProps) {
   const { address, chainId, isConnected } = useAccount();
   const { connectAsync, connectors, isPending } = useConnect();
@@ -123,6 +125,7 @@ export function WalletConnectButton({
           evmConnector: connector,
           promptForSignature: true,
           walletType: 'evm',
+          ambassadorInvitationCode,
         });
       }
     } catch {
@@ -232,7 +235,13 @@ export function WalletConnectButton({
                   description: `Firma el login con ${shortAddress(activeAddress)}.`,
                   isLoading: isWaitingForApproval || isAuthLoading,
                   label: 'Firmar wallet actual',
-                  onSelect: () => fetchUser(activeAddress, { promptForSignature: true, walletType: activeWalletType }),
+                  onSelect: () => fetchUser(activeAddress, {
+                    promptForSignature: true,
+                    walletType: activeWalletType,
+                    ...(activeWalletType === 'evm' && ambassadorInvitationCode
+                      ? { ambassadorInvitationCode }
+                      : {}),
+                  }),
                 }
               : undefined
         }
