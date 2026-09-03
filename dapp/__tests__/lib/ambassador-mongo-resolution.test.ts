@@ -137,30 +137,6 @@ describe("Mongo ambassador canonical resolution", () => {
     );
   });
 
-  it("considera registrada una wallet que ya compro durante la preventa", async () => {
-    const findOne = jest.fn().mockResolvedValue({ _id: "presale-row" });
-    const db = {
-      collection: (name: string) =>
-        name === "presale_participants" ? { findOne } : {},
-    } as unknown as Db;
-    const repository = createMongoAmbassadorAttributionRepository(
-      db,
-      {} as ClientSession
-    );
-
-    await expect(repository.hasPresalePurchase(REFERRED)).resolves.toBe(true);
-    expect(findOne).toHaveBeenCalledWith(
-      {
-        normalizedWalletAddress: REFERRED,
-        firstPurchaseAt: { $exists: true, $ne: null },
-      },
-      {
-        session: expect.any(Object),
-        projection: { _id: 1 },
-      }
-    );
-  });
-
   it("crea el perfil sin actualizar una ruta incluida en setOnInsert", async () => {
     const profiles: AmbassadorProfile[] = [];
     const updateOne = jest.fn(async (

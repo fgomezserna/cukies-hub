@@ -23,7 +23,6 @@ const NOW = new Date("2026-08-30T12:00:00.000Z");
 class MemoryAmbassadorRepository implements AmbassadorAttributionRepository {
   readonly attributions = new Map<string, AmbassadorAttribution>();
   readonly presale = new Map<string, LockedPresaleAmbassador>();
-  readonly presalePurchases = new Set<string>();
   graphWriteFences = 0;
 
   async acquireGraphWriteFence() {
@@ -36,10 +35,6 @@ class MemoryAmbassadorRepository implements AmbassadorAttributionRepository {
 
   async findLockedPresaleAmbassador(referredWalletNormalized: string) {
     return this.presale.get(referredWalletNormalized) ?? null;
-  }
-
-  async hasPresalePurchase(referredWalletNormalized: string) {
-    return this.presalePurchases.has(referredWalletNormalized);
   }
 
   async insertAttribution(attribution: AmbassadorAttribution) {
@@ -160,21 +155,6 @@ describe("ambassador attribution", () => {
         (attribution) => attribution.source === "presale_locked"
       )
     ).toBe(true);
-  });
-
-  it("no permite atribuir despues a una wallet que ya compro en preventa", async () => {
-    const repository = new MemoryAmbassadorRepository();
-    repository.presalePurchases.add(REFERRED);
-
-    await expect(
-      acceptDirectAmbassadorAttribution(repository, {
-        referredWallet: REFERRED,
-        ambassadorWallet: AMBASSADOR,
-        signedSessionEvidenceHash: sessionEvidence("late-presale-attribution"),
-        now: NOW,
-      })
-    ).rejects.toThrow(/registrada durante la preventa/);
-    expect(repository.attributions.size).toBe(0);
   });
 
   it("materializa el sponsor bloqueado de preventa y le da precedencia", async () => {

@@ -27,8 +27,6 @@ export async function GET() {
     return json({
       status: "ok",
       policy: AMBASSADOR_ATTRIBUTION_POLICY,
-      registrationInvitationCode:
-        session.ambassadorInvitationCodeAtRegistration ?? null,
       dashboard,
     });
   } catch (error) {
