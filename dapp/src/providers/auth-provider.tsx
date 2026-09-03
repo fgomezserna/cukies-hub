@@ -22,7 +22,6 @@ type FetchUserOptions = {
   walletType?: LoginWalletType;
   evmConnector?: Connector;
   requireSignedWallet?: boolean;
-  ambassadorInvitationCode?: string;
 };
 
 function isUserRejectedRequest(error: unknown) {
@@ -86,7 +85,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const loginWalletType: LoginWalletType = options.walletType || (isEvmConnected ? 'evm' : 'tron');
     const shouldPromptForSignature = Boolean(options.promptForSignature);
     const requireSignedWallet = options.requireSignedWallet === true;
-    const ambassadorInvitationCode = options.ambassadorInvitationCode;
     const canUseWalletAddress = isConnected || Boolean(walletAddress && shouldPromptForSignature);
 
     if (!canUseWalletAddress || !addressToUse) {
@@ -108,9 +106,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           walletAddress: addressToUse,
           ...(requireSignedWallet
             ? { walletType: loginWalletType, requireSignedWallet: true }
-            : {}),
-          ...(ambassadorInvitationCode
-            ? { ambassadorInvitationCode }
             : {}),
         }),
       });
@@ -156,9 +151,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             message: challenge.message,
             signature,
             ...(requireSignedWallet ? { requireSignedWallet: true } : {}),
-            ...(ambassadorInvitationCode
-              ? { ambassadorInvitationCode }
-              : {}),
           }),
         });
       }

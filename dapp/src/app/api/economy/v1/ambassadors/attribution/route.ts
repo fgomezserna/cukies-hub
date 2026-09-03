@@ -40,16 +40,12 @@ async function signedIdentity() {
   }
   return {
     walletAddress,
-    ambassadorInvitationCodeAtRegistration:
-      session.ambassadorInvitationCodeAtRegistration,
     signedSessionEvidenceHash: stableAmbassadorHash({
       kind: "signed_wallet_session",
       userId: session.userId,
       signedWalletAddress: walletAddress,
       issuedAt: session.issuedAt,
       expiresAt: session.expiresAt,
-      ambassadorInvitationCodeAtRegistration:
-        session.ambassadorInvitationCodeAtRegistration,
     }),
   };
 }
@@ -81,13 +77,8 @@ function responseAttribution(attribution: Awaited<ReturnType<typeof getCanonical
 
 function errorResponse(error: unknown) {
   if (error instanceof UkiEconomyError) {
-    const publicCode =
-      error.code === "CONFLICT" &&
-      error.details?.reason === "registration_already_complete"
-        ? "REGISTRATION_ALREADY_COMPLETE"
-        : error.code;
     return json(
-      { status: "error", code: publicCode },
+      { status: "error", code: error.code },
       error.code === "CONFLICT" ? 409 : error.code === "NOT_FOUND" ? 404 : 400,
     );
   }
@@ -134,14 +125,6 @@ export async function POST(request: Request) {
       return json({ status: "error", code: "INVALID_INVITATION_CODE" }, 400);
     }
     const invitationCode = assertAmbassadorInvitationCode(body.invitationCode);
-    if (
-      identity.ambassadorInvitationCodeAtRegistration !== invitationCode
-    ) {
-      return json(
-        { status: "error", code: "REGISTRATION_ALREADY_COMPLETE" },
-        409
-      );
-    }
     const attribution = await acceptCanonicalAmbassadorInvitation({
       referredWallet: identity.walletAddress,
       invitationCode,
