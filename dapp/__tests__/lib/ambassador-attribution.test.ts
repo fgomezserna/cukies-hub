@@ -23,6 +23,12 @@ const NOW = new Date("2026-08-30T12:00:00.000Z");
 class MemoryAmbassadorRepository implements AmbassadorAttributionRepository {
   readonly attributions = new Map<string, AmbassadorAttribution>();
   readonly presale = new Map<string, LockedPresaleAmbassador>();
+  readonly presalePurchases = new Set<string>();
+  graphWriteFences = 0;
+
+  async acquireGraphWriteFence() {
+    this.graphWriteFences += 1;
+  }
 
   async findAttribution(referredWalletNormalized: string) {
     return this.attributions.get(referredWalletNormalized) ?? null;
@@ -30,6 +36,10 @@ class MemoryAmbassadorRepository implements AmbassadorAttributionRepository {
 
   async findLockedPresaleAmbassador(referredWalletNormalized: string) {
     return this.presale.get(referredWalletNormalized) ?? null;
+  }
+
+  async hasPresalePurchase(referredWalletNormalized: string) {
+    return this.presalePurchases.has(referredWalletNormalized);
   }
 
   async insertAttribution(attribution: AmbassadorAttribution) {
@@ -94,6 +104,7 @@ describe("ambassador attribution", () => {
 
     expect(replay).toEqual(first);
     expect(repository.attributions.size).toBe(1);
+    expect(repository.graphWriteFences).toBe(2);
     await expect(
       acceptDirectAmbassadorAttribution(repository, {
         referredWallet: REFERRED,
@@ -102,6 +113,72 @@ describe("ambassador attribution", () => {
         now: NOW,
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("rechaza una referencia circular directa entre dos wallets", async () => {
+    const repository = new MemoryAmbassadorRepository();
+    await acceptDirectAmbassadorAttribution(repository, {
+      referredWallet: REFERRED,
+      ambassadorWallet: AMBASSADOR,
+      signedSessionEvidenceHash: sessionEvidence("a-to-b"),
+      now: NOW,
+    });
+
+    await expect(
+      acceptDirectAmbassadorAttribution(repository, {
+        referredWallet: AMBASSADOR,
+        ambassadorWallet: REFERRED,
+        signedSessionEvidenceHash: sessionEvidence("b-to-a"),
+        now: NOW,
+      })
+    ).rejects.toThrow(/referencia circular/);
+    expect(repository.attributions.size).toBe(1);
+  });
+
+  it("rechaza ciclos largos que combinan preventa y una atribucion nueva", async () => {
+    const repository = new MemoryAmbassadorRepository();
+    repository.presale.set(REFERRED, {
+      referredWalletNormalized: REFERRED,
+      ambassadorWalletNormalized: AMBASSADOR,
+      lockedAt: new Date("2026-06-24T21:49:03.000Z"),
+      sourceReferenceHash: stableAmbassadorHash({ presale: "a-to-b" }),
+    });
+    repository.presale.set(AMBASSADOR, {
+      referredWalletNormalized: AMBASSADOR,
+      ambassadorWalletNormalized: OTHER,
+      lockedAt: new Date("2026-06-25T14:10:26.000Z"),
+      sourceReferenceHash: stableAmbassadorHash({ presale: "b-to-c" }),
+    });
+
+    await expect(
+      acceptDirectAmbassadorAttribution(repository, {
+        referredWallet: OTHER,
+        ambassadorWallet: REFERRED,
+        signedSessionEvidenceHash: sessionEvidence("c-to-a"),
+        now: NOW,
+      })
+    ).rejects.toThrow(/referencia circular/);
+    expect(repository.attributions.size).toBe(2);
+    expect(
+      [...repository.attributions.values()].every(
+        (attribution) => attribution.source === "presale_locked"
+      )
+    ).toBe(true);
+  });
+
+  it("no permite atribuir despues a una wallet que ya compro en preventa", async () => {
+    const repository = new MemoryAmbassadorRepository();
+    repository.presalePurchases.add(REFERRED);
+
+    await expect(
+      acceptDirectAmbassadorAttribution(repository, {
+        referredWallet: REFERRED,
+        ambassadorWallet: AMBASSADOR,
+        signedSessionEvidenceHash: sessionEvidence("late-presale-attribution"),
+        now: NOW,
+      })
+    ).rejects.toThrow(/registrada durante la preventa/);
+    expect(repository.attributions.size).toBe(0);
   });
 
   it("materializa el sponsor bloqueado de preventa y le da precedencia", async () => {

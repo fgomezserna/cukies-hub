@@ -62,7 +62,28 @@ describe('ambassador summary API', () => {
     expect(await response.json()).toMatchObject({
       status: 'ok',
       policy: { version: 'ambassador-direct-v1', commissionBps: 500, levels: 1 },
+      registrationInvitationCode: null,
       dashboard: { walletNormalized: WALLET, profile: { invitationCode: 'cw-123456789abc' } },
+    });
+  });
+
+  it('expone solo el codigo sellado por el servidor durante el alta', async () => {
+    mockSession.mockResolvedValue({
+      userId: 'user-1',
+      walletAddress: WALLET,
+      signedWalletAddress: WALLET,
+      walletType: 'evm',
+      ambassadorInvitationCodeAtRegistration: 'cw-123456789abc',
+      issuedAt: '2026-09-02T10:00:00.000Z',
+      expiresAt: '2026-09-03T10:00:00.000Z',
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'ok',
+      registrationInvitationCode: 'cw-123456789abc',
     });
   });
 

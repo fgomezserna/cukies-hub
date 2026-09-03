@@ -7,6 +7,7 @@ const mockClearWalletChallengeCookie = jest.fn();
 const mockFindOrSyncUserFromCukies = jest.fn();
 const mockCreateUserDirectly = jest.fn();
 const mockEnsureHubWalletForLogin = jest.fn();
+const mockFindHubUserIdByLegacyWallets = jest.fn();
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -43,6 +44,9 @@ jest.mock('@/lib/mongodb-hub', () => ({
 
 jest.mock('@/lib/user-wallets', () => ({
   ensureHubWalletForLogin: (...args: unknown[]) => mockEnsureHubWalletForLogin(...args),
+  findHubUserIdByLegacyWallets: (...args: unknown[]) => (
+    mockFindHubUserIdByLegacyWallets(...args)
+  ),
 }));
 
 import { POST } from '@/app/api/auth/login/route';
@@ -50,6 +54,7 @@ import { POST } from '@/app/api/auth/login/route';
 const walletAddress = '0x1111111111111111111111111111111111111111';
 const message = 'Cukies wallet login challenge';
 const signature = '0xsigned';
+const ambassadorInvitationCode = 'cw-123456789abc';
 const user = {
   id: 'user-1',
   walletAddress,
@@ -90,6 +95,7 @@ describe('API /auth/login', () => {
     mockFindOrSyncUserFromCukies.mockResolvedValue(null);
     mockCreateUserDirectly.mockResolvedValue('user-1');
     mockEnsureHubWalletForLogin.mockResolvedValue(undefined);
+    mockFindHubUserIdByLegacyWallets.mockResolvedValue(null);
   });
 
   it('devuelve el usuario existente tras validar la firma', async () => {
@@ -122,16 +128,58 @@ describe('API /auth/login', () => {
     expect(mockClearWalletChallengeCookie).toHaveBeenCalled();
   });
 
-  it('reutiliza un usuario sincronizado desde la base Cukies', async () => {
+  it('no habilita una invitacion para una wallet que ya estaba registrada', async () => {
+    mockFindUnique.mockResolvedValue(user);
+
+    const response = await POST(request(signedBody({ ambassadorInvitationCode })));
+
+    expect(response.status).toBe(200);
+    expect(mockSetWalletSessionCookie).toHaveBeenCalledWith({
+      userId: user.id,
+      walletAddress,
+      signedWalletAddress: walletAddress,
+      walletType: 'evm',
+    });
+  });
+
+  it('considera registrada una wallet secundaria ya vinculada a un usuario', async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(user);
+    mockFindHubUserIdByLegacyWallets.mockResolvedValue(user.id);
+
+    const response = await POST(request(signedBody({ ambassadorInvitationCode })));
+
+    expect(response.status).toBe(200);
+    expect(mockFindHubUserIdByLegacyWallets).toHaveBeenCalledWith({
+      walletAddresses: [walletAddress],
+    });
+    expect(mockFindOrSyncUserFromCukies).not.toHaveBeenCalled();
+    expect(mockCreateUserDirectly).not.toHaveBeenCalled();
+    expect(mockSetWalletSessionCookie).toHaveBeenCalledWith({
+      userId: user.id,
+      walletAddress,
+      signedWalletAddress: walletAddress,
+      walletType: 'evm',
+    });
+  });
+
+  it('considera registrada una wallet sincronizada desde la base Cukies', async () => {
     mockFindUnique.mockResolvedValue(null);
     mockFindOrSyncUserFromCukies.mockResolvedValue(user);
 
-    const response = await POST(request(signedBody()));
+    const response = await POST(request(signedBody({ ambassadorInvitationCode })));
 
     expect(response.status).toBe(200);
     expect(mockFindOrSyncUserFromCukies).toHaveBeenCalledWith(walletAddress);
     expect(mockCreateUserDirectly).not.toHaveBeenCalled();
     expect(mockEnsureHubWalletForLogin).toHaveBeenCalledWith(user.id, walletAddress, 'evm');
+    expect(mockSetWalletSessionCookie).toHaveBeenCalledWith({
+      userId: user.id,
+      walletAddress,
+      signedWalletAddress: walletAddress,
+      walletType: 'evm',
+    });
   });
 
   it('crea directamente un usuario nuevo y lo vuelve a leer con relaciones', async () => {
@@ -153,6 +201,36 @@ describe('API /auth/login', () => {
         completedQuests: { include: { quest: true } },
       },
     });
+  });
+
+  it('sella la invitacion solo en la sesion que crea una wallet nueva', async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(user);
+
+    const response = await POST(request(signedBody({ ambassadorInvitationCode })));
+
+    expect(response.status).toBe(200);
+    expect(mockSetWalletSessionCookie).toHaveBeenCalledWith({
+      userId: user.id,
+      walletAddress,
+      signedWalletAddress: walletAddress,
+      walletType: 'evm',
+      ambassadorInvitationCodeAtRegistration: ambassadorInvitationCode,
+    });
+  });
+
+  it('rechaza un codigo de embajador invalido antes de registrar la wallet', async () => {
+    const response = await POST(request(signedBody({
+      ambassadorInvitationCode: 'codigo-invalido',
+    })));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid ambassador invitation code',
+    });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockCreateUserDirectly).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -28,6 +28,7 @@ export type WalletSessionPayload = {
   walletAddress: string;
   signedWalletAddress: string;
   walletType: WalletAuthType;
+  ambassadorInvitationCodeAtRegistration?: string;
   issuedAt: string;
   expiresAt: string;
 };
@@ -271,6 +272,7 @@ export async function setWalletSessionCookie(params: {
   walletAddress: string;
   signedWalletAddress: string;
   walletType: WalletAuthType;
+  ambassadorInvitationCodeAtRegistration?: string;
 }) {
   const issuedAt = new Date();
   const expiresAt = new Date(issuedAt.getTime() + SESSION_TTL_MS);
@@ -279,6 +281,12 @@ export async function setWalletSessionCookie(params: {
     walletAddress: normalizeWalletAddress(params.walletAddress),
     signedWalletAddress: normalizeWalletAddress(params.signedWalletAddress),
     walletType: params.walletType,
+    ...(params.ambassadorInvitationCodeAtRegistration
+      ? {
+          ambassadorInvitationCodeAtRegistration:
+            params.ambassadorInvitationCodeAtRegistration,
+        }
+      : {}),
     issuedAt: issuedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };

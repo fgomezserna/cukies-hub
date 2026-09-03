@@ -76,6 +76,7 @@ type SummaryResponse = {
   status: "ok" | "error";
   dashboard?: AmbassadorDashboard;
   policy?: { version: string; commissionBps: number; levels: number };
+  registrationInvitationCode?: string | null;
   code?: string;
 };
 
@@ -200,6 +201,8 @@ export function AmbassadorProgram({
   const walletAddress = user?.walletAddress ?? null;
   const [dashboard, setDashboard] = useState<AmbassadorDashboard | null>(null);
   const [policy, setPolicy] = useState<SummaryResponse["policy"]>(undefined);
+  const [registrationInvitationCode, setRegistrationInvitationCode] =
+    useState<string | null>(null);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [requestState, setRequestState] = useState<
     "idle" | "loading" | "ready" | "error"
@@ -226,6 +229,7 @@ export function AmbassadorProgram({
         throw new Error(body.code);
       setDashboard(body.dashboard);
       setPolicy(body.policy);
+      setRegistrationInvitationCode(body.registrationInvitationCode ?? null);
       setRequestState("ready");
     } catch {
       setRequestState("error");
@@ -240,6 +244,7 @@ export function AmbassadorProgram({
     if (!walletAddress || walletType !== "evm") {
       setDashboard(null);
       setPolicy(undefined);
+      setRegistrationInvitationCode(null);
       setRequestState("idle");
       return;
     }
@@ -327,7 +332,9 @@ export function AmbassadorProgram({
     } catch (error) {
       const code = error instanceof Error ? error.message : "";
       setFeedback(
-        code === "CONFLICT"
+        code === "REGISTRATION_ALREADY_COMPLETE"
+          ? "Esta wallet ya estaba registrada y no puede añadir un embajador después del alta."
+          : code === "CONFLICT"
           ? "Esta wallet ya tiene otro embajador confirmado y no puede cambiarlo."
           : code === "NOT_FOUND"
           ? "Esta invitación ya no está disponible."
@@ -342,6 +349,10 @@ export function AmbassadorProgram({
   const isOwnInvitation = Boolean(
     invitation &&
       dashboard?.profile.invitationCode === invitation.invitationCode
+  );
+  const canAcceptInvitation = Boolean(
+    invitation &&
+      registrationInvitationCode === invitation.invitationCode
   );
 
   return (
@@ -427,6 +438,7 @@ export function AmbassadorProgram({
               {invitation &&
               !dashboard?.ownAttribution &&
               walletAddress &&
+              canAcceptInvitation &&
               !isOwnInvitation ? (
                 <div className="rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] p-4">
                   <label className="flex cursor-pointer items-start gap-3">
@@ -455,9 +467,10 @@ export function AmbassadorProgram({
                     Confirmar embajador
                   </button>
                 </div>
-              ) : !walletAddress ? (
+              ) : !walletAddress && invitation ? (
                 <LandingWalletConnectButton
                   evmOnly
+                  ambassadorInvitationCode={invitation?.invitationCode}
                   showCompactText={false}
                   label="Conectar para confirmar"
                   compactLabel="Conectar"
@@ -476,6 +489,20 @@ export function AmbassadorProgram({
                 <p className="text-sm font-semibold text-amber-200">
                   No puedes aceptar tu propia invitación.
                 </p>
+              ) : walletAddress &&
+                invitation &&
+                requestState === "ready" &&
+                !canAcceptInvitation ? (
+                <div className="flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-4">
+                  <LockKey
+                    className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]"
+                    weight="fill"
+                  />
+                  <p className="text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    Esta wallet ya estaba registrada. Las invitaciones solo se
+                    pueden confirmar durante el alta inicial.
+                  </p>
+                </div>
               ) : null}
             </div>
           </Panel>
@@ -497,7 +524,9 @@ export function AmbassadorProgram({
 
       {authLoading || requestState === "loading" ? <LoadingProgram /> : null}
 
-      {!authLoading && (!walletAddress || walletType !== "evm") ? (
+      {!initialInvitationCode &&
+      !authLoading &&
+      (!walletAddress || walletType !== "evm") ? (
         <section className="grid min-h-[28rem] overflow-hidden rounded-[18px] border border-[var(--uki-lilac)]/25 bg-[#09060f] lg:grid-cols-[1.15fr_0.85fr]">
           <div className="flex flex-col justify-center p-6 sm:p-10">
             <UsersThree
@@ -513,6 +542,7 @@ export function AmbassadorProgram({
             </p>
             <LandingWalletConnectButton
               evmOnly
+              ambassadorInvitationCode={invitation?.invitationCode}
               className="mt-6 w-fit"
               showCompactText={false}
             />

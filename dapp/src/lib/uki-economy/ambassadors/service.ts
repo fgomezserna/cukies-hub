@@ -15,6 +15,8 @@ import type {
   LockedPresaleAmbassador,
 } from "./types";
 
+const MAX_AMBASSADOR_CHAIN_DEPTH = 1_024;
+
 function assertSameSponsor(
   current: AmbassadorAttribution,
   ambassadorWalletNormalized: string,
@@ -61,6 +63,42 @@ function fromLockedPresale(locked: LockedPresaleAmbassador, now: Date) {
     acceptedAt: locked.lockedAt,
     now,
   });
+}
+
+async function assertAttributionDoesNotCreateCycle(
+  repository: AmbassadorAttributionRepository,
+  referredWalletNormalized: string,
+  ambassadorWalletNormalized: string,
+  now: Date
+) {
+  const visited = new Set<string>();
+  let currentWallet = ambassadorWalletNormalized;
+
+  for (let depth = 0; depth < MAX_AMBASSADOR_CHAIN_DEPTH; depth += 1) {
+    if (currentWallet === referredWalletNormalized) {
+      throw new DomainConflictError(
+        "La atribucion crearia una referencia circular entre embajadores."
+      );
+    }
+    if (visited.has(currentWallet)) {
+      throw new DomainConflictError(
+        "La cadena del embajador ya contiene una referencia circular y no puede ampliarse."
+      );
+    }
+    visited.add(currentWallet);
+
+    const currentAttribution = await resolveAmbassadorAttribution(
+      repository,
+      currentWallet,
+      now
+    );
+    if (!currentAttribution) return;
+    currentWallet = currentAttribution.ambassadorWalletNormalized;
+  }
+
+  throw new DomainConflictError(
+    "La cadena del embajador supera el limite seguro de validacion."
+  );
 }
 
 export async function resolveAmbassadorAttribution(
@@ -111,6 +149,7 @@ export async function acceptDirectAmbassadorAttribution(
     input.ambassadorWallet,
     "ambassadorWallet"
   );
+  await repository.acquireGraphWriteFence(now);
   const canonical = await resolveAmbassadorAttribution(
     repository,
     referredWalletNormalized,
@@ -125,6 +164,12 @@ export async function acceptDirectAmbassadorAttribution(
         : "La wallet ya tiene un embajador distinto y la atribucion es inmutable."
     );
   }
+  if (await repository.hasPresalePurchase(referredWalletNormalized)) {
+    throw new DomainConflictError(
+      "La wallet ya quedo registrada durante la preventa y no puede anadir un embajador despues.",
+      { reason: "registration_already_complete" }
+    );
+  }
   const candidate = buildAmbassadorAttribution({
     referredWallet: referredWalletNormalized,
     ambassadorWallet: ambassadorWalletNormalized,
@@ -133,6 +178,12 @@ export async function acceptDirectAmbassadorAttribution(
     acceptedAt: now,
     now,
   });
+  await assertAttributionDoesNotCreateCycle(
+    repository,
+    referredWalletNormalized,
+    ambassadorWalletNormalized,
+    now
+  );
   return persistCandidate(
     repository,
     candidate,

@@ -55,12 +55,14 @@ export type AmbassadorProfile = {
 };
 
 export interface AmbassadorAttributionRepository {
+  acquireGraphWriteFence(now: Date): Promise<void>;
   findAttribution(
     referredWalletNormalized: string
   ): Promise<AmbassadorAttribution | null>;
   findLockedPresaleAmbassador(
     referredWalletNormalized: string
   ): Promise<LockedPresaleAmbassador | null>;
+  hasPresalePurchase(referredWalletNormalized: string): Promise<boolean>;
   insertAttribution(
     attribution: AmbassadorAttribution
   ): Promise<"inserted" | "duplicate">;
