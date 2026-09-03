@@ -62,7 +62,6 @@ export interface AmbassadorAttributionRepository {
   findLockedPresaleAmbassador(
     referredWalletNormalized: string
   ): Promise<LockedPresaleAmbassador | null>;
-  hasPresalePurchase(referredWalletNormalized: string): Promise<boolean>;
   insertAttribution(
     attribution: AmbassadorAttribution
   ): Promise<"inserted" | "duplicate">;

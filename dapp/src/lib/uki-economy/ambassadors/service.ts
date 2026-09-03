@@ -164,12 +164,6 @@ export async function acceptDirectAmbassadorAttribution(
         : "La wallet ya tiene un embajador distinto y la atribucion es inmutable."
     );
   }
-  if (await repository.hasPresalePurchase(referredWalletNormalized)) {
-    throw new DomainConflictError(
-      "La wallet ya quedo registrada durante la preventa y no puede anadir un embajador despues.",
-      { reason: "registration_already_complete" }
-    );
-  }
   const candidate = buildAmbassadorAttribution({
     referredWallet: referredWalletNormalized,
     ambassadorWallet: ambassadorWalletNormalized,
