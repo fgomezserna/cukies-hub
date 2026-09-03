@@ -1,5 +1,6 @@
 export const AMBASSADOR_ECONOMY_COLLECTIONS = [
   "ambassador_attributions",
+  "ambassador_graph_state",
   "ambassador_profiles",
 ] as const;
 
@@ -18,6 +19,11 @@ export const AMBASSADOR_ECONOMY_INDEX_DEFINITIONS = [
     collection: "ambassador_attributions",
     keys: { source: 1, policyVersion: 1, acceptedAt: -1 },
     options: { name: "ambassador_policy_audit" },
+  },
+  {
+    collection: "ambassador_graph_state",
+    keys: { updatedAt: -1 },
+    options: { name: "ambassador_graph_state_updated" },
   },
   {
     collection: "ambassador_profiles",

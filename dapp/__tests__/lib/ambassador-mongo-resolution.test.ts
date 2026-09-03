@@ -1,6 +1,7 @@
-import type { Db } from "mongodb";
+import type { ClientSession, Db } from "mongodb";
 
 import {
+  createMongoAmbassadorAttributionRepository,
   getOrCreateMongoAmbassadorProfile,
   materializeLockedPresaleAmbassadorAttributions,
   resolveMongoAmbassadorAttributionsForWallets,
@@ -128,6 +129,63 @@ function fakeDb(input: {
 }
 
 describe("Mongo ambassador canonical resolution", () => {
+  it("serializa las escrituras del grafo dentro de la transaccion Mongo", async () => {
+    const session = {} as ClientSession;
+    const updateOne = jest.fn().mockResolvedValue({ acknowledged: true });
+    const db = {
+      collection: (name: string) =>
+        name === "ambassador_graph_state"
+          ? { updateOne }
+          : {},
+    } as unknown as Db;
+    const repository = createMongoAmbassadorAttributionRepository(db, session);
+
+    await repository.acquireGraphWriteFence(NOW);
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: "ambassador-attribution-graph" },
+      {
+        $inc: { revision: 1 },
+        $set: { updatedAt: NOW },
+        $setOnInsert: { createdAt: NOW },
+      },
+      { session, upsert: true }
+    );
+  });
+
+  it("no permite atribuciones Mongo fuera de una transaccion", async () => {
+    const db = { collection: () => ({}) } as unknown as Db;
+    const repository = createMongoAmbassadorAttributionRepository(db);
+
+    await expect(repository.acquireGraphWriteFence(NOW)).rejects.toThrow(
+      "AMBASSADOR_ATTRIBUTION_TRANSACTION_REQUIRED"
+    );
+  });
+
+  it("considera registrada una wallet que ya compro durante la preventa", async () => {
+    const findOne = jest.fn().mockResolvedValue({ _id: "presale-row" });
+    const db = {
+      collection: (name: string) =>
+        name === "presale_participants" ? { findOne } : {},
+    } as unknown as Db;
+    const repository = createMongoAmbassadorAttributionRepository(
+      db,
+      {} as ClientSession
+    );
+
+    await expect(repository.hasPresalePurchase(REFERRED)).resolves.toBe(true);
+    expect(findOne).toHaveBeenCalledWith(
+      {
+        normalizedWalletAddress: REFERRED,
+        firstPurchaseAt: { $exists: true, $ne: null },
+      },
+      {
+        session: expect.any(Object),
+        projection: { _id: 1 },
+      }
+    );
+  });
+
   it("crea el perfil sin actualizar una ruta incluida en setOnInsert", async () => {
     const profiles: AmbassadorProfile[] = [];
     const updateOne = jest.fn(
