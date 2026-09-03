@@ -19,7 +19,6 @@ import {
   ensureHubWalletForLogin,
   findHubUserIdByLegacyWallets,
 } from '@/lib/user-wallets';
-import { assertAmbassadorInvitationCode } from '@/lib/uki-economy/ambassadors/rules';
 
 const userIncludes = {
   lastCheckIn: true,
@@ -38,7 +37,6 @@ export async function POST(request: Request) {
       message,
       signature,
       requireSignedWallet: requestedSignedWalletMode,
-      ambassadorInvitationCode: requestedAmbassadorInvitationCode,
     } = await request.json();
 
     if (!walletAddress || typeof walletAddress !== 'string') {
@@ -48,20 +46,6 @@ export async function POST(request: Request) {
     const normalizedAddress = normalizeWalletAddress(walletAddress);
     const resolvedWalletType = resolveWalletType(normalizedAddress, walletType);
     const requireSignedWallet = requestedSignedWalletMode === true;
-    let ambassadorInvitationCode: string | undefined;
-
-    if (requestedAmbassadorInvitationCode !== undefined) {
-      try {
-        ambassadorInvitationCode = assertAmbassadorInvitationCode(
-          requestedAmbassadorInvitationCode,
-        );
-      } catch {
-        return NextResponse.json(
-          { error: 'Invalid ambassador invitation code' },
-          { status: 400 },
-        );
-      }
-    }
 
     if (
       requireSignedWallet &&
@@ -126,22 +110,18 @@ export async function POST(request: Request) {
       );
     }
 
-    let createdNewUser = false;
     let user = await prisma.user.findUnique({
       where: {
         walletAddress: normalizedAddress,
       },
       include: userIncludes,
     });
-    let walletWasAlreadyRegistered = Boolean(user);
-
     if (!user) {
       const linkedUserId = await findHubUserIdByLegacyWallets({
         walletAddresses: [normalizedAddress],
       });
 
       if (linkedUserId) {
-        walletWasAlreadyRegistered = true;
         user = await prisma.user.findUnique({
           where: { id: linkedUserId },
           include: userIncludes,
@@ -157,7 +137,6 @@ export async function POST(request: Request) {
         
         if (syncedUser) {
           console.log('✅ Usuario sincronizado desde BD cukies');
-          walletWasAlreadyRegistered = true;
           user = syncedUser;
         } else {
           // Si no existe en cukies, crear nuevo usuario
@@ -176,7 +155,6 @@ export async function POST(request: Request) {
             },
             include: userIncludes
           });
-          createdNewUser = Boolean(user);
         }
       } catch (createError) {
               // If the error is P2002 (unique constraint violation), it means the user was already created
@@ -209,9 +187,6 @@ export async function POST(request: Request) {
       walletAddress: user.walletAddress,
       signedWalletAddress: normalizedAddress,
       walletType: resolvedWalletType,
-      ...(createdNewUser && !walletWasAlreadyRegistered && ambassadorInvitationCode
-        ? { ambassadorInvitationCodeAtRegistration: ambassadorInvitationCode }
-        : {}),
     });
     await clearWalletChallengeCookie();
 

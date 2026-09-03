@@ -124,19 +124,6 @@ export function createMongoAmbassadorAttributionRepository(
       );
       return lockedPresaleAmbassador(row);
     },
-    async hasPresalePurchase(referredWalletNormalized) {
-      const row = await presale.findOne(
-        {
-          normalizedWalletAddress: referredWalletNormalized,
-          firstPurchaseAt: { $exists: true, $ne: null },
-        },
-        {
-          ...options,
-          projection: { _id: 1 },
-        }
-      );
-      return Boolean(row);
-    },
     async insertAttribution(attribution) {
       assertAmbassadorAttribution(attribution);
       try {

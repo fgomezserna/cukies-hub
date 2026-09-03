@@ -67,45 +67,11 @@ describe("ambassador attribution API", () => {
       walletAddress: REFERRED,
       signedWalletAddress: REFERRED,
       walletType: "evm",
-      ambassadorInvitationCodeAtRegistration: INVITATION_CODE,
       issuedAt: "2026-08-30T11:00:00.000Z",
       expiresAt: "2026-08-31T11:00:00.000Z",
     });
     mockAccept.mockResolvedValue(attribution);
     mockGet.mockResolvedValue(attribution);
-  });
-
-  it("rechaza atribuciones posteriores al alta aunque la wallet no tuviera sponsor", async () => {
-    mockSession.mockResolvedValue({
-      userId: "user-1",
-      walletAddress: REFERRED,
-      signedWalletAddress: REFERRED,
-      walletType: "evm",
-      issuedAt: "2026-08-30T11:00:00.000Z",
-      expiresAt: "2026-08-31T11:00:00.000Z",
-    });
-
-    const response = await POST(request({ invitationCode: INVITATION_CODE }));
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      status: "error",
-      code: "REGISTRATION_ALREADY_COMPLETE",
-    });
-    expect(mockAccept).not.toHaveBeenCalled();
-  });
-
-  it("rechaza un codigo distinto al que quedo sellado durante el alta", async () => {
-    const response = await POST(request({
-      invitationCode: "cw-aaaaaaaaaaaa",
-    }));
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      status: "error",
-      code: "REGISTRATION_ALREADY_COMPLETE",
-    });
-    expect(mockAccept).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -116,7 +82,7 @@ describe("ambassador attribution API", () => {
     delete process.env.AMBASSADOR_ATTRIBUTION_WRITES_ENABLED;
   });
 
-  it("deriva la wallet referida de la sesion firmada y resuelve un codigo opaco", async () => {
+  it("permite que una cuenta autenticada sin atribucion confirme expresamente un codigo opaco", async () => {
     const response = await POST(request({
       invitationCode: INVITATION_CODE,
       referredWalletAddress: "0x9999999999999999999999999999999999999999",
@@ -135,6 +101,14 @@ describe("ambassador attribution API", () => {
       policy: { version: "ambassador-direct-v1", commissionBps: 500, levels: 1 },
       attribution: { referredWalletNormalized: REFERRED, commissionBps: 500, levels: 1 },
     });
+  });
+
+  it("rechaza codigos de invitacion invalidos sin ejecutar la atribucion", async () => {
+    const response = await POST(request({ invitationCode: "codigo-invalido" }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ status: "error", code: "VALIDATION" });
+    expect(mockAccept).not.toHaveBeenCalled();
   });
 
   it("exige sesion EVM firmada tanto para consultar como para mutar", async () => {
@@ -201,21 +175,6 @@ describe("ambassador attribution API", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ status: "error", code: "CONFLICT" });
-  });
-
-  it("explica cuando la wallet ya estaba registrada en preventa", async () => {
-    mockAccept.mockRejectedValue(new DomainConflictError(
-      "internal presale registration detail",
-      { reason: "registration_already_complete" },
-    ));
-
-    const response = await POST(request({ invitationCode: INVITATION_CODE }));
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      status: "error",
-      code: "REGISTRATION_ALREADY_COMPLETE",
-    });
   });
 
   it("no filtra mensajes de errores TypeError inesperados", async () => {

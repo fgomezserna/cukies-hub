@@ -454,15 +454,20 @@ La recompensa por ranking se aplica sobre la parte del jugador que queda despues
 
 - Cada wallet EVM registrada puede compartir su enlace de embajador, tenga o no
   un embajador propio.
-- La invitacion solo puede quedar vinculada durante el alta inicial de la wallet.
-  Una wallet que ya existia en Cukies World no puede anadir ni cambiar de
-  embajador posteriormente.
-- Una wallet ya presente como usuario directo, wallet vinculada, usuario legacy
-  o comprador de preventa se considera registrada.
-- El codigo utilizado durante el alta queda sellado en la sesion firmada y el
-  endpoint de atribucion solo acepta ese mismo codigo.
+- El login y el alta de cuenta son independientes de la atribucion: conectar o
+  firmar una wallet en cualquier pagina no crea una relacion de embajador ni
+  cierra la posibilidad de confirmarla mas adelante.
+- Una relacion nueva solo se crea desde `/embajadores/[codigo]`, despues de que
+  la wallet EVM autenticada vea al invitador y confirme expresamente la relacion.
+- Mientras no exista una relacion canonica, la wallet puede confirmar un
+  embajador sin importar cuando se creo su cuenta o si ya era usuario directo,
+  wallet vinculada, usuario legacy o comprador de preventa.
+- Una vez confirmada o materializada desde preventa, la relacion no puede
+  anadirse de nuevo, sustituirse ni modificarse.
 - Los sponsors confirmados durante la preventa se conservan automaticamente y
   tienen precedencia sobre cualquier intento posterior.
+- La fecha `acceptedAt` delimita la atribucion economica: solo se generan
+  comisiones por premios elegibles posteriores, nunca de forma retroactiva.
 - La relacion es directa, de un solo nivel e inmutable. No se permiten
   autorreferencias ni ciclos de ninguna longitud entre wallets.
 - Las escrituras del grafo se serializan y se valida toda la cadena antes de
