@@ -67,11 +67,45 @@ describe("ambassador attribution API", () => {
       walletAddress: REFERRED,
       signedWalletAddress: REFERRED,
       walletType: "evm",
+      ambassadorInvitationCodeAtRegistration: INVITATION_CODE,
       issuedAt: "2026-08-30T11:00:00.000Z",
       expiresAt: "2026-08-31T11:00:00.000Z",
     });
     mockAccept.mockResolvedValue(attribution);
     mockGet.mockResolvedValue(attribution);
+  });
+
+  it("rechaza atribuciones posteriores al alta aunque la wallet no tuviera sponsor", async () => {
+    mockSession.mockResolvedValue({
+      userId: "user-1",
+      walletAddress: REFERRED,
+      signedWalletAddress: REFERRED,
+      walletType: "evm",
+      issuedAt: "2026-08-30T11:00:00.000Z",
+      expiresAt: "2026-08-31T11:00:00.000Z",
+    });
+
+    const response = await POST(request({ invitationCode: INVITATION_CODE }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "REGISTRATION_ALREADY_COMPLETE",
+    });
+    expect(mockAccept).not.toHaveBeenCalled();
+  });
+
+  it("rechaza un codigo distinto al que quedo sellado durante el alta", async () => {
+    const response = await POST(request({
+      invitationCode: "cw-aaaaaaaaaaaa",
+    }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "REGISTRATION_ALREADY_COMPLETE",
+    });
+    expect(mockAccept).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -167,6 +201,21 @@ describe("ambassador attribution API", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ status: "error", code: "CONFLICT" });
+  });
+
+  it("explica cuando la wallet ya estaba registrada en preventa", async () => {
+    mockAccept.mockRejectedValue(new DomainConflictError(
+      "internal presale registration detail",
+      { reason: "registration_already_complete" },
+    ));
+
+    const response = await POST(request({ invitationCode: INVITATION_CODE }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "REGISTRATION_ALREADY_COMPLETE",
+    });
   });
 
   it("no filtra mensajes de errores TypeError inesperados", async () => {

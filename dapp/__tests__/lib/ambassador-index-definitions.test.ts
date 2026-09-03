@@ -7,6 +7,7 @@ describe("ambassador economy index definitions", () => {
   it("mantiene una sola atribucion canonica por wallet referida", () => {
     expect(AMBASSADOR_ECONOMY_COLLECTIONS).toEqual([
       "ambassador_attributions",
+      "ambassador_graph_state",
       "ambassador_profiles",
     ]);
     expect(AMBASSADOR_ECONOMY_INDEX_DEFINITIONS).toContainEqual({
@@ -29,6 +30,14 @@ describe("ambassador economy index definitions", () => {
         options: { unique: true, name: "ambassador_invitation_code_unique" },
       },
     ]));
+  });
+
+  it("precrea el estado que serializa las escrituras del grafo", () => {
+    expect(AMBASSADOR_ECONOMY_INDEX_DEFINITIONS).toContainEqual({
+      collection: "ambassador_graph_state",
+      keys: { updatedAt: -1 },
+      options: { name: "ambassador_graph_state_updated" },
+    });
   });
 
   it("permite auditar invitados directos y la politica capturada", () => {

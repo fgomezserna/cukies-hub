@@ -29,6 +29,7 @@ const TestComponent = () => {
           promptForSignature: true,
           requireSignedWallet: true,
           walletType: 'evm',
+          ambassadorInvitationCode: 'cw-123456789abc',
         })}
         data-testid="fetch-signed-evm-user"
       >
@@ -250,7 +251,7 @@ describe('providers/AuthProvider', () => {
     })
   })
 
-  it('forces a new EVM signature when requireSignedWallet is enabled', async () => {
+  it('sella la invitacion en la solicitud inicial y en el login EVM firmado', async () => {
     const walletAddress = '0x1111111111111111111111111111111111111111'
     mockUseAccount.mockReturnValue({
       address: walletAddress,
@@ -299,6 +300,7 @@ describe('providers/AuthProvider', () => {
         walletAddress,
         walletType: 'evm',
         requireSignedWallet: true,
+        ambassadorInvitationCode: 'cw-123456789abc',
       }),
     })
     expect(mockFetch).toHaveBeenNthCalledWith(2, '/api/auth/challenge', {
@@ -315,6 +317,7 @@ describe('providers/AuthProvider', () => {
         message: 'Sign this challenge',
         signature: '0xsigned-login-message',
         requireSignedWallet: true,
+        ambassadorInvitationCode: 'cw-123456789abc',
       }),
     })
     expect(mockSignMessageAsync).toHaveBeenCalledWith(expect.objectContaining({

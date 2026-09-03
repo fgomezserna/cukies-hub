@@ -7,6 +7,7 @@ const mockVerifyWalletSignature = jest.fn();
 const mockSetWalletSessionCookie = jest.fn();
 const mockClearWalletChallengeCookie = jest.fn();
 const mockEnsureHubWalletForLogin = jest.fn();
+const mockFindHubUserIdByLegacyWallets = jest.fn();
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -45,6 +46,9 @@ jest.mock('@/lib/mongodb-hub', () => ({
 
 jest.mock('@/lib/user-wallets', () => ({
   ensureHubWalletForLogin: (...args: unknown[]) => mockEnsureHubWalletForLogin(...args),
+  findHubUserIdByLegacyWallets: (...args: unknown[]) => (
+    mockFindHubUserIdByLegacyWallets(...args)
+  ),
 }));
 
 import { POST } from '@/app/api/auth/login/route';
@@ -82,6 +86,7 @@ describe('/api/auth/login requireSignedWallet', () => {
     mockSetWalletSessionCookie.mockResolvedValue(undefined);
     mockClearWalletChallengeCookie.mockResolvedValue(undefined);
     mockEnsureHubWalletForLogin.mockResolvedValue(undefined);
+    mockFindHubUserIdByLegacyWallets.mockResolvedValue(null);
   });
 
   it('mantiene la reutilizacion legacy de una sesion asociada a la wallet primaria', async () => {
