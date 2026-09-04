@@ -1,4 +1,6 @@
 import "server-only";
+import type { EconomyCycleCalendar } from '../cycle-calendar';
+import { rewardAccountingDayStart, rewardAccountingWeek } from './calendar';
 
 import { AMBASSADOR_ATTRIBUTION_POLICY } from "../ambassadors/types";
 import { DomainConflictError, DomainValidationError } from "../errors";
@@ -53,7 +55,8 @@ function canonicalRaw(value: string, label: string) {
   }
 }
 
-function exactDayId(value: string) {
+function exactDayId(value: string, calendar?: EconomyCycleCalendar) {
+  if (calendar) { rewardAccountingDayStart(value, 0, calendar); return value; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new DomainValidationError("dayId debe usar YYYY-MM-DD UTC.");
   }
@@ -149,6 +152,7 @@ export function reserveForCredits(credits: number): RewardReserveBreakdown {
 }
 
 export function sealDailyRewardAccounting(input: {
+  calendar?: EconomyCycleCalendar;
   dayId: string;
   ruleVersion: string;
   ruleConfigHash: string;
@@ -164,7 +168,7 @@ export function sealDailyRewardAccounting(input: {
   destinations: UndistributedDestinations;
   sealedAt: Date;
 }): DailyRewardAccounting {
-  const dayId = exactDayId(input.dayId);
+  const dayId = exactDayId(input.dayId, input.calendar);
   const ruleVersion = validRewardText(input.ruleVersion, "ruleVersion");
   const ruleConfigHash = canonicalConfigHash(input.ruleConfigHash);
   const sealedAt = validRewardDate(input.sealedAt, "sealedAt");
@@ -236,6 +240,7 @@ export function sealDailyRewardAccounting(input: {
     compareRewardText(left.allocationId, right.allocationId));
   const sourceSetHash = stableRewardHash({ dayId, sourceIds, sourceReservedRaw });
   const payload = {
+    ...(input.calendar ? { calendar: input.calendar } : {}),
     dayId, ruleVersion, ruleConfigHash, sourceIds, sourceSetHash, sourceReservedRaw,
     capacityMaterializedRaw, priorReservedInflowRaw, topupRaw,
     emissionRaw, buckets, undistributed, priorReservedUndistributed,
@@ -684,6 +689,7 @@ export function calculateDailyRewardSettlement(input: {
   const priorReservedInflow = priorCredit + priorCukieOriginal + priorCukieSecond
     + priorAmbassadorReserved;
   return sealDailyRewardAccounting({
+    ...(input.rule.emissionBudget.calendar ? { calendar: input.rule.emissionBudget.calendar } : {}),
     dayId: input.dayId,
     ruleVersion: input.rule.version,
     ruleConfigHash: policy.ruleConfigHash,
@@ -879,6 +885,7 @@ export function selectWeeklyBestResults(results: readonly WeeklyGameResult[]) {
 }
 
 export function calculateWeeklyPrize(input: {
+  calendar?: EconomyCycleCalendar;
   periodId: string;
   ruleVersion: string;
   ruleConfigHash: string;
@@ -898,26 +905,11 @@ export function calculateWeeklyPrize(input: {
   const ambassadorReserve = canonicalRaw(input.ambassadorReserveRaw, "ambassadorReserveRaw");
   const payoutAt = validRewardDate(input.payoutAt, "payoutAt");
   const sealedAt = validRewardDate(input.sealedAt, "sealedAt");
-  const payoutMonday = new Date(Date.UTC(
-    payoutAt.getUTCFullYear(),
-    payoutAt.getUTCMonth(),
-    payoutAt.getUTCDate(),
-  ));
-  if (
-    payoutMonday.getUTCDay() !== 1
-    || payoutAt.getUTCHours() !== 17
-    || payoutAt.getUTCMinutes() !== 0
-    || payoutAt.getUTCSeconds() !== 0
-    || payoutAt.getUTCMilliseconds() !== 0
-  ) {
-    throw new DomainConflictError("El payout weekly debe sellarse un lunes a las 17:00:00.000 UTC.");
+  const schedule = rewardAccountingWeek(periodId, input.calendar);
+  if (payoutAt.getTime() !== schedule.payoutAt.getTime()) {
+    throw new DomainConflictError("periodId y payout weekly deben coincidir con el calendario (lunes 17:00:00.000 UTC por defecto).");
   }
-  const periodMonday = new Date(payoutMonday.getTime() - WEEK_MS);
-  if (getIsoWeekPeriodId(periodMonday) !== periodId) {
-    throw new DomainConflictError("periodId no coincide con la semana UTC anterior al payout.");
-  }
-  const expectedDailyAccountingIds = Array.from({ length: 7 }, (_, index) =>
-    `reward-daily:${new Date(periodMonday.getTime() + index * DAY_MS).toISOString().slice(0, 10)}`);
+  const expectedDailyAccountingIds = schedule.dayIds.map((dayId) => `reward-daily:${dayId}`);
   const providedSourceDailyAccountingIds = input.sourceDailyAccountingIds.map((id, index) =>
     validRewardText(id, `sourceDailyAccountingIds[${index}]`));
   const canonicalSourceIds = [...providedSourceDailyAccountingIds].sort(compareRewardText);
@@ -929,8 +921,7 @@ export function calculateWeeklyPrize(input: {
     throw new DomainConflictError("Weekly exige los siete cierres diarios canonicos de su periodo.");
   }
   const sourceDailyAccountingIds = expectedDailyAccountingIds;
-  const poolTrancheSchedule = Array.from({ length: 7 }, (_, index) =>
-    new Date(payoutMonday.getTime() + (index + 1) * DAY_MS + 16 * 60 * 60_000));
+  const poolTrancheSchedule = schedule.trancheAt;
   if (ambassadorReserve !== mulDiv(pot, AMBASSADOR_COMMISSION_BPS, BPS)) {
     throw new DomainConflictError("La reserva ambassador weekly debe ser exactamente 5% del bote.");
   }
@@ -979,8 +970,8 @@ export function calculateWeeklyPrize(input: {
     previousBlockTimestamp,
     confirmedAt,
   };
-  const gamePeriodStartsAt = new Date(periodMonday.getTime() + 14 * 60 * 60_000);
-  const gamePeriodEndsAt = new Date(gamePeriodStartsAt.getTime() + WEEK_MS);
+  const gamePeriodStartsAt = schedule.startsAt;
+  const gamePeriodEndsAt = schedule.endsAt;
   for (const source of input.results) {
     const canonical = canonicalWeeklyResult(source);
     if (
@@ -1191,6 +1182,7 @@ export function calculateWeeklyPrize(input: {
   })).sort((left, right) => compareRewardText(left.allocationId, right.allocationId));
   const payload = {
     periodId,
+    ...(input.calendar ? { calendar: input.calendar } : {}),
     ruleVersion,
     ruleConfigHash,
     fundingMode: "reserved_no_mint" as const,
@@ -1231,32 +1223,18 @@ export function assertWeeklyPrizeAccountingIntegrity(
   validRewardText(accounting.ruleVersion, "ruleVersion");
   canonicalEvidenceHash(accounting.ruleConfigHash, "ruleConfigHash");
   const payoutAt = validRewardDate(accounting.payoutAt, "payoutAt");
-  const payoutMonday = new Date(Date.UTC(
-    payoutAt.getUTCFullYear(), payoutAt.getUTCMonth(), payoutAt.getUTCDate(),
-  ));
-  if (
-    payoutMonday.getUTCDay() !== 1
-    || payoutAt.getUTCHours() !== 17
-    || payoutAt.getUTCMinutes() !== 0
-    || payoutAt.getUTCSeconds() !== 0
-    || payoutAt.getUTCMilliseconds() !== 0
-  ) {
+  const schedule = rewardAccountingWeek(periodId, accounting.calendar);
+  if (payoutAt.getTime() !== schedule.payoutAt.getTime()) {
     throw new DomainConflictError("El accounting weekly no contiene un payout canonico.");
   }
-  const periodMonday = new Date(payoutMonday.getTime() - WEEK_MS);
-  if (getIsoWeekPeriodId(periodMonday) !== periodId) {
-    throw new DomainConflictError("El accounting weekly no coincide con su periodo ISO.");
-  }
-  const expectedSourceIds = Array.from({ length: 7 }, (_, index) =>
-    `reward-daily:${new Date(periodMonday.getTime() + index * DAY_MS).toISOString().slice(0, 10)}`);
+  const expectedSourceIds = schedule.dayIds.map((dayId) => `reward-daily:${dayId}`);
   if (
     accounting.sourceDailyAccountingIds.length !== 7
     || accounting.sourceDailyAccountingIds.some((id, index) => id !== expectedSourceIds[index])
   ) {
     throw new DomainConflictError("El accounting weekly no conserva sus siete cierres canonicos.");
   }
-  const expectedSchedule = Array.from({ length: 7 }, (_, index) =>
-    new Date(payoutMonday.getTime() + (index + 1) * DAY_MS + 16 * 60 * 60_000));
+  const expectedSchedule = schedule.trancheAt;
   if (
     accounting.poolTrancheSchedule.length !== 7
     || accounting.poolTrancheSchedule.some((scheduledAt, index) =>
@@ -1388,7 +1366,11 @@ export function selectStoredWeeklyPoolTranche(
   };
 }
 
-export function weeklySettlementSchedule(periodMondayUtc: Date) {
+export function weeklySettlementSchedule(periodMondayUtc: Date, calendar?: EconomyCycleCalendar) {
+  if (calendar) {
+    const schedule = rewardAccountingWeek(getIsoWeekPeriodId(periodMondayUtc, calendar), calendar);
+    return { playerPayoutAt: schedule.payoutAt, trancheAt: schedule.trancheAt };
+  }
   const monday = validRewardDate(periodMondayUtc, "periodMondayUtc");
   if (
     monday.getUTCDay() !== 1 || monday.getUTCHours() !== 0 || monday.getUTCMinutes() !== 0

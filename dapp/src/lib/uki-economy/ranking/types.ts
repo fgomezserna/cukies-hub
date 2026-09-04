@@ -1,3 +1,5 @@
+import type { EconomyCycleCalendar } from '../cycle-calendar';
+
 export const WEEKLY_RANKING_RULE_SCOPE = "weekly_arena_ranking" as const;
 export const WEEKLY_RANKING_INITIAL_RANK = 5 as const;
 export const WEEKLY_RANKING_MIN_PROMOTION_GAMES = 20 as const;
@@ -12,6 +14,7 @@ export type WeeklyRankingTier = {
 };
 
 export type WeeklyRankingRule = {
+  calendar?: EconomyCycleCalendar;
   _id: string;
   scope: typeof WEEKLY_RANKING_RULE_SCOPE;
   version: string;

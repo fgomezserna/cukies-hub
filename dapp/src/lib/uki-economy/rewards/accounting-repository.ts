@@ -1,4 +1,6 @@
 import "server-only";
+import { acceleratedDayFromId, economyCycleDurationMs, economyCycleDelayMs } from '../cycle-calendar';
+import { rewardAccountingDayId, rewardAccountingDayStart, rewardAccountingWeek, firstRewardDayStart } from './calendar';
 
 import type { ClientSession, Db } from "mongodb";
 
@@ -29,7 +31,7 @@ import {
   assertWeeklyPrizeAccountingIntegrity,
   selectStoredWeeklyPoolTranche,
 } from "./accounting";
-import { assertRewardEmissionBudgetState } from "./emission-budget";
+import { assertRewardEmissionBudgetState, rewardEmissionBudgetDayWindow } from "./emission-budget";
 import {
   assertRewardRule,
   rewardRuleActiveAtQuery,
@@ -52,18 +54,6 @@ type SettledGameEvidence = {
 };
 
 const CANONICAL_REWARD_DAY_ID = /^\d{4}-\d{2}-\d{2}$/;
-
-function rewardDayStart(dayId: string) {
-  const value = new Date(`${dayId}T00:00:00.000Z`);
-  if (
-    !CANONICAL_REWARD_DAY_ID.test(dayId)
-    || Number.isNaN(value.getTime())
-    || value.toISOString().slice(0, 10) !== dayId
-  ) {
-    throw new DomainConflictError(`El cierre reward contiene un dayId no canonico: ${dayId}.`);
-  }
-  return value;
-}
 
 export interface RewardAccountingRepository {
   findRewardRuleByVersion(ruleVersion: string): Promise<RewardRule | null>;
@@ -132,16 +122,7 @@ export function createMongoRewardAccountingRepository(
   const tranches = db.collection<PoolTrancheAccounting>("reward_pool_tranche_accounting");
   const sources = db.collection<WeeklyGameSource>("reward_weekly_game_sources");
   const games = db.collection<SettledGameEvidence>("game_economy_sessions");
-  const rules = db.collection<{
-    scope: string;
-    version: string;
-    activeFrom: Date;
-    emissionBudget: {
-      programStartsAt: Date;
-      dayBoundarySecondUtc: number;
-      lateReservationGraceSeconds: number;
-    };
-  }>("economy_rule_versions");
+  const rules = db.collection<RewardRule>("economy_rule_versions");
   const rewardRules = db.collection<RewardRule>("economy_rule_versions");
   const canonicalBlocks = db.collection<{
     chainId: number;
@@ -195,8 +176,7 @@ export function createMongoRewardAccountingRepository(
       if (current) return current;
       assertRewardRule(input.rule, input.startsAt);
       const expectedStartsAt = new Date(
-        rewardDayStart(input.dayId).getTime()
-          + input.rule.emissionBudget.dayBoundarySecondUtc * 1_000,
+        rewardAccountingDayStart(input.dayId, input.rule.emissionBudget.dayBoundarySecondUtc, input.rule.emissionBudget.calendar).getTime(),
       );
       if (
         input.rule.emissionBudget.unusedDailyCapacity !== "materialize_undistributed"
@@ -229,11 +209,8 @@ export function createMongoRewardAccountingRepository(
             _id: budgetDayId,
             dayId: budgetDayId,
             startsAt: input.startsAt,
-            endsAt: new Date(input.startsAt.getTime() + 24 * 60 * 60_000),
-            reservationClosesAt: new Date(
-              input.startsAt.getTime()
-                + (24 * 60 * 60 + input.rule.emissionBudget.lateReservationGraceSeconds) * 1_000,
-            ),
+            endsAt: new Date(input.startsAt.getTime() + economyCycleDurationMs(input.rule.emissionBudget.calendar)),
+            reservationClosesAt: rewardEmissionBudgetDayWindow(input.startsAt, input.rule.emissionBudget.dayBoundarySecondUtc, input.rule.emissionBudget.lateReservationGraceSeconds, input.rule.emissionBudget.calendar).reservationClosesAt,
             reservedRaw: capRaw,
             revision: 0,
             createdAt: input.now,
@@ -248,6 +225,7 @@ export function createMongoRewardAccountingRepository(
           }
         : {
             _id: "reward_allocations",
+            ...(input.rule.emissionBudget.calendar ? { calendar: input.rule.emissionBudget.calendar } : {}),
             scope: "reward_allocations",
             programStartsAt: input.rule.emissionBudget.programStartsAt,
             dayBoundarySecondUtc: input.rule.emissionBudget.dayBoundarySecondUtc,
@@ -369,7 +347,7 @@ export function createMongoRewardAccountingRepository(
     }, options).sort({ periodAnchorAt: 1, playedAt: 1, sessionId: 1 }).toArray(),
     async listDailyRewardSourceLines(dayId) {
       const events = await emissionEvents.find({
-        dayId: { $regex: `^${dayId}T` },
+        dayId: dayId.startsWith('C') ? acceleratedDayFromId(dayId).start.toISOString() : { $regex: `^${dayId}T` },
         status: "reserved",
       }, options)
         .sort({ sourceId: 1 }).toArray();
@@ -394,19 +372,20 @@ export function createMongoRewardAccountingRepository(
     async findNextClosableRewardDay(ruleVersion, now) {
       const rule = await rules.findOne({ scope: "reward_allocations", version: ruleVersion }, options);
       if (!rule) throw new DomainConflictError(`No existe la regla reward ${ruleVersion}.`);
+      const calendar = rule.emissionBudget.calendar;
       const latest = await daily.findOne({
         ruleVersion,
         status: "sealed",
-        dayId: { $regex: CANONICAL_REWARD_DAY_ID },
+        dayId: { $regex: calendar ? /^C(1800|3600)-D:/ : CANONICAL_REWARD_DAY_ID },
       }, { ...options, sort: { dayId: -1 } });
-      const next = latest
-        ? rewardDayStart(latest.dayId)
-        : new Date(`${rule.activeFrom.toISOString().slice(0, 10)}T00:00:00.000Z`);
-      if (latest) next.setUTCDate(next.getUTCDate() + 1);
-      const startsAt = new Date(next.getTime() + rule.emissionBudget.dayBoundarySecondUtc * 1_000);
-      const closesAt = new Date(startsAt.getTime() + 26 * 60 * 60_000);
+      const startsAt = latest
+        ? new Date(rewardAccountingDayStart(latest.dayId, rule.emissionBudget.dayBoundarySecondUtc, calendar).getTime() + economyCycleDurationMs(calendar))
+        : firstRewardDayStart(rule.activeFrom, rule.emissionBudget.dayBoundarySecondUtc, calendar);
+      const effectiveUntil = rule.supersededAt ?? rule.activeUntil;
+      if (effectiveUntil && startsAt.getTime() >= effectiveUntil.getTime()) return null;
+      const closesAt = new Date(startsAt.getTime() + economyCycleDurationMs(calendar) + economyCycleDelayMs(2, calendar));
       return now.getTime() >= closesAt.getTime()
-        ? { dayId: next.toISOString().slice(0, 10), startsAt }
+        ? { dayId: rewardAccountingDayId(startsAt, calendar), startsAt }
         : null;
     },
     listDailyAccounting: (startsOn, endsBefore) => daily.find({
@@ -610,21 +589,22 @@ export class RewardAccountingService {
       const rule = await repository.findRewardRuleByVersion(input.ruleVersion);
       if (!rule) throw new DomainConflictError(`No existe la regla reward ${input.ruleVersion}.`);
       assertRewardRule(rule);
-      const firstContainingPeriod = getTreasureHuntWeeklyPeriod(rule.activeFrom);
+      const calendar = rule.emissionBudget.calendar;
+      const firstContainingPeriod = getTreasureHuntWeeklyPeriod(rule.activeFrom, calendar);
       let startsAt = firstContainingPeriod.startsAt.getTime() < rule.activeFrom.getTime()
-        ? new Date(firstContainingPeriod.startsAt.getTime() + 7 * 24 * 60 * 60_000)
+        ? new Date(firstContainingPeriod.startsAt.getTime() + 7 * economyCycleDurationMs(calendar))
         : firstContainingPeriod.startsAt;
       const effectiveUntil = [rule.activeUntil, rule.supersededAt]
         .filter((value): value is Date => value instanceof Date)
         .sort((left, right) => left.getTime() - right.getTime())[0];
       while (true) {
-        const endsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60_000);
-        const payoutAt = new Date(endsAt.getTime() + 3 * 60 * 60_000);
+        const endsAt = new Date(startsAt.getTime() + 7 * economyCycleDurationMs(calendar));
+        const payoutAt = new Date(endsAt.getTime() + economyCycleDelayMs(3, calendar));
         if (
           payoutAt.getTime() > now.getTime()
           || (effectiveUntil && endsAt.getTime() > effectiveUntil.getTime())
         ) return null;
-        const periodId = getIsoWeekPeriodId(startsAt);
+        const periodId = getIsoWeekPeriodId(startsAt, calendar);
         const current = await repository.findWeekly(periodId);
         if (!current) return { periodId, startsAt, payoutAt };
         assertWeeklyPrizeAccountingIntegrity(current);
@@ -650,7 +630,8 @@ export class RewardAccountingService {
     return this.runTransaction(async (repository) => {
       const current = await repository.findDaily(input.dayId);
       if (current) return current;
-      const startsAt = new Date(`${input.dayId}T14:00:00.000Z`);
+      const candidateRule = await repository.findRewardRuleByVersion(input.ruleVersion);
+      const startsAt = rewardAccountingDayStart(input.dayId, candidateRule?.emissionBudget.dayBoundarySecondUtc, candidateRule?.emissionBudget.calendar);
       const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
       if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.dayId}.`);
       const {
@@ -664,6 +645,7 @@ export class RewardAccountingService {
       );
       const accounting = sealDailyRewardAccounting({
         ...input,
+        ...(rule.emissionBudget.calendar ? { calendar: rule.emissionBudget.calendar } : {}),
         ...sources,
         ruleConfigHash: policy.ruleConfigHash,
         emissionRaw: rule.emissionBudget.dailyCapRaw,
@@ -683,7 +665,10 @@ export class RewardAccountingService {
       const candidate = await repository.findNextClosableRewardDay(input.ruleVersion, input.now);
       if (!candidate) return null;
       const { dayId, startsAt } = candidate;
-      const endsAt = new Date(startsAt.getTime() + 24 * 60 * 60_000);
+      const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
+      if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${dayId}.`);
+      const calendar = rule.emissionBudget.calendar;
+      const endsAt = new Date(startsAt.getTime() + economyCycleDurationMs(calendar));
       const readiness = await repository.dailyReadiness(startsAt, endsAt);
       if (
         readiness.unfinishedRuns > 0
@@ -696,8 +681,6 @@ export class RewardAccountingService {
       }
       const current = await repository.findDaily(dayId);
       if (current) return current;
-      const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
-      if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${dayId}.`);
       const [
         sourceLines,
         creditContributors,
@@ -710,9 +693,14 @@ export class RewardAccountingService {
         repository.listCreditContributors(startsAt),
         repository.listCukieParticipants("original", startsAt, endsAt),
         repository.listCukieParticipants("second_generation", startsAt, endsAt),
-        repository.findPriorWeeklyPoolTranche(new Date(endsAt.getTime() + 2 * 60 * 60_000)),
+        repository.findPriorWeeklyPoolTranche(new Date(endsAt.getTime() + economyCycleDelayMs(2, calendar))),
         repository.listDailyAmbassadorSnapshots(startsAt, endsAt),
       ]);
+      // A delayed lottery/weekly close must not silently erase its first tranche
+      // when the daily scheduler catches up before the weekly scheduler.
+      if (calendar && startsAt.getTime() >= new Date(calendar.anchorAt).getTime() + 7 * economyCycleDurationMs(calendar) && !priorWeekly) {
+        throw new DomainConflictError(`El dia ${dayId} sigue pendiente del cierre weekly que financia su tramo.`);
+      }
       const capacity = await repository.materializeDailyCapacity({
         dayId,
         startsAt,
@@ -770,20 +758,14 @@ export class RewardAccountingService {
       if (current) assertWeeklyPrizeAccountingIntegrity(current);
       const startsAt = validRewardDate(input.startsAt, "startsAt");
       const now = validRewardDate(input.now, "now");
-      const endsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60_000);
-      const payoutAt = new Date(Date.UTC(
-        endsAt.getUTCFullYear(),
-        endsAt.getUTCMonth(),
-        endsAt.getUTCDate(),
-        17,
-      ));
+      const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
+      if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.periodId}.`);
+      const calendar = rule.emissionBudget.calendar;
+      const schedule = rewardAccountingWeek(input.periodId, calendar);
+      const { endsAt, payoutAt } = schedule;
       if (
-        startsAt.getUTCDay() !== 1
-        || startsAt.getUTCHours() !== 14
-        || startsAt.getUTCMinutes() !== 0
-        || startsAt.getUTCSeconds() !== 0
-        || startsAt.getUTCMilliseconds() !== 0
-        || getIsoWeekPeriodId(startsAt) !== input.periodId
+        startsAt.getTime() !== schedule.startsAt.getTime()
+        || getIsoWeekPeriodId(startsAt, calendar) !== input.periodId
         || now.getTime() < payoutAt.getTime()
       ) {
         throw new DomainConflictError(
@@ -791,26 +773,23 @@ export class RewardAccountingService {
         );
       }
       const daily = (await repository.listDailyAccounting(
-        startsAt.toISOString().slice(0, 10),
-        endsAt.toISOString().slice(0, 10),
+        rewardAccountingDayId(startsAt, calendar),
+        rewardAccountingDayId(endsAt, calendar),
       )).sort((left, right) => left.dayId.localeCompare(right.dayId));
-      const expectedDays = Array.from({ length: 7 }, (_, index) =>
-        new Date(startsAt.getTime() + index * 24 * 60 * 60_000).toISOString().slice(0, 10));
+      const expectedDays = schedule.dayIds;
       if (
         daily.length !== 7
         || daily.some((row, index) =>
           row.dayId !== expectedDays[index]
           || row._id !== `reward-daily:${expectedDays[index]}`
           || row.ruleVersion !== input.ruleVersion
+          || row.ruleConfigHash !== rule.configHash
+          || stableRewardHash(row.calendar ?? null) !== stableRewardHash(calendar ?? null)
           || row.status !== "sealed")
       ) {
         throw new DomainConflictError(
           `El weekly ${input.periodId} exige siete cierres diarios canonicos de la misma regla.`,
         );
-      }
-      const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
-      if (!rule) {
-        throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.periodId}.`);
       }
       assertRewardRule(rule, startsAt);
       const potRaw = daily.reduce(
@@ -827,6 +806,7 @@ export class RewardAccountingService {
       const { assertCurrentUndistributedRule, calculateWeeklyPrize } = await import("./accounting");
       const policy = assertCurrentUndistributedRule(rule);
       const accounting = calculateWeeklyPrize({
+        ...(calendar ? { calendar } : {}),
         periodId: input.periodId,
         ruleVersion: policy.ruleVersion,
         ruleConfigHash: policy.ruleConfigHash,

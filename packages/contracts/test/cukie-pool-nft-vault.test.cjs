@@ -10,7 +10,7 @@ describe('CukiePoolNftVault', function () {
   async function deployFixture() {
     const [owner, alice, bob, nextOwner] = await ethers.getSigners();
     const Vault = await ethers.getContractFactory('CukiePoolNftVault');
-    const vault = await Vault.deploy(owner.address);
+    const vault = await Vault.deploy(owner.address, 86400);
     const Nft = await ethers.getContractFactory('MockERC721');
     const nft = await Nft.deploy('Cukies', 'CUKI');
     await vault.setCollectionAllowed(await nft.getAddress(), true);
@@ -454,7 +454,7 @@ describe('CukiePoolNftVault', function () {
     await vault.connect(nextOwner).acceptOwnership();
     await vault.connect(nextOwner).pause();
     expect(await vault.paused()).to.equal(true);
-    await expect(Vault.deploy(ethers.ZeroAddress))
+    await expect(Vault.deploy(ethers.ZeroAddress, 86400))
       .to.be.revertedWithCustomError(vault, 'OwnableInvalidOwner');
   });
 });

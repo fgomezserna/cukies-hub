@@ -1,4 +1,5 @@
 import "server-only";
+import { economyCycleDurationMs } from '../cycle-calendar';
 
 import type { ClientSession, Db } from "mongodb";
 
@@ -53,8 +54,9 @@ export async function resolveAppliedArenaRanking(input: {
     };
   }
 
+  const calendar = input.rewardRule.emissionBudget.calendar;
   const shiftedPeriod = getIsoWeekPeriod(
-    new Date(periodAnchorAt.getTime() - RANKING_BOUNDARY_SHIFT_MS),
+    new Date(periodAnchorAt.getTime() - (calendar ? 0 : RANKING_BOUNDARY_SHIFT_MS)), calendar,
   );
   const options = input.session ? { session: input.session } : {};
   const previous = await input.db.collection<WeeklyRankingSnapshot>("game_weekly_rankings")
@@ -70,7 +72,7 @@ export async function resolveAppliedArenaRanking(input: {
 
   if (!previous) {
     const previousPeriodId = getIsoWeekPeriodId(
-      new Date(shiftedPeriod.start.getTime() - 7 * 24 * 60 * 60_000),
+      new Date(shiftedPeriod.start.getTime() - 7 * economyCycleDurationMs(calendar)), calendar,
     );
     const rank = 5;
     const snapshot = {

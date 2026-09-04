@@ -1,4 +1,5 @@
 import type { CukieMasterSlot } from "../cukie-master/types";
+import type { EconomyCycleCalendar } from "../cycle-calendar";
 
 export const CREDIT_SCHEMA_VERSION = 3 as const;
 export const CREDIT_RULE_SCOPE = "competition_credits" as const;
@@ -39,6 +40,7 @@ export type CreditVerifiedContractIdentity = {
 };
 
 export type CompetitionCreditRule = {
+  calendar?: EconomyCycleCalendar;
   _id: string;
   scope: typeof CREDIT_RULE_SCOPE;
   version: string;
@@ -72,6 +74,7 @@ export type CompetitionCreditRule = {
 };
 
 export type CompetitionCreditPeriod = {
+  calendar?: EconomyCycleCalendar;
   periodId: string;
   cutoff: Date;
   nextCutoff: Date;

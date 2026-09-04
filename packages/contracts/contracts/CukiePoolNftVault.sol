@@ -12,7 +12,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 /// @notice Custodies lendable Cukies and guarantees exits at versioned daily cutoffs.
 /// @dev Generation, rarity, game quotas and rewards intentionally remain off-chain.
 contract CukiePoolNftVault is Ownable2Step, Pausable, ReentrancyGuard, IERC721Receiver {
-    uint256 public constant PERIOD_DURATION = 1 days;
+    // Constructor-only storage preserves a stable runtime bytecode identity.
+    uint256 public PERIOD_DURATION;
     uint64 public constant INITIAL_PERIOD_START = 14 hours;
 
     enum Lifecycle {
@@ -138,8 +139,14 @@ contract CukiePoolNftVault is Ownable2Step, Pausable, ReentrancyGuard, IERC721Re
     error CustodyNotReleased();
     error UntrackedAssetNotCustodied();
     error OwnershipRenounceDisabled();
+    error InvalidPeriodDuration();
 
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner, uint256 periodDuration) Ownable(initialOwner) {
+        if (
+            periodDuration != 1 days
+                && !(block.chainid == 97 && (periodDuration == 30 minutes || periodDuration == 1 hours))
+        ) revert InvalidPeriodDuration();
+        PERIOD_DURATION = periodDuration;
         calendarVersionCount = 1;
         _calendarVersions[1] = CalendarVersion({
             effectiveAt: INITIAL_PERIOD_START,
@@ -152,7 +159,7 @@ contract CukiePoolNftVault is Ownable2Step, Pausable, ReentrancyGuard, IERC721Re
             INITIAL_PERIOD_START,
             INITIAL_PERIOD_START + uint64(PERIOD_DURATION),
             0,
-            uint32(INITIAL_PERIOD_START)
+            uint32(uint256(INITIAL_PERIOD_START) % PERIOD_DURATION)
         );
     }
 
@@ -449,7 +456,7 @@ contract CukiePoolNftVault is Ownable2Step, Pausable, ReentrancyGuard, IERC721Re
 
     function _periodAtUsingVersion(CalendarVersion memory calendar, uint32 version, uint64 timestamp)
         private
-        pure
+        view
         returns (Period memory)
     {
         if (timestamp < calendar.effectiveAt) revert TimestampBeforeCalendar();

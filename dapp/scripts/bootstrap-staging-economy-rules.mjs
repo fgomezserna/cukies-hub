@@ -170,6 +170,7 @@ function publicSummary(mode, rules, inspection, applied = false) {
       ruleset: STAGING_ECONOMY_RULESET.id,
     },
     policy: {
+      calendar: rules.reward.emissionBudget.calendar ?? null,
       activeFrom: rules.reward.activeFrom,
       dayBoundarySecondUtc: rules.reward.emissionBudget.dayBoundarySecondUtc,
       lateReservationGraceSeconds: rules.reward.emissionBudget.lateReservationGraceSeconds,

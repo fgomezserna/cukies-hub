@@ -315,6 +315,7 @@ function assertAccountingPayloadHash(accounting, accountingKind) {
   } else if (accountingKind === 'daily') {
     payload = {
       dayId: accounting.dayId,
+      ...(accounting.calendar ? { calendar: accounting.calendar } : {}),
       ruleVersion: accounting.ruleVersion,
       ruleConfigHash: accounting.ruleConfigHash,
       sourceIds: accounting.sourceIds,
@@ -334,6 +335,7 @@ function assertAccountingPayloadHash(accounting, accountingKind) {
   } else {
     payload = {
       periodId: accounting.periodId,
+      ...(accounting.calendar ? { calendar: accounting.calendar } : {}),
       ruleVersion: accounting.ruleVersion,
       ruleConfigHash: accounting.ruleConfigHash,
       fundingMode: accounting.fundingMode,
@@ -474,6 +476,10 @@ export function buildRewardPublicationArtifacts(input) {
   }
   if (!input.rule || input.rule.version !== input.accounting.ruleVersion) {
     throw new Error(`El cierre ${input.accountingId} no liga una regla exacta.`);
+  }
+  if (stableRewardPublicationHash(input.accounting.calendar ?? null)
+    !== stableRewardPublicationHash(input.rule.emissionBudget?.calendar ?? null)) {
+    throw new Error('El calendario contable no coincide con la regla sellada.');
   }
   const ruleDestinations = assertUndistributedRule(input.rule);
   if (

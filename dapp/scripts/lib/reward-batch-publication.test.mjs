@@ -159,6 +159,20 @@ test('materializa solo beneficiarios como claims y separa transferencias/quema',
   );
 });
 
+test('incluye el calendario del cierre acelerado en el hash sin cambiar sus claims', () => {
+  const candidate = input();
+  const baseline = buildRewardPublicationArtifacts(candidate);
+  candidate.accounting.calendar = { version: 'cycle-v1', chainId: 97, cycleSeconds: 1800, anchorAt: '2026-08-19T14:00:00.000Z' };
+  assert.throws(() => buildRewardPublicationArtifacts(candidate), /calendario/);
+  candidate.rule.emissionBudget = { calendar: candidate.accounting.calendar };
+  assert.throws(() => buildRewardPublicationArtifacts(candidate), /payloadHash/);
+  const { _id, payloadHash, status, ...payload } = candidate.accounting;
+  candidate.accounting.payloadHash = stableRewardPublicationHash(payload);
+  const fast = buildRewardPublicationArtifacts(candidate);
+  assert.equal(fast.plan.claimableTotalRaw, baseline.plan.claimableTotalRaw);
+  assert.equal(fast.batch.merkleRoot, baseline.batch.merkleRoot);
+});
+
 test('produce el mismo root/input hash que la herramienta de contratos', () => {
   const artifacts = buildRewardPublicationArtifacts(input());
   const manifest = generateRewardsMerkle({

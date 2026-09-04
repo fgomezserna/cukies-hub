@@ -1,3 +1,5 @@
+import type { EconomyCycleCalendar } from '../cycle-calendar';
+
 export const GAME_ECONOMY_RULE_SCOPE = "game_economy" as const;
 
 export const GAME_ECONOMY_SESSION_STATUSES = [
@@ -63,6 +65,7 @@ export type GameEconomyCalculationRule = {
 };
 
 export type GameEconomyRuleSnapshot = {
+  calendar?: EconomyCycleCalendar;
   gameId: string;
   version: string;
   configHash: string;

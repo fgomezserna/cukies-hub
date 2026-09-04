@@ -1,4 +1,5 @@
 import "server-only";
+import type { EconomyCycleCalendar } from '../cycle-calendar';
 
 import type { ClientSession, Db } from "mongodb";
 
@@ -83,10 +84,12 @@ export interface RewardRepository {
     periodEndExclusive: Date,
     afterSessionId: string | null,
     limit: number,
-  ): Promise<Array<{ sessionId: string; settledAt: Date }>>;
+    calendar?: EconomyCycleCalendar,
+  ): Promise<Array<{ sessionId: string; settledAt: Date; createdAt?: Date }>>;
   countPendingGameSettlements(
     periodStart: Date,
     periodEndExclusive: Date,
+    calendar?: EconomyCycleCalendar,
   ): Promise<number>;
   countOpenPeriodIncidents(periodId: string): Promise<number>;
   findPeriodState(periodId: string): Promise<RewardPeriodState | null>;
@@ -380,19 +383,22 @@ export function createMongoRewardRepository(
       periodEndExclusive,
       afterSessionId,
       limit,
-    ) => db.collection<{ sessionId: string; settledAt: Date }>("game_economy_sessions")
+      calendar,
+    ) => db.collection<{ sessionId: string; settledAt: Date; createdAt?: Date }>("game_economy_sessions")
       .find({
         status: "settled",
-        settledAt: { $gte: periodStart, $lt: periodEndExclusive },
+        ...(calendar ? { createdAt: { $gte: periodStart, $lt: periodEndExclusive } } : { settledAt: { $gte: periodStart, $lt: periodEndExclusive } }),
         ...(afterSessionId ? { sessionId: { $gt: afterSessionId } } : {}),
-      }, { ...options, projection: { _id: 0, sessionId: 1, settledAt: 1 } })
+      }, { ...options, projection: { _id: 0, sessionId: 1, settledAt: 1, ...(calendar ? { createdAt: 1 } : {}) } })
       .sort({ sessionId: 1 })
       .limit(limit)
       .toArray(),
-    countPendingGameSettlements: (periodStart, periodEndExclusive) =>
+    countPendingGameSettlements: (periodStart, periodEndExclusive, calendar) =>
       db.collection("game_economy_sessions").countDocuments({
+        ...(calendar ? { createdAt: { $gte: periodStart, $lt: periodEndExclusive }, status: { $nin: ['settled', 'forfeited', 'expired', 'rejected'] } } : {
         "settlementIntent.decidedAt": { $gte: periodStart, $lt: periodEndExclusive },
         settlementCommand: { $exists: false },
+        }),
       }, { ...options, limit: 1 }),
     countOpenPeriodIncidents: (periodId) => incidents.countDocuments(
       { periodId, status: "open" },

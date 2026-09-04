@@ -388,8 +388,8 @@ export async function openTreasureHuntEconomyRun(input: {
     now,
   });
   const resources = await loadReservedResources(gameSession, now);
-  const daily = getTreasureHuntDailyPeriod(gameSession.createdAt);
-  const weekly = getTreasureHuntWeeklyPeriod(gameSession.createdAt);
+  const daily = getTreasureHuntDailyPeriod(gameSession.createdAt, gameSession.rule.calendar);
+  const weekly = getTreasureHuntWeeklyPeriod(gameSession.createdAt, gameSession.rule.calendar);
   const quotaId = resources.credit.bucket === "pool"
     ? quotaReservationId(runId)
     : null;

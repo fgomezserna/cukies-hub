@@ -304,6 +304,7 @@ async function listCanonicalSettledGameSourceIds(
     await repository.countPendingGameSettlements(
       period.start,
       period.endExclusive,
+      period.calendar,
     ) > 0
   ) {
     throw new DomainConflictError(
@@ -318,6 +319,7 @@ async function listCanonicalSettledGameSourceIds(
       period.endExclusive,
       afterSessionId,
       REWARD_ALLOCATION_PAGE_SIZE,
+      period.calendar,
     );
     if (page.length === 0) break;
     const last = page.at(-1)!;
@@ -326,8 +328,9 @@ async function listCanonicalSettledGameSourceIds(
       || page.some((session) => (
         !(session.settledAt instanceof Date)
         || Number.isNaN(session.settledAt.getTime())
-        || session.settledAt.getTime() < period.start.getTime()
-        || session.settledAt.getTime() >= period.endExclusive.getTime()
+        || (period.calendar ? session.createdAt?.getTime() : session.settledAt.getTime())! < period.start.getTime()
+        || (period.calendar ? session.createdAt?.getTime() : session.settledAt.getTime())! >= period.endExclusive.getTime()
+        || (period.calendar && !(session.createdAt instanceof Date))
       ))
     ) {
       throw new DomainConflictError("El censo canonico de games no avanzo o contiene otra semana.");

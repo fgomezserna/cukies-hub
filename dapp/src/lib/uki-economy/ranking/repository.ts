@@ -1,4 +1,5 @@
 import "server-only";
+import type { EconomyCycleCalendar } from '../cycle-calendar';
 
 import type { ClientSession, Db } from "mongodb";
 
@@ -21,6 +22,7 @@ import {
 export type RankingParticipantKey = { gameId: string; walletNormalized: string };
 
 export interface WeeklyRankingRepository {
+  countPendingCycleSessions?(start: Date, endExclusive: Date): Promise<number>;
   findRuleByVersion(version: string): Promise<WeeklyRankingRule | null>;
   findFirstRuleBefore(endExclusive: Date): Promise<WeeklyRankingRule | null>;
   findRuleCovering(start: Date, endExclusive: Date): Promise<WeeklyRankingRule | null>;
@@ -30,6 +32,7 @@ export interface WeeklyRankingRepository {
   replaceRuleState(expectedRevision: number, state: WeeklyRankingRuleState): Promise<boolean>;
   insertRule(rule: WeeklyRankingRule): Promise<void>;
   listSettledSessionsPage(input: {
+    calendar?: EconomyCycleCalendar;
     start: Date;
     endExclusive: Date;
     afterId: string | null;
@@ -104,8 +107,10 @@ export function createMongoWeeklyRankingRepository(db: Db, session: ClientSessio
       return result.matchedCount === 1;
     },
     async insertRule(rule) { await rules.insertOne(rule, options); },
-    listSettledSessionsPage: ({ start, endExclusive, afterId, limit }) => sessions.find({
+    countPendingCycleSessions: (start, endExclusive) => sessions.countDocuments({ createdAt: { $gte: start, $lt: endExclusive }, status: { $nin: ['settled', 'forfeited', 'expired', 'rejected'] } }),
+    listSettledSessionsPage: ({ start, endExclusive, afterId, limit, calendar }) => sessions.find({
       status: "settled",
+      ...(calendar ? { createdAt: { $gte: start, $lt: endExclusive }, "rule.calendar.version": calendar.version, "rule.calendar.cycleSeconds": calendar.cycleSeconds } : {
       $or: [
         {
           gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
@@ -123,6 +128,7 @@ export function createMongoWeeklyRankingRepository(db: Db, session: ClientSessio
           settledAt: { $gte: start, $lt: endExclusive },
         },
       ],
+      }),
       ...(afterId ? { _id: { $gt: afterId } } : {}),
     }, options).sort({ _id: 1 }).limit(limit).toArray(),
     listReservations: (reservationIds) => reservationIds.length === 0

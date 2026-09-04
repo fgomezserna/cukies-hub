@@ -44,6 +44,7 @@ export function parseGameRuleCommand(
     throw new DomainValidationError("El body no es JSON valido.");
   }
   const payload = exact(record(decoded, "body"), [
+    ...('calendar' in record(decoded, 'body') ? ['calendar'] : []),
     "gameId",
     "version",
     "sessionTtlMs",
@@ -82,6 +83,7 @@ export function parseGameRuleCommand(
     "weightDenominatorRaw",
   ], "calculation");
   return {
+    ...(payload.calendar !== undefined ? { calendar: payload.calendar as PersistGameEconomyRuleInput['calendar'] } : {}),
     gameId: payload.gameId as string,
     version: payload.version as string,
     sessionTtlMs: payload.sessionTtlMs as number,

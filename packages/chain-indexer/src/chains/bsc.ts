@@ -203,7 +203,14 @@ async function verifyBscContractIdentity(input: {
         }),
         candidate.client.getBytecode({ address: input.identity.address as Address }),
       ]);
-      return { receipt, bytecode };
+      const poolPeriodDurationSeconds = input.identity.alias === 'CUKIE_POOL_NFT_VAULT'
+        ? Number(await candidate.client.readContract({
+            address: input.identity.address as Address,
+            abi: [{ type: 'function', name: 'PERIOD_DURATION', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+            functionName: 'PERIOD_DURATION',
+          }))
+        : undefined;
+      return { receipt, bytecode, poolPeriodDurationSeconds };
     },
   );
   const receiptAddress = value.receipt.contractAddress?.toLowerCase();
@@ -224,8 +231,14 @@ async function verifyBscContractIdentity(input: {
   if (runtimeCodeHash !== input.identity.runtimeCodeHash) {
     throw new Error(`${input.identity.alias} no coincide con el runtimeCodeHash configurado.`);
   }
+  const duration = value.poolPeriodDurationSeconds;
+  if (duration !== undefined && duration !== 86_400
+    && !(input.expectedChainId === 97 && (duration === 1800 || duration === 3600))) {
+    throw new Error('Cukie Pool tiene una duracion no permitida para esta red.');
+  }
   return {
     identity: input.identity,
+    poolPeriodDurationSeconds: duration,
     verifiedAt: now(),
     rpcHost: rpc.host,
   };
@@ -403,6 +416,8 @@ export async function ingestBscOnce(
           contractDeploymentBlock: verified.identity.deploymentBlock,
           contractDeploymentTxHash: verified.identity.deploymentTxHash,
           contractConfigHash: verified.identity.configHash,
+          ...(verified.poolPeriodDurationSeconds !== undefined
+            ? { poolPeriodDurationSeconds: verified.poolPeriodDurationSeconds } : {}),
         }
       : {};
     const fromBlock = cursor?.nextBlock

@@ -1,3 +1,5 @@
+import { acceleratedCyclePeriod, acceleratedWeekId, acceleratedDayId, type EconomyCycleCalendar } from '../cycle-calendar';
+
 export const TREASURE_HUNT_ECONOMY_POLICY = Object.freeze({
   policyVersion: "treasure-hunt-staging-v1",
   gameId: "treasure-hunt",
@@ -99,7 +101,11 @@ function shiftedUtcDayStart(at: Date) {
   );
 }
 
-export function getTreasureHuntDailyPeriod(at: Date): TreasureHuntPeriod {
+export function getTreasureHuntDailyPeriod(at: Date, calendar?: EconomyCycleCalendar): TreasureHuntPeriod {
+  if (calendar) {
+    const period = acceleratedCyclePeriod(at, calendar);
+    return { periodId: acceleratedDayId(at, calendar), startsAt: period.start, endsAt: period.endExclusive, policyVersion: TREASURE_HUNT_ECONOMY_POLICY.policyVersion };
+  }
   const startsAt = shiftedUtcDayStart(at);
   return {
     periodId: `th-day:${startsAt.toISOString()}`,
@@ -109,7 +115,11 @@ export function getTreasureHuntDailyPeriod(at: Date): TreasureHuntPeriod {
   };
 }
 
-export function getTreasureHuntWeeklyPeriod(at: Date): TreasureHuntPeriod {
+export function getTreasureHuntWeeklyPeriod(at: Date, calendar?: EconomyCycleCalendar): TreasureHuntPeriod {
+  if (calendar) {
+    const period = acceleratedCyclePeriod(at, calendar, 7);
+    return { periodId: acceleratedWeekId(at, calendar), startsAt: period.start, endsAt: period.endExclusive, policyVersion: TREASURE_HUNT_ECONOMY_POLICY.policyVersion };
+  }
   const dailyStart = shiftedUtcDayStart(at);
   const isoDay = dailyStart.getUTCDay() || 7;
   const startsAt = new Date(

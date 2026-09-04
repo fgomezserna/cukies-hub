@@ -1,4 +1,7 @@
+import { acceleratedCyclePeriod, acceleratedWeekId, acceleratedWeekFromId, type EconomyCycleCalendar } from './cycle-calendar';
+
 export type UtcPeriod = {
+  calendar?: EconomyCycleCalendar;
   id: string;
   start: Date;
   endExclusive: Date;
@@ -50,12 +53,14 @@ function isoWeekParts(value: Date) {
   return { midnight, isoDay, year, week };
 }
 
-export function getIsoWeekPeriodId(value: Date) {
+export function getIsoWeekPeriodId(value: Date, calendar?: EconomyCycleCalendar) {
+  if (calendar) return acceleratedWeekId(value, calendar);
   const { year, week } = isoWeekParts(value);
   return `${year}-W${String(week).padStart(2, '0')}`;
 }
 
-export function getIsoWeekPeriodBounds(value: Date) {
+export function getIsoWeekPeriodBounds(value: Date, calendar?: EconomyCycleCalendar) {
+  if (calendar) return acceleratedCyclePeriod(value, calendar, 7);
   const { midnight, isoDay } = isoWeekParts(value);
   const start = new Date(midnight.getTime() - (isoDay - 1) * DAY_MS);
 
@@ -65,15 +70,21 @@ export function getIsoWeekPeriodBounds(value: Date) {
   };
 }
 
-export function getIsoWeekPeriod(value: Date): UtcPeriod {
-  const bounds = getIsoWeekPeriodBounds(value);
+export function getIsoWeekPeriod(value: Date, calendar?: EconomyCycleCalendar): UtcPeriod {
+  const bounds = getIsoWeekPeriodBounds(value, calendar);
   return {
-    id: getIsoWeekPeriodId(value),
+    id: getIsoWeekPeriodId(value, calendar),
+    ...(calendar ? { calendar } : {}),
     ...bounds,
   };
 }
 
 export function getIsoWeekPeriodFromId(periodId: string): UtcPeriod {
+  if (periodId.startsWith('C')) {
+    const period = acceleratedWeekFromId(periodId);
+    const cycleSeconds = (period.endExclusive.getTime() - period.start.getTime()) / 7000 as 1800 | 3600;
+    return { ...period, calendar: { version: 'cycle-v1', chainId: 97, cycleSeconds, anchorAt: period.start.toISOString() } };
+  }
   const match = /^(\d{4})-W(\d{2})$/.exec(periodId);
   if (!match) throw new TypeError('Se requiere un periodo ISO semanal canonico.');
   const year = Number(match[1]);

@@ -99,6 +99,7 @@ function parseRule(value: unknown): Omit<PersistRewardRuleInput, "now"> {
   const emissionBudget = nested(
     item.emissionBudget,
     [
+      "calendar",
       "programStartsAt",
       "dayBoundarySecondUtc",
       "lateReservationGraceSeconds",

@@ -1,7 +1,8 @@
 import "server-only";
 
 import { DomainConflictError, DomainValidationError } from "../errors";
-import { getIsoWeekPeriod, getIsoWeekPeriodId } from "../periods";
+import { getIsoWeekPeriod, getIsoWeekPeriodFromId } from "../periods";
+import { assertEconomyCycleCalendar, type EconomyCycleCalendar } from '../cycle-calendar';
 import {
   compareRewardText,
   stableRewardHash,
@@ -53,6 +54,7 @@ function integer(value: unknown, label: string, min: number, max: number) {
 export function buildWeeklyRankingRuleConfigHash(rule: Omit<WeeklyRankingRule, "configHash" | "createdAt" | "updatedAt">) {
   return stableRewardHash({
     scope: rule.scope,
+    ...(rule.calendar ? { calendar: rule.calendar } : {}),
     version: rule.version,
     active: rule.active,
     activeFrom: rule.activeFrom,
@@ -68,6 +70,7 @@ export function buildWeeklyRankingRuleConfigHash(rule: Omit<WeeklyRankingRule, "
 }
 
 export function assertWeeklyRankingRule(rule: WeeklyRankingRule, at?: Date) {
+  assertEconomyCycleCalendar(rule.calendar);
   if (rule.scope !== WEEKLY_RANKING_RULE_SCOPE || rule._id !== `${WEEKLY_RANKING_RULE_SCOPE}:${rule.version}`) {
     throw new DomainValidationError("La regla no pertenece al ranking semanal.");
   }
@@ -106,6 +109,7 @@ export function assertWeeklyRankingRule(rule: WeeklyRankingRule, at?: Date) {
 }
 
 export function buildCurrentWeeklyRankingRule(input: {
+  calendar?: EconomyCycleCalendar;
   version: string;
   activeFrom: Date;
   activeUntil?: Date;
@@ -115,13 +119,14 @@ export function buildCurrentWeeklyRankingRule(input: {
   const activeFrom = validRewardDate(input.activeFrom, "activeFrom");
   const activeUntil = input.activeUntil ? validRewardDate(input.activeUntil, "activeUntil") : undefined;
   const now = validRewardDate(input.now, "now");
-  if (getIsoWeekPeriod(activeFrom).start.getTime() !== activeFrom.getTime()) {
+  if (getIsoWeekPeriod(activeFrom, input.calendar).start.getTime() !== activeFrom.getTime()) {
     throw new DomainValidationError("activeFrom debe ser lunes 00:00:00 UTC.");
   }
-  if (activeUntil && getIsoWeekPeriod(activeUntil).start.getTime() !== activeUntil.getTime()) {
+  if (activeUntil && getIsoWeekPeriod(activeUntil, input.calendar).start.getTime() !== activeUntil.getTime()) {
     throw new DomainValidationError("activeUntil debe ser lunes 00:00:00 UTC.");
   }
   const base = {
+    ...(input.calendar ? { calendar: input.calendar } : {}),
     _id: `${WEEKLY_RANKING_RULE_SCOPE}:${version}`,
     scope: WEEKLY_RANKING_RULE_SCOPE,
     version,
@@ -217,11 +222,11 @@ export function weeklyRankingSnapshotPayload(snapshot: Omit<WeeklyRankingSnapsho
 }
 
 export function assertWeeklyRankingSnapshotIntegrity(snapshot: WeeklyRankingSnapshot) {
-  const period = getIsoWeekPeriod(snapshot.periodStart);
+  const period = getIsoWeekPeriodFromId(snapshot.periodId);
   const expectedId = weeklyRankingId(snapshot.periodId, snapshot.gameId, snapshot.walletNormalized);
   canonicalRaw(snapshot.totalCappedScoreRaw, "ranking.totalCappedScoreRaw");
   canonicalRaw(snapshot.totalScoreCapRaw, "ranking.totalScoreCapRaw", false);
-  if (snapshot.periodId !== getIsoWeekPeriodId(snapshot.periodStart)
+  if (snapshot.periodId !== period.id
     || snapshot.periodStart.getTime() !== period.start.getTime()
     || snapshot.periodEndExclusive.getTime() !== period.endExclusive.getTime()
     || snapshot._id !== expectedId

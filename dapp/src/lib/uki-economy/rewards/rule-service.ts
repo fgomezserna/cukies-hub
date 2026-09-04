@@ -1,4 +1,5 @@
 import "server-only";
+import { acceleratedCyclePeriod } from '../cycle-calendar';
 
 import { DomainConflictError, DomainValidationError } from "../errors";
 import type { RewardTransactionRunner } from "./repository";
@@ -34,7 +35,8 @@ function isMongoDuplicateKey(error: unknown) {
 function sameGlobalEmissionLedger(left: RewardRule, right: RewardRule) {
   const current = left.emissionBudget;
   const next = right.emissionBudget;
-  return current.programStartsAt.getTime() === next.programStartsAt.getTime()
+  return stableRewardHash(current.calendar ?? null) === stableRewardHash(next.calendar ?? null)
+    && current.programStartsAt.getTime() === next.programStartsAt.getTime()
     && current.dayBoundarySecondUtc === next.dayBoundarySecondUtc
     && current.lateReservationGraceSeconds === next.lateReservationGraceSeconds
     && current.lifetimeCapRaw === next.lifetimeCapRaw
@@ -58,7 +60,10 @@ function assertFutureRuleTransition(
     );
   }
   const boundaryMs = next.emissionBudget.dayBoundarySecondUtc * 1_000;
-  if ((next.activeFrom.getTime() - boundaryMs) % DAY_MS !== 0) {
+  const calendar = next.emissionBudget.calendar;
+  if (calendar
+    ? acceleratedCyclePeriod(next.activeFrom, calendar).start.getTime() !== next.activeFrom.getTime()
+    : (next.activeFrom.getTime() - boundaryMs) % DAY_MS !== 0) {
     throw new DomainConflictError(
       `La regla ${next.version} debe empezar exactamente en un corte diario.`,
     );

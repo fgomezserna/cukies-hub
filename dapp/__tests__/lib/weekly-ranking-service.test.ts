@@ -16,6 +16,7 @@ import type { CreditReservation } from "@/lib/uki-economy/credits/types";
 import { stableGameEconomyHash } from "@/lib/uki-economy/game-economy/rules";
 import type { GameEconomySession } from "@/lib/uki-economy/game-economy/types";
 import { getIsoWeekPeriod } from "@/lib/uki-economy/periods";
+import type { EconomyCycleCalendar } from '@/lib/uki-economy/cycle-calendar';
 import { stableRewardHash } from "@/lib/uki-economy/rewards/rules";
 import type {
   WeeklyRankingRepository,
@@ -136,12 +137,15 @@ class MemoryRankingRepository {
       ? this.rule
       : null;
   }
-  async listSettledSessionsPage(input: { start: Date; endExclusive: Date; afterId: string | null; limit: number }) {
+  async countPendingCycleSessions(start: Date, end: Date) {
+    return this.sessions.filter((row) => row.createdAt >= start && row.createdAt < end && !['settled', 'forfeited', 'expired', 'rejected'].includes(row.status)).length;
+  }
+  async listSettledSessionsPage(input: { start: Date; endExclusive: Date; afterId: string | null; limit: number; calendar?: EconomyCycleCalendar }) {
     this.sessionPageCalls += 1;
     return this.sessions
       .filter((row) => row.status === "settled"
-        && row.settledAt! >= input.start
-        && row.settledAt! < input.endExclusive
+        && (input.calendar ? row.createdAt : row.settledAt!) >= input.start
+        && (input.calendar ? row.createdAt : row.settledAt!) < input.endExclusive
         && (!input.afterId || row._id > input.afterId))
       .sort((left, right) => left._id.localeCompare(right._id))
       .slice(0, input.limit);
@@ -184,6 +188,28 @@ function service(repository: MemoryRankingRepository) {
 }
 
 describe("weekly ranking sealed producer", () => {
+  it('cierra y reproduce una semana de siete ciclos sin perder una sesion liquidada tras el corte', async () => {
+    const calendar: EconomyCycleCalendar = { version: 'cycle-v1', chainId: 97, cycleSeconds: 1800, anchorAt: '2026-09-04T12:00:00.000Z' };
+    const fastStart = new Date(calendar.anchorAt);
+    const period = getIsoWeekPeriod(fastStart, calendar);
+    const now = new Date(period.endExclusive.getTime() + 150000);
+    const repository = new MemoryRankingRepository();
+    Object.assign(repository.rule, buildCurrentWeeklyRankingRule({ version: 'ranking-fast', activeFrom: fastStart, calendar, now: fastStart }));
+    const row = fixture(123, 'pool', new Date(period.endExclusive.getTime() + 100000));
+    row.game.createdAt = new Date(period.endExclusive.getTime() - 1000);
+    row.game.rule.calendar = calendar;
+    repository.sessions = [row.game];
+    repository.credits = [row.credit];
+    const ranking = service(repository);
+    await expect(ranking.closePeriod({ period, now: new Date(now.getTime() - 1), pageSize: 5 })).rejects.toThrow(/no termina/);
+    row.game.status = 'started';
+    await expect(ranking.closePeriod({ period, now, pageSize: 5 })).rejects.toThrow(/pendientes/);
+    row.game.status = 'settled';
+    await expect(ranking.closeCompletedPeriod({ now, pageSize: 5 })).resolves.toMatchObject({ periodId: period.id, sourceCount: 1, replayed: false });
+    await expect(ranking.closeCompletedPeriod({ now, pageSize: 5 })).resolves.toMatchObject({ periodId: period.id, sourceCount: 1, replayed: true });
+    expect(repository.sources[0].periodAnchorAt).toEqual(row.game.createdAt);
+    expect(repository.snapshots[0].periodEndExclusive).toEqual(period.endExclusive);
+  });
   it("paginates more than 10k pool settlements and emits one immutable participant snapshot", async () => {
     const repository = new MemoryRankingRepository();
     const rows = Array.from({ length: 10_001 }, (_, index) => fixture(index));

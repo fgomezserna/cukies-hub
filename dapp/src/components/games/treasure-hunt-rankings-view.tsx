@@ -70,7 +70,7 @@ function ActiveTreasureHuntRankingsView() {
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">Competición semanal automática</p>
             <h3 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">Tu mejor partida con créditos del pool</h3>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[#aaa8a2]">
-              No hay que abrir ni archivar torneos manualmente: el lunes a las 14:00 UTC se cierra esta semana, se conserva el resultado y empieza la siguiente.
+              Al terminar el periodo se guarda la clasificación y empieza el siguiente automáticamente. Aquí puedes consultar las fechas de la competición actual.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">

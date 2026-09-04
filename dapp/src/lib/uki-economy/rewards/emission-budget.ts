@@ -1,4 +1,5 @@
 import "server-only";
+import { acceleratedCyclePeriod, economyCycleDurationMs, type EconomyCycleCalendar } from '../cycle-calendar';
 
 import { DomainConflictError, DomainValidationError } from "../errors";
 import { formatRawAmount, parseRawAmount } from "../money";
@@ -32,6 +33,7 @@ export function rewardEmissionBudgetDayWindow(
   ruleEffectiveAtInput: Date,
   dayBoundarySecondUtc: number,
   lateReservationGraceSeconds: number,
+  calendar?: EconomyCycleCalendar,
 ) {
   const ruleEffectiveAt = validRewardDate(ruleEffectiveAtInput, "ruleEffectiveAt");
   if (
@@ -45,11 +47,11 @@ export function rewardEmissionBudgetDayWindow(
     throw new DomainValidationError("La frontera y la gracia diaria no son validas.");
   }
   const boundaryMs = dayBoundarySecondUtc * 1_000;
-  const startsAtMs = Math.floor(
+  const startsAtMs = calendar ? acceleratedCyclePeriod(ruleEffectiveAt, calendar).start.getTime() : Math.floor(
     (ruleEffectiveAt.getTime() - boundaryMs) / DAY_MS,
   ) * DAY_MS + boundaryMs;
   const startsAt = new Date(startsAtMs);
-  const endsAt = new Date(startsAtMs + DAY_MS);
+  const endsAt = new Date(startsAtMs + economyCycleDurationMs(calendar));
   const reservationClosesAt = new Date(
     endsAt.getTime() + lateReservationGraceSeconds * 1_000,
   );
@@ -77,6 +79,7 @@ export function assertRewardEmissionBudgetState(
   validRevision(state.revision, "El estado global de emision");
   if (
     state._id !== REWARD_EMISSION_BUDGET_SCOPE
+    || stableRewardHash(state.calendar ?? null) !== stableRewardHash(config.calendar ?? null)
     || state.scope !== REWARD_EMISSION_BUDGET_SCOPE
     || !(state.programStartsAt instanceof Date)
     || state.programStartsAt.getTime() !== config.programStartsAt.getTime()
@@ -167,6 +170,7 @@ function buildEvent(input: {
   });
   const immutable = {
     eventId,
+    ...(input.rule.emissionBudget.calendar ? { calendar: input.rule.emissionBudget.calendar } : {}),
     sourceId: input.source.sourceId,
     periodId: input.source.periodId,
     dayId: input.window.dayId,
@@ -218,6 +222,7 @@ export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEve
       event.ruleEffectiveAt,
       event.dayBoundarySecondUtc,
       event.lateReservationGraceSeconds,
+      event.calendar,
     );
     const expectedReason = decideBudgetReason({
       ruleEffectiveAt: event.ruleEffectiveAt,
@@ -256,7 +261,7 @@ export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEve
       && event.dayEndsAt.getTime() === window.endsAt.getTime()
       && event.reservationClosesAt.getTime() === window.reservationClosesAt.getTime()
       && validRewardDate(event.dayEndsAt, "budgetEvent.dayEndsAt").getTime()
-        - event.dayStartsAt.getTime() === DAY_MS
+        - event.dayStartsAt.getTime() === economyCycleDurationMs(event.calendar)
       && validRewardDate(
         event.reservationClosesAt,
         "budgetEvent.reservationClosesAt",
@@ -321,6 +326,7 @@ export function assertRewardEmissionBudgetReplay(
     source.ruleEffectiveAt,
     rule.emissionBudget.dayBoundarySecondUtc,
     rule.emissionBudget.lateReservationGraceSeconds,
+    rule.emissionBudget.calendar,
   );
   if (
     event.sourceId !== source.sourceId
@@ -383,6 +389,7 @@ export async function reserveRewardEmissionBudget(
     source.ruleEffectiveAt,
     config.dayBoundarySecondUtc,
     config.lateReservationGraceSeconds,
+    config.calendar,
   );
   const state = await repository.findEmissionBudgetState();
   const day = await repository.findEmissionBudgetDay(window.dayId);
@@ -444,6 +451,7 @@ export async function reserveRewardEmissionBudget(
       }
     : {
         _id: REWARD_EMISSION_BUDGET_SCOPE,
+        ...(config.calendar ? { calendar: config.calendar } : {}),
         scope: REWARD_EMISSION_BUDGET_SCOPE,
         programStartsAt: config.programStartsAt,
         dayBoundarySecondUtc: config.dayBoundarySecondUtc,

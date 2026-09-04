@@ -96,6 +96,22 @@ mock o en memoria; no despliega, firma ni escribe en las bases de Stage.
 
 Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 
+## Calendario acelerado de pruebas (preparado; activacion pendiente)
+
+- Alcance aprobado el 2026-09-04: staging puede reiniciar sus datos economicos de prueba; no se requiere migrar partidas, creditos, rankings ni repartos antiguos.
+- Objetivo: ciclos de 1.800 segundos y semanas de siete ciclos (3 h 30 min), con siete entregas posteriores separadas por un ciclo. Se mantiene el reloj real de BSC Testnet.
+- La configuracion incluye un ancla UTC explicita e inmutable por escenario. Las reglas y snapshots conservan su calendario y hashes; sin configuracion se mantienen las duraciones originales de produccion.
+- No escalar expiracion de sesiones de autenticacion, HMAC, leases, tiempo de partida, confirmaciones ni freshness de RPC.
+- Orden: probar localmente y desplegar pool en chain 97; preparar variables con gates economicos deshabilitados; integrar codigo en staging (autodeploy); detener workers durante el reset; ejecutar plan/apply y bootstrap; habilitar gates y verificar autodeploy final. No lanzar redeploy manual ni tocar main.
+- Antes del reset, validar recurso `u4s804o4wwcckowgk0woo4wg`, chain 97 y base `cukieshub-new-staging`. No borrar bases completas ni colecciones de usuarios, embajadores, preventa o assets no necesarias. No tocar main, produccion ni servicios externos.
+- Descartar el historial off-chain no mueve activos entre contratos. Las posiciones del vault anterior no aparecen en el nuevo; se usan NFTs de prueba disponibles para el nuevo escenario.
+- Variables exclusivas de app28: `ECONOMY_CYCLE_SECONDS=1800`, `ECONOMY_CYCLE_ANCHOR_AT=<ISO UTC alineado futuro>`, `COMPETITION_CREDITS_RULE_VERSION=credits-staging-cycle-v1`, `REWARD_ACCOUNTING_RULE_VERSION=rewards-staging-cycle-v1`, `WEEKLY_RANKING_SCHEDULER_INTERVAL_MS=60000`. El bootstrap mantiene game version `staging-test-v4`, cuyo hash incluye el nuevo calendario; ranking version `weekly-ranking-staging-cycle-v1`.
+- Pool desplegado y verificado el 2026-09-04: `0x359b8FC829eB6D320DF6301C8F323AF9AE773B41`, bloque `129039386`, tx `0xb0ecdb8b7f0c1e38057b017d0bfecdece89611376427d4d09717306a8f84ba47`, runtime hash `0x27a137898fe63a8090049e1b595b0d0ee4f8a8a0a59979880f745fd33f030479`. Getter `PERIOD_DURATION=1800`; coleccion autorizada `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8`. Script pool-only: `packages/contracts/scripts/deploy-fast-pool.testnet.cjs`.
+- Reset: `dapp/scripts/reset-staging-economy.mjs --plan` y luego `--apply --confirm RESET_TEST_ECONOMY_APP28`, con `STAGING_ECONOMY_WRITERS_STOPPED=true` y `STAGING_PREVIOUS_POOL_ADDRESS=0xd405acff1bba872be893e796c39f3eacbde2872b`. Preserva usuarios, embajadores, preventa, inventario, staking on-chain, slots Master maduros y sus historiales fuente. Solo elimina el historial de economia y las proyecciones del pool sustituido; conserva indices. No permite repetir el reset del mismo ancla.
+- Bootstrap posterior: `dapp/scripts/bootstrap-staging-economy-rules.mjs --plan`, seguido de `--apply --confirm APPLY_STAGING_TESTNET_97_RULES_V4`. Exige cursores verificados recientes y duracion on-chain del nuevo pool igual al calendario.
+- Inventario previo: ocho slots Master activos, ninguno con primera entrega futura ni en gracia; no hace falta reconstruir esos slots. Sin partidas abiertas ni locks de juego pendientes.
+- Validacion local: build DApp, typechecks DApp/indexer, lint focalizado, 1.055 tests DApp, 30 tests de contratos en chain97; los ciclos cortos se rechazan en otras redes. Creditos cubren gasto, reserva atravesando corte, caducidad, siguiente entrega e idempotencia; rewards cubre cierre semanal y siete tramos.
+
 ## Reglas de ramas
 
 | Rama | Regla |
