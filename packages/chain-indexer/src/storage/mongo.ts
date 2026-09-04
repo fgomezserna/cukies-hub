@@ -349,6 +349,7 @@ export class IndexerStore {
       activeUntil?: Date;
       cutoffHourUtc?: number;
       cutoffMinuteUtc?: number;
+      calendar?: { version: string; chainId: number; cycleSeconds: number; anchorAt: string };
       scope?: string;
     }>('economy_rule_versions').find({
       scope: 'competition_credits',
@@ -366,6 +367,18 @@ export class IndexerStore {
         || !Number.isSafeInteger(rule.cutoffMinuteUtc)
       ) continue;
       const firstReliableInstant = rule.activeFrom > reliableFrom ? rule.activeFrom : reliableFrom;
+      const calendar = rule.calendar;
+      let durationMs = 86_400_000;
+      if (calendar) {
+        const anchor = new Date(calendar.anchorAt);
+        if (calendar.version !== 'cycle-v1' || calendar.chainId !== 97
+          || ![1800, 3600].includes(calendar.cycleSeconds)
+          || Number.isNaN(anchor.getTime()) || anchor.toISOString() !== calendar.anchorAt
+          || anchor.getTime() % (calendar.cycleSeconds * 1000) !== 0) {
+          throw new Error('Calendario de creditos invalido: no se pueden certificar sus cutoffs.');
+        }
+        durationMs = calendar.cycleSeconds * 1000;
+      }
       let cutoff = new Date(Date.UTC(
         firstReliableInstant.getUTCFullYear(),
         firstReliableInstant.getUTCMonth(),
@@ -373,14 +386,18 @@ export class IndexerStore {
         Number(rule.cutoffHourUtc),
         Number(rule.cutoffMinuteUtc),
       ));
-      if (cutoff < firstReliableInstant) cutoff = new Date(cutoff.getTime() + 86_400_000);
+      if (calendar) {
+        const anchor = new Date(calendar.anchorAt).getTime();
+        cutoff = new Date(anchor + Math.ceil((firstReliableInstant.getTime() - anchor) / durationMs) * durationMs);
+      }
+      if (cutoff < firstReliableInstant) cutoff = new Date(cutoff.getTime() + durationMs);
       const end = rule.activeUntil && rule.activeUntil < safeThrough ? rule.activeUntil : safeThrough;
       while (cutoff <= end) {
         if (candidates.length >= 20_000) {
           throw new Error('El backlog de cutoffs canonicos excede el limite auditable de 20.000.');
         }
         candidates.push(cutoff);
-        cutoff = new Date(cutoff.getTime() + 86_400_000);
+        cutoff = new Date(cutoff.getTime() + durationMs);
       }
     }
     const unique = [...new Map(candidates.map((cutoff) => [cutoff.toISOString(), cutoff])).values()]

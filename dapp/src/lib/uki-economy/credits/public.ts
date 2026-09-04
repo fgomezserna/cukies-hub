@@ -185,6 +185,7 @@ export async function getCompetitionCreditWalletStatus(
   return {
     walletNormalized,
     rule: {
+      ...(rule.calendar ? { calendar: rule.calendar } : {}),
       version: rule.version,
       creditsPerSlot: rule.creditsPerSlot,
       cutoffHourUtc: rule.cutoffHourUtc,

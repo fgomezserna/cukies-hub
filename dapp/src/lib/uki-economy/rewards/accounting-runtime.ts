@@ -167,7 +167,9 @@ export async function settlePendingTreasureHuntRewards(input: {
   for (const game of candidates) {
     const result = await rewardCalculationCoordinator.settleGame({
       sessionId: game.sessionId,
-      periodId: getIsoWeekPeriodId(new Date(game.createdAt.getTime() - 14 * 60 * 60_000)),
+      periodId: game.rule.calendar
+        ? getIsoWeekPeriodId(game.createdAt, game.rule.calendar)
+        : getIsoWeekPeriodId(new Date(game.createdAt.getTime() - 14 * 60 * 60_000)),
       expectedRuleVersion: game.rule.reward.rewardRuleVersion,
       now,
     });

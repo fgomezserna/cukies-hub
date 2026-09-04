@@ -122,3 +122,23 @@ test("the staging bootstrap documents pass the production domain validators", as
   expect(assertGameEconomyRule(rules.game as GameEconomyRule)).toBe(rules.game);
   expect(assertWeeklyRankingRule(rules.ranking as WeeklyRankingRule)).toBe(rules.ranking);
 });
+
+test("accelerated bootstrap snapshots one clock across all domain validators", async () => {
+  const { buildStagingEconomyRuleSet } = await import("../../scripts/staging-economy-rules-policy.mjs");
+  const now = new Date("2026-09-04T09:00:00.000Z");
+  const environment = { ...stagingEnvironment(), ECONOMY_CYCLE_SECONDS: '1800', ECONOMY_CYCLE_ANCHOR_AT: '2026-09-04T10:00:00.000Z' };
+  const cursors = verifiedCursors(now).map((cursor) => ({ ...cursor,
+    ...(cursor.contractAlias === 'CUKIE_POOL_NFT_VAULT' ? { poolPeriodDurationSeconds: 1800 } : {}) }));
+  const rules = buildStagingEconomyRuleSet({ environment, cursors, now });
+  expect(assertRewardRule(rules.reward as RewardRule)).toBe(rules.reward);
+  expect(assertCompetitionCreditRule(rules.credit as CompetitionCreditRule)).toBe(rules.credit);
+  expect(assertGameEconomyRule(rules.game as GameEconomyRule)).toBe(rules.game);
+  expect(assertWeeklyRankingRule(rules.ranking as WeeklyRankingRule)).toBe(rules.ranking);
+  expect(rules.reward.emissionBudget.calendar).toEqual(rules.credit.calendar);
+  expect(rules.game.calendar).toEqual(rules.ranking.calendar);
+  expect(rules.game.credit.creditRuleConfigHash).toBe(rules.credit.configHash);
+  expect(rules.reward.version).toBe('rewards-staging-cycle-v1');
+  expect(rules.game.sessionTtlMs).toBe(600_000);
+  expect(() => buildStagingEconomyRuleSet({ environment, cursors: verifiedCursors(now), now })).toThrow(/verified duration/);
+  expect(() => buildStagingEconomyRuleSet({ environment: { ...environment, APP_ENV: 'production' }, cursors, now })).toThrow();
+});

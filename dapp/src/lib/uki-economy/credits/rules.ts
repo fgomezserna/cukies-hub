@@ -7,6 +7,13 @@ import { normalizeWalletAddress } from "@/lib/wallet-address";
 import { DomainValidationError } from "../errors";
 import { assertCreditAmount } from "../money";
 import {
+  acceleratedCyclePeriod,
+  assertEconomyCycleCalendar,
+  economyCycleDelayMs,
+  economyCycleDurationMs,
+  type EconomyCycleCalendar,
+} from "../cycle-calendar";
+import {
   CREDITS_PER_MATURE_SLOT,
   CREDIT_RULE_SCOPE,
   type CompetitionCreditPeriod,
@@ -83,6 +90,8 @@ export function safeCompetitionCreditPeriodScopeId(
       return fallback;
     }
     const record = period as Record<string, unknown>;
+    const calendar = record.calendar as EconomyCycleCalendar | undefined;
+    assertEconomyCycleCalendar(calendar);
     const { periodId, cutoff, nextCutoff, settlementTarget, ruleVersion, ruleConfigHash } =
       record;
     if (
@@ -94,7 +103,7 @@ export function safeCompetitionCreditPeriodScopeId(
       Number.isNaN(cutoff.getTime()) ||
       !(nextCutoff instanceof Date) ||
       Number.isNaN(nextCutoff.getTime()) ||
-      nextCutoff.getTime() !== cutoff.getTime() + DAY_MS ||
+      nextCutoff.getTime() !== cutoff.getTime() + economyCycleDurationMs(calendar) ||
       !(settlementTarget instanceof Date) ||
       Number.isNaN(settlementTarget.getTime()) ||
       settlementTarget.getTime() < cutoff.getTime() ||
@@ -135,6 +144,7 @@ export function buildCompetitionCreditRuleConfigHash(
   rule: CompetitionCreditRule
 ) {
   return stableCreditHash({
+    calendar: rule.calendar,
     scope: rule.scope,
     version: rule.version,
     active: rule.active,
@@ -238,6 +248,11 @@ export function assertCompetitionCreditRule(rule: CompetitionCreditRule) {
     throw new DomainValidationError("rule.active debe ser boolean.");
   }
   validCreditDate(rule.activeFrom, "rule.activeFrom");
+  assertEconomyCycleCalendar(rule.calendar, rule.expectedBscChainId);
+  if (rule.calendar && (
+    rule.activeFrom.getTime() < new Date(rule.calendar.anchorAt).getTime()
+    || acceleratedCyclePeriod(rule.activeFrom, rule.calendar).start.getTime() !== rule.activeFrom.getTime()
+  )) throw new DomainValidationError("La regla debe empezar en un corte del calendario.");
   if (rule.activeUntil) {
     validCreditDate(rule.activeUntil, "rule.activeUntil");
     if (rule.activeUntil.getTime() <= rule.activeFrom.getTime()) {
@@ -401,6 +416,7 @@ export function assertRuleActiveAt(rule: CompetitionCreditRule, at: Date) {
 
 function scheduledCutoffOnUtcDay(value: Date, rule: CompetitionCreditRule) {
   const date = validCreditDate(value, "value");
+  if (rule.calendar) return acceleratedCyclePeriod(date, rule.calendar).start;
   return new Date(
     Date.UTC(
       date.getUTCFullYear(),
@@ -428,8 +444,14 @@ export function buildCompetitionCreditPeriod(
       ).padStart(2, "0")}:${String(rule.cutoffMinuteUtc).padStart(2, "0")} UTC.`
     );
   }
-  const nextCutoff = new Date(cutoff.getTime() + DAY_MS);
-  const settlementTarget = new Date(
+  const nextCutoff = new Date(cutoff.getTime() + economyCycleDurationMs(rule.calendar));
+  const settlementTarget = rule.calendar
+    ? new Date(cutoff.getTime() + economyCycleDelayMs(
+      (rule.settlementHourUtc * 60 + rule.settlementMinuteUtc
+        - rule.cutoffHourUtc * 60 - rule.cutoffMinuteUtc) / 60,
+      rule.calendar,
+    ))
+    : new Date(
     Date.UTC(
       cutoff.getUTCFullYear(),
       cutoff.getUTCMonth(),
@@ -449,6 +471,7 @@ export function buildCompetitionCreditPeriod(
     );
   }
   return {
+    ...(rule.calendar ? { calendar: { ...rule.calendar } } : {}),
     periodId: `${rule.version}:${rule.configHash}:${cutoff.toISOString()}`,
     cutoff,
     nextCutoff,
@@ -468,7 +491,7 @@ export function currentCompetitionCreditPeriod(
   const cutoff =
     timestamp.getTime() >= today.getTime()
       ? today
-      : new Date(today.getTime() - DAY_MS);
+      : new Date(today.getTime() - economyCycleDurationMs(rule.calendar));
   return buildCompetitionCreditPeriod(cutoff, rule);
 }
 
@@ -481,7 +504,7 @@ export function computePoolConfigEffectiveCutoff(
   const today = scheduledCutoffOnUtcDay(requestedAt, rule);
   return requestedAt.getTime() < today.getTime()
     ? today
-    : new Date(today.getTime() + DAY_MS);
+    : new Date(today.getTime() + economyCycleDurationMs(rule.calendar));
 }
 
 export function validPoolCreditsPerSlot(value: number) {

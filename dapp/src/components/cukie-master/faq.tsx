@@ -12,7 +12,7 @@ const FAQS = [
     question: '¿Qué ocurre cuando se completan los 500 cupos iniciales?',
     answer: [
       'El requisito no sube automáticamente por alcanzar la capacidad. La operación puede ampliar los cupos disponibles o publicar una nueva versión del requisito.',
-      'Si se aprueba una subida, las posiciones existentes disponen de una ventana de gracia de 48 horas. Al terminar, cada wallet conserva únicamente los cupos para los que cumpla el nuevo mínimo.',
+      'Si se aprueba una subida, tus cupos mostrarán la fecha límite para adaptarte. Al terminar ese plazo, cada wallet conserva únicamente los cupos para los que cumpla el nuevo mínimo.',
     ],
   },
   {
@@ -25,7 +25,7 @@ const FAQS = [
   {
     question: '¿Qué ventajas activas tiene ser Cukie Master?',
     answer: [
-      'Cada cupo que haya madurado al menos 24 horas recibe 100 créditos en el corte diario correspondiente.',
+      'Cada cupo recibe 100 créditos por periodo una vez completada su espera inicial. En tu resumen puedes consultar cuándo estará listo.',
       'Puedes reservar esos créditos para jugar o aportar una parte al pool de créditos. Los créditos no equivalen ni garantizan 100 UKI: el resultado depende de partidas válidas y de las reglas económicas vigentes.',
       'La participación en votaciones o gobernanza todavía no está disponible.',
     ],
@@ -34,7 +34,7 @@ const FAQS = [
     question: '¿El requisito Cukie Master es el mismo que el de Treasure Hunt?',
     answer: [
       'No. Cukie Master usa UKI pendientes de vesting más UKI en staking y parte de 20.000 UKI por cupo.',
-      'Treasure Hunt usa exclusivamente UKI confirmados en staking y concede una partida por cada 2.000 UKI completos durante la campaña configurada.',
+      'El acceso a Treasure Hunt depende de la competición activa. Consulta el coste y las condiciones actuales en la pantalla del juego.',
     ],
   },
   {
@@ -48,7 +48,7 @@ const FAQS = [
 
 const ESSENTIALS = [
   'Tu vesting pendiente y tu staking de UKI se suman automáticamente.',
-  'Cada cupo necesita 24 horas antes de su primera entrega de créditos.',
+  'En cada cupo puedes consultar cuándo empieza a recibir créditos.',
   'Puedes conservar créditos para jugar o aportar una parte al pool.',
 ] as const;
 

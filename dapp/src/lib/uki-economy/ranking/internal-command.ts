@@ -1,4 +1,5 @@
 import "server-only";
+import { assertEconomyCycleCalendar, type EconomyCycleCalendar } from '../cycle-calendar';
 
 import { DomainValidationError } from "../errors";
 import { validRewardText } from "../rewards/rules";
@@ -29,7 +30,10 @@ export function parseWeeklyRankingRuleCommand(rawBody: Buffer) {
   } catch {
     throw new DomainValidationError("El body no es JSON valido.");
   }
-  const body = exact(record(decoded, "body"), ["version", "activeFrom", "activeUntil"], "body");
+  const bodyRecord = record(decoded, 'body');
+  const body = exact(bodyRecord, ["version", "activeFrom", "activeUntil", ...('calendar' in bodyRecord ? ['calendar'] : [])], "body");
+  const calendar = body.calendar as EconomyCycleCalendar | undefined;
+  assertEconomyCycleCalendar(calendar);
   const iso = (value: unknown, label: string) => {
     if (typeof value !== "string") throw new DomainValidationError(`${label} debe ser ISO-8601 UTC.`);
     const parsed = new Date(value);
@@ -39,6 +43,7 @@ export function parseWeeklyRankingRuleCommand(rawBody: Buffer) {
     return parsed;
   };
   return {
+    ...(calendar ? { calendar } : {}),
     version: validRewardText(body.version, "version"),
     activeFrom: iso(body.activeFrom, "activeFrom"),
     activeUntil: body.activeUntil === null ? undefined : iso(body.activeUntil, "activeUntil"),

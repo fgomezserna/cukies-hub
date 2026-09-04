@@ -1,4 +1,5 @@
 import "server-only";
+import { assertEconomyCycleCalendar } from '../cycle-calendar';
 
 import { createHash } from "node:crypto";
 import { getAddress, isAddress } from "viem";
@@ -149,6 +150,7 @@ export function rewardRuleActiveAtQuery(atInput: Date) {
 }
 
 export function assertRewardRule(rule: RewardRule, at?: Date) {
+  assertEconomyCycleCalendar(rule.emissionBudget?.calendar);
   if (!rule || rule.scope !== REWARD_RULE_SCOPE) {
     throw new DomainValidationError("La regla no pertenece a reward_allocations.");
   }

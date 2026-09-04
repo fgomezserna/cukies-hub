@@ -150,6 +150,53 @@ function replaceWithFragmentedLots(input: {
 }
 
 describe("competition credit grant -> pool -> reservation flow", () => {
+  it('grants 100 per slot every 30 minutes, expires only unused credits and preserves a real reservation across the cutoff', async () => {
+    const at = (seconds: number) => new Date(CUTOFF.getTime() + seconds * 1000);
+    const calendar = { version: 'cycle-v1' as const, chainId: 97 as const, cycleSeconds: 1800 as const, anchorAt: CUTOFF.toISOString() };
+    const rule = testCompetitionCreditRule({ calendar, expectedBscChainId: 97, activeFrom: CUTOFF, cutoffHourUtc: 12, settlementHourUtc: 12 });
+    const sourceSlot = slot();
+    const repository = new MemoryCompetitionCreditRepository({
+      rule,
+      slots: [sourceSlot],
+      watermark: testCreditSourceWatermark({ observedThrough: CUTOFF, updatedAt: CUTOFF, sourceHash: buildCreditSourceSlotsHash([sourceSlot]), slotCount: 1 }),
+    });
+    const service = createCompetitionCreditService(createMemoryCompetitionCreditRunner(repository));
+    const first = await openDailyRun({ repository, service, cutoff: CUTOFF, now: at(60) });
+    expect(first.expectedGrantCredits).toBe(100);
+    expect(first.period.calendar).toEqual(calendar);
+    expect(first.period.nextCutoff).toEqual(at(1800));
+    const spent = await service.reserve({ walletAddress: WALLET, sessionId: 'fast-spent', costCode: 'treasure-hunt:start', idempotencyKey: 'fast-spent-reserve', now: at(120) });
+    await service.consumeReservation({ reservationId: spent.reservationId, idempotencyKey: 'fast-spent-consume', committedAt: at(121), now: at(122) });
+    expect(repository.state.ownLots[0]).toMatchObject({ availableCredits: 90, spentCredits: 10 });
+    const crossing = await service.reserve({ walletAddress: WALLET, sessionId: 'fast-cross-cutoff', costCode: 'treasure-hunt:start', idempotencyKey: 'fast-cross-reserve', now: at(1799) });
+    expect(crossing.periodId).toBe(first.period.periodId);
+    expect(crossing.expiresAt).toEqual(at(2399));
+    await expect(service.expireAvailableLotsBatch({ now: at(1799) })).resolves.toMatchObject({ expired: 0 });
+    await expect(service.expireAvailableLotsBatch({ now: at(1800) })).resolves.toMatchObject({ expired: 1 });
+    expect(repository.state.ownLots[0]).toMatchObject({ availableCredits: 0, reservedCredits: 10, spentCredits: 10, expiredCredits: 80, expiresAt: at(1800) });
+    await expect(service.expireAvailableLotsBatch({ now: at(1800) })).resolves.toMatchObject({ expired: 0 });
+
+    repository.state.sourceHealth.observedThrough = at(1800);
+    repository.state.sourceHealth.checkedAt = at(1800);
+    await service.refreshSourceWatermark({ route: 'uki', expectedRuleVersion: rule.version, now: at(1800) });
+    const second = await openDailyRun({ repository, service, cutoff: at(1800), now: at(1801) });
+    expect(second.expectedGrantCredits).toBe(100);
+    expect(second.period.periodId).not.toBe(first.period.periodId);
+    expect(second.period.nextCutoff).toEqual(at(3600));
+    const consumed = await service.consumeReservation({ reservationId: crossing.reservationId, idempotencyKey: 'fast-cross-consume', committedAt: at(1860), now: at(1861) });
+    expect(consumed).toMatchObject({ status: 'consumed', periodId: first.period.periodId });
+    expect(repository.state.ownLots.find((lot) => lot.runId === first.runId)).toMatchObject({ availableCredits: 0, reservedCredits: 0, spentCredits: 20, expiredCredits: 80 });
+    expect(repository.state.ownLots.find((lot) => lot.runId === second.runId)).toMatchObject({ availableCredits: 100, reservedCredits: 0, spentCredits: 0, expiredCredits: 0 });
+    await expect(service.createDailyRun({ cutoff: at(1800), expectedRuleVersion: rule.version, now: at(1862) })).resolves.toMatchObject({ runId: second.runId, status: 'open' });
+    await expect(service.consumeReservation({ reservationId: crossing.reservationId, idempotencyKey: 'fast-cross-consume', committedAt: at(1860), now: at(1863) })).resolves.toMatchObject({ status: 'consumed' });
+    expect(repository.state.runs).toHaveLength(2);
+    expect(repository.state.ownLots).toHaveLength(2);
+    expect(repository.state.ledger.filter((entry) => entry.operation === 'grant')).toHaveLength(2);
+    expect(repository.state.ledger.filter((entry) => entry.operation === 'expire')).toHaveLength(1);
+    expect(new Set(repository.state.ledger.map((entry) => entry._id)).size).toBe(repository.state.ledger.length);
+    expect(repository.state.incidents).toEqual([]);
+  });
+
   it("grants every eligible UKI and NFT slot exactly once for a 5+5 Cukie Master", async () => {
     const stagingCutoff = new Date("2026-07-10T14:00:00.000Z");
     const maximumWalletSlots = (["uki", "nft"] as const).flatMap((route) =>

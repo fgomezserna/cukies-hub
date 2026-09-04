@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 import { DomainValidationError } from '../errors';
+import { economyCycleDurationMs, loadEconomyCycleCalendar } from '../cycle-calendar';
 import type {
   CukiePoolAssignment,
   CukiePoolGeneration,
@@ -111,7 +112,7 @@ export function gamesQuota(
 
 export function firstPoolEligibilityAt(stakedAt: Date) {
   const value = validPoolDate(stakedAt, 'stakedAt');
-  return new Date(value.getTime() + CUKIE_POOL_MATURITY_MS);
+  return new Date(value.getTime() + economyCycleDurationMs(loadEconomyCycleCalendar()));
 }
 
 export function deterministicSeikuAssetId(sessionId: string) {

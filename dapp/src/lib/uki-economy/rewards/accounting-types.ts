@@ -1,3 +1,5 @@
+import type { EconomyCycleCalendar } from '../cycle-calendar';
+
 export const UKI_TOKEN_DECIMALS = 18 as const;
 export const DAILY_REWARD_EMISSION_RAW = "500000000000000000000000" as const;
 
@@ -24,6 +26,7 @@ export type UndistributedSplit = {
 };
 
 export type DailyRewardAccounting = {
+  calendar?: EconomyCycleCalendar;
   _id: string;
   dayId: string;
   ruleVersion: string;
@@ -244,6 +247,7 @@ export type WeeklyLotteryEntropy = {
 };
 
 export type WeeklyPrizeAccounting = {
+  calendar?: EconomyCycleCalendar;
   _id: string;
   periodId: string;
   ruleVersion: string;

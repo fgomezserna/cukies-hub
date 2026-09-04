@@ -1,3 +1,5 @@
+import type { EconomyCycleCalendar } from '../cycle-calendar';
+
 export const REWARD_RULE_SCOPE = "reward_allocations" as const;
 export const REWARD_SCHEMA_VERSION = 2 as const;
 export const REWARD_BPS_DENOMINATOR = 10_000 as const;
@@ -8,6 +10,7 @@ export const REWARD_ALLOCATION_PAGE_SIZE = 1_000 as const;
 export const REWARD_EMISSION_BUDGET_SCOPE = REWARD_RULE_SCOPE;
 
 export type RewardEmissionBudgetConfig = {
+  calendar?: EconomyCycleCalendar;
   /** Inicio irreversible del programa global; cambiarlo no reinicia el ledger. */
   programStartsAt: Date;
   /** Segundo UTC (0-86399) en el que empieza cada ventana diaria. */
@@ -212,6 +215,7 @@ export type RewardSourceManifest = {
 };
 
 export type RewardEmissionBudgetState = {
+  calendar?: EconomyCycleCalendar;
   _id: typeof REWARD_EMISSION_BUDGET_SCOPE;
   scope: typeof REWARD_EMISSION_BUDGET_SCOPE;
   programStartsAt: Date;
@@ -251,6 +255,7 @@ export type RewardEmissionBudgetReason =
  * una fuente rechazada no puede reaparecer con otra fecha, regla o reparto.
  */
 export type RewardEmissionBudgetEvent = {
+  calendar?: EconomyCycleCalendar;
   _id: string;
   eventId: string;
   sourceId: string;

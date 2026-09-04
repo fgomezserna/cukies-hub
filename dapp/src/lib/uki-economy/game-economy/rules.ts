@@ -1,4 +1,5 @@
 import "server-only";
+import { assertEconomyCycleCalendar } from '../cycle-calendar';
 
 import { createHash } from "node:crypto";
 
@@ -136,6 +137,7 @@ function validInteger(
 
 export function gameRuleConfigPayload(rule: GameEconomyRuleSnapshot) {
   return {
+    ...(rule.calendar ? { calendar: rule.calendar } : {}),
     gameId: rule.gameId,
     version: rule.version,
     sessionTtlMs: rule.sessionTtlMs,
@@ -221,6 +223,7 @@ export function assertGameEconomyRuleSnapshot(
   if (!rule || typeof rule !== "object") {
     throw new DomainValidationError("La regla de juego es obligatoria.");
   }
+  assertEconomyCycleCalendar(rule.calendar);
   if (
     validGameText(rule.gameId, "rule.gameId") !== rule.gameId ||
     validGameText(rule.version, "rule.version") !== rule.version
@@ -324,6 +327,7 @@ export function toGameRuleSnapshot(
 ): GameEconomyRuleSnapshot {
   assertGameEconomyRule(rule);
   return {
+    ...(rule.calendar ? { calendar: { ...rule.calendar } } : {}),
     gameId: rule.gameId,
     version: rule.version,
     configHash: rule.configHash,

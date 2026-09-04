@@ -11,6 +11,7 @@ import {
 import { normalizeLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 
 import { SchemaNotReadyError } from '../errors';
+import { economyCycleDurationMs, loadEconomyCycleCalendar } from '../cycle-calendar';
 import { gamesQuota, poolPriority } from './rules';
 import type { CukiePoolGeneration, CukiePoolRarity } from './types';
 
@@ -21,7 +22,6 @@ export const CUKIE_POOL_VAULT_PERIOD_USAGE = 'cukie_pool_vault_period_usage';
 
 const NFT_VAULT_COLLECTIONS = 'nft_vault_collections';
 const CUKIE_MASTER_NFT_POSITIONS = 'cukie_master_nft_positions';
-const PERIOD_SECONDS = BigInt(86_400);
 const BSC_ADDRESS = /^0x[0-9a-f]{40}$/;
 const DECIMAL = /^(0|[1-9][0-9]*)$/;
 const MAX_VAULT_ROWS = 1_000;
@@ -42,6 +42,7 @@ export type CukiePoolVaultConfig = {
   chainId: 56 | 97;
   vaultAddressNormalized: string;
   collectionAddresses: string[];
+  periodDurationSeconds?: number;
 };
 
 export type CukiePoolVaultPeriod = {
@@ -144,6 +145,7 @@ type IndexerCheckpointDocument = {
 };
 
 type ParsedCalendar = {
+  periodSeconds: bigint;
   version: bigint;
   effectiveAt: bigint;
   firstCutoffAt: bigint;
@@ -209,10 +211,16 @@ export function requireCukiePoolVaultConfig(): CukiePoolVaultConfig {
     || collectionAddresses.some((value) => !BSC_ADDRESS.test(value))
     || new Set(collectionAddresses).size !== collectionAddresses.length
   ) return sourceError('la configuracion de red, vault o colecciones no es canonica.');
-  return { chainId, vaultAddressNormalized: vaultAddress, collectionAddresses };
+  return { chainId, vaultAddressNormalized: vaultAddress, collectionAddresses,
+    periodDurationSeconds: economyCycleDurationMs(loadEconomyCycleCalendar()) / 1000 };
 }
 
 function parseCalendar(document: CalendarDocument, config: CukiePoolVaultConfig) {
+  const duration = config.periodDurationSeconds ?? 86_400;
+  if (duration !== 86_400 && !(config.chainId === 97 && (duration === 1800 || duration === 3600))) {
+    return sourceError('duracion no permitida para esta red.');
+  }
+  const periodSeconds = BigInt(duration);
   if (
     document.chain !== 'BSC'
     || document.chainId !== config.chainId
@@ -228,10 +236,11 @@ function parseCalendar(document: CalendarDocument, config: CukiePoolVaultConfig)
   ));
   if (
     firstCutoffAt <= effectiveAt
-    || firstCutoffAt > effectiveAt + PERIOD_SECONDS
-    || periodAnchorSeconds !== firstCutoffAt % PERIOD_SECONDS
+    || firstCutoffAt > effectiveAt + periodSeconds
+    || (version === BigInt(1) && firstCutoffAt !== effectiveAt + periodSeconds)
+    || periodAnchorSeconds !== firstCutoffAt % periodSeconds
   ) return sourceError(`la version ${version} contiene limites de periodo incoherentes.`);
-  return { version, effectiveAt, firstCutoffAt, firstPeriodId } satisfies ParsedCalendar;
+  return { version, effectiveAt, firstCutoffAt, firstPeriodId, periodSeconds } satisfies ParsedCalendar;
 }
 
 function periodFromCalendar(calendar: ParsedCalendar, timestamp: bigint) {
@@ -245,12 +254,12 @@ function periodFromCalendar(calendar: ParsedCalendar, timestamp: bigint) {
       endsAt: calendar.firstCutoffAt,
     };
   }
-  const completed = (timestamp - calendar.firstCutoffAt) / PERIOD_SECONDS;
-  const startsAt = calendar.firstCutoffAt + completed * PERIOD_SECONDS;
+  const completed = (timestamp - calendar.firstCutoffAt) / calendar.periodSeconds;
+  const startsAt = calendar.firstCutoffAt + completed * calendar.periodSeconds;
   return {
     periodId: calendar.firstPeriodId + completed + BigInt(1),
     startsAt,
-    endsAt: startsAt + PERIOD_SECONDS,
+    endsAt: startsAt + calendar.periodSeconds,
   };
 }
 
@@ -408,6 +417,7 @@ async function assertCukiePoolVaultOperationalHealth(
         || cursor.contractAddress.toLowerCase() !== config.vaultAddressNormalized
         || cursor.verifiedChainId !== config.chainId
         || cursor.bootstrapStatus !== 'verified'
+        || (cursor.poolPeriodDurationSeconds ?? 86_400) !== (config.periodDurationSeconds ?? 86_400)
         || !(cursor.bootstrapVerifiedAt instanceof Date)
         || !(cursor.updatedAt instanceof Date)
         || cursor.updatedAt < freshnessCutoff

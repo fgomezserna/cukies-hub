@@ -147,7 +147,9 @@ async function expectedRuntimeCodeHash(contractName) {
 
 async function deployVault(contractName, deployerAddress) {
   const Factory = await hre.ethers.getContractFactory(contractName);
-  const contract = await Factory.deploy(deployerAddress);
+  const contract = contractName === 'CukiePoolNftVault'
+    ? await Factory.deploy(deployerAddress, 86400)
+    : await Factory.deploy(deployerAddress);
   const deploymentTransaction = contract.deploymentTransaction();
   if (!deploymentTransaction) {
     throw new Error(`${contractName} did not expose its deployment transaction.`);

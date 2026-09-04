@@ -5,6 +5,11 @@
         "internalType": "address",
         "name": "initialOwner",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "periodDuration",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -68,6 +73,11 @@
   {
     "inputs": [],
     "name": "InvalidFirstCutoff",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidPeriodDuration",
     "type": "error"
   },
   {

@@ -81,6 +81,8 @@ function rpc(input: {
   logCalls?: Array<{ fromBlock: bigint; toBlock: bigint }>;
   chainId?: number;
   bytecode?: `0x${string}`;
+  poolPeriodDurationSeconds?: bigint;
+  contractReadCalls?: Array<{ address: string; functionName: string }>;
   receipt?: {
     contractAddress: `0x${string}`;
     blockNumber: bigint;
@@ -106,6 +108,11 @@ function rpc(input: {
         };
       },
       getBytecode: async () => input.bytecode ?? '0x',
+      readContract: async ({ address, functionName }: { address: string; functionName: string }) => {
+        input.contractReadCalls?.push({ address, functionName });
+        if (input.poolPeriodDurationSeconds === undefined) throw new Error('PERIOD_DURATION getter unavailable');
+        return input.poolPeriodDurationSeconds;
+      },
       getTransactionReceipt: async () => input.receipt ?? {
         contractAddress: null,
         blockNumber: BigInt(0),
@@ -494,4 +501,71 @@ test('does not seal an existing UKI cursor whose coverage starts after deploymen
     /no demuestra cobertura desde el bloque de despliegue/,
   );
   assert.deepEqual(updates, []);
+});
+
+function poolVaultFixture(chainId: 56 | 97, duration?: bigint) {
+  const address = `0x${'3'.repeat(40)}` as const;
+  const bytecode = '0x60016000' as const;
+  const identity = { alias: 'CUKIE_POOL_NFT_VAULT' as const, chainId, address, startBlock: 105, deploymentBlock: 105, deploymentTxHash: `0x${'4'.repeat(64)}`, runtimeCodeHash: keccak256(bytecode), configHash: `0x${'5'.repeat(64)}` };
+  const contractReadCalls: Array<{ address: string; functionName: string }> = [];
+  const client = rpc({ host: 'pool.test', chainId, bytecode, poolPeriodDurationSeconds: duration, contractReadCalls, receipt: { contractAddress: address, blockNumber: 105n, status: 'success' } });
+  const settings = config({ bscExpectedChainId: chainId, contractAliases: ['CUKIE_POOL_NFT_VAULT'], cukiePoolNftVaultAddress: address, cukiePoolNftVaultStartBlock: 105, maxBlockRange: 10, verifiedBscContracts: { CUKIE_POOL_NFT_VAULT: identity } });
+  return { address, identity, client, settings, contractReadCalls, ...fakeStore() };
+}
+
+test('pins the live pool duration in every verified testnet cursor without changing confirmations', async () => {
+  for (const duration of [1800n, 3600n]) {
+    const fixture = poolVaultFixture(97, duration);
+    const result = await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
+    assert.deepEqual(fixture.contractReadCalls, [{ address: fixture.address, functionName: 'PERIOD_DURATION' }]);
+    assert.equal(fixture.updates.length, 7);
+    for (const { config: eventConfig, update } of fixture.updates) {
+      assert.equal(eventConfig.contractAlias, 'CUKIE_POOL_NFT_VAULT');
+      assert.equal(update.poolPeriodDurationSeconds, Number(duration));
+      assert.equal(update.bootstrapStatus, 'verified');
+      assert.equal(update.verifiedChainId, 97);
+      assert.equal(update.contractCodeHash, fixture.identity.runtimeCodeHash);
+      assert.equal(update.contractDeploymentBlock, 105);
+      assert.equal(update.processedFromBlock, 105);
+    }
+    assert.equal(result.safeBlock, 110);
+    assert.equal(fixture.settings.bscConfirmations, 10);
+    assert.equal(fixture.checkpoints.length, 1);
+  }
+});
+
+test('keeps the 86400-second pool calendar valid on chain 56 and chain 97', async () => {
+  for (const chainId of [56, 97] as const) {
+    const fixture = poolVaultFixture(chainId, 86400n);
+    await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
+    assert.equal(fixture.contractReadCalls.length, 1);
+    assert.equal(fixture.updates.length, 7);
+    assert.ok(fixture.updates.every(({ update }) => update.poolPeriodDurationSeconds === 86400 && update.verifiedChainId === chainId));
+  }
+});
+
+test('refuses fast production pools and unsupported testnet durations before sealing any cursor', async () => {
+  const cases: Array<{ chainId: 56 | 97; duration: bigint }> = [
+    { chainId: 56, duration: 1800n },
+    { chainId: 56, duration: 3600n },
+    { chainId: 97, duration: 0n },
+    { chainId: 97, duration: 1799n },
+    { chainId: 97, duration: 7200n },
+  ];
+  for (const { chainId, duration } of cases) {
+    const fixture = poolVaultFixture(chainId, duration);
+    await assert.rejects(ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] }), /duracion no permitida/);
+    assert.equal(fixture.contractReadCalls.length, 1);
+    assert.deepEqual(fixture.updates, []);
+    assert.deepEqual(fixture.eventBatches, []);
+    assert.deepEqual(fixture.checkpoints, []);
+  }
+});
+
+test('requires a successful pool getter and never invents a default when RPC cannot read it', async () => {
+  const fixture = poolVaultFixture(97);
+  await assert.rejects(ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] }), /PERIOD_DURATION getter unavailable/);
+  assert.equal(fixture.contractReadCalls.length, 1);
+  assert.deepEqual(fixture.updates, []);
+  assert.deepEqual(fixture.checkpoints, []);
 });

@@ -262,7 +262,7 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('Periodo actual')).toBeInTheDocument();
     expect(screen.getByText('Bote acumulado')).toBeInTheDocument();
     expect(screen.getByText('Participantes clasificados')).toBeInTheDocument();
-    expect(screen.getByText(/No hay que abrir ni archivar torneos manualmente/i)).toBeInTheDocument();
+    expect(screen.getByText(/Al terminar el periodo se guarda la clasificación/i)).toBeInTheDocument();
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
     expect(headers).toEqual(['Pos.', 'Jugador', 'Situación', 'Cukie usado', 'Mejor puntuación']);

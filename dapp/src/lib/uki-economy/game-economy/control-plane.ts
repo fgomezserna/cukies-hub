@@ -95,6 +95,7 @@ function buildRule(input: PersistGameEconomyRuleInput): GameEconomyRule {
     throw new DomainValidationError("active debe ser booleano.");
   }
   const withoutHash: Omit<GameEconomyRuleSnapshot, "configHash"> = {
+    ...(input.calendar ? { calendar: { ...input.calendar } } : {}),
     gameId: validGameText(input.gameId, "gameId"),
     version: validGameText(input.version, "version"),
     sessionTtlMs: input.sessionTtlMs,

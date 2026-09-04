@@ -97,6 +97,7 @@ export type ChainCursor = {
   contractDeploymentBlock?: number;
   contractDeploymentTxHash?: string;
   contractConfigHash?: string;
+  poolPeriodDurationSeconds?: number;
   updatedAt: Date;
 };
 

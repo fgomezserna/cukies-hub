@@ -1,4 +1,5 @@
 import "server-only";
+import { economyCycleDelayMs, type EconomyCycleCalendar } from '../cycle-calendar';
 
 import { validateReservationIntegrity } from "../credits/service";
 import type { CreditReservation } from "../credits/types";
@@ -6,7 +7,7 @@ import { DomainConflictError, DomainValidationError, StaleFenceError } from "../
 import { stableGameEconomyHash, assertGameSessionIntegrity, parseCanonicalRaw } from "../game-economy/rules";
 import type { GameEconomySession } from "../game-economy/types";
 import { TREASURE_HUNT_ECONOMY_POLICY } from "../game-economy/treasure-hunt-policy";
-import { getIsoWeekPeriod, getIsoWeekPeriodId, type UtcPeriod } from "../periods";
+import { getIsoWeekPeriod, getIsoWeekPeriodId, getIsoWeekPeriodFromId, type UtcPeriod } from "../periods";
 import {
   compareRewardText,
   stableRewardHash,
@@ -140,11 +141,11 @@ function buildSource(game: GameEconomySession, credit: CreditReservation, period
   if (credit.bucket !== "pool") {
     throw new DomainConflictError(`La session ${game.sessionId} no usa creditos del pool.`);
   }
-  const periodAnchorAt = game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
+  const periodAnchorAt = game.rule.calendar ? game.createdAt : game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
     && game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
     ? new Date(game.createdAt.getTime() - 14 * 60 * 60_000)
     : game.settledAt!;
-  if (!game.settledAt || getIsoWeekPeriodId(periodAnchorAt) !== period.id) {
+  if (!game.settledAt || getIsoWeekPeriodId(periodAnchorAt, game.rule.calendar) !== period.id) {
     throw new DomainConflictError(`La session ${game.sessionId} no pertenece a ${period.id}.`);
   }
   const cappedScore = parseCanonicalRaw(game.validation!.cappedScoreRaw, "cappedScoreRaw");
@@ -165,7 +166,7 @@ function buildSource(game: GameEconomySession, credit: CreditReservation, period
     reservationId: credit.reservationId,
     gameId: game.gameId,
     walletNormalized: game.walletNormalized,
-    periodAnchorAt: game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
+    periodAnchorAt: game.rule.calendar ? game.createdAt : game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
       && game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
       ? game.createdAt
       : game.settledAt,
@@ -222,14 +223,18 @@ export function assertWeeklyRankingSourceIntegrity(source: WeeklyRankingSource) 
     || !/^[0-9a-f]{64}$/.test(source.creditPayloadHash)
     || !/^[0-9a-f]{64}$/.test(source.gameRuleConfigHash)
     || source.sourceHash !== stableRewardHash(weeklyRankingSourcePayload(source))
-    || getIsoWeekPeriodId(new Date(
-      source.periodAnchorAt.getTime()
-        - (source.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId ? 14 * 60 * 60_000 : 0),
-    )) !== source.periodId) {
+    || !sourceBelongsToPeriod(source)) {
     throw new DomainConflictError(`Source ${source._id} no supera integridad.`);
   }
   validRewardDate(source.createdAt, "source.createdAt");
   return source;
+}
+
+function sourceBelongsToPeriod(source: WeeklyRankingSource) {
+  const period = getIsoWeekPeriodFromId(source.periodId);
+  const shift = !period.calendar && source.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId ? 14 * 60 * 60_000 : 0;
+  const anchor = source.periodAnchorAt.getTime() - shift;
+  return anchor >= period.start.getTime() && anchor < period.endExclusive.getTime();
 }
 
 function manifestPayload(manifest: Omit<WeeklyRankingManifest, "payloadHash" | "createdAt">) {
@@ -255,8 +260,8 @@ export function assertWeeklyRankingManifestIntegrity(manifest: WeeklyRankingMani
   if (manifest._id !== manifest.manifestId
     || !/^[0-9a-f]{64}$/.test(manifest.manifestId)
     || manifest.status !== "sealed"
-    || manifest.periodId !== getIsoWeekPeriodId(manifest.periodStart)
-    || getIsoWeekPeriod(manifest.periodStart).endExclusive.getTime() !== manifest.periodEndExclusive.getTime()
+    || getIsoWeekPeriodFromId(manifest.periodId).start.getTime() !== manifest.periodStart.getTime()
+    || getIsoWeekPeriodFromId(manifest.periodId).endExclusive.getTime() !== manifest.periodEndExclusive.getTime()
     || !Number.isSafeInteger(manifest.sourceCount)
     || manifest.sourceCount < 0
     || !Number.isSafeInteger(manifest.participantCount)
@@ -323,6 +328,7 @@ async function scanSources(
     const sessions = await repository.listSettledSessionsPage({
       start: period.start,
       endExclusive: period.endExclusive,
+      ...(period.calendar ? { calendar: period.calendar } : {}),
       afterId,
       limit: size,
     });
@@ -471,7 +477,7 @@ function isDuplicateKey(error: unknown) {
 export class WeeklyRankingService {
   constructor(private readonly runTransaction: WeeklyRankingTransactionRunner) {}
 
-  async persistCurrentRule(input: { version: string; activeFrom: Date; activeUntil?: Date; now: Date }) {
+  async persistCurrentRule(input: { calendar?: EconomyCycleCalendar; version: string; activeFrom: Date; activeUntil?: Date; now: Date }) {
     const candidate = buildCurrentWeeklyRankingRule(input);
     const attempt = () => this.runTransaction(async (repository) => {
       const existing = await repository.findRuleByVersion(candidate.version);
@@ -516,14 +522,14 @@ export class WeeklyRankingService {
 
   async closeCompletedPeriod(input: { now: Date; pageSize?: number }) {
     const now = validRewardDate(input.now, "now");
-    const current = getIsoWeekPeriod(now);
     const period = await this.runTransaction(async (repository) => {
-      const firstRule = await repository.findFirstRuleBefore(current.start);
+      const firstRule = await repository.findFirstRuleBefore(now);
       if (!firstRule) {
         throw new DomainConflictError("No hay una regla de ranking activa antes del cierre actual.");
       }
       assertWeeklyRankingRule(firstRule);
-      let cursor = getIsoWeekPeriod(firstRule.activeFrom);
+      const current = getIsoWeekPeriod(now, firstRule.calendar);
+      let cursor = getIsoWeekPeriod(firstRule.activeFrom, firstRule.calendar);
       let latestCovered: UtcPeriod | null = null;
       while (cursor.endExclusive.getTime() <= current.start.getTime()) {
         const coveringRule = await repository.findRuleCovering(cursor.start, cursor.endExclusive);
@@ -532,7 +538,7 @@ export class WeeklyRankingService {
           const state = await repository.findPeriodState(cursor.id);
           if (!state) return cursor;
         }
-        cursor = getIsoWeekPeriod(new Date(cursor.endExclusive.getTime() + 1));
+        cursor = getIsoWeekPeriod(new Date(cursor.endExclusive.getTime() + 1), firstRule.calendar);
       }
       if (!latestCovered) {
         throw new DomainConflictError("No hay semanas completas cubiertas por una regla de ranking.");
@@ -547,7 +553,7 @@ export class WeeklyRankingService {
   async closePeriod(input: { period: UtcPeriod; now: Date; pageSize: number }) {
     const size = pageSize(input.pageSize);
     const now = validRewardDate(input.now, "now");
-    const canonical = getIsoWeekPeriod(input.period.start);
+    const canonical = getIsoWeekPeriodFromId(input.period.id);
     if (input.period.id !== canonical.id
       || input.period.start.getTime() !== canonical.start.getTime()
       || input.period.endExclusive.getTime() !== canonical.endExclusive.getTime()) {
@@ -556,7 +562,7 @@ export class WeeklyRankingService {
     if (canonical.endExclusive.getTime() > now.getTime()) {
       throw new DomainConflictError(`El periodo ${canonical.id} aun no ha terminado.`);
     }
-    if (canonical.endExclusive.getTime() + 14 * 60 * 60_000 > now.getTime()) {
+    if (canonical.endExclusive.getTime() + (canonical.calendar ? economyCycleDelayMs(2, canonical.calendar) : 14 * 60 * 60_000) > now.getTime()) {
       throw new DomainConflictError(
         `El periodo ${canonical.id} de Treasure Hunt no termina hasta las 14:00 UTC.`,
       );
@@ -564,6 +570,8 @@ export class WeeklyRankingService {
     return this.runTransaction(async (repository) => {
       const rule = await repository.findRuleCovering(canonical.start, canonical.endExclusive);
       if (!rule) throw new DomainConflictError(`No existe regla que cubra todo ${canonical.id}.`);
+      if (getIsoWeekPeriodId(canonical.start, rule.calendar) !== canonical.id) throw new DomainConflictError('La regla ranking no corresponde al calendario del periodo.');
+      if (canonical.calendar && (!repository.countPendingCycleSessions || await repository.countPendingCycleSessions(canonical.start, canonical.endExclusive) > 0)) throw new DomainConflictError('El periodo ranking contiene sesiones pendientes.');
       assertWeeklyRankingRule(rule, canonical.start);
       const existing = await repository.findManifest(canonical.id);
       const sealedAt = existing?.sealedAt ?? now;

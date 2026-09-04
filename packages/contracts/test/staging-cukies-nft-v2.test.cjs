@@ -10,7 +10,7 @@ describe('StagingCukiesNftV2', function () {
     const MasterVault = await ethers.getContractFactory('CukieMasterNftVault');
     const masterVault = await MasterVault.deploy(owner.address);
     const PoolVault = await ethers.getContractFactory('CukiePoolNftVault');
-    const poolVault = await PoolVault.deploy(owner.address);
+    const poolVault = await PoolVault.deploy(owner.address, 86400);
     const collection = await nft.getAddress();
     await masterVault.connect(owner).setCollectionAllowed(collection, true);
     await poolVault.connect(owner).setCollectionAllowed(collection, true);

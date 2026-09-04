@@ -53,6 +53,7 @@ export function assertSettlementRewardPeriod(periodId: string, settledAt: Date) 
 }
 
 function settlementRewardAnchor(game: GameEconomySession) {
+  if (game.rule.calendar) return { effectiveAt: game.createdAt, periodId: getIsoWeekPeriodId(game.createdAt, game.rule.calendar) };
   return game.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId &&
     game.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
     ? {
@@ -224,6 +225,7 @@ export async function loadSettlementRewardSnapshot(input: SettleGameRewardsInput
     const gameReward = assertProductiveGameRewardBinding(game.rule);
     if (
       gameReward.rewardRuleVersion !== rule.version
+      || stableRewardHash(game.rule.calendar ?? null) !== stableRewardHash(rule.emissionBudget.calendar ?? null)
       || gameReward.rewardRuleConfigHash !== rule.configHash
     ) {
       throw new DomainConflictError(

@@ -65,6 +65,7 @@ const TERMINAL_STATUSES = new Set<GameEconomySessionStatus>([
 ]);
 
 function rewardGuardPeriodId(session: GameEconomySession) {
+  if (session.rule.calendar) return getIsoWeekPeriodId(session.createdAt, session.rule.calendar);
   return session.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId &&
     session.rule.version === TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion
     ? getIsoWeekPeriodId(new Date(session.createdAt.getTime() - 14 * 60 * 60_000))

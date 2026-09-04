@@ -213,7 +213,7 @@ export default function TreasureHuntRulesView() {
             <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
               <CalendarClock className="h-7 w-7 text-[var(--uki-lilac)]" aria-hidden="true" />
               <div className="space-y-2">
-                <p>Empieza cada lunes a las 14:00 UTC y termina el lunes siguiente a la misma hora.</p>
+                <p>Cada competición abarca siete periodos de créditos. Consulta las fechas de inicio y cierre en Rankings.</p>
                 <p>Solo cuentan las partidas pagadas con créditos del pool y se conserva una única puntuación por wallet: la mejor de la semana.</p>
                 <p>Si dos jugadores empatan, queda delante quien consiguió antes esa puntuación.</p>
                 <p>Al comenzar la semana siguiente, la clasificación anterior queda congelada en el historial.</p>
@@ -242,7 +242,7 @@ export default function TreasureHuntRulesView() {
             </div>
             <p className="flex items-start gap-3 rounded-[9px] border border-white/10 bg-black/10 p-4">
               <Trophy className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
-              <span>El reparto se cierra los lunes a las 17:00 UTC. Cuando quede registrado, podrás seguirlo desde <Link href="/premios" className="font-black text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">Premios</Link>.</span>
+              <span>El reparto se procesa después del cierre de la competición y la confirmación de sus resultados. Cuando quede registrado, podrás seguirlo desde <Link href="/premios" className="font-black text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">Premios</Link>.</span>
             </p>
           </RuleSection>
 

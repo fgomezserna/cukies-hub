@@ -615,7 +615,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
       return {
         eyebrow: 'En validación',
         title: `${counts.qualifying === 1 ? 'Tu cupo está' : 'Tus cupos están'} madurando`,
-        description: 'Cada cupo empieza a generar créditos cuando completa sus primeras 24 horas y llega al siguiente corte diario.',
+        description: 'Cada cupo empieza a generar créditos cuando completa su espera inicial y llega el siguiente reparto. Consulta la fecha indicada en tu cupo.',
         primary: { href: '/credits', label: 'Ver mis créditos' },
         secondary: { href: '#uki-staking', label: 'Revisar staking' },
         warning: false,
@@ -965,7 +965,7 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
 
           {route.pendingRequirement ? (
             <div className="mt-4 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-semibold leading-relaxed text-amber-100">
-              Próximo requisito: {requirementLabel(route.pendingRequirement)}. Puedes ajustarte hasta {dateLabel(route.requirementGraceEndsAt) ?? 'el final de la ventana de 48 horas'}.
+              Próximo requisito: {requirementLabel(route.pendingRequirement)}. Puedes ajustarte hasta {dateLabel(route.requirementGraceEndsAt) ?? 'el final del periodo de gracia'}.
             </div>
           ) : null}
         </div>

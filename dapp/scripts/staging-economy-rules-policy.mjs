@@ -288,11 +288,12 @@ function buildVerifiedSources(cursors, sourceContractAddresses, now) {
   return identities;
 }
 
-function buildRewardRule(activeFrom, programStartsAt, now) {
+function buildRewardRule(activeFrom, programStartsAt, now, calendar) {
+  const version = calendar ? 'rewards-staging-cycle-v1' : STAGING_ECONOMY_RULESET.rewardVersion;
   const base = {
-    _id: `reward_allocations:${STAGING_ECONOMY_RULESET.rewardVersion}`,
+    _id: `reward_allocations:${version}`,
     scope: 'reward_allocations',
-    version: STAGING_ECONOMY_RULESET.rewardVersion,
+    version,
     active: true,
     activeFrom,
     tokenDecimals: 18,
@@ -328,6 +329,7 @@ function buildRewardRule(activeFrom, programStartsAt, now) {
       floorAmountRaw: '750000000000000000',
     },
     emissionBudget: {
+      ...(calendar ? { calendar } : {}),
       programStartsAt,
       dayBoundarySecondUtc: 14 * 60 * 60,
       lateReservationGraceSeconds: 86_400,
@@ -373,11 +375,13 @@ function buildRewardRule(activeFrom, programStartsAt, now) {
   };
 }
 
-function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
+function buildCreditRule(activeFrom, now, sourceContractAddresses, identities, calendar) {
+  const version = calendar ? 'credits-staging-cycle-v1' : STAGING_ECONOMY_RULESET.creditVersion;
   const base = {
-    _id: `competition_credits:${STAGING_ECONOMY_RULESET.creditVersion}`,
+    _id: `competition_credits:${version}`,
     scope: 'competition_credits',
-    version: STAGING_ECONOMY_RULESET.creditVersion,
+    version,
+    ...(calendar ? { calendar } : {}),
     active: true,
     activeFrom,
     cutoffHourUtc: 14,
@@ -423,14 +427,16 @@ function buildCreditRule(activeFrom, now, sourceContractAddresses, identities) {
       leaseDurationMs: base.leaseDurationMs,
       reservationTtlMs: base.reservationTtlMs,
       costs: base.costs,
+      ...(calendar ? { calendar } : {}),
     }),
     createdAt: now,
     updatedAt: now,
   };
 }
 
-function buildGameRule(activeFrom, now, rewardRule, creditRule) {
+function buildGameRule(activeFrom, now, rewardRule, creditRule, calendar) {
   const snapshot = {
+    ...(calendar ? { calendar } : {}),
     gameId: STAGING_ECONOMY_RULESET.gameId,
     version: STAGING_ECONOMY_RULESET.gameVersion,
     sessionTtlMs: 10 * 60 * 1000,
@@ -473,11 +479,13 @@ function buildGameRule(activeFrom, now, rewardRule, creditRule) {
   };
 }
 
-function buildRankingRule(activeFrom, now) {
+function buildRankingRule(activeFrom, now, calendar) {
+  const version = calendar ? 'weekly-ranking-staging-cycle-v1' : STAGING_ECONOMY_RULESET.rankingVersion;
   const base = {
-    _id: `weekly_arena_ranking:${STAGING_ECONOMY_RULESET.rankingVersion}`,
+    _id: `weekly_arena_ranking:${version}`,
     scope: 'weekly_arena_ranking',
-    version: STAGING_ECONOMY_RULESET.rankingVersion,
+    version,
+    ...(calendar ? { calendar } : {}),
     active: true,
     activeFrom,
     initialRank: 5,
@@ -503,6 +511,7 @@ function buildRankingRule(activeFrom, now) {
       performanceBasis: base.performanceBasis,
       eligibleCreditBucket: base.eligibleCreditBucket,
       tiers: base.tiers,
+      ...(calendar ? { calendar } : {}),
     }),
     createdAt: now,
     updatedAt: now,
@@ -520,6 +529,28 @@ export function buildStagingEconomyRuleSet({
   }
   const { sourceContractAddresses } = validateStagingEconomyEnvironment(environment);
   const identities = buildVerifiedSources(cursors, sourceContractAddresses, now);
+  if (environment.ECONOMY_CYCLE_SECONDS && environment.ECONOMY_CYCLE_SECONDS !== '86400') {
+    const cycleSeconds = Number(environment.ECONOMY_CYCLE_SECONDS);
+    const anchor = new Date(environment.ECONOMY_CYCLE_ANCHOR_AT ?? '');
+    if (![1800, 3600].includes(cycleSeconds) || Number.isNaN(anchor.getTime())
+      || anchor.toISOString() !== environment.ECONOMY_CYCLE_ANCHOR_AT
+      || anchor.getTime() % (cycleSeconds * 1000) !== 0 || anchor < now) {
+      throw new StagingEconomyRulesError(['accelerated calendar requires 1800/3600 and an aligned future ISO anchor']);
+    }
+    if (cursors.some((cursor) => cursor.contractAlias === 'CUKIE_POOL_NFT_VAULT'
+      && cursor.poolPeriodDurationSeconds !== cycleSeconds)) {
+      throw new StagingEconomyRulesError(['pool contract verified duration must match the accelerated calendar']);
+    }
+    const calendar = { version: 'cycle-v1', chainId: 97, cycleSeconds, anchorAt: anchor.toISOString() };
+    const reward = buildRewardRule(anchor, anchor, now, calendar);
+    const credit = buildCreditRule(anchor, now, sourceContractAddresses, identities, calendar);
+    const game = buildGameRule(anchor, now, reward, credit, calendar);
+    const ranking = buildRankingRule(anchor, now, calendar);
+    return { reward, credit, game, ranking };
+  }
+  if (environment.ECONOMY_CYCLE_ANCHOR_AT) {
+    throw new StagingEconomyRulesError(['calendar anchor requires accelerated cycles']);
+  }
   const activeFrom = new Date(STAGING_ECONOMY_RULESET.activeFrom);
   if (!(creditBaselineAt instanceof Date) || Number.isNaN(creditBaselineAt.getTime())) {
     throw new StagingEconomyRulesError(['creditBaselineAt must be a valid Date']);

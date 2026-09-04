@@ -7,6 +7,7 @@ import {
   StaleFenceError,
 } from "../errors";
 import { assertCreditAmount } from "../money";
+import { economyCycleDurationMs } from "../cycle-calendar";
 import { reconcileCompetitionCreditSnapshot } from "./reconciliation";
 import {
   mapCreditPersistenceError,
@@ -624,7 +625,6 @@ function validateExistingCreditRun(
     cutoff.getTime() !== period.cutoff.getTime() ||
     nextCutoff.getTime() !== period.nextCutoff.getTime() ||
     settlementTarget.getTime() !== period.settlementTarget.getTime() ||
-    settlementNextCutoff.getTime() !== settlementCutoff.getTime() + 24 * 60 * 60 * 1000 ||
     run.settlementPeriod.periodId !== expectedSettlementPeriod.periodId ||
     settlementCutoff.getTime() !== expectedSettlementPeriod.cutoff.getTime() ||
     settlementNextCutoff.getTime() !== expectedSettlementPeriod.nextCutoff.getTime() ||
@@ -1960,9 +1960,7 @@ export function createCompetitionCreditService(
     }
     let candidateCutoff: Date;
     if (latest) {
-      candidateCutoff = new Date(
-        latest.period.cutoff.getTime() + 24 * 60 * 60 * 1000
-      );
+      candidateCutoff = new Date(latest.period.nextCutoff);
     } else {
       const oldestRule = await mappedTransaction(runner, (repository) =>
         repository.findOldestRule()
@@ -1970,25 +1968,15 @@ export function createCompetitionCreditService(
       if (!oldestRule) {
         throw new DomainConflictError("No existe ninguna regla historica de creditos.");
       }
-      candidateCutoff = new Date(
-        Date.UTC(
-          oldestRule.activeFrom.getUTCFullYear(),
-          oldestRule.activeFrom.getUTCMonth(),
-          oldestRule.activeFrom.getUTCDate(),
-          oldestRule.cutoffHourUtc,
-          oldestRule.cutoffMinuteUtc,
-          0,
-          0
-        )
-      );
+      candidateCutoff = currentCompetitionCreditPeriod(oldestRule.activeFrom, oldestRule).cutoff;
       if (candidateCutoff.getTime() < oldestRule.activeFrom.getTime()) {
-        candidateCutoff = new Date(candidateCutoff.getTime() + 24 * 60 * 60 * 1000);
+        candidateCutoff = new Date(candidateCutoff.getTime() + economyCycleDurationMs(oldestRule.calendar));
       }
     }
     const eligibleCutoff =
       now.getTime() >= current.settlementTarget.getTime()
         ? current.cutoff
-        : new Date(current.cutoff.getTime() - 24 * 60 * 60 * 1000);
+        : new Date(current.cutoff.getTime() - economyCycleDurationMs(input.rule.calendar));
     if (candidateCutoff.getTime() > eligibleCutoff.getTime()) {
       return null;
     }

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { DomainValidationError } from '../errors';
+import { economyCycleDelayMs, loadEconomyCycleCalendar } from '../cycle-calendar';
 import {
   CUKIE_MASTER_FIRST_CREDIT_DELAY_HOURS,
   CUKIE_MASTER_REQUIREMENT_GRACE_HOURS,
@@ -132,9 +133,9 @@ export function calculateRouteSlotTarget(input: {
 }
 
 export function firstCreditAt(now: Date) {
-  return new Date(now.getTime() + CUKIE_MASTER_FIRST_CREDIT_DELAY_HOURS * 60 * 60 * 1000);
+  return new Date(now.getTime() + economyCycleDelayMs(CUKIE_MASTER_FIRST_CREDIT_DELAY_HOURS, loadEconomyCycleCalendar()));
 }
 
 export function requirementGraceEndsAt(now: Date) {
-  return new Date(now.getTime() + CUKIE_MASTER_REQUIREMENT_GRACE_HOURS * 60 * 60 * 1000);
+  return new Date(now.getTime() + economyCycleDelayMs(CUKIE_MASTER_REQUIREMENT_GRACE_HOURS, loadEconomyCycleCalendar()));
 }

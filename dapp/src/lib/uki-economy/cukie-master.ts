@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { normalizeWalletAddress } from '@/lib/wallet-address';
+import { economyCycleDelayMs, loadEconomyCycleCalendar } from './cycle-calendar';
 
 import {
   CUKIE_MASTER_DAILY_CREDITS_PER_SLOT,
@@ -161,7 +162,7 @@ export function buildCukieMasterSnapshot(
     totalSlots: slotBreakdown.totalSlots,
     maxTotalSlots: CUKIE_MASTER_MAX_TOTAL_SLOTS_PER_WALLET,
     dailyCreditsPreview: slotBreakdown.totalSlots * CUKIE_MASTER_DAILY_CREDITS_PER_SLOT,
-    firstCreditDelayHours: CUKIE_MASTER_FIRST_CREDIT_DELAY_HOURS,
+    firstCreditDelayHours: economyCycleDelayMs(CUKIE_MASTER_FIRST_CREDIT_DELAY_HOURS, loadEconomyCycleCalendar()) / 3_600_000,
     status: 'calculated',
   } satisfies Omit<CukieMasterSnapshotDocument, 'snapshotHash'>;
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { loadEconomyCycleCalendar } from '../cycle-calendar';
 
 import { displayCompetitionAlias, generateCompetitionAlias } from "@/lib/treasure-hunt-competition";
 import { getEconomyDb } from "@/lib/indexer-db/mongodb";
@@ -177,7 +178,8 @@ export async function getTreasureHuntWeeklyOverview(input: {
   mineOnly?: boolean;
 } = {}): Promise<TreasureHuntWeeklyOverview> {
   const now = input.now ?? new Date();
-  const period = getTreasureHuntWeeklyPeriod(now);
+  const calendar = loadEconomyCycleCalendar();
+  const period = getTreasureHuntWeeklyPeriod(now, calendar);
   const walletNormalized = input.currentWalletAddress?.toLowerCase() ?? null;
   const pageSize = boundedInteger(input.pageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const page = boundedInteger(input.page, 1, 1_000_000);
@@ -208,7 +210,7 @@ export async function getTreasureHuntWeeklyOverview(input: {
       .toArray(),
     db.collection<RewardPoolAccrual>("reward_pool_accruals")
       .find({
-        periodId: weeklyRewardPeriodId(period.startsAt),
+        periodId: calendar ? period.periodId : weeklyRewardPeriodId(period.startsAt),
         category: "weekly_prize_pool",
         status: "accrued",
       })
