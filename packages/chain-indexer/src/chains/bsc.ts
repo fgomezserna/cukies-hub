@@ -9,6 +9,7 @@ import {
 
 import { bscEventAbis } from '../config/abis.js';
 import { getContractEventConfigs } from '../config/contracts.js';
+import { LEGACY_BSC_CONTRACT_ALIASES } from '../legacy/contracts.js';
 import { normalizeDomainEvent } from '../normalize.js';
 import type {
   ChainEvent,
@@ -293,10 +294,12 @@ export async function ingestBscOnce(
   const safeBlock = Math.max(0, latestBlock - config.bscConfirmations);
   const contractEvents = getContractEventConfigs(['BSC'], {
     tokenAddress: config.tokenAddress,
+    ukiTokenAddress: config.ukiTokenAddress,
     tokenV2Address: config.tokenV2Address,
     marketplaceAddress: config.marketplaceAddress,
     ukiMarketplaceAddress: config.ukiMarketplaceAddress,
     bridgeAddress: config.bridgeAddress,
+    bridgeEndpointAddress: config.bridgeEndpointAddress,
     presaleAddress: config.presaleAddress,
     ukiStakingAddress: config.ukiStakingAddress,
     vestingVaultAddress: config.vestingVaultAddress,
@@ -372,8 +375,14 @@ export async function ingestBscOnce(
       Number(cursor?.processedFromBlock) >= 0 &&
       Number.isSafeInteger(cursor?.processedFromTimestampMs) &&
       Number(cursor?.processedFromTimestampMs) >= 0;
-    const configuredStartBlock = contractEvent.contractAlias === 'UKI_STAKING'
+    const configuredStartBlock = config.runtimeScope === 'legacy'
+      ? config.legacyStartBlocks?.[contractEvent.contractAlias]
+      : contractEvent.contractAlias === 'UKI_STAKING'
       ? config.ukiStakingStartBlock
+      : contractEvent.contractAlias === 'UKI_TOKEN'
+        ? config.ukiTokenStartBlock ?? config.bscStartBlock
+      : contractEvent.contractAlias === 'PRESALE'
+          ? config.presaleStartBlock ?? config.bscStartBlock
       : contractEvent.contractAlias === 'VESTING_VAULT'
         ? config.vestingVaultStartBlock
         : contractEvent.contractAlias === 'REWARDS_DISTRIBUTOR'
@@ -388,11 +397,21 @@ export async function ingestBscOnce(
                   ? config.ukiMarketplaceStartBlock
                 : contractEvent.contractAlias === 'BRIDGE'
                   ? config.bridgeStartBlock
+                  : contractEvent.contractAlias === 'BRIDGE_ENDPOINT'
+                    ? config.bridgeEndpointStartBlock ?? config.bscStartBlock
                   : contractEvent.contractAlias === 'CUKIE_MASTER_NFT_VAULT'
                     ? config.cukieMasterNftVaultStartBlock
                     : contractEvent.contractAlias === 'CUKIE_POOL_NFT_VAULT'
                       ? config.cukiePoolNftVaultStartBlock
-                      : config.bscStartBlock;
+                  : config.bscStartBlock;
+    if (config.runtimeScope === 'legacy') {
+      if (!LEGACY_BSC_CONTRACT_ALIASES.includes(contractEvent.contractAlias as typeof LEGACY_BSC_CONTRACT_ALIASES[number])) {
+        throw new Error(`${contractEvent.contractAlias} no pertenece al perímetro BSC legacy.`);
+      }
+      if (configuredStartBlock === undefined || !Number.isSafeInteger(configuredStartBlock) || configuredStartBlock < 0) {
+        throw new Error(`${contractEvent.contractAlias} legacy exige un bloque inicial explícito no negativo.`);
+      }
+    }
     const verified = verifiedContracts.get(contractEvent.contractAlias);
     if (
       verified
@@ -421,9 +440,11 @@ export async function ingestBscOnce(
         }
       : {};
     const fromBlock = cursor?.nextBlock
-      ?? (configuredStartBlock !== undefined && configuredStartBlock > 0
-        ? configuredStartBlock
-        : safeBlock);
+      ?? (config.runtimeScope === 'legacy'
+        ? configuredStartBlock!
+        : configuredStartBlock !== undefined && configuredStartBlock > 0
+          ? configuredStartBlock
+          : safeBlock);
 
     if (fromBlock > safeBlock) {
       const processedThroughTimestampMs = await getBlockTimestampMs({
@@ -503,6 +524,7 @@ export async function ingestBscOnce(
 
       events.push({
         _id: `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
+        runtimeScope: config.runtimeScope ?? 'default',
         chain: 'BSC',
         chainId: config.bscExpectedChainId,
         contractAlias: contractEvent.contractAlias,

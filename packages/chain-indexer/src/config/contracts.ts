@@ -1,6 +1,7 @@
 import { isAddress } from 'viem';
 
-import type { ChainName, ContractAlias, ContractEventConfig } from '../types.js';
+import type { ChainName, ContractAlias, ContractEventConfig, EventName } from '../types.js';
+import { canonicalEventsForAlias, contractEventManifest } from './event-manifest.js';
 
 const bscContracts = {
   TOKEN: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
@@ -17,12 +18,18 @@ const bscContracts = {
   | 'VESTING_VAULT'
   | 'REWARDS_DISTRIBUTOR'
   | 'UKI_MARKETPLACE'
+  | 'BRIDGE_ENDPOINT'
+  | 'UKI_TOKEN'
   | 'CUKIE_MASTER_NFT_VAULT'
   | 'CUKIE_POOL_NFT_VAULT'
+  | 'MINT'
+  | 'REFERRALS'
 >, string>;
 
 const tronContracts = {
   TOKEN: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
+  MINT: 'TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7',
+  REFERRALS: 'TZ4QM9RF1pxfoxnPY8UGAQEEwq5SDoZXk4',
   POINTS: 'TWwNJEySYrkNXTpDBF7WfGwkoW4YTZ4yKA',
   STAKING_POINTS: 'TUfbQaVERA1TmT31LU3HWJS6xsW3B8VfUY',
   BREEDING_POINTS: 'TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S',
@@ -36,51 +43,18 @@ const tronContracts = {
   | 'VESTING_VAULT'
   | 'REWARDS_DISTRIBUTOR'
   | 'UKI_MARKETPLACE'
+  | 'BRIDGE_ENDPOINT'
+  | 'UKI_TOKEN'
   | 'CUKIE_MASTER_NFT_VAULT'
   | 'CUKIE_POOL_NFT_VAULT'
 >, string>;
 
-const eventsByContract = {
-  TOKEN: ['Transfer', 'CukieMetadataConfigured'],
-  TOKEN_V2: ['Transfer', 'CukieMetadataConfigured'],
-  POINTS: ['Mint', 'Burn'],
-  STAKING_POINTS: ['Stake', 'Unstake'],
-  BREEDING_POINTS: ['BreedStart', 'BreedFinish'],
-  MARKETPLACE: [
-    'TokenOnSale',
-    'TokenBought',
-    'MarketTokenSaleCancelled',
-    'MarketTokenPriceChanged',
-  ],
-  UKI_MARKETPLACE: [
-    'UkiMarketplaceOrderCreated',
-    'UkiMarketplaceOrderCancelled',
-    'UkiMarketplaceOrderExpired',
-    'UkiMarketplaceOrderInvalidated',
-    'UkiMarketplaceTokenNonceInvalidated',
-    'UkiMarketplaceOrderFilled',
-  ],
-  BRIDGE: ['JumpInBridge', 'JumpOutBridge'],
-  PRESALE: ['Purchased'],
-  UKI_STAKING: ['Staked', 'Unstaked'],
-  VESTING_VAULT: ['VestingCreated', 'TokensReleased'],
-  REWARDS_DISTRIBUTOR: ['BatchPublished', 'RewardClaimed', 'BatchClosed'],
-  CUKIE_MASTER_NFT_VAULT: [
-    'CukieMasterCollectionAllowedUpdated',
-    'CukieMasterDeposited',
-    'CukieMasterWithdrawn',
-    'CukieMasterUntrackedERC721Recovered',
-  ],
-  CUKIE_POOL_NFT_VAULT: [
-    'CukiePoolCollectionAllowedUpdated',
-    'CukiePoolCalendarVersionScheduled',
-    'CukiePoolDeposited',
-    'CukiePoolExitRequested',
-    'CukiePoolWithdrawableAtAdvanced',
-    'CukiePoolWithdrawn',
-    'CukiePoolUntrackedERC721Recovered',
-  ],
-} as const;
+const eventsByContract = Object.fromEntries(
+  Object.keys(contractEventManifest).map((alias) => [
+    alias,
+    canonicalEventsForAlias(alias as ContractAlias),
+  ]),
+) as Partial<Record<ContractAlias, readonly EventName[]>>;
 
 type BscContractAddressOptions = {
   tokenAddress?: string;
@@ -88,6 +62,8 @@ type BscContractAddressOptions = {
   marketplaceAddress?: string;
   ukiMarketplaceAddress?: string;
   bridgeAddress?: string;
+  bridgeEndpointAddress?: string;
+  ukiTokenAddress?: string;
   presaleAddress?: string;
   ukiStakingAddress?: string;
   vestingVaultAddress?: string;
@@ -107,6 +83,9 @@ export function getMonitoredContractAddresses(options: BscContractAddressOptions
         ? { UKI_MARKETPLACE: options.ukiMarketplaceAddress }
         : {}),
       ...(options.bridgeAddress ? { BRIDGE: options.bridgeAddress } : {}),
+      ...(options.bridgeEndpointAddress
+        ? { BRIDGE_ENDPOINT: options.bridgeEndpointAddress } : {}),
+      ...(options.ukiTokenAddress ? { UKI_TOKEN: options.ukiTokenAddress } : {}),
       ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
       ...(options.ukiStakingAddress ? { UKI_STAKING: options.ukiStakingAddress } : {}),
       ...(options.vestingVaultAddress ? { VESTING_VAULT: options.vestingVaultAddress } : {}),
@@ -132,10 +111,11 @@ export function getContractAliasByAddress(
   options: BscContractAddressOptions = {},
 ) {
   const addresses = getMonitoredContractAddresses(options)[chain];
-  const normalizedAddress = address.toLowerCase();
+  const normalizedAddress = chain === 'BSC' ? address.toLowerCase() : address;
 
   for (const [alias, contractAddress] of Object.entries(addresses)) {
-    if (contractAddress.toLowerCase() === normalizedAddress) {
+    const candidate = chain === 'BSC' ? contractAddress.toLowerCase() : contractAddress;
+    if (candidate === normalizedAddress) {
       return alias as ContractAlias;
     }
   }
@@ -151,6 +131,8 @@ export function getContractEventConfigs(
     marketplaceAddress?: string;
     ukiMarketplaceAddress?: string;
     bridgeAddress?: string;
+    bridgeEndpointAddress?: string;
+    ukiTokenAddress?: string;
     presaleAddress?: string;
     ukiStakingAddress?: string;
     vestingVaultAddress?: string;
@@ -167,6 +149,9 @@ export function getContractEventConfigs(
   const marketplaceAddress = options.marketplaceAddress?.trim();
   const ukiMarketplaceAddress = options.ukiMarketplaceAddress?.trim();
   const bridgeAddress = options.bridgeAddress?.trim();
+  const bridgeEndpointAddress = options.bridgeEndpointAddress?.trim();
+  const ukiTokenAddress = options.ukiTokenAddress?.trim();
+  const presaleAddress = options.presaleAddress?.trim();
   const ukiStakingAddress = options.ukiStakingAddress?.trim();
   const vestingVaultAddress = options.vestingVaultAddress?.trim();
   const rewardsDistributorAddress = options.rewardsDistributorAddress?.trim();
@@ -179,6 +164,9 @@ export function getContractEventConfigs(
     ['MARKETPLACE', marketplaceAddress],
     ['UKI_MARKETPLACE', ukiMarketplaceAddress],
     ['BRIDGE', bridgeAddress],
+    ['BRIDGE_ENDPOINT', bridgeEndpointAddress],
+    ['UKI_TOKEN', ukiTokenAddress],
+    ['PRESALE', presaleAddress],
     ['UKI_STAKING', ukiStakingAddress],
     ['VESTING_VAULT', vestingVaultAddress],
     ['REWARDS_DISTRIBUTOR', rewardsDistributorAddress],
@@ -188,7 +176,7 @@ export function getContractEventConfigs(
     if (address && (!isAddress(address) || /^0x0{40}$/i.test(address))) {
       throw new Error(`${alias} no tiene una address BSC valida.`);
     }
-    if (allowedAliases?.has(alias) && !address) {
+    if (chains.includes('BSC') && allowedAliases?.has(alias) && !address) {
       throw new Error(`${alias} fue solicitado sin una address BSC configurada.`);
     }
   }
@@ -221,11 +209,11 @@ export function getContractEventConfigs(
   if (
     allowedAliases
     && [...allowedAliases].some((alias) => (
-      alias === 'TOKEN'
-      || alias === 'TOKEN_V2'
-      || alias === 'MARKETPLACE'
+      alias === 'TOKEN_V2'
       || alias === 'UKI_MARKETPLACE'
-      || alias === 'BRIDGE'
+      || alias === 'BRIDGE_ENDPOINT'
+      || alias === 'UKI_TOKEN'
+      || alias === 'PRESALE'
       || alias === 'UKI_STAKING'
       || alias === 'VESTING_VAULT'
       || alias === 'REWARDS_DISTRIBUTOR'
@@ -246,19 +234,27 @@ export function getContractEventConfigs(
           ...((!allowedAliases || allowedAliases.has('TOKEN')) && tokenAddress
             ? { TOKEN: tokenAddress }
             : {}),
-          ...((!allowedAliases || allowedAliases.has('TOKEN_V2')) && tokenV2Address
+          ...(allowedAliases?.has('TOKEN_V2') && tokenV2Address
             ? { TOKEN_V2: tokenV2Address }
             : {}),
           ...((!allowedAliases || allowedAliases.has('MARKETPLACE')) && marketplaceAddress
             ? { MARKETPLACE: marketplaceAddress }
             : {}),
-          ...((!allowedAliases || allowedAliases.has('UKI_MARKETPLACE')) && ukiMarketplaceAddress
+          ...(allowedAliases?.has('UKI_MARKETPLACE') && ukiMarketplaceAddress
             ? { UKI_MARKETPLACE: ukiMarketplaceAddress }
             : {}),
           ...((!allowedAliases || allowedAliases.has('BRIDGE')) && bridgeAddress
             ? { BRIDGE: bridgeAddress }
             : {}),
-          ...(options.presaleAddress ? { PRESALE: options.presaleAddress } : {}),
+          ...(allowedAliases?.has('BRIDGE_ENDPOINT') && bridgeEndpointAddress
+            ? { BRIDGE_ENDPOINT: bridgeEndpointAddress }
+            : {}),
+          ...(allowedAliases?.has('UKI_TOKEN') && ukiTokenAddress
+            ? { UKI_TOKEN: ukiTokenAddress }
+            : {}),
+          ...((!allowedAliases || allowedAliases.has('PRESALE')) && presaleAddress
+            ? { PRESALE: presaleAddress }
+            : {}),
           ...(allowedAliases?.has('UKI_STAKING') && ukiStakingAddress
             ? { UKI_STAKING: ukiStakingAddress }
             : {}),

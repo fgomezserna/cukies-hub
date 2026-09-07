@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { pathToFileURL } from 'node:url';
+import { validateLegacyIndexerEnvironment } from './assert-legacy-indexer.mjs';
 
 export const PRODUCTION_TARGET = Object.freeze({
   appEnv: 'production',
@@ -92,6 +93,7 @@ function requireAddress(environment, key, expected, failures) {
 }
 
 export function validateProductionEnvironment(environment = process.env, scope = 'full') {
+  if (scope === 'legacy-chain-indexer') return validateLegacyIndexerEnvironment(environment, 'production');
   const failures = [];
   const supportedScopes = new Set(['full', 'dapp', 'chain-indexer', 'cuki-card-worker']);
   if (!supportedScopes.has(scope)) {

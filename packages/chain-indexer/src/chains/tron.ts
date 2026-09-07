@@ -1,4 +1,5 @@
 import { getContractEventConfigs } from '../config/contracts.js';
+import { LEGACY_CONTRACT_ALIASES } from '../legacy/contracts.js';
 import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ContractEventConfig, IndexerConfig, JsonRecord } from '../types.js';
 import { normalizeTronArgs, now, toJsonRecord } from '../utils/json.js';
@@ -55,6 +56,17 @@ async function delay(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function eventsBaseUrl(config: IndexerConfig) {
+  const parsed = new URL(config.tronApiBaseUrl);
+  const pathname = parsed.pathname.replace(/\/$/, '');
+  if (config.runtimeScope === 'legacy') {
+    if (parsed.origin !== 'https://api.trongrid.io' || pathname !== '/v1') {
+      throw new Error('Runtime legacy TRON exige https://api.trongrid.io/v1 para eventos.');
+    }
+  }
+  return `${parsed.origin}${pathname}`;
+}
+
 function buildTronUrl(
   config: IndexerConfig,
   contractEvent: ContractEventConfig,
@@ -62,7 +74,7 @@ function buildTronUrl(
   fingerprint?: string | null,
 ) {
   const url = new URL(
-    `${config.tronApiBaseUrl}/contracts/${contractEvent.contractAddress}/events`,
+    `${eventsBaseUrl(config)}/contracts/${contractEvent.contractAddress}/events`,
   );
   url.searchParams.set('only_confirmed', 'true');
   url.searchParams.set('order_by', 'block_timestamp,asc');
@@ -100,7 +112,7 @@ async function fetchTronEvents(
   return (await response.json()) as TronGridResponse;
 }
 
-function eventToChainEvent(contractEvent: ContractEventConfig, event: TronGridEvent): ChainEvent {
+function eventToChainEvent(config: IndexerConfig, contractEvent: ContractEventConfig, event: TronGridEvent): ChainEvent {
   const argsRaw = normalizeTronArgs(event.result ?? {});
   const args = toJsonRecord(argsRaw);
   const normalized = normalizeDomainEvent(
@@ -114,6 +126,7 @@ function eventToChainEvent(contractEvent: ContractEventConfig, event: TronGridEv
 
   return {
     _id: `TRON:${contractEvent.contractAlias}:${contractEvent.eventName}:${event.transaction_id}:${eventIndex}`,
+    runtimeScope: config.runtimeScope ?? 'default',
     chain: 'TRON',
     contractAlias: contractEvent.contractAlias,
     contractAddress: contractEvent.contractAddress,
@@ -136,7 +149,9 @@ function eventToChainEvent(contractEvent: ContractEventConfig, event: TronGridEv
 export async function ingestTronOnce(store: IndexerStore, config: IndexerConfig) {
   if (!config.chains.includes('TRON')) return { inserted: 0, pages: 0 };
 
-  const contractEvents = getContractEventConfigs(['TRON']);
+  const contractEvents = getContractEventConfigs(['TRON'], config.runtimeScope === 'legacy'
+    ? { contractAliases: [...LEGACY_CONTRACT_ALIASES] }
+    : { contractAliases: config.contractAliases });
   let inserted = 0;
   let pages = 0;
   let rateLimited = false;
@@ -161,7 +176,7 @@ export async function ingestTronOnce(store: IndexerStore, config: IndexerConfig)
         response = await fetchTronEvents(config, contractEvent, minTimestampMs, null);
       }
 
-      const events = (response.data ?? []).map((event) => eventToChainEvent(contractEvent, event));
+      const events = (response.data ?? []).map((event) => eventToChainEvent(config, contractEvent, event));
       const result = await store.upsertEvents(events);
       const nextFingerprint = extractFingerprint(response);
       const lastTimestamp = events.at(-1)?.timestampMs;

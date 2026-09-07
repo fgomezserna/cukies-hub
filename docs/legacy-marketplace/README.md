@@ -141,8 +141,8 @@ autoridad.
 
 ### Frontera del worker legacy acordada
 
-Diseno en preparacion; esta seccion no acredita un servicio desplegado.
-`legacy-chain-indexer` reutilizara el motor del Hub para leer los 14 contratos
+Implementacion local; esta seccion no acredita un servicio desplegado.
+`legacy-chain-indexer` reutiliza el motor del Hub para leer los 14 contratos
 canonicos de `contracts.json`: BSC 56 y TRON mainnet tanto en Stage como en
 produccion. Usara un perfil Compose propio, sin dominio publico, firmantes ni
 operaciones on-chain. El relayer que completa transfers es una responsabilidad
@@ -180,6 +180,14 @@ los contratos nuevos. La evidencia actual acredita runtime de los seis contratos
 BSC, pero solo cuatro tienen deploy tx/bloque registrados; en TRON el `codeHash`
 observado por el proveedor tampoco equivale a codigo fuente verificado.
 
+La verificacion del worker contra RPC publico del 2026-09-07 comprobo los
+14 hashes esperados (6 BSC y 8 TRON) y guardo las pruebas observadas en Mongo
+local de QA. Se conserva una exportacion de campos publicos en
+[`evidence/2026-09-07-indexer-source-proofs.json`](evidence/2026-09-07-indexer-source-proofs.json):
+BSC anclado al bloque `120561835`; TRON calculado con `keccak256(runtimecode)`
+de `getcontractinfo`. Esto verifica las fuentes existentes; no acredita un
+backfill ni un despliegue del servicio.
+
 ### Activacion Stage y criterios de reconciliacion
 
 El primer destino es exclusivamente Coolify app `28`, UUID
@@ -208,6 +216,7 @@ base y su usuario dedicado se provisionan para este worker. Esta lectura de
 | `CUKIES_LEGACY_TRON_NETWORK` / `CUKIES_LEGACY_TRON_API_BASE_URL` | `mainnet` / API mainnet con eventos historicos; credencial opcional exclusiva |
 | `CUKIES_LEGACY_BSC_START_BLOCK` | Inicio explicito; `0` significa historia completa en el worker dedicado, no empezar desde el head |
 | `CUKIES_LEGACY_TRON_START_TIMESTAMP_MS` | Inicio explicito; `0` evita asumir una fecha de despliegue no acreditada |
+| `CUKIES_LEGACY_TRON_REQUEST_DELAY_MS` | `2000`: pasada de los 40 eventos configurados completada sin API key ni 429 en 87,309 s |
 
 El inicio completo es conservador y no garantiza terminar antes del 15. Se debe
 medir el avance real por contrato/evento, limites RPC y errores 429, ajustar rango
@@ -216,6 +225,14 @@ acorta el historico silenciosamente para aparentar que el worker esta al dia.
 Una importacion de `processedEvents` puede acelerar la migracion, pero requiere
 comprobar identidad, eventos ausentes y checkpoint de cada fuente antes de usarla
 como cobertura. El `setup` de una base vacia no demuestra backfill.
+
+Validacion local del lote: 84 pruebas del indexer (incluido CAS Mongo), 63 de
+guards Stage/Compose, 14 de produccion, configuracion/identidad legacy 5/5,
+typecheck y build correctos. Las ventanas acotadas de RPC no contenian eventos;
+la decodificacion y replay se validaron con fixtures/ABI y Mongo local. El
+resumen durable, comandos y limites estan en
+[`evidence/2026-09-07-indexer-validation.json`](evidence/2026-09-07-indexer-validation.json).
+La imagen completa aun debe construirse y verificarse durante el despliegue.
 
 La reconciliacion se registra por familia en esta ficha, junto a la evidencia
 fechada, con estos criterios:

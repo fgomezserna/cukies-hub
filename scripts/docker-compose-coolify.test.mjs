@@ -173,6 +173,15 @@ test('chain-indexer receives an isolated verified UKI marketplace identity', () 
   assert.ok(definition.includes('CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH: ${CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH:-}'));
 });
 
+test('legacy chain-indexer builds its own image and never inherits the dapp runtime', () => {
+  const definition = serviceDefinition('legacy-chain-indexer');
+
+  assert.doesNotMatch(definition, /<<: \*dapp-runtime/);
+  assert.match(definition, /    build:\n/);
+  assert.ok(definition.includes('        CUKIES_SERVICE: legacy-chain-indexer'));
+  assert.ok(definition.includes('    profiles:\n      - legacy-indexer'));
+});
+
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {
   test(`${serviceName} only calls its resource-scoped dapp alias`, () => {
     const definition = serviceDefinition(serviceName);
