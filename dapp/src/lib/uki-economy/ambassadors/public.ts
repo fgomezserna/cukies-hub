@@ -11,11 +11,12 @@ import { DomainConflictError } from "../errors";
 import type { RewardAccountingAllocationDocument } from "../rewards/accounting-types";
 import {
   findMongoAmbassadorByInvitationCode,
+  getMongoAmbassadorEnrollment,
   getOrCreateMongoAmbassadorProfile,
   materializeLockedPresaleAmbassadorAttributions,
   resolveMongoAmbassadorAttribution,
 } from "./repository";
-import { assertAmbassadorInvitationCode, validAmbassadorWallet } from "./rules";
+import { assertAmbassadorInvitationCode, getDefaultAmbassadorWallet, validAmbassadorWallet } from "./rules";
 import type { AmbassadorAttribution } from "./types";
 
 const COMMISSION_CATEGORIES = ["ambassador_ordinary", "ambassador_weekly"] as const;
@@ -146,6 +147,8 @@ export async function getPublicAmbassadorInvitation(code: string) {
   return profile ? {
     invitationCode: profile.invitationCode,
     ambassadorWalletMasked: shortWallet(profile.walletNormalized),
+    isCukiesWorld: Boolean(process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim())
+      && profile.walletNormalized === getDefaultAmbassadorWallet(),
   } : null;
 }
 
@@ -156,7 +159,7 @@ export async function getAmbassadorDashboard(wallet: string, now = new Date()) {
     ambassadorWallet: walletNormalized,
     now,
   });
-  const [profile, ownAttribution, referrals, commissions] = await Promise.all([
+  const [profile, ownAttribution, referrals, commissions, enrollment] = await Promise.all([
     getOrCreateMongoAmbassadorProfile(db, walletNormalized, now),
     resolveMongoAmbassadorAttribution(db, walletNormalized, now),
     db.collection<AmbassadorAttribution>("ambassador_attributions")
@@ -165,15 +168,22 @@ export async function getAmbassadorDashboard(wallet: string, now = new Date()) {
       .limit(100)
       .toArray(),
     commissionDashboard(db, walletNormalized, now),
+    getMongoAmbassadorEnrollment(db, walletNormalized),
   ]);
+  const defaultWallet = process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()
+    ? getDefaultAmbassadorWallet()
+    : null;
   return {
     walletNormalized,
-    profile: {
+    profile: profile ? {
       invitationCode: profile.invitationCode,
-    },
+    } : null,
+    enrollment,
+    defaultAmbassador: defaultWallet ? { ambassadorWalletMasked: shortWallet(defaultWallet) } : null,
     ownAttribution: ownAttribution ? {
       attributionId: ownAttribution.attributionId,
       ambassadorWalletMasked: shortWallet(ownAttribution.ambassadorWalletNormalized),
+      isCukiesWorld: ownAttribution.ambassadorWalletNormalized === defaultWallet,
       source: ownAttribution.source,
       acceptedAt: ownAttribution.acceptedAt.toISOString(),
       commissionBps: ownAttribution.commissionBpsSnapshot,

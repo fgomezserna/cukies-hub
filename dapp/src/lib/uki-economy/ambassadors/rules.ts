@@ -42,6 +42,14 @@ export function validAmbassadorWallet(value: unknown, label = "wallet") {
   return normalized;
 }
 
+export function getDefaultAmbassadorWallet(
+  environment: Record<string, string | undefined> = process.env,
+) {
+  const wallet = environment.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim();
+  if (!wallet) throw new TypeError("AMBASSADOR_DEFAULT_WALLET_NOT_CONFIGURED");
+  return validAmbassadorWallet(wallet, "AMBASSADOR_DEFAULT_WALLET_ADDRESS");
+}
+
 function validDate(value: unknown, label: string) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     throw new DomainValidationError(`${label} debe ser una fecha valida.`);

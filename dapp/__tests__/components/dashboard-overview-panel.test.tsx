@@ -200,6 +200,23 @@ describe('DashboardOverviewPanel', () => {
     expect(switchChain).toHaveBeenCalledWith({ chainId: 97 });
   });
 
+  it('distinguishes a calendar awaiting confirmation from missing financial data', async () => {
+    const data = summary();
+    const vesting = data.modules.vesting;
+    if (vesting.state === 'unavailable') throw new Error('fixture');
+    fetchMock.mockResolvedValue(response(summary({
+      vesting: module({ ...vesting.data, configFrozen: false }, 'degraded'),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByText('Algunos datos requieren atención')).toBeInTheDocument();
+    expect(screen.getByText('El calendario de liberación está pendiente de confirmación')).toBeInTheDocument();
+    expect(screen.getByText('100 UKI')).toBeInTheDocument();
+    expect(screen.queryByText('Algunos datos no están disponibles')).not.toBeInTheDocument();
+    expect(screen.queryByText('No disponible')).not.toBeInTheDocument();
+  });
+
   it('falla cerrado si el contrato agregado no tiene el esquema esperado', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'ok', data: { chainId: 97 } }) });
 

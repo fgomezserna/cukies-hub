@@ -1,4 +1,5 @@
 import { isAddress } from 'viem';
+import { parseBscReadRpcUrls } from '@/lib/bsc-read-rpc';
 
 import type { UkiMarketplaceRuntime } from './types';
 
@@ -33,20 +34,11 @@ function parseAddress(environment: Environment) {
   return address.toLowerCase() as `0x${string}`;
 }
 
-function parseRpcUrl(environment: Environment, chainId: 56 | 97 | null) {
+function parseRpcUrls(environment: Environment, chainId: 56 | 97 | null) {
   const explicit = value(environment, 'CHAIN_INDEXER_BSC_RPC_URLS')
-    ?.split(',')
-    .map((candidate) => candidate.trim())
-    .find(Boolean)
     ?? value(environment, 'CHAIN_INDEXER_BSC_RPC_URL');
   const candidate = explicit ?? (chainId === 56 ? value(environment, 'BSC_RPC_URL') : null);
-  if (!candidate) return null;
-  try {
-    const parsed = new URL(candidate);
-    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
+  return parseBscReadRpcUrls(candidate ?? undefined);
 }
 
 export function resolveUkiMarketplaceRuntime(
@@ -57,7 +49,7 @@ export function resolveUkiMarketplaceRuntime(
   const publicEnvironment = value(environment, 'NEXT_PUBLIC_APP_ENV');
   const chainId = parseChainId(environment);
   const marketplaceAddress = parseAddress(environment);
-  const rpcUrl = parseRpcUrl(environment, chainId);
+  const rpcUrls = parseRpcUrls(environment, chainId);
 
   if (!appEnvironment || appEnvironment !== publicEnvironment) {
     issues.push('APP_ENV y NEXT_PUBLIC_APP_ENV deben coincidir.');
@@ -70,13 +62,13 @@ export function resolveUkiMarketplaceRuntime(
   }
   if (!chainId) issues.push('La chain del marketplace UKI no es coherente.');
   if (!marketplaceAddress) issues.push('La address del marketplace UKI no es coherente.');
-  if (!rpcUrl) issues.push('Falta un RPC BSC explicito para validar órdenes en vivo.');
+  if (rpcUrls.length === 0) issues.push('Falta un RPC BSC explicito para validar órdenes en vivo.');
 
   return {
     ready: issues.length === 0,
     chainId,
     marketplaceAddress,
-    rpcUrl,
+    rpcUrls,
     issues,
   };
 }

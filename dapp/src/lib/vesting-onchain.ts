@@ -1,14 +1,8 @@
-import { createPublicClient, getAddress, http, isAddress } from 'viem';
+import { createPublicClient, getAddress, isAddress } from 'viem';
 import { bsc, bscTestnet } from 'viem/chains';
 
 import { ukiSaleContracts, vestingVaultAbi } from '@/lib/contracts/uki-sale';
-
-const BSC_RPC_URL = process.env.CHAIN_INDEXER_BSC_RPC_URL
-  ?? process.env.BSC_RPC_URL
-  ?? 'https://bsc-dataseed1.binance.org';
-const BSC_TESTNET_RPC_URL = process.env.CHAIN_INDEXER_BSC_TESTNET_RPC_URL
-  ?? process.env.BSC_TESTNET_RPC_URL
-  ?? 'https://data-seed-prebsc-1-s1.binance.org:8545';
+import { bscReadTransport, parseBscReadRpcUrls } from '@/lib/bsc-read-rpc';
 
 type SupportedVestingChainId = 56 | 97;
 
@@ -33,16 +27,34 @@ export type WalletVestingDependencies = {
 
 function supportedChain(chainId: number) {
   if (chainId === bsc.id) {
-    return { chain: bsc, chainId: bsc.id as SupportedVestingChainId, rpcUrl: BSC_RPC_URL };
+    return { chain: bsc, chainId: bsc.id as SupportedVestingChainId };
   }
   if (chainId === bscTestnet.id) {
     return {
       chain: bscTestnet,
       chainId: bscTestnet.id as SupportedVestingChainId,
-      rpcUrl: BSC_TESTNET_RPC_URL,
     };
   }
   return null;
+}
+
+export function vestingRpcUrls(
+  chainId: SupportedVestingChainId,
+  environment: Record<string, string | undefined> = process.env,
+) {
+  const configured = chainId === 97
+    ? environment.CHAIN_INDEXER_BSC_TESTNET_RPC_URLS?.trim()
+      || environment.CHAIN_INDEXER_BSC_TESTNET_RPC_URL?.trim()
+      || environment.BSC_TESTNET_RPC_URL?.trim()
+      || environment.CHAIN_INDEXER_BSC_RPC_URLS?.trim()
+      || environment.CHAIN_INDEXER_BSC_RPC_URL?.trim()
+    : environment.CHAIN_INDEXER_BSC_RPC_URLS?.trim()
+      || environment.CHAIN_INDEXER_BSC_RPC_URL?.trim()
+      || environment.BSC_RPC_URL?.trim();
+  if (configured) return parseBscReadRpcUrls(configured);
+  return chainId === 97
+    ? ['https://data-seed-prebsc-1-s1.binance.org:8545', 'https://bsc-testnet-rpc.publicnode.com']
+    : ['https://bsc-dataseed1.binance.org', 'https://bsc-rpc.publicnode.com'];
 }
 
 function productionDependencies(): WalletVestingDependencies {
@@ -54,7 +66,7 @@ function productionDependencies(): WalletVestingDependencies {
   const canonicalVault = getAddress(vaultAddress) as `0x${string}`;
   const client = createPublicClient({
     chain: chain.chain,
-    transport: http(chain.rpcUrl, { timeout: 8_000, retryCount: 1 }),
+    transport: bscReadTransport(vestingRpcUrls(chain.chainId), chain.chainId),
   });
   return {
     chainId: chain.chainId,

@@ -54,8 +54,15 @@ export type AmbassadorProfile = {
   updatedAt: Date;
 };
 
+export type AmbassadorEnrollment = {
+  isPresaleParticipant: boolean;
+  canChooseSponsor: boolean;
+  canInvite: boolean;
+};
+
 export interface AmbassadorAttributionRepository {
   acquireGraphWriteFence(now: Date): Promise<void>;
+  hasPresaleParticipation(referredWalletNormalized: string): Promise<boolean>;
   findAttribution(referredWalletNormalized: string): Promise<AmbassadorAttribution | null>;
   findLockedPresaleAmbassador(
     referredWalletNormalized: string,

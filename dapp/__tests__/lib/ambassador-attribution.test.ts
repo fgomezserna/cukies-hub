@@ -23,6 +23,7 @@ const NOW = new Date("2026-08-30T12:00:00.000Z");
 class MemoryAmbassadorRepository implements AmbassadorAttributionRepository {
   readonly attributions = new Map<string, AmbassadorAttribution>();
   readonly presale = new Map<string, LockedPresaleAmbassador>();
+  readonly presaleParticipants = new Set<string>();
   graphWriteFences = 0;
 
   async acquireGraphWriteFence() {
@@ -31,6 +32,11 @@ class MemoryAmbassadorRepository implements AmbassadorAttributionRepository {
 
   async findAttribution(referredWalletNormalized: string) {
     return this.attributions.get(referredWalletNormalized) ?? null;
+  }
+
+  async hasPresaleParticipation(referredWalletNormalized: string) {
+    return this.presaleParticipants.has(referredWalletNormalized)
+      || this.presale.has(referredWalletNormalized);
   }
 
   async findLockedPresaleAmbassador(referredWalletNormalized: string) {
@@ -103,7 +109,46 @@ describe("ambassador attribution", () => {
       ambassadorWallet: OTHER,
       signedSessionEvidenceHash: sessionEvidence("other"),
       now: NOW,
-    })).rejects.toMatchObject({ code: "CONFLICT" });
+    })).rejects.toMatchObject({
+      code: "CONFLICT",
+      details: { reason: "AMBASSADOR_ALREADY_CONFIRMED" },
+    });
+  });
+
+  it("bloquea elegir sponsor despues de participar en preventa sin sponsor", async () => {
+    const repository = new MemoryAmbassadorRepository();
+    repository.presaleParticipants.add(REFERRED);
+
+    await expect(acceptDirectAmbassadorAttribution(repository, {
+      referredWallet: REFERRED,
+      ambassadorWallet: AMBASSADOR,
+      signedSessionEvidenceHash: sessionEvidence(),
+      now: NOW,
+    })).rejects.toMatchObject({
+      code: "CONFLICT",
+      details: { reason: "PRESALE_SPONSOR_LOCKED" },
+    });
+    expect(repository.attributions.size).toBe(0);
+    expect(repository.graphWriteFences).toBe(1);
+  });
+
+  it("conserva el replay de una atribucion previa aunque ahora sea comprador", async () => {
+    const repository = new MemoryAmbassadorRepository();
+    const first = await acceptDirectAmbassadorAttribution(repository, {
+      referredWallet: REFERRED,
+      ambassadorWallet: AMBASSADOR,
+      signedSessionEvidenceHash: sessionEvidence(),
+      now: NOW,
+    });
+    repository.presaleParticipants.add(REFERRED);
+
+    await expect(acceptDirectAmbassadorAttribution(repository, {
+      referredWallet: REFERRED,
+      ambassadorWallet: AMBASSADOR,
+      signedSessionEvidenceHash: sessionEvidence("replay-after-purchase"),
+      now: NOW,
+    })).resolves.toEqual(first);
+    expect(repository.attributions.size).toBe(1);
   });
 
   it("rechaza una referencia circular directa entre dos wallets", async () => {
@@ -122,7 +167,10 @@ describe("ambassador attribution", () => {
         signedSessionEvidenceHash: sessionEvidence("b-to-a"),
         now: NOW,
       })
-    ).rejects.toThrow(/referencia circular/);
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      details: { reason: "AMBASSADOR_CYCLE" },
+    });
     expect(repository.attributions.size).toBe(1);
   });
 
@@ -148,7 +196,10 @@ describe("ambassador attribution", () => {
         signedSessionEvidenceHash: sessionEvidence("c-to-a"),
         now: NOW,
       })
-    ).rejects.toThrow(/referencia circular/);
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      details: { reason: "AMBASSADOR_CYCLE" },
+    });
     expect(repository.attributions.size).toBe(2);
     expect(
       [...repository.attributions.values()].every(

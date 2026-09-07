@@ -3,6 +3,7 @@ import {
   type DashboardModulePayloads,
   type DashboardSummaryDependencies,
 } from '@/lib/dashboard/summary';
+import { DomainConflictError } from '@/lib/uki-economy/errors';
 
 const now = new Date('2026-08-30T12:00:00.000Z');
 const wallet = '0x1111111111111111111111111111111111111111';
@@ -82,6 +83,44 @@ function input(runtimeDependencies: DashboardSummaryDependencies) {
 }
 
 describe('dashboard aggregate summary', () => {
+  it('logs the failed module and safe category without wallet, provider messages or secrets', async () => {
+    const logger = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const runtimeDependencies = dependencies();
+      runtimeDependencies.loadCredits = jest.fn(async () => {
+        throw Object.assign(new Error('mongodb://secret:password@private'), {
+          code: 'SCHEMA_NOT_READY', details: { reason: 'secret database reason', wallet },
+        });
+      });
+      await buildDashboardSummary(input(runtimeDependencies));
+      expect(logger).toHaveBeenCalledWith('[dashboard] module unavailable', {
+        module: 'credits', errorType: 'Error', code: 'SCHEMA_NOT_READY',
+      });
+      expect(JSON.stringify(logger.mock.calls)).not.toMatch(/secret|password|0x1111/);
+    } finally {
+      logger.mockRestore();
+    }
+  });
+  it.each([
+    'CREDIT_RULE_MISSING', 'CREDIT_RULE_OVERLAP', 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
+  ])('logs the controlled credit reason %s without exposing details in the response', async (reason) => {
+    const logger = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const runtimeDependencies = dependencies();
+      runtimeDependencies.loadCredits = jest.fn(async () => {
+        throw new DomainConflictError('secret database message', { reason, wallet, secret: 'password' });
+      });
+      const result = await buildDashboardSummary(input(runtimeDependencies));
+      expect(logger).toHaveBeenCalledWith('[dashboard] module unavailable', {
+        module: 'credits', errorType: 'Unknown', code: 'CONFLICT', reason,
+      });
+      expect(JSON.stringify(logger.mock.calls)).not.toMatch(/secret|password|0x1111/);
+      expect(result.modules.credits).toMatchObject({ state: 'unavailable', issues: ['MODULE_UNAVAILABLE'], data: null });
+      expect(JSON.stringify(result)).not.toContain(reason);
+    } finally {
+      logger.mockRestore();
+    }
+  });
   it('agrega en paralelo módulos saludables con identidad, red y freshness', async () => {
     const runtimeDependencies = dependencies();
     const result = await buildDashboardSummary(input(runtimeDependencies));

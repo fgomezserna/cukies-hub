@@ -2,12 +2,12 @@ import 'server-only';
 
 import {
   createPublicClient,
-  http,
   isAddress,
   type Address,
   type ContractFunctionParameters,
 } from 'viem';
 import { bsc, bscTestnet } from 'viem/chains';
+import { bscReadTransport } from '@/lib/bsc-read-rpc';
 
 import { ukiMarketplaceNftReadAbi, ukiMarketplaceReadAbi } from './abi';
 import type {
@@ -47,7 +47,7 @@ export class ViemUkiMarketplaceLiveReader implements UkiMarketplaceLiveReader {
       orders.length === 0
       || !this.runtime.ready
       || !this.runtime.marketplaceAddress
-      || !this.runtime.rpcUrl
+      || this.runtime.rpcUrls.length === 0
       || !this.runtime.chainId
     ) {
       return orders.length === 0 ? new Map() : unavailable(orders);
@@ -90,7 +90,7 @@ export class ViemUkiMarketplaceLiveReader implements UkiMarketplaceLiveReader {
     try {
       const client = createPublicClient({
         chain: this.runtime.chainId === 97 ? bscTestnet : bsc,
-        transport: http(this.runtime.rpcUrl, { timeout: 8_000, retryCount: 1 }),
+        transport: bscReadTransport(this.runtime.rpcUrls, this.runtime.chainId),
       });
       const results = await client.multicall({ contracts, allowFailure: true });
       const inspections = new Map<string, UkiMarketplaceLiveInspection>();

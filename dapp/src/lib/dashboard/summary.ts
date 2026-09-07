@@ -181,7 +181,23 @@ async function captureModule<K extends DashboardModuleId>(input: {
       issues,
       data: result.data,
     };
-  } catch {
+  } catch (error) {
+    // Never log provider messages, URLs, wallets or database connection strings.
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+    const safeCodes: unknown[] = ['VALIDATION', 'CONFLICT', 'NOT_FOUND', 'STALE_FENCE', 'SCHEMA_NOT_READY'];
+    const details = error && typeof error === 'object' && 'details' in error ? error.details : null;
+    const reason = details && typeof details === 'object' && 'reason' in details ? details.reason : null;
+    const safeReasons: unknown[] = [
+      'CREDIT_RULE_MISSING', 'CREDIT_RULE_OVERLAP', 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
+    ];
+    const name = error instanceof Error ? error.name : 'Unknown';
+    const safeNames = ['Error', 'TypeError', 'MongoServerError', 'MongoNetworkError', 'MongoServerSelectionError'];
+    console.error('[dashboard] module unavailable', {
+      module: input.module,
+      errorType: safeNames.includes(name) ? name : 'Unknown',
+      code: safeCodes.includes(code) ? code : 'MODULE_UNAVAILABLE',
+      ...(safeReasons.includes(reason) ? { reason } : {}),
+    });
     return {
       state: 'unavailable',
       generatedAt,
