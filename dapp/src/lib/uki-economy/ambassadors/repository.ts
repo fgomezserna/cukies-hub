@@ -6,11 +6,13 @@ import {
   assertAmbassadorInvitationCode,
   assertAmbassadorAttribution,
   buildAmbassadorAttribution,
+  getDefaultAmbassadorWallet,
   stableAmbassadorHash,
   validAmbassadorWallet,
 } from "./rules";
 import type {
   AmbassadorAttribution,
+  AmbassadorEnrollment,
   AmbassadorProfile,
   AmbassadorAttributionRepository,
   LockedPresaleAmbassador,
@@ -107,6 +109,28 @@ export function createMongoAmbassadorAttributionRepository(
         options
       );
       return row ? assertAmbassadorAttribution(row) : null;
+    },
+    async hasPresaleParticipation(referredWalletNormalized) {
+      const row = await presale.findOne(
+        { normalizedWalletAddress: referredWalletNormalized },
+        {
+          ...options,
+          projection: {
+            _id: 0,
+            normalizedWalletAddress: 1,
+            lockedSponsorWalletAddress: 1,
+            sponsorLockedAt: 1,
+            firstPurchaseAt: 1,
+          },
+        }
+      );
+      if (
+        row?.firstPurchaseAt instanceof Date &&
+        !Number.isNaN(row.firstPurchaseAt.getTime())
+      ) {
+        return true;
+      }
+      return lockedPresaleAmbassador(row) !== null;
     },
     async findLockedPresaleAmbassador(referredWalletNormalized) {
       const row = await presale.findOne(
@@ -287,6 +311,8 @@ export async function getOrCreateMongoAmbassadorProfile(
   session?: ClientSession
 ) {
   const walletNormalized = validAmbassadorWallet(wallet);
+  const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, session);
+  if (!enrollment.canInvite) return null;
   const invitationCode = ambassadorInvitationCode(walletNormalized);
   const profile: AmbassadorProfile = {
     _id: `ambassador-profile:${walletNormalized}`,
@@ -329,11 +355,33 @@ export async function findMongoAmbassadorByInvitationCode(
     .collection<AmbassadorProfile>("ambassador_profiles")
     .findOne({ invitationCode }, session ? { session } : {});
   if (!row) return null;
+  const walletNormalized = validAmbassadorWallet(row.walletNormalized);
+  if (row.invitationCode !== ambassadorInvitationCode(walletNormalized)) {
+    throw new DomainConflictError("El codigo de invitacion no coincide con su embajador.");
+  }
+  const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, session);
+  if (!enrollment.canInvite) return null;
   return {
     ...row,
-    walletNormalized: validAmbassadorWallet(row.walletNormalized),
+    walletNormalized,
     invitationCode: assertAmbassadorInvitationCode(row.invitationCode),
   };
+}
+
+export async function getMongoAmbassadorEnrollment(
+  db: Db,
+  wallet: string,
+  session?: ClientSession
+): Promise<AmbassadorEnrollment> {
+  const walletNormalized = validAmbassadorWallet(wallet);
+  const repository = createMongoAmbassadorAttributionRepository(db, session);
+  const isPresaleParticipant = await repository.hasPresaleParticipation(walletNormalized);
+  const attribution = await repository.findAttribution(walletNormalized);
+  const isDefaultAmbassador =
+    Boolean(process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()) &&
+    walletNormalized === getDefaultAmbassadorWallet();
+  const canInvite = isPresaleParticipant || attribution !== null || isDefaultAmbassador;
+  return { isPresaleParticipant, canChooseSponsor: !canInvite, canInvite };
 }
 
 export async function materializeLockedPresaleAmbassadorAttributions(
