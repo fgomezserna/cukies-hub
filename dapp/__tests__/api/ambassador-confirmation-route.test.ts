@@ -47,6 +47,20 @@ describe('reto de firma de embajador', () => {
     }));
   });
 
+  it('emite el reto de producción para mainnet y su tesorería configurada', async () => {
+    const treasury = '0x538b7ec80b13325ecf7dc3b9b73a58ac56492e01';
+    Object.assign(process.env, { APP_ENV: 'production', STAGING_ONLY_GUARD: 'false',
+      NEXT_PUBLIC_UKI_CHAIN_ID: '56', CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '56',
+      AMBASSADOR_DEFAULT_WALLET_ADDRESS: treasury });
+    expect((await POST(request({ sponsor: 'cukies_world' }))).status).toBe(200);
+    expect(createAmbassadorConfirmation).toHaveBeenCalledWith(expect.objectContaining({
+      wallet: WALLET, ambassadorWallet: treasury, target: { sponsor: 'cukies_world' }, chainId: 56,
+    }));
+    process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID = '97';
+    expect((await POST(request({ sponsor: 'cukies_world' }))).status).toBe(400);
+    expect(createAmbassadorConfirmation).toHaveBeenCalledTimes(1);
+  });
+
   it('sin invitador requiere una wallet Cukies World configurada', async () => {
     expect((await POST(request({ sponsor: 'cukies_world' }))).status).toBe(200);
     expect(createAmbassadorConfirmation).toHaveBeenCalledWith(expect.objectContaining({ ambassadorWallet: SPONSOR }));

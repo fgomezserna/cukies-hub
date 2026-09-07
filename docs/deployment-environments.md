@@ -307,7 +307,7 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `UKI_VESTING_VAULT_ADDRESS` | Opcional attach testnet | Opcional attach mainnet | Solo si se reutiliza. |
 | `SALE_OWNER_ADDRESS` | Admin/multisig testnet | Multisig mainnet | Obligatorio en redes no locales. |
 | `SALE_TREASURY_ADDRESS` | Treasury testnet | Treasury mainnet | Controlado. |
-| `AMBASSADOR_DEFAULT_WALLET_ADDRESS` | `0x19907a00aBF02975fb60D616C99565894c08d859` | Wallet de tesoreria aprobada | Treasury Testnet verificada el 2026-09-07 con `Presale.treasury()`; configurar en app 28. Sin fallback Testnet en produccion. |
+| `AMBASSADOR_DEFAULT_WALLET_ADDRESS` | `0x19907a00aBF02975fb60D616C99565894c08d859` | `0x538b7EC80B13325ecf7DC3b9b73A58ac56492e01` | Tesorerias verificadas el 2026-09-07 con `Presale.treasury()` en cadenas 97 y 56. Configurar por separado en apps 28 y 12; sin fallback entre entornos. |
 | `SALE_START` | Timestamp testnet | Timestamp mainnet | UTC. |
 | `SALE_END` | Timestamp testnet | Timestamp mainnet | UTC. |
 | `UKI_PER_ASM` | Ratio testnet | Ratio mainnet | Raw `1e18` scale. |
