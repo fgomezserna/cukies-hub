@@ -12,6 +12,52 @@ source ~/.zshrc >/dev/null 2>&1 &&
 ```
 - Tu prioridad es elegir el mejor workflow para el objetivo, no ejecutar comandos por inercia.
 
+## Flujo por defecto de agentes
+
+Para trabajo que se pueda separar con seguridad, el coordinador se limita a razonamiento y orquestación: conserva la decisión, el reparto, la revisión de evidencia/diff y la integración; delega la ejecución rutinaria en agentes baratos `gpt-5.6-luna`. El flujo por defecto es: auditor Luna `medium` para lectura por puntos, implementador Luna `high` para un parche acotado y verificador Luna `high` independiente cuando el riesgo lo justifique. Luna admite `low`, `medium`, `high`, `xhigh` y `max`; `max` solo se permite como escalada justificada dentro de Luna. El coordinador no duplica implementación ni rastreo rutinario. Las operaciones privilegiadas ya autorizadas por el usuario se ejecutan si la herramienta solo está disponible para la raíz.
+
+- Invocar mediante `collaboration.spawn_agent` con exactamente los campos `task_name`, `model`, `reasoning_effort`, `fork_turns` y `message`; el encargo autocontenido va dentro de `message`. Fijar siempre el modelo y esfuerzo indicados para el rol. No crear chats, cron ni subcomandos/configuración ficticios.
+- Reutilizar un agente solo para el mismo alcance, modelo y esfuerzo; no resucitar agentes Astra anteriores para trabajo barato. Si Luna no está disponible, declararlo y pedir preferencia en ese momento; no escalar silenciosamente a un modelo más caro.
+- Concurrencia máxima: `min(3, capacidad del runtime)`; normalmente 1-2 workers, sin subdelegación. Agrupar 2-5 puntos relacionados y no lanzar un agente por check. Para documentación pequeña, editar localmente sin ceremonia.
+- Hacer una pasada y, como máximo, una corrección acotada por hallazgos. Cada pasada debe limitarse orientativamente a 15-20 consultas focales y un resultado de 300 palabras más tabla/apéndice; si falta evidencia, registrar el hueco y replantear el alcance con el coordinador, sin abandonar el objetivo ni esperar permiso rutinario.
+- Los límites son operativos, no cuotas garantizadas. No inventar precios o porcentajes de ahorro ni recurrir a API facturada o resets para este flujo sin petición expresa. Las auditorías solo leen: no implementan ni mutan sistemas remotos. Seguridad y economía se escalan al coordinador para revisión; eso no concede potencia máxima ni una aprobación nueva.
+
+Ejemplo de invocación real para una auditoría de solo lectura:
+
+```json
+{
+  "task_name": "auditar_issue_123_puntos_a_b",
+  "model": "gpt-5.6-luna",
+  "reasoning_effort": "medium",
+  "fork_turns": "none",
+  "message": "Rol auditor, solo lectura. ISSUE-123, puntos A-B. Consulta como máximo 15-20 fuentes focales; no edites archivos del repo ni mutes sistemas remotos. Usa la evidencia disponible y registra en /tmp/issue-123-audit.md cada punto con ID, código, local, Stage/Prod, hasta 2 rutas, bloqueo y próximo paso. Sin evidencia informa sin verificar; no conviertas ese estado en pendiente o falla. Devuelve un resumen de hasta 300 palabras y la ruta del resultado."
+}
+```
+
+Cada reporte debe incluir por punto: ID, código, estado local, Stage/Prod con
+fecha y SHA cuando exista, como máximo dos rutas de evidencia, bloqueo y próximo
+paso. Un estado sin verificar no equivale a pendiente o falla; documentación
+vieja o la ausencia de un archivo no prueba inexistencia. Nunca marcar todo
+cerrado solo por health checks o tests unitarios. La tabla de estado vive en
+`docs/antes-del-15-seguimiento.md` y las reglas funcionales en
+`docs/uki-current-operating-rules.md`; no duplicar esas historias en este
+archivo. Los derechos de merge, deploy, secretos y separación Stage/main se
+conservan.
+
+### Contrato de fuente única de seguimiento
+
+- El estado y alcance vigente se actualizan en `docs/antes-del-15-seguimiento.md`;
+  las reglas funcionales viven en `docs/uki-current-operating-rules.md` y las
+  issues solo coordinan tareas vinculadas.
+- Tras cada decisión o evidencia, actualiza la misma fila y conserva la fecha,
+  URL/artefacto y alcance; no crees estados paralelos en backlog o mapas.
+- La decisión explícita del usuario supersede documentación antigua. Una issue
+  cerrada, health verde, merge o deploy técnico no equivale a publicación de
+  producto.
+- Usa pruebas sin repetirlas por ritual y reconcilia conflictos entre fuentes
+  antes de responder. Distingue siempre confirmación de usuario, observación
+  live y contraste pendiente.
+
 ## Project Structure
 
 This is a pnpm monorepo containing multiple applications:
@@ -19,7 +65,8 @@ This is a pnpm monorepo containing multiple applications:
 - **`dapp/`** - Main Next.js 15 web application (Hyppie Gaming Platform)
 - **`games/sybil-slayer/`** - Next.js game running on port 9002 (Token Runner game)
 - **`games/hyppie-road/`** - Next.js game running on port 9003 (Hyppie Road game)
-- **`packages/`** - Shared packages and utilities
+- **`games/tower-builder/`** - Tower Builder game
+- **`packages/`** - Shared packages, contracts, chain indexer and card/bridge workers; see `pnpm-workspace.yaml` and each package manifest.
 
 ## Development Commands
 
@@ -252,19 +299,11 @@ Choose work in this order:
 1. User-specified issue, PR, milestone or explicit instruction.
 2. The earliest active launch milestone by the current GitHub milestone order, not by stale milestone names written in old issue bodies.
 3. Unblocked `priority:p0` leaf issues inside that earliest active milestone.
-4. For the current UKI launch roadmap, `Phase 0 - Landing live, compra cerrada` is the first active phase. It includes communication, architecture of information, landing, system visual, disclaimers, data audit and public assets.
-5. Inside Phase 0, follow the live coordination issue and comments before implementation. The current correction of focus is: close branding and communication foundations before generating more screens or implementing final visual styling.
-6. For `#141 [UKI-004] Comunicacion, restyling y sistema visual de lanzamiento`, the required order is:
-   - inventory of the current website and existing visual assets,
-   - brand DNA: what stays, what is modernized and what is discarded,
-   - approved UKI launch brand direction,
-   - approved brand board,
-   - only then home, presale, dashboard and other sections.
-7. If a proposal looks like a presentation/deck instead of a navigable landing, reject that direction and return to visual system and structure.
-8. Do not treat `M0.5`, `M7` or other old milestone names inside issue bodies as authoritative when GitHub milestones have been reorganized into Phase 0-5. The current GitHub milestone assignment and recent epic comments override stale body text.
-9. Leaf task issues before parent epics.
-10. Issues with clear acceptance criteria before ambiguous issues.
-11. If an issue has `blocked`, `needs-validation`, missing product decisions, missing legal approval, or an unapproved UX image gate, do not implement beyond safe discovery/spec work. Comment what is blocked and what decision is needed.
+4. Read the live coordination issue and recent epic comments before choosing communication, branding, UX or public-shell work. Follow the approved brand direction before final visual implementation.
+5. Treat milestone names, issue priorities and visual approval state as live GitHub data. Do not carry forward a historical launch phase or issue number as permanent priority.
+6. Leaf task issues before parent epics.
+7. Issues with clear acceptance criteria before ambiguous issues.
+8. If an issue has `blocked`, `needs-validation`, missing product decisions, missing legal approval, or an unapproved UX image gate, do not implement beyond safe discovery/spec work. Comment what is blocked and what decision is needed.
 
 Before selecting an issue, read its parent epic, child checklist, labels, milestone and recent comments. Recent comments are mandatory because roadmap changes and priority corrections are coordinated there:
 
@@ -272,7 +311,7 @@ Before selecting an issue, read its parent epic, child checklist, labels, milest
 source ~/.zshrc >/dev/null 2>&1 && gh issue view <number> --repo fgomezserna/cukies-hub --comments --json number,title,body,labels,milestone,assignees,state,comments
 ```
 
-If the candidate belongs to an epic, also read the epic issue and recent comments before recommending or starting work. For UKI Phase 0, read at minimum `#141` before choosing any communication, restyling, landing, UX image or public-shell task.
+If the candidate belongs to an epic, also read the epic issue and recent comments before recommending or starting work. For communication, restyling, landing or UX image work, read the currently assigned coordination epic and its approval decisions.
 
 ### Issue Intake
 
@@ -294,23 +333,9 @@ Validacion prevista:
 ```
 5. If the issue is too large, split it into smaller child issues and link them from the parent instead of producing a broad, risky patch.
 
-### Delegation With Sub-Agents
+### Delegación con subagentes
 
-The main agent decides whether to use sub-agents in each case. Do not ask the user to decide this by default. Use senior engineering judgment based on scope, independence of tasks, risk and expected speedup.
-
-- The main agent acts as tech lead: triage, architecture, risk control, final review, integration, GitHub comments and closure.
-- Use sub-agents when work can be split into bounded, independent tasks with disjoint write scopes.
-- Keep work local when the task is tightly coupled, ambiguous, urgent on the critical path, or too risky to delegate cleanly.
-- Give each worker:
-  - exact issue number and goal,
-  - files/modules they own,
-  - files/modules they must not touch,
-  - acceptance criteria,
-  - required validation command,
-  - instruction not to revert or overwrite work by others.
-- Do not delegate the immediate blocker if the main agent needs that result before doing anything else.
-- Review every worker patch before commit. The main agent remains accountable for coherence, tests and issue updates.
-- If the current runtime does not provide sub-agents or parallel delegation tools, continue locally and mention that limitation only if it affects delivery.
+La sección de flujo por defecto anterior es la política única de delegación. Prioriza alcances acotados e independientes y conserva en el coordinador la integración, revisión, actualizaciones de GitHub y cierre. Si un trabajo dependiente o ambiguo puede delimitarse con seguridad, el coordinador fija ese alcance y delega su ejecución. Si las herramientas de delegación no están disponibles, comunica la limitación y avanza la decisión o el plan; no hagas fallback automático a Astra ni a implementación cara.
 
 ### Implementation Rules
 
@@ -329,6 +354,8 @@ The main agent decides whether to use sub-agents in each case. Do not ask the us
 ### Verification
 
 Run the smallest reliable validation set for the touched area:
+
+- Ejecuta checks focales durante el parche. Los checks completos exigidos se ejecutan una vez por lote y SHA final, no una vez por worker; repítelos solo si cambios o fallos lo justifican. Para cambios solo documentales no añadas tests de producto; valida formato, diff y coherencia del documento.
 
 - DApp changes:
 ```bash

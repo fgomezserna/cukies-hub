@@ -4,6 +4,9 @@ Estado: aceptado para implementacion inicial.
 Issue: #16 `UKI-001.1`.
 Fecha: 2026-05-12.
 Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
+Estado de lanzamiento vigente: [seguimiento del 15](antes-del-15-seguimiento.md) (2026-09-07).
+Este ADR conserva decisiones tecnicas; no mantiene una tabla de estados
+alternativa.
 
 ## Contexto
 
@@ -15,7 +18,10 @@ Reglas base heredadas del backlog tecnico:
 - Mongo opera producto, juegos, creditos, rankings, pools, snapshots y calculos.
 - BSC liquida valor, compras, vesting, staking de UKI y claims finales.
 - Treasure Hunt es el primer juego, pero las reglas deben soportar multiples juegos.
-- El bridge/marketplace existente no se reimplementa dentro de este lanzamiento.
+- El bridge/marketplace existente forma parte del programa de migracion legacy
+  antes del 15: se inventaria, audita, reutiliza o migra con sus datos,
+  contratos y asociaciones legitimas, y se retira el runtime antiguo al quedar
+  cero consumidores. Este ADR no declara ese programa cerrado.
 - Direccion actual de producto: las nuevas posiciones de staking Cukie Master y pool de Cukies operan solo en BSC; Tron se mantiene para lectura, reconciliacion y migracion salvo decision posterior.
 
 ## Decision
