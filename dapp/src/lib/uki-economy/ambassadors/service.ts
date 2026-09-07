@@ -2,11 +2,13 @@ import { DomainConflictError } from "../errors";
 import {
   createMongoAmbassadorAttributionRepository,
   findMongoAmbassadorByInvitationCode,
+  getMongoAmbassadorEnrollment,
   getOrCreateMongoAmbassadorProfile,
 } from "./repository";
 import {
   assertAmbassadorAttribution,
   buildAmbassadorAttribution,
+  getDefaultAmbassadorWallet,
   validAmbassadorWallet,
 } from "./rules";
 import type {
@@ -25,6 +27,7 @@ function assertSameSponsor(
   assertAmbassadorAttribution(current);
   if (current.ambassadorWalletNormalized !== ambassadorWalletNormalized) {
     throw new DomainConflictError(reason, {
+      reason: "AMBASSADOR_ALREADY_CONFIRMED",
       referredWalletNormalized: current.referredWalletNormalized,
       currentAmbassadorWalletNormalized: current.ambassadorWalletNormalized,
     });
@@ -72,12 +75,14 @@ async function assertAttributionDoesNotCreateCycle(
   for (let depth = 0; depth < MAX_AMBASSADOR_CHAIN_DEPTH; depth += 1) {
     if (currentWallet === referredWalletNormalized) {
       throw new DomainConflictError(
-        "La atribucion crearia una referencia circular entre embajadores."
+        "La atribucion crearia una referencia circular entre embajadores.",
+        { reason: "AMBASSADOR_CYCLE" },
       );
     }
     if (visited.has(currentWallet)) {
       throw new DomainConflictError(
-        "La cadena del embajador ya contiene una referencia circular y no puede ampliarse."
+        "La cadena del embajador ya contiene una referencia circular y no puede ampliarse.",
+        { reason: "AMBASSADOR_CYCLE" },
       );
     }
     visited.add(currentWallet);
@@ -92,7 +97,8 @@ async function assertAttributionDoesNotCreateCycle(
   }
 
   throw new DomainConflictError(
-    "La cadena del embajador supera el limite seguro de validacion."
+    "La cadena del embajador supera el limite seguro de validacion.",
+    { reason: "AMBASSADOR_CHAIN_TOO_DEEP" },
   );
 }
 
@@ -159,6 +165,19 @@ export async function acceptDirectAmbassadorAttribution(
         : "La wallet ya tiene un embajador distinto y la atribucion es inmutable.",
     );
   }
+  if (process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()
+    && referredWalletNormalized === getDefaultAmbassadorWallet()) {
+    throw new DomainConflictError(
+      "Cukies World es la raiz de embajadores y no puede elegir un patrocinador.",
+      { reason: "AMBASSADOR_ALREADY_CONFIRMED" },
+    );
+  }
+  if (await repository.hasPresaleParticipation(referredWalletNormalized)) {
+    throw new DomainConflictError(
+      "Las wallets que participaron en la preventa ya no pueden elegir un embajador.",
+      { reason: "PRESALE_SPONSOR_LOCKED" },
+    );
+  }
   const candidate = buildAmbassadorAttribution({
     referredWallet: referredWalletNormalized,
     ambassadorWallet: ambassadorWalletNormalized,
@@ -208,6 +227,17 @@ export async function acceptCanonicalAmbassadorAttribution(input: {
   );
 }
 
+export async function acceptCanonicalCukiesWorldEnrollment(input: {
+  referredWallet: string;
+  signedSessionEvidenceHash: string;
+  now?: Date;
+}) {
+  return acceptCanonicalAmbassadorAttribution({
+    ...input,
+    ambassadorWallet: getDefaultAmbassadorWallet(),
+  });
+}
+
 export async function acceptCanonicalAmbassadorInvitation(input: {
   referredWallet: string;
   invitationCode: string;
@@ -243,4 +273,15 @@ export async function getCanonicalAmbassadorProfile(
 ) {
   const { getEconomyDb } = await import("@/lib/indexer-db/mongodb");
   return getOrCreateMongoAmbassadorProfile(await getEconomyDb(), wallet, now);
+}
+
+export async function getCanonicalAmbassadorEnrollment(wallet: string) {
+  const { getEconomyDb } = await import("@/lib/indexer-db/mongodb");
+  return getMongoAmbassadorEnrollment(await getEconomyDb(), wallet);
+}
+
+export async function getCanonicalAmbassadorInvitationWallet(invitationCode: string) {
+  const { getEconomyDb } = await import("@/lib/indexer-db/mongodb");
+  const profile = await findMongoAmbassadorByInvitationCode(await getEconomyDb(), invitationCode);
+  return profile?.walletNormalized ?? null;
 }

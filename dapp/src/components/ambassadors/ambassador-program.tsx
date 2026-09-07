@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatUnits } from 'viem';
+import { useSignMessage } from 'wagmi';
 import {
   ArrowClockwise,
   ArrowRight,
@@ -37,10 +38,13 @@ type CommissionStatus =
 
 type AmbassadorDashboard = {
   walletNormalized: string;
-  profile: { invitationCode: string };
+  profile: { invitationCode: string } | null;
+  enrollment: { isPresaleParticipant: boolean; canChooseSponsor: boolean; canInvite: boolean };
+  defaultAmbassador: { ambassadorWalletMasked: string } | null;
   ownAttribution: {
     attributionId: string;
     ambassadorWalletMasked: string;
+    isCukiesWorld: boolean;
     source: AttributionSource;
     acceptedAt: string;
     commissionBps: number;
@@ -132,7 +136,7 @@ const STATUS_COPY: Record<CommissionStatus, { label: string; helper: string }> =
 function sourceCopy(source: AttributionSource) {
   return source === 'presale_locked'
     ? 'Vinculado automáticamente desde la preventa'
-    : 'Confirmado mediante invitación';
+    : 'Confirmado con tu wallet';
 }
 
 function Metric({ label, value, helper }: { label: string; value: string; helper: string }) {
@@ -157,86 +161,165 @@ function LoadingProgram() {
   );
 }
 
+const PENDING_INVITATION_KEY = 'cukies:ambassador:pending-invitation';
+
+function storedInvitation() {
+  try {
+    return window.sessionStorage.getItem(PENDING_INVITATION_KEY)?.trim().toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+function confirmationError(error: unknown) {
+  const code = error instanceof Error ? error.message : '';
+  const messages: Record<string, string> = {
+    AMBASSADOR_CYCLE: 'No puedes registrarte con este embajador porque formarías un ciclo.',
+    PRESALE_SPONSOR_LOCKED: 'Participaste en la preventa y ya no puedes asignarte un embajador.',
+    AMBASSADOR_ALREADY_CONFIRMED: 'Esta wallet ya tiene un embajador confirmado y no puede cambiarlo.',
+    INVALID_SIGNATURE: 'No hemos podido validar la firma. Vuelve a confirmar con tu wallet.',
+    AMBASSADOR_CONFIRMATION_REQUIRED: 'Confirma tu embajador con una firma en tu wallet.',
+    AMBASSADOR_DEFAULT_WALLET_NOT_CONFIGURED: 'Ahora no podemos confirmar a Cukies World como embajador. Tu selección se conserva; inténtalo más tarde.',
+    AMBASSADOR_CONFIRMATION_SECRET_NOT_CONFIGURED: 'La confirmación de embajador no está disponible ahora. Tu selección se conserva; inténtalo más tarde.',
+    NOT_FOUND: 'Esta invitación ya no está disponible.',
+  };
+  return messages[code] ?? 'No hemos podido confirmar la invitación. Tu invitación pendiente se conserva; vuelve a intentarlo.';
+}
+
 export function AmbassadorProgram({ initialInvitationCode }: { initialInvitationCode?: string }) {
   const { user, isLoading: authLoading, walletType } = useAuth();
+  const { signMessageAsync } = useSignMessage();
   const walletAddress = user?.walletAddress ?? null;
+  const walletKey = walletType === 'evm' ? walletAddress?.toLowerCase() ?? null : null;
   const [dashboard, setDashboard] = useState<AmbassadorDashboard | null>(null);
   const [policy, setPolicy] = useState<SummaryResponse['policy']>(undefined);
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [pendingInvitationCode, setPendingInvitationCode] = useState<string | null>(
+    initialInvitationCode?.trim().toLowerCase() || null,
+  );
+  const [resolvedInvitation, setResolvedInvitation] = useState<Invitation | null>(null);
+  const invitation = resolvedInvitation?.invitationCode === pendingInvitationCode ? resolvedInvitation : null;
   const [requestState, setRequestState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [invitationState, setInvitationState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [accepting, setAccepting] = useState(false);
   const [consent, setConsent] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ message: string; error?: boolean } | null>(null);
+  const mounted = useRef(false);
+  const currentWallet = useRef(walletKey);
+  currentWallet.current = walletKey;
+  const dashboardRequest = useRef(0);
+  const confirmationContextKey = JSON.stringify([walletKey, pendingInvitationCode, initialInvitationCode]);
+  const confirmationContext = useRef({ key: confirmationContextKey });
+  if (confirmationContext.current.key !== confirmationContextKey) {
+    confirmationContext.current = { key: confirmationContextKey };
+  }
+  const activeConfirmation = useRef<object | null>(null);
+  const currentDashboard = dashboard?.walletNormalized.toLowerCase() === walletKey ? dashboard : null;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      dashboardRequest.current += 1;
+      activeConfirmation.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const code = initialInvitationCode?.trim().toLowerCase();
+    if (code) {
+      try {
+        window.sessionStorage.setItem(PENDING_INVITATION_KEY, code);
+      } catch {
+        // The invitation still works in memory when browser storage is unavailable.
+      }
+    }
+    setPendingInvitationCode(code || storedInvitation());
+  }, [initialInvitationCode]);
+
+  useEffect(() => {
+    activeConfirmation.current = null;
+    setAccepting(false);
+    setConsent(false);
+  }, [confirmationContextKey]);
 
   const loadDashboard = useCallback(async () => {
-    if (!walletAddress || walletType !== 'evm') return;
+    if (!walletKey) return;
+    const requestId = ++dashboardRequest.current;
+    const isCurrent = () => mounted.current && currentWallet.current === walletKey && dashboardRequest.current === requestId;
     setRequestState('loading');
-    setFeedback(null);
+    setFeedback((previous) => previous?.error ? null : previous);
     try {
       const response = await fetch('/api/economy/v1/ambassadors/summary', {
         cache: 'no-store',
         credentials: 'same-origin',
       });
       const body = await response.json() as SummaryResponse;
-      if (!response.ok || body.status !== 'ok' || !body.dashboard) throw new Error(body.code);
+      if (!isCurrent()) return;
+      if (!response.ok || body.status !== 'ok' || !body.dashboard || body.dashboard.walletNormalized.toLowerCase() !== walletKey) {
+        throw new Error(body.code);
+      }
       setDashboard(body.dashboard);
       setPolicy(body.policy);
       setRequestState('ready');
     } catch {
+      if (!isCurrent()) return;
       setRequestState('error');
-      setFeedback('No podemos actualizar el programa ahora. No se ha guardado ningún cambio.');
+      setFeedback({ message: 'No podemos actualizar el programa ahora. Tus relaciones y comisiones se conservan.', error: true });
     }
-  }, [walletAddress, walletType]);
+  }, [walletKey]);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!walletAddress || walletType !== 'evm') {
-      setDashboard(null);
-      setPolicy(undefined);
-      setRequestState('idle');
+    dashboardRequest.current += 1;
+    setDashboard(null);
+    setPolicy(undefined);
+    setFeedback(null);
+    setCopied(false);
+    setRequestState('idle');
+    if (!authLoading && walletKey) void loadDashboard();
+    return () => { dashboardRequest.current += 1; };
+  }, [authLoading, loadDashboard, walletKey]);
+
+  useEffect(() => {
+    setResolvedInvitation(null);
+    if (!pendingInvitationCode) {
+      setInvitationState('idle');
       return;
     }
-    void loadDashboard();
-  }, [authLoading, loadDashboard, walletAddress, walletType]);
-
-  useEffect(() => {
-    const code = initialInvitationCode?.trim().toLowerCase();
-    if (!code) return;
     const controller = new AbortController();
     setInvitationState('loading');
-    fetch(`/api/economy/v1/ambassadors/invitations/${encodeURIComponent(code)}`, {
+    fetch(`/api/economy/v1/ambassadors/invitations/${encodeURIComponent(pendingInvitationCode)}`, {
       cache: 'no-store',
       signal: controller.signal,
     })
       .then(async (response) => {
         const body = await response.json() as InvitationResponse;
+        if (controller.signal.aborted) return;
         if (!response.ok || body.status !== 'ok' || !body.invitation) throw new Error(body.code);
-        setInvitation(body.invitation);
+        setResolvedInvitation(body.invitation);
         setInvitationState('ready');
       })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        setInvitation(null);
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setResolvedInvitation(null);
         setInvitationState('error');
       });
     return () => controller.abort();
-  }, [initialInvitationCode]);
+  }, [pendingInvitationCode]);
 
   const invitationUrl = useMemo(() => {
-    if (!dashboard || typeof window === 'undefined') return null;
-    return `${window.location.origin}/embajadores/${dashboard.profile.invitationCode}`;
-  }, [dashboard]);
+    if (!currentDashboard?.enrollment.canInvite || !currentDashboard.profile || typeof window === 'undefined') return null;
+    return `${window.location.origin}/embajadores/${currentDashboard.profile.invitationCode}`;
+  }, [currentDashboard]);
 
   async function copyInvitationLink() {
     if (!invitationUrl) return;
     try {
       await navigator.clipboard.writeText(invitationUrl);
       setCopied(true);
-      setFeedback('Enlace copiado.');
+      setFeedback({ message: 'Enlace copiado.' });
     } catch {
-      setFeedback('No se ha podido copiar el enlace.');
+      setFeedback({ message: 'No se ha podido copiar el enlace.', error: true });
     }
   }
 
@@ -257,40 +340,69 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
     await copyInvitationLink();
   }
 
+  const defaultAmbassador = !pendingInvitationCode ? currentDashboard?.defaultAmbassador : null;
+  const proposedAmbassador = invitation ?? defaultAmbassador;
+  const isOwnInvitation = Boolean(
+    invitation && currentDashboard?.profile?.invitationCode === invitation.invitationCode,
+  );
+
   async function acceptInvitation() {
-    if (!invitation || !consent || accepting || dashboard?.ownAttribution) return;
+    if (!proposedAmbassador || !consent || activeConfirmation.current || !walletAddress || !currentDashboard?.enrollment.canChooseSponsor || currentDashboard.ownAttribution || isOwnInvitation) return;
+    const context = confirmationContext.current;
+    const operation = {};
+    activeConfirmation.current = operation;
+    const isCurrent = () => mounted.current && confirmationContext.current === context && activeConfirmation.current === operation;
+    const target = invitation ? { invitationCode: invitation.invitationCode } : { sponsor: 'cukies_world' as const };
     setAccepting(true);
     setFeedback(null);
     try {
+      const challengeResponse = await fetch('/api/economy/v1/ambassadors/confirmation', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(target),
+      });
+      const challenge = await challengeResponse.json() as { status: string; message?: string; code?: string };
+      if (!isCurrent()) return;
+      if (!challengeResponse.ok || challenge.status !== 'ok' || !challenge.message) throw new Error(challenge.code);
+      let signature: string;
+      try {
+        signature = await signMessageAsync({ account: walletAddress as `0x${string}`, message: challenge.message });
+      } catch {
+        if (isCurrent()) setFeedback({ message: 'No se ha completado la firma. Tu invitación pendiente se conserva y puedes volver a intentarlo.', error: true });
+        return;
+      }
+      if (!isCurrent()) return;
       const response = await fetch('/api/economy/v1/ambassadors/attribution', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ invitationCode: invitation.invitationCode }),
+        body: JSON.stringify({ ...target, signature }),
       });
       const body = await response.json() as SummaryResponse;
+      if (!isCurrent()) return;
       if (!response.ok || body.status !== 'ok') throw new Error(body.code);
+      try {
+        if (storedInvitation() === pendingInvitationCode) window.sessionStorage.removeItem(PENDING_INVITATION_KEY);
+      } catch {
+        // Confirmation is valid even if browser storage is unavailable.
+      }
+      setPendingInvitationCode(null);
+      setResolvedInvitation(null);
       setConsent(false);
+      setFeedback({ message: 'Embajador confirmado. Esta relación ya queda protegida.' });
       await loadDashboard();
-      setFeedback('Embajador confirmado. Esta relación ya queda protegida.');
     } catch (error) {
-      const code = error instanceof Error ? error.message : '';
-      setFeedback(
-        code === 'CONFLICT'
-          ? 'Esta wallet ya tiene otro embajador confirmado y no puede cambiarlo.'
-          : code === 'NOT_FOUND'
-            ? 'Esta invitación ya no está disponible.'
-            : 'No hemos podido confirmar la invitación. No se ha guardado ningún cambio.',
-      );
+      if (isCurrent()) setFeedback({ message: confirmationError(error), error: true });
     } finally {
-      setAccepting(false);
+      if (isCurrent()) {
+        activeConfirmation.current = null;
+        setAccepting(false);
+      }
     }
   }
 
   const commissionPercent = (policy?.commissionBps ?? 500) / 100;
-  const isOwnInvitation = Boolean(
-    invitation && dashboard?.profile.invitationCode === invitation.invitationCode,
-  );
 
   return (
     <div className="uki-landing mx-auto min-h-full w-full max-w-[1480px] [background:transparent] pb-10 text-[var(--uki-cream)]">
@@ -318,13 +430,13 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         </div>
       </header>
 
-      {initialInvitationCode ? (
+      {pendingInvitationCode || (currentDashboard?.enrollment.canChooseSponsor && defaultAmbassador) ? (
         <section aria-labelledby="invitation-title" className="pt-7">
           <Panel innerClassName="p-5 sm:p-7">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)] lg:items-center">
               <div>
-                <p className="uki-label">Has recibido una invitación</p>
-                <h2 id="invitation-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Confirma quién te invitó</h2>
+                <p className="uki-label">{pendingInvitationCode ? 'Has recibido una invitación' : 'Tu embajador propuesto'}</p>
+                <h2 id="invitation-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">{pendingInvitationCode ? 'Confirma quién te invitó' : 'Confirma tu embajador'}</h2>
                 {invitationState === 'loading' ? (
                   <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--uki-muted)]">
                     <SpinnerGap className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" /> Comprobando la invitación…
@@ -333,21 +445,23 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                   <p role="alert" className="mt-4 flex items-start gap-2 text-sm font-semibold text-amber-200">
                     <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> Esta invitación no existe o ya no puede utilizarse.
                   </p>
-                ) : invitation ? (
+                ) : proposedAmbassador ? (
                   <div className="mt-4 flex items-center gap-3">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac)]/10">
                       <Crown className="h-5 w-5 text-[var(--uki-lilac)]" weight="fill" />
                     </span>
                     <div>
-                      <p className="font-mono text-base font-black text-[var(--uki-cream)]">{invitation.ambassadorWalletMasked}</p>
-                      <p className="mt-0.5 text-xs font-semibold text-[var(--uki-muted)]">Será tu embajador directo</p>
+                      {defaultAmbassador ? <p className="font-black text-[var(--uki-cream)]">Cukies World</p> : null}
+                      <p className="font-mono text-base font-black text-[var(--uki-cream)]">{proposedAmbassador.ambassadorWalletMasked}</p>
+                      <p className="mt-0.5 text-xs font-semibold text-[var(--uki-muted)]">{currentDashboard && !currentDashboard.enrollment.canChooseSponsor ? 'Wallet que te invita' : 'Será tu embajador directo'}</p>
                     </div>
                   </div>
                 ) : null}
               </div>
 
-              {invitation &&
-              !dashboard?.ownAttribution &&
+              {proposedAmbassador &&
+              currentDashboard?.enrollment.canChooseSponsor &&
+              !currentDashboard?.ownAttribution &&
               walletAddress &&
               requestState === "ready" &&
               !isOwnInvitation ? (
@@ -356,11 +470,12 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                     <input
                       type="checkbox"
                       checked={consent}
+                      disabled={accepting}
                       onChange={(event) => setConsent(event.target.checked)}
                       className="mt-1 h-4 w-4 accent-[var(--uki-lilac)]"
                     />
                     <span className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                      Entiendo que esta relación es permanente y no podré sustituirla más adelante.
+                      Entiendo que esta relación es permanente y no podré sustituirla más adelante. La confirmaré con una firma en mi wallet, sin gas.
                     </span>
                   </label>
                   <button
@@ -370,7 +485,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                     className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-4 font-headline text-sm font-black text-[#09060f] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {accepting ? <SpinnerGap className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" weight="bold" />}
-                    Confirmar embajador
+                    {accepting ? 'Esperando confirmación…' : 'Confirmar embajador'}
                   </button>
                 </div>
               ) : !walletAddress && invitation ? (
@@ -380,11 +495,13 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                   label="Conectar para confirmar"
                   compactLabel="Conectar"
                 />
-              ) : dashboard?.ownAttribution ? (
+              ) : currentDashboard?.ownAttribution ? (
                 <div className="flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-4">
                   <LockKey className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" weight="fill" />
                   <p className="text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">Tu wallet ya tiene un embajador confirmado.</p>
                 </div>
+              ) : currentDashboard?.enrollment.isPresaleParticipant ? (
+                <p className="text-sm font-semibold text-[var(--uki-muted)]">Participaste en la preventa y ya no puedes asignarte un embajador. Conservas tu enlace para invitar.</p>
               ) : isOwnInvitation ? (
                 <p className="text-sm font-semibold text-amber-200">No puedes aceptar tu propia invitación.</p>
               ) : null}
@@ -394,14 +511,14 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       ) : null}
 
       {feedback ? (
-        <div role="status" className="mt-5 flex items-start gap-3 rounded-[10px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.06] p-4 text-sm font-semibold text-[var(--uki-text)]">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" weight="bold" /> {feedback}
+        <div role={feedback.error ? 'alert' : 'status'} className="mt-5 flex items-start gap-3 rounded-[10px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.06] p-4 text-sm font-semibold text-[var(--uki-text)]">
+          {feedback.error ? <Warning className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" weight="bold" /> : <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" weight="bold" />} {feedback.message}
         </div>
       ) : null}
 
       {authLoading || requestState === 'loading' ? <LoadingProgram /> : null}
 
-      {!initialInvitationCode &&
+      {!pendingInvitationCode &&
       !authLoading &&
       (!walletAddress || walletType !== 'evm') ? (
         <section className="grid min-h-[28rem] overflow-hidden rounded-[18px] border border-[var(--uki-lilac)]/25 bg-[#09060f] lg:grid-cols-[1.15fr_0.85fr]">
@@ -409,7 +526,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
             <UsersThree className="h-8 w-8 text-[var(--uki-lilac)]" weight="fill" />
             <h2 className="mt-5 max-w-xl font-headline text-3xl font-black sm:text-4xl">Conecta tu wallet para abrir tu programa</h2>
             <p className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-              Verás tu enlace, los invitados confirmados y cada comisión desde que se registra hasta que llega a tu wallet.
+              Puedes conectar y navegar sin confirmar ningún embajador. Si llegas con una invitación, se conservará hasta que decidas confirmarla.
             </p>
             <LandingWalletConnectButton evmOnly className="mt-6 w-fit" showCompactText={false} />
           </div>
@@ -431,7 +548,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         </div>
       ) : null}
 
-      {requestState === 'ready' && dashboard ? (
+      {requestState === 'ready' && currentDashboard ? (
         <>
           <section aria-labelledby="summary-title" className="pt-7">
             <div className="flex items-end justify-between gap-4 pb-4">
@@ -444,10 +561,10 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
               </button>
             </div>
             <div className="grid overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] sm:grid-cols-2 xl:grid-cols-4 sm:[&>*+*]:border-l sm:[&>*+*]:border-white/10">
-              <Metric label="Invitados confirmados" value={dashboard.referrals.length.toLocaleString('es-ES')} helper="Relaciones directas y permanentes" />
-              <Metric label="En preparación" value={`${formatUki(dashboard.commissions.totals.pendingRaw)} UKI`} helper="Registrado antes de su publicación" />
-              <Metric label="Disponible" value={`${formatUki(dashboard.commissions.totals.claimableRaw)} UKI`} helper="Ya puede cobrarse en Premios" />
-              <Metric label="Cobrado" value={`${formatUki(dashboard.commissions.totals.claimedRaw)} UKI`} helper="Confirmado en tu wallet" />
+              <Metric label="Invitados confirmados" value={currentDashboard.referrals.length.toLocaleString('es-ES')} helper="Relaciones directas y permanentes" />
+              <Metric label="En preparación" value={`${formatUki(currentDashboard.commissions.totals.pendingRaw)} UKI`} helper="Registrado antes de su publicación" />
+              <Metric label="Disponible" value={`${formatUki(currentDashboard.commissions.totals.claimableRaw)} UKI`} helper="Ya puede cobrarse en Premios" />
+              <Metric label="Cobrado" value={`${formatUki(currentDashboard.commissions.totals.claimedRaw)} UKI`} helper="Confirmado en tu wallet" />
             </div>
           </section>
 
@@ -461,9 +578,11 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 <LinkSimple className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
               </div>
               <p className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                La persona invitada verá tu wallet abreviada y decidirá si confirma la relación. Tu dirección completa no aparece en el enlace.
+                {invitationUrl
+                  ? 'La persona invitada verá tu wallet abreviada y decidirá si confirma la relación. Tu dirección completa no aparece en el enlace.'
+                  : 'Confirma primero tu embajador con una firma en tu wallet, sin gas. Después se activará tu enlace para invitar.'}
               </p>
-              <div className="mt-5 overflow-hidden rounded-[10px] border border-white/10 bg-black/25">
+              {invitationUrl ? <div className="mt-5 overflow-hidden rounded-[10px] border border-white/10 bg-black/25">
                 <p className="break-all px-4 py-3 font-mono text-xs text-[var(--uki-text)]">{invitationUrl}</p>
                 <div className="grid border-t border-white/10 sm:grid-cols-2">
                   <button type="button" onClick={copyInvitationLink} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black text-[var(--uki-lilac)] transition active:scale-[0.98]">
@@ -474,7 +593,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                     <ShareNetwork className="h-4 w-4" weight="bold" /> Compartir
                   </button>
                 </div>
-              </div>
+              </div> : <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[var(--uki-lilac)]"><LockKey className="h-5 w-5 shrink-0" weight="fill" /> Confirmación de embajador pendiente</p>}
             </Panel>
 
             <Panel innerClassName="p-5 sm:p-7">
@@ -485,18 +604,25 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 </div>
                 <ShieldCheck className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="fill" />
               </div>
-              {dashboard.ownAttribution ? (
+              {currentDashboard.ownAttribution ? (
                 <div className="mt-5 rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] p-5">
-                  <p className="font-mono text-lg font-black">{dashboard.ownAttribution.ambassadorWalletMasked}</p>
-                  <p className="mt-2 text-sm font-semibold text-[var(--uki-lilac)]">{sourceCopy(dashboard.ownAttribution.source)}</p>
-                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(dashboard.ownAttribution.acceptedAt)}. Esta relación no puede sustituirse.</p>
+                  {currentDashboard.ownAttribution.isCukiesWorld ? <p className="mb-1 font-black">Cukies World</p> : null}
+                  <p className="font-mono text-lg font-black">{currentDashboard.ownAttribution.ambassadorWalletMasked}</p>
+                  <p className="mt-2 text-sm font-semibold text-[var(--uki-lilac)]">{sourceCopy(currentDashboard.ownAttribution.source)}</p>
+                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(currentDashboard.ownAttribution.acceptedAt)}. Esta relación no puede sustituirse.</p>
                 </div>
               ) : (
                 <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
                   <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
                   <div>
-                    <p className="font-black">No tienes embajador</p>
-                    <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">Solo se asignará cuando abras un enlace válido y lo confirmes con tu wallet.</p>
+                    <p className="font-black">{currentDashboard.enrollment.isPresaleParticipant ? 'Sin embajador en la preventa' : 'Embajador pendiente de confirmar'}</p>
+                    <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{currentDashboard.enrollment.isPresaleParticipant
+                      ? 'Tu participación en la preventa conserva tu enlace para invitar, pero ya no permite asignarte un patrocinador.'
+                      : proposedAmbassador
+                        ? 'Conectar tu wallet y navegar no confirma la relación. Solo se guardará cuando la confirmes con una firma específica, sin gas.'
+                        : pendingInvitationCode
+                          ? 'Conservamos tu invitación pendiente. Debe estar disponible antes de que puedas confirmarla.'
+                          : 'Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.'}</p>
                   </div>
                 </div>
               )}
@@ -510,17 +636,17 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 <h2 id="referrals-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Tus invitados</h2>
                 <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Aquí aparecen tanto las nuevas invitaciones como los referidos confirmados durante la preventa.</p>
               </div>
-              <span className="font-headline text-3xl font-black text-[var(--uki-lilac)]">{dashboard.referrals.length}</span>
+              <span className="font-headline text-3xl font-black text-[var(--uki-lilac)]">{currentDashboard.referrals.length}</span>
             </div>
-            {dashboard.referrals.length === 0 ? (
+            {currentDashboard.referrals.length === 0 ? (
               <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
                 <UsersThree className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
                 <p className="mt-4 font-headline text-xl font-black">Todavía no tienes invitados confirmados</p>
-                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">Comparte tu enlace. La relación aparecerá aquí en cuanto la otra wallet la confirme.</p>
+                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{invitationUrl ? 'Comparte tu enlace. La relación aparecerá aquí en cuanto la otra wallet la confirme.' : 'Podrás invitar cuando confirmes tu embajador y se active tu enlace.'}</p>
               </div>
             ) : (
               <div className="divide-y divide-white/10 border-b border-white/10">
-                {dashboard.referrals.map((referral) => (
+                {currentDashboard.referrals.map((referral) => (
                   <article key={referral.attributionId} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                     <div className="flex min-w-0 items-center gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.07]">
@@ -549,7 +675,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 Ver en Premios <ArrowRight className="h-4 w-4" weight="bold" />
               </Link>
             </div>
-            {dashboard.commissions.history.length === 0 ? (
+            {currentDashboard.commissions.history.length === 0 ? (
               <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
                 <Gift className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
                 <p className="mt-4 font-headline text-xl font-black">Aún no se han generado comisiones</p>
@@ -557,7 +683,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
               </div>
             ) : (
               <div className="divide-y divide-white/10 border-b border-white/10">
-                {dashboard.commissions.history.map((entry) => {
+                {currentDashboard.commissions.history.map((entry) => {
                   const status = STATUS_COPY[entry.status];
                   return (
                     <article key={entry.allocationId} className="grid gap-4 py-5 md:grid-cols-[minmax(0,1.2fr)_minmax(180px,0.7fr)_auto] md:items-center">
@@ -594,7 +720,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 </div>
                 <ol className="divide-y divide-white/10 bg-[#0d0914]">
                   {[
-                    ['01', 'Una sola confirmación', 'El invitado acepta la relación una vez. Si venía de la preventa, ya aparece confirmada automáticamente.'],
+                    ['01', 'Una sola confirmación', 'Los nuevos usuarios confirman a su embajador con una firma específica, sin gas. Las relaciones de preventa se conservan y ya no pueden añadirse ni cambiarse.'],
                     ['02', 'El invitado no pierde nada', `El invitado recibe su premio completo y tú recibes un ${commissionPercent.toLocaleString('es-ES')}% adicional.`],
                     ['03', 'Sin cambios retroactivos', 'La vinculación nueva solo afecta a premios posteriores. No hay segundo nivel ni comisión sobre otra comisión.'],
                     ['04', 'Cobro desde Premios', 'La comisión se registra con el cierre correspondiente y se cobra mediante el mismo sistema de premios UKI.'],

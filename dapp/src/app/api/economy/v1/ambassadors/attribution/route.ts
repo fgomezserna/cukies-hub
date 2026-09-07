@@ -1,65 +1,20 @@
-import { NextResponse } from "next/server";
-
-import { readWalletSession } from "@/lib/wallet-auth";
 import {
-  acceptCanonicalAmbassadorInvitation,
+  acceptCanonicalAmbassadorInvitation, acceptCanonicalCukiesWorldEnrollment,
   getCanonicalAmbassadorAttribution,
-} from "@/lib/uki-economy/ambassadors/service";
+} from '@/lib/uki-economy/ambassadors/service';
 import {
-  assertAmbassadorAttributionWritesEnabled,
-  assertAmbassadorInvitationCode,
-  assertAmbassadorRuntime,
-  stableAmbassadorHash,
-  validAmbassadorWallet,
-} from "@/lib/uki-economy/ambassadors/rules";
-import { AMBASSADOR_ATTRIBUTION_POLICY } from "@/lib/uki-economy/ambassadors/types";
-import { UkiEconomyError } from "@/lib/uki-economy/errors";
+  assertAmbassadorAttributionWritesEnabled, assertAmbassadorRuntime,
+} from '@/lib/uki-economy/ambassadors/rules';
+import { AMBASSADOR_ATTRIBUTION_POLICY } from '@/lib/uki-economy/ambassadors/types';
+import {
+  ambassadorConfirmationOrigin, clearAmbassadorConfirmation, verifyAmbassadorConfirmation,
+} from '@/lib/uki-economy/ambassadors/confirmation';
+import {
+  ambassadorErrorResponse, ambassadorJson, ambassadorTarget, ambassadorTargetWallet,
+  readAmbassadorBody, signedAmbassadorIdentity,
+} from '@/lib/uki-economy/ambassadors/http';
 
-export const dynamic = "force-dynamic";
-
-const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
-
-function json(payload: unknown, status = 200) {
-  return NextResponse.json(payload, { status, headers: NO_STORE_HEADERS });
-}
-
-async function signedIdentity() {
-  const session = await readWalletSession();
-  if (
-    !session ||
-    session.walletType !== "evm" ||
-    typeof session.userId !== "string" ||
-    !session.userId.trim() ||
-    typeof session.signedWalletAddress !== "string"
-  ) return null;
-  let walletAddress: string;
-  try {
-    walletAddress = validAmbassadorWallet(session.signedWalletAddress);
-  } catch {
-    return null;
-  }
-  return {
-    walletAddress,
-    signedSessionEvidenceHash: stableAmbassadorHash({
-      kind: "signed_wallet_session",
-      userId: session.userId,
-      signedWalletAddress: walletAddress,
-      issuedAt: session.issuedAt,
-      expiresAt: session.expiresAt,
-    }),
-  };
-}
-
-async function readBody(request: Request) {
-  try {
-    const value: unknown = await request.json();
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
+export const dynamic = 'force-dynamic';
 
 function responseAttribution(attribution: Awaited<ReturnType<typeof getCanonicalAmbassadorAttribution>>) {
   return attribution ? {
@@ -75,67 +30,48 @@ function responseAttribution(attribution: Awaited<ReturnType<typeof getCanonical
   } : null;
 }
 
-function errorResponse(error: unknown) {
-  if (error instanceof UkiEconomyError) {
-    return json(
-      { status: "error", code: error.code },
-      error.code === "CONFLICT" ? 409 : error.code === "NOT_FOUND" ? 404 : 400,
-    );
-  }
-  if (
-    error instanceof TypeError &&
-    error.message === "AMBASSADOR_RUNTIME_MISCONFIGURED"
-  ) {
-    return json({ status: "error", code: error.message }, 400);
-  }
-  if (
-    error instanceof TypeError &&
-    error.message === "AMBASSADOR_ATTRIBUTION_WRITES_DISABLED"
-  ) {
-    return json({ status: "error", code: error.message }, 503);
-  }
-  console.error("Ambassador attribution request failed", error);
-  return json({ status: "error", code: "INTERNAL_ERROR" }, 500);
-}
 
 export async function GET() {
   try {
     assertAmbassadorRuntime(process.env);
-    const identity = await signedIdentity();
-    if (!identity) return json({ status: "error", code: "AUTH_REQUIRED" }, 401);
+    const identity = await signedAmbassadorIdentity();
+    if (!identity) return ambassadorJson({ status: 'error', code: 'AUTH_REQUIRED' }, 401);
     const attribution = await getCanonicalAmbassadorAttribution(identity.walletAddress);
-    return json({
-      status: "ok",
-      policy: AMBASSADOR_ATTRIBUTION_POLICY,
-      attribution: responseAttribution(attribution),
-    });
+    return ambassadorJson({ status: 'ok', policy: AMBASSADOR_ATTRIBUTION_POLICY,
+      attribution: responseAttribution(attribution) });
   } catch (error) {
-    return errorResponse(error);
+    return ambassadorErrorResponse(error);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    assertAmbassadorRuntime(process.env);
+    const runtime = assertAmbassadorRuntime(process.env);
     assertAmbassadorAttributionWritesEnabled(process.env);
-    const identity = await signedIdentity();
-    if (!identity) return json({ status: "error", code: "AUTH_REQUIRED" }, 401);
-    const body = await readBody(request);
-    if (typeof body?.invitationCode !== "string") {
-      return json({ status: "error", code: "INVALID_INVITATION_CODE" }, 400);
+    const identity = await signedAmbassadorIdentity();
+    if (!identity) return ambassadorJson({ status: 'error', code: 'AUTH_REQUIRED' }, 401);
+    const body = await readAmbassadorBody(request);
+    const target = ambassadorTarget(body);
+    if (!target) return ambassadorJson({ status: 'error', code: 'INVALID_INVITATION_CODE' }, 400);
+    if (typeof body?.signature !== 'string') {
+      return ambassadorJson({ status: 'error', code: 'AMBASSADOR_CONFIRMATION_REQUIRED' }, 400);
     }
-    const invitationCode = assertAmbassadorInvitationCode(body.invitationCode);
-    const attribution = await acceptCanonicalAmbassadorInvitation({
-      referredWallet: identity.walletAddress,
-      invitationCode,
-      signedSessionEvidenceHash: identity.signedSessionEvidenceHash,
+    const ambassadorWallet = await ambassadorTargetWallet(target);
+    if (!ambassadorWallet) return ambassadorJson({ status: 'error', code: 'NOT_FOUND' }, 404);
+    const evidence = await verifyAmbassadorConfirmation({
+      wallet: identity.walletAddress, sessionEvidenceHash: identity.signedSessionEvidenceHash,
+      ambassadorWallet, target, signature: body.signature,
+      origin: ambassadorConfirmationOrigin(request), chainId: runtime.chainId,
     });
-    return json({
-      status: "ok",
-      policy: AMBASSADOR_ATTRIBUTION_POLICY,
-      attribution: responseAttribution(attribution),
-    }, 201);
+    if (!evidence) return ambassadorJson({ status: 'error', code: 'INVALID_SIGNATURE' }, 400);
+    const input = { referredWallet: identity.walletAddress, signedSessionEvidenceHash: evidence };
+    const attribution = 'invitationCode' in target
+      ? await acceptCanonicalAmbassadorInvitation({ ...input, invitationCode: target.invitationCode })
+      : await acceptCanonicalCukiesWorldEnrollment(input);
+    await clearAmbassadorConfirmation();
+    return ambassadorJson({ status: 'ok', policy: AMBASSADOR_ATTRIBUTION_POLICY,
+      attribution: responseAttribution(attribution) }, 201);
   } catch (error) {
-    return errorResponse(error);
+    return ambassadorErrorResponse(error);
   }
 }

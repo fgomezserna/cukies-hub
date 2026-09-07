@@ -1,8 +1,11 @@
 import { readWalletSession } from "@/lib/wallet-auth";
 import {
   acceptCanonicalAmbassadorInvitation,
+  acceptCanonicalCukiesWorldEnrollment,
+  getCanonicalAmbassadorInvitationWallet,
   getCanonicalAmbassadorAttribution,
 } from "@/lib/uki-economy/ambassadors/service";
+import { verifyAmbassadorConfirmation, clearAmbassadorConfirmation } from '@/lib/uki-economy/ambassadors/confirmation';
 import { DomainConflictError } from "@/lib/uki-economy/errors";
 import {
   GET,
@@ -14,7 +17,15 @@ jest.mock("@/lib/wallet-auth", () => ({
 }));
 jest.mock("@/lib/uki-economy/ambassadors/service", () => ({
   acceptCanonicalAmbassadorInvitation: jest.fn(),
+  acceptCanonicalCukiesWorldEnrollment: jest.fn(),
+  getCanonicalAmbassadorInvitationWallet: jest.fn(),
   getCanonicalAmbassadorAttribution: jest.fn(),
+}));
+
+jest.mock('@/lib/uki-economy/ambassadors/confirmation', () => ({
+  verifyAmbassadorConfirmation: jest.fn(),
+  clearAmbassadorConfirmation: jest.fn(),
+  ambassadorConfirmationOrigin: () => 'https://hub.test',
 }));
 
 const REFERRED = "0x1111111111111111111111111111111111111111";
@@ -50,7 +61,7 @@ function request(body: unknown) {
   return new Request("https://hub.test/api/economy/v1/ambassadors/attribution", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ signature: "0x1234", ...(body as object) }),
   });
 }
 
@@ -71,6 +82,10 @@ describe("ambassador attribution API", () => {
       expiresAt: "2026-08-31T11:00:00.000Z",
     });
     mockAccept.mockResolvedValue(attribution);
+    jest.mocked(acceptCanonicalCukiesWorldEnrollment).mockResolvedValue(attribution);
+    jest.mocked(getCanonicalAmbassadorInvitationWallet).mockResolvedValue(AMBASSADOR);
+    jest.mocked(verifyAmbassadorConfirmation).mockResolvedValue('a'.repeat(64));
+    jest.mocked(clearAmbassadorConfirmation).mockResolvedValue(undefined);
     mockGet.mockResolvedValue(attribution);
   });
 
@@ -188,4 +203,73 @@ describe("ambassador attribution API", () => {
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });
+});
+
+
+describe('firma específica de confirmación', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.APP_ENV = 'staging';
+    process.env.STAGING_ONLY_GUARD = 'true';
+    process.env.NEXT_PUBLIC_UKI_CHAIN_ID = '97';
+    process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID = '97';
+    process.env.AMBASSADOR_ATTRIBUTION_WRITES_ENABLED = 'true';
+    process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS = AMBASSADOR;
+    mockSession.mockResolvedValue({ userId: 'user-1', walletAddress: REFERRED,
+      signedWalletAddress: REFERRED, walletType: 'evm', issuedAt: NOW.toISOString(),
+      expiresAt: '2026-09-01T00:00:00.000Z' });
+    jest.mocked(getCanonicalAmbassadorInvitationWallet).mockResolvedValue(AMBASSADOR);
+    jest.mocked(verifyAmbassadorConfirmation).mockResolvedValue('a'.repeat(64));
+    mockAccept.mockResolvedValue(attribution);
+    jest.mocked(acceptCanonicalCukiesWorldEnrollment).mockResolvedValue(attribution);
+  });
+  afterEach(() => {
+    for (const key of ['APP_ENV', 'STAGING_ONLY_GUARD', 'NEXT_PUBLIC_UKI_CHAIN_ID',
+      'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID', 'AMBASSADOR_ATTRIBUTION_WRITES_ENABLED',
+      'AMBASSADOR_DEFAULT_WALLET_ADDRESS']) delete process.env[key];
+  });
+
+  it('rechaza una sesión firmada sin firma específica y no escribe', async () => {
+    const response = await POST(request({ invitationCode: INVITATION_CODE, signature: undefined }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'AMBASSADOR_CONFIRMATION_REQUIRED' });
+    expect(mockAccept).not.toHaveBeenCalled();
+  });
+
+  it('rechaza firma caducada, de otra wallet o de otro sponsor sin escribir', async () => {
+    jest.mocked(verifyAmbassadorConfirmation).mockResolvedValue(null);
+    const response = await POST(request({ invitationCode: INVITATION_CODE }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'INVALID_SIGNATURE' });
+    expect(mockAccept).not.toHaveBeenCalled();
+    expect(clearAmbassadorConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('firma y confirma Cukies World usando exclusivamente la dirección configurada', async () => {
+    const response = await POST(request({ sponsor: 'cukies_world', ambassadorWallet: REFERRED }));
+    expect(response.status).toBe(201);
+    expect(verifyAmbassadorConfirmation).toHaveBeenCalledWith(expect.objectContaining({
+      ambassadorWallet: AMBASSADOR, target: { sponsor: 'cukies_world' }, wallet: REFERRED,
+    }));
+    expect(acceptCanonicalCukiesWorldEnrollment).toHaveBeenCalledWith({
+      referredWallet: REFERRED, signedSessionEvidenceHash: 'a'.repeat(64),
+    });
+    expect(clearAmbassadorConfirmation).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechaza targets ambiguos y enlaces antiguos no elegibles', async () => {
+    expect((await POST(request({ sponsor: 'cukies_world', invitationCode: INVITATION_CODE }))).status).toBe(400);
+    jest.mocked(getCanonicalAmbassadorInvitationWallet).mockResolvedValue(null);
+    expect((await POST(request({ invitationCode: INVITATION_CODE }))).status).toBe(404);
+    expect(mockAccept).not.toHaveBeenCalled();
+  });
+
+  it.each(['AMBASSADOR_CYCLE', 'PRESALE_SPONSOR_LOCKED', 'AMBASSADOR_ALREADY_CONFIRMED'])(
+    'distingue %s sin exponer detalles privados', async (reason) => {
+      mockAccept.mockRejectedValue(new DomainConflictError('private detail', { reason, wallet: AMBASSADOR }));
+      const response = await POST(request({ invitationCode: INVITATION_CODE }));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ status: 'error', code: reason });
+    },
+  );
 });
