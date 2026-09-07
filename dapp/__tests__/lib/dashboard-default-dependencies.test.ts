@@ -191,6 +191,20 @@ describe('dashboard default dependencies', () => {
     );
   });
 
+  it('keeps valid vesting amounts visible when its calendar is not frozen yet', async () => {
+    mockVesting.mockResolvedValue({
+      chainId: 97, configFrozen: false, hasPosition: true,
+      totalAmountRaw: '10000', releasedAmountRaw: '1000', releasableRaw: '2000',
+      lockedAmountRaw: '7000', progressBps: 3000,
+    } as never);
+    const dependencies = dashboardSummaryDependencies({ environment: 'staging', chainId: 97 });
+    await expect(dependencies.loadVesting(wallet, now)).resolves.toMatchObject({
+      health: 'degraded',
+      issues: ['VESTING_CONFIG_NOT_FROZEN'],
+      data: { configFrozen: false, totalAmountRaw: '10000', releasableRaw: '2000' },
+    });
+  });
+
   it('acepta vesting mainnet cuando producción configura chain 56', async () => {
     mockVesting.mockResolvedValue({
       chainId: 56,

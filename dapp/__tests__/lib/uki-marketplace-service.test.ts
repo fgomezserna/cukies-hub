@@ -77,12 +77,12 @@ function dependencies(input: {
     inspectOrders: jest.fn().mockResolvedValue(input.inspections ?? new Map()),
   };
   const runtime = input.ready === false
-    ? { ready: false, chainId: null, marketplaceAddress: null, rpcUrl: null, issues: ['missing'] }
+    ? { ready: false, chainId: null, marketplaceAddress: null, rpcUrls: [], issues: ['missing'] }
     : {
         ready: true,
         chainId: 97 as const,
         marketplaceAddress: marketplace as `0x${string}`,
-        rpcUrl: 'https://rpc.test.invalid/',
+        rpcUrls: ['https://rpc.test.invalid/'],
         issues: [],
       };
   return {
@@ -247,8 +247,18 @@ describe('UKI marketplace runtime boundary', () => {
       ready: true,
       chainId: 97,
       marketplaceAddress: marketplace,
-      rpcUrl: 'https://rpc.test.invalid/',
+      rpcUrls: ['https://rpc.test.invalid/'],
       issues: [],
+    });
+  });
+
+  it('preserves the fallback endpoints when the first RPC is unavailable', () => {
+    expect(resolveUkiMarketplaceRuntime({
+      ...base,
+      CHAIN_INDEXER_BSC_RPC_URLS: 'https://primary.invalid,https://secondary.invalid',
+    })).toMatchObject({
+      ready: true,
+      rpcUrls: ['https://primary.invalid/', 'https://secondary.invalid/'],
     });
   });
 

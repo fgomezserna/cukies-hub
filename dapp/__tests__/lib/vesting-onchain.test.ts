@@ -2,6 +2,7 @@ import {
   VestingOnChainUnavailableError,
   VestingOnChainValidationError,
   readWalletVestingStatus,
+  vestingRpcUrls,
   type WalletVestingDependencies,
 } from '@/lib/vesting-onchain';
 
@@ -28,6 +29,19 @@ function dependencies(
 }
 
 describe('readWalletVestingStatus', () => {
+  it('uses all staging indexer RPCs and does not default to a different provider', () => {
+    expect(vestingRpcUrls(97, {
+      CHAIN_INDEXER_BSC_RPC_URLS: 'https://primary.invalid,https://secondary.invalid',
+      CHAIN_INDEXER_BSC_RPC_URL: 'https://unused.invalid',
+    })).toEqual(['https://primary.invalid/', 'https://secondary.invalid/']);
+    expect(vestingRpcUrls(97, {
+      CHAIN_INDEXER_BSC_TESTNET_RPC_URL: 'https://testnet.invalid',
+      CHAIN_INDEXER_BSC_RPC_URLS: 'https://unused.invalid',
+    })).toEqual(['https://testnet.invalid/']);
+    expect(vestingRpcUrls(56, { BSC_RPC_URL: 'https://mainnet.invalid' }))
+      .toEqual(['https://mainnet.invalid/']);
+  });
+
   it('materializa el calendario Testnet sin perder precisión ni confundir bloqueado con reclamable', async () => {
     const runtime = dependencies();
 

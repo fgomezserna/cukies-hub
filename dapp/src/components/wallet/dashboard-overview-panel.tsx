@@ -246,6 +246,8 @@ export function DashboardOverviewPanel() {
   }, [authLoading, hasSignedEvmSession, reloadNonce]);
 
   const summary = request.summary;
+  const unavailableModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_UNAVAILABLE') ?? [];
+  const reviewModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_DEGRADED') ?? [];
   const wrongChain = Boolean(summary && isConnected && chainId !== summary.network.chainId);
   const master = summary ? moduleData(summary.modules.cukieMaster) : null;
   const credits = summary ? moduleData(summary.modules.credits) : null;
@@ -336,12 +338,21 @@ export function DashboardOverviewPanel() {
               </div>
             ) : null}
 
-            {summary.alerts.length > 0 ? (
+            {unavailableModules.length > 0 ? (
               <div role="status" className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-400/10 p-4">
                 <p className="font-black text-amber-100">Algunos datos no están disponibles</p>
                 <p className="mt-1 text-xs font-semibold text-amber-100/75">
-                  Ahora mismo no podemos mostrar: {summary.alerts.map((alert) => MODULE_LABELS[alert.module]).join(', ')}.
+                  Ahora mismo no podemos mostrar: {unavailableModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}.
                   Puedes seguir usando el resto de tu cuenta.
+                </p>
+              </div>
+            ) : null}
+            {reviewModules.length > 0 ? (
+              <div role="status" className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-400/10 p-4">
+                <p className="font-black text-amber-100">Algunos datos requieren atención</p>
+                <p className="mt-1 text-xs font-semibold text-amber-100/75">
+                  Puedes consultar los datos de {reviewModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}.
+                  Revisa sus avisos antes de continuar.
                 </p>
               </div>
             ) : null}
@@ -430,6 +441,7 @@ export function DashboardOverviewPanel() {
                   `${ukiLabel(vesting.releasableRaw)} disponibles ahora`,
                   `${ukiLabel(vesting.lockedAmountRaw)} bloqueados`,
                   `${(vesting.progressBps / 100).toLocaleString('es-ES')}% liberado`,
+                  ...(vesting.configFrozen ? [] : ['El calendario de liberación está pendiente de confirmación']),
                 ] : []}
               />
               <DashboardCard
@@ -484,7 +496,7 @@ function DashboardCard<K extends DashboardModuleId>({
           <h3 className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">{title}</h3>
         </div>
         {module.state === 'ready' ? <CheckCircle2 aria-label="Datos disponibles" className="h-4 w-4 text-[var(--uki-lilac)]" /> : null}
-        {module.state === 'degraded' ? <AlertTriangle aria-label="Datos incompletos" className="h-4 w-4 text-amber-300" /> : null}
+        {module.state === 'degraded' ? <AlertTriangle aria-label="Datos con avisos" className="h-4 w-4 text-amber-300" /> : null}
       </div>
       {available ? (
         <>

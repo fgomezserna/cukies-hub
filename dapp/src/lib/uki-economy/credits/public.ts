@@ -53,6 +53,7 @@ export async function getCompetitionCreditWalletStatus(
       rules.length === 0
         ? 'No existe una regla activa de creditos.'
         : 'Hay reglas activas de creditos solapadas.',
+      { reason: rules.length === 0 ? 'CREDIT_RULE_MISSING' : 'CREDIT_RULE_OVERLAP' },
     );
   }
   const rule = assertCompetitionCreditRule(rules[0]);
@@ -95,7 +96,9 @@ export async function getCompetitionCreditWalletStatus(
     throw new DomainConflictError('La wallet excede el maximo canonico de 10 slots.');
   }
   if (accounts.length > routes.length || pools.length > routes.length || watermarks.length > routes.length) {
-    throw new DomainConflictError('La proyeccion de creditos contiene rutas duplicadas.');
+    throw new DomainConflictError('La proyeccion de creditos contiene rutas duplicadas.', {
+      reason: 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
+    });
   }
 
   const configurations = await Promise.all(slots.map(async (slot) => {

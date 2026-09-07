@@ -109,6 +109,6 @@ export type UkiMarketplaceRuntime = {
   ready: boolean;
   chainId: 56 | 97 | null;
   marketplaceAddress: `0x${string}` | null;
-  rpcUrl: string | null;
+  rpcUrls: string[];
   issues: string[];
 };
