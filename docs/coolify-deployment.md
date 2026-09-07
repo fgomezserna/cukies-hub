@@ -133,9 +133,36 @@ CHAIN_INDEXER_START_BSC_BLOCK=123291898
 CHAIN_INDEXER_BSC_CONFIRMATIONS=12
 ```
 
-`CHAIN_INDEXER_PRESALE_ADDRESS` debe ser el contrato `Presale` real del entorno. Si no se define, el worker seguira indexando Cukies legacy, marketplace y bridge, pero no leera compras de preventa ni generara `presale_purchases`, `presale_participants` o `presale_referral_contributions`.
+Para habilitar aliases BSC con verificacion de identidad, Coolify debe inyectar
+explicitamente la address y los cuatro campos de bootstrap de cada contrato.
+Complemento de configuracion staging para estos dos contratos; conservar la
+lista completa de aliases habilitados del entorno:
 
-`CHAIN_INDEXER_START_BSC_BLOCK` debe apuntar al bloque de despliegue del contrato de preventa o a un bloque anterior cercano. Para backfill historico amplio, usar un RPC que soporte rangos de logs suficientemente antiguos.
+```bash
+CHAIN_INDEXER_UKI_TOKEN_ADDRESS=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c
+
+CHAIN_INDEXER_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
+CHAIN_INDEXER_PRESALE_START_BSC_BLOCK=123291898
+CHAIN_INDEXER_PRESALE_DEPLOYMENT_BSC_BLOCK=123291898
+CHAIN_INDEXER_PRESALE_DEPLOYMENT_TX_HASH=0x846987138438bc3e77bfa8a957011b7cf6bbfc7b8fae59a548949102a0abc80e
+CHAIN_INDEXER_PRESALE_RUNTIME_CODE_HASH=0xb913b21342f583078dc890e77a2e0bb43b4e77ae02f04a180284aee3ceb7b8a3
+
+CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS=0xc2252D797Da294D16b84282d213604b4Bcf6EE09
+CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK=123359171
+CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_BSC_BLOCK=123359171
+CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_TX_HASH=0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639
+CHAIN_INDEXER_REWARDS_DISTRIBUTOR_RUNTIME_CODE_HASH=0x654fa2495a76004361c98bf51a10d5b9e7a50564ca4b89ee9e95af04cb92b4fc
+```
+
+Los dos bloques de cada contrato deben ser iguales y el recibo debe resolver la
+address y el runtime hash configurados. No se debe activar un alias usando solo
+la address, el bloque global ni un fallback de otra variable pública; el
+fallback anidado de `UKI_TOKEN_ADDRESS` generaba una plantilla truncada y queda
+prohibido.
+
+`CHAIN_INDEXER_PRESALE_ADDRESS` debe ser el contrato `Presale` real del entorno. Si `PRESALE` esta habilitado y falta su address o identidad, el worker rechaza el arranque; no se debe quitar el alias para eludir esa validacion.
+
+`CHAIN_INDEXER_PRESALE_START_BSC_BLOCK` debe ser su bloque exacto de despliegue; el bloque global no sustituye la identidad por contrato. Para backfill historico amplio, usar un RPC que soporte rangos de logs suficientemente antiguos.
 
 ### Escenario de preventa staging 2026-08-05
 
