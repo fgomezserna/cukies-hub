@@ -64,7 +64,7 @@ consumidores de runtime. Esta tabla registra alcance; no ejecuta esas fases ahor
 | A | **CONFIRMADO POR USUARIO + OBSERVADO LIVE**: pool de liquidez activa desde hace mas de una semana. | `output/verification/pancake-mainnet-20260907.json`, BSC `56`, bloque `120529300`, `2026-09-07T16:50:13Z`; reservas `1.148.104,4871 UKI` + `4.658,0014 ASM`, LP bloqueada hasta `2027-02-23T15:33:10Z`; swaps `2026-08-31` y `2026-09-07`. | Registrar reservas/swaps/locker en cada revision; comprobar logo/ficha y la ruta USDC anunciada en el copy. Rutas BNB/USDT multihop acreditadas. |
 | B | **CONFIRMADO POR USUARIO + OBSERVADO LIVE**: staking y torneo actual post-preventa funcionan. Producto: `Torneo Lanzamiento UKI`; no es el torneo antiguo de preventa. | `https://cukies.world/api/games/treasure-hunt/competition`, HTTP 200, `2026-09-07T16:50:56Z`; contrato `0xad18...59696`, campaña activa hasta `2026-09-15T15:00Z`. | Mantener evidencia de participante/firma separada; no reabrir approve/stake como fallo de estado. |
 | C | **RESUELTO · confirmado por el usuario**: cierre funcional aceptado. | Confirmacion de producto; 2026-09-07. | No reabrir por falta de una prueba adicional; conservar checks como historial. |
-| D | **MIGRACION POR COMPLETAR**: migrar toda funcionalidad legacy al Hub con infraestructura nueva, auth, datos y contratos seguros; dejar de usar el repo antiguo. | Decision de producto e inventario de `cukiesworld-stack`; 2026-09-07; detalle [D](#d-reporte-de-seguridad-de-nico). | Portar por flujos completos; coordinar [#160](https://github.com/fgomezserna/cukies-hub/issues/160); cero consumidores runtime antes de retirar. |
+| D | **MIGRACION POR COMPLETAR**: migrar toda funcionalidad legacy al Hub con infraestructura nueva, auth, datos y contratos seguros; dejar de usar el repo antiguo. | Decision de producto e [inventario de migracion](legacy-marketplace/README.md); 2026-09-07: 14 contratos, 34 contenedores y 16 instancias de base. | Inventario registrado; seguir con importacion preview y paridad por flujos completos; coordinar [#160](https://github.com/fgomezserna/cukies-hub/issues/160); cero consumidores runtime antes de retirar. |
 | 1 | **EN PROGRAMA DE MIGRACION LEGACY**: bridge Tron -> BSC, con seguridad, E2E y fees dentro del alcance. | Decision de producto; 2026-09-07. | Revalidar fuente, relayer, rutas, fee y pausa; sin presentar el bridge como cerrado. |
 | 2A-C | **EN PROGRAMA DE MIGRACION LEGACY**: datos/listings, fees y marketplace UKI; los contratos y tarifas pertenecen al programa. | Decision de producto; 2026-09-07; #19 y #249 como coordinación de auditoria/slice. | Inventario -> infraestructura Hub -> migracion validada -> flujos -> corte; refs [2A-C](#2-marketplace). |
 | 3 | **EN STAGING, EN PRUEBAS**: Cukie Master, creditos, pools, prestamos y rewards. | Confirmacion de producto; 2026-09-07; smoke 11:44 UTC como evidencia fechada. | Registrar resultados de consumo/caducidad de creditos, stake/unstake, prestamos, cierres, reparto e idempotencia; completar los flujos pendientes segun esas pruebas. |
@@ -842,18 +842,38 @@ ritmo, menor duracion restante del programa.
 - [ ] El suministro es fijo: rewards se prefundan desde reserva; nunca se mintea
   por cerrar un dia.
 
-## Inventario posterior y bloque LEGACY antes del 15
+## Inventario y bloque LEGACY antes del 15
 
-`post1` (Cukie Points) y `post2` (crias) pertenecen al bloque de Migracion
-legacy y
-siguen dentro del alcance ANTES DEL 15; su ejecucion no se autoriza en este
-seguimiento. `post3` a `post9` se conservan como inventario posterior sin
-afirmar codigo definitivo ni cierre.
+El detalle técnico y la evidencia durable viven en
+[legacy-marketplace/README.md](legacy-marketplace/README.md). Esta tabla es el
+resumen operativo único: una pieza puede estar portada en código y seguir
+desplegada o consumida por legacy. El inventario live del 2026-09-07 observó 34
+contenedores `running`; eso no demuestra paridad ni retirada.
+
+| Bloque | Estado local | Stage/Prod observado | Criterio de salida antes de retirar |
+| --- | --- | --- | --- |
+| Contratos legacy: 14 addresses mainnet (8 TRON, 6 BSC), 16 ABI originales | Inventariados; checkout antiguo conserva 1 `.sol` aislado y Hub tiene 4 bundles BSC recuperados desde Sourcify (3 `exact_match`, 1 `match`) | Código/owners live confirmados; custodia de claves y fuentes verificadas de 2 BSC y 8 TRON siguen pendientes | Evidencia de procedencia/ownership, sin asumir compilación local, custodia rotada y snapshot de owners/supply/eventos |
+| Producers/consumer/sync y eventos | Chain-indexer/importers portados parcialmente | `chain-indexer` live; legacy getters/setter también `running` | Replay idempotente, diferencias de `processedEvents`/`completedEvents` aceptadas y cero consumidores legacy |
+| Cards/assets | `cuki-card-worker` portado en código | Worker Hub live observado; jobs/paridad de imágenes sin cierre | Assets y jobs reconciliados, URLs antiguas fuera de respuestas y smoke de card worker |
+| Auth/GraphQL/REST legacy | NextAuth/API Hub parcial; upstream legacy sigue inventariado | Servicios auth/GraphQL/REST live; `CUKIES_DATABASE_URL` observado | Identidad mínima migrada, cero llamadas/mutaciones legacy y secretos revocados |
+| `cukies`, `tx_nfts`, `points`, `tx_points`, `originals`, usuarios/wallets | Importación parcial; conteos son metadatos (`estimatedDocumentCount` o `collStats.count`), no reconciliación | Stage legacy 17.464 `cukies`; nuevo Stage 18 fixtures aislados; Hub Stage `User` 335, `UserWallet` 336 y `GameSession` 5.759 | Manifest por colección, colisiones/huérfanos explicados y paridad por wallet/token/evento; no comparar fixtures Stage con main |
+| Cukie Points (`post1`) | No ejecutado; permanece ANTES DEL 15 | Claimed/pending y cutoff por contrastar BSC/TRON | Export read-only con cutoff aprobado; no conversión automática a créditos |
+| Crías y Originales (`post2`) | No ejecutado; permanece ANTES DEL 15 | Dry-run, pausa y snapshot BSC/TRON por decidir | Listado Originales con/sin cría, historial conservado y pausa autorizada |
+| Game y matchmaking | Censo pendiente; no descartado | `game-api` y `matchmaking-api` legacy live | Criterio funcional, consumidores y datos cubiertos en Hub o decisión explícita |
+| Learn y Ludo | Censo pendiente; no descartado | `data-rest-learn-api`, `data-rest-ludo-api`, `learn-bot-worker` live | Rutas, usuarios y datos reconciliados o criterio funcional aprobado |
+
+No se declara `legacy retirado` por health verde, conteo igual, código portado,
+merge o contenedor `running`. Los estados válidos son `portado`, `desplegado`,
+`gate activo`, `paridad` y `retirado`, con evidencia separada en cada caso.
+
+## Resto del inventario posterior al 15
+
+Cukie Points y crias (post1 y post2) se adelantan al bloque legacy anterior.
+Los puntos post3 a post9 conservan su alcance posterior; este inventario no
+los adelanta ni declara resueltos.
 
 | ID / titulo | Codigo | Local | Stage | Prod | Proximo paso / evidencia |
 | --- | --- | --- | --- | --- | --- |
-| post1. Parar Cukie Points y exportar claimed/pending BSC+Tron | `ANTES15 · MIGRACION LEGACY` | No ejecutado; alcance conservado | Snapshot/cutoff por contrastar | Migracion y conversion futura separadas | Inventariar y validar snapshot; no exigir conversion Cukie Points->creditos antes del corte/export autorizado; ref. `docs/uki-new-economy-db-implementation-map.md`. |
-| post2. Pausar crias y listar Originales con/sin cria | `ANTES15 · MIGRACION LEGACY` | No ejecutado; alcance conservado | Dry-run, pausa y snapshot por contrastar | Pausa BSC/Tron por decidir | Inventariar y validar pausa/historial; no ejecutar en este seguimiento. |
 | 3. Tablas de premios preventa/competicion | `sin verificar` | No reejecutado esta pasada | Manifest, revisión y pago sin verificar | Tabla final y vesting 9+6 sin verificar | Generar tablas sin PII; detalle histórico en [settlement](../dapp/src/lib/treasure-hunt-competition/settlement.ts), no revalidado. |
 | 4. Login user/password y multiples wallets | `sin verificar` | No reejecutado esta pasada | Auditoría, recuperación y delegación sin verificar | Auditoría de roles/auth y delegación sin verificar | Revalidar aislamiento, unicidad y account-linking; detalle histórico en [legacy auth](legacy-marketplace/README.md), no revalidado. |
 | 5. Liberacion progresiva de UKI | `sin verificar` | No reejecutado esta pasada | Regla exacta, congelación y contrato sin verificar | Modelo económico/legal y tesorería sin verificar | Definir modelo, invariantes y contrato; detalle histórico en [runbook vesting](uki-mainnet-intermediate-listing-runbook.md), no revalidado. |

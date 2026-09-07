@@ -1,0 +1,1912 @@
+{
+  "observedAt": "2026-09-07T17:19:02.967061+00:00",
+  "host": "192.168.1.201",
+  "containers": [
+    {
+      "name": "reward-batch-publisher-u4s804o4wwcckowgk0woo4wg-112007303266",
+      "id": "6894a6e5efc0",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:34.874655942Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "reward-batch-publisher",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "CARD_WORKER_UPLOAD": "true",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "COOLIFY_BRANCH": "staging",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "APP_ENV": "staging",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "competition-credit-scheduler-u4s804o4wwcckowgk0woo4wg-112007037448",
+      "id": "dd50843a86ef",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:40:14.676723907Z",
+      "restartCount": 1,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "competition-credit-scheduler",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "COMPETITION_CREDITS_SCHEDULER_ENABLED": "true",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "CARD_WORKER_UPLOAD": "true",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "COOLIFY_BRANCH": "staging",
+        "APP_ENV": "staging",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "game-economy-scheduler-u4s804o4wwcckowgk0woo4wg-112007138064",
+      "id": "a103cda7a695",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:32.441004727Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "game-economy-scheduler",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "COOLIFY_BRANCH": "staging",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "APP_ENV": "staging",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "CARD_WORKER_UPLOAD": "true",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "cukie-pool-scheduler-u4s804o4wwcckowgk0woo4wg-112007187989",
+      "id": "5ee7c582f414",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:35.062927281Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "cukie-pool-scheduler",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "APP_ENV": "staging",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "CARD_WORKER_UPLOAD": "true",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "COOLIFY_BRANCH": "staging",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "reward-accounting-scheduler-u4s804o4wwcckowgk0woo4wg-112007255747",
+      "id": "344262b0ae29",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:35.365943827Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "reward-accounting-scheduler",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "COOLIFY_BRANCH": "staging",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "CARD_WORKER_UPLOAD": "true",
+        "APP_ENV": "staging",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "weekly-ranking-scheduler-u4s804o4wwcckowgk0woo4wg-112007220325",
+      "id": "ad85dcce5262",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:33.589319797Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "weekly-ranking-scheduler",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        }
+      ],
+      "publicGates": {
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "CARD_WORKER_UPLOAD": "true",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "APP_ENV": "staging",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "COOLIFY_BRANCH": "staging",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "cukie-master-scheduler-u4s804o4wwcckowgk0woo4wg-112006988910",
+      "id": "eeeeca749e4e",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:35.365628255Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "cukie-master-scheduler",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        }
+      ],
+      "publicGates": {
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "APP_ENV": "staging",
+        "COOLIFY_BRANCH": "staging",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "CARD_WORKER_UPLOAD": "true",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "chain-indexer-u4s804o4wwcckowgk0woo4wg-112006777542",
+      "id": "3c4b52a87f86",
+      "image": "u4s804o4wwcckowgk0woo4wg-chain-indexer",
+      "imageId": "sha256:d29f3a2ab963c3a8982fe5f78f475868b27878e58760337ee95b1fd7ee0afbc5",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:34.055142825Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "chain-indexer",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        }
+      ],
+      "publicGates": {
+        "COOLIFY_BRANCH": "staging",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "CARD_WORKER_UPLOAD": "true",
+        "APP_ENV": "staging",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "NEXT_PUBLIC_APP_ENV": ""
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "dapp-u4s804o4wwcckowgk0woo4wg-112006512024",
+      "id": "c7dc852cd9ce",
+      "image": "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest",
+      "imageId": "sha256:4a33b763e1abeca31788fbe18b1b55a07df8acb999f4e36972123aa4711e9feb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:35.102306958Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "dapp",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        }
+      ],
+      "publicGates": {
+        "CARD_WORKER_UPLOAD": "true",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "COOLIFY_BRANCH": "staging",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "NEXT_PUBLIC_APP_ENV": "staging",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "APP_ENV": "staging",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "cuki-card-worker-u4s804o4wwcckowgk0woo4wg-112007384414",
+      "id": "adb9b38e0c62",
+      "image": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker",
+      "imageId": "sha256:a5f49fcc7f8927ce7376a25f8e62ca2834dd7bde25c3d136f060a139c2c56ec0",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.271221032Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "cuki-card-worker",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "COOLIFY_BRANCH": "staging",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "APP_ENV": "staging",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "CARD_WORKER_UPLOAD": "true",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "NEXT_PUBLIC_APP_ENV": ""
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "staging-mongo-u4s804o4wwcckowgk0woo4wg-112006474261",
+      "id": "d6942e546bc2",
+      "image": "u4s804o4wwcckowgk0woo4wg-staging-mongo",
+      "imageId": "sha256:3bee7ba95ffa6a595b5b930c0e7508b1ea910a8fc7cde2d9a77f416c4b942c80",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:34.986437212Z",
+      "restartCount": 0,
+      "project": "u4s804o4wwcckowgk0woo4wg",
+      "service": "staging-mongo",
+      "resource": "game-hub-staging",
+      "dbTargets": [
+        {
+          "variable": "STAGING_MONGO_SOURCE_LEGACY_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "STAGING_MONGO_SOURCE_CARD_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "STAGING_MONGO_SOURCE_ECONOMY_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukieshub-new-staging",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new-staging"
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-legacy-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "STAGING_MONGO_SOURCE_HUB_URL",
+          "host": "cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg",
+          "port": 27017,
+          "database": "cukies-hub-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "true",
+        "ECONOMY_CYCLE_SECONDS": "1800",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "SOURCE_COMMIT": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "COMPOSE_PROFILES": "staging-runtime,card-worker",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "CUKIES_BRIDGE_RELAYER_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "CARD_WORKER_UPLOAD": "true",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "CUKIES_BRIDGE_RELAYER_DB_NAME": "cukieshub-new-staging",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "APP_ENV": "staging",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "ECONOMY_GAMES_HMAC_SECRET",
+        "ECONOMY_INTERNAL_HMAC_SECRET",
+        "MONGO_INITDB_ROOT_PASSWORD",
+        "NEXTAUTH_SECRET",
+        "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+        "STAGING_MONGO_ROOT_PASSWORD",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET"
+      ]
+    },
+    {
+      "name": "chain-indexer-jookw8ow8woks088s44404ok-090324961141",
+      "id": "9f0cb66f1118",
+      "image": "jookw8ow8woks088s44404ok-chain-indexer",
+      "imageId": "sha256:9f0b85249823ac199484efb660241a5631fc84188d9355ffd005832a4035ada5",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:33.070431822Z",
+      "restartCount": 0,
+      "project": "jookw8ow8woks088s44404ok",
+      "service": "chain-indexer",
+      "resource": "game-hub",
+      "dbTargets": [
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-hub",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new"
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-hub",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-hub",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "false",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "CARD_WORKER_UPLOAD": "true",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new",
+        "CARD_WORKER_DB_NAME": "cukieshub-new",
+        "SOURCE_COMMIT": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "56",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "false",
+        "APP_ENV": "production",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "COOLIFY_BRANCH": "main",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "56",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "DISCORD_CLIENT_SECRET",
+        "IFTTT_WEBHOOK_SECRET",
+        "NEXTAUTH_SECRET",
+        "PUSHER_SECRET",
+        "RESEND_API_KEY",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET",
+        "TWITTER_CLIENT_SECRET"
+      ]
+    },
+    {
+      "name": "dapp-jookw8ow8woks088s44404ok-090324812114",
+      "id": "1a4be58662f1",
+      "image": "jookw8ow8woks088s44404ok-dapp",
+      "imageId": "sha256:e9708c63657b3f11ed37fdc9541d87facbf67f24a81c6496aac12edb4d7aafc3",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-09-07T16:39:33.682565513Z",
+      "restartCount": 0,
+      "project": "jookw8ow8woks088s44404ok",
+      "service": "dapp",
+      "resource": "game-hub",
+      "dbTargets": [
+        {
+          "variable": "CHAIN_INDEXER_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-hub",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new"
+        },
+        {
+          "variable": "DATABASE_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-hub",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CUKIES_DATABASE_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "CARD_WORKER_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-hub",
+          "credentialsPresent": true,
+          "effectiveDatabase": "cukieshub-new"
+        }
+      ],
+      "publicGates": {
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "false",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "CARD_WORKER_UPLOAD": "true",
+        "APP_ENV": "production",
+        "TREASURE_HUNT_COMPETITION_ENABLED": "true",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new",
+        "AMBASSADOR_ATTRIBUTION_WRITES_ENABLED": "true",
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "COMPETITION_CREDITS_RUNTIME_ENABLED": "false",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "SOURCE_COMMIT": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e",
+        "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "56",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "CARD_WORKER_DB_NAME": "cukieshub-new",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false",
+        "COOLIFY_BRANCH": "main",
+        "TREASURE_HUNT_MULTIPLAYER_ENABLED": "false",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "56"
+      },
+      "credentialVariableNames": [
+        "AUTH_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "DISCORD_CLIENT_SECRET",
+        "IFTTT_WEBHOOK_SECRET",
+        "NEXTAUTH_SECRET",
+        "PUSHER_SECRET",
+        "RESEND_API_KEY",
+        "TREASURE_HUNT_COMPETITION_ALIAS_SECRET",
+        "TREASURE_HUNT_COMPETITION_PROOF_SECRET",
+        "TREASURE_HUNT_COMPETITION_REVIEW_SECRET",
+        "TREASURE_HUNT_COMPETITION_SETTLEMENT_SECRET",
+        "TWITTER_CLIENT_SECRET"
+      ]
+    },
+    {
+      "name": "data-rest-learn-api-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "e74b8a86392c",
+      "image": "192.168.1.207:5000/cukies/cukies_learn-data-rest:a7251b5",
+      "imageId": "sha256:07459732e6de43945895eaba813ecd987a78480d238262b79cac371faf0cfaaf",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.866748686Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "data-rest-learn-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-learn",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_JWT_SECRET",
+        "NX_JWT_SECRET_GRAPH"
+      ]
+    },
+    {
+      "name": "data-rest-learn-api-cukiesapistaging",
+      "id": "64bb0fb054bb",
+      "image": "192.168.1.207:5000/cukies/cukies_learn-data-rest:a7251b5",
+      "imageId": "sha256:07459732e6de43945895eaba813ecd987a78480d238262b79cac371faf0cfaaf",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.319947073Z",
+      "restartCount": 0,
+      "project": "cukiesapistaging",
+      "service": "data-rest-learn-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-learn-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_JWT_SECRET",
+        "NX_JWT_SECRET_GRAPH"
+      ]
+    },
+    {
+      "name": "data-graphql-api-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "a4bce040fb12",
+      "image": "192.168.1.207:5000/cukies/cukies_world-data-graphql:security-20260820-54cbf484",
+      "imageId": "sha256:3ee6a484feacbf95d51ad9fdfda82f693f3d855e4fa9cc529f0019619dea6694",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.272239992Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "data-graphql-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "data-graphql-api-cukiesapistaging",
+      "id": "523744baa198",
+      "image": "192.168.1.207:5000/cukies/cukies_world-data-graphql:security-20260820-54cbf484",
+      "imageId": "sha256:3ee6a484feacbf95d51ad9fdfda82f693f3d855e4fa9cc529f0019619dea6694",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.297611103Z",
+      "restartCount": 0,
+      "project": "cukiesapistaging",
+      "service": "data-graphql-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "game-api-cukiesapistaging",
+      "id": "0e16c93b3e22",
+      "image": "192.168.1.207:5000/cukies/cukies_world-game:latest",
+      "imageId": "sha256:94dc3230d23485f8569c2afbafa13c8e3d02dfac5e4c0c05c003592289ee933e",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.096195809Z",
+      "restartCount": 0,
+      "project": "cukies-api-staging",
+      "service": "game-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "matchmaking-api-cukiesapistaging",
+      "id": "8fda41b5c1de",
+      "image": "192.168.1.207:5000/cukies/cukies_world-matchmaking:codex-island-20260701T065752Z-1f4d04cc-join-token",
+      "imageId": "sha256:5b43ef59ee24cfb4a81a4b9ae434f2c6ae562b54823767347f53277907e86fa1",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:33.170367732Z",
+      "restartCount": 0,
+      "project": "cukies-api-staging",
+      "service": "matchmaking-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "marketplace-cukiesapistaging",
+      "id": "52c91bb6a915",
+      "image": "192.168.1.207:5000/cukies/cukies_world-dapp:latest",
+      "imageId": "sha256:6f04194c31d85492b598bda060a418966cfa7fc8fdc27c481d53c23944fc20ac",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.069126935Z",
+      "restartCount": 0,
+      "project": "cukies-api-staging",
+      "service": "marketplace",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_BSC_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_TRON_DB",
+          "host": "51.91.72.150",
+          "port": 27017,
+          "database": "eventlog",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "auth-api-cukiesapistaging",
+      "id": "00f92935dc50",
+      "image": "192.168.1.207:5000/cukies/cukies_world-auth:latest",
+      "imageId": "sha256:7d198d322dedcf1ea4fe395ff47b941be2a82fc9da3133db2594e19ae3ba48c7",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:33.024557328Z",
+      "restartCount": 0,
+      "project": "cukiesapistaging",
+      "service": "auth-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "data-rest-api-cukiesapistaging",
+      "id": "f597e18591cb",
+      "image": "192.168.1.207:5000/cukies/cukies_world-data-rest:latest",
+      "imageId": "sha256:15f01b6ca5325e1f242906a39e0e695a24611ed47d8e6cb050102db82322256f",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:33.458889631Z",
+      "restartCount": 0,
+      "project": "cukiesapistaging",
+      "service": "data-rest-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "data-rest-ludo-api-cukiesapistaging",
+      "id": "91250f838b26",
+      "image": "192.168.1.207:5000/cukies/cukies_ludo-data-rest:latest",
+      "imageId": "sha256:60fe5d42db9bd430df41f1baabbd4fafe2c4075ad37ba70d5dec2f742e9d8540",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:32.430880173Z",
+      "restartCount": 0,
+      "project": "cukiesapistaging",
+      "service": "data-rest-ludo-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-learn-staging",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_JWT_SECRET",
+        "NX_JWT_SECRET_GRAPH"
+      ]
+    },
+    {
+      "name": "data-rest-ludo-api-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "05c2401b9d32",
+      "image": "192.168.1.207:5000/cukies/cukies_ludo-data-rest:latest",
+      "imageId": "sha256:60fe5d42db9bd430df41f1baabbd4fafe2c4075ad37ba70d5dec2f742e9d8540",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.145262409Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "data-rest-ludo-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-learn",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_JWT_SECRET",
+        "NX_JWT_SECRET_GRAPH"
+      ]
+    },
+    {
+      "name": "marketplace-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "3e045d1f5299",
+      "image": "192.168.1.207:5000/cukies/cukies_world-dapp:latest",
+      "imageId": "sha256:6f04194c31d85492b598bda060a418966cfa7fc8fdc27c481d53c23944fc20ac",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.831032699Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "marketplace",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_BSC_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-staging",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_TRON_DB",
+          "host": "51.91.72.150",
+          "port": 27017,
+          "database": "eventlog",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "auth-api-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "c53a000803ff",
+      "image": "192.168.1.207:5000/cukies/cukies_world-auth:latest",
+      "imageId": "sha256:4da4875914cd89e768d09a00889823df280a32173592832569d4fa2e940254c7",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.207395539Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "auth-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "data-rest-api-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "a052756010e2",
+      "image": "192.168.1.207:5000/cukies/cukies_world-data-rest:latest",
+      "imageId": "sha256:15f01b6ca5325e1f242906a39e0e695a24611ed47d8e6cb050102db82322256f",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:35.336431221Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "data-rest-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "learn-bot-worker-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "68bc3820617c",
+      "image": "192.168.1.207:5000/cukies/cukies-learn-bot:latest",
+      "imageId": "sha256:9f07e7ec8d251d283f788a34e38d07f87a413c697cb1843347ea84f66c0a10f0",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:33.3049907Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "learn-bot-worker",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "game-api-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "fde3cbb2b178",
+      "image": "192.168.1.207:5000/cukies/cukies_world-game:latest",
+      "imageId": "sha256:98dab2aab41ee087fc60d24257a203e2465c268dd4b30060d7aa4a6bf10ca837",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.102299544Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "game-api",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_GAME_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies-game",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        },
+        {
+          "variable": "NX_DATA_DB",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SAAKURU_API_KEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "getter-bsc-worker-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "db1bab3c5785",
+      "image": "registry.digitalocean.com/cukies/cukies-backend-getter-bsc:latest",
+      "imageId": "sha256:e19b650e593da70b60e0d138bf2d4be3730c103e29007e2d9e250a1d246af6d1",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:33.719128338Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "getter-bsc-worker",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "cards-worker-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "9760a14d7f10",
+      "image": "registry.digitalocean.com/cukies/cukies-backend-generate-missing-images:latest",
+      "imageId": "sha256:a107c13cb13a7011adbe4b1d5bc1e7c969f264eed86f44a9e22d26c82cfe7543",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.709920754Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "cards-worker",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "setter-worker-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "bd76f4891cb5",
+      "image": "registry.digitalocean.com/cukies/cukies-backend-setter:latest",
+      "imageId": "sha256:4c6b6b7fd9027ddf430a58772efd6d5ccbb6fc763a63108e6bce557abf70f7b2",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.064135216Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "setter-worker",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "getter-tron-worker-kcos4s4w4sggg84ksgw4gwoo",
+      "id": "a0adcd2a6a20",
+      "image": "registry.digitalocean.com/cukies/cukies-backend-getter-tron:latest",
+      "imageId": "sha256:974126026d9f5ca213bf6739098e2f95e49b57242102b1928aa9604b8ee229b4",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.451536924Z",
+      "restartCount": 0,
+      "project": "kcos4s4w4sggg84ksgw4gwoo",
+      "service": "getter-tron-worker",
+      "resource": "service-vokgw84g4g4cs0woog0g8o0k",
+      "dbTargets": [
+        {
+          "variable": "NX_MONGO_URL",
+          "host": "192.168.1.221",
+          "port": 27017,
+          "database": "cukies",
+          "credentialsPresent": true
+        }
+      ],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "NX_S3_SECRET_ACCESSKEY",
+        "NX_SECRET_WORD"
+      ]
+    },
+    {
+      "name": "cukies-mongodb",
+      "id": "d39ec80038e4",
+      "image": "mongo:4.4",
+      "imageId": "sha256:d896c071ac6936bcb205f35c17a556b9cabf54733c4e1f4d68cda1348424d65d",
+      "status": "running",
+      "health": "not-configured",
+      "startedAt": "2026-09-07T16:39:34.660514036Z",
+      "restartCount": 0,
+      "project": "mongodb",
+      "service": "mongodb",
+      "resource": null,
+      "dbTargets": [],
+      "publicGates": {},
+      "credentialVariableNames": [
+        "MONGO_INITDB_ROOT_PASSWORD"
+      ]
+    }
+  ],
+  "legacyWorkerLogMetadata": {
+    "observedAt": "2026-09-07T17:26:29.197712+00:00",
+    "sampleWindow": "last 30m, max 200 lines per worker",
+    "workers": [
+      {
+        "name": "getter-bsc-worker-kcos4s4w4sggg84ksgw4gwoo",
+        "exitCode": 0,
+        "sampleLines": 200,
+        "latestLogAt": "2026-09-07T17:26:21.738463559Z",
+        "linesMatchingErrorOrTimeout": 65,
+        "note": "Only log metadata; matches are not proof of service failure or successful processing."
+      },
+      {
+        "name": "getter-tron-worker-kcos4s4w4sggg84ksgw4gwoo",
+        "exitCode": 0,
+        "sampleLines": 200,
+        "latestLogAt": "2026-09-07T17:26:22.451015011Z",
+        "linesMatchingErrorOrTimeout": 0,
+        "note": "Only log metadata; matches are not proof of service failure or successful processing."
+      },
+      {
+        "name": "setter-worker-kcos4s4w4sggg84ksgw4gwoo",
+        "exitCode": 0,
+        "sampleLines": 200,
+        "latestLogAt": "2026-09-07T17:26:24.797762924Z",
+        "linesMatchingErrorOrTimeout": 0,
+        "note": "Only log metadata; matches are not proof of service failure or successful processing."
+      },
+      {
+        "name": "cards-worker-kcos4s4w4sggg84ksgw4gwoo",
+        "exitCode": 0,
+        "sampleLines": 200,
+        "latestLogAt": "2026-09-07T17:26:28.701981952Z",
+        "linesMatchingErrorOrTimeout": 24,
+        "note": "Only log metadata; matches are not proof of service failure or successful processing."
+      }
+    ]
+  }
+}
