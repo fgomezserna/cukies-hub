@@ -234,6 +234,17 @@ resumen durable, comandos y limites estan en
 [`evidence/2026-09-07-indexer-validation.json`](evidence/2026-09-07-indexer-validation.json).
 La imagen completa aun debe construirse y verificarse durante el despliegue.
 
+El codigo del worker y eventos esta en el commit `fa708fd` de la
+[PR #319](https://github.com/fgomezserna/cukies-hub/pull/319), con destino
+`staging`. La recuperacion completa del historico BSC necesita un proveedor de
+archivo: PublicNode exigio un token para la consulta de 50.000 bloques, el RPC
+publico BNB Chain devolvio `limit exceeded` y bloXroute no sirvio el bloque de
+despliegue. Se conservan los dos contrastes alternativos en
+[`evidence/2026-09-07-indexer-archive-rpc.json`](evidence/2026-09-07-indexer-archive-rpc.json).
+No se ha creado una cuenta, contratado un plan ni copiado una credencial de
+produccion para resolverlo. Validar ese acceso antes de activar backfill desde
+`0`; la prueba de lectura reciente no sustituye al historico.
+
 La reconciliacion se registra por familia en esta ficha, junto a la evidencia
 fechada, con estos criterios:
 
