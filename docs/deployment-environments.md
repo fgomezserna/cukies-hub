@@ -342,6 +342,11 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_{START_BSC_BLOCK,DEPLOYMENT_BSC_BLOCK}` | `125280547` | Start y deployment block coinciden. |
 | `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_DEPLOYMENT_TX_HASH` | `0x07a032f881b437f8264491fcc603466b55873a2921b16051d65f0aeecb01632f` | Receipt BSC Testnet verificado. |
 | `CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_RUNTIME_CODE_HASH` | `0x36c0f9144323fc23ce9ab02063196943f7d633abb207a8df519db35caf26637a` | Keccak-256 del bytecode runtime. |
+| `CHAIN_INDEXER_PRESALE_ADDRESS` | `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA` | Debe coincidir con la variable publica. |
+| `CHAIN_INDEXER_PRESALE_START_BSC_BLOCK` | `123291898` | Bloque exacto de despliegue. |
+| `CHAIN_INDEXER_PRESALE_DEPLOYMENT_BSC_BLOCK` | `123291898` | Debe coincidir con el receipt de despliegue y con el start block. |
+| `CHAIN_INDEXER_PRESALE_DEPLOYMENT_TX_HASH` | `0x846987138438bc3e77bfa8a957011b7cf6bbfc7b8fae59a548949102a0abc80e` | Receipt BSC Testnet verificado. |
+| `CHAIN_INDEXER_PRESALE_RUNTIME_CODE_HASH` | `0xb913b21342f583078dc890e77a2e0bb43b4e77ae02f04a180284aee3ceb7b8a3` | Keccak-256 del bytecode runtime testnet actual. |
 | `CHAIN_INDEXER_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK` | `123359165` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK` | `123359165` | Debe coincidir con el receipt de despliegue y con el start block. |
@@ -354,7 +359,12 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH` | `0x7fa2f464e4ee11ac2c37c4adeb28b0b81c261b1e6a755ca65d159dfb3a60249c` | Keccak-256 del bytecode runtime testnet actual. |
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK` | `123359171` | Bloque exacto de despliegue. |
+| `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_BSC_BLOCK` | `123359171` | Debe coincidir con el receipt de despliegue y con el start block. |
+| `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_TX_HASH` | `0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639` | Receipt BSC Testnet verificado. |
+| `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_RUNTIME_CODE_HASH` | `0x654fa2495a76004361c98bf51a10d5b9e7a50564ca4b89ee9e95af04cb92b4fc` | Keccak-256 del bytecode runtime testnet actual. |
 | `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Gate de finalidad para las proyecciones UKI. |
+
+Cada alias BSC con verificacion de identidad incluido en `CHAIN_INDEXER_CONTRACT_ALIASES` requiere su address y los cuatro campos de identidad (`START_BSC_BLOCK`, `DEPLOYMENT_BSC_BLOCK`, `DEPLOYMENT_TX_HASH` y `RUNTIME_CODE_HASH`). Los dos bloques deben ser iguales; `CHAIN_INDEXER_START_BSC_BLOCK` no sustituye esta evidencia por contrato. Las identidades de `PRESALE` y `REWARDS_DISTRIBUTOR` se contrastaron por RPC el 2026-09-07 a las 23:01 UTC (chain 97, receipt, address, bloque y bytecode runtime). `CHAIN_INDEXER_UKI_TOKEN_ADDRESS` se configura explícitamente en Coolify y no se deriva de `NEXT_PUBLIC_UKI_TOKEN_ADDRESS`.
 
 ### Publicador de rewards en staging
 

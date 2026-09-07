@@ -232,11 +232,15 @@ typecheck y build correctos. Las ventanas acotadas de RPC no contenian eventos;
 la decodificacion y replay se validaron con fixtures/ABI y Mongo local. El
 resumen durable, comandos y limites estan en
 [`evidence/2026-09-07-indexer-validation.json`](evidence/2026-09-07-indexer-validation.json).
-La imagen completa aun debe construirse y verificarse durante el despliegue.
+Las imagenes completas de dapp e indexer se construyeron en Coolify al integrar
+la PR #319. El rollout detecto una variable UKI truncada y campos de identidad
+ausentes para PRESALE/REWARDS: ver la configuracion corregida y las pruebas RPC
+en [entornos de despliegue](../deployment-environments.md).
 
 El codigo del worker y eventos esta en el commit `fa708fd` de la
-[PR #319](https://github.com/fgomezserna/cukies-hub/pull/319), con destino
-`staging`. La recuperacion completa del historico BSC necesita un proveedor de
+[PR #319](https://github.com/fgomezserna/cukies-hub/pull/319), integrada en
+`staging` como `7d0d1ce`. El perfil `legacy-indexer` sigue desactivado.
+La recuperacion completa del historico BSC necesita un proveedor de
 archivo: PublicNode exigio un token para la consulta de 50.000 bloques, el RPC
 publico BNB Chain devolvio `limit exceeded` y bloXroute no sirvio el bloque de
 despliegue. Se conservan los dos contrastes alternativos en

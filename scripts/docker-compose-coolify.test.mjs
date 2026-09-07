@@ -31,6 +31,29 @@ const sharedDappRuntimeWorkers = [
 const resourceScopedDappAlias = 'dapp-${COOLIFY_RESOURCE_UUID:?Coolify must expose the resource UUID}';
 const internalResourceDappUrl = 'http://dapp-${COOLIFY_RESOURCE_UUID}:3000';
 
+const verifiedBscIdentityAliases = [
+  'TOKEN',
+  'UKI_TOKEN',
+  'TOKEN_V2',
+  'MARKETPLACE',
+  'UKI_MARKETPLACE',
+  'BRIDGE',
+  'BRIDGE_ENDPOINT',
+  'PRESALE',
+  'UKI_STAKING',
+  'VESTING_VAULT',
+  'REWARDS_DISTRIBUTOR',
+  'CUKIE_MASTER_NFT_VAULT',
+  'CUKIE_POOL_NFT_VAULT',
+];
+
+const verifiedBscIdentitySuffixes = [
+  'START_BSC_BLOCK',
+  'DEPLOYMENT_BSC_BLOCK',
+  'DEPLOYMENT_TX_HASH',
+  'RUNTIME_CODE_HASH',
+];
+
 function serviceDefinition(serviceName) {
   const startMarker = `  ${serviceName}:\n`;
   const start = compose.indexOf(startMarker);
@@ -158,6 +181,36 @@ test('dapp injects the public environment identity and optional liquidity links'
     /NEXT_PUBLIC_CUKIES_BRIDGE_(?:BSC|TRON)_[A-Z_]+:.*(?:b775ec58411F0460716CC7FA6FbbE2c38AfD2A6E|TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ)/i,
   );
 });
+
+for (const serviceName of ['dapp', 'chain-indexer']) {
+  test(`${serviceName} carries every verified BSC contract identity field`, () => {
+    const definition = serviceDefinition(serviceName);
+
+    for (const alias of verifiedBscIdentityAliases) {
+      for (const suffix of verifiedBscIdentitySuffixes) {
+        const field = `CHAIN_INDEXER_${alias}_${suffix}`;
+        assert.ok(
+          definition.includes(`      ${field}: \${${field}:-}`),
+          `${serviceName} is missing ${field}`,
+        );
+      }
+    }
+  });
+}
+
+for (const serviceName of ['dapp', 'chain-indexer']) {
+  test(`${serviceName} does not derive UKI_TOKEN identity from the public fallback`, () => {
+    const definition = serviceDefinition(serviceName);
+
+    assert.ok(definition.includes(
+      'CHAIN_INDEXER_UKI_TOKEN_ADDRESS: ${CHAIN_INDEXER_UKI_TOKEN_ADDRESS:-}',
+    ));
+    assert.doesNotMatch(
+      definition,
+      /CHAIN_INDEXER_UKI_TOKEN_ADDRESS:.*\$\{NEXT_PUBLIC_UKI_TOKEN_ADDRESS/,
+    );
+  });
+}
 
 test('chain-indexer receives an isolated verified UKI marketplace identity', () => {
   const definition = serviceDefinition('chain-indexer');
