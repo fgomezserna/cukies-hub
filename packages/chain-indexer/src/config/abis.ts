@@ -5,6 +5,19 @@ import type { EventName } from '../types.js';
 export const eventSignatures: Record<EventName, string> = {
   Transfer:
     'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+  Approval:
+    'event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)',
+  ApprovalForAll:
+    'event ApprovalForAll(address indexed owner, address indexed operator, bool approved)',
+  MinterAdded: 'event MinterAdded(address indexed account)',
+  MinterRemoved: 'event MinterRemoved(address indexed account)',
+  OwnershipRenounced: 'event OwnershipRenounced(address indexed previousOwner)',
+  OwnershipTransferred:
+    'event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)',
+  OwnershipTransferStarted:
+    'event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner)',
+  Paused: 'event Paused(address account)',
+  Unpaused: 'event Unpaused(address account)',
   CukieMetadataConfigured:
     'event CukieMetadataConfigured(uint256 indexed tokenId, uint8 rarity, uint8 generation)',
   Mint: 'event Mint(address indexed user, uint256 points)',
@@ -40,6 +53,48 @@ export const eventSignatures: Record<EventName, string> = {
     'event JumpInBridge(uint256 tokenId, address originOwner, address destOwner, uint8 network, uint256 createdAt)',
   JumpOutBridge:
     'event JumpOutBridge(uint256 tokenId, address destOwner, uint256 createdAt)',
+  MintReferral:
+    'event MintReferral(address indexed user, address indexed sponsor, uint256 num, uint256 value, uint256 comission, uint8 indexed level)',
+  BridgeRequested:
+    'event BridgeRequested(bytes32 indexed transferId, uint256 indexed tokenId, address indexed sourceOwner, bytes20 destinationOwner, uint8 sourceNetwork, uint8 destinationNetwork, uint256 nonce, uint256 feePaid, bytes32 metadataHash, uint256 createdAt)',
+  BridgeCompleted:
+    'event BridgeCompleted(bytes32 indexed transferId, uint256 indexed tokenId, address indexed destinationOwner, uint8 sourceNetwork, uint8 destinationNetwork, bool minted, bytes32 metadataHash, uint256 createdAt)',
+  RelayerUpdated: 'event RelayerUpdated(address indexed relayer, bool allowed)',
+  BridgePriceUpdated: 'event BridgePriceUpdated(uint256 previousPrice, uint256 newPrice)',
+  FeeRecipientUpdated:
+    'event FeeRecipientUpdated(address indexed previousRecipient, address indexed newRecipient)',
+  UntrackedERC721Recovered:
+    'event UntrackedERC721Recovered(address indexed collectionAddress, uint256 indexed tokenId, address indexed recipient)',
+  CollectionAllowedUpdated:
+    'event CollectionAllowedUpdated(address indexed collection, bool allowed)',
+  PaymentTokenAllowedUpdated:
+    'event PaymentTokenAllowedUpdated(address indexed paymentToken, bool allowed)',
+  NativePaymentAllowedUpdated: 'event NativePaymentAllowedUpdated(bool allowed)',
+  FeeConfigUpdated: 'event FeeConfigUpdated(address indexed recipient, uint16 feeBps)',
+  NativeFeesClaimed: 'event NativeFeesClaimed(address indexed recipient, uint256 amount)',
+  MinPurchaseUpdated: 'event MinPurchaseUpdated(uint256 minAsmPerPurchase)',
+  SaleEnabledUpdated: 'event SaleEnabledUpdated(bool enabled)',
+  SaleWindowUpdated: 'event SaleWindowUpdated(uint64 saleStart, uint64 saleEnd)',
+  TotalUkiForSaleUpdated: 'event TotalUkiForSaleUpdated(uint256 totalUkiForSale)',
+  TreasuryUpdated:
+    'event TreasuryUpdated(address indexed previousTreasury, address indexed nextTreasury)',
+  UkiPerAsmUpdated: 'event UkiPerAsmUpdated(uint256 previousUkiPerAsm, uint256 nextUkiPerAsm)',
+  PresaleVestingConfigFrozen: 'event PresaleVestingConfigFrozen(uint64 start, uint64 duration)',
+  PresaleVestingConfigUpdated: 'event PresaleVestingConfigUpdated(uint64 start, uint64 duration)',
+  RoleAdminChanged:
+    'event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole)',
+  RoleGranted:
+    'event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender)',
+  RoleRevoked:
+    'event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender)',
+  UnallocatedWithdrawn: 'event UnallocatedWithdrawn(address indexed to, uint256 amount)',
+  ExcessRecovered: 'event ExcessRecovered(address indexed to, uint256 amount)',
+  UkiTokenApproval: 'event Approval(address indexed owner, address indexed spender, uint256 value)',
+  UkiTokenOwnershipTransferred:
+    'event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)',
+  UkiTokenPaused: 'event Paused(address account)',
+  UkiTokenTransfer: 'event Transfer(address indexed from, address indexed to, uint256 value)',
+  UkiTokenUnpaused: 'event Unpaused(address account)',
   Purchased:
     'event Purchased(address indexed buyer, uint256 asmAmount, uint256 ukiAmount, uint256 totalBuyerAsm, uint256 totalBuyerUki)',
   Staked:
@@ -86,3 +141,10 @@ export const bscEventAbis = Object.fromEntries(
     parseAbiItem(signature) as AbiEvent,
   ]),
 ) as Record<EventName, AbiEvent>;
+
+// TRONGrid returns ABI events separately from viem and legacy bridge versions
+// do not share the BSC JumpOutBridge payload. Keep the shape that affects
+// decoding explicit instead of inferring it from the event name.
+export const tronEventSignatures: Partial<Record<EventName, string>> = {
+  JumpOutBridge: 'event JumpOutBridge(uint256 tokenId, uint256 createdAt)',
+};

@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-07",
+  "scope": "Local implementation and bounded public RPC reads; no deployment or historical data parity",
+  "baseStagingCommit": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+  "eventCoverage": {
+    "legacyContracts": 14,
+    "legacyContractEventBindings": 75,
+    "newContractProfiles": 10,
+    "newContractEventBindings": 87,
+    "compiledNewContracts": true
+  },
+  "checks": [
+    { "command": "pnpm --filter @cukies/chain-indexer test", "tests": 84, "passed": 84, "failed": 0, "mongoIntegration": true },
+    { "command": "pnpm guard:staging:test", "tests": 63, "passed": 63, "failed": 0 },
+    { "command": "node --test scripts/assert-production.test.mjs", "tests": 14, "passed": 14, "failed": 0 },
+    { "command": "pnpm --filter @cukies/chain-indexer legacy:test", "tests": 5, "passed": 5, "failed": 0 },
+    { "command": "pnpm --filter @cukies/chain-indexer typecheck", "exitCode": 0 },
+    { "command": "pnpm --filter @cukies/chain-indexer build", "exitCode": 0 },
+    { "command": "docker compose config --quiet", "profiles": ["inactive legacy", "legacy-indexer"], "result": "PASS with synthetic local environment" }
+  ],
+  "publicSourceVerification": { "bsc": 6, "tron": 8, "passed": 14, "evidence": "2026-09-07-indexer-source-proofs.json" },
+  "boundedIngest": {
+    "database": "local QA replica set only",
+    "bsc": { "chainId": 56, "alias": "TOKEN", "startBlock": 120561655, "ranges": 7, "insertedEvents": 0, "durationMs": 847 },
+    "tron": { "network": "mainnet", "contractEventConfigs": 40, "aliases": 8, "delayMs": 2000, "pages": 40, "http200Responses": 40, "rateLimited": false, "errors": [], "timeouts": 0, "insertedEvents": 0, "durationMs": 87309, "apiKeyUsed": false, "reusedVerifiedSourceProofs": true }
+  },
+  "limitations": [
+    "No historical backfill, metadata migration, consumer cutover or deployment was executed.",
+    "The bounded RPC ingestion windows contained no events; decoding, projections and replay were checked with ABI fixtures and local Mongo tests.",
+    "TRON with no request delay returned HTTP 429. The successful full pass used two seconds, now the dedicated legacy default.",
+    "A BSC publicnode query over 50000 blocks returned HTTP 403 requiring an archive token; the archive provider must be validated before full backfill.",
+    "Docker Compose validation and package compilation do not prove a built or deployed container image."
+  ]
+}

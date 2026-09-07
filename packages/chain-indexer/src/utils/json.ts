@@ -11,6 +11,20 @@ const tronAddressFields = new Set([
   'originOwner',
   'destOwner',
   'user',
+  'sponsor',
+  'approved',
+  'operator',
+  'account',
+  'beneficiary',
+  'recipient',
+  'collection',
+  'collectionAddress',
+  'sourceOwner',
+  'paymentToken',
+  'relayer',
+  'previousOwner',
+  'newOwner',
+  'feeRecipient',
 ]);
 
 export function toJsonValue(value: unknown): JsonValue {

@@ -1,0 +1,15 @@
+{
+  "schema": "cukies.legacy-source-provenance.v1",
+  "files": [
+    {
+      "file": "MarketplaceInGame.sol",
+      "repository": "https://github.com/fgomezserna/cukiesworld-stack",
+      "commit": "f6ed108682260c8e62844b686a60299843bbd619",
+      "path": "apps/contracts/MarketplaceInGame.sol",
+      "sha256": "188978a1fc806adf757d11520521bec2840330b4e5a062fac3baf797dde446e7",
+      "classification": "reference-only",
+      "deploymentAssociation": "not-established",
+      "compilerOrDeployExecuted": false
+    }
+  ]
+}

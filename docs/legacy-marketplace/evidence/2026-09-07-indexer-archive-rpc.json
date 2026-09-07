@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-09-07T21:12:27.981Z",
+  "scope": "Public BSC RPC only; no secrets, MongoDB, remote mutations or repository edits",
+  "chain": "BSC mainnet",
+  "expectedChainId": 56,
+  "contract": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+  "event": "Transfer(address,address,uint256)",
+  "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+  "deployBlock": 16906879,
+  "testedRange": { "fromBlock": 16906879, "toBlock": 16956878, "count": 50000 },
+  "sources": [
+    "dapp/src/providers/web3-provider.tsx (public mainnet RPC candidates)",
+    "packages/chain-indexer/src/config/env.ts (BSC mainnet fallback)",
+    "packages/chain-indexer/README.md (archive RPC requirement for legacy backfill)"
+  ],
+  "requests": [
+    {
+      "provider": "https://bsc-dataseed-public.bnbchain.org",
+      "method": "eth_chainId",
+      "http": 200,
+      "durationMs": 316,
+      "chainId": "0x38",
+      "rpcError": null
+    },
+    {
+      "provider": "https://bsc-dataseed-public.bnbchain.org",
+      "method": "eth_getLogs",
+      "filter": "TOKEN + Transfer at block 16906879",
+      "http": 200,
+      "durationMs": 53,
+      "logCount": null,
+      "rpcError": { "code": -32005, "message": "limit exceeded" }
+    },
+    {
+      "provider": "https://bsc-dataseed-public.bnbchain.org",
+      "method": "eth_getLogs",
+      "filter": "TOKEN + Transfer, blocks 16906879..16956878",
+      "http": 200,
+      "durationMs": 51,
+      "logCount": null,
+      "rpcError": { "code": -32005, "message": "limit exceeded" }
+    },
+    {
+      "provider": "https://bsc.rpc.blxrbdn.com",
+      "method": "eth_chainId",
+      "http": 200,
+      "durationMs": 236,
+      "chainId": "0x38",
+      "rpcError": null
+    },
+    {
+      "provider": "https://bsc.rpc.blxrbdn.com",
+      "method": "eth_getLogs",
+      "filter": "TOKEN + Transfer at block 16906879",
+      "http": 200,
+      "durationMs": 44,
+      "logCount": null,
+      "rpcError": { "code": -32000, "message": "header not found" }
+    },
+    {
+      "provider": "https://bsc.rpc.blxrbdn.com",
+      "method": "eth_getLogs",
+      "filter": "TOKEN + Transfer, blocks 16906879..16956878",
+      "http": 200,
+      "durationMs": 44,
+      "logCount": null,
+      "rpcError": { "code": -32000, "message": "exceed maximum block range: 5000" }
+    }
+  ],
+  "conclusion": "Ambos endpoints confirman chainId 56, pero ninguno sirve el getLogs histórico requerido. No hay provider de archivo gratuito verificado en esta pasada (máximo 2 providers y 6 requests)."
+}

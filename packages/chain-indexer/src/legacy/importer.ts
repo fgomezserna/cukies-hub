@@ -13,6 +13,15 @@ import {
 
 const supportedEventNames = new Set<EventName>([
   'Transfer',
+  'Approval',
+  'ApprovalForAll',
+  'MinterAdded',
+  'MinterRemoved',
+  'OwnershipRenounced',
+  'OwnershipTransferred',
+  'OwnershipTransferStarted',
+  'Paused',
+  'Unpaused',
   'Mint',
   'Burn',
   'Stake',
@@ -25,6 +34,18 @@ const supportedEventNames = new Set<EventName>([
   'MarketTokenPriceChanged',
   'JumpInBridge',
   'JumpOutBridge',
+  'MintReferral',
+  'BridgeRequested',
+  'BridgeCompleted',
+  'RelayerUpdated',
+  'BridgePriceUpdated',
+  'FeeRecipientUpdated',
+  'UntrackedERC721Recovered',
+  'CollectionAllowedUpdated',
+  'PaymentTokenAllowedUpdated',
+  'NativePaymentAllowedUpdated',
+  'FeeConfigUpdated',
+  'NativeFeesClaimed',
 ]);
 
 type LegacyProcessedEvent = {

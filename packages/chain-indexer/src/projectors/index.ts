@@ -3,6 +3,7 @@ import type { ClientSession } from 'mongodb';
 
 import { getMonitoredContractAddresses } from '../config/contracts.js';
 import type {
+  ChainCursor,
   ChainEvent,
   JsonValue,
   VerifiedBscContractAlias,
@@ -11,63 +12,63 @@ import { getNumber, getString, normalizeAddress, now } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
 import { enqueueCukieMasterRecalculation } from './cukie-master-outbox.js';
 import { projectNftVaultEvent } from './nft-vaults.js';
+import { isMongoDuplicateKey, monotonicAbsoluteUpdate } from './monotonic.js';
+import {
+  assertLegacyContractIdentity,
+  isLegacyEvent,
+  legacyListingDocumentId,
+  legacyListingIdentity,
+  legacyNftIdentity,
+  legacyNftDocumentId,
+  legacyPointsIdentity,
+} from '../legacy/identity.js';
+import { LEGACY_CONTRACT_ALIASES, legacyContractAddress, legacyContractProof } from '../legacy/contracts.js';
+import { classifyLegacyAdminEvent, projectLegacyAdminAudit } from './legacy-admin-audit.js';
+export { monotonicAbsoluteUpdate } from './monotonic.js';
+import {
+  isLegacyAuditEvent,
+  projectBreedingLedger,
+  projectBridgeLifecycle,
+  projectGenericAuditEvent,
+  projectLegacyAuditEvent,
+  projectReferralEvent,
+  projectRawAuditEvent,
+} from './legacy-events.js';
 
 function collection(store: IndexerStore, name: string) {
   return store.db.collection<any>(name);
 }
 
-function isMongoDuplicateKey(error: unknown) {
-  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 11000);
-}
-
-type MonotonicTuple = { blockNumber: number; logIndex: number };
-type MonotonicCollection = {
-  updateOne(
-    filter: Record<string, unknown>,
-    update: Record<string, unknown>,
-    options?: Record<string, unknown>,
-  ): Promise<{ matchedCount: number }>;
-  insertOne(document: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
-};
-
-function monotonicTupleFilter(id: string, tuple: MonotonicTuple) {
-  return {
-    _id: id,
-    $or: [
-      { lastBlockNumber: { $exists: false } },
-      { lastBlockNumber: { $lt: tuple.blockNumber } },
-      { lastBlockNumber: tuple.blockNumber, lastLogIndex: { $lte: tuple.logIndex } },
-    ],
-  };
-}
-
-export async function monotonicAbsoluteUpdate(
-  target: MonotonicCollection,
-  id: string,
-  tuple: MonotonicTuple,
-  values: Record<string, unknown>,
-  createdAt: Date,
-  session?: ClientSession,
-) {
-  const set = {
-    ...values,
-    lastBlockNumber: tuple.blockNumber,
-    lastLogIndex: tuple.logIndex,
-  };
-  const updateExisting = () => target.updateOne(
-    monotonicTupleFilter(id, tuple),
-    { $set: set },
-    { upsert: false, session },
-  );
-  const updated = await updateExisting();
-  if (updated.matchedCount > 0) return true;
-
-  try {
-    await target.insertOne({ _id: id, ...set, createdAt }, { session });
-    return true;
-  } catch (error) {
-    if (!isMongoDuplicateKey(error)) throw error;
-    return (await updateExisting()).matchedCount > 0;
+async function assertLegacyEventBoundary(store: IndexerStore, event: ChainEvent) {
+  if (!LEGACY_CONTRACT_ALIASES.includes(event.contractAlias as typeof LEGACY_CONTRACT_ALIASES[number])) {
+    throw new Error(`${event.contractAlias} no pertenece al manifiesto legacy canónico.`);
+  }
+  const canonicalAddress = legacyContractAddress(event.chain, event.contractAlias);
+  if (!canonicalAddress) {
+    throw new Error(`${event.contractAlias} no tiene address legacy canónica para ${event.chain}.`);
+  }
+  const proof = legacyContractProof(event.chain, event.contractAlias as typeof LEGACY_CONTRACT_ALIASES[number]);
+  assertLegacyContractIdentity(event, event.contractAlias as typeof LEGACY_CONTRACT_ALIASES[number]);
+  const observed = await collection(store, 'legacy_source_proofs').findOne({
+    _id: `${event.chain}:${event.chain === 'BSC' ? '56' : 'mainnet'}:${event.contractAlias}`,
+    runtimeScope: 'legacy',
+    chain: event.chain,
+    alias: event.contractAlias,
+    network: 'mainnet',
+    expectedRuntimeHash: proof.runtimeHash,
+    verification: { $in: ['live-rpc-runtime-keccak256', 'trongrid-runtimecode-keccak256'] },
+    observedAt: { $type: 'date' },
+  });
+  if (!observed || typeof observed.address !== 'string'
+    || (event.chain === 'BSC'
+      ? observed.address.toLowerCase() !== canonicalAddress.toLowerCase()
+      : observed.address !== canonicalAddress)
+    || (event.chain === 'BSC' && observed.chainId !== 56)
+    || typeof observed.observedRuntimeHash !== 'string'
+    || observed.observedRuntimeHash.toLowerCase() !== proof.runtimeHash.toLowerCase()
+    || (event.chain === 'BSC'
+      && (!Number.isSafeInteger(observed.observedAtBlock) || observed.observedAtBlock < 0))) {
+    throw new Error(`${event.contractAlias} legacy no tiene prueba RPC viva persistida.`);
   }
 }
 
@@ -110,6 +111,7 @@ function bscNftMaterializationIdentity(event: ChainEvent) {
 }
 
 function nftDocumentId(event: ChainEvent, id: string) {
+  if (isLegacyEvent(event)) return legacyNftDocumentId(event, id);
   if (event.chain !== 'BSC' || event.contractAlias !== 'TOKEN_V2') return id;
   const identity = bscNftMaterializationIdentity(event)!;
   return `${identity.chainId}:${identity.collectionAddressNormalized}:${id}`;
@@ -138,6 +140,7 @@ function isMonitoredContractAddress(event: ChainEvent, value: string | null) {
     ukiMarketplaceAddress: process.env.CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS
       ?? process.env.NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS,
     bridgeAddress: process.env.CHAIN_INDEXER_BRIDGE_ADDRESS,
+    bridgeEndpointAddress: process.env.CHAIN_INDEXER_BRIDGE_ENDPOINT_ADDRESS,
     presaleAddress: process.env.CHAIN_INDEXER_PRESALE_ADDRESS,
     ukiStakingAddress: process.env.CHAIN_INDEXER_UKI_STAKING_ADDRESS,
     vestingVaultAddress: process.env.CHAIN_INDEXER_VESTING_VAULT_ADDRESS,
@@ -202,6 +205,9 @@ async function invalidateActiveMarketplaceListing(
   documentId = id,
 ) {
   const invalidatedAt = eventDate(event);
+  const listingFilter = isLegacyEvent(event)
+    ? { ...legacyListingIdentity(event, id), status: 'active' }
+    : { tokenId: id, status: 'active' };
 
   await Promise.all([
     collection(store, 'cukies').updateOne(
@@ -225,7 +231,7 @@ async function invalidateActiveMarketplaceListing(
       },
     ),
     collection(store, 'marketplace_listings').updateOne(
-      { tokenId: id, status: 'active' },
+      listingFilter,
       {
         $set: {
           status: 'invalid',
@@ -250,6 +256,7 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
   if (!id) return 'Transfer sin tokenId';
   const documentId = nftDocumentId(event, id);
   const bscIdentity = bscNftMaterializationIdentity(event);
+  const legacyIdentity = isLegacyEvent(event) ? legacyNftIdentity(event, id) : null;
 
   const from = stringField(event, 'from');
   const to = stringField(event, 'to');
@@ -274,6 +281,13 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
     {
       $set: {
         tokenId: id,
+        ...(legacyIdentity
+          ? {
+              chainId: legacyIdentity.chainId,
+              collectionAddress: legacyIdentity.collectionAddress,
+              collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+            }
+          : {}),
         ...(bscIdentity ?? {}),
         user: to,
         owner: to,
@@ -340,6 +354,7 @@ async function projectCukieMetadata(store: IndexerStore, event: ChainEvent) {
     return 'CukieMetadataConfigured con generacion invalida';
   }
   const documentId = nftDocumentId(event, id);
+  const legacyIdentity = isLegacyEvent(event) ? legacyNftIdentity(event, id) : null;
   const identity = bscNftMaterializationIdentity(event)!;
   const cukies = collection(store, 'cukies');
   if (event.contractAlias === 'TOKEN_V2') {
@@ -388,20 +403,31 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
   if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'MARKETPLACE');
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
+  const documentId = nftDocumentId(event, id);
+  const legacyIdentity = isLegacyEvent(event) ? legacyNftIdentity(event, id) : null;
+  const listingIdentity = isLegacyEvent(event) ? legacyListingIdentity(event, id) : null;
+  const listingDocumentId = isLegacyEvent(event) ? legacyListingDocumentId(event, id) : id;
 
   if (event.eventName === 'TokenOnSale' || event.eventName === 'MarketTokenPriceChanged') {
     const price = numberField(event, 'price');
     const priceRaw = stringField(event, 'priceRaw');
-    const current = await collection(store, 'cukies').findOne({ _id: id });
+    const current = await collection(store, 'cukies').findOne({ _id: documentId });
     const owner = stringField(event, 'owner')
       ?? getString(current?.owner ?? current?.user);
     const ownerNormalized = normalizeAddress(event.chain, owner);
 
     await collection(store, 'cukies').updateOne(
-      { _id: id },
+      { _id: documentId },
       {
         $set: {
           tokenId: id,
+          ...(legacyIdentity
+            ? {
+                chainId: legacyIdentity.chainId,
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
           ...(owner ? { user: owner, owner, ownerNormalized } : {}),
           network: event.chain,
           state: 'onSale',
@@ -416,7 +442,7 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
-          _id: id,
+          _id: documentId,
           origin: 'indexed',
           birthNetwork: event.chain,
           createdAt: now(),
@@ -426,11 +452,12 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
     );
 
     await collection(store, 'marketplace_listings').updateOne(
-      { tokenId: id },
+      { ...(listingIdentity ?? { tokenId: id }) },
       {
         $set: {
           tokenId: id,
           chain: event.chain,
+          ...(listingIdentity ?? {}),
           ...(owner ? { owner, ownerNormalized } : {}),
           price: price ?? 0,
           priceRaw,
@@ -440,6 +467,7 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
+          _id: listingDocumentId,
           createdAt: now(),
         },
       },
@@ -451,13 +479,20 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'TokenBought') {
     const to = stringField(event, 'to');
-    const previous = await collection(store, 'cukies').findOne({ _id: id });
+    const previous = await collection(store, 'cukies').findOne({ _id: documentId });
 
     await collection(store, 'cukies').updateOne(
-      { _id: id },
+      { _id: documentId },
       {
         $set: {
           tokenId: id,
+          ...(legacyIdentity
+            ? {
+                chainId: legacyIdentity.chainId,
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
           user: to,
           owner: to,
           ownerNormalized: normalizeAddress(event.chain, to),
@@ -473,7 +508,7 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
-          _id: id,
+          _id: documentId,
           origin: 'indexed',
           birthNetwork: event.chain,
           createdAt: now(),
@@ -483,11 +518,12 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
     );
 
     await collection(store, 'marketplace_listings').updateOne(
-      { tokenId: id },
+      { ...(listingIdentity ?? { tokenId: id }) },
       {
         $set: {
           tokenId: id,
           chain: event.chain,
+          ...(listingIdentity ?? {}),
           buyer: to,
           buyerNormalized: normalizeAddress(event.chain, to),
           status: 'sold',
@@ -496,6 +532,7 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
+          _id: listingDocumentId,
           createdAt: now(),
         },
       },
@@ -516,10 +553,17 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'MarketTokenSaleCancelled') {
     await collection(store, 'cukies').updateOne(
-      { _id: id },
+      { _id: documentId },
       {
         $set: {
           tokenId: id,
+          ...(legacyIdentity
+            ? {
+                chainId: legacyIdentity.chainId,
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
           state: 'available',
           price: 0,
           priceOriginal: '0',
@@ -531,7 +575,7 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
-          _id: id,
+          _id: documentId,
           origin: 'indexed',
           birthNetwork: event.chain,
           network: event.chain,
@@ -542,17 +586,19 @@ async function projectMarketplace(store: IndexerStore, event: ChainEvent) {
     );
 
     await collection(store, 'marketplace_listings').updateOne(
-      { tokenId: id },
+      { ...(listingIdentity ?? { tokenId: id }) },
       {
         $set: {
           tokenId: id,
           chain: event.chain,
+          ...(listingIdentity ?? {}),
           status: 'cancelled',
           cancelledAt: eventDate(event),
           updatedAt: now(),
           lastEventId: event._id,
         },
         $setOnInsert: {
+          _id: listingDocumentId,
           createdAt: now(),
         },
       },
@@ -885,16 +931,25 @@ export async function projectUkiMarketplaceEvent(
 async function projectStaking(store: IndexerStore, event: ChainEvent) {
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
+  const documentId = nftDocumentId(event, id);
+  const legacyIdentity = isLegacyEvent(event) ? legacyNftIdentity(event, id) : null;
 
   const owner = stringField(event, 'owner');
 
   await invalidateActiveMarketplaceListing(store, event, id, 'staking');
 
   await collection(store, 'cukies').updateOne(
-    { _id: id },
+    { _id: documentId },
     {
       $set: {
         tokenId: id,
+        ...(legacyIdentity
+          ? {
+              chainId: legacyIdentity.chainId,
+              collectionAddress: legacyIdentity.collectionAddress,
+              collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+            }
+          : {}),
         ...(owner ? { user: owner, owner, ownerNormalized: normalizeAddress(event.chain, owner) } : {}),
         network: event.chain,
         state: event.eventName === 'Stake' ? 'staking' : 'available',
@@ -905,7 +960,7 @@ async function projectStaking(store: IndexerStore, event: ChainEvent) {
         lastEventId: event._id,
       },
       $setOnInsert: {
-        _id: id,
+        _id: documentId,
         origin: 'indexed',
         birthNetwork: event.chain,
         createdAt: now(),
@@ -923,6 +978,9 @@ async function projectPoints(store: IndexerStore, event: ChainEvent) {
   const points = numberField(event, 'points') ?? 0;
 
   if (!address || !addressNormalized) return `${event.eventName} sin address`;
+  const pointsIdentity = isLegacyEvent(event)
+    ? legacyPointsIdentity(event, addressNormalized)
+    : addressNormalized;
 
   const session = store.db.client.startSession();
   try {
@@ -938,6 +996,13 @@ async function projectPoints(store: IndexerStore, event: ChainEvent) {
             chainId: event.chainId,
             address,
             addressNormalized,
+            ...(isLegacyEvent(event)
+              ? {
+                  chain: event.chain,
+                  pointsContractAddressNormalized: event.contractAddress.toLowerCase(),
+                  walletNormalized: addressNormalized,
+                }
+              : {}),
             points,
             type: stringField(event, 'pointType'),
             txHash: event.txHash,
@@ -951,20 +1016,38 @@ async function projectPoints(store: IndexerStore, event: ChainEvent) {
       );
 
       const [summary] = await transactions.aggregate<{ points: number }>([
-        { $match: { addressNormalized } },
+        {
+          $match: isLegacyEvent(event)
+            ? {
+                chain: event.chain,
+                pointsContractAddressNormalized: event.contractAddress.toLowerCase(),
+                walletNormalized: addressNormalized,
+              }
+            : { addressNormalized },
+        },
         { $group: { _id: null, points: { $sum: '$points' } } },
       ], { session }).toArray();
 
       await collection(store, 'point_balances').updateOne(
-        { addressNormalized },
+        isLegacyEvent(event)
+          ? { _id: pointsIdentity }
+          : { addressNormalized },
         {
           $set: {
             address,
+            ...(isLegacyEvent(event)
+              ? {
+                  chain: event.chain,
+                  pointsContractAddressNormalized: event.contractAddress.toLowerCase(),
+                  walletNormalized: addressNormalized,
+                }
+              : {}),
             points: summary?.points ?? 0,
             lastEventId: event._id,
             updatedAt: now(),
           },
           $setOnInsert: {
+            ...(isLegacyEvent(event) ? { _id: pointsIdentity } : {}),
             createdAt: now(),
           },
         },
@@ -983,6 +1066,9 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
   const parent2 = stringField(event, 'parent2');
 
   if (!parent1 || !parent2) return `${event.eventName} sin parent1/parent2`;
+  const parentDocumentIds = isLegacyEvent(event)
+    ? [legacyNftDocumentId(event, parent1), legacyNftDocumentId(event, parent2)]
+    : [parent1, parent2];
 
   if (event.eventName === 'BreedStart') {
     await Promise.all([
@@ -990,7 +1076,7 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
       invalidateActiveMarketplaceListing(store, event, parent2, 'breeding'),
     ]);
     await collection(store, 'cukies').updateMany(
-      { _id: { $in: [parent1, parent2] } },
+      { _id: { $in: parentDocumentIds } },
       {
         $set: {
           state: 'breeding',
@@ -1010,12 +1096,21 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
   const owner = stringField(event, 'owner');
 
   if (!id) return 'BreedFinish sin tokenId/result';
+  const documentId = nftDocumentId(event, id);
+  const legacyIdentity = isLegacyEvent(event) ? legacyNftIdentity(event, id) : null;
 
   await collection(store, 'cukies').updateOne(
-    { _id: id },
+    { _id: documentId },
     {
       $set: {
         tokenId: id,
+        ...(legacyIdentity
+          ? {
+              chainId: legacyIdentity.chainId,
+              collectionAddress: legacyIdentity.collectionAddress,
+              collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+            }
+          : {}),
         user: owner,
         owner,
         ownerNormalized: normalizeAddress(event.chain, owner),
@@ -1030,7 +1125,7 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
         lastEventId: event._id,
       },
       $setOnInsert: {
-        _id: id,
+        _id: documentId,
         children: [],
         history: [],
         price: 0,
@@ -1041,7 +1136,7 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
   );
 
   await collection(store, 'cukies').updateMany(
-    { _id: { $in: [parent1, parent2] } },
+    { _id: { $in: parentDocumentIds } },
     {
       $set: {
         state: 'available',
@@ -1050,7 +1145,7 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
         lastEventId: event._id,
       },
       $addToSet: {
-        children: id,
+        children: isLegacyEvent(event) ? documentId : id,
       },
     },
   );
@@ -1070,9 +1165,17 @@ async function projectBreeding(store: IndexerStore, event: ChainEvent) {
 }
 
 async function projectBridge(store: IndexerStore, event: ChainEvent) {
-  if (event.chain === 'BSC') await verifiedContractCursor(store, event, 'BRIDGE');
+  if (event.chain === 'BSC') {
+    await verifiedContractCursor(
+      store,
+      event,
+      event.contractAlias === 'BRIDGE_ENDPOINT' ? 'BRIDGE_ENDPOINT' : 'BRIDGE',
+    );
+  }
   const id = tokenId(event);
   if (!id) return `${event.eventName} sin tokenId`;
+  const documentId = nftDocumentId(event, id);
+  const legacyIdentity = isLegacyEvent(event) ? legacyNftIdentity(event, id) : null;
 
   const from = stringField(event, 'from');
   const to = stringField(event, 'to');
@@ -1081,10 +1184,17 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'JumpInBridge') {
     await collection(store, 'cukies').updateOne(
-      { _id: id },
+      { _id: documentId },
       {
         $set: {
           tokenId: id,
+          ...(legacyIdentity
+            ? {
+                chainId: legacyIdentity.chainId,
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
           state: 'inBridge',
           network: event.chain,
           price: 0,
@@ -1094,7 +1204,7 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
-          _id: id,
+          _id: documentId,
           origin: 'indexed',
           birthNetwork: event.chain,
           createdAt: now(),
@@ -1106,10 +1216,17 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'JumpOutBridge') {
     await collection(store, 'cukies').updateOne(
-      { _id: id },
+      { _id: documentId },
       {
         $set: {
           tokenId: id,
+          ...(legacyIdentity
+            ? {
+                chainId: legacyIdentity.chainId,
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
           user: to,
           owner: to,
           ownerNormalized: normalizeAddress(event.chain, to),
@@ -1122,7 +1239,7 @@ async function projectBridge(store: IndexerStore, event: ChainEvent) {
           lastEventId: event._id,
         },
         $setOnInsert: {
-          _id: id,
+          _id: documentId,
           origin: 'indexed',
           birthNetwork: event.chain,
           createdAt: now(),
@@ -1400,6 +1517,65 @@ async function verifiedContractCursor(
   event: ChainEvent,
   alias: VerifiedBscContractAlias,
 ) {
+  if (store.runtimeScope === 'legacy') {
+    if (!['TOKEN', 'POINTS', 'STAKING_POINTS', 'BREEDING_POINTS', 'MARKETPLACE', 'BRIDGE'].includes(alias)) {
+      throw new Error(`${alias} no pertenece al perímetro contractual legacy.`);
+    }
+    if (!store.legacySourcesVerified) {
+      throw new Error('Fuentes legacy sin verificación live en el store.');
+    }
+    const legacyAlias = alias as 'TOKEN' | 'POINTS' | 'STAKING_POINTS' | 'BREEDING_POINTS' | 'MARKETPLACE' | 'BRIDGE';
+    const proof = legacyContractProof(event.chain, legacyAlias);
+    assertLegacyContractIdentity(
+      event,
+      legacyAlias,
+    );
+    const observed = await collection(store, 'legacy_source_proofs').findOne({
+      _id: `${event.chain}:${event.chain === 'BSC' ? '56' : 'mainnet'}:${legacyAlias}`,
+      runtimeScope: 'legacy',
+      chain: event.chain,
+      alias: legacyAlias,
+      network: 'mainnet',
+      expectedRuntimeHash: proof.runtimeHash,
+      verification: { $in: ['live-rpc-runtime-keccak256', 'trongrid-runtimecode-keccak256'] },
+      observedAt: { $type: 'date' },
+    });
+    const canonicalAddress = legacyContractAddress(event.chain, legacyAlias);
+    if (!observed || !canonicalAddress || typeof observed.address !== 'string'
+      || (event.chain === 'BSC'
+        ? observed.address.toLowerCase() !== canonicalAddress.toLowerCase()
+        : observed.address !== canonicalAddress)
+      || (event.chain === 'BSC' && observed.chainId !== 56)
+      || typeof observed.observedRuntimeHash !== 'string'
+      || observed.observedRuntimeHash.toLowerCase() !== proof.runtimeHash.toLowerCase()
+      || (event.chain === 'BSC'
+        && (!Number.isSafeInteger(observed.observedAtBlock) || observed.observedAtBlock < 0))) {
+      throw new Error(`${legacyAlias} legacy no tiene prueba RPC viva persistida.`);
+    }
+    await store.cursors().updateOne(
+      { _id: `${event.chain}:${alias}:${event.eventName}` },
+      {
+        $set: {
+          chain: event.chain,
+          ...(event.chain === 'BSC' ? { chainId: 56 } : { network: 'mainnet' }),
+          contractAlias: alias,
+          contractAddress: event.contractAddress,
+          runtimeScope: 'legacy',
+          legacyRuntimeHash: proof.runtimeHash,
+          ...(typeof observed.observedAtBlock === 'number' ? { legacyRuntimeCheckedAtBlock: observed.observedAtBlock } : {}),
+          legacySourceVerifiedAt: observed.observedAt,
+          legacyProofEvidence: proof.evidence,
+          legacyProofVerification: observed.verification,
+        },
+        $setOnInsert: { _id: `${event.chain}:${alias}:${event.eventName}` },
+      },
+      { upsert: true },
+    );
+    return {
+      ...proof,
+      legacySourceVerifiedAt: observed.observedAt,
+    } as unknown as ChainCursor;
+  }
   const cursor = await store.cursors().findOne({
     chain: event.chain,
     contractAlias: alias,
@@ -1804,6 +1980,59 @@ export async function projectRewardsDistributorEvent(store: IndexerStore, event:
 }
 
 export async function projectEvent(store: IndexerStore, event: ChainEvent) {
+  if (store.runtimeScope === 'legacy') {
+    event = { ...event, runtimeScope: 'legacy' };
+    if (!store.legacySourcesVerified) {
+      return 'Fuentes legacy sin verificación live en el store.';
+    }
+    try {
+      await assertLegacyEventBoundary(store, event);
+    } catch (error) {
+      await projectRawAuditEvent(store, event, 'legacy-boundary-rejected');
+      return error instanceof Error ? error.message : 'Evento fuera de la frontera legacy.';
+    }
+  } else if (event.runtimeScope === 'legacy') {
+    return 'Evento runtime legacy rechazado por un store default.';
+  }
+
+  if (
+    store.runtimeScope === 'legacy'
+    && [
+      'Purchased',
+      'Staked',
+      'Unstaked',
+      'VestingCreated',
+      'TokensReleased',
+      'BatchPublished',
+      'RewardClaimed',
+      'BatchClosed',
+    ].includes(event.eventName)
+  ) {
+    return projectRawAuditEvent(store, event, 'legacy-economy-boundary');
+  }
+
+  const adminDescriptor = classifyLegacyAdminEvent(event);
+  if (adminDescriptor) {
+    let sourceVerified = false;
+    try {
+      if (store.runtimeScope === 'legacy') {
+        if (!store.legacySourcesVerified) throw new Error('Fuentes legacy sin verificación live.');
+        if (event.chain === 'BSC') {
+          await verifiedContractCursor(store, event, event.contractAlias as VerifiedBscContractAlias);
+        }
+        sourceVerified = true;
+      } else if (event.chain === 'BSC') {
+        await verifiedContractCursor(store, event, event.contractAlias as VerifiedBscContractAlias);
+        sourceVerified = true;
+      }
+    } catch (error) {
+      await projectRawAuditEvent(store, event, adminDescriptor.classification);
+      return error instanceof Error ? error.message : 'Evento admin sin fuente verificada.';
+    }
+    const adminResult = await projectLegacyAdminAudit(store, event, { sourceVerified });
+    if (adminResult && !adminResult.preserveDomain) return null;
+  }
+
   if (
     event.contractAlias === 'CUKIE_MASTER_NFT_VAULT'
     || event.contractAlias === 'CUKIE_POOL_NFT_VAULT'
@@ -1816,6 +2045,33 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
 
   if (event.eventName === 'CukieMetadataConfigured') {
     return projectCukieMetadata(store, event);
+  }
+
+  if (
+    event.chain === 'BSC'
+    && (
+      isLegacyAuditEvent(event)
+      || event.eventName === 'BridgeRequested'
+      || event.eventName === 'BridgeCompleted'
+    )
+  ) {
+    try {
+      await verifiedContractCursor(store, event, event.contractAlias as VerifiedBscContractAlias);
+    } catch (error) {
+      await projectRawAuditEvent(store, event, 'unverified-bsc-contract');
+      return error instanceof Error ? error.message : 'Evento BSC sin cursor contractual verificado.';
+    }
+  }
+
+  // Configuration/approval events must remain auditable and must never enter
+  // points or economy projectors, including the names shared by Marketplace
+  // and NFT vault contracts.
+  if (isLegacyAuditEvent(event)) {
+    return projectLegacyAuditEvent(store, event);
+  }
+
+  if (event.eventName === 'MintReferral') {
+    return projectReferralEvent(store, event);
   }
 
   if (event.contractAlias === 'UKI_MARKETPLACE') {
@@ -1840,7 +2096,12 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
   }
 
   if (event.eventName === 'BreedStart' || event.eventName === 'BreedFinish') {
+    await projectBreedingLedger(store, event);
     return projectBreeding(store, event);
+  }
+
+  if (event.eventName === 'BridgeRequested' || event.eventName === 'BridgeCompleted') {
+    return projectBridgeLifecycle(store, event);
   }
 
   if (event.eventName === 'JumpInBridge' || event.eventName === 'JumpOutBridge') {
@@ -1867,7 +2128,9 @@ export async function projectEvent(store: IndexerStore, event: ChainEvent) {
     return projectRewardsDistributorEvent(store, event);
   }
 
-  return `Evento sin projector: ${event.eventName}`;
+  // Keep configured and future ABI events recoverable. Raw chain_events are
+  // still the source of truth; this projection is an idempotent audit row.
+  return projectGenericAuditEvent(store, event);
 }
 
 export async function projectOnce(store: IndexerStore, batchSize: number) {

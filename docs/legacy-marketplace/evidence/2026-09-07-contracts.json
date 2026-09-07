@@ -1,0 +1,284 @@
+{
+  "observedAt": "2026-09-07T17:23:49.964Z",
+  "scope": "14 legacy addresses; read-only public RPC/API; no transaction or signature",
+  "bsc": {
+    "chainId": 56,
+    "provider": "https://bsc.publicnode.com",
+    "providerFallbackAttempted": "https://bsc-dataseed.binance.org (HTML response, unusable)",
+    "ownerSelector": "0x8da5cb5b (owner())",
+    "items": [
+      {
+        "role": "TOKEN",
+        "address": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+        "code": "present",
+        "runtimeBytes": 12603,
+        "owner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "deployment": {
+          "transactionHash": "0x07e9c8853177353ee53f2a928458eb4f64e0f5734ef39a2d2d8f7ef8a6f2b464",
+          "blockNumber": "16906879",
+          "transactionIndex": "0",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        },
+        "sourceMatch": "exact_match",
+        "sourcePath": "packages/contracts/legacy/bsc/token",
+        "sourceRetrievedAt": "2026-09-07T17:30:23.214367+00:00",
+        "runtimeKeccak256": "0x078fce406c0ca0dacda5bb0a64f131ecd79585458696b4be1e14676049213663",
+        "runtimeCheckedAtBlock": 120535004,
+        "runtimeMatchesSourcifyOnchainBytecode": true
+      },
+      {
+        "role": "POINTS",
+        "address": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
+        "code": "present",
+        "runtimeBytes": 2668,
+        "owner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "deployment": {
+          "transactionHash": "0x396f6620704655510f383ede9e7372bf45520c49f679bdeb6903a7526103de00",
+          "blockNumber": "16531539",
+          "transactionIndex": "2",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        },
+        "sourceMatch": "exact_match",
+        "sourcePath": "packages/contracts/legacy/bsc/points",
+        "sourceRetrievedAt": "2026-09-07T17:30:23.214367+00:00",
+        "runtimeKeccak256": "0xf7fc590ae1241936be68eb088e3fb00d743958fc32d2792079434fa6e235aaae",
+        "runtimeCheckedAtBlock": 120535004,
+        "runtimeMatchesSourcifyOnchainBytecode": true
+      },
+      {
+        "role": "STAKING_POINTS",
+        "address": "0xF381bfB59A2ae9623eFBce2C83AafF60f783cc6F",
+        "code": "present",
+        "runtimeBytes": 4837,
+        "owner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "deployment": {
+          "transactionHash": "0x51ad29406f07563bababd17e20689306aff02ecfb5b37e3b7c1ad75262a158b3",
+          "blockNumber": "16531543",
+          "transactionIndex": "3",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        },
+        "sourceMatch": "match",
+        "sourcePath": "packages/contracts/legacy/bsc/staking_points",
+        "sourceRetrievedAt": "2026-09-07T17:30:23.214367+00:00",
+        "runtimeKeccak256": "0xabba51642a3eb3bf11fea2d4c182070f6aea7a744d354b7646417e145c53da06",
+        "runtimeCheckedAtBlock": 120535004,
+        "runtimeMatchesSourcifyOnchainBytecode": true
+      },
+      {
+        "role": "BREEDING_POINTS",
+        "address": "0x39Be8C4FA342C5f3C10d7c16941A0946D29Ade4A",
+        "code": "present",
+        "runtimeBytes": 9512,
+        "owner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "runtimeKeccak256": "0xf1ba7ea8248d21ccf78514eaabdafcac2ce99d4da207afcb18651cdb20bac4d8",
+        "runtimeCheckedAtBlock": 120535004
+      },
+      {
+        "role": "MARKETPLACE",
+        "address": "0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91",
+        "code": "present",
+        "runtimeBytes": 5721,
+        "owner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "runtimeKeccak256": "0x91cd01cc755910034d20756b87e8ee9c808232695ac9d30cb149dd7eb0db05b6",
+        "runtimeCheckedAtBlock": 120535004
+      },
+      {
+        "role": "BRIDGE",
+        "address": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E",
+        "code": "present",
+        "runtimeBytes": 3031,
+        "owner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
+        "deployment": {
+          "transactionHash": "0xfad29c491c7fb23dc5b7a0de1d09674d7670408c1a486a2c30f718fdc9026bc2",
+          "blockNumber": "16913556",
+          "transactionIndex": "0",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        },
+        "sourceMatch": "exact_match",
+        "sourcePath": "packages/contracts/legacy/bsc/bridge",
+        "sourceRetrievedAt": "2026-09-07T17:30:23.214367+00:00",
+        "runtimeKeccak256": "0xf2e2b86b841c558a3ce7145d0dbb5b1802109646c1db6a36a3e95b07f8e4ef25",
+        "runtimeCheckedAtBlock": 120535004,
+        "runtimeMatchesSourcifyOnchainBytecode": true
+      }
+    ],
+    "sourceVerification": {
+      "provider": "https://repo.sourcify.dev/56/{address}",
+      "exactOrMatch": {
+        "TOKEN": {
+          "status": "exact_match",
+          "target": "contracts/CukieToken.sol:CukieToken",
+          "compiler": "solc 0.5.4+commit.9549d8ff"
+        },
+        "POINTS": {
+          "status": "exact_match",
+          "target": "contracts/CukiesPoints.sol:CukiesPoints",
+          "compiler": "solc 0.5.4+commit.9549d8ff"
+        },
+        "STAKING_POINTS": {
+          "status": "match",
+          "target": "contracts/CukiesStakePoints.sol:CukiesStakePoints",
+          "compiler": "solc 0.5.4+commit.9549d8ff"
+        },
+        "BRIDGE": {
+          "status": "exact_match",
+          "target": "contracts/CukiesNFTBridge.sol:CukiesNFTBridge",
+          "compiler": "solc 0.5.4+commit.9549d8ff"
+        }
+      },
+      "notFound": [
+        "BREEDING_POINTS",
+        "MARKETPLACE"
+      ]
+    },
+    "runtimeHashVerifiedAt": "2026-09-07T17:33:02.963Z",
+    "runtimeHashBlock": 120535004
+  },
+  "tron": {
+    "network": "mainnet",
+    "provider": "https://api.tronstack.io/wallet/getcontractinfo",
+    "ownerProvider": "https://api.tronstack.io/wallet/triggerconstantcontract",
+    "ownerSelector": "owner()",
+    "items": [
+      {
+        "role": "MINT",
+        "address": "TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7",
+        "code": "present",
+        "name": "CukieMinter",
+        "codeHash": "0c9bd88f3b0db1e3cd1099aaea1f5ba4cd6c4e14af2f87ae429547a15d2db2f6",
+        "abiEntries": 27,
+        "owner": "TJUqscjJxgnPq7S3YgLVZjGhbW7iPjfX4G"
+      },
+      {
+        "role": "TOKEN",
+        "address": "TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe",
+        "code": "present",
+        "name": "CukieToken",
+        "codeHash": "26247c8fd0642bd4fdd62ab6f2c304719118f2c440148498d6e937e683354875",
+        "abiEntries": 41,
+        "owner": "TJUqscjJxgnPq7S3YgLVZjGhbW7iPjfX4G"
+      },
+      {
+        "role": "REFERRALS",
+        "address": "TZ4QM9RF1pxfoxnPY8UGAQEEwq5SDoZXk4",
+        "code": "present",
+        "name": "Referrals",
+        "codeHash": "84a6b7f88653939dac15dd7a7271ed501d9ef3d90d2efbd8f1adcae20006b36f",
+        "abiEntries": 14,
+        "owner": "TJUqscjJxgnPq7S3YgLVZjGhbW7iPjfX4G"
+      },
+      {
+        "role": "POINTS",
+        "address": "TWwNJEySYrkNXTpDBF7WfGwkoW4YTZ4yKA",
+        "code": "present",
+        "name": "CukiesPoints",
+        "codeHash": "6519fa699d8d307a4e782e96ca72d4dcd03366c28943272cb2f5c875ed507058",
+        "abiEntries": 23,
+        "owner": "THESbAsrsX8JfRiYm7P1Kupcs1i7JaB1cM"
+      },
+      {
+        "role": "STAKING_POINTS",
+        "address": "TUfbQaVERA1TmT31LU3HWJS6xsW3B8VfUY",
+        "code": "present",
+        "name": "CukiesStakePoints",
+        "codeHash": "b2f188e8db9ed0f537c8f2ea7fd0769e428e6a87484078638be2b09bd1ecb3c1",
+        "abiEntries": 28,
+        "owner": "THESbAsrsX8JfRiYm7P1Kupcs1i7JaB1cM"
+      },
+      {
+        "role": "BREEDING_POINTS",
+        "address": "TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S",
+        "code": "present",
+        "name": "CukiesBreed",
+        "codeHash": "ffa0f2cf52d8419817b8cf493c7abe370fb245b22a6219aee18e2d0c7714e826",
+        "abiEntries": 41,
+        "owner": "THESbAsrsX8JfRiYm7P1Kupcs1i7JaB1cM"
+      },
+      {
+        "role": "MARKETPLACE",
+        "address": "TWDoJEq4eVd9vUgQ6f5knjqouRBPyGDzSB",
+        "code": "present",
+        "name": "CukiesMarketplace",
+        "codeHash": "f6b0a972f6aad1db7268f12e2b0bd8ae25ebff255f28413271f30b0cd2dd0341",
+        "abiEntries": 31,
+        "owner": "TKAR18UKjMQzBkZLoiViUeYWKTft8Sz3k2"
+      },
+      {
+        "role": "BRIDGE",
+        "address": "TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ",
+        "code": "present",
+        "name": "CukiesBridge",
+        "codeHash": "afeccd1602e6c6d83ec82f50db1f426548a79ae6d0b018762cee39c2862c64cc",
+        "abiEntries": 20,
+        "owner": "TKAR18UKjMQzBkZLoiViUeYWKTft8Sz3k2"
+      }
+    ],
+    "sourceVerification": "Not checked against an authoritative TRON source registry in this pass; TronGrid/TronStack contract-info responses prove deployed bytecode metadata and ABI, not verified source."
+  },
+  "limitations": [
+    "BSC first provider returned HTML; second provider succeeded.",
+    "TronGrid returned rate-limit responses after the first request; TronStack succeeded for all eight.",
+    "No private keys, API keys, raw bytecode, source files or transaction calls were copied."
+  ],
+  "sourceImport": {
+    "observedAt": "2026-09-07T17:30:23.214367+00:00",
+    "provider": "Sourcify APIv2",
+    "apiDocumentation": "https://docs.sourcify.dev/docs/api/",
+    "contracts": [
+      {
+        "role": "BRIDGE",
+        "address": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E",
+        "match": "exact_match",
+        "localPath": "packages/contracts/legacy/bsc/bridge",
+        "sourceFiles": 8,
+        "deployment": {
+          "transactionHash": "0xfad29c491c7fb23dc5b7a0de1d09674d7670408c1a486a2c30f718fdc9026bc2",
+          "blockNumber": "16913556",
+          "transactionIndex": "0",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        }
+      },
+      {
+        "role": "POINTS",
+        "address": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
+        "match": "exact_match",
+        "localPath": "packages/contracts/legacy/bsc/points",
+        "sourceFiles": 10,
+        "deployment": {
+          "transactionHash": "0x396f6620704655510f383ede9e7372bf45520c49f679bdeb6903a7526103de00",
+          "blockNumber": "16531539",
+          "transactionIndex": "2",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        }
+      },
+      {
+        "role": "STAKING_POINTS",
+        "address": "0xF381bfB59A2ae9623eFBce2C83AafF60f783cc6F",
+        "match": "match",
+        "localPath": "packages/contracts/legacy/bsc/staking_points",
+        "sourceFiles": 8,
+        "deployment": {
+          "transactionHash": "0x51ad29406f07563bababd17e20689306aff02ecfb5b37e3b7c1ad75262a158b3",
+          "blockNumber": "16531543",
+          "transactionIndex": "3",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        }
+      },
+      {
+        "role": "TOKEN",
+        "address": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+        "match": "exact_match",
+        "localPath": "packages/contracts/legacy/bsc/token",
+        "sourceFiles": 19,
+        "deployment": {
+          "transactionHash": "0x07e9c8853177353ee53f2a928458eb4f64e0f5734ef39a2d2d8f7ef8a6f2b464",
+          "blockNumber": "16906879",
+          "transactionIndex": "0",
+          "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+        }
+      }
+    ],
+    "localCompilationExecuted": false,
+    "note": "Preserved source bundles and settings, no generated artifacts or deployment scripts executed."
+  }
+}

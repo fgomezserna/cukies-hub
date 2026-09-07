@@ -67,11 +67,13 @@ const envSchema = z.object({
   CHAIN_INDEXER_PRESALE_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_PRESALE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_TOKEN_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_UKI_TOKEN_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_TOKEN_V2_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_MARKETPLACE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_BRIDGE_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_BRIDGE_ENDPOINT_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_UKI_STAKING_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_STAKING_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_VESTING_VAULT_ADDRESS: z.string().optional(),
@@ -81,10 +83,18 @@ const envSchema = z.object({
   NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_PRESALE_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_PRESALE_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_PRESALE_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_PRESALE_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_TOKEN_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_TOKEN_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_TOKEN_DEPLOYMENT_TX_HASH: z.string().optional(),
   CHAIN_INDEXER_TOKEN_RUNTIME_CODE_HASH: z.string().optional(),
+  CHAIN_INDEXER_UKI_TOKEN_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_UKI_TOKEN_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_UKI_TOKEN_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_UKI_TOKEN_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_TOKEN_V2_DEPLOYMENT_TX_HASH: z.string().optional(),
@@ -101,6 +111,10 @@ const envSchema = z.object({
   CHAIN_INDEXER_BRIDGE_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_BRIDGE_DEPLOYMENT_TX_HASH: z.string().optional(),
   CHAIN_INDEXER_BRIDGE_RUNTIME_CODE_HASH: z.string().optional(),
+  CHAIN_INDEXER_BRIDGE_ENDPOINT_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_BRIDGE_ENDPOINT_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_BRIDGE_ENDPOINT_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_BRIDGE_ENDPOINT_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_UKI_STAKING_DEPLOYMENT_TX_HASH: z.string().optional(),
@@ -110,6 +124,9 @@ const envSchema = z.object({
   CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH: z.string().optional(),
   CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_REWARDS_DISTRIBUTOR_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_CUKIE_MASTER_NFT_VAULT_DEPLOYMENT_TX_HASH: z.string().optional(),
@@ -167,7 +184,7 @@ export function resolveMongoDatabaseNameFromUrl(databaseUrl: string, envName: st
   return databaseName;
 }
 
-function parseContractAliases(value?: string): ContractAlias[] | undefined {
+export function parseContractAliases(value?: string): ContractAlias[] | undefined {
   if (!value) return undefined;
 
   const aliases = value
@@ -184,6 +201,10 @@ function parseContractAliases(value?: string): ContractAlias[] | undefined {
       item === 'MARKETPLACE' ||
       item === 'UKI_MARKETPLACE' ||
       item === 'BRIDGE' ||
+      item === 'BRIDGE_ENDPOINT' ||
+      item === 'UKI_TOKEN' ||
+      item === 'MINT' ||
+      item === 'REFERRALS' ||
       item === 'PRESALE' ||
       item === 'UKI_STAKING' ||
       item === 'VESTING_VAULT' ||
@@ -325,11 +346,14 @@ export function getIndexerConfig(): IndexerConfig {
   const chains = parseChains(env.CHAIN_INDEXER_CHAINS);
   const contractAliases = parseContractAliases(env.CHAIN_INDEXER_CONTRACT_ALIASES);
   const presaleAddress = env.CHAIN_INDEXER_PRESALE_ADDRESS ?? env.NEXT_PUBLIC_UKI_PRESALE_ADDRESS;
+  const presaleRequested = contractAliases?.includes('PRESALE') ?? false;
   const tokenRequested = contractAliases?.includes('TOKEN') ?? false;
+  const ukiTokenRequested = contractAliases?.includes('UKI_TOKEN') ?? false;
   const tokenV2Requested = contractAliases?.includes('TOKEN_V2') ?? false;
   const marketplaceRequested = contractAliases?.includes('MARKETPLACE') ?? false;
   const ukiMarketplaceRequested = contractAliases?.includes('UKI_MARKETPLACE') ?? false;
   const bridgeRequested = contractAliases?.includes('BRIDGE') ?? false;
+  const bridgeEndpointRequested = contractAliases?.includes('BRIDGE_ENDPOINT') ?? false;
   const ukiStakingRequested = contractAliases?.includes('UKI_STAKING') ?? false;
   const vestingVaultRequested = contractAliases?.includes('VESTING_VAULT') ?? false;
   const rewardsDistributorRequested =
@@ -342,6 +366,11 @@ export function getIndexerConfig(): IndexerConfig {
     env.CHAIN_INDEXER_TOKEN_ADDRESS,
     'TOKEN',
     tokenRequested,
+  );
+  const ukiTokenAddress = resolveOptionalBscAddress(
+    env.CHAIN_INDEXER_UKI_TOKEN_ADDRESS,
+    'UKI_TOKEN',
+    ukiTokenRequested,
   );
   const tokenV2Address = resolveOptionalBscAddress(
     env.CHAIN_INDEXER_TOKEN_V2_ADDRESS,
@@ -363,6 +392,11 @@ export function getIndexerConfig(): IndexerConfig {
     env.CHAIN_INDEXER_BRIDGE_ADDRESS,
     'BRIDGE',
     bridgeRequested,
+  );
+  const bridgeEndpointAddress = resolveOptionalBscAddress(
+    env.CHAIN_INDEXER_BRIDGE_ENDPOINT_ADDRESS,
+    'BRIDGE_ENDPOINT',
+    bridgeEndpointRequested,
   );
   const ukiStakingAddress = resolveOptionalBscAddress(
     env.CHAIN_INDEXER_UKI_STAKING_ADDRESS ?? env.NEXT_PUBLIC_UKI_STAKING_ADDRESS,
@@ -402,6 +436,16 @@ export function getIndexerConfig(): IndexerConfig {
     deploymentTxHash: env.CHAIN_INDEXER_TOKEN_DEPLOYMENT_TX_HASH,
     runtimeCodeHash: env.CHAIN_INDEXER_TOKEN_RUNTIME_CODE_HASH,
     requested: tokenRequested,
+  });
+  const ukiTokenIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'UKI_TOKEN',
+    chainId: bscExpectedChainId,
+    address: ukiTokenAddress,
+    startBlock: env.CHAIN_INDEXER_UKI_TOKEN_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_UKI_TOKEN_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_UKI_TOKEN_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_UKI_TOKEN_RUNTIME_CODE_HASH,
+    requested: ukiTokenRequested,
   });
   const tokenV2Identity = resolveVerifiedBscContractIdentity({
     alias: 'TOKEN_V2',
@@ -443,6 +487,26 @@ export function getIndexerConfig(): IndexerConfig {
     runtimeCodeHash: env.CHAIN_INDEXER_BRIDGE_RUNTIME_CODE_HASH,
     requested: bridgeRequested,
   });
+  const bridgeEndpointIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'BRIDGE_ENDPOINT',
+    chainId: bscExpectedChainId,
+    address: bridgeEndpointAddress,
+    startBlock: env.CHAIN_INDEXER_BRIDGE_ENDPOINT_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_BRIDGE_ENDPOINT_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_BRIDGE_ENDPOINT_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_BRIDGE_ENDPOINT_RUNTIME_CODE_HASH,
+    requested: bridgeEndpointRequested,
+  });
+  const presaleIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'PRESALE',
+    chainId: bscExpectedChainId,
+    address: presaleAddress,
+    startBlock: env.CHAIN_INDEXER_PRESALE_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_PRESALE_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_PRESALE_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_PRESALE_RUNTIME_CODE_HASH,
+    requested: presaleRequested,
+  });
   const ukiStakingIdentity = resolveVerifiedBscContractIdentity({
     alias: 'UKI_STAKING',
     chainId: bscExpectedChainId,
@@ -462,6 +526,16 @@ export function getIndexerConfig(): IndexerConfig {
     deploymentTxHash: env.CHAIN_INDEXER_VESTING_VAULT_DEPLOYMENT_TX_HASH,
     runtimeCodeHash: env.CHAIN_INDEXER_VESTING_VAULT_RUNTIME_CODE_HASH,
     requested: vestingVaultRequested,
+  });
+  const rewardsDistributorIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'REWARDS_DISTRIBUTOR',
+    chainId: bscExpectedChainId,
+    address: rewardsDistributorAddress,
+    startBlock: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_RUNTIME_CODE_HASH,
+    requested: rewardsDistributorRequested,
   });
   const cukieMasterNftVaultIdentity = resolveVerifiedBscContractIdentity({
     alias: 'CUKIE_MASTER_NFT_VAULT',
@@ -496,6 +570,7 @@ export function getIndexerConfig(): IndexerConfig {
 
   for (const [alias, requested, startBlock] of [
     ['TOKEN', tokenRequested, env.CHAIN_INDEXER_TOKEN_START_BSC_BLOCK],
+    ['UKI_TOKEN', ukiTokenRequested, env.CHAIN_INDEXER_UKI_TOKEN_START_BSC_BLOCK],
     ['TOKEN_V2', tokenV2Requested, env.CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK],
     ['MARKETPLACE', marketplaceRequested, env.CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK],
     [
@@ -504,6 +579,8 @@ export function getIndexerConfig(): IndexerConfig {
       env.CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK,
     ],
     ['BRIDGE', bridgeRequested, env.CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK],
+    ['BRIDGE_ENDPOINT', bridgeEndpointRequested, env.CHAIN_INDEXER_BRIDGE_ENDPOINT_START_BSC_BLOCK],
+    ['PRESALE', presaleRequested, env.CHAIN_INDEXER_PRESALE_START_BSC_BLOCK],
     ['UKI_STAKING', ukiStakingRequested, env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK],
     ['VESTING_VAULT', vestingVaultRequested, env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK],
     [
@@ -530,10 +607,13 @@ export function getIndexerConfig(): IndexerConfig {
   if (
     (
       tokenRequested
+      || ukiTokenRequested
       || tokenV2Requested
       || marketplaceRequested
       || ukiMarketplaceRequested
       || bridgeRequested
+      || bridgeEndpointRequested
+      || presaleRequested
       || ukiStakingRequested
       || vestingVaultRequested
       || rewardsDistributorRequested
@@ -565,20 +645,25 @@ export function getIndexerConfig(): IndexerConfig {
     projectBatchSize: env.CHAIN_INDEXER_PROJECT_BATCH_SIZE,
     presaleAddress,
     tokenAddress,
+    ukiTokenAddress,
     tokenV2Address,
     marketplaceAddress,
     ukiMarketplaceAddress,
     bridgeAddress,
+    bridgeEndpointAddress,
     ukiStakingAddress,
     vestingVaultAddress,
     rewardsDistributorAddress,
     cukieMasterNftVaultAddress,
     cukiePoolNftVaultAddress,
     tokenStartBlock: env.CHAIN_INDEXER_TOKEN_START_BSC_BLOCK,
+    ukiTokenStartBlock: env.CHAIN_INDEXER_UKI_TOKEN_START_BSC_BLOCK,
     tokenV2StartBlock: env.CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK,
     marketplaceStartBlock: env.CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK,
     ukiMarketplaceStartBlock: env.CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK,
     bridgeStartBlock: env.CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK,
+    bridgeEndpointStartBlock: env.CHAIN_INDEXER_BRIDGE_ENDPOINT_START_BSC_BLOCK,
+    presaleStartBlock: env.CHAIN_INDEXER_PRESALE_START_BSC_BLOCK,
     ukiStakingStartBlock: env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK,
     vestingVaultStartBlock: env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK,
     rewardsDistributorStartBlock: env.CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK,
@@ -588,12 +673,16 @@ export function getIndexerConfig(): IndexerConfig {
       env.CHAIN_INDEXER_CUKIE_POOL_NFT_VAULT_START_BSC_BLOCK,
     verifiedBscContracts: {
       ...(tokenIdentity ? { TOKEN: tokenIdentity } : {}),
+      ...(ukiTokenIdentity ? { UKI_TOKEN: ukiTokenIdentity } : {}),
       ...(tokenV2Identity ? { TOKEN_V2: tokenV2Identity } : {}),
       ...(marketplaceIdentity ? { MARKETPLACE: marketplaceIdentity } : {}),
       ...(ukiMarketplaceIdentity ? { UKI_MARKETPLACE: ukiMarketplaceIdentity } : {}),
       ...(bridgeIdentity ? { BRIDGE: bridgeIdentity } : {}),
+      ...(bridgeEndpointIdentity ? { BRIDGE_ENDPOINT: bridgeEndpointIdentity } : {}),
+      ...(presaleIdentity ? { PRESALE: presaleIdentity } : {}),
       ...(ukiStakingIdentity ? { UKI_STAKING: ukiStakingIdentity } : {}),
       ...(vestingVaultIdentity ? { VESTING_VAULT: vestingVaultIdentity } : {}),
+      ...(rewardsDistributorIdentity ? { REWARDS_DISTRIBUTOR: rewardsDistributorIdentity } : {}),
       ...(cukieMasterNftVaultIdentity
         ? { CUKIE_MASTER_NFT_VAULT: cukieMasterNftVaultIdentity }
         : {}),

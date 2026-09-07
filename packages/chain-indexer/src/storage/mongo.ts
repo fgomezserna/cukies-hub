@@ -12,6 +12,7 @@ import type {
   ContractEventConfig,
   IndexerConfig,
   VerifiedBscContractIdentity,
+  RuntimeScope,
 } from '../types.js';
 import { now } from '../utils/json.js';
 import { ECONOMY_INDEXES } from './economy-indexes.js';
@@ -25,10 +26,13 @@ import {
 export class IndexerStore {
   private client: MongoClient;
   readonly db: Db;
+  readonly runtimeScope: RuntimeScope;
+  legacySourcesVerified = false;
 
   constructor(config: IndexerConfig) {
     this.client = new MongoClient(config.mongoUrl);
     this.db = this.client.db(config.dbName);
+    this.runtimeScope = config.runtimeScope ?? 'default';
   }
 
   async connect() {

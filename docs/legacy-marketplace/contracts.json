@@ -14,6 +14,21 @@
         "BREEDING_POINTS": "TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S",
         "MARKETPLACE": "TWDoJEq4eVd9vUgQ6f5knjqouRBPyGDzSB",
         "BRIDGE": "TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ"
+      },
+      "owners": {
+        "MINT": "TJUqscjJxgnPq7S3YgLVZjGhbW7iPjfX4G",
+        "TOKEN": "TJUqscjJxgnPq7S3YgLVZjGhbW7iPjfX4G",
+        "REFERRALS": "TJUqscjJxgnPq7S3YgLVZjGhbW7iPjfX4G",
+        "POINTS": "THESbAsrsX8JfRiYm7P1Kupcs1i7JaB1cM",
+        "STAKING_POINTS": "THESbAsrsX8JfRiYm7P1Kupcs1i7JaB1cM",
+        "BREEDING_POINTS": "THESbAsrsX8JfRiYm7P1Kupcs1i7JaB1cM",
+        "MARKETPLACE": "TKAR18UKjMQzBkZLoiViUeYWKTft8Sz3k2",
+        "BRIDGE": "TKAR18UKjMQzBkZLoiViUeYWKTft8Sz3k2"
+      },
+      "ownership": {
+        "checkedAt": "2026-09-07T17:23:49.964Z",
+        "method": "owner()",
+        "custodyVerified": false
       }
     },
     "bsc": {
@@ -21,11 +36,12 @@
       "chainId": 56,
       "rpc": "https://bsc-dataseed.binance.org",
       "ownership": {
-        "checkedAt": "2026-06-04",
-        "method": "owner() via public BSC mainnet RPC",
+        "checkedAt": "2026-09-07T17:23:49.964Z",
+        "method": "0x8da5cb5b (owner())",
         "criticalOwnerRotationRequired": true,
         "criticalOwner": "0x7894df8379c2e156f0e4d9df0829127d605bd52b",
-        "reason": "EOA owner with public activity consistent with compromise risk; rotate all legacy BSC contract ownership to an approved secure wallet or multisig."
+        "reason": "EOA owner with public activity consistent with compromise risk; rotate all legacy BSC contract ownership to an approved secure wallet or multisig.",
+        "custodyVerified": false
       },
       "contracts": {
         "TOKEN": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
@@ -115,6 +131,54 @@
       "publicUrl": "https://marketplace.cukies.world/assets/contracts/tron/bridge.json",
       "localPath": "docs/legacy-marketplace/abis/tron/bridge.abi.json",
       "entries": 20
+    }
+  },
+  "lastVerifiedAt": "2026-09-07T17:23:49.964Z",
+  "verificationEvidence": "docs/legacy-marketplace/evidence/2026-09-07-contracts.json",
+  "sourceBundles": {
+    "BRIDGE": {
+      "chainId": 56,
+      "path": "packages/contracts/legacy/bsc/bridge",
+      "match": "exact_match",
+      "deployment": {
+        "transactionHash": "0xfad29c491c7fb23dc5b7a0de1d09674d7670408c1a486a2c30f718fdc9026bc2",
+        "blockNumber": "16913556",
+        "transactionIndex": "0",
+        "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+      }
+    },
+    "POINTS": {
+      "chainId": 56,
+      "path": "packages/contracts/legacy/bsc/points",
+      "match": "exact_match",
+      "deployment": {
+        "transactionHash": "0x396f6620704655510f383ede9e7372bf45520c49f679bdeb6903a7526103de00",
+        "blockNumber": "16531539",
+        "transactionIndex": "2",
+        "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+      }
+    },
+    "STAKING_POINTS": {
+      "chainId": 56,
+      "path": "packages/contracts/legacy/bsc/staking_points",
+      "match": "match",
+      "deployment": {
+        "transactionHash": "0x51ad29406f07563bababd17e20689306aff02ecfb5b37e3b7c1ad75262a158b3",
+        "blockNumber": "16531543",
+        "transactionIndex": "3",
+        "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+      }
+    },
+    "TOKEN": {
+      "chainId": 56,
+      "path": "packages/contracts/legacy/bsc/token",
+      "match": "exact_match",
+      "deployment": {
+        "transactionHash": "0x07e9c8853177353ee53f2a928458eb4f64e0f5734ef39a2d2d8f7ef8a6f2b464",
+        "blockNumber": "16906879",
+        "transactionIndex": "0",
+        "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+      }
     }
   }
 }

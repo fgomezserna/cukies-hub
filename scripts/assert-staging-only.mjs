@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { pathToFileURL } from 'node:url';
+import { validateLegacyIndexerEnvironment } from './assert-legacy-indexer.mjs';
 
 export const STAGING_TARGET = Object.freeze({
   appEnv: 'staging',
@@ -139,6 +140,7 @@ function validateOptionalUkiMarketplaceIdentity(environment, failures) {
 }
 
 export function validateStagingEnvironment(environment = process.env, scope = 'full') {
+  if (scope === 'legacy-chain-indexer') return validateLegacyIndexerEnvironment(environment, 'staging');
   const failures = [];
   const supportedScopes = new Set([
     'full',
@@ -147,6 +149,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     'cukies-bridge-relayer',
     'cuki-card-worker',
     'economy-scheduler',
+    'legacy-chain-indexer',
   ]);
   if (!supportedScopes.has(scope)) {
     throw new StagingGuardError([`unsupported guard scope ${scope}`]);

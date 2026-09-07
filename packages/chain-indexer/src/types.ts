@@ -1,5 +1,7 @@
 export type ChainName = 'BSC' | 'TRON';
 
+export type RuntimeScope = 'default' | 'legacy';
+
 export type ContractAlias =
   | 'TOKEN'
   | 'TOKEN_V2'
@@ -9,15 +11,28 @@ export type ContractAlias =
   | 'MARKETPLACE'
   | 'UKI_MARKETPLACE'
   | 'BRIDGE'
+  | 'BRIDGE_ENDPOINT'
+  | 'UKI_TOKEN'
   | 'PRESALE'
   | 'UKI_STAKING'
   | 'VESTING_VAULT'
   | 'REWARDS_DISTRIBUTOR'
   | 'CUKIE_MASTER_NFT_VAULT'
-  | 'CUKIE_POOL_NFT_VAULT';
+  | 'CUKIE_POOL_NFT_VAULT'
+  | 'MINT'
+  | 'REFERRALS';
 
 export type EventName =
   | 'Transfer'
+  | 'Approval'
+  | 'ApprovalForAll'
+  | 'MinterAdded'
+  | 'MinterRemoved'
+  | 'OwnershipRenounced'
+  | 'OwnershipTransferred'
+  | 'OwnershipTransferStarted'
+  | 'Paused'
+  | 'Unpaused'
   | 'CukieMetadataConfigured'
   | 'Mint'
   | 'Burn'
@@ -37,6 +52,36 @@ export type EventName =
   | 'UkiMarketplaceOrderFilled'
   | 'JumpInBridge'
   | 'JumpOutBridge'
+  | 'MintReferral'
+  | 'BridgeRequested'
+  | 'BridgeCompleted'
+  | 'RelayerUpdated'
+  | 'BridgePriceUpdated'
+  | 'FeeRecipientUpdated'
+  | 'UntrackedERC721Recovered'
+  | 'CollectionAllowedUpdated'
+  | 'PaymentTokenAllowedUpdated'
+  | 'NativePaymentAllowedUpdated'
+  | 'FeeConfigUpdated'
+  | 'NativeFeesClaimed'
+  | 'MinPurchaseUpdated'
+  | 'SaleEnabledUpdated'
+  | 'SaleWindowUpdated'
+  | 'TotalUkiForSaleUpdated'
+  | 'TreasuryUpdated'
+  | 'UkiPerAsmUpdated'
+  | 'PresaleVestingConfigFrozen'
+  | 'PresaleVestingConfigUpdated'
+  | 'RoleAdminChanged'
+  | 'RoleGranted'
+  | 'RoleRevoked'
+  | 'UnallocatedWithdrawn'
+  | 'ExcessRecovered'
+  | 'UkiTokenApproval'
+  | 'UkiTokenOwnershipTransferred'
+  | 'UkiTokenPaused'
+  | 'UkiTokenTransfer'
+  | 'UkiTokenUnpaused'
   | 'Purchased'
   | 'Staked'
   | 'Unstaked'
@@ -97,6 +142,10 @@ export type ChainCursor = {
   contractDeploymentBlock?: number;
   contractDeploymentTxHash?: string;
   contractConfigHash?: string;
+  legacyRuntimeHash?: string;
+  legacyRuntimeCheckedAtBlock?: number;
+  legacySourceVerifiedAt?: Date;
+  legacyProofEvidence?: string;
   poolPeriodDurationSeconds?: number;
   updatedAt: Date;
 };
@@ -107,8 +156,12 @@ export type VerifiedBscContractAlias =
   | 'MARKETPLACE'
   | 'UKI_MARKETPLACE'
   | 'BRIDGE'
+  | 'BRIDGE_ENDPOINT'
+  | 'UKI_TOKEN'
+  | 'PRESALE'
   | 'UKI_STAKING'
   | 'VESTING_VAULT'
+  | 'REWARDS_DISTRIBUTOR'
   | 'CUKIE_MASTER_NFT_VAULT'
   | 'CUKIE_POOL_NFT_VAULT';
 
@@ -125,6 +178,7 @@ export type VerifiedBscContractIdentity = {
 
 export type ChainEvent = {
   _id: string;
+  runtimeScope?: RuntimeScope;
   chain: ChainName;
   chainId?: number;
   contractAlias: ContractAlias;
@@ -149,6 +203,7 @@ export type ChainEvent = {
 };
 
 export type IndexerConfig = {
+  runtimeScope?: RuntimeScope;
   mongoUrl: string;
   dbName: string;
   chains: ChainName[];
@@ -167,10 +222,12 @@ export type IndexerConfig = {
   projectBatchSize: number;
   presaleAddress?: string;
   tokenAddress?: string;
+  ukiTokenAddress?: string;
   tokenV2Address?: string;
   marketplaceAddress?: string;
   ukiMarketplaceAddress?: string;
   bridgeAddress?: string;
+  bridgeEndpointAddress?: string;
   ukiStakingAddress?: string;
   rewardsDistributorAddress?: string;
   vestingVaultAddress?: string;
@@ -182,6 +239,9 @@ export type IndexerConfig = {
   marketplaceStartBlock?: number;
   ukiMarketplaceStartBlock?: number;
   bridgeStartBlock?: number;
+  bridgeEndpointStartBlock?: number;
+  presaleStartBlock?: number;
+  ukiTokenStartBlock?: number;
   rewardsDistributorStartBlock?: number;
   vestingVaultStartBlock?: number;
   cukieMasterNftVaultStartBlock?: number;
@@ -190,6 +250,8 @@ export type IndexerConfig = {
     Record<VerifiedBscContractAlias, VerifiedBscContractIdentity>
   >;
   contractAliases?: ContractAlias[];
+  /** Legacy runtime: every monitored BSC alias receives an explicit origin. */
+  legacyStartBlocks?: Partial<Record<ContractAlias, number>>;
 };
 
 export type LegacyImportConfig = {

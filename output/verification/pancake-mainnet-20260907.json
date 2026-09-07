@@ -1,0 +1,170 @@
+{
+  "schema": "cukies.pancake-mainnet-live-verification.v1",
+  "verifiedAt": "2026-09-07T16:50:13Z",
+  "network": {
+    "chainId": 56,
+    "latestBlock": 120529300,
+    "latestBlockHash": "0x52578f9972e0c37d2aa57573af3954193b44899f910f5a3f6bb0789bb1a65ece",
+    "latestBlockTimestamp": "2026-09-07T16:50:13Z",
+    "rpcReadOnly": [
+      "https://bsc-dataseed1.binance.org",
+      "https://bsc.rpc.blxrbdn.com",
+      "https://rpc-bsc.48.club"
+    ]
+  },
+  "contracts": {
+    "pair": "0x40b315f31421b5D31DE018055Cb30f78265024Be",
+    "uki": "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA",
+    "asm": "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+    "locker": "0xb3E43944DF782EEeD9A99f0CFA4301c72b9629E6",
+    "pancakeV2Factory": "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+    "pancakeV2Router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    "ukiRuntimeCodeHash": "0x670bc1ea470be67f3b77c5248eaa9f33b20bde55d2a9e21b0a68cdb5e06eea6d",
+    "asmRuntimeCodeHash": "0x11c30576e0858e7f4246032ba233559a53e41e85a1d270b5fef9af7007fb8ae8",
+    "pairRuntimeCodeHash": "0x60e4bcb14447615ab7c14fda2c2d70ca4191570e8841c75618e627c8f72662f8",
+    "lockerRuntimeCodeHash": "0xbbcc39e46345b772345609258964e8504482b0eb21729f489ab789bc996e4846"
+  },
+  "tokenAndPool": {
+    "token0": "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA",
+    "token1": "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+    "uki": {
+      "name": "Cukies UKI",
+      "symbol": "UKI",
+      "decimals": 18,
+      "totalSupplyRaw": "1000000000000000000000000000"
+    },
+    "asm": {
+      "name": "Ascensum token",
+      "symbol": "ASM",
+      "decimals": 18
+    },
+    "reserve0Raw": "1148104487125773506027771",
+    "reserve1Raw": "4658001439841752636269",
+    "reserve0": "1148104.487125773506027771 UKI",
+    "reserve1": "4658.001439841752636269 ASM",
+    "reserveBlockTimestamp": "2026-09-07T16:16:27Z",
+    "lpTotalSupplyRaw": "73070219754849786296135",
+    "lockerLpBalanceRaw": "73070219754849786295135",
+    "zeroAddressLpBalanceRaw": "1000",
+    "lpCustodyInterpretation": "Locker holds totalSupply minus standard UniswapV2 MINIMUM_LIQUIDITY (1000 raw LP) burned at zero address."
+  },
+  "locker": {
+    "lpToken": "0x40b315f31421b5D31DE018055Cb30f78265024Be",
+    "owner": "0x01B4b739A6e340Be9120C51cEbdbbd1909C3a233",
+    "lockedLiquidityRaw": "73070219754849786295135",
+    "releasableRaw": "0",
+    "lockDurationSeconds": 15552000,
+    "unlockTime": "2027-02-23T15:33:10Z"
+  },
+  "swapActivity": {
+    "classification": "swaps en ambas fechas; no se afirma continuidad ininterrumpida",
+    "event": "Swap(address,uint256,uint256,uint256,uint256,address)",
+    "oldEvidence": {
+      "provider": "https://bsc.rpc.blxrbdn.com",
+      "range": { "fromBlock": 119160300, "toBlock": 119210300 },
+      "eventsFound": 9,
+      "first": {
+        "block": 119165282,
+        "blockHash": "0x84d252f90e99e44a8bcd5518f76ee8657afd4cdb836cb2c6d7d93a1829efafcb",
+        "timestamp": "2026-08-31T14:12:07Z",
+        "txHash": "0xa4e7560505281ac5ad9e666997095090d42beea177b906fb4e201acf218ff251"
+      },
+      "last": {
+        "block": 119188439,
+        "blockHash": "0xed2afb74e91363ca8eb572d8c35ed292088de85f9e5191f4f994fe07a1acc12a",
+        "timestamp": "2026-08-31T17:05:50Z",
+        "txHash": "0x5959c6a7863254ac62d4b0248d7f6d728f477a76aeda659baae5fddfeef3a479"
+      }
+    },
+    "recentEvidence": {
+      "provider": "https://bsc.rpc.blxrbdn.com",
+      "block": 120524799,
+      "blockHash": "0x7b74dd412c067bcb280ba665c40736d71b0880bb912d941abe8da9261b2196c9",
+      "timestamp": "2026-09-07T16:16:27Z",
+      "txHash": "0x00cfad4b08522c3c0d0926224e97951b48f1c1a31d3cee78d678c51888433a61",
+      "directLogQueryCount": 1,
+      "dexscreener": {
+        "url": "https://api.dexscreener.com/latest/dex/pairs/bsc/0x40b315f31421b5d31de018055cb30f78265024be",
+        "h24Buys": 16,
+        "h24Sells": 2,
+        "h24VolumeUsd": 367.52,
+        "pairCreatedAt": "2026-08-27T16:04:52Z"
+      },
+      "geckoTerminalTradeApi": "https://api.geckoterminal.com/api/v2/networks/bsc/pools/0x40b315f31421b5d31de018055cb30f78265024be/trades"
+    }
+  },
+  "routes": {
+    "asmToUki": {
+      "available": true,
+      "path": [
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ],
+      "routerQuoteFor1AsmRaw": "245811222688721635602"
+    },
+    "ukiToAsmToUsdt": {
+      "available": true,
+      "path": [
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA",
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x55d398326f99059fF775485246999027B3197955"
+      ],
+      "routerQuoteFor1UkiRaw": [
+        "1000000000000000000",
+        "4046976953303758",
+        "26348082978246703"
+      ],
+      "asmUsdtPair": "0xc16a37eF0066B641a3b64cf892dfDE63ECF25F81"
+    },
+    "usdtToAsmToUki": {
+      "available": true,
+      "path": [
+        "0x55d398326f99059fF775485246999027B3197955",
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ],
+      "routerQuoteFor1UsdtRaw": [
+        "1000000000000000000",
+        "152874136602623685",
+        "37584995270017389627"
+      ]
+    },
+    "wbnbViaUsdtToAsmToUki": {
+      "available": true,
+      "wbnbUsdtPair": "0x16b9a82891338f9bA80E2D6970FddA79D1eb0daE",
+      "path": [
+        "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        "0x55d398326f99059fF775485246999027B3197955",
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ],
+      "routerQuoteFor1WbnbRaw": [
+        "1000000000000000000",
+        "737873919322986715862",
+        "112579729743645625114",
+        "27027685304192154450172"
+      ]
+    },
+    "directUkiUsdt": { "available": false, "factoryPair": "0x0000000000000000000000000000000000000000" },
+    "directWbnbToAsmToUki": { "available": false, "factoryPairWbnbAsm": "0x0000000000000000000000000000000000000000", "routerQuote": "reverted; bridged WBNB/USDT path above is available" },
+    "directWbnbToUki": { "available": false, "factoryPair": "0x0000000000000000000000000000000000000000", "routerQuote": "reverted" }
+  },
+  "interface": {
+    "productionUrl": "https://cukies.world/",
+    "observedSwapHref": "https://pancakeswap.finance/swap?chain=bsc&inputCurrency=0x707F0f4a39a4a26239F7D00463B15AB5656861f9&outputCurrency=0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA",
+    "observedCopy": "Compra UKI con BNB, USDT, USDC o ASM desde el formulario directo de la portada.",
+    "sourceRule": "dapp/src/lib/landing-network.ts:178-188 genera la ruta BSC ASM -> UKI cuando chainId=56 y existe el pair.",
+    "assessment": "La ruta ASM/UKI propuesta por la interfaz pública coincide con el pool Mainnet verificado. También hay quotes Mainnet para USDT->ASM->UKI y WBNB->USDT->ASM->UKI; la ruta directa UKI/USDT no existe. USDC requiere verificación separada antes de tratarla como disponible."
+  },
+  "followUpOnly": [
+    "Logo/ficha de metadata en PancakeSwap Mainnet: proceso externo, no acreditado por RPC.",
+    "Verificar explícitamente ruta USDC si el copy público debe seguir ofreciéndola.",
+    "Mantener monitor de reservas, Swap y estado del locker; esta lectura puntual no acredita continuidad ininterrumpida."
+  ],
+  "reproduceWithoutSecrets": [
+    "source ~/.zshrc >/dev/null 2>&1 && curl -sS https://rpc-bsc.48.club -H 'content-type: application/json' --data '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}'",
+    "source ~/.zshrc >/dev/null 2>&1 && curl -fsSL 'https://api.dexscreener.com/latest/dex/pairs/bsc/0x40b315f31421b5d31de018055cb30f78265024be'",
+    "source ~/.zshrc >/dev/null 2>&1 && curl -fsSL 'https://api.geckoterminal.com/api/v2/networks/bsc/pools/0x40b315f31421b5d31de018055cb30f78265024be/trades'",
+    "source ~/.zshrc >/dev/null 2>&1 && curl -sS https://bsc.rpc.blxrbdn.com -H 'content-type: application/json' --data '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x40b315f31421b5D31DE018055Cb30f78265024Be\",\"fromBlock\":\"0x72eaf20\",\"toBlock\":\"0x72eaf20\",\"topics\":[\"0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822\"]}]}'"
+  ]
+}

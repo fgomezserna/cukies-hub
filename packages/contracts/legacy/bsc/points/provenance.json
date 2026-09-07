@@ -1,0 +1,74 @@
+{
+  "schema": "cukies.legacy-verified-source.v1",
+  "role": "POINTS",
+  "chainId": 56,
+  "address": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
+  "retrievedAt": "2026-09-07T17:30:23.214367+00:00",
+  "sourceUrl": "https://sourcify.dev/server/v2/contract/56/0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2?fields=all",
+  "match": "exact_match",
+  "creationMatch": "exact_match",
+  "runtimeMatch": "exact_match",
+  "compilation": {
+    "language": "Solidity",
+    "compiler": "solc",
+    "compilerVersion": "0.5.4+commit.9549d8ff",
+    "compilerSettings": {
+      "libraries": {},
+      "optimizer": {
+        "runs": 200,
+        "enabled": true
+      }
+    },
+    "name": "CukiesPoints",
+    "fullyQualifiedName": "contracts/CukiesPoints.sol:CukiesPoints"
+  },
+  "deployment": {
+    "transactionHash": "0x396f6620704655510f383ede9e7372bf45520c49f679bdeb6903a7526103de00",
+    "blockNumber": "16531539",
+    "transactionIndex": "2",
+    "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+  },
+  "localCompilationExecuted": false,
+  "files": [
+    {
+      "path": "contracts/Context.sol",
+      "sha256": "e0cccb07ec7d48f6f48812297992486921d9e5b8d9ea5f18021f72d87601ea94"
+    },
+    {
+      "path": "contracts/CukiesPoints.sol",
+      "sha256": "89319d30c7ffa32b6c186c6f09c2f2f3d791b4781b742995c80b9b9e23de5a4c"
+    },
+    {
+      "path": "contracts/ICukie.sol",
+      "sha256": "cfa921481d1ea2b93084da3ba08046cd6e99f527276d7cb6276ad2f5e3c1c668"
+    },
+    {
+      "path": "contracts/ITRC165.sol",
+      "sha256": "49a2e822d4897e7c4584db0a91a8dda1e029651bb535c4fac440a6e0a5f50ae3"
+    },
+    {
+      "path": "contracts/ITRC721.sol",
+      "sha256": "5493c241116e7444211a9fa55d669e50cbce4f88c40682dd838b024574296936"
+    },
+    {
+      "path": "contracts/ITRC721Metadata.sol",
+      "sha256": "a358977fb0892c7e95c02ab9258e6a19bcee94a0d285459522f193ad1ead3a67"
+    },
+    {
+      "path": "contracts/MinterRole.sol",
+      "sha256": "e060c6434436a77c49a74195cdefda8039f4583447d1e0e8605f766a45576d1e"
+    },
+    {
+      "path": "contracts/Ownable.sol",
+      "sha256": "2ac7b88ea09e956f6ca53048d6e8c4e6d15c8f0bcd7745045c96a41339210259"
+    },
+    {
+      "path": "contracts/Roles.sol",
+      "sha256": "abea4484359843cf86352cacf131dd2d5d15e64653c31dd87769b4fd1672a8b3"
+    },
+    {
+      "path": "contracts/SafeMath.sol",
+      "sha256": "20af11adb0e22d4baf5b50f45896a7bb988e4f54c61aab45f2bf61cdfc45f1a3"
+    }
+  ]
+}

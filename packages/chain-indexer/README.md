@@ -60,3 +60,30 @@ Colecciones principales:
 ## Import legacy
 
 `pnpm indexer:import:legacy` importa eventos desde `CUKIES_DATABASE_URL` (`processedEvents`) al nuevo `chain_events`, manteniendo idempotencia por `_id` normalizado. Sirve para sembrar `cukieshub-new` con historico legacy mientras la ingesta on-chain sigue viva/reconciliando.
+
+## Cobertura de ABI y Mongo de integración
+
+La prueba `test/event-coverage.test.ts` contrasta los 14 fixtures legacy BSC/TRON y los 10 perfiles de contratos nuevos con el manifiesto declarativo y los artifacts compilados, incluidos eventos heredados. Antes de comprobar cobertura de contratos nuevos, compila localmente `packages/contracts` (`pnpm --filter @cukies/contracts compile`) y no uses ABI descargadas de red.
+
+La prueba CAS Mongo es opt-in y se omite por defecto. Para ejecutarla contra una base local temporal, define `CHAIN_INDEXER_TEST_MONGO_URL` (por ejemplo, una URI local con `cukies-legacy-events-test` y su replica set) y ejecuta `pnpm --filter @cukies/chain-indexer exec tsx --test test/bridge-cas.integration.test.ts`. Si la variable está definida pero Mongo no conecta, la prueba falla; nunca hace fallback a otra base.
+
+## Worker dedicado a contratos legacy existentes
+
+El servicio `legacy-chain-indexer`, perfil Compose `legacy-indexer`, reutiliza
+este paquete con una configuracion explicita `CUKIES_LEGACY_*`. Consume los
+contratos existentes BSC 56 y TRON mainnet en ambos entornos; mantiene bases,
+credenciales y cursores distintos en Stage y produccion. El inventario,
+parametros y gates de activacion se mantienen en
+[`docs/legacy-marketplace/README.md`](../../docs/legacy-marketplace/README.md#activacion-stage-y-criterios-de-reconciliacion).
+
+Comandos del servicio: `legacy:setup` verifica las fuentes y crea indices;
+`legacy:ingest` ejecuta una pasada; `legacy:project` materializa un lote;
+`legacy:status` consulta estado; `legacy:run:dev` inicia el bucle local y
+`legacy:run` ejecuta el build de produccion. La configuracion dedicada no usa
+los defaults del indexer anterior: un inicio legacy explicito `0` representa
+historia completa. `legacy:test` valida configuracion e identidades.
+
+Las lecturas no firman transacciones. La prueba de runtime `legacy-existing`
+acredita address/red/hash observado, sin inventar evidencia de despliegue.
+El ledger historico de referidos no confirma patrocinadores de la economia
+nueva, y las transferencias ERC20 no alteran balances internos ni rewards.

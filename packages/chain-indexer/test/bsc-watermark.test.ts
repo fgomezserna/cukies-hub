@@ -7,7 +7,11 @@ import type { IndexerStore } from '../src/storage/index.js';
 import type { ChainCursor, ContractEventConfig, IndexerConfig } from '../src/types.js';
 
 const PRESALE_ADDRESS = `0x${'1'.repeat(40)}`;
+const TOKEN_ADDRESS = '0x0dbDeBCC62f11005BF434ABFad74564E896aC861';
 const PLAYER = `0x${'2'.repeat(40)}`;
+const PRESALE_EVENT_COUNT = 10;
+const UKI_STAKING_EVENT_COUNT = 6;
+const POOL_VAULT_EVENT_COUNT = 11;
 
 function config(overrides: Partial<IndexerConfig> = {}): IndexerConfig {
   return {
@@ -148,19 +152,21 @@ test('watermark follows the last traversed range block and falls back for its ti
     rpcClients: [primary, secondary],
   });
 
-  assert.deepEqual(logCalls, [{ fromBlock: BigInt(100), toBlock: BigInt(104) }]);
+  assert.deepEqual(logCalls, Array.from({ length: PRESALE_EVENT_COUNT }, () => ({
+    fromBlock: BigInt(100), toBlock: BigInt(104),
+  })));
   assert.deepEqual(primaryBlockCalls, [BigInt(110), BigInt(100), BigInt(104)]);
   assert.deepEqual(secondaryBlockCalls, [BigInt(110), BigInt(100), BigInt(104)]);
   assert.equal(result.safeBlock, 110);
-  assert.equal(result.ranges, 1);
-  assert.deepEqual(updates.map(({ update }) => update), [{
+  assert.equal(result.ranges, PRESALE_EVENT_COUNT);
+  assert.deepEqual(updates.map(({ update }) => update), Array.from({ length: PRESALE_EVENT_COUNT }, () => ({
     nextBlock: 105,
     safeBlock: 110,
     processedFromBlock: 100,
     processedFromTimestampMs: 1_000_000,
     processedThroughBlock: 104,
     processedThroughTimestampMs: 1_040_000,
-  }]);
+  })));
 });
 
 test('reuses an event block timestamp when the range watermark is the same block', async () => {
@@ -187,7 +193,7 @@ test('reuses an event block timestamp when the range watermark is the same block
   await ingestBscOnce(store, config(), { rpcClients: [client] });
 
   assert.deepEqual(blockCalls, [BigInt(110), BigInt(100), BigInt(104)]);
-  assert.equal(eventBatches[0]?.length, 1);
+  assert.equal(eventBatches.filter((batch) => batch.length > 0).length, PRESALE_EVENT_COUNT);
   assert.equal((eventBatches[0]?.[0] as { timestampMs: number }).timestampMs, 1_040_000);
   assert.equal(updates[0]?.update.processedFromBlock, 100);
   assert.equal(updates[0]?.update.processedFromTimestampMs, 1_000_000);
@@ -206,12 +212,12 @@ test('persists a safe-head watermark when the cursor is already caught up', asyn
   assert.deepEqual(logCalls, []);
   assert.deepEqual(blockCalls, [BigInt(110)]);
   assert.deepEqual(eventBatches, []);
-  assert.deepEqual(updates.map(({ update }) => update), [{
+  assert.deepEqual(updates.map(({ update }) => update), Array.from({ length: PRESALE_EVENT_COUNT }, () => ({
     nextBlock: 111,
     safeBlock: 110,
     processedThroughBlock: 110,
     processedThroughTimestampMs: 1_100_000,
-  }]);
+  })));
   assert.equal(checkpoints.length, 1);
   assert.equal(operations.at(-1), 'checkpoint');
 });
@@ -244,16 +250,53 @@ test('records safe head as explicit coverage origin for a new start-block zero c
 
   await ingestBscOnce(store, config({ bscStartBlock: 0 }), { rpcClients: [client] });
 
-  assert.deepEqual(logCalls, [{ fromBlock: BigInt(110), toBlock: BigInt(110) }]);
+  assert.deepEqual(logCalls, Array.from({ length: PRESALE_EVENT_COUNT }, () => ({
+    fromBlock: BigInt(110), toBlock: BigInt(110),
+  })));
   assert.deepEqual(blockCalls, [BigInt(110)]);
-  assert.deepEqual(updates.map(({ update }) => update), [{
+  assert.deepEqual(updates.map(({ update }) => update), Array.from({ length: PRESALE_EVENT_COUNT }, () => ({
     nextBlock: 111,
     safeBlock: 110,
     processedFromBlock: 110,
     processedFromTimestampMs: 1_100_000,
     processedThroughBlock: 110,
     processedThroughTimestampMs: 1_100_000,
-  }]);
+  })));
+});
+
+test('legacy start block zero is historical and never falls back to safe head', async () => {
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({ host: 'mainnet.test', logCalls });
+  const { store, updates } = fakeStore();
+
+  await ingestBscOnce(store, config({
+    runtimeScope: 'legacy',
+    bscStartBlock: 100,
+    bscConfirmations: 120,
+    maxBlockRange: 5,
+    contractAliases: ['TOKEN'],
+    tokenAddress: TOKEN_ADDRESS,
+    legacyStartBlocks: { TOKEN: 0 },
+  }), { rpcClients: [client] });
+
+  assert.equal(logCalls[0]?.fromBlock, 0n);
+  assert.equal(logCalls[0]?.toBlock, 0n);
+  assert.equal(updates[0]?.update.processedFromBlock, 0);
+});
+
+test('legacy ingestion rejects a missing per-alias start block instead of using safe head', async () => {
+  const client = rpc({ host: 'mainnet.test' });
+  const { store } = fakeStore();
+
+  await assert.rejects(
+    ingestBscOnce(store, config({
+      runtimeScope: 'legacy',
+      contractAliases: ['TOKEN'],
+      tokenAddress: TOKEN_ADDRESS,
+      legacyStartBlocks: {},
+    }), { rpcClients: [client] }),
+    /TOKEN legacy exige un bloque inicial explícito/,
+  );
 });
 
 test('skips an RPC from a different chain before reading blocks', async () => {
@@ -293,11 +336,13 @@ test('uses the deployment block configured for each UKI economy contract', async
     ukiStakingStartBlock: 105,
   }), { rpcClients: [client] });
 
-  assert.deepEqual(logCalls, [
-    { fromBlock: 105n, toBlock: 109n },
-    { fromBlock: 105n, toBlock: 109n },
-  ]);
-  assert.deepEqual(updates.map(({ update }) => update.processedFromBlock), [105, 105]);
+  assert.deepEqual(logCalls, Array.from({ length: UKI_STAKING_EVENT_COUNT }, () => ({
+    fromBlock: 105n, toBlock: 109n,
+  })));
+  assert.deepEqual(
+    updates.map(({ update }) => update.processedFromBlock),
+    Array.from({ length: UKI_STAKING_EVENT_COUNT }, () => 105),
+  );
 });
 
 test('uses and seals the independent TOKEN_V2 deployment identity', async () => {
@@ -335,15 +380,19 @@ test('uses and seals the independent TOKEN_V2 deployment identity', async () => 
   assert.deepEqual(logCalls, [
     { fromBlock: 106n, toBlock: 110n },
     { fromBlock: 106n, toBlock: 110n },
+    { fromBlock: 106n, toBlock: 110n },
+    { fromBlock: 106n, toBlock: 110n },
+    { fromBlock: 106n, toBlock: 110n },
   ]);
   assert.deepEqual(updates.map(({ config: eventConfig, update }) => ({
     alias: eventConfig.contractAlias,
     start: update.processedFromBlock,
     txHash: update.contractDeploymentTxHash,
-  })), [
-    { alias: 'TOKEN_V2', start: 106, txHash: deploymentTxHash },
-    { alias: 'TOKEN_V2', start: 106, txHash: deploymentTxHash },
-  ]);
+  })), Array.from({ length: 5 }, () => ({
+    alias: 'TOKEN_V2',
+    start: 106,
+    txHash: deploymentTxHash,
+  })));
 });
 
 test('verifies UKI contract receipt and runtime before sealing cursor identity', async () => {
@@ -377,7 +426,7 @@ test('verifies UKI contract receipt and runtime before sealing cursor identity',
     verifiedBscContracts: { UKI_STAKING: identity },
   }), { rpcClients: [client] });
 
-  assert.equal(updates.length, 2);
+  assert.equal(updates.length, UKI_STAKING_EVENT_COUNT);
   for (const { update } of updates) {
     assert.equal(update.bootstrapStatus, 'verified');
     assert.equal(update.verifiedChainId, 97);
@@ -518,7 +567,7 @@ test('pins the live pool duration in every verified testnet cursor without chang
     const fixture = poolVaultFixture(97, duration);
     const result = await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
     assert.deepEqual(fixture.contractReadCalls, [{ address: fixture.address, functionName: 'PERIOD_DURATION' }]);
-    assert.equal(fixture.updates.length, 7);
+    assert.equal(fixture.updates.length, POOL_VAULT_EVENT_COUNT);
     for (const { config: eventConfig, update } of fixture.updates) {
       assert.equal(eventConfig.contractAlias, 'CUKIE_POOL_NFT_VAULT');
       assert.equal(update.poolPeriodDurationSeconds, Number(duration));
@@ -539,7 +588,7 @@ test('keeps the 86400-second pool calendar valid on chain 56 and chain 97', asyn
     const fixture = poolVaultFixture(chainId, 86400n);
     await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
     assert.equal(fixture.contractReadCalls.length, 1);
-    assert.equal(fixture.updates.length, 7);
+    assert.equal(fixture.updates.length, POOL_VAULT_EVENT_COUNT);
     assert.ok(fixture.updates.every(({ update }) => update.poolPeriodDurationSeconds === 86400 && update.verifiedChainId === chainId));
   }
 });

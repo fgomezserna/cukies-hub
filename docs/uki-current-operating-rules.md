@@ -702,6 +702,58 @@ primera liquidacion. Ninguna de estas cantidades entra en un claim de usuario.
 - Pendiente: revisar si se cobra TRX para cubrir fee posterior en BSC.
 - Direccion actual: no priorizar bridge de vuelta de BSC a Tron si no cambian las condiciones.
 
+### Contratos legacy, eventos y convivencia (decision del 2026-09-07)
+
+- Se reutilizan los contratos legacy existentes en BSC mainnet y TRON mainnet,
+  tambien desde staging. No se redepliegan copias legacy en testnet. Los
+  contratos nuevos mantienen deployments distintos: testnets en staging y
+  mainnets en produccion.
+- Los workers del Hub deben cubrir el mismo alcance legacy en Stage y Main;
+  cambian sus destinos de datos, credenciales y cursores por entorno. Leer un
+  contrato mainnet desde Stage no autoriza escribir en bases de produccion ni
+  ejecutar transacciones on-chain. La ingesta de legacy no genera por si sola
+  posiciones, creditos ni rewards de la economia nueva.
+- Se cubren todos los eventos de los ABIs inventariados, incluidos NFT,
+  marketplace, bridge, CukiePoints, staking, breeding/crias, mint y referidos.
+  Cada evento conserva su cadena, contrato, transaccion y posicion de log.
+  Los eventos de negocio tienen proyeccion y reconciliacion; approvals,
+  propiedad, roles, pausa y configuracion conservan trazabilidad explicita.
+  Ningun evento se considera cubierto solo por aparecer en una lista: deben
+  verificarse ingesta, persistencia, replay y su efecto o clasificacion.
+- Marketplace legacy y marketplace UKI/v2 conviven en una misma lista,
+  con filtros comunes y selector de origen Todos/Legacy/UKI. Cada tarjeta
+  legacy lleva un distintivo visible `Legacy`, ademas de red y moneda; el
+  detalle y las acciones resuelven el contrato exacto del anuncio.
+- Se conserva la funcionalidad de los filtros legacy activos, incluidas
+  habilidades y con/sin crias por red. No se mezcla numericamente BNB, TRX y
+  UKI al ordenar por precio sin una moneda o conversion explicita.
+- Los anuncios legacy no se convierten automaticamente en ordenes UKI: el
+  vendedor cancela y republica. El contrato UKI actual publica mediante
+  transaccion `createOrder` tras approval, no mediante orden off-chain EIP-712.
+- Orden de entrega: eventos y workers con datos reconciliados; UX completa de
+  marketplace, bridge, CukiePoints y breeding; despues sidebar, menu y dashboard
+  inicial ajustados a esos flujos. Los cortes de generacion de puntos y crias
+  siguen requiriendo su fecha y operacion concreta; no se ejecutan por importar
+  eventos o habilitar lecturas.
+
+La UX posterior a la reconciliacion se valida por recorrido completo:
+
+| Recorrido | Comportamiento requerido |
+| --- | --- |
+| Explorar marketplace | Lista conjunta, origen Todos/Legacy/UKI, red, tipo, generacion, habilidades y crias cuando existan esos atributos; busqueda, paginacion y reset coherentes. Un atributo no disponible no se representa como cero. |
+| Comprar o gestionar anuncio | Mostrar origen, red, moneda, precio/fee y contrato exactos; approval y accion segun ABI. Legacy conserva compra, alta, cancelacion y cambio de precio. UKI conserva publicacion, cancelacion y reparacion de approval. Revalidar owner, permisos y vigencia antes de firmar. |
+| Migrar mediante bridge | Prioridad TRON -> BSC; seleccionar NFT elegible y destino, mostrar fee y seguir solicitud, confirmacion y finalizacion con ambas transacciones. Distinguir protocolos legacy/endpoint v2, pendientes y errores que requieran intervencion; no anunciar completado solo por recibir la solicitud. |
+| Consultar Cukie Points | Separar saldo ya emitido de puntos pendientes calculados en staking; explicar su procedencia y fecha. Mostrar posiciones e historial por red. No inventar una accion claim que el contrato no ofrece, ni activar conversiones con ratios aun propuestos. |
+| Gestionar staking legacy | Mostrar posiciones, elegibilidad y acciones stake/unstake soportadas por cada contrato, con su efecto sobre puntos; mantenerlo separado del staking UKI y Cukie Master. |
+| Gestionar crias | Padres elegibles, coste/condiciones, inicio, operacion pendiente, finalizacion e historial padre/hijo segun contrato. La UX del corte se concreta al fijar fecha y tratamiento de operaciones ya iniciadas. |
+| Navegar y entrar al dashboard | Agrupar las acciones reales de esos recorridos; mostrar operaciones pendientes, balances disponibles y accesos utiles. Tratar carga, error parcial y ausencia de datos sin presentar un fallo de lectura como saldo cero. Revisar tambien perfil, avatar y notificaciones. |
+
+En Stage, operar contratos legacy seguira siendo una transaccion real de mainnet.
+La prueba de ingesta no habilita por si sola botones de escritura: sus gates,
+wallet QA y coste se validan en la fase de UX correspondiente. Los metodos de
+pago alternativos del marketplace UKI solo se ofrecen cuando la configuracion
+y el contrato los permiten.
+
 ## Cukie Points y crias
 
 Necesidades:

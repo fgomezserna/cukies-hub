@@ -107,7 +107,7 @@ COPY . .
 
 RUN if [ "$CUKIES_SERVICE" = "dapp" ]; then \
       pnpm --filter dapp build; \
-    elif [ "$CUKIES_SERVICE" = "chain-indexer" ]; then \
+    elif [ "$CUKIES_SERVICE" = "chain-indexer" ] || [ "$CUKIES_SERVICE" = "legacy-chain-indexer" ]; then \
       pnpm --filter @cukies/chain-indexer run build; \
     elif [ "$CUKIES_SERVICE" = "cuki-card-worker" ]; then \
       pnpm --filter @cukies/cuki-card-worker run build; \

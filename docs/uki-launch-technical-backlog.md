@@ -6,6 +6,14 @@ Fuente operativa de NFTs: Mongo Proxmox / marketplace.cukies.world.
 Regla base: Mongo opera producto y juegos; BSC liquida valor, staking de UKI, vesting y claims.
 Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 2026-05-17.
 
+Fuente unica de estado vigente: [seguimiento del 15](antes-del-15-seguimiento.md) (correccion
+de producto 2026-09-07). Este backlog define alcance, requisitos y tareas para
+issues; no mantiene estados alternativos. Issues y PRs coordinan trabajo
+vinculado, pero una issue cerrada, un health check o un merge/deploy no
+equivalen a publicacion de producto. La decision del usuario y la evidencia
+fechada mas reciente superseden fotos antiguas; los conflictos se reconcilian
+en el seguimiento antes de responder.
+
 ## Convenciones
 
 - `Milestone`: entrega tecnica verificable.
@@ -38,7 +46,10 @@ Fuente de reglas vigente: `docs/uki-current-operating-rules.md` sincronizado el 
 
 1. La nueva economia UKI vive solo en BSC.
 2. Los NFTs existentes pueden estar en BSC y Tron, pero la app y juegos pueden usar Mongo como fuente operativa.
-3. El bridge entre redes ya existe en `marketplace.cukies.world`; no forma parte del core de este backlog salvo integracion de estados.
+3. El bridge entre redes ya existe en `marketplace.cukies.world`; su auditoria,
+   integracion y migracion pertenecen al programa de Migracion legacy del
+   seguimiento.
+   Este backlog conserva requisitos, pero no declara el bridge cerrado.
 4. Las partidas, creditos, ranking, pools y calculos se resuelven off-chain.
 5. Las compras, vesting, staking de UKI y claim final de UKI se resuelven on-chain en BSC.
 6. Treasure Hunt es el primer juego, pero la arquitectura debe soportar multiples juegos.
@@ -1231,7 +1242,11 @@ Dependencias: UKI-090.
 
 ## Orden recomendado de ejecucion
 
-1. M0 y M0.5 son lo primero: decisiones, narrativa, UX, restyling, imagenes validadas y comunicacion inicial.
+Este orden es una guia tecnica historica; no es una prioridad de lanzamiento
+actual. La prioridad y el alcance vigentes se leen en
+[seguimiento del 15](antes-del-15-seguimiento.md).
+
+1. M0 y M0.5 agrupan decisiones, narrativa, UX, restyling, imagenes validadas y comunicacion inicial.
 2. M1 y M2 avanzan despues o en paralelo, pero sin bloquear la preparacion publica del lanzamiento.
 3. M3 se puede implementar contra mocks de contratos y luego conectar testnet.
 4. M4 y M5 deben cerrarse juntos porque creditos/pools afectan partidas.

@@ -1,6 +1,18 @@
 # UKI new economy database implementation map
 
-Estado: la vertical v3 de créditos, Treasure Hunt, ranking y contabilidad de rewards está implementada con gates de activación independientes. Los contratos NFT siguen desplegados en BSC Testnet y sus identidades/cursores están verificados. La publicación de batches claimables y cualquier paso a mainnet continúan siendo operaciones separadas que exigen funding y aprobación explícita.
+Fuente unica de estado vigente: [seguimiento del 15](antes-del-15-seguimiento.md) (correccion
+de producto 2026-09-07). Este mapa conserva decisiones, requisitos y detalle
+tecnico de datos; sus estados descriptivos son evidencia fechada y no una
+segunda tabla de lanzamiento. La decision del usuario y la evidencia live mas
+reciente superseden fotos antiguas; issues/commits/health no equivalen a
+publicacion de producto.
+
+Detalle técnico: la vertical v3 de créditos, Treasure Hunt, ranking y
+contabilidad de rewards conserva gates de activación independientes. Estas
+frases son evidencia fechada del mapa; el estado actual se lee únicamente en
+[seguimiento del 15](antes-del-15-seguimiento.md). La publicación de batches claimables y
+cualquier paso a mainnet continúan siendo operaciones separadas que exigen
+funding y aprobación explícita.
 Decision vigente: Cukie Master permite 5 cupos por ruta UKI y 5 cupos por ruta NFT/Cukies Originales por wallet.
 Decision vigente: Cukie Master NFT y Cukie Pool requieren vaults custodiales BSC separados; el soft staking Mongo actual queda superseded.
 
@@ -23,7 +35,7 @@ BSC sigue siendo la fuente de verdad para valor transferible y custodia: UKI, AS
 
 Fecha de comprobacion: 2026-08-15.
 
-Veredicto: la integracion legacy es parcial. Hay UI para iniciar `jumpInBridge`,
+Registro de comprobacion del 2026-08-15: la integracion legacy era parcial. Hay UI para iniciar `jumpInBridge`,
 ABIs, lectura de eventos y proyeccion `inBridge -> available`, pero el
 repositorio no contiene el executor/relayer que complete el salto entre redes.
 El fixture BSC Testnet solo emite eventos y no custodia, quema, acuña ni mueve
@@ -34,7 +46,7 @@ Tron -> BSC real end-to-end.
 | --- | --- |
 | UI de entrada y approval | Implementada; el despliegue actual sigue configurado con contratos mainnet. |
 | Indexer BSC y Tron | Implementado como lector; proyecta `JumpInBridge` y `JumpOutBridge`. |
-| Executor/relayer cross-chain | Ausente del repositorio. |
+| Executor/relayer cross-chain | No demostrado en aquella foto; el inventario posterior registra un relayer Stage-only para auditar y activar con gates. |
 | Custodia o burn/mint verificable | No demostrada: falta source verificado o auditoria de los contratos legacy. |
 | BSC Testnet | NFT y fuentes de eventos desplegados; la fuente bridge no ejecuta bridge. |
 | Tron testnet/Nile | Sin contrato fuente ni activos de prueba comprobados. |
@@ -89,10 +101,10 @@ verifica metadata/custodia, usa leases, backoff y DLQ, no reenvia receipts ambig
 y reconcilia una unica representacion circulante. El profile Docker permanece
 desactivado y exige gates explicitos de Stage.
 
-Esto aun no cierra el bridge del documento. Faltan los despliegues reales en
-Nile/BSC Testnet, allowlist/key handover, el E2E real con receipts y reconciliacion,
-y sustituir los `10 TRX` por una tarifa derivada del coste BSC medido con buffer
-aprobado.
+Esto no cerraba el bridge en aquella fecha. El destino BSC Testnet ya estaba
+desplegado, verificado y con relayer dedicado; faltan el despliegue Nile, el E2E
+real con receipts y reconciliacion, y sustituir los `10 TRX` por una tarifa
+derivada del coste BSC medido con buffer aprobado.
 
 Direcciones legacy mainnet documentadas:
 
@@ -239,10 +251,10 @@ El maximo potencial por wallet es 10 cupos si el usuario alcanza 5 por ruta. Est
 | Pausar generacion de Cukie Points | Operacion legacy controlada por contrato; antes de ejecutar, generar snapshot de claimed + pending usando `points` + `calcPoints(tokenId)`. Resultado se importa como baseline a `cukieshub-new`. | Biblioteca preview-only, manifest, plan sin firma y verificador implementados; snapshot/report live y ejecución siguen pendientes de aprobación. |
 | Tabla por wallet de Cukie Points | Export desde legacy `points` + wallets/user linkage + pending on-chain. Guardar resumen estructural, no datos sensibles en Git. | Serializadores JSONL/CSV canónicos implementados; falta proporcionar fuentes/cutoffs live autorizados. |
 | Pausar crias con Cukie Points | Operacion legacy: pausar contrato/UI. No crear nueva mecanica de breeding en UKI. | Pendiente de accion ops. |
-| Bridge Tron -> BSC | Migracion unidireccional a BSC; nueva economia solo acepta nuevas posiciones BSC. `NftInventoryService` marca Tron como lectura/migracion. | Parcial: contrato, UI fail-closed y relayer idempotente estan emulados localmente; faltan deploy Nile/BSC Testnet y E2E real. |
-| Incidente GraphQL de usuarios | El backend legacy no puede exponer enumeración masiva, hashes de contraseña ni la relación anidada wallet→usuario. JWT y firmas de wallet deben fallar cerrados; ninguna credencial de chain puede vivir en código. | El parche base sigue en el PR borrador `cukiesworld-stack#18` contra `Development`. La rama local dependiente queda en `c218e13b`: GraphQL 4 suites/13 tests, auth 2 suites/23 tests, scanner 31 tests, lint sin errores, frontend y commander compilan para Stage, y tanto el árbol Git como el bundle de Stage pasan el escáner sin material sensible. También se retiraron credenciales versionadas, claves privadas del navegador, tests contra bases remotas y contraseñas Telegram predecibles; los contenedores reciben el token privado por BuildKit. Aún faltan push/revisión, build de auth/GraphQL/productores con un `NPM_TOKEN` nuevo para resolver los paquetes privados `@3fera`, rotación de todas las credenciales expuestas, invalidación de sesiones, reset/revisión de cuentas y smoke negativo en Stage. No se considera cerrado hasta completar esas acciones operativas. |
-| Marketplace legacy | Mantenerlo como fuente histórica durante la migración, pero publicar solo órdenes con evidencia owner/listing coherente. `Stake`, `Transfer`, bridge, compra o cancelación invalidan o cierran la orden; Cukie Points se repara con eventos absolutos. | Implementado y probado localmente sobre el indexador Stage. Tarifas legacy verificadas por lectura: venta 10%, cancelación 0, cambio 0.0002 BNB/10 TRX y unstake sin fee. Falta ejecutar y auditar el backfill antes de trasladar el filtro a producción. |
-| Marketplace UKI | Contrato BSC no custodial: el NFT permanece en la wallet hasta la compra; owner y approval se revalidan al llenar. Precio exacto al vendedor en UKI y comisión pagada por el comprador en UKI, BNB o USDT mediante rutas configuradas. | Contrato, API/UI, indexación, replay y estados `active/sold/cancelled/expired/invalid` implementados. El gate local `pnpm staging:marketplace:verify-local` emula chain `97` y valida UKI directo de forma independiente: BNB/USDT se ocultan si sus rutas no están completas y BNB además nace bloqueado on-chain. Sigue cerrado en Stage porque el contrato no está desplegado/verificado; BNB/USDT no tienen hoy ruta verificada y la comisión nueva requiere decisión de producto antes del deploy. |
+| Bridge Tron -> BSC | Migracion unidireccional a BSC; nueva economia solo acepta nuevas posiciones BSC. `NftInventoryService` marca Tron como lectura/migracion. | La evidencia fechada describia destino Testnet, relayer allowlisted y E2E local preparado; el programa vigente exige inventariar/auditar fuente Nile, E2E firmado y tarifa medida antes de activarlo. |
+| Incidente GraphQL de usuarios | El backend legacy no puede exponer enumeración masiva ni secretos; las asociaciones wallet→usuario legitimas se revalidan, mientras JWT, sesiones y privilegios heredados fallan cerrados. | Evidencia local del 31-08-2026 (`5e2ce9a`, `a057428`, gates y smoke) conservada como historial. El estado live, la procedencia del binario y los slices por portar se contrastan en la tabla unica; no se deduce cierre o ausencia de runtime desde aquella foto. |
+| Marketplace legacy | Mantenerlo como fuente histórica durante la migración, pero publicar solo órdenes con evidencia owner/listing coherente. `Stake`, `Transfer`, bridge, compra o cancelación invalidan o cierran la orden; Cukie Points se repara con eventos absolutos. | La evidencia local de `pnpm staging:marketplace:verify-local` queda como gate técnico fechado; las tarifas, backfill, contratos y consumidores live forman parte del programa de Migracion legacy y requieren re-inventario antes de declarar cierre. |
+| Marketplace UKI | Contrato BSC no custodial: el NFT permanece en la wallet hasta la compra; owner y approval se revalidan al llenar. Precio exacto al vendedor en UKI y comisión pagada por el comprador en UKI, BNB o USDT mediante rutas configuradas. | Contrato, API/UI, indexación, replay y estados `active/sold/cancelled/expired/invalid` descritos en la evidencia local. La foto fechada indicaba deploy/rutas por verificar; la configuración actual debe inventariarse en el seguimiento y un env vacío no prueba ausencia de contrato. |
 | Premios preventa | Registrar elegibilidad/ranking off-chain; mint/entrega de NFTs requiere flujo BSC/ops especifico. | Pendiente. |
 | Cierre preventa y extension | Contrato `Presale` permite mover ventanas; decision de prolongar se decide por estado on-chain/indexado. | Implementado en contrato, pendiente de politica ops. |
 | Torneo compradores preventa | Crear entitlement ledger: 1 partida por cada 1,000 UKI comprados, basado en eventos `Purchased`. | Pendiente. |

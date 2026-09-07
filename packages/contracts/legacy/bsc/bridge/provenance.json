@@ -1,0 +1,66 @@
+{
+  "schema": "cukies.legacy-verified-source.v1",
+  "role": "BRIDGE",
+  "chainId": 56,
+  "address": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E",
+  "retrievedAt": "2026-09-07T17:30:23.214367+00:00",
+  "sourceUrl": "https://sourcify.dev/server/v2/contract/56/0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E?fields=all",
+  "match": "exact_match",
+  "creationMatch": "exact_match",
+  "runtimeMatch": "exact_match",
+  "compilation": {
+    "language": "Solidity",
+    "compiler": "solc",
+    "compilerVersion": "0.5.4+commit.9549d8ff",
+    "compilerSettings": {
+      "libraries": {},
+      "optimizer": {
+        "runs": 200,
+        "enabled": true
+      }
+    },
+    "name": "CukiesNFTBridge",
+    "fullyQualifiedName": "contracts/CukiesNFTBridge.sol:CukiesNFTBridge"
+  },
+  "deployment": {
+    "transactionHash": "0xfad29c491c7fb23dc5b7a0de1d09674d7670408c1a486a2c30f718fdc9026bc2",
+    "blockNumber": "16913556",
+    "transactionIndex": "0",
+    "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+  },
+  "localCompilationExecuted": false,
+  "files": [
+    {
+      "path": "contracts/Context.sol",
+      "sha256": "e0cccb07ec7d48f6f48812297992486921d9e5b8d9ea5f18021f72d87601ea94"
+    },
+    {
+      "path": "contracts/CukiesNFTBridge.sol",
+      "sha256": "1a2c6a02f6c1c8591c7012bf69ee44b4dcb5bea5214e1f6d548dba7519163cbd"
+    },
+    {
+      "path": "contracts/ICukie.sol",
+      "sha256": "cfa921481d1ea2b93084da3ba08046cd6e99f527276d7cb6276ad2f5e3c1c668"
+    },
+    {
+      "path": "contracts/ITRC165.sol",
+      "sha256": "49a2e822d4897e7c4584db0a91a8dda1e029651bb535c4fac440a6e0a5f50ae3"
+    },
+    {
+      "path": "contracts/ITRC721.sol",
+      "sha256": "5493c241116e7444211a9fa55d669e50cbce4f88c40682dd838b024574296936"
+    },
+    {
+      "path": "contracts/ITRC721Metadata.sol",
+      "sha256": "a358977fb0892c7e95c02ab9258e6a19bcee94a0d285459522f193ad1ead3a67"
+    },
+    {
+      "path": "contracts/Ownable.sol",
+      "sha256": "2ac7b88ea09e956f6ca53048d6e8c4e6d15c8f0bcd7745045c96a41339210259"
+    },
+    {
+      "path": "contracts/Pausable.sol",
+      "sha256": "9a21da7cc93a106c277b30b7e4124f47ea4601201b1602e271449d5dac23072c"
+    }
+  ]
+}

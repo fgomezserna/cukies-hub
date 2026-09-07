@@ -1,0 +1,110 @@
+{
+  "schema": "cukies.legacy-verified-source.v1",
+  "role": "TOKEN",
+  "chainId": 56,
+  "address": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+  "retrievedAt": "2026-09-07T17:30:23.214367+00:00",
+  "sourceUrl": "https://sourcify.dev/server/v2/contract/56/0x0dbDeBCC62f11005BF434ABFad74564E896aC861?fields=all",
+  "match": "exact_match",
+  "creationMatch": "exact_match",
+  "runtimeMatch": "exact_match",
+  "compilation": {
+    "language": "Solidity",
+    "compiler": "solc",
+    "compilerVersion": "0.5.4+commit.9549d8ff",
+    "compilerSettings": {
+      "libraries": {},
+      "optimizer": {
+        "runs": 200,
+        "enabled": true
+      }
+    },
+    "name": "CukieToken",
+    "fullyQualifiedName": "contracts/CukieToken.sol:CukieToken"
+  },
+  "deployment": {
+    "transactionHash": "0x07e9c8853177353ee53f2a928458eb4f64e0f5734ef39a2d2d8f7ef8a6f2b464",
+    "blockNumber": "16906879",
+    "transactionIndex": "0",
+    "deployer": "0x7894df8379C2E156F0E4D9df0829127D605bD52b"
+  },
+  "localCompilationExecuted": false,
+  "files": [
+    {
+      "path": "contracts/Address.sol",
+      "sha256": "be12b749cf5b6793fbe2588214376fee1ead700ed64988e932159e553a92f61d"
+    },
+    {
+      "path": "contracts/Context.sol",
+      "sha256": "e0cccb07ec7d48f6f48812297992486921d9e5b8d9ea5f18021f72d87601ea94"
+    },
+    {
+      "path": "contracts/Counters.sol",
+      "sha256": "dfe84ced220e07e5210a5ef059f77eb31a386936446fc49a73af1e640bed2666"
+    },
+    {
+      "path": "contracts/CukieToken.sol",
+      "sha256": "c571984262e001c64de1e03c973bb3421b32581aa5583a7eadd026e33b0ed519"
+    },
+    {
+      "path": "contracts/ITRC165.sol",
+      "sha256": "49a2e822d4897e7c4584db0a91a8dda1e029651bb535c4fac440a6e0a5f50ae3"
+    },
+    {
+      "path": "contracts/ITRC721.sol",
+      "sha256": "5493c241116e7444211a9fa55d669e50cbce4f88c40682dd838b024574296936"
+    },
+    {
+      "path": "contracts/ITRC721Enumerable.sol",
+      "sha256": "7c24fac56c6fdc5c64b161131db721c96688f91e4529383d0f123ac767480f6e"
+    },
+    {
+      "path": "contracts/ITRC721Metadata.sol",
+      "sha256": "a358977fb0892c7e95c02ab9258e6a19bcee94a0d285459522f193ad1ead3a67"
+    },
+    {
+      "path": "contracts/ITRC721Receiver.sol",
+      "sha256": "89baf092a67e2424543868d1c7f9f759ea95c58562b9681a464df1348a10864c"
+    },
+    {
+      "path": "contracts/MinterRole.sol",
+      "sha256": "e060c6434436a77c49a74195cdefda8039f4583447d1e0e8605f766a45576d1e"
+    },
+    {
+      "path": "contracts/Ownable.sol",
+      "sha256": "2ac7b88ea09e956f6ca53048d6e8c4e6d15c8f0bcd7745045c96a41339210259"
+    },
+    {
+      "path": "contracts/Roles.sol",
+      "sha256": "abea4484359843cf86352cacf131dd2d5d15e64653c31dd87769b4fd1672a8b3"
+    },
+    {
+      "path": "contracts/SafeMath.sol",
+      "sha256": "20af11adb0e22d4baf5b50f45896a7bb988e4f54c61aab45f2bf61cdfc45f1a3"
+    },
+    {
+      "path": "contracts/TRC165.sol",
+      "sha256": "047bbe03cba5d1db2ea6efb7b54a871328b2b1cadef2b94a6517957010af2f53"
+    },
+    {
+      "path": "contracts/TRC721.sol",
+      "sha256": "8e7a4475575a2f7691b1d1171c585930087a1d358dd430c5081eb6f242d1f96a"
+    },
+    {
+      "path": "contracts/TRC721Enumerable.sol",
+      "sha256": "43914fbf64d34d1ff421c5f6df7a2e5124a01c87b574d642705a4b7a42cb0e8b"
+    },
+    {
+      "path": "contracts/TRC721Metadata.sol",
+      "sha256": "0d69886cb5cf347e557bffd6ac5104e2d78c30b743800469a52f99a416e26ddf"
+    },
+    {
+      "path": "contracts/TRC721MetadataMintable.sol",
+      "sha256": "a90ccf992d22e79383e33c08d02dfb21796a65ed3845bc9a1f6708b1d1c9af16"
+    },
+    {
+      "path": "contracts/TRC721Mintable.sol",
+      "sha256": "1d5a001e8d9127cfe61e7952e96d621450eb9ba0dba92c82daddf3511f40b90b"
+    }
+  ]
+}

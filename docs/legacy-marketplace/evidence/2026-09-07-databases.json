@@ -1,0 +1,3816 @@
+{
+  "schema": "cukies.legacy-database-inventory.v1",
+  "readOnly": true,
+  "note": "Metadata counts at separate reads, not an atomic or reconciled migration snapshot. No document values exported.",
+  "environments": [
+    {
+      "observedAt": "2026-09-07T17:20:29.652Z",
+      "environment": "production",
+      "sha": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e",
+      "countMethod": "estimatedDocumentCount (metadata; not a reconciled snapshot)",
+      "databases": [
+        {
+          "name": "cukies",
+          "collections": [
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "processedEvents",
+              "estimatedCount": 191607,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "__v",
+                "blockNumber",
+                "contractAddress",
+                "createdAt",
+                "data",
+                "eventName",
+                "network",
+                "timeStamp",
+                "date",
+                "transactionId",
+                "updatedAt",
+                "processing",
+                "processingStarted",
+                "processed",
+                "processedAt"
+              ]
+            },
+            {
+              "name": "world_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "virtual_cukis",
+              "estimatedCount": 0
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "items",
+              "estimatedCount": 0
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 4328,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "chain",
+                "address",
+                "__v"
+              ]
+            },
+            {
+              "name": "txPoints",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx",
+              "estimatedCount": 0
+            },
+            {
+              "name": "blockTimestamps",
+              "estimatedCount": 15781
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "users",
+              "estimatedCount": 1337,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "uuid_1",
+                  "key": {
+                    "uuid": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "username_1",
+                  "key": {
+                    "username": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "name",
+                "lastName",
+                "username",
+                "email",
+                "wallets",
+                "password",
+                "role",
+                "__v",
+                "resourceMaps"
+              ]
+            },
+            {
+              "name": "dashboard_cache",
+              "estimatedCount": 3
+            },
+            {
+              "name": "games",
+              "estimatedCount": 0
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "txLottery",
+              "estimatedCount": 98
+            },
+            {
+              "name": "originals",
+              "estimatedCount": 12100,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "user",
+                "origin",
+                "network",
+                "parents",
+                "img",
+                "type",
+                "cukiNumber",
+                "children",
+                "numChildren",
+                "history",
+                "skills",
+                "state",
+                "price"
+              ]
+            },
+            {
+              "name": "buysComissions",
+              "estimatedCount": 9422
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "config",
+              "estimatedCount": 1
+            },
+            {
+              "name": "points",
+              "estimatedCount": 23515,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "address",
+                "points",
+                "type",
+                "date",
+                "description",
+                "txID",
+                "network"
+              ]
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "blacklistedtokens",
+              "estimatedCount": 1272
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 25662,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "tokenId",
+                "nftType",
+                "from",
+                "to",
+                "date",
+                "txid",
+                "type",
+                "price"
+              ]
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 17464,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "user",
+                "origin",
+                "network",
+                "birthNetwork",
+                "parents",
+                "img",
+                "type",
+                "cukiNumber",
+                "skills",
+                "history",
+                "children",
+                "numChildren",
+                "numChildrenTron",
+                "numChildrenBsc",
+                "price",
+                "state",
+                "timeStamp",
+                "priceOriginal",
+                "childrens"
+              ]
+            },
+            {
+              "name": "tx_points",
+              "estimatedCount": 23529,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "address",
+                "points",
+                "type",
+                "date",
+                "txID",
+                "__v"
+              ]
+            },
+            {
+              "name": "settings",
+              "estimatedCount": 36
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "completedEvents",
+              "estimatedCount": 119441,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "eventId",
+                "timeStamp",
+                "createdAt",
+                "updatedAt",
+                "__v"
+              ]
+            },
+            {
+              "name": "referrals",
+              "estimatedCount": 3364
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "processedevents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "txMarketplace",
+              "estimatedCount": 9240
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "wallets_groups",
+              "estimatedCount": 2895
+            }
+          ]
+        },
+        {
+          "name": "cukies-hub",
+          "collections": [
+            {
+              "name": "GameCheckpoint",
+              "estimatedCount": 8179
+            },
+            {
+              "name": "User",
+              "estimatedCount": 484
+            },
+            {
+              "name": "PointTransaction",
+              "estimatedCount": 268
+            },
+            {
+              "name": "GameResult",
+              "estimatedCount": 420
+            },
+            {
+              "name": "GameSession",
+              "estimatedCount": 18916
+            },
+            {
+              "name": "UserWallet",
+              "estimatedCount": 488
+            },
+            {
+              "name": "TreasureHuntMultiplayerMatch",
+              "estimatedCount": 0
+            }
+          ]
+        },
+        {
+          "name": "cukieshub-new",
+          "collections": [
+            {
+              "name": "ambassador_attributions",
+              "estimatedCount": 377
+            },
+            {
+              "name": "uki_staking_positions",
+              "estimatedCount": 36
+            },
+            {
+              "name": "reward_period_seals",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_owned_cukie_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_accounting_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_nft_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_referral_contributions_archive_testnet_before_mainnet_20260615T1010Z",
+              "estimatedCount": 18
+            },
+            {
+              "name": "cukie_pool_vault_asset_leases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_source_manifests",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_vault_recovery_audit",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_emission_budget_days",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_allocations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_integrity_incidents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_daily_capacity_materializations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_asset_locks",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_slot_history_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "ambassador_profiles",
+              "estimatedCount": 15
+            },
+            {
+              "name": "weekly_ranking_audit_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_reservations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_ranking_archive_entries",
+              "estimatedCount": 952
+            },
+            {
+              "name": "competition_credit_cutoff_blocks",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "economy_rule_versions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_publication_plans",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_lots",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_emission_budget_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_pool_lots",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_rule_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_participants",
+              "estimatedCount": 525
+            },
+            {
+              "name": "competition_credit_run_items",
+              "estimatedCount": 0
+            },
+            {
+              "name": "uki_vesting_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_pool_tranche_accounting",
+              "estimatedCount": 0
+            },
+            {
+              "name": "treasure_hunt_pool_quota_reservations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_cursors",
+              "estimatedCount": 21
+            },
+            {
+              "name": "presale_game_campaigns",
+              "estimatedCount": 5
+            },
+            {
+              "name": "uki_staking_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukie_pool_nft_vault_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_account_periods",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_referral_campaign_config",
+              "estimatedCount": 0
+            },
+            {
+              "name": "credit_pool_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_purchases_archive_testnet_before_mainnet_20260615T1010Z",
+              "estimatedCount": 10
+            },
+            {
+              "name": "game_owned_cukie_epochs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_assignments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_purchases",
+              "estimatedCount": 827
+            },
+            {
+              "name": "marketplace_listings",
+              "estimatedCount": 342
+            },
+            {
+              "name": "treasure_hunt_economy_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_emission_budget_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_accounting_allocations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "card_generation_jobs",
+              "estimatedCount": 5,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "tokenId_1_createdAt_-1",
+                  "key": {
+                    "tokenId": 1,
+                    "createdAt": -1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "status_1_createdAt_-1",
+                  "key": {
+                    "status": 1,
+                    "createdAt": -1
+                  },
+                  "unique": false
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "tokenId",
+                "status",
+                "outputPath",
+                "width",
+                "height",
+                "createdAt"
+              ]
+            },
+            {
+              "name": "cukie_master_route_capacity",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_rules",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_route_rounds",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_participants_archive_testnet_before_mainnet_20260615T1010Z",
+              "estimatedCount": 9
+            },
+            {
+              "name": "weekly_ranking_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 17464,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "state_1_network_1_ownerNormalized_1_timeStamp_-1",
+                  "key": {
+                    "state": 1,
+                    "network": 1,
+                    "ownerNormalized": 1,
+                    "timeStamp": -1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "ownerNormalized_1_state_1_network_1",
+                  "key": {
+                    "ownerNormalized": 1,
+                    "state": 1,
+                    "network": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "cardImageStatus_1_cardImageLockedAt_1",
+                  "key": {
+                    "cardImageStatus": 1,
+                    "cardImageLockedAt": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "needsImage_1_cardImageAttempts_1",
+                  "key": {
+                    "needsImage": 1,
+                    "cardImageAttempts": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "img_1",
+                  "key": {
+                    "img": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "type_1_skills.generation_1",
+                  "key": {
+                    "type": 1,
+                    "skills.generation": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "cukies_bsc_asset_identity_unique",
+                  "key": {
+                    "chainId": 1,
+                    "collectionAddressNormalized": 1,
+                    "tokenId": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "birthNetwork",
+                "children",
+                "createdAt",
+                "history",
+                "lastEventId",
+                "network",
+                "origin",
+                "owner",
+                "ownerNormalized",
+                "parents",
+                "price",
+                "state",
+                "timeStamp",
+                "tokenId",
+                "updatedAt",
+                "user",
+                "cukiNumber",
+                "img",
+                "metadataImportedAt",
+                "metadataSource",
+                "needsMetadata",
+                "numChildren",
+                "numChildrenBsc",
+                "numChildrenTron",
+                "skills",
+                "type"
+              ]
+            },
+            {
+              "name": "chain_events_presale_archive_testnet_before_mainnet_20260615T1010Z",
+              "estimatedCount": 10
+            },
+            {
+              "name": "weekly_ranking_manifests",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_position_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_claim_proofs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_events",
+              "estimatedCount": 41826
+            },
+            {
+              "name": "competition_ranking_archives",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukie_master_slot_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_pool_configs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_asset_lock_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_result_evidence",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_rule_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_claims",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_vault_period_usage",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_period_states",
+              "estimatedCount": 0
+            },
+            {
+              "name": "weekly_ranking_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_dead_letters",
+              "estimatedCount": 0
+            },
+            {
+              "name": "economy_internal_nonces",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_resource_bindings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "weekly_ranking_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_calendar_versions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_integrity_incidents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_slot_versions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "point_transactions",
+              "estimatedCount": 3494
+            },
+            {
+              "name": "bridge_transfers",
+              "estimatedCount": 3214
+            },
+            {
+              "name": "reward_accounting_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_owned_cukie_assignments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "weekly_ranking_period_states",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_referral_contributions",
+              "estimatedCount": 2274
+            },
+            {
+              "name": "chain_bsc_checkpoints",
+              "estimatedCount": 1
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 15395,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "eventId_1",
+                  "key": {
+                    "eventId": 1
+                  },
+                  "unique": true
+                },
+                {
+                  "name": "tokenId_1_timestampMs_-1",
+                  "key": {
+                    "tokenId": 1,
+                    "timestampMs": -1
+                  },
+                  "unique": false
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "blockNumber",
+                "chain",
+                "contractAlias",
+                "createdAt",
+                "date",
+                "eventId",
+                "eventName",
+                "from",
+                "logIndex",
+                "network",
+                "nftType",
+                "price",
+                "timestampMs",
+                "to",
+                "tokenId",
+                "transactionId",
+                "txHash",
+                "type"
+              ]
+            },
+            {
+              "name": "weekly_ranking_rule_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "economy_schema_metadata",
+              "estimatedCount": 1
+            },
+            {
+              "name": "competition_credit_source_watermarks",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_daily_accounting",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_ledger",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_vault_collections",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_weekly_prize_accounting",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_game_attempts",
+              "estimatedCount": 15237
+            },
+            {
+              "name": "game_weekly_rankings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "ambassador_graph_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "uki_vesting_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_indexer_runs",
+              "estimatedCount": 249326
+            },
+            {
+              "name": "ambassador_attribution_quarantine",
+              "estimatedCount": 1
+            },
+            {
+              "name": "weekly_ranking_sources",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_game_participants",
+              "estimatedCount": 465
+            },
+            {
+              "name": "chain_bsc_canonical_blocks",
+              "estimatedCount": 10585
+            },
+            {
+              "name": "reward_claim_batches",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_run_holds",
+              "estimatedCount": 0
+            },
+            {
+              "name": "point_balances",
+              "estimatedCount": 418
+            },
+            {
+              "name": "game_economy_sessions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_pool_accruals",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_incidents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_recalculation_jobs",
+              "estimatedCount": 54
+            },
+            {
+              "name": "cukie_master_snapshots",
+              "estimatedCount": 0
+            },
+            {
+              "name": "treasure_hunt_pool_daily_usage",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_pool_periods",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_weekly_game_sources",
+              "estimatedCount": 0
+            },
+            {
+              "name": "treasure_hunt_weekly_bests",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_slots",
+              "estimatedCount": 0
+            }
+          ]
+        },
+        {
+          "name": "cukies-staging",
+          "collections": [
+            {
+              "name": "originals",
+              "estimatedCount": 12100,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "user",
+                "origin",
+                "network",
+                "parents",
+                "img",
+                "type",
+                "cukiNumber",
+                "children",
+                "numChildren",
+                "history",
+                "skills",
+                "state",
+                "price"
+              ]
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "resourcemaps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "config",
+              "estimatedCount": 1
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 3662,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "chain",
+                "address",
+                "__v"
+              ]
+            },
+            {
+              "name": "contractevent",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx_points",
+              "estimatedCount": 23492,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "address",
+                "points",
+                "type",
+                "date",
+                "txID",
+                "__v"
+              ]
+            },
+            {
+              "name": "transactions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "txPoints",
+              "estimatedCount": 37844
+            },
+            {
+              "name": "referrals",
+              "estimatedCount": 3364
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 17459,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "cukiNumber",
+                "type",
+                "img",
+                "user",
+                "origin",
+                "birthNetwork",
+                "parents",
+                "network",
+                "history",
+                "skills",
+                "children",
+                "numChildren",
+                "numChildrenTron",
+                "numChildrenBsc",
+                "state",
+                "price",
+                "timeStamp",
+                "__v"
+              ]
+            },
+            {
+              "name": "games",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 22886,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "nftType",
+                "from",
+                "to",
+                "date",
+                "txid",
+                "type",
+                "price",
+                "__v"
+              ]
+            },
+            {
+              "name": "items",
+              "estimatedCount": 0
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "resources",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "codex_backup_test0001_user_20260629192500",
+              "estimatedCount": 1
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "tokenId_1",
+                  "key": {
+                    "tokenId": 1
+                  },
+                  "unique": true
+                },
+                {
+                  "name": "genetic_1",
+                  "key": {
+                    "genetic": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "codex_backup_test0001_cukies_20260629191718",
+              "estimatedCount": 52
+            },
+            {
+              "name": "ds",
+              "estimatedCount": 0
+            },
+            {
+              "name": "bscContractEvents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "s",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukis",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "ns",
+              "estimatedCount": 0
+            },
+            {
+              "name": "processedEvents",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "is",
+              "estimatedCount": 0
+            },
+            {
+              "name": "points",
+              "estimatedCount": 15309,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "address",
+                "points",
+                "type",
+                "date",
+                "description",
+                "txID"
+              ]
+            },
+            {
+              "name": "processedevents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "os",
+              "estimatedCount": 0
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx",
+              "estimatedCount": 10092
+            },
+            {
+              "name": "txLottery",
+              "estimatedCount": 98
+            },
+            {
+              "name": "txMarketplace",
+              "estimatedCount": 9240
+            },
+            {
+              "name": "world_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "completedEvents",
+              "estimatedCount": 119441,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "eventId",
+                "timeStamp",
+                "createdAt",
+                "updatedAt",
+                "__v"
+              ]
+            },
+            {
+              "name": "dashboard_cache",
+              "estimatedCount": 3
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tiles",
+              "estimatedCount": 0
+            },
+            {
+              "name": "blacklistedtokens",
+              "estimatedCount": 1083
+            },
+            {
+              "name": "buysComissions",
+              "estimatedCount": 9422
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "users",
+              "estimatedCount": 1292,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "uuid_1",
+                  "key": {
+                    "uuid": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "username_1",
+                  "key": {
+                    "username": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "name",
+                "lastName",
+                "username",
+                "email",
+                "wallets",
+                "password",
+                "role",
+                "__v",
+                "resourceMaps",
+                "maps"
+              ]
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "txes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "wallets_groups",
+              "estimatedCount": 2955
+            }
+          ]
+        },
+        {
+          "name": "cukies-game",
+          "collections": [
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "craftings",
+              "estimatedCount": 1
+            },
+            {
+              "name": "items",
+              "estimatedCount": 60
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 1
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 404
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "stats",
+              "estimatedCount": 61
+            },
+            {
+              "name": "usermaps",
+              "estimatedCount": 89
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "buildings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "resourcemaps",
+              "estimatedCount": 1
+            }
+          ]
+        },
+        {
+          "name": "cukies-game-staging",
+          "collections": [
+            {
+              "name": "buildings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "resourcemaps",
+              "estimatedCount": 51
+            },
+            {
+              "name": "cukimissions",
+              "estimatedCount": 206
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "stats",
+              "estimatedCount": 61
+            },
+            {
+              "name": "items",
+              "estimatedCount": 331
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "craftings",
+              "estimatedCount": 1
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 45
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "usermaps",
+              "estimatedCount": 2
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 10
+            },
+            {
+              "name": "saakuru_txes",
+              "estimatedCount": 3356
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 51
+            },
+            {
+              "name": "movements",
+              "estimatedCount": 432
+            },
+            {
+              "name": "inventory_sorted",
+              "estimatedCount": 21
+            }
+          ]
+        },
+        {
+          "name": "cukies-learn",
+          "collections": [
+            {
+              "name": "coin_movements",
+              "estimatedCount": 646
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 2134
+            },
+            {
+              "name": "aliases",
+              "estimatedCount": 23359
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "answers",
+              "estimatedCount": 587
+            },
+            {
+              "name": "games",
+              "estimatedCount": 13460
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 5
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "roulette_spins",
+              "estimatedCount": 557
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "tokenId_1",
+                  "key": {
+                    "tokenId": 1
+                  },
+                  "unique": true
+                },
+                {
+                  "name": "genetic_1",
+                  "key": {
+                    "genetic": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "token_movements",
+              "estimatedCount": 69
+            },
+            {
+              "name": "credit_movements",
+              "estimatedCount": 17
+            },
+            {
+              "name": "socialtaskstates",
+              "estimatedCount": 25
+            },
+            {
+              "name": "saakuru_txes",
+              "estimatedCount": 22
+            },
+            {
+              "name": "roulette_prizes",
+              "estimatedCount": 5
+            },
+            {
+              "name": "users",
+              "estimatedCount": 32,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "id_1",
+                  "key": {
+                    "id": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "id",
+                "role",
+                "tokenBalance",
+                "world_without_wallet",
+                "tokenHistory",
+                "createdAt",
+                "updatedAt",
+                "__v"
+              ]
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "advertisements",
+              "estimatedCount": 1
+            },
+            {
+              "name": "socialtasks",
+              "estimatedCount": 5
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "address_1",
+                  "key": {
+                    "address": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "point_movements",
+              "estimatedCount": 173
+            },
+            {
+              "name": "meme_movements",
+              "estimatedCount": 140
+            },
+            {
+              "name": "processedevents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "batchgames",
+              "estimatedCount": 0
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            }
+          ]
+        },
+        {
+          "name": "cukies-learn-staging",
+          "collections": [
+            {
+              "name": "processedevents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "games",
+              "estimatedCount": 0
+            },
+            {
+              "name": "credit_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "saakuru_txes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "socialtasks",
+              "estimatedCount": 0
+            },
+            {
+              "name": "coin_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "users",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "id_1",
+                  "key": {
+                    "id": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "roulette_prizes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "point_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "answers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "roulette_spins",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "address_1",
+                  "key": {
+                    "address": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "tokenId_1",
+                  "key": {
+                    "tokenId": 1
+                  },
+                  "unique": true
+                },
+                {
+                  "name": "genetic_1",
+                  "key": {
+                    "genetic": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "socialtaskstates",
+              "estimatedCount": 0
+            },
+            {
+              "name": "advertisements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "token_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "meme_movements",
+              "estimatedCount": 0
+            }
+          ]
+        }
+      ],
+      "host": "192.168.1.221:27017"
+    },
+    {
+      "observedAt": "2026-09-07T17:20:30.677Z",
+      "environment": "staging",
+      "sha": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4",
+      "countMethod": "estimatedDocumentCount (metadata; not a reconciled snapshot)",
+      "databases": [
+        {
+          "name": "cukies-hub-staging",
+          "collections": [
+            {
+              "name": "GameSession",
+              "estimatedCount": 5759
+            },
+            {
+              "name": "TreasureHuntMultiplayerMatch",
+              "estimatedCount": 0
+            },
+            {
+              "name": "User",
+              "estimatedCount": 335
+            },
+            {
+              "name": "UserWallet",
+              "estimatedCount": 336
+            },
+            {
+              "name": "__staging_refresh",
+              "estimatedCount": 1
+            }
+          ]
+        },
+        {
+          "name": "cukies-legacy-staging",
+          "collections": [
+            {
+              "name": "tx_points",
+              "estimatedCount": 23529,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "address",
+                "points",
+                "type",
+                "date",
+                "txID",
+                "__v"
+              ]
+            },
+            {
+              "name": "txMarketplace",
+              "estimatedCount": 9240
+            },
+            {
+              "name": "originals",
+              "estimatedCount": 12100,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "user",
+                "origin",
+                "network",
+                "parents",
+                "img",
+                "type",
+                "cukiNumber",
+                "children",
+                "numChildren",
+                "history",
+                "skills",
+                "state",
+                "price"
+              ]
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 25662,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "tokenId",
+                "nftType",
+                "from",
+                "to",
+                "date",
+                "txid",
+                "type",
+                "price"
+              ]
+            },
+            {
+              "name": "settings",
+              "estimatedCount": 36
+            },
+            {
+              "name": "referrals",
+              "estimatedCount": 3364
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 4319,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "chain",
+                "address",
+                "__v"
+              ]
+            },
+            {
+              "name": "completedEvents",
+              "estimatedCount": 119441,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "eventId",
+                "timeStamp",
+                "createdAt",
+                "updatedAt",
+                "__v"
+              ]
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 17464,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "user",
+                "origin",
+                "network",
+                "birthNetwork",
+                "parents",
+                "img",
+                "type",
+                "cukiNumber",
+                "skills",
+                "history",
+                "children",
+                "numChildren",
+                "numChildrenTron",
+                "numChildrenBsc",
+                "price",
+                "state",
+                "timeStamp",
+                "priceOriginal",
+                "childrens"
+              ]
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "points",
+              "estimatedCount": 23515,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "address",
+                "points",
+                "type",
+                "date",
+                "description",
+                "txID",
+                "network"
+              ]
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "txLottery",
+              "estimatedCount": 98
+            },
+            {
+              "name": "buysComissions",
+              "estimatedCount": 9422
+            },
+            {
+              "name": "processedEvents",
+              "estimatedCount": 191607,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "__v",
+                "blockNumber",
+                "contractAddress",
+                "createdAt",
+                "data",
+                "eventName",
+                "network",
+                "timeStamp",
+                "date",
+                "transactionId",
+                "updatedAt",
+                "processing",
+                "processingStarted",
+                "processed",
+                "processedAt"
+              ]
+            },
+            {
+              "name": "dashboard_cache",
+              "estimatedCount": 3
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "blockTimestamps",
+              "estimatedCount": 15781
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "users",
+              "estimatedCount": 1337,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "uuid_1",
+                  "key": {
+                    "uuid": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "username_1",
+                  "key": {
+                    "username": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "name",
+                "lastName",
+                "username",
+                "email",
+                "wallets",
+                "role",
+                "__v",
+                "resourceMaps"
+              ]
+            },
+            {
+              "name": "config",
+              "estimatedCount": 1
+            },
+            {
+              "name": "items",
+              "estimatedCount": 0
+            },
+            {
+              "name": "games",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "__staging_refresh",
+              "estimatedCount": 1
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "txPoints",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "world_movements",
+              "estimatedCount": 0
+            },
+            {
+              "name": "processedevents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "virtual_cukis",
+              "estimatedCount": 0
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "wallets_groups",
+              "estimatedCount": 2895
+            }
+          ]
+        },
+        {
+          "name": "cukieshub-new-staging",
+          "collections": [
+            {
+              "name": "reward_accounting_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_events",
+              "estimatedCount": 6
+            },
+            {
+              "name": "competition_staking_qa_resets",
+              "estimatedCount": 1
+            },
+            {
+              "name": "ambassador_profiles",
+              "estimatedCount": 2
+            },
+            {
+              "name": "competition_credit_source_watermarks",
+              "estimatedCount": 2
+            },
+            {
+              "name": "marketplace_listings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_asset_lock_events",
+              "estimatedCount": 8
+            },
+            {
+              "name": "reward_weekly_game_sources",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_ranking_archive_entries",
+              "estimatedCount": 955
+            },
+            {
+              "name": "game_owned_cukie_epochs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_nft_vault_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_claim_proofs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_dead_letters",
+              "estimatedCount": 0
+            },
+            {
+              "name": "economy_internal_nonces",
+              "estimatedCount": 30
+            },
+            {
+              "name": "cukie_pool_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_referral_contributions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_cutoff_blocks",
+              "estimatedCount": 12
+            },
+            {
+              "name": "point_balances",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_position_events",
+              "estimatedCount": 349
+            },
+            {
+              "name": "cukie_pool_vault_asset_leases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_daily_accounting",
+              "estimatedCount": 0
+            },
+            {
+              "name": "staking_game_settlements",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukie_master_route_capacity",
+              "estimatedCount": 2
+            },
+            {
+              "name": "economy_schema_metadata",
+              "estimatedCount": 2
+            },
+            {
+              "name": "cukie_pool_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_slot_versions",
+              "estimatedCount": 24
+            },
+            {
+              "name": "treasure_hunt_weekly_bests",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_purchases",
+              "estimatedCount": 2
+            },
+            {
+              "name": "ambassador_graph_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "competition_credit_run_holds",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_resource_bindings",
+              "estimatedCount": 1
+            },
+            {
+              "name": "competition_credit_run_items",
+              "estimatedCount": 96
+            },
+            {
+              "name": "reward_integrity_incidents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_calendar_versions",
+              "estimatedCount": 1
+            },
+            {
+              "name": "game_result_evidence",
+              "estimatedCount": 0
+            },
+            {
+              "name": "uki_vesting_positions",
+              "estimatedCount": 2
+            },
+            {
+              "name": "weekly_ranking_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_route_rounds",
+              "estimatedCount": 2
+            },
+            {
+              "name": "reward_weekly_prize_accounting",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_staging_early_closures",
+              "estimatedCount": 1
+            },
+            {
+              "name": "competition_credit_reservations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_assignments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "treasure_hunt_economy_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "bridge_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_participants",
+              "estimatedCount": 3
+            },
+            {
+              "name": "nft_asset_locks",
+              "estimatedCount": 7
+            },
+            {
+              "name": "uki_staking_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "competition_credit_pool_periods",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukie_master_snapshots",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_game_participants",
+              "estimatedCount": 7
+            },
+            {
+              "name": "competition_credit_pool_lots",
+              "estimatedCount": 2
+            },
+            {
+              "name": "game_owned_cukie_assignments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_runs",
+              "estimatedCount": 24
+            },
+            {
+              "name": "reward_allocations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_rules",
+              "estimatedCount": 1
+            },
+            {
+              "name": "game_economy_runtime_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_recalculation_jobs",
+              "estimatedCount": 33
+            },
+            {
+              "name": "game_weekly_rankings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_pool_tranche_accounting",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_runtime_runs",
+              "estimatedCount": 24354
+            },
+            {
+              "name": "economy_rule_versions",
+              "estimatedCount": 3
+            },
+            {
+              "name": "cukie_master_slot_history_state",
+              "estimatedCount": 2
+            },
+            {
+              "name": "weekly_ranking_audit_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_events",
+              "estimatedCount": 116
+            },
+            {
+              "name": "uki_marketplace_token_nonces",
+              "estimatedCount": 0
+            },
+            {
+              "name": "uki_vesting_events",
+              "estimatedCount": 2
+            },
+            {
+              "name": "cukie_master_slot_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_emission_budget_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "scheduler_heartbeats",
+              "estimatedCount": 1
+            },
+            {
+              "name": "reward_emission_budget_days",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_period_states",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_economy_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_publication_plans",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_ranking_archives",
+              "estimatedCount": 2
+            },
+            {
+              "name": "presale_game_attempts",
+              "estimatedCount": 7
+            },
+            {
+              "name": "game_economy_rule_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "weekly_ranking_period_states",
+              "estimatedCount": 0
+            },
+            {
+              "name": "ambassador_attributions",
+              "estimatedCount": 1
+            },
+            {
+              "name": "chain_bsc_checkpoints",
+              "estimatedCount": 1
+            },
+            {
+              "name": "treasure_hunt_pool_daily_usage",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_claims",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 24,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "tokenId_1_timestampMs_-1",
+                  "key": {
+                    "tokenId": 1,
+                    "timestampMs": -1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "eventId_1",
+                  "key": {
+                    "eventId": 1
+                  },
+                  "unique": true
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "blockNumber",
+                "chain",
+                "contractAlias",
+                "createdAt",
+                "date",
+                "eventId",
+                "eventName",
+                "from",
+                "logIndex",
+                "network",
+                "nftType",
+                "price",
+                "timestampMs",
+                "to",
+                "tokenId",
+                "transactionId",
+                "txHash",
+                "type"
+              ]
+            },
+            {
+              "name": "weekly_ranking_rule_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "reward_emission_budget_state",
+              "estimatedCount": 0
+            },
+            {
+              "name": "weekly_ranking_manifests",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_pool_positions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_source_manifests",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 18,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "cardImageStatus_1_cardImageLockedAt_1",
+                  "key": {
+                    "cardImageStatus": 1,
+                    "cardImageLockedAt": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "needsImage_1_cardImageAttempts_1",
+                  "key": {
+                    "needsImage": 1,
+                    "cardImageAttempts": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "img_1",
+                  "key": {
+                    "img": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "type_1_skills.generation_1",
+                  "key": {
+                    "type": 1,
+                    "skills.generation": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "ownerNormalized_1_state_1_network_1",
+                  "key": {
+                    "ownerNormalized": 1,
+                    "state": 1,
+                    "network": 1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "state_1_network_1_ownerNormalized_1_timeStamp_-1",
+                  "key": {
+                    "state": 1,
+                    "network": 1,
+                    "ownerNormalized": 1,
+                    "timeStamp": -1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "cukies_bsc_asset_identity_unique",
+                  "key": {
+                    "chainId": 1,
+                    "collectionAddressNormalized": 1,
+                    "tokenId": 1
+                  },
+                  "unique": true
+                },
+                {
+                  "name": "cukies_active_marketplace",
+                  "key": {
+                    "state": 1,
+                    "marketplaceListingStatus": 1,
+                    "network": 1,
+                    "timeStamp": -1
+                  },
+                  "unique": false
+                }
+              ],
+              "sampleFieldNames": [
+                "_id",
+                "birthNetwork",
+                "children",
+                "createdAt",
+                "history",
+                "lastEventId",
+                "network",
+                "origin",
+                "owner",
+                "ownerNormalized",
+                "parents",
+                "price",
+                "state",
+                "timeStamp",
+                "tokenId",
+                "updatedAt",
+                "user",
+                "generation",
+                "metadataBlockNumber",
+                "metadataEventId",
+                "rarity"
+              ]
+            },
+            {
+              "name": "uki_marketplace_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "card_generation_jobs",
+              "estimatedCount": 0,
+              "indexes": [
+                {
+                  "name": "_id_",
+                  "key": {
+                    "_id": 1
+                  },
+                  "unique": true,
+                  "uniquenessSource": "MongoDB implicit _id constraint"
+                },
+                {
+                  "name": "tokenId_1_createdAt_-1",
+                  "key": {
+                    "tokenId": 1,
+                    "createdAt": -1
+                  },
+                  "unique": false
+                },
+                {
+                  "name": "status_1_createdAt_-1",
+                  "key": {
+                    "status": 1,
+                    "createdAt": -1
+                  },
+                  "unique": false
+                }
+              ],
+              "sampleFieldNames": []
+            },
+            {
+              "name": "competition_credit_account_periods",
+              "estimatedCount": 24
+            },
+            {
+              "name": "competition_credit_runtime_state",
+              "estimatedCount": 2
+            },
+            {
+              "name": "reward_rule_state",
+              "estimatedCount": 1
+            },
+            {
+              "name": "nft_vault_recovery_audit",
+              "estimatedCount": 0
+            },
+            {
+              "name": "chain_cursors",
+              "estimatedCount": 29
+            },
+            {
+              "name": "cukie_pool_vault_period_usage",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_vault_collections",
+              "estimatedCount": 2
+            },
+            {
+              "name": "chain_bsc_canonical_blocks",
+              "estimatedCount": 15737
+            },
+            {
+              "name": "weekly_ranking_sources",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_ranking_archive_recoveries",
+              "estimatedCount": 1
+            },
+            {
+              "name": "chain_indexer_runs",
+              "estimatedCount": 36469
+            },
+            {
+              "name": "reward_claim_batches",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukie_master_nft_positions",
+              "estimatedCount": 8
+            },
+            {
+              "name": "cukie_master_slots",
+              "estimatedCount": 8
+            },
+            {
+              "name": "credit_pool_positions",
+              "estimatedCount": 2
+            },
+            {
+              "name": "cukie_master_positions",
+              "estimatedCount": 8
+            },
+            {
+              "name": "competition_staking_qa_reset_audits",
+              "estimatedCount": 1
+            },
+            {
+              "name": "point_transactions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "game_owned_cukie_events",
+              "estimatedCount": 0
+            },
+            {
+              "name": "weekly_ranking_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_period_seals",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_game_campaigns",
+              "estimatedCount": 3
+            },
+            {
+              "name": "competition_credit_incidents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_accounting_runtime_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_lots",
+              "estimatedCount": 96
+            },
+            {
+              "name": "game_economy_sessions",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukie_master_runtime_state",
+              "estimatedCount": 3
+            },
+            {
+              "name": "treasure_hunt_pool_quota_reservations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_pool_accruals",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_pool_configs",
+              "estimatedCount": 2
+            },
+            {
+              "name": "uki_staking_positions",
+              "estimatedCount": 3
+            },
+            {
+              "name": "competition_credit_runtime_runs",
+              "estimatedCount": 424
+            },
+            {
+              "name": "reward_accounting_allocations",
+              "estimatedCount": 0
+            },
+            {
+              "name": "competition_credit_ledger",
+              "estimatedCount": 220
+            },
+            {
+              "name": "chain_integrity_incidents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "presale_referral_campaign_config",
+              "estimatedCount": 0
+            },
+            {
+              "name": "weekly_ranking_runs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "reward_daily_capacity_materializations",
+              "estimatedCount": 0
+            }
+          ]
+        }
+      ],
+      "lastCollectionReadAt": "2026-09-07T17:22:02.121Z",
+      "host": "192.168.1.201 / app28 isolated staging-mongo"
+    },
+    {
+      "observedAt": "2026-09-07T17:34:00.269Z",
+      "environment": "legacy-container-copy",
+      "host": "192.168.1.201/cukies-mongodb",
+      "countMethod": "collStats.count (metadata; not a reconciled snapshot)",
+      "databases": [
+        {
+          "name": "cukies",
+          "collections": [
+            {
+              "name": "blacklistedtokens",
+              "estimatedCount": 1266
+            },
+            {
+              "name": "blockTimestamps",
+              "estimatedCount": 15781
+            },
+            {
+              "name": "buysComissions",
+              "estimatedCount": 9422
+            },
+            {
+              "name": "completedEvents",
+              "estimatedCount": 119441
+            },
+            {
+              "name": "config",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 17464
+            },
+            {
+              "name": "dashboard_cache",
+              "estimatedCount": 3
+            },
+            {
+              "name": "games",
+              "estimatedCount": 0
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 0
+            },
+            {
+              "name": "items",
+              "estimatedCount": 0
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "originals",
+              "estimatedCount": 12100
+            },
+            {
+              "name": "points",
+              "estimatedCount": 23505
+            },
+            {
+              "name": "processedEvents",
+              "estimatedCount": 191521
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "referrals",
+              "estimatedCount": 3364
+            },
+            {
+              "name": "settings",
+              "estimatedCount": 36
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx",
+              "estimatedCount": 0
+            },
+            {
+              "name": "txLottery",
+              "estimatedCount": 98
+            },
+            {
+              "name": "txMarketplace",
+              "estimatedCount": 9240
+            },
+            {
+              "name": "txPoints",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 25606
+            },
+            {
+              "name": "tx_points",
+              "estimatedCount": 23519
+            },
+            {
+              "name": "users",
+              "estimatedCount": 1341
+            },
+            {
+              "name": "virtual_cukis",
+              "estimatedCount": 0
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 4324
+            },
+            {
+              "name": "wallets_groups",
+              "type": "view",
+              "viewOn": "cukies",
+              "documentCount": 2896,
+              "countMethod": "view aggregate count at observation time"
+            },
+            {
+              "name": "world_movements",
+              "estimatedCount": 0
+            }
+          ]
+        },
+        {
+          "name": "cukies-game",
+          "collections": [
+            {
+              "name": "buildings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "craftings",
+              "estimatedCount": 1
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 404
+            },
+            {
+              "name": "items",
+              "estimatedCount": 60
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 1
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "resourcemaps",
+              "estimatedCount": 1
+            },
+            {
+              "name": "stats",
+              "estimatedCount": 61
+            },
+            {
+              "name": "usermaps",
+              "estimatedCount": 89
+            }
+          ]
+        },
+        {
+          "name": "cukies-game-staging",
+          "collections": [
+            {
+              "name": "buildings",
+              "estimatedCount": 0
+            },
+            {
+              "name": "craftings",
+              "estimatedCount": 1
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukimissions",
+              "estimatedCount": 136
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 38
+            },
+            {
+              "name": "inventory_sorted",
+              "type": "view",
+              "viewOn": "inventories",
+              "documentCount": 20,
+              "countMethod": "view aggregate count at observation time"
+            },
+            {
+              "name": "items",
+              "estimatedCount": 331
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 1
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 10
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "movements",
+              "estimatedCount": 420
+            },
+            {
+              "name": "resourcemaps",
+              "estimatedCount": 1
+            },
+            {
+              "name": "saakuru_txes",
+              "estimatedCount": 3356
+            },
+            {
+              "name": "stats",
+              "estimatedCount": 61
+            },
+            {
+              "name": "usermaps",
+              "estimatedCount": 69
+            }
+          ]
+        },
+        {
+          "name": "cukies-learn",
+          "collections": [
+            {
+              "name": "advertisements",
+              "estimatedCount": 1
+            },
+            {
+              "name": "aliases",
+              "estimatedCount": 23359
+            },
+            {
+              "name": "answers",
+              "estimatedCount": 587
+            },
+            {
+              "name": "batchgames",
+              "estimatedCount": 0
+            },
+            {
+              "name": "coin_movements",
+              "estimatedCount": 646
+            },
+            {
+              "name": "credit_movements",
+              "estimatedCount": 17
+            },
+            {
+              "name": "games",
+              "estimatedCount": 13460
+            },
+            {
+              "name": "meme_movements",
+              "estimatedCount": 140
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "point_movements",
+              "estimatedCount": 173
+            },
+            {
+              "name": "processedevents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 2134
+            },
+            {
+              "name": "roulette_prizes",
+              "estimatedCount": 5
+            },
+            {
+              "name": "roulette_spins",
+              "estimatedCount": 557
+            },
+            {
+              "name": "saakuru_txes",
+              "estimatedCount": 22
+            },
+            {
+              "name": "socialtasks",
+              "estimatedCount": 5
+            },
+            {
+              "name": "socialtaskstates",
+              "estimatedCount": 25
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "token_movements",
+              "estimatedCount": 69
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 5
+            },
+            {
+              "name": "users",
+              "estimatedCount": 32
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 0
+            }
+          ]
+        },
+        {
+          "name": "cukies-staging",
+          "collections": [
+            {
+              "name": "blacklistedtokens",
+              "estimatedCount": 1083
+            },
+            {
+              "name": "bscContractEvents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "buysComissions",
+              "estimatedCount": 9422
+            },
+            {
+              "name": "completedEvents",
+              "estimatedCount": 119441
+            },
+            {
+              "name": "config",
+              "estimatedCount": 1
+            },
+            {
+              "name": "contractevent",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cs",
+              "estimatedCount": 0
+            },
+            {
+              "name": "cukies",
+              "estimatedCount": 17459
+            },
+            {
+              "name": "cukis",
+              "estimatedCount": 0
+            },
+            {
+              "name": "dashboard_cache",
+              "estimatedCount": 3
+            },
+            {
+              "name": "ds",
+              "estimatedCount": 0
+            },
+            {
+              "name": "games",
+              "estimatedCount": 0
+            },
+            {
+              "name": "inventories",
+              "estimatedCount": 0
+            },
+            {
+              "name": "is",
+              "estimatedCount": 0
+            },
+            {
+              "name": "items",
+              "estimatedCount": 0
+            },
+            {
+              "name": "maps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missiongroups",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "missionsteps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nft_orders",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_aliases",
+              "estimatedCount": 0
+            },
+            {
+              "name": "nfts_purchased",
+              "estimatedCount": 0
+            },
+            {
+              "name": "ns",
+              "estimatedCount": 0
+            },
+            {
+              "name": "originals",
+              "estimatedCount": 12100
+            },
+            {
+              "name": "os",
+              "estimatedCount": 0
+            },
+            {
+              "name": "points",
+              "estimatedCount": 15309
+            },
+            {
+              "name": "processedEvents",
+              "estimatedCount": 0
+            },
+            {
+              "name": "qrcodes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "questions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "referrals",
+              "estimatedCount": 3364
+            },
+            {
+              "name": "resourcemaps",
+              "estimatedCount": 0
+            },
+            {
+              "name": "resources",
+              "estimatedCount": 0
+            },
+            {
+              "name": "s",
+              "estimatedCount": 0
+            },
+            {
+              "name": "subscriptions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "sync_transfers",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tiles",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tokens",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tournaments",
+              "estimatedCount": 0
+            },
+            {
+              "name": "transactions",
+              "estimatedCount": 0
+            },
+            {
+              "name": "tx",
+              "estimatedCount": 10092
+            },
+            {
+              "name": "txLottery",
+              "estimatedCount": 98
+            },
+            {
+              "name": "txMarketplace",
+              "estimatedCount": 9240
+            },
+            {
+              "name": "txPoints",
+              "estimatedCount": 37844
+            },
+            {
+              "name": "tx_nfts",
+              "estimatedCount": 22886
+            },
+            {
+              "name": "tx_points",
+              "estimatedCount": 23492
+            },
+            {
+              "name": "txes",
+              "estimatedCount": 0
+            },
+            {
+              "name": "users",
+              "estimatedCount": 1292
+            },
+            {
+              "name": "wallets",
+              "estimatedCount": 3661
+            },
+            {
+              "name": "wallets_groups",
+              "type": "view",
+              "viewOn": "cukies",
+              "documentCount": 2955,
+              "countMethod": "view aggregate count at observation time"
+            },
+            {
+              "name": "world_movements",
+              "estimatedCount": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -21,7 +21,16 @@ function baseNormalized(chain: ChainName, args: Record<string, unknown>) {
     tokenId,
     user,
     userNormalized: normalizeAddress(chain, user),
+    // Keep contract payload clocks exact. The canonical event timestamp is
+    // ChainEvent.timestampMs and must never be replaced by these values.
+    dateRaw: getString(args.date),
+    createdAtRaw: getString(args.createdAt),
+    boughtAtRaw: getString(args.boughtAt),
   };
+}
+
+function rawFields(args: Record<string, unknown>, keys: string[]) {
+  return Object.fromEntries(keys.map((key) => [`${key}Raw`, getString(args[key])]));
 }
 
 function normalizePrice(chain: ChainName, value: unknown) {
@@ -61,6 +70,113 @@ export function normalizeDomainEvent(
       isMint,
       state: 'available',
       txType: isMint ? 'Mint' : 'Gift',
+    });
+  }
+
+  if (eventName === 'Approval') {
+    const owner = getString(args.owner);
+    const approved = getString(args.approved);
+    return toJsonRecord({
+      ...base,
+      owner,
+      ownerNormalized: normalizeAddress(chain, owner),
+      approved,
+      approvedNormalized: normalizeAddress(chain, approved),
+      approvalState: approved && (
+        (chain === 'BSC' && approved.toLowerCase() === zeroBscAddress)
+        || (chain === 'TRON' && approved.toUpperCase() === zeroTronAddress)
+      ) ? 'revoked' : 'active',
+      classification: 'approval',
+    });
+  }
+
+  if (eventName === 'ApprovalForAll') {
+    const owner = getString(args.owner);
+    const operator = getString(args.operator);
+    return toJsonRecord({
+      ...base,
+      owner,
+      ownerNormalized: normalizeAddress(chain, owner),
+      operator,
+      operatorNormalized: normalizeAddress(chain, operator),
+      approvalState: args.approved === true ? 'active' : 'revoked',
+      classification: 'approval',
+    });
+  }
+
+  if (eventName === 'MintReferral') {
+    const user = getString(args.user);
+    const sponsor = getString(args.sponsor);
+    const commission = getString(args.commission ?? args.comission);
+    return toJsonRecord({
+      ...base,
+      user,
+      userNormalized: normalizeAddress(chain, user),
+      sponsor,
+      sponsorNormalized: normalizeAddress(chain, sponsor),
+      numRaw: getString(args.num),
+      valueRaw: getString(args.value),
+      commissionRaw: commission,
+      // Preserve the source typo as well as the canonical alias.
+      comissionRaw: getString(args.comission),
+      levelRaw: getString(args.level),
+      classification: 'referral',
+      txType: eventName,
+    });
+  }
+
+  if (
+    eventName === 'BridgeRequested'
+    || eventName === 'BridgeCompleted'
+  ) {
+    const transferId = getString(args.transferId);
+    const destinationOwner = getString(args.destinationOwner);
+    const sourceOwner = getString(args.sourceOwner);
+    return toJsonRecord({
+      ...base,
+      transferId,
+      tokenId: getString(args.tokenId),
+      sourceOwner,
+      sourceOwnerNormalized: normalizeAddress(chain, sourceOwner),
+      destinationOwner,
+      // bytes20 is not necessarily an EVM address; retain it verbatim.
+      destinationOwnerRaw: destinationOwner,
+      destinationOwnerNormalized: destinationOwner?.toLowerCase() ?? null,
+      sourceNetworkRaw: getString(args.sourceNetwork),
+      destinationNetworkRaw: getString(args.destinationNetwork),
+      nonceRaw: getString(args.nonce),
+      feePaidRaw: getString(args.feePaid),
+      metadataHash: getString(args.metadataHash),
+      minted: typeof args.minted === 'boolean' ? args.minted : null,
+      state: eventName === 'BridgeRequested' ? 'requested' : 'completed',
+      classification: 'bridge',
+      txType: eventName,
+    });
+  }
+
+  if (
+    eventName === 'MinterAdded'
+    || eventName === 'MinterRemoved'
+    || eventName === 'OwnershipRenounced'
+    || eventName === 'OwnershipTransferred'
+    || eventName === 'OwnershipTransferStarted'
+    || eventName === 'Paused'
+    || eventName === 'Unpaused'
+    || eventName === 'RelayerUpdated'
+    || eventName === 'BridgePriceUpdated'
+    || eventName === 'FeeRecipientUpdated'
+    || eventName === 'UntrackedERC721Recovered'
+    || eventName === 'CollectionAllowedUpdated'
+    || eventName === 'PaymentTokenAllowedUpdated'
+    || eventName === 'NativePaymentAllowedUpdated'
+    || eventName === 'FeeConfigUpdated'
+    || eventName === 'NativeFeesClaimed'
+  ) {
+    return toJsonRecord({
+      ...base,
+      ...rawFields(args, Object.keys(args)),
+      classification: 'admin',
+      txType: eventName,
     });
   }
 
