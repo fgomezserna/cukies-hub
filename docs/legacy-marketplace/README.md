@@ -229,13 +229,23 @@ explícito, consumidor identificado y criterio de salida aprobado.
 
 ## 5. Fases y criterios de salida
 
+La decision de producto del 2026-09-07 fija la reutilizacion de los contratos
+legacy mainnet tambien desde Stage, sin redeploys testnet. El orden vigente es
+eventos completos (incluido breeding) y workers aislados -> reconciliacion ->
+UX funcional con marketplace Legacy/UKI conjunto -> sidebar/menu/dashboard.
+Las reglas viven en [reglas operativas](../uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07)
+y el estado se actualiza en [seguimiento](../antes-del-15-seguimiento.md).
+Los contratos nuevos si tienen deployments distintos por entorno. La
+autorizacion de implementar no significa que los workers ya esten activados.
+
 | Fase | Trabajo | Criterio de salida verificable |
 | --- | --- | --- |
 | P0 Inventario | Congelar manifests, addresses, fuentes, custodias, 34 contenedores y bases; registrar owners sin valores secretos | Evidencias durables de contracts/runtime/databases; cada pieza tiene destino y bloqueo; cero secretos en docs |
-| P1 Import preview | Importadores reanudables para eventos, metadata, `tx_nfts`, points, users/wallets/referrals, originals y assets; solo lectura | Manifest por colección con `sourceCollection`, `sourceId`, versión, checkpoint, `skipped` y dead letters; dry-run sin mutar Stage |
-| P2 Portado y paridad Stage | Portar flujos, importar en bases Stage aisladas y comparar por cadena/contrato/evento/token/wallet; ejecutar replay idempotente y cubrir game/matchmaking/learn/ludo con criterio funcional | Diferencias aceptadas por producto/operaciones, huérfanos y colisiones explicados, vistas Hub equivalentes y smokes Stage verdes |
-| P3 Corte | Congelar legacy, cambiar consumidores por slice, validar auth/ownership/assets y observar egress | Cero lecturas/escrituras del slice al GraphQL/auth/Mongo legacy; rollback read-only disponible; gates del Hub explícitos |
-| P4 Retirada | Detener workers legacy por servicio, rotar/revocar credenciales, mantener evidencia y soporte mínimo | Cero consumidores y conexiones; health/smoke del Hub; revisión de seguridad; solo entonces declarar `legacy retirado` |
+| P1 Eventos y workers | Completar el catalogo ABI legacy/nuevo, ingesta, proyecciones y auditoria de approvals/admin; incluir breeding y correlacion de bridge. Worker legacy dedicado con destino Stage separado | Cobertura ABI automatizada, replay idempotente, fechas/identidades preservadas, ningun evento desconocido descartado y guards de fuente/destino verificados |
+| P2 Datos y paridad Stage | Importadores reanudables de metadata, eventos, `tx_nfts`, points, users/wallets/referrals, originals y assets; dry-run antes de backfill acotado | Manifest por coleccion con origen/version/checkpoint; divergencias y huerfanos explicados por cadena/contrato/token/wallet; worker activo y observado tras reinicio |
+| P3 UX funcional | Marketplace conjunto Legacy/UKI, filtros historicos activos y acciones; bridge, puntos/staking y breeding completos; despues navegacion/dashboard. Conservar game/matchmaking/learn/ludo en su censo funcional | Flujos escritorio/movil, estados degradados y red/contrato exactos; las tarjetas legacy se identifican sin separar el catalogo en dos productos excluyentes |
+| P4 Corte | Cambiar consumidores por slice, validar auth/ownership/assets y observar egress. Los contratos legacy siguen donde estan desplegados | Cero llamadas del slice al GraphQL/auth/Mongo antiguo; rollback de consumidores documentado; no se detienen contratos on-chain por retirar el repo |
+| P5 Retirada | Detener workers antiguos por servicio, rotar/revocar credenciales, mantener evidencia y soporte minimo | Cero consumidores y conexiones a los servicios sustituidos; health/smoke del Hub; solo entonces declarar `legacy retirado` |
 
 Puntos Cukie Points y crías tienen además el corte de producto del seguimiento
 ANTES DEL 15: exportar claimed/pending y conservar historial/Originales con

@@ -26,8 +26,10 @@ conserva como evidencia historica; no sustituye el estado actual.
 - La prioridad actual es la seccion **ANTES DEL 15 DE SEPTIEMBRE**. La seccion
   posterior se inventaria al final para no perderla, pero no se considera parte
   de la entrega inmediata salvo instruccion expresa.
-- El trabajo ordinario se integra en `staging`, con pruebas Stage y BSC
-  Testnet `97` antes de validarlo en el Stage remoto.
+- El trabajo ordinario se integra en `staging`. Los contratos nuevos se prueban
+  en testnet; por decision del 2026-09-07 los workers legacy consumen los
+  contratos existentes BSC `56`/TRON mainnet tambien desde Stage, con datos y
+  cursores aislados de produccion. No se redepliega legacy en testnet.
 - Los cambios ordinarios siguen staging -> main. Los hotfixes autorizados van
   primero a main y se propagan a staging para no perderlos. Esta revision
   documental no ejecuta despliegues ni publicaciones.
@@ -38,7 +40,7 @@ conserva como evidencia historica; no sustituye el estado actual.
 
 | Referencia | Uso vigente |
 | --- | --- |
-| Stage | Coolify app `28`, rama `staging`, `https://cukieshub.eurekand.com`; BSC Testnet `97` y bases Stage aisladas. |
+| Stage | Coolify app `28`, rama `staging`, `https://cukieshub.eurekand.com`; contratos nuevos en testnet `97`, fuentes legacy BSC `56`/TRON mainnet existentes y destinos Stage aislados. La decision de fuentes no equivale a activacion observada de workers. |
 | Produccion | Coolify app `12`, rama `main`, `https://cukies.world`; BSC Mainnet `56`. En esta revision solo lecturas publicas para A/B y health. |
 | Fotos Git con 37/47 commits y candidatos locales | Historia de trabajo; no son el estado actual ni autorizan deploy/publicacion. Los SHAs se conservan en el registro historico inferior. |
 
@@ -56,7 +58,9 @@ Migracion legacy: seguridad, identidad, datos, bridge, marketplace, Cukie Points
 y crias. Su secuencia es inventario -> portar al Hub sobre la infraestructura
 nueva -> migrar y reconciliar datos -> probar flujos -> cortar dependencias ->
 retirar los servicios antiguos y dejar de usar su repo cuando queden cero
-consumidores de runtime. Esta tabla registra alcance; no ejecuta esas fases ahora.
+consumidores de runtime. La ejecucion autorizada comienza por cubrir todos los
+eventos, incluido breeding, y workers legacy en Stage. La UX funcional sigue
+a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 
 | ID | Estado y alcance actual | Fuente y fecha | Proximo paso + issue real |
 | --- | --- | --- | --- |
@@ -66,10 +70,10 @@ consumidores de runtime. Esta tabla registra alcance; no ejecuta esas fases ahor
 | C | **RESUELTO · confirmado por el usuario**: cierre funcional aceptado. | Confirmacion de producto; 2026-09-07. | No reabrir por falta de una prueba adicional; conservar checks como historial. |
 | D | **MIGRACION POR COMPLETAR**: migrar toda funcionalidad legacy al Hub con infraestructura nueva, auth, datos y contratos seguros; dejar de usar el repo antiguo. | Decision de producto e [inventario de migracion](legacy-marketplace/README.md); 2026-09-07: 14 contratos, 34 contenedores y 16 instancias de base. | Inventario registrado; seguir con importacion preview y paridad por flujos completos; coordinar [#160](https://github.com/fgomezserna/cukies-hub/issues/160); cero consumidores runtime antes de retirar. |
 | 1 | **EN PROGRAMA DE MIGRACION LEGACY**: bridge Tron -> BSC, con seguridad, E2E y fees dentro del alcance. | Decision de producto; 2026-09-07. | Revalidar fuente, relayer, rutas, fee y pausa; sin presentar el bridge como cerrado. |
-| 2A-C | **EN PROGRAMA DE MIGRACION LEGACY**: datos/listings, fees y marketplace UKI; los contratos y tarifas pertenecen al programa. | Decision de producto; 2026-09-07; #19 y #249 como coordinación de auditoria/slice. | Inventario -> infraestructura Hub -> migracion validada -> flujos -> corte; refs [2A-C](#2-marketplace). |
+| 2A-C | **EN IMPLEMENTACION DEL BLOQUE DE EVENTOS**: datos/listings, fees y marketplace UKI. Legacy y UKI conviviran en una lista con filtros y distintivo Legacy por tarjeta. | Decision explicita de producto; 2026-09-07; [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). | Completar eventos/approvals/breeding y workers aislados, reconciliar datos y despues integrar lista/filtros/acciones. Staging observado `d4bc372`: API UKI 503 y listado legacy; main `fb2b190`: API UKI 404. No equivale a ausencia de un contrato desplegado. |
 | 3 | **EN STAGING, EN PRUEBAS**: Cukie Master, creditos, pools, prestamos y rewards. | Confirmacion de producto; 2026-09-07; smoke 11:44 UTC como evidencia fechada. | Registrar resultados de consumo/caducidad de creditos, stake/unstake, prestamos, cierres, reparto e idempotencia; completar los flujos pendientes segun esas pruebas. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
-| 5 | **PENDIENTE DE REVISION UX**: menu, sidebar, perfil, avatar, notificaciones y superficies relacionadas. | Decision de producto; 2026-09-07. | Revisar arquitectura y estados UX antes de comunicar cierre. |
+| 5 | **SECUENCIADO TRAS LA UX FUNCIONAL LEGACY/V2**: menu, sidebar, dashboard inicial, perfil, avatar y notificaciones. | Decision de producto; 2026-09-07. | Primero eventos/workers y flujos completos; despues reorganizar navegacion y dashboard segun acciones y estados reales. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
@@ -81,7 +85,8 @@ correspondan:
 
 1. Requisito funcional contrastado con la fuente vigente.
 2. Implementacion y gates locales Stage/Testnet verdes.
-3. Despliegue del SHA exacto en Stage y smoke real con datos/contratos Testnet.
+3. Despliegue del SHA exacto en Stage y smoke real: contratos nuevos en testnet;
+   contratos legacy existentes con fuentes mainnet y destino de datos Stage.
 4. Notas de promocion a produccion, incluyendo configuracion, seguridad,
    operaciones, observabilidad y rollback.
 
@@ -98,8 +103,9 @@ de los puntos ya desplegados o en pruebas.
   inercia todo el acumulado local sin revisar su alcance.
 - [ ] Revisar `git diff origin/staging...<release-candidate>` y separar cualquier
   trabajo que no sea necesario para esta entrega.
-- [ ] Ejecutar los gates locales del lote sobre BSC Testnet `97` y Mongo local
-  replica set `127.0.0.1:37018`, sin conexiones de escritura a Stage remoto.
+- [ ] Ejecutar los gates locales del lote sobre Mongo local replica set
+  `127.0.0.1:37018`: nueva economia BSC `97`, legacy BSC `56`/TRON mainnet
+  mediante fixtures/replay y lecturas verificadas. Sin escrituras a produccion.
 - [ ] Ejecutar lint, typecheck, tests y builds de DApp, indexer y cada juego
   afectado.
 - [ ] Validar `pnpm guard:staging:test` y `pnpm guard:staging` con UUID de Coolify
@@ -682,10 +688,15 @@ Stage:
 
 Produccion:
 
-- [ ] Auditoria, Safe owner y dominios EIP-712/nonce/cancelacion congelados.
+- [ ] Auditoria, Safe owner y politica on-chain de nonce/cancelacion congelada.
+  El contrato actual publica con `createOrder`; no implementa ordenes EIP-712.
 - [ ] Router/token/path Mainnet exactos y liquidez suficiente para cada moneda.
 - [ ] Plan de coexistencia: Legacy BNB no se migra silenciosamente; el vendedor
   cancela y republica en UKI.
+- [ ] Lista conjunta Legacy/UKI con filtros comunes, origen y distintivo Legacy
+  por tarjeta. Reponer filtros legacy activos de habilidades y crias; conservar
+  contrato, red y moneda en detalle/acciones. Esta decision sustituye tanto las
+  dos secciones locales como el selector excluyente observado en Stage.
 - [ ] Definir la compra Tron y migracion automatica como flujo separado; no
   mezclarla con el contrato BSC sin E2E y politica aprobados.
 
