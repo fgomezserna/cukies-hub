@@ -452,26 +452,30 @@ La recompensa por ranking se aplica sobre la parte del jugador que queda despues
 
 ## Embajadores
 
-- Cada wallet EVM registrada puede compartir su enlace de embajador, tenga o no
-  un embajador propio.
-- El login y el alta de cuenta son independientes de la atribucion: conectar o
-  firmar una wallet en cualquier pagina no crea una relacion de embajador ni
-  cierra la posibilidad de confirmarla mas adelante.
-- Una relacion nueva solo se crea desde `/embajadores/[codigo]`, despues de que
-  la wallet EVM autenticada vea al invitador y confirme expresamente la relacion.
-- Mientras no exista una relacion canonica, la wallet puede confirmar un
-  embajador sin importar cuando se creo su cuenta o si ya era usuario directo,
-  wallet vinculada, usuario legacy o comprador de preventa.
-- Una vez confirmada o materializada desde preventa, la relacion no puede
-  anadirse de nuevo, sustituirse ni modificarse.
-- Los sponsors confirmados durante la preventa se conservan automaticamente y
-  tienen precedencia sobre cualquier intento posterior.
-- La fecha `acceptedAt` delimita la atribucion economica: solo se generan
-  comisiones por premios elegibles posteriores, nunca de forma retroactiva.
-- La relacion es directa, de un solo nivel e inmutable. No se permiten
-  autorreferencias ni ciclos de ninguna longitud entre wallets.
-- Las escrituras del grafo se serializan y se valida toda la cadena antes de
-  aceptar una relacion nueva para impedir ciclos creados concurrentemente.
+- Las wallets que compraron en preventa conservan su enlace y su patrocinador
+  historico. Si compraron sin patrocinador, ya no pueden elegir uno, tampoco
+  Cukies World: no se crean relaciones retroactivas.
+- Las demas wallets activan su enlace propio solo despues de confirmar su
+  patrocinador. Los enlaces antiguos emitidos sin compra ni confirmacion dejan
+  de ser visibles y de aceptar invitados; se conservan perfiles e historial.
+- Conectar, firmar el login o navegar no confirma ni descarta un patrocinador.
+  La invitacion pendiente se conserva en la pestaña hasta la confirmacion.
+- En `/embajadores/[codigo]` se propone la wallet invitadora; sin invitacion se
+  propone Cukies World. Una invitacion invalida no se sustituye silenciosamente
+  por Cukies World.
+- Confirmar requiere consentimiento y una firma especifica de la wallet, sin
+  transaccion ni gas. La firma vincula wallet, patrocinador, sesion, dominio,
+  red y un reto de cinco minutos. La sesion firmada de login no la sustituye.
+- Cukies World es un patrocinador real configurado por entorno mediante
+  `AMBASSADOR_DEFAULT_WALLET_ADDRESS`. Su wallet raiz puede invitar sin
+  patrocinador propio y no puede elegir uno. Staging usa una wallet de pruebas;
+  produccion debe configurar expresamente tesoreria, sin fallback testnet.
+- La atribucion es directa, de un solo nivel e inmutable. No se permiten
+  autorreferencias ni ciclos de ninguna longitud, ni siquiera al recorrer una
+  wallet raiz con historial previo. Las escrituras se serializan en Mongo.
+- La fecha `acceptedAt` delimita la atribucion economica: solo genera comisiones
+  por premios elegibles posteriores. El 5% corresponde al patrocinador confirmado,
+  incluida la wallet configurada de Cukies World en las altas directas.
 
 ## Treasure Hunt
 

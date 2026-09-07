@@ -32,6 +32,8 @@ describe('ambassador summary API', () => {
       walletNormalized: WALLET,
       profile: { invitationCode: 'cw-123456789abc' },
       ownAttribution: null,
+      enrollment: { isPresaleParticipant: true, canChooseSponsor: false, canInvite: true },
+      defaultAmbassador: null,
       referrals: [],
       commissions: {
         totals: {

@@ -186,10 +186,14 @@ describe("Mongo ambassador canonical resolution", () => {
       }
     );
     const db = {
-      collection: () => ({
+      collection: (name: string) => name === "ambassador_profiles" ? ({
         updateOne,
         findOne: async (filter: { _id: string }) =>
           profiles.find((profile) => profile._id === filter._id) ?? null,
+      }) : ({
+        findOne: async () => name === "presale_participants"
+          ? { normalizedWalletAddress: AMBASSADOR, firstPurchaseAt: NOW }
+          : null,
       }),
     } as unknown as Db;
 

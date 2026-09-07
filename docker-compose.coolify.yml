@@ -72,6 +72,7 @@ services:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
       AMBASSADOR_ATTRIBUTION_WRITES_ENABLED: ${AMBASSADOR_ATTRIBUTION_WRITES_ENABLED:-false}
+      AMBASSADOR_DEFAULT_WALLET_ADDRESS: ${AMBASSADOR_DEFAULT_WALLET_ADDRESS:-}
       COOLIFY_BRANCH: ${COOLIFY_BRANCH:?Coolify must expose the staging branch}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       PORT: 3000

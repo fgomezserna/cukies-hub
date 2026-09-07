@@ -37,6 +37,7 @@ describe('ambassador invitation API', () => {
     mockGetInvitation.mockResolvedValue({
       invitationCode: 'cw-123456789abc',
       ambassadorWalletMasked: '0x2222…2222',
+      isCukiesWorld: false,
     });
 
     const response = await request('cw-123456789abc');
@@ -48,6 +49,7 @@ describe('ambassador invitation API', () => {
       invitation: {
         invitationCode: 'cw-123456789abc',
         ambassadorWalletMasked: '0x2222…2222',
+        isCukiesWorld: false,
       },
     });
   });
