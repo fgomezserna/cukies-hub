@@ -736,6 +736,24 @@ primera liquidacion. Ninguna de estas cantidades entra en un claim de usuario.
   siguen requiriendo su fecha y operacion concreta; no se ejecutan por importar
   eventos o habilitar lecturas.
 
+La UX posterior a la reconciliacion se valida por recorrido completo:
+
+| Recorrido | Comportamiento requerido |
+| --- | --- |
+| Explorar marketplace | Lista conjunta, origen Todos/Legacy/UKI, red, tipo, generacion, habilidades y crias cuando existan esos atributos; busqueda, paginacion y reset coherentes. Un atributo no disponible no se representa como cero. |
+| Comprar o gestionar anuncio | Mostrar origen, red, moneda, precio/fee y contrato exactos; approval y accion segun ABI. Legacy conserva compra, alta, cancelacion y cambio de precio. UKI conserva publicacion, cancelacion y reparacion de approval. Revalidar owner, permisos y vigencia antes de firmar. |
+| Migrar mediante bridge | Prioridad TRON -> BSC; seleccionar NFT elegible y destino, mostrar fee y seguir solicitud, confirmacion y finalizacion con ambas transacciones. Distinguir protocolos legacy/endpoint v2, pendientes y errores que requieran intervencion; no anunciar completado solo por recibir la solicitud. |
+| Consultar Cukie Points | Separar saldo ya emitido de puntos pendientes calculados en staking; explicar su procedencia y fecha. Mostrar posiciones e historial por red. No inventar una accion claim que el contrato no ofrece, ni activar conversiones con ratios aun propuestos. |
+| Gestionar staking legacy | Mostrar posiciones, elegibilidad y acciones stake/unstake soportadas por cada contrato, con su efecto sobre puntos; mantenerlo separado del staking UKI y Cukie Master. |
+| Gestionar crias | Padres elegibles, coste/condiciones, inicio, operacion pendiente, finalizacion e historial padre/hijo segun contrato. La UX del corte se concreta al fijar fecha y tratamiento de operaciones ya iniciadas. |
+| Navegar y entrar al dashboard | Agrupar las acciones reales de esos recorridos; mostrar operaciones pendientes, balances disponibles y accesos utiles. Tratar carga, error parcial y ausencia de datos sin presentar un fallo de lectura como saldo cero. Revisar tambien perfil, avatar y notificaciones. |
+
+En Stage, operar contratos legacy seguira siendo una transaccion real de mainnet.
+La prueba de ingesta no habilita por si sola botones de escritura: sus gates,
+wallet QA y coste se validan en la fase de UX correspondiente. Los metodos de
+pago alternativos del marketplace UKI solo se ofrecen cuando la configuracion
+y el contrato los permiten.
+
 ## Cukie Points y crias
 
 Necesidades:

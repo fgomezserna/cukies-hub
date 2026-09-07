@@ -4,8 +4,10 @@ Inventario de procedencia, runtime, contratos, datos y migración. Esta ficha es
 la fuente de detalle del legado; [antes-del-15-seguimiento.md](../antes-del-15-seguimiento.md)
 es la fuente del resumen de lanzamiento y no sustituye los gates de esta ficha.
 
-**Corte auditado:** 2026-09-07. **Modo:** solo lectura; no se ejecutaron
-migraciones, despliegues, firmas, rotaciones ni cambios en el runtime legacy.
+**Corte auditado:** 2026-09-07. **Modo del inventario:** solo lectura; ese corte
+no incluyo migraciones, despliegues, firmas, rotaciones ni cambios en el runtime
+legacy. La implementacion local posterior se registra en el seguimiento de
+lanzamiento enlazado arriba; no convierte el inventario en prueba de despliegue.
 
 **Estado de migracion: parcial.** El Hub ya tiene indexacion, proyecciones,
 importacion parcial de metadata/eventos y worker de cards. Convive con los
@@ -136,6 +138,103 @@ Se reutilizan `packages/chain-indexer/src/legacy` para import/reconcile,
 `packages/cuki-card-worker`, `packages/cukies-bridge-relayer` y las APIs propias
 del Hub. No se recrean Bull, producers, consumers ni el backend Nx como nueva
 autoridad.
+
+### Frontera del worker legacy acordada
+
+Diseno en preparacion; esta seccion no acredita un servicio desplegado.
+`legacy-chain-indexer` reutilizara el motor del Hub para leer los 14 contratos
+canonicos de `contracts.json`: BSC 56 y TRON mainnet tanto en Stage como en
+produccion. Usara un perfil Compose propio, sin dominio publico, firmantes ni
+operaciones on-chain. El relayer que completa transfers es una responsabilidad
+distinta y no debe duplicar envios contra los mismos contratos.
+
+| Frontera | Stage | Produccion |
+| --- | --- | --- |
+| Contratos legacy | Los existentes BSC 56/TRON mainnet | Los mismos contratos |
+| Base dedicada propuesta | `cukies-legacy-indexer-staging` | `cukies-legacy-indexer` |
+| Contratos nuevos | Deployments de testnet | Deployments propios de mainnet |
+| Cursores y credenciales | Exclusivos de Stage | Exclusivos de produccion |
+
+La configuracion legacy sera explicita y no heredara la URI, RPC, addresses o
+checkpoints del indexer de economia. Las bases dedicadas evitan prefijos
+redundantes en las colecciones. Dentro de cada base, NFTs/listings se identifican
+por red, coleccion NFT canonica y tokenId; el address emisor de staking, breeding
+o marketplace no sustituye al address de esa coleccion. Los puntos incorporan
+red, contrato POINTS y wallet. Un mismo tokenId en TRON y BSC debe conservar dos
+estados independientes. La ingesta legacy no genera outbox de economia nueva,
+creditos ni rewards.
+
+Antes de arrancar la ingesta en Stage: verificar identidad y red de cada fuente,
+fijar el inicio historico y probar backfill/replay sin duplicados. Durante la
+ingesta se comparan estados con contratos y datos legacy y se registran cursores
+y discrepancias; los consumidores se cambian solo tras reconciliar. Una ABI
+cubierta solo acredita que se reconocen sus eventos; no acredita paridad de datos
+ni una UX operativa.
+
+Para los contratos existentes, la prueba de fuente puede acreditar address
+canonica, red y hash de runtime observado sin afirmar un deploy reproducible.
+Debe quedar identificada como `legacy-existing`, con su procedencia y checkpoint;
+no se inventan transacciones o bloques de despliegue. La cobertura historica se
+registra aparte. Esta modalidad no sustituye el bootstrap de identidad exigido a
+los contratos nuevos. La evidencia actual acredita runtime de los seis contratos
+BSC, pero solo cuatro tienen deploy tx/bloque registrados; en TRON el `codeHash`
+observado por el proveedor tampoco equivale a codigo fuente verificado.
+
+### Activacion Stage y criterios de reconciliacion
+
+El primer destino es exclusivamente Coolify app `28`, UUID
+`u4s804o4wwcckowgk0woo4wg`, rama `staging`. El perfil Compose
+`legacy-indexer` se anade a los perfiles ya activos, conservandolos. El
+servicio `legacy-chain-indexer` requiere `CUKIES_LEGACY_INDEXER_ENABLED=true`
+y credenciales Mongo limitadas a `cukies-legacy-indexer-staging`. La URI debe
+nombrar esa misma base. La configuracion concreta se revisa con el SHA de la PR
+antes del merge; no se copia un entorno completo desde el runtime antiguo.
+
+Destino comprobado por SSH el 2026-09-07: el Mongo exclusivo de Stage anuncia
+`cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg:27017` en la red `coolify`,
+replica set `cukies-staging-rs0`, `isWritablePrimary=true`. Ese hostname y
+`replicaSet=cukies-staging-rs0` forman la parte publica de la URI propuesta; la
+base y su usuario dedicado se provisionan para este worker. Esta lectura de
+`hello` no ha creado bases, usuarios ni un servicio nuevo.
+
+| Parametro | Valor o criterio de Stage |
+| --- | --- |
+| `APP_ENV` / `STAGING_ONLY_GUARD` | `staging` / `true` |
+| `COOLIFY_BRANCH` / `COOLIFY_RESOURCE_UUID` | `staging` / UUID de app 28 |
+| `CUKIES_SERVICE` | `legacy-chain-indexer` |
+| `CUKIES_LEGACY_INDEXER_DB_NAME` | `cukies-legacy-indexer-staging` |
+| `CUKIES_LEGACY_INDEXER_MONGO_URL` | Secreto exclusivo de esa base en Coolify; nunca versionado |
+| `CUKIES_LEGACY_BSC_CHAIN_ID` / `CUKIES_LEGACY_BSC_RPC_URLS` | `56` / proveedores mainnet capaces de servir el historico elegido |
+| `CUKIES_LEGACY_TRON_NETWORK` / `CUKIES_LEGACY_TRON_API_BASE_URL` | `mainnet` / API mainnet con eventos historicos; credencial opcional exclusiva |
+| `CUKIES_LEGACY_BSC_START_BLOCK` | Inicio explicito; `0` significa historia completa en el worker dedicado, no empezar desde el head |
+| `CUKIES_LEGACY_TRON_START_TIMESTAMP_MS` | Inicio explicito; `0` evita asumir una fecha de despliegue no acreditada |
+
+El inicio completo es conservador y no garantiza terminar antes del 15. Se debe
+medir el avance real por contrato/evento, limites RPC y errores 429, ajustar rango
+y frecuencia de lectura, y registrar una estimacion de duracion observada. No se
+acorta el historico silenciosamente para aparentar que el worker esta al dia.
+Una importacion de `processedEvents` puede acelerar la migracion, pero requiere
+comprobar identidad, eventos ausentes y checkpoint de cada fuente antes de usarla
+como cobertura. El `setup` de una base vacia no demuestra backfill.
+
+La reconciliacion se registra por familia en esta ficha, junto a la evidencia
+fechada, con estos criterios:
+
+| Familia | Comparacion necesaria para cambiar consumidores |
+| --- | --- |
+| NFT y cards | Inventario, owner actual, metadata/atributos y URL de card; identidad red + coleccion + tokenId; muestras de wallets y recuentos completos |
+| Marketplace | Ordenes activas, precio, moneda, vendedor y estado terminal frente a contratos; legacy y UKI se reconcilian por separado antes de agregarlos en UI |
+| Cukie Points y staking | Ledger mint/burn, saldo por wallet, posiciones stake/unstake y puntos pendientes calculados por contrato; sin convertirlos automaticamente en creditos nuevos |
+| Breeding | Cada ciclo start/finish, padres/hijos y operaciones pendientes; replay sin duplicados ni mezcla entre ciclos |
+| Bridge | Solicitudes, completados y huerfanos; contrato/ruta/coleccion/token/owner; legacy y endpoint v2 mantienen protocolos distintos |
+| Administracion y ERC20 | Roles, permisos, pausas, cambios de owner/configuracion y ledger UKI; auditables sin generar rewards ni balances internos |
+
+El gate para UX es: fuentes verificadas, cobertura historica explicita, cero
+errores criticos sin explicar y diferencias de datos resueltas o visibles como
+limitacion de producto. La posterior retirada exige ademas cero consumidores del
+repo y servicios antiguos. El rollback de esta primera activacion consiste en
+detener solo `legacy-chain-indexer` y conservar su base/cursores para diagnostico;
+la dapp y los workers actuales siguen con sus fuentes hasta superar el gate.
 
 ### Runtime live observado
 
