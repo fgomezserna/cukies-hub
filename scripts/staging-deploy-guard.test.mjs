@@ -1,0 +1,580 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import {
+  STAGING_DEPLOY_GUARD,
+  assertDeploymentTarget,
+  assertFreeSpace,
+  assertNoOtherBuild,
+  createCoolifyClient,
+  parseFreeBytes,
+  preflightBeforeStart,
+  watchDeployment,
+} from './staging-deploy-guard.mjs';
+
+const COMMIT = '5e6ee836310c5924bbaa492e0244a70539f5dc9a';
+const TARGET = 'deployment-target-123';
+
+function record(status, deploymentUuid = TARGET, overrides = {}) {
+  return {
+    deployment_uuid: deploymentUuid,
+    application_id: '28',
+    commit: COMMIT,
+    status,
+    ...overrides,
+  };
+}
+
+function dfOutput(freeKib) {
+  return `Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/test 100 1 ${freeKib} 1% /srv\n`;
+}
+
+function fakeExec(stdout) {
+  return async () => ({ stdout });
+}
+
+function cooperativeSleep() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+function retriableCoolifyError(message) {
+  const error = new Error(message);
+  error.coolifyRetriable = true;
+  return error;
+}
+
+describe('staging deployment guard', () => {
+  it('reads df output and enforces the 10 GiB floor', () => {
+    const freeBytes = parseFreeBytes(dfOutput(99));
+    assert.equal(freeBytes, 99n * 1024n);
+    assert.throws(() => assertFreeSpace(9n * 1024n * 1024n * 1024n), /espacio libre insuficiente/);
+  });
+
+  it('rejects a wrong deployment, app or commit without cancellation', () => {
+    assert.throws(
+      () => assertDeploymentTarget(record('building', 'other'), { deploymentUuid: TARGET, expectedCommit: COMMIT }),
+      /no coincide/,
+    );
+    assert.throws(
+      () => assertDeploymentTarget(record('building', TARGET, { application_id: '12' }), { deploymentUuid: TARGET, expectedCommit: COMMIT }),
+      /no pertenece/,
+    );
+    assert.throws(
+      () => assertDeploymentTarget(record('building', TARGET, { commit: 'd5babb90efa75a3a5784153733067b959d2f1a58' }), { deploymentUuid: TARGET, expectedCommit: COMMIT }),
+      /commit esperado/,
+    );
+    assert.throws(() => assertNoOtherBuild([record('queued', 'other')], TARGET), /otro build activo/);
+  });
+
+  it('runs preflight against app 28 and never mutates or cancels', async () => {
+    let cancelled = 0;
+    const result = await preflightBeforeStart({
+      expectedCommit: COMMIT,
+      client: {
+        listDeployments: async (resourceUuid) => {
+          assert.equal(resourceUuid, STAGING_DEPLOY_GUARD.resourceUuid);
+          return [];
+        },
+        cancelDeployment: async () => { cancelled += 1; },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+    });
+    assert.equal(result.readyToStart, true);
+    assert.equal(result.applicationId, '28');
+    assert.equal(cancelled, 0);
+  });
+
+  it('exits cleanly for finished, failed and cancelled deployments', async (t) => {
+    for (const status of ['finished', 'failed', 'cancelled-by-user']) {
+      await t.test(status, async () => {
+        let cancelCalls = 0;
+        const result = await watchDeployment({
+          deploymentUuid: TARGET,
+          expectedCommit: COMMIT,
+          client: {
+            getDeployment: async () => record(status),
+            listDeployments: async () => [record(status)],
+            cancelDeployment: async () => { cancelCalls += 1; },
+          },
+          exec: fakeExec(dfOutput(20_000_000)),
+          sleep: cooperativeSleep,
+        });
+        assert.equal(result.status, status);
+        assert.equal(result.cancelCount, 0);
+        assert.equal(cancelCalls, 0);
+      });
+    }
+  });
+
+  it('cancels exactly once on low space and verifies terminal state', async () => {
+    let current = record('building');
+    let cancelCalls = 0;
+    const diagnostics = [];
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => current,
+        listDeployments: async () => [current],
+        cancelDeployment: async (deploymentUuid) => {
+          cancelCalls += 1;
+          assert.equal(deploymentUuid, TARGET);
+          assert.equal(diagnostics[0]?.event, 'cancel_requested');
+          current = record('cancelled-by-user');
+          return { status: 200, payload: { deployment_uuid: TARGET, message: 'Deployment cancelled.' } };
+        },
+      },
+      exec: fakeExec(dfOutput(9_000_000)),
+      sleep: cooperativeSleep,
+      diagnosticWriter: async (event) => diagnostics.push(event),
+    });
+    assert.equal(result.status, 'cancelled-by-user');
+    assert.equal(result.cancelCount, 1);
+    assert.equal(cancelCalls, 1);
+    assert.equal(diagnostics.length, 2);
+    assert.equal(diagnostics[0].event, 'cancel_requested');
+    assert.equal(diagnostics[1].event, 'cancel_result');
+    assert.equal(diagnostics[0].reasonCode, 'low_disk');
+    assert.equal(diagnostics[0].phase, 'df');
+    assert.equal(diagnostics[0].status, 'building');
+    assert.equal(diagnostics[0].deploymentUuid, TARGET);
+    assert.equal(diagnostics[0].sha, COMMIT);
+    assert.equal(diagnostics[0].minimumFreeBytes, STAGING_DEPLOY_GUARD.minimumFreeBytes.toString());
+    assert.equal(diagnostics[0].freeBytes, (9_000_000n * 1024n).toString());
+    assert.equal(diagnostics[1].cancellationResult.responseStatus, 200);
+    assert.equal(typeof diagnostics[0].operation.durationMs, 'number');
+  });
+
+  it('persists the cancellation timeout diagnostic when the ACK is unavailable', async () => {
+    const diagnostics = [];
+    await assert.rejects(
+      watchDeployment({
+        deploymentUuid: TARGET,
+        expectedCommit: COMMIT,
+        client: {
+          getDeployment: async () => record('building'),
+          listDeployments: async () => [record('building')],
+          cancelDeployment: async () => { throw new Error('Coolify API POST /cancel excedió el timeout de 3000 ms.'); },
+        },
+        exec: fakeExec(dfOutput(9_000_000)),
+        sleep: cooperativeSleep,
+        diagnosticWriter: async (event) => diagnostics.push(event),
+      }),
+      /excedió el timeout/,
+    );
+    assert.equal(diagnostics.length, 2);
+    assert.equal(diagnostics[0].event, 'cancel_requested');
+    assert.equal(diagnostics[1].event, 'cancel_result');
+    assert.equal(diagnostics[0].reasonCode, 'low_disk');
+    assert.equal(diagnostics[0].phase, 'df');
+    assert.equal(diagnostics[1].cancellationResult.ok, false);
+    assert.match(diagnostics[1].cancellationResult.error, /timeout/);
+    assert.equal(diagnostics[1].cancellationOperation.phase, 'cancel');
+    assert.equal(diagnostics[0].cancelCount, 1);
+  });
+
+  it('cancels exactly once on df failure and verifies terminal state', async () => {
+    let current = record('building');
+    let reads = 0;
+    let cancelCalls = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => current,
+        listDeployments: async () => [current],
+        cancelDeployment: async () => {
+          cancelCalls += 1;
+          current = record('cancelled');
+          return { status: 200, payload: { cancelled: true, deployment_uuid: TARGET } };
+        },
+      },
+      exec: async () => {
+        reads += 1;
+        if (reads === 1) throw new Error('df unavailable');
+        return { stdout: dfOutput(20_000_000) };
+      },
+      sleep: cooperativeSleep,
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.cancelCount, 1);
+    assert.equal(cancelCalls, 1);
+  });
+
+  it('times out a hanging df call and follows the single-cancel path', async () => {
+    let current = record('building');
+    let cancelCalls = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      timeoutMs: 10,
+      client: {
+        getDeployment: async () => current,
+        listDeployments: async () => [current],
+        cancelDeployment: async () => {
+          cancelCalls += 1;
+          current = record('cancelled');
+          return { status: 200, payload: { cancelled: true, deployment_uuid: TARGET } };
+        },
+      },
+      exec: async () => new Promise(() => {}),
+      sleep: cooperativeSleep,
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.cancelCount, 1);
+    assert.equal(cancelCalls, 1);
+  });
+
+  it('keeps monitoring after a transient application-list failure', async () => {
+    let listCalls = 0;
+    let cancelCalls = 0;
+    const diagnostics = [];
+    let clock = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => record('building'),
+        listDeployments: async () => {
+          listCalls += 1;
+          if (listCalls === 2) throw retriableCoolifyError('temporary Coolify application-list failure');
+          return [record(listCalls >= 3 ? 'finished' : 'building')];
+        },
+        cancelDeployment: async () => {
+          cancelCalls += 1;
+          throw new Error('not expected');
+        },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+      apiIntervalMs: 5,
+      diskIntervalMs: 7,
+      now: () => clock,
+      sleep: async (ms) => {
+        if (ms === 5) clock += 5;
+        await cooperativeSleep();
+      },
+      diagnosticWriter: async (event) => diagnostics.push(event),
+    });
+    assert.equal(result.status, 'finished');
+    assert.equal(result.cancelCount, 0);
+    assert.equal(cancelCalls, 0);
+    assert.equal(diagnostics.length, 2);
+    assert.equal(diagnostics[0].event, 'api_transient_failure');
+    assert.equal(diagnostics[0].reasonCode, 'coolify_query_transient_failure');
+    assert.equal(diagnostics[1].event, 'api_recovered');
+  });
+
+  it('does not cancel for a slow successful application-list read', async () => {
+    let listCalls = 0;
+    let cancelCalls = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => record('building'),
+        listDeployments: async () => {
+          listCalls += 1;
+          if (listCalls === 2) await new Promise((resolve) => setTimeout(resolve, 15));
+          return [record(listCalls >= 2 ? 'finished' : 'building')];
+        },
+        cancelDeployment: async () => { cancelCalls += 1; },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+      sleep: cooperativeSleep,
+    });
+    assert.equal(result.status, 'finished');
+    assert.equal(result.cancelCount, 0);
+    assert.equal(cancelCalls, 0);
+  });
+
+  it('cancels after 45 seconds without a valid Coolify read', async () => {
+    let listCalls = 0;
+    let cancelCalls = 0;
+    let terminal = false;
+    let clock = 0;
+    const diagnostics = [];
+    const requestTimeouts = [];
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => record('building'),
+        listDeployments: async (_resourceUuid, options) => {
+          listCalls += 1;
+          requestTimeouts.push(options?.timeoutMs ?? null);
+          if (terminal) return [record('cancelled')];
+          if (listCalls === 1) return [record('building')];
+          clock += 15_000;
+          throw retriableCoolifyError('Coolify temporarily unavailable');
+        },
+        cancelDeployment: async () => {
+          cancelCalls += 1;
+          terminal = true;
+          return { status: 200, payload: { message: 'cancelled' } };
+        },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+      apiIntervalMs: 5,
+      diskIntervalMs: 7,
+      maximumApiUnverifiedMs: 45_000,
+      now: () => clock,
+      sleep: async (ms) => {
+        await cooperativeSleep();
+      },
+      diagnosticWriter: async (event) => diagnostics.push(event),
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.cancelCount, 1);
+    assert.equal(cancelCalls, 1);
+    const failures = diagnostics.filter((event) => event.event === 'api_transient_failure');
+    assert.deepEqual(failures.map((event) => event.apiUnverifiedMs), [15_000, 30_000, 45_000]);
+    assert.equal(failures.at(-1).reasonCode, 'coolify_query_unavailable');
+    assert.equal(diagnostics.at(-2).event, 'cancel_requested');
+    assert.equal(diagnostics.at(-2).reasonCode, 'coolify_query_unavailable');
+    assert.deepEqual(requestTimeouts.slice(1, 4), [15_000, 15_000, 15_000]);
+  });
+
+  it('cancels for low disk while an API read is pending', async () => {
+    let listCalls = 0;
+    let cancelCalls = 0;
+    let pendingReadStarted = false;
+    let releasePendingRead;
+    const pendingRead = new Promise((resolve) => { releasePendingRead = resolve; });
+    let terminal = false;
+    const task = watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => record('building'),
+        listDeployments: async () => {
+          listCalls += 1;
+          if (terminal) return [record('cancelled')];
+          if (listCalls === 1) return [record('building')];
+          pendingReadStarted = true;
+          return pendingRead;
+        },
+        cancelDeployment: async () => {
+          cancelCalls += 1;
+          terminal = true;
+          return { status: 200, payload: { message: 'cancelled' } };
+        },
+      },
+      exec: fakeExec(dfOutput(9_000_000)),
+      sleep: cooperativeSleep,
+    });
+    while (!pendingReadStarted || cancelCalls === 0) await cooperativeSleep();
+    assert.equal(cancelCalls, 1);
+    releasePendingRead([record('cancelled')]);
+    const result = await task;
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.cancelCount, 1);
+  });
+
+  it('cancels immediately for a non-retryable API failure after initial binding', async () => {
+    let listCalls = 0;
+    let terminal = false;
+    const diagnostics = [];
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => record('building'),
+        listDeployments: async () => {
+          listCalls += 1;
+          if (terminal) return [record('cancelled')];
+          if (listCalls === 1) return [record('building')];
+          throw new Error('Coolify API GET returned HTTP 401.');
+        },
+        cancelDeployment: async () => {
+          terminal = true;
+          return { status: 200, payload: { message: 'cancelled' } };
+        },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+      sleep: cooperativeSleep,
+      diagnosticWriter: async (event) => diagnostics.push(event),
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(diagnostics[0].event, 'cancel_requested');
+    assert.equal(diagnostics[0].reasonCode, 'coolify_query_nonretryable_error');
+  });
+
+  it('uses the direct deployment endpoint only for initial binding', async () => {
+    let getCalls = 0;
+    let listCalls = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => {
+          getCalls += 1;
+          return record('building');
+        },
+        listDeployments: async () => {
+          listCalls += 1;
+          return [record(listCalls >= 2 ? 'finished' : 'building')];
+        },
+        cancelDeployment: async () => { throw new Error('not expected'); },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+      sleep: cooperativeSleep,
+    });
+    assert.equal(result.status, 'finished');
+    assert.equal(getCalls, 1);
+    assert.equal(listCalls, 2);
+  });
+
+  it('fails without cancelling when the first query cannot verify the target', async () => {
+    let cancelCalls = 0;
+    await assert.rejects(
+      watchDeployment({
+        deploymentUuid: TARGET,
+        expectedCommit: COMMIT,
+        client: {
+          getDeployment: async () => { throw new Error('Coolify unavailable'); },
+          listDeployments: async () => [],
+          cancelDeployment: async () => { cancelCalls += 1; },
+        },
+        sleep: cooperativeSleep,
+      }),
+      /Coolify unavailable/,
+    );
+    assert.equal(cancelCalls, 0);
+  });
+
+  it('fails if another active build appears and does not cancel the target', async () => {
+    let cancelCalls = 0;
+    await assert.rejects(
+      watchDeployment({
+        deploymentUuid: TARGET,
+        expectedCommit: COMMIT,
+        client: {
+          getDeployment: async () => record('building'),
+          listDeployments: async () => [record('building'), record('queued', 'other')],
+          cancelDeployment: async () => { cancelCalls += 1; },
+        },
+        exec: fakeExec(dfOutput(20_000_000)),
+        sleep: cooperativeSleep,
+      }),
+      /otro build activo/,
+    );
+    assert.equal(cancelCalls, 0);
+  });
+
+  it('rejects a cancellation ACK for a different deployment', async () => {
+    let cancelCalls = 0;
+    await assert.rejects(
+      watchDeployment({
+        deploymentUuid: TARGET,
+        expectedCommit: COMMIT,
+        client: {
+          getDeployment: async () => record('building'),
+          listDeployments: async () => [record('building')],
+          cancelDeployment: async () => {
+            cancelCalls += 1;
+            return { status: 200, payload: { deployment_uuid: 'other', message: 'Deployment cancelled.' } };
+          },
+        },
+        exec: fakeExec(dfOutput(9_000_000)),
+        sleep: cooperativeSleep,
+      }),
+      /deployment incorrecto/,
+    );
+    assert.equal(cancelCalls, 1);
+  });
+
+  it('uses only the expected Coolify endpoints and bearer token in the client', async () => {
+    const calls = [];
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test/',
+      token: 'token-not-logged',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (url.includes('/applications/') ? [] : { message: 'Deployment cancelled.' }),
+        };
+      },
+    });
+    await client.getDeployment(TARGET);
+    await client.listDeployments();
+    await client.cancelDeployment(TARGET);
+    assert.deepEqual(calls.map(({ url }) => url), [
+      `https://coolify.test/api/v1/deployments/${TARGET}`,
+      `https://coolify.test/api/v1/deployments/applications/${STAGING_DEPLOY_GUARD.resourceUuid}`,
+      `https://coolify.test/api/v1/deployments/${TARGET}/cancel`,
+    ]);
+    assert.equal(calls[2].options.method, 'POST');
+    assert.equal(calls[2].options.headers.authorization, 'Bearer token-not-logged');
+  });
+
+  it('rejects an unexpected deployment-list payload instead of treating it as empty', async () => {
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      token: 'token-not-logged',
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ unexpected: true }) }),
+    });
+    await assert.rejects(client.listDeployments(), /payload inesperado/);
+  });
+
+  it('retries only the explicitly transient Coolify HTTP responses', async () => {
+    for (const [status, retriable] of [[400, false], [408, true], [429, true], [500, true]]) {
+      const client = createCoolifyClient({
+        baseUrl: 'https://coolify.test',
+        token: 'token-not-logged',
+        fetchImpl: async () => ({ ok: false, status, json: async () => ({}) }),
+      });
+      await assert.rejects(
+        client.listDeployments(),
+        (error) => error?.coolifyRetriable === retriable,
+        `HTTP ${status} retry classification`,
+      );
+    }
+  });
+
+  it('aborts a hanging Coolify request at the bounded timeout', async () => {
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      token: 'token-not-logged',
+      timeoutMs: 10,
+      fetchImpl: async (_url, { signal }) => new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('aborted by test')), { once: true });
+      }),
+    });
+    await assert.rejects(client.getDeployment(TARGET), /excedió el timeout de 10 ms/);
+  });
+
+  it('keeps the timeout active while reading a hanging response body', async () => {
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      token: 'token-not-logged',
+      timeoutMs: 10,
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => new Promise(() => {}) }),
+    });
+    await assert.rejects(client.getDeployment(TARGET), /excedió el timeout de 10 ms/);
+  });
+
+  it('uses separate least-privilege read and deploy tokens', async () => {
+    const authorizationHeaders = [];
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      readToken: 'read-token',
+      deployToken: 'deploy-token',
+      fetchImpl: async (url, options) => {
+        authorizationHeaders.push(options.headers.authorization);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (url.includes('/applications/')
+            ? []
+            : { deployment_uuid: TARGET, application_id: '28', commit: COMMIT, status: 'finished', message: 'Deployment cancelled.' }),
+        };
+      },
+    });
+    await client.getDeployment(TARGET);
+    await client.listDeployments();
+    await client.cancelDeployment(TARGET);
+    assert.deepEqual(authorizationHeaders, ['Bearer read-token', 'Bearer read-token', 'Bearer deploy-token']);
+  });
+});

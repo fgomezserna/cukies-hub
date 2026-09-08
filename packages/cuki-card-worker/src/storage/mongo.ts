@@ -1,6 +1,44 @@
+import crypto from 'node:crypto';
+
 import { Db, MongoClient, type Filter } from 'mongodb';
 
-import type { CardWorkerConfig, CukiDocument, GenerationResult } from '../types.js';
+import type {
+  AssetIdentityContext,
+  CardImageLease,
+  CardWorkerConfig,
+  ClaimedCuki,
+  CukiDocument,
+  GenerationResult,
+} from '../types.js';
+import { canonicalAssetIdentity, validateAssetIdentityContext } from '../identity.js';
+
+const validTypeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
+const validGenerationValues = [1, 2, '1', '2'];
+
+export function buildRenderableMetadataFilter(): Filter<CukiDocument> {
+  return {
+    $and: [
+      { $or: [{ type: { $in: validTypeValues } }, { type: { $exists: false }, rarity: { $in: validTypeValues } }] },
+      {
+        $or: [
+          { 'skills.generation': { $in: validGenerationValues } },
+          { 'skills.generation': { $exists: false }, generation: { $in: validGenerationValues } },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildCardImageLeaseFilter(documentId: string, lease: CardImageLease): Filter<CukiDocument> {
+  return {
+    _id: documentId,
+    cardImageStatus: 'processing',
+    cardImageLockId: lease.lockId,
+    cardImageLeaseVersion: lease.leaseVersion,
+    updatedAt: lease.claimedAt,
+    cardImageLeaseSourceRevision: lease.sourceRevision,
+  };
+}
 
 export class CardWorkerStore {
   private client: MongoClient;
@@ -33,6 +71,7 @@ export class CardWorkerStore {
   async ensureIndexes() {
     await Promise.all([
       this.cukies().createIndex({ cardImageStatus: 1, cardImageLockedAt: 1 }),
+      this.cukies().createIndex({ cardImageLockId: 1, cardImageLeaseVersion: 1 }),
       this.cukies().createIndex({ needsImage: 1, cardImageAttempts: 1 }),
       this.cukies().createIndex({ img: 1 }),
       this.cukies().createIndex({ type: 1, 'skills.generation': 1 }),
@@ -41,31 +80,53 @@ export class CardWorkerStore {
     ]);
   }
 
-  async getCuki(tokenId: string) {
-    return this.cukies().findOne({ _id: tokenId });
+  async getCuki(documentId: string) {
+    return this.cukies().findOne({ _id: documentId });
+  }
+
+  private async findCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    if (context) validateAssetIdentityContext(context);
+    const candidates = await this.cukies().find({ $or: [{ tokenId }, { _id: tokenId }] }).toArray();
+    const matching = candidates.filter((candidate) => {
+      if (candidate.tokenId && candidate.tokenId !== tokenId) return false;
+      const identity = canonicalAssetIdentity(
+        context && !candidate.tokenId ? { ...candidate, tokenId } : candidate,
+        context,
+      );
+      if (!identity) return false;
+      if (!context) return true;
+      const expected = canonicalAssetIdentity({
+        _id: candidate._id,
+        tokenId,
+        ...context,
+      });
+      return identity === expected;
+    });
+    if (matching.length > 1) {
+      throw new Error(`El token ${tokenId} es ambiguo: exige red, chainId y colección.`);
+    }
+    return matching[0] ?? null;
+  }
+
+  async getCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    return this.findCukiByTokenId(tokenId, context);
   }
 
   private renderableMetadataFilter(): Filter<CukiDocument> {
-    return {
-      $and: [
-        { $or: [{ type: { $exists: true, $ne: null } }, { rarity: { $exists: true, $ne: null } }] },
-        {
-          $or: [
-            { 'skills.generation': { $exists: true, $ne: null } },
-            { generation: { $exists: true, $ne: null } },
-          ],
-        },
-      ],
-    };
+    return buildRenderableMetadataFilter();
   }
 
-  private claimFilter(tokenId?: string): Filter<CukiDocument> {
+  private claimFilter(tokenId?: string, _legacyContext?: AssetIdentityContext, expected?: CukiDocument): Filter<CukiDocument> {
     const metadataFilter = this.renderableMetadataFilter();
+    const revisionFilter: Filter<CukiDocument>[] = expected
+      ? [expected.updatedAt ? { updatedAt: expected.updatedAt } : { $or: [{ updatedAt: { $exists: false } }, { updatedAt: null }] }]
+      : [];
 
     return {
       ...(tokenId ? { _id: tokenId } : {}),
       $and: [
         ...(metadataFilter.$and ?? []),
+        ...revisionFilter,
         {
           $or: [
             { cardImageAttempts: { $exists: false } },
@@ -85,67 +146,94 @@ export class CardWorkerStore {
     };
   }
 
-  async claimNextCuki() {
-    return this.cukies().findOneAndUpdate(
-      {
-        $and: [
-          this.renderableMetadataFilter(),
-          {
-            $or: [
-              { needsImage: true },
-              { cardImageStatus: 'pending' },
-              { cardImageStatus: 'failed', cardImageAttempts: { $lt: this.config.maxAttempts } },
-              {
-                cardImageStatus: 'processing',
-                cardImageLockedAt: { $lt: new Date(Date.now() - this.config.staleLockMs) },
-              },
-              { img: { $exists: false } },
-              { img: null },
-              { img: '' },
-            ],
+  private async claim(filter: Filter<CukiDocument>, sort?: Record<string, 1 | -1>) {
+    const now = new Date();
+    const lockId = crypto.randomUUID();
+    const updated = await this.cukies().findOneAndUpdate(
+      filter,
+      [
+        {
+          $set: {
+            cardImageStatus: 'processing',
+            cardImageLockedAt: now,
+            cardImageLockId: lockId,
+            cardImageLastError: null,
+            cardImageLeaseVersion: { $add: [{ $ifNull: ['$cardImageLeaseVersion', 0] }, 1] },
+            cardImageLeaseSourceRevision: { $ifNull: ['$updatedAt', null] },
+            updatedAt: now,
           },
-        ],
-      },
-      {
-        $set: {
-          cardImageStatus: 'processing',
-          cardImageLockedAt: new Date(),
-          cardImageLastError: null,
-          updatedAt: new Date(),
         },
-        $inc: {
-          cardImageAttempts: 1,
+        {
+          $set: {
+            cardImageAttempts: { $add: [{ $ifNull: ['$cardImageAttempts', 0] }, 1] },
+          },
         },
-      },
-      {
-        sort: { timeStamp: 1, _id: 1 },
-        returnDocument: 'after',
-      },
+      ] as any,
+      { returnDocument: 'after', ...(sort ? { sort } : {}) },
     );
+
+    if (!updated) return null;
+
+    const lease: CardImageLease = {
+      lockId,
+      leaseVersion: updated.cardImageLeaseVersion ?? 1,
+      claimedAt: updated.updatedAt ?? now,
+      sourceRevision: updated.cardImageLeaseSourceRevision ?? null,
+    };
+
+    return { ...updated, lease } satisfies ClaimedCuki;
   }
 
-  async claimCukiById(tokenId: string) {
-    return this.cukies().findOneAndUpdate(
-      this.claimFilter(tokenId),
-      {
-        $set: {
-          cardImageStatus: 'processing',
-          cardImageLockedAt: new Date(),
-          cardImageLastError: null,
-          updatedAt: new Date(),
+  async claimNextCuki(context?: AssetIdentityContext) {
+    const candidateFilter: Filter<CukiDocument> = {
+      $and: [
+        this.claimFilter(undefined, context),
+        {
+          $or: [
+            { needsImage: true },
+            { cardImageStatus: 'pending' },
+            { cardImageStatus: 'failed', cardImageAttempts: { $lt: this.config.maxAttempts } },
+            { cardImageStatus: 'processing', cardImageLockedAt: { $lt: new Date(Date.now() - this.config.staleLockMs) } },
+            { img: { $exists: false } },
+            { img: null },
+            { img: '' },
+          ],
         },
-        $inc: { cardImageAttempts: 1 },
-      },
-      { returnDocument: 'after' },
-    );
+      ],
+    };
+    if (context) validateAssetIdentityContext(context);
+    const candidates = this.cukies().find(candidateFilter).sort({ timeStamp: 1, _id: 1 }).batchSize(50);
+    for await (const candidate of candidates) {
+      if (!canonicalAssetIdentity(candidate, context)) continue;
+      const claimed = await this.claimCukiByDocumentId(candidate._id, context);
+      if (claimed) return claimed;
+    }
+    return null;
+  }
+
+  async claimCukiByDocumentId(documentId: string, legacyContext?: AssetIdentityContext) {
+    if (legacyContext) validateAssetIdentityContext(legacyContext);
+    const current = await this.getCuki(documentId);
+    if (!current || !canonicalAssetIdentity(current, legacyContext)) return null;
+    return this.claim(this.claimFilter(documentId, legacyContext, current));
+  }
+
+  async claimCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    const candidate = await this.findCukiByTokenId(tokenId, context);
+    return candidate ? this.claimCukiByDocumentId(candidate._id, context) : null;
+  }
+
+  async claimCukiById(documentId: string) {
+    return this.claimCukiByDocumentId(documentId);
   }
 
   async listBackfillCukies() {
     return this.cukies()
-      .find(this.renderableMetadataFilter())
-      .project({
+      .find({})
+      .project<CukiDocument>({
         _id: 1,
         tokenId: 1,
+        chain: 1,
         network: 1,
         chainId: 1,
         collectionAddressNormalized: 1,
@@ -154,14 +242,23 @@ export class CardWorkerStore {
         rarity: 1,
         generation: 1,
         skills: 1,
+        needsImage: 1,
+        cardImageStatus: 1,
+        cardImageAttempts: 1,
+        cardImageLockedAt: 1,
+        updatedAt: 1,
       })
       .sort({ _id: 1 })
       .toArray();
   }
 
-  async markGenerated(tokenId: string, result: GenerationResult) {
+  private leaseFilter(claimed: ClaimedCuki): Filter<CukiDocument> {
+    return buildCardImageLeaseFilter(claimed._id, claimed.lease);
+  }
+
+  async markGenerated(claimed: ClaimedCuki, result: GenerationResult) {
     const updated = await this.cukies().updateOne(
-      { _id: tokenId, cardImageStatus: 'processing' },
+      this.leaseFilter(claimed),
       {
         $set: {
           img: result.imageUrl,
@@ -179,17 +276,17 @@ export class CardWorkerStore {
     );
 
     if (updated.matchedCount !== 1) {
-      throw new Error(`No se pudo confirmar la publicación de la card ${tokenId}: el lock ya no es válido.`);
+      throw new Error(`No se pudo confirmar la publicación de la card ${claimed._id}: el lease ya no es válido o el documento cambió.`);
     }
 
-    await this.recordJob(tokenId, 'generated', result);
+    await this.recordJob(claimed._id, 'generated', result);
   }
 
-  async markFailed(tokenId: string, error: unknown) {
+  async markFailed(claimed: ClaimedCuki, error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
 
-    await this.cukies().updateOne(
-      { _id: tokenId },
+    const updated = await this.cukies().updateOne(
+      this.leaseFilter(claimed),
       {
         $set: {
           cardImageStatus: 'failed',
@@ -202,12 +299,17 @@ export class CardWorkerStore {
       },
     );
 
-    await this.recordJob(tokenId, 'failed', { error: message });
+    if (updated.matchedCount !== 1) {
+      throw new Error(`No se pudo registrar el fallo de la card ${claimed._id}: el lease ya no es válido.`);
+    }
+
+    await this.recordJob(claimed._id, 'failed', { error: message });
   }
 
-  async recordJob(tokenId: string, status: string, payload: Record<string, unknown>) {
+  async recordJob(documentId: string, status: string, payload: Record<string, unknown>) {
     await this.jobs().insertOne({
-      tokenId,
+      documentId,
+      tokenId: payload.tokenId ?? documentId,
       status,
       ...payload,
       createdAt: new Date(),
