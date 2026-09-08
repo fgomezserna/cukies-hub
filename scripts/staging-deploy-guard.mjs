@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
+import { appendFile, stat, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -35,6 +36,45 @@ const ACTIVE_STATUSES = new Set([
   'cancelling',
 ]);
 
+const DEFAULT_DIAGNOSTIC_MAX_BYTES = 64 * 1024;
+
+function safeDiagnosticText(value, maxLength = 240) {
+  return String(value ?? '')
+    .replace(/bearer\s+[^\s]+/gi, 'Bearer [redacted]')
+    .replace(/(token|secret|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+    .slice(0, maxLength);
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+async function persistDiagnostic(event, {
+  filePath,
+  maxBytes = DEFAULT_DIAGNOSTIC_MAX_BYTES,
+  append = appendFile,
+  readStat = stat,
+  overwrite = writeFile,
+} = {}) {
+  if (!filePath) return;
+  const line = `${JSON.stringify(event)}\n`;
+  const lineBytes = Buffer.byteLength(line);
+  if (lineBytes > maxBytes) throw new Error('Guard de staging: evento de diagnóstico demasiado grande.');
+
+  let currentBytes = 0;
+  try {
+    currentBytes = (await readStat(filePath)).size;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+
+  if (currentBytes + lineBytes > maxBytes) {
+    await overwrite(filePath, line, { mode: 0o600 });
+    return;
+  }
+  await append(filePath, line, { mode: 0o600 });
+}
+
 function statusOf(record) {
   return String(record?.status ?? '').trim().toLowerCase();
 }
@@ -63,7 +103,7 @@ function asDeploymentRecords(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.deployments)) return payload.deployments;
   if (Array.isArray(payload?.data)) return payload.data;
-  return [];
+  throw new Error('Guard de staging: payload inesperado en la lista de deployments.');
 }
 
 export function parseFreeBytes(dfOutput) {
@@ -125,6 +165,23 @@ export async function readFreeBytes({
     return parseFreeBytes(stdout);
   } finally {
     clearTimeout(timeoutHandle);
+  }
+}
+
+async function measureOperation(phase, operation, setLastOperation) {
+  const startedAt = nowMs();
+  try {
+    const result = await operation();
+    setLastOperation({ phase, durationMs: nowMs() - startedAt, ok: true });
+    return result;
+  } catch (error) {
+    setLastOperation({
+      phase,
+      durationMs: nowMs() - startedAt,
+      ok: false,
+      error: safeDiagnosticText(error instanceof Error ? error.message : error),
+    });
+    throw error;
   }
 }
 
@@ -253,6 +310,13 @@ function assertCancellationAck(result, deploymentUuid) {
   if (body.cancelled !== true && body.canceled !== true && !message.includes('cancel')) {
     throw new Error(`Guard de staging: ACK de Coolify no indica cancelación de ${deploymentUuid}.`);
   }
+  return {
+    responseStatus: result.status,
+    acknowledgedUuid: acknowledgedUuid || deploymentUuid,
+    status: safeDiagnosticText(body.status),
+    message: safeDiagnosticText(body.message),
+    cancelled: body.cancelled === true || body.canceled === true,
+  };
 }
 
 export async function watchDeployment({
@@ -265,6 +329,9 @@ export async function watchDeployment({
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   exec = execFileAsync,
   onCancel = () => {},
+  diagnosticFile = null,
+  diagnosticMaxBytes = DEFAULT_DIAGNOSTIC_MAX_BYTES,
+  diagnosticWriter,
 } = {}) {
   requireExpectedCommit(expectedCommit);
   if (!deploymentUuid) throw new Error('Guard de staging: falta STAGING_DEPLOYMENT_UUID.');
@@ -276,24 +343,65 @@ export async function watchDeployment({
   let targetVerified = false;
   let cancellationRequested = false;
   let lastVerifiedRecord;
+  let lastOperation;
+  let lastFreeBytes;
+  const writeDiagnostic = diagnosticWriter ?? ((event) => persistDiagnostic(event, {
+    filePath: diagnosticFile,
+    maxBytes: diagnosticMaxBytes,
+  }));
 
-  const cancelOnce = async (reason) => {
+  const recordOperation = (operation) => {
+    lastOperation = operation;
+  };
+
+  const cancelOnce = async ({ code, message }) => {
     if (cancellationRequested) return false;
     assertDeploymentTarget(lastVerifiedRecord, { deploymentUuid, expectedCommit });
-    const result = await client.cancelDeployment(deploymentUuid);
-    assertCancellationAck(result, deploymentUuid);
+    const triggeringOperation = lastOperation;
+    const result = await measureOperation(
+      'cancel',
+      () => client.cancelDeployment(deploymentUuid),
+      recordOperation,
+    );
+    const cancellationResult = assertCancellationAck(result, deploymentUuid);
     cancellationRequested = true;
     cancelCount += 1;
-    await onCancel({ deploymentUuid, reason, cancelCount });
+    const event = {
+      event: 'cancel',
+      at: new Date().toISOString(),
+      phase: triggeringOperation?.phase,
+      operation: triggeringOperation,
+      cancellationOperation: lastOperation,
+      reasonCode: code,
+      reason: safeDiagnosticText(message),
+      deploymentUuid,
+      expectedCommit,
+      status: statusOf(lastVerifiedRecord),
+      sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
+      minimumFreeBytes: minimumFreeBytes.toString(),
+      freeBytes: lastFreeBytes?.toString() ?? null,
+      cancelCount,
+      cancellationResult,
+    };
+    await writeDiagnostic(event);
+    await onCancel(event);
     return true;
   };
 
   while (true) {
     let deployment;
     try {
-      deployment = await client.getDeployment(deploymentUuid);
+      deployment = await measureOperation(
+        'get',
+        () => client.getDeployment(deploymentUuid),
+        recordOperation,
+      );
       assertDeploymentTarget(deployment, { deploymentUuid, expectedCommit });
-      const records = await client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid);
+      const records = await measureOperation(
+        'list',
+        () => client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid),
+        recordOperation,
+      );
       const listedTarget = records.find((record) => deploymentUuidOf(record) === deploymentUuid);
       if (!listedTarget) {
         throw new Error(`Guard de staging: ${deploymentUuid} no está relacionado con la aplicación ${STAGING_DEPLOY_GUARD.resourceUuid}.`);
@@ -307,7 +415,7 @@ export async function watchDeployment({
       if (cancellationRequested) {
         throw new Error(`Guard de staging: no se pudo verificar el estado terminal tras cancelar ${deploymentUuid}: ${error.message}`);
       }
-      await cancelOnce(`fallo de consulta: ${error.message}`);
+      await cancelOnce({ code: 'coolify_query_error', message: `fallo de consulta: ${error.message}` });
       await sleep(STAGING_DEPLOY_GUARD.intervalMs);
       continue;
     }
@@ -318,12 +426,17 @@ export async function watchDeployment({
 
     let freeBytes;
     try {
-      freeBytes = await readFreeBytes({ mountPath, exec, timeoutMs });
+      freeBytes = await measureOperation(
+        'df',
+        () => readFreeBytes({ mountPath, exec, timeoutMs }),
+        recordOperation,
+      );
+      lastFreeBytes = freeBytes;
     } catch (error) {
-      await cancelOnce(`fallo de lectura de espacio: ${error.message}`);
+      await cancelOnce({ code: 'df_error', message: `fallo de lectura de espacio: ${error.message}` });
     }
     if (freeBytes !== undefined && freeBytes < minimumFreeBytes) {
-      await cancelOnce(`espacio libre insuficiente: ${freeBytes} bytes`);
+      await cancelOnce({ code: 'low_disk', message: `espacio libre insuficiente: ${freeBytes} bytes` });
     }
 
     await sleep(STAGING_DEPLOY_GUARD.intervalMs);
@@ -351,7 +464,13 @@ async function main() {
     return;
   }
 
-  const result = await watchDeployment({ client, deploymentUuid, expectedCommit, mountPath });
+  const result = await watchDeployment({
+    client,
+    deploymentUuid,
+    expectedCommit,
+    mountPath,
+    diagnosticFile: process.env.STAGING_GUARD_DIAGNOSTIC_FILE ?? '/tmp/staging-deploy-guard-diagnostics.jsonl',
+  });
   console.log(JSON.stringify({ ok: true, phase: 'watch', ...result }));
 }
 

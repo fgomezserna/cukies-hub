@@ -99,6 +99,7 @@ describe('staging deployment guard', () => {
   it('cancels exactly once on low space and verifies terminal state', async () => {
     let current = record('building');
     let cancelCalls = 0;
+    const diagnostics = [];
     const result = await watchDeployment({
       deploymentUuid: TARGET,
       expectedCommit: COMMIT,
@@ -114,10 +115,21 @@ describe('staging deployment guard', () => {
       },
       exec: fakeExec(dfOutput(9_000_000)),
       sleep: async () => {},
+      diagnosticWriter: async (event) => diagnostics.push(event),
     });
     assert.equal(result.status, 'cancelled-by-user');
     assert.equal(result.cancelCount, 1);
     assert.equal(cancelCalls, 1);
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0].reasonCode, 'low_disk');
+    assert.equal(diagnostics[0].phase, 'df');
+    assert.equal(diagnostics[0].status, 'building');
+    assert.equal(diagnostics[0].deploymentUuid, TARGET);
+    assert.equal(diagnostics[0].sha, COMMIT);
+    assert.equal(diagnostics[0].minimumFreeBytes, STAGING_DEPLOY_GUARD.minimumFreeBytes.toString());
+    assert.equal(diagnostics[0].freeBytes, (9_000_000n * 1024n).toString());
+    assert.equal(diagnostics[0].cancellationResult.responseStatus, 200);
+    assert.equal(typeof diagnostics[0].operation.durationMs, 'number');
   });
 
   it('cancels exactly once on df failure and verifies terminal state', async () => {
@@ -264,7 +276,11 @@ describe('staging deployment guard', () => {
       token: 'token-not-logged',
       fetchImpl: async (url, options) => {
         calls.push({ url, options });
-        return { ok: true, status: 200, json: async () => ({ message: 'Deployment cancelled.' }) };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (url.includes('/applications/') ? [] : { message: 'Deployment cancelled.' }),
+        };
       },
     });
     await client.getDeployment(TARGET);
@@ -277,6 +293,15 @@ describe('staging deployment guard', () => {
     ]);
     assert.equal(calls[2].options.method, 'POST');
     assert.equal(calls[2].options.headers.authorization, 'Bearer token-not-logged');
+  });
+
+  it('rejects an unexpected deployment-list payload instead of treating it as empty', async () => {
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      token: 'token-not-logged',
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ unexpected: true }) }),
+    });
+    await assert.rejects(client.listDeployments(), /payload inesperado/);
   });
 
   it('aborts a hanging Coolify request at the bounded timeout', async () => {
@@ -307,9 +332,15 @@ describe('staging deployment guard', () => {
       baseUrl: 'https://coolify.test',
       readToken: 'read-token',
       deployToken: 'deploy-token',
-      fetchImpl: async (_url, options) => {
+      fetchImpl: async (url, options) => {
         authorizationHeaders.push(options.headers.authorization);
-        return { ok: true, status: 200, json: async () => ({ deployment_uuid: TARGET, application_id: '28', commit: COMMIT, status: 'finished', message: 'Deployment cancelled.' }) };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (url.includes('/applications/')
+            ? []
+            : { deployment_uuid: TARGET, application_id: '28', commit: COMMIT, status: 'finished', message: 'Deployment cancelled.' }),
+        };
       },
     });
     await client.getDeployment(TARGET);
