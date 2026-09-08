@@ -381,7 +381,10 @@
       ],
       "repairWrites": 0,
       "owner": "Parallel assets deployment task investigating infrastructure; root avoids concurrent server changes",
-      "status": "open"
+      "status": "open",
+      "rootCause": "VM1001 /srv filesystem full: 175G total, zero available; Mongo WiredTiger errno28 / No space left on device with WT_PANIC.",
+      "confirmedBy": "Parallel infrastructure owner 01a0817d-b179-7ba0-aa3e-bbeca0d0dc0a",
+      "updatedAt": "2026-09-08T15:49:34.697016+00:00"
     }
   }
 }

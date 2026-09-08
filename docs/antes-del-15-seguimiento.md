@@ -1000,7 +1000,10 @@ script `849a9c1` obtiene revision independiente PASS y 4/4 tests focales;
 no infiere fechas si falta evidencia temporal. La lectura final queda
 interrumpida por perdida de resolucion DNS hacia Mongo y `coolify-db`
 durante el despliegue paralelo de assets. No se ha aplicado la reparacion
-a Mongo; la recuperacion de infraestructura se coordina con esa tarea.
+a Mongo; la recuperacion de infraestructura se coordina con esa tarea. Su
+diagnostico confirma `/srv` al 100% (175G, sin espacio libre), con Mongo
+`WiredTiger errno 28 / No space left on device` y `WT_PANIC`. La causa de
+esta caida de infraestructura se distingue del defecto de historial.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 
