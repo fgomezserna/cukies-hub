@@ -291,7 +291,7 @@
   },
   "creditCutoffFollowUp": {
     "observedAt": "2026-09-08T14:44:19Z",
-    "status": "history and projection repaired; PR332 deployed and NFT catchup advancing; public-reader and idle watermark refresh patch validated, final deployment pending",
+    "status": "RESOLVED IN STAGING: history, projections, credit catchup, public reader and idle freshness verified on 67303f6",
     "qaNftCutoffs": [
       {
         "cutoff": "2026-09-08T14:00:00Z",
@@ -330,7 +330,7 @@
       }
     },
     "dataMutationsDuringAudit": false,
-    "nextStep": "Deploy the validated public-reader and idle watermark refresh patch, then verify both routes current, zero QA grants, fresh sources across idle ticks and coherent signed UI.",
+    "nextStep": "Continue broader UX/legacy validation under issue289; Marketplace unavailable and Vesting unassigned notices remain separate. No production promotion in this repair.",
     "issue": "https://github.com/fgomezserna/cukies-hub/issues/326",
     "impactAudit": {
       "qaAffectedNftRuns": 2,
@@ -586,7 +586,7 @@
       ],
       "repairWrites": 0,
       "owner": "Parallel assets deployment task investigating infrastructure; root avoids concurrent server changes",
-      "status": "infrastructure recovered; credits active; PR332 deployed with NFT catchup advancing; final reader/freshness patch pending",
+      "status": "Recovered; dapp/indexer healthy, credit runtime active and verified; final code served67303f6",
       "rootCause": "VM1001 /srv filesystem full: 175G total, zero available; Mongo WiredTiger errno28 / No space left on device with WT_PANIC.",
       "confirmedBy": "Parallel infrastructure owner 01a0817d-b179-7ba0-aa3e-bbeca0d0dc0a",
       "updatedAt": "2026-09-08T16:02:14.554982+00:00",
@@ -603,7 +603,7 @@
         "earlierSpaceRecoveryCause": "not established; no cleanup performed by these tasks",
         "pruneOrDataDeletionPerformed": false
       },
-      "statusUpdatedAt": "2026-09-08T18:48:21Z"
+      "statusUpdatedAt": "2026-09-08T19:28:28.432Z"
     },
     "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/329",
     "buildMitigation": {
@@ -611,7 +611,7 @@
       "configuration": "COMPOSE_PARALLEL_LIMIT=1 as build-time environment variable",
       "mechanism": "Coolify build-time.env passed via --env-file; installed Compose consumes MaxConcurrency",
       "guard": "Independent disk probe every 2.5s, floor 10GiB; API request budget 15s and bounded 45s availability tolerance, immediate invalid-identity/payload/concurrent-build rejection",
-      "status": "PR332 deployment finished; final public-reader and idle-refresh patch deployment pending",
+      "status": "Final stability deployment finished and functionally verified; operator retains coordination of temporary deployment settings",
       "creditsGate": "restored true and verified effective at 18:13:05Z; do not pause again for the final code deployment",
       "assetsWorker": "contained by deployment operator; backfill not part of this repair",
       "latestAttempt": {
@@ -753,7 +753,7 @@
       "observedAt": "2026-09-08T18:39:10.047Z",
       "masterProjection": "All four existing NFT sources complete and projectionFresh true; only one required rematerialization. QA has zero slots and no pending-materialization UI warning.",
       "masterWorker": "Enabled; one deterministic new full-reconciliation job completed normally, no completed jobs reopened.",
-      "creditRoute": "PR332 deployed: NFT catchup advances beyond 14:30 with zero QA grants. Current public reader still counts contained incidents, and waiting ticks do not refresh UKI watermark.",
+      "creditRoute": "Both routes current at19:00 cutoff; subsequent waiting ticks refresh source evidence; no QA grants from any cutoff since15:00.",
       "jobWrites": 1,
       "rematerialization": {
         "planHash": "0a040ce4dcef468be7bdc3acba95d3a7bfe5a3d714adb1eca85c8bfe305f25e4",
@@ -975,8 +975,9 @@
           "dapp/src/lib/uki-economy/credits/runtime.ts"
         ],
         "scope": "Public reader shares strict predicate at current cutoff. Idle route ticks validate and refresh source watermark without creating runs; route failures and common expiry preserved.",
-        "deployed": false,
-        "codeCommit": "d9a6ccf9c3460685d4646e7625d47c6104791863"
+        "deployed": true,
+        "codeCommit": "d9a6ccf9c3460685d4646e7625d47c6104791863",
+        "pullRequest": 333
       },
       "checks": {
         "focusedTests": 23,
@@ -1130,7 +1131,285 @@
           ]
         },
         "bundleSha256": "d3994f38bdac64e071b8e3f68cc38e5292f8a009f4a2841573b0403d94f28cad"
+      },
+      "deployment": {
+        "deploymentUuid": "xkkg08gk4c84ss8ww0gc4w8o",
+        "gitSha": "67303f66f0b64797fffa21a4722b3f0a672a07c1",
+        "finishedAt": "2026-09-08T19:25:51Z",
+        "publicHealth": "ok",
+        "environment": "staging",
+        "dappHealthy": true,
+        "indexerHealthy": true,
+        "effectiveCreditsEnabled": true,
+        "composeProfiles": "staging-runtime",
+        "rewardAccountingEnabled": false,
+        "cardWorkerPresent": false,
+        "diskFreeKiB": 18450132,
+        "guard": {
+          "started": "after queue identification while in_progress",
+          "cancelCount": 0,
+          "diagnosticCount": 0
+        }
+      },
+      "liveVerification": {
+        "verifiedAt": "2026-09-08T19:28:28.432Z",
+        "latestRunsByRoute": [
+          {
+            "route": "nft",
+            "runId": "bdd36bf505257e4d3ed2330567927cfb0f8bce1f83ae554f802f05e144e0dc84",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+            "cutoff": "2026-09-08T19:00:00.000Z",
+            "nextCutoff": "2026-09-08T19:30:00.000Z",
+            "status": "open",
+            "createdAt": "2026-09-08T19:10:50.899Z",
+            "updatedAt": "2026-09-08T19:10:51.197Z"
+          },
+          {
+            "route": "uki",
+            "runId": "caf0cc5471c0fdec4ef41d444169ab68e5db0712a08dd80157590bd161fd2d80",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+            "cutoff": "2026-09-08T19:00:00.000Z",
+            "nextCutoff": "2026-09-08T19:30:00.000Z",
+            "status": "open",
+            "createdAt": "2026-09-08T19:06:45.606Z",
+            "updatedAt": "2026-09-08T19:06:46.503Z"
+          }
+        ],
+        "qaPostWithdrawalItems": {
+          "cutoff": "2026-09-08T15:00:00.000Z",
+          "itemCount": 0,
+          "grantCredits": 0,
+          "ownCredits": 0,
+          "poolCredits": 0,
+          "statuses": {},
+          "items": []
+        },
+        "historicalIncidentsRemainOpen": 2,
+        "idleSamples": [
+          {
+            "observedAt": "2026-09-08T19:26:54.239Z",
+            "watermarks": [
+              {
+                "route": "nft",
+                "status": "healthy",
+                "observedThrough": "2026-09-08T19:26:34.065Z",
+                "updatedAt": "2026-09-08T19:26:51.489Z"
+              },
+              {
+                "route": "uki",
+                "status": "healthy",
+                "observedThrough": "2026-09-08T19:26:29.099Z",
+                "updatedAt": "2026-09-08T19:26:51.351Z"
+              }
+            ],
+            "routes": {
+              "uki": {
+                "balance": {
+                  "grantedCredits": 0,
+                  "poolDepositedCredits": 0,
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "spentCredits": 0,
+                  "expiredCredits": 0,
+                  "blocked": false
+                },
+                "pool": {
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "blocked": false
+                },
+                "grants": {
+                  "healthy": true,
+                  "sourceObservedThrough": "2026-09-08T19:26:29.099Z",
+                  "openIncidents": 0
+                }
+              },
+              "nft": {
+                "balance": {
+                  "grantedCredits": 0,
+                  "poolDepositedCredits": 0,
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "spentCredits": 0,
+                  "expiredCredits": 0,
+                  "blocked": false
+                },
+                "pool": {
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "blocked": false
+                },
+                "grants": {
+                  "healthy": true,
+                  "sourceObservedThrough": "2026-09-08T19:26:34.065Z",
+                  "openIncidents": 0
+                }
+              }
+            },
+            "latestTick": {
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "expiredReservations": 0,
+              "expiredLots": 0,
+              "routeResults": [
+                {
+                  "route": "uki",
+                  "status": "waiting",
+                  "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+                  "creditRunId": "",
+                  "batchesProcessed": 0,
+                  "itemsApplied": 0,
+                  "pendingItems": 0
+                },
+                {
+                  "route": "nft",
+                  "status": "waiting",
+                  "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+                  "creditRunId": "",
+                  "batchesProcessed": 0,
+                  "itemsApplied": 0,
+                  "pendingItems": 0
+                }
+              ],
+              "completedAt": "2026-09-08T19:26:51.594Z"
+            }
+          },
+          {
+            "observedAt": "2026-09-08T19:27:56.814Z",
+            "watermarks": [
+              {
+                "route": "nft",
+                "status": "healthy",
+                "observedThrough": "2026-09-08T19:27:30.729Z",
+                "updatedAt": "2026-09-08T19:27:52.108Z"
+              },
+              {
+                "route": "uki",
+                "status": "healthy",
+                "observedThrough": "2026-09-08T19:27:25.637Z",
+                "updatedAt": "2026-09-08T19:27:51.976Z"
+              }
+            ],
+            "routes": {
+              "uki": {
+                "balance": {
+                  "grantedCredits": 0,
+                  "poolDepositedCredits": 0,
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "spentCredits": 0,
+                  "expiredCredits": 0,
+                  "blocked": false
+                },
+                "pool": {
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "blocked": false
+                },
+                "grants": {
+                  "healthy": true,
+                  "sourceObservedThrough": "2026-09-08T19:27:25.637Z",
+                  "openIncidents": 0
+                }
+              },
+              "nft": {
+                "balance": {
+                  "grantedCredits": 0,
+                  "poolDepositedCredits": 0,
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "spentCredits": 0,
+                  "expiredCredits": 0,
+                  "blocked": false
+                },
+                "pool": {
+                  "availableCredits": 0,
+                  "reservedCredits": 0,
+                  "blocked": false
+                },
+                "grants": {
+                  "healthy": true,
+                  "sourceObservedThrough": "2026-09-08T19:27:30.729Z",
+                  "openIncidents": 0
+                }
+              }
+            },
+            "latestTick": {
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "expiredReservations": 0,
+              "expiredLots": 0,
+              "routeResults": [
+                {
+                  "route": "uki",
+                  "status": "waiting",
+                  "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+                  "creditRunId": "",
+                  "batchesProcessed": 0,
+                  "itemsApplied": 0,
+                  "pendingItems": 0
+                },
+                {
+                  "route": "nft",
+                  "status": "waiting",
+                  "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+                  "creditRunId": "",
+                  "batchesProcessed": 0,
+                  "itemsApplied": 0,
+                  "pendingItems": 0
+                }
+              ],
+              "completedAt": "2026-09-08T19:27:52.210Z"
+            }
+          }
+        ],
+        "assertions": {
+          "bothWatermarksAdvanceDuringWaiting": true,
+          "noItemsAppliedDuringWaiting": true,
+          "bothRoutesHealthy": true,
+          "zeroQaPostWithdrawalGrants": true
+        },
+        "ui": {
+          "signedQaWallet": true,
+          "reconnectionRequired": false,
+          "cukieMaster": {
+            "activeSlots": 0,
+            "dailyCredits": 0,
+            "materializationWarning": false
+          },
+          "credits": {
+            "availableCredits": 0,
+            "configurableSlots": 0,
+            "pendingValidityWarning": false
+          },
+          "dashboard": {
+            "masterActiveSlots": 0,
+            "availableCredits": 0,
+            "poolActivePositions": 0,
+            "masterAndCreditsAvailable": true,
+            "independentNotices": [
+              "Marketplace unavailable",
+              "Vesting without assignment"
+            ]
+          }
+        }
+      },
+      "productionVerification": {
+        "verifiedAt": "2026-09-08T19:28Z",
+        "status": "ok",
+        "environment": "production",
+        "gitSha": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e",
+        "changedByThisRepair": false
       }
-    }
+    },
+    "resolvedAt": "2026-09-08T19:28:28.432Z"
   }
 }
