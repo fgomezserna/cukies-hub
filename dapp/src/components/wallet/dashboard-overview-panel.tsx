@@ -214,6 +214,7 @@ export function DashboardOverviewPanel() {
   const [request, setRequest] = useState<RequestState>({ state: 'idle', summary: null });
   const [reloadNonce, setReloadNonce] = useState(0);
   const hasSignedEvmSession = Boolean(user && walletType === 'evm');
+  const walletNeedsSignature = Boolean(isConnected && !hasSignedEvmSession);
 
   useEffect(() => {
     if (authLoading) return;
@@ -250,6 +251,15 @@ export function DashboardOverviewPanel() {
   const reviewModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_DEGRADED') ?? [];
   const wrongChain = Boolean(summary && isConnected && chainId !== summary.network.chainId);
   const master = summary ? moduleData(summary.modules.cukieMaster) : null;
+  const masterDataReady = Boolean(
+    master
+    && master.routes.uki.sourceComplete
+    && master.routes.uki.projectionFresh
+    && !master.routes.uki.synchronizing
+    && master.routes.nft.sourceComplete
+    && master.routes.nft.projectionFresh
+    && !master.routes.nft.synchronizing,
+  );
   const credits = summary ? moduleData(summary.modules.credits) : null;
   const pool = summary ? moduleData(summary.modules.cukiePool) : null;
   const rewards = summary ? moduleData(summary.modules.rewards) : null;
@@ -262,13 +272,10 @@ export function DashboardOverviewPanel() {
       <Panel innerClassName="p-5 sm:p-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="uki-label">Tu actividad</p>
-            <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)]">
-              Todo en un vistazo
+            <p className="uki-label">Actividad</p>
+            <h2 className="mt-1 font-headline text-xl font-black uppercase text-[var(--uki-cream)]">
+              Datos clave
             </h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              Revisa tus cupos, créditos, Cukies, premios, liberación de UKI y actividad de juego.
-            </p>
           </div>
           {hasSignedEvmSession ? (
             <button
@@ -285,11 +292,20 @@ export function DashboardOverviewPanel() {
 
         {!authLoading && !hasSignedEvmSession ? (
           <div className="mt-6 rounded-[8px] border border-white/10 bg-black/20 p-5">
-            <p className="font-black text-[var(--uki-cream)]">Conecta tu wallet</p>
-            <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-              Conecta tu wallet para consultar tus activos y continuar jugando.
+            <p className="font-black text-[var(--uki-cream)]">
+              {walletNeedsSignature ? 'Firma tu wallet' : 'Conecta tu wallet'}
             </p>
-            <LandingWalletConnectButton evmOnly className="mt-4" showCompactText={false} />
+            <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+              {walletNeedsSignature
+                ? 'Firma el acceso para consultar tus activos y continuar jugando.'
+                : 'Conecta tu wallet para consultar tus activos y continuar jugando.'}
+            </p>
+            <LandingWalletConnectButton
+              evmOnly
+              className="mt-4"
+              label={walletNeedsSignature ? 'Firmar wallet' : 'Conectar wallet'}
+              showCompactText={false}
+            />
           </div>
         ) : null}
 
@@ -364,9 +380,9 @@ export function DashboardOverviewPanel() {
                 module={summary.modules.cukieMaster}
                 href="/cukie-master#mi-estado"
                 action="Gestionar cupos"
-                value={master ? integerLabel(master.allocatedSlots) : null}
+                value={masterDataReady && master ? integerLabel(master.allocatedSlots) : null}
                 label="cupos activos"
-                details={master ? [
+                details={masterDataReady && master ? [
                   `${integerLabel(master.routes.uki.allocatedSlots)} por UKI`,
                   `${integerLabel(master.routes.nft.allocatedSlots)} por Cukies Originales`,
                 ] : []}

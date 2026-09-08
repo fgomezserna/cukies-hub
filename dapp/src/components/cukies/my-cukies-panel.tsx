@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Cookie, Layers3, Loader2, RefreshCw, Store } from 'lucide-react';
 
@@ -65,15 +65,32 @@ function itemAction(cukie: MyCukieCollectionItem) {
   return { href: `/marketplace/${cukie.tokenId}`, label: 'Ver ficha' };
 }
 
+function itemActionDescription(cukie: MyCukieCollectionItem) {
+  if (cukie.custody === 'cukie_pool') return 'Consulta o retira la aportación al pool.';
+  if (cukie.custody === 'cukie_master') return 'Gestiona la posición depositada en Cukie Master.';
+  if (cukie.state === 'available') return 'Puedes aportarlo al pool cuando quieras.';
+  return 'Revisa identidad, estado y actividad del Cukie.';
+}
+
 export function MyCukiesPanel() {
   const { user, isLoading: authLoading } = useAuth();
   const walletAddress = user?.walletAddress ?? null;
   const [state, setState] = useState<LoadState>('idle');
   const [collection, setCollection] = useState<MyCukieCollectionData | null>(null);
+  const requestIdRef = useRef(0);
   const items = useMemo(() => collection?.items ?? [], [collection]);
 
-  const load = useCallback(async (signal?: AbortSignal) => {
+  const load = useCallback(async (
+    signal?: AbortSignal,
+    expectedRequestId = requestIdRef.current,
+  ) => {
     if (!walletAddress) return;
+    const requestedWallet = walletAddress;
+    const isCurrentRequest = () => (
+      requestIdRef.current === expectedRequestId
+      && walletAddress === requestedWallet
+      && !signal?.aborted
+    );
     setState('loading');
     const params = new URLSearchParams({ walletAddress });
     const response = await fetch('/api/cukies/mine?' + params.toString(), {
@@ -83,24 +100,31 @@ export function MyCukiesPanel() {
     });
     const body = await response.json() as MyCukieCollectionResponse;
     if (!response.ok || body.status !== 'ok') throw new Error('CUKIES_UNAVAILABLE');
+    if (!isCurrentRequest()) return;
     setCollection(body.data);
     setState('ready');
   }, [walletAddress]);
 
   useEffect(() => {
     if (authLoading) return;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     if (!walletAddress) {
       setCollection(null);
       setState('idle');
       return;
     }
     const controller = new AbortController();
-    load(controller.signal).catch((error: unknown) => {
+    load(controller.signal, requestId).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (requestIdRef.current !== requestId) return;
       setCollection(null);
       setState('unavailable');
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (requestIdRef.current === requestId) requestIdRef.current += 1;
+    };
   }, [authLoading, load, walletAddress]);
 
   if (authLoading) {
@@ -137,7 +161,12 @@ export function MyCukiesPanel() {
             <h1 className="mt-2 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">Mis Cukies</h1>
             <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">Aquí aparecen los Cukies asociados a tu wallet. Abre una ficha para ver sus datos o elige una acción para utilizarlos.</p>
           </div>
-          <button type="button" onClick={() => load().catch(() => setState('unavailable'))} disabled={state === 'loading'} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] disabled:opacity-50">
+          <button type="button" onClick={() => {
+            const requestId = requestIdRef.current;
+            void load(undefined, requestId).catch(() => {
+              if (requestIdRef.current === requestId) setState('unavailable');
+            });
+          }} disabled={state === 'loading'} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] disabled:opacity-50">
             <RefreshCw className={state === 'loading' ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Actualizar colección
           </button>
@@ -202,10 +231,19 @@ export function MyCukiesPanel() {
                 <div className="p-5">
                   <h3 className="font-headline text-xl font-black text-[var(--uki-cream)]">Cukie #{cukie.tokenId}</h3>
                   <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">{generationLabel(cukie)} · {rarityLabel(cukie)}</p>
+                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">
+                    Red: {cukie.network ?? 'No disponible'} · Origen: {cukie.origin ?? 'No disponible'}
+                  </p>
                   <p className="mt-3 text-xs font-bold text-[var(--uki-lilac)]">{stateLabel(cukie)}</p>
-                  <Link href={itemAction(cukie).href} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-4 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
-                    {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
-                  </Link>
+                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">{itemActionDescription(cukie)}</p>
+                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                    <Link href={`/marketplace/${cukie.tokenId}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-white/15 bg-white/[0.04] px-3 text-sm font-black text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac)]/45">
+                      Ver ficha <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                    </Link>
+                    <Link href={itemAction(cukie).href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                      {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                    </Link>
+                  </div>
                 </div>
               </article>
             ))}
@@ -219,6 +257,20 @@ export function MyCukiesPanel() {
           <Link href="/marketplace" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 text-sm font-black text-[#09060f]">Explorar marketplace <ArrowRight className="h-4 w-4" /></Link>
         </div>
       ) : null}
+
+      <section aria-label="Herramientas para tus Cukies" className="mt-8 grid gap-3 border-t border-white/10 pt-7 sm:grid-cols-3">
+        {[
+          ['/bridge', 'Bridge', 'Consulta movimientos entre redes y sigue los Cukies en transferencia.'],
+          ['/breeding', 'Crías', 'Elige padres compatibles y revisa las crías activas o terminadas.'],
+          ['/cukiepoints', 'Cukie Points', 'Consulta saldo personal y movimientos de puntos por red.'],
+        ].map(([href, label, helper]) => (
+          <Link key={href} href={href} className="group rounded-[13px] border border-white/10 bg-black/25 p-4 transition hover:border-[var(--uki-lilac)]/40">
+            <span className="font-black text-[var(--uki-cream)]">{label}</span>
+            <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--uki-muted)]">{helper}</span>
+            <ArrowRight className="mt-3 h-4 w-4 text-[var(--uki-lilac)] transition-transform group-hover:translate-x-1" />
+          </Link>
+        ))}
+      </section>
     </div>
   );
 }

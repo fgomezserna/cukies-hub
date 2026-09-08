@@ -9,12 +9,19 @@ import {
   createSwapDeadline,
   formatEditableSwapAmount,
   formatSwapAmount,
+  getUkiSwapNetworkLabel,
 } from '@/lib/uki-swap';
 
 const ASM = '0x707F0f4a39a4a26239F7D00463B15AB5656861f9' as Address;
 const UKI = '0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA' as Address;
 
 describe('uki-swap', () => {
+  it('expone la red objetivo que debe firmar la wallet', () => {
+    expect(getUkiSwapNetworkLabel(56)).toBe('BNB Smart Chain');
+    expect(getUkiSwapNetworkLabel(97)).toBe('BSC Testnet');
+    expect(getUkiSwapNetworkLabel(1)).toBe('Red no configurada');
+  });
+
   it('fuerza las rutas V2 verificadas en BSC mainnet', () => {
     const config = buildUkiSwapConfig({ chainId: 56, asmAddress: ASM, ukiAddress: UKI });
 

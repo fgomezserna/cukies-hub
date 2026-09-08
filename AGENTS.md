@@ -411,9 +411,18 @@ PR body must include:
 - Risks, follow-ups and any blocked items.
 - Screenshots or approved generated images for UX changes when relevant.
 
+Autorizacion permanente del usuario para staging (8 de septiembre de 2026):
+una peticion de implementar o corregir incluye commit, push, merge a `staging`
+y despliegue de la app 28, sin pedir una confirmacion adicional para esos pasos.
+Completa la entrega comprobando el SHA servido y el comportamiento afectado;
+un parche local o una PR abierta no son una entrega terminada. Conserva los
+checks y revisiones exigidos. Esta autorizacion no incluye `main`/produccion,
+operaciones destructivas ni trabajos fuera del alcance solicitado; una peticion
+solo de auditoria sigue siendo de lectura.
+
 Do not merge unless all of these are true:
 
-1. The user asked for merge or the current operating mode explicitly grants merge authority.
+1. The user asked for merge or the staging authorization above applies; other targets need their own authorization.
 2. Required checks pass or failures are understood and accepted.
 3. The PR fully satisfies the linked issue acceptance criteria.
 4. No unresolved review comments remain.

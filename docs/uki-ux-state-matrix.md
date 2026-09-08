@@ -1,179 +1,84 @@
-# UKI UX state matrix
+# Cukies Hub: matriz de estados UX
 
-Estado: especificacion UX actualizada; Dashboard pendiente de validacion visual.
-Issues: #111 `UKI-070.2`, #289 `UKI-031.0`.
-Fecha: 2026-08-30.
-Fuentes: `docs/uki-dapp-sitemap.md`, `docs/uki-current-operating-rules.md`, `docs/uki-technical-disclaimers.md`.
+Fecha: 2026-09-08. **Especificación de aceptación; no certificación de que todos
+los estados funcionen.** Sustituye la matriz del 30 de agosto, cuyas rutas y
+mensajes de preventa ya no representan la navegación vigente.
 
-## Objetivo
+Fuentes: [auditoría y arquitectura](uki-dapp-sitemap.md),
+[reglas funcionales](uki-current-operating-rules.md) y
+[seguimiento único](antes-del-15-seguimiento.md#5-dashboard-y-arquitectura-del-sitio).
+Las prioridades y la evidencia LIVE están en la auditoría; aquí solo se define
+cómo debe responder la interfaz. No se añaden reglas de economía ni pantallas.
 
-Definir estados de UI para cada pantalla de la dapp UKI antes de implementar restyling o pantallas finales. La matriz evita que una pantalla mezcle responsabilidades o prometa acciones que todavia no estan disponibles.
+## Estados comunes
 
-## Estados globales
-
-Estos estados se aplican a cualquier pantalla que dependa de wallet, red, datos on-chain o APIs internas.
-
-| Estado | Cuando aparece | UI esperada | Accion principal | No hacer |
-| --- | --- | --- | --- | --- |
-| Wallet desconectada | No hay wallet conectada y la pantalla necesita datos personales o transaccion. | Estado vacio con explicacion corta y bloque de datos publicos si aplica. | Connect wallet. | Mostrar balances ficticios o rewards personales. |
-| Chain incorrecta | Wallet conectada en red distinta de BNB Smart Chain para accion UKI. | Banner persistente y bloqueo de acciones on-chain. | Switch to BNB Smart Chain. | Permitir compra, staking, claim o pool actions. |
-| Datos cargando | API, indexer o contrato aun responde. | Skeletons con estructura real de pantalla. | Ninguna o cancelar si aplica. | Cambiar layout al terminar de cargar. |
-| Datos sincronizando | Hay cache parcial o indexer retrasado. | Aviso de sincronizacion y datos en solo lectura cuando sea seguro. | Retry / refresh. | Permitir acciones economicas si falta reconciliacion. |
-| Error recuperable | API/contrato falla pero el usuario puede reintentar. | Mensaje tecnico corto, codigo si existe y accion retry. | Retry. | Perder contexto de formulario o seleccion. |
-| Accion pendiente | Hay tx o job pendiente. | Estado de progreso con hash/job id cuando exista. | View on BscScan / View status. | Duplicar la accion sin idempotencia. |
-| Accion confirmada | Tx/evento/job confirmado. | Confirmacion discreta y siguiente paso claro. | Continue / view details. | Marcar claim/compra como final sin evento confirmado. |
-| Coming next | La fase no esta abierta pero se comunica utilidad futura. | Preview bloqueada con fase y criterio de apertura. | Read details / Join presale. | Simular disponibilidad real. |
-
-## Landing / Launch
-
-Ruta: `/`
-
-| Estado | UI esperada | Accion principal | Secundarias |
+| Estado | Información necesaria | Acción o salida | Evitar |
 | --- | --- | --- | --- |
-| Publica ready | Hero de preventa cerrada, facts de UKI, BSC, ASM, vesting y utilidad futura. | Join UKI presale / Notify me segun estado real. | Read sale details, View Treasure Hunt. |
-| Preventa aun cerrada | Mostrar fecha prevista o "coming soon" sin formulario transaccional. | Read sale details. | Connect wallet opcional si aporta valor. |
-| Wallet desconectada | Landing sigue siendo navegable; modulo de compra muestra preview sin datos personales. | Connect wallet. | Read sale details. |
-| Chain incorrecta | Banner si wallet conectada, sin bloquear lectura publica. | Switch network. | Read sale details. |
-| Datos cargando | Skeleton solo para status strip/modulo dinamico. | Ninguna. | Ninguna. |
-| Error de status | Mantener landing y marcar status de preventa como no disponible. | Retry status. | Read docs. |
+| Wallet desconectada | Qué permite consultar/conseguir al conectarla; lectura pública útil cuando exista. | Conectar wallet desde la tarea. | Cifras personales ficticias, exigir conectar para leer información pública. |
+| Wallet conectada sin sesión firmada | Diferenciar conexión de acceso a datos privados. | Firmar sesión; conservar la navegación y el referido propuesto. | Confirmar patrocinador implícitamente o confundir esta firma con su confirmación específica. |
+| Red incorrecta | Red conectada y red requerida para la acción concreta, incluida TRON/BSC legacy cuando corresponda. | Cambiar a la red requerida; lectura segura si está disponible. | Pedir conectar otra vez cuando ya está conectado, o tratar todos los contratos como la misma red. |
+| Cargando | Geometría estable por módulo; todavía no hay resultado. | Esperar; refresco deshabilitado mientras corresponda. | Mostrar cero o «no tienes» antes de resolver la fuente. |
+| Vacío confirmado | Alcance y periodo de la consulta; no hay datos/activos/operaciones en ese alcance. | Siguiente acción pertinente: jugar, explorar o gestionar recursos. | Equiparar vacío con error, o presentar un calendario personal sin asignación. |
+| Parcial / origen no disponible | Qué se conoce, qué falta y qué acciones siguen siendo seguras. | Reintentar el módulo afectado; mantener acceso a los demás. | Totales parciales presentados como completos, cero de un origen desconocido o «Todo al día». |
+| Datos anteriores / sincronizando | Última lectura verificada y efecto sobre la acción; indicar si puede consultarse una posición conocida. | Actualizar o consultar el estado existente. | Recomendar nuevos depósitos a partir de una falta de lectura; retirar acceso a recuperación segura sin motivo. |
+| Error recuperable | Qué no se pudo completar, si hubo cambios y cómo continuar. | Reintentar conservando selección/filtros; ayuda cuando proceda. | Pantalla vacía, errores internos crudos o «vuelve más tarde» sin contexto. |
+| Servicio pausado | Qué acción está desactivada y qué lectura/seguimiento sigue disponible. | Consultar operaciones previas, regresar a colección o actualizar disponibilidad. | Prometer fecha no aprobada, fingir un catálogo actualizado o un formulario operativo. |
+| Revisión antes de firma | Activo/cantidad, red, moneda, fee/gas si aplica, destinatario y efecto sobre recursos/posición. | Una confirmación con propósito explícito. | Mezclar approve con operación final o usar la misma etiqueta para firma de sesión y transacción. |
+| Firma rechazada | Operación cancelada por el usuario; estado real si existió una aprobación previa. | Volver a revisar, reintentar o salir. | Presentarlo como fallo del servicio o reiniciar silenciosamente una transacción. |
+| Operación pendiente | Paso actual, referencia de transacción cuando exista y siguiente confirmación esperada. | Seguir estado; impedir duplicados. | Declarar completado por recibir un hash o por aceptar una solicitud. |
+| Operación confirmada | Evidencia canónica del dominio; impacto y siguiente paso. | Volver a lista, ver posición, resultado o historial. | Confirmación optimista de compra/bridge/claim sin la evidencia requerida. |
 
-## Preventa UKI
+Los componentes consumen estados de los dominios; no calculan balances,
+elegibilidad, ranking o reparto en cliente. Las acciones mantienen idempotencia
+y no muestran jobs, colecciones, endpoints o proofs crudos como instrucciones
+de usuario. Los detalles técnicos útiles para soporte/explorador se separan.
 
-Ruta: `/presale`
+## Casos específicos por recorrido
 
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Preventa cerrada | Condiciones visibles: precio 0.01 USD, duracion 1 mes, ASM, vesting 9 meses, liquidez. Compra bloqueada. | Connect wallet / Read rules. | View vesting rules. |
-| Wallet desconectada | Formulario en modo preview sin allowance ni balance personal. | Connect wallet. | Read sale details. |
-| Chain incorrecta | Compra, approve y vesting personal bloqueados. | Switch to BNB Smart Chain. | View public sale facts. |
-| Sin allowance ASM | Balance visible; compra bloqueada hasta approve. | Approve ASM. | Edit amount. |
-| Allowance suficiente | Quote ASM -> UKI, vesting preview y riesgos visibles. | Buy UKI. | Edit amount, View BscScan config. |
-| Compra pendiente | Hash visible, formulario bloqueado e idempotencia por tx. | View on BscScan. | Return to wallet. |
-| Compra confirmada | Resumen comprado, vesting creado/pendiente de indexar. | View vesting. | Go to wallet. |
-| Sale cap agotado | Compra bloqueada; explicar que preventa esta agotada. | View wallet. | Read tokenomics. |
-| Error compra | Mantener amount/quote y mostrar motivo: allowance, cap, ventana, red o contrato pausado. | Retry. | Edit amount. |
+| Ruta / tarea | Escenarios que deben probarse | Resultado de UX requerido |
+| --- | --- | --- |
+| `/` · entrada pública | Torneo activo, edición cerrada, nuevo modo semanal; compra con monedas disponibles; lectura de estado fallida. | Hero, instrucciones, contador y CTA describen la misma fase. Compra y preventa terminada se distinguen. No se deduce ausencia de liquidez de un fallo de lectura. |
+| `/dashboard` | Sin actividad, listo para jugar, retirada/cobro pendiente, fuente parcial, inventario/master/créditos con alcances diferentes. | Una siguiente acción respaldada por datos; fecha/periodo y avisos junto al módulo. Wallet derivada de la sesión; ningún query arbitrario expone datos privados. |
+| `/cukie-master` | Vías UKI/Originales, vesting computable, requisito incompleto, validación, activo, gracia, retiro, datos sin reconciliar. | Distinguir requisito de saldo y cupos materializados. Mostrar qué falta o cuándo cambia el estado sin duplicar límites ni inducir un depósito innecesario. Efecto de retirar visible antes de firmar. |
+| `/credits` | Saldo actual y futuro distintos, antes/después de corte, reparto guardado/cambiado, caducidad, error de historial o de configuración. | Disponible hoy, comprometido, aportado y próximo reparto separados. Cambios en múltiplos admitidos, cuándo se aplican y confirmación de guardado inequívocos. Historial no convierte entradas acumuladas en saldo disponible. |
+| `/cukie-hodler` | Disponible en wallet, en custodia activándose, disponible para partidas, asignado, salida pedida, retirable, fuente incompleta. | Acción según estado y tiempo. Total en custodia no equivale a disponible para jugar. La indisponibilidad de inventario no afirma cero posiciones ni oculta recuperación de una posición conocida. |
+| `/cukie-hodler/recuperar` | Depositado pero no visible, posición encontrada/no encontrada, red errónea, operación pendiente. | Explicar que es una posición existente. Si ya aparece en el pool, dirigir a su salida normal; conservar la recuperación directa validada. |
+| `/cukies` | Wallet/Pool/Master, disponible/listado/bloqueado/bridge, datos parciales, imagen fallida. | Cada NFT tiene ficha y estado legible, más acción compatible. Origen/red visibles; fallback de imagen del producto. No presentar una fuente parcial como colección completa. |
+| `/marketplace` y detalle | Ambos orígenes, filtros sin resultados, catálogo no disponible, listado cambiado, ownership/approval revocados, compra/publicación/cancelación pendientes. | Todos/Legacy/UKI con misma navegación; filtros de red/tipo/generación/habilidades/crías donde procedan. Precio con moneda; detalle y acción por contrato exacto. Regresar restaura filtros y posición. |
+| `/bridge` | TRON → BSC, red/wallet destino, NFT no elegible, fee, servicio pausado, solicitud/confirmación/finalización y fallo recuperable. | Revisar origen/destino antes de aprobar; seguir ambas transacciones cuando existan. No anunciar finalizado al registrar la solicitud. No asumir reversa BSC → TRON como prioridad. |
+| `/cukiepoints` | Saldo emitido, pendiente de staking, posiciones e historial por red; red no conectada, fuente fallida y acciones pausadas. | No sumar desconocido como cero ni mezclar saldo emitido con pendiente. No confundir con `/points` o créditos. Solo acciones soportadas por contrato; sin claim/conversión inventados. |
+| `/breeding` y pestañas | Padres compatibles/no elegibles, coste/puntos, approve, inicio, cría activa, apertura/finalización, historial y corte de servicio. | Distinguir wallet, red, disponibilidad de fuente y falta de padres. URL refleja pestaña; conservar la familia y las operaciones ya iniciadas. Condiciones de corte siguen decisión de producto. |
+| Treasure Hunt · entrada | Torneo de staking y modo semanal; saldo propio/pool, sin recursos, preparación, iframe bloqueado, reserva, finalización/abandono/error. | Nombre, coste, disponibilidad y botón coinciden entre portada/resumen/contenedor/juego. Nunca gastar recursos al navegar. Diferenciar reserva, consumo y liberación según resultado canónico. |
+| Treasure Hunt · reglas/ranking | Semana actual, especiales cerrados, sin resultados, mi posición, histórico, créditos propios/pool. | Mismas reglas y cantidades en todas las ayudas; fecha y periodo claros. No confundir recompensa directa con clasificación. Las fechas de pruebas aceleradas salen del periodo real. |
+| `/premios` | Sin premios, preparación, disponible, cobrado, caducado/revisión; claim pendiente/rechazado/fallido. | Importe cobrable y plazo primero. Preparado no es cobrable; embajadores se identifica como origen y conserva vínculo a su panel. Confirmar cobro con la evidencia canónica. |
+| `/vesting` | Desconectado, sin asignación, bloqueado, liberación parcial, claim, contrato/lectura no disponible. | No aparentar calendario personal en un vacío; no presentar fallo como cero. Explicar disponible/próxima liberación y conservar datos de compra histórica. Ruta alternativa solo con diferencia/compatibilidad definida. |
+| `/embajadores` y referido | Nuevo directo, con referido, confirmación pendiente, firma rechazada, ciclo, preventa sin sponsor, preventa con relación, confirmado. | Nuevos: firma específica sin gas antes de enlace propio. Navegar o firmar sesión no confirma. Preventa sin sponsor no puede añadirse uno; preservar enlaces elegibles. Mensaje específico de ciclo, sin confundirlo con relación ya fijada. |
+| Cuenta / perfil / ajustes | Alias del ranking vs identificador público, nombre inmutable, foto ausente/errónea, validación, guardado y privacidad. | Explicar qué campo se publica y qué se puede cambiar. Avatar real o fallback local; guardar con feedback. No confundir wallet con identidad del ranking ni publicar datos privados. |
+| Notificaciones | Sin actividad, nueva, leída, error y destino. | Contador real, sin mensaje fijo ni misión inventada. Nombre accesible. Abrir un elemento lleva a la operación/contenido que lo originó. |
+| Puntos de cuenta, quests y juegos secundarios | Función publicada/no publicada, sin actividad, carga/error, XP y recompensas. | No prometer UKI ni misiones inexistentes. Idioma/identidad consistentes; mantener los sistemas de puntos diferenciados. Su presencia en código no obliga a añadirlos al menú. |
+| `/indexer` · operación interna | Sin sesión, usuario sin permiso, autorizado, datos fallidos. | Sin datos privados para no autorizados y fuera del menú cliente. No se crea una ruta administrativa nueva para el rediseño. |
 
-## Dashboard Wallet
+## Navegación, móvil y accesibilidad
 
-Ruta canonica: `/dashboard`. `/wallet` sera alias legacy cuando la pantalla
-funcional este disponible.
+- Mismos destinos y conceptos en escritorio/móvil y Stage/Main; cambios de red
+  o contratos se explican cuando afecten a una decisión real.
+- Menú activo en la ruta y sus hijas; logo/Inicio conservan `/`, Resumen usa
+  `/dashboard`. Las herramientas de colección tienen entrada contextual.
+- Drawer con nombre y cierre visible, foco contenido, Escape y retorno al
+  activador al cancelar. Tras navegar, foco en el contenido nuevo de forma
+  predecible. Comprobar historial del navegador y enlaces profundos.
+- Objetivo táctil del proyecto: 44 × 44 px. Comprobar anchos 320, 391, 768 y
+  1440 px, zoom y menú en altura reducida. Sin scroll horizontal global.
+- Iconos y selectores tienen nombre accesible; errores y estados no dependen
+  exclusivamente del color. Contraste y lector de pantalla se validan aparte.
+- Un encabezado principal por pantalla operativa, dato decisivo y CTA antes de
+  contenido secundario. Tablas pueden desplazarse dentro de su contenedor,
+  manteniendo visibles sus etiquetas y unidades.
 
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Wallet desconectada | Estado vacio con valor de conectar: UKI, Cukies, creditos, slots y rewards; sin cifras personales. | Connect wallet. | Como jugar. |
-| Wallet conectada sin firma | La wallet esta visible, pero los modulos privados permanecen cerrados hasta crear la sesion EVM firmada. | Firmar sesion. | Volver al inicio. |
-| Chain incorrecta | Datos ya verificados en solo lectura cuando sea seguro; acciones bloqueadas. En Stage exige chain 97. | Switch network. | Refresh data. |
-| Loading | Skeleton estable por modulos: identidad, alertas, UKI, slots, creditos, Cukies, juego y rewards. | Ninguna. | Ninguna. |
-| Partial | Mantiene los modulos validos y marca cada fuente fallida con `asOf`; nunca sustituye desconocido por cero. | Retry failed modules. | View available modules. |
-| Stale | Aviso de sincronizacion, timestamp y bloqueo de acciones sensibles. | Refresh data. | View source status. |
-| Sin actividad | Wallet firmada sin actividad economica detectada. | Go to Cukie Master. | View Cukies, Play. |
-| Datos inconsistentes | Alertas por NFT/listing/bridge/indexer, requisito o snapshot; acciones sensibles bloqueadas. | Refresh / contact support. | View details. |
-| Ready | Resumen personal con alertas priorizadas y enlaces a pantallas especializadas. | Play / Review wallet status. | Go to Cukie Master, View rewards. |
-| Error total | Error recuperable con codigo, contexto y retry; ningun modulo presenta ceros falsos. | Retry. | Contact support. |
+## Registro de validación
 
-## Cukie Master
-
-Ruta: `/cukie-master`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Coming next | Explica cupos, rutas y regla de 24h sin permitir staking si la fase no esta abierta. | Read rules. | Go to presale. |
-| Wallet desconectada | Preview de rutas y puntos por rareza; sin calculo personal. | Connect wallet. | Read rules. |
-| Chain incorrecta | Acciones UKI/NFT BSC bloqueadas. | Switch network. | View read-only summary. |
-| Sin cupos | Muestra requisito actual: 20,000 UKI o 3 puntos Cukies Originales. | Stake UKI / Review NFTs. | Go to presale. |
-| Cupo activo | Cupos, espera 24h, creditos futuros y exceso stakeado. | Manage slots. | Configure credits. |
-| Requisito subiendo | Aviso fuerte: requisito anterior/nuevo, cantidad adicional, fecha limite 48h y cupos que perderia. | Add stake / add points. | View deadline. |
-| Unstake pendiente | Impacto claro en cupos y creditos futuros. | Confirm unstake. | Cancel. |
-
-## Pool de Creditos
-
-Ruta: `/pools/credits`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Coming next | Explica aportes diarios y minimo vigente sin permitir configuracion. | Read rules. | Go to Cukie Master. |
-| Sin cupo Cukie Master | Bloquear configuracion; explicar requisito. | Go to Cukie Master. | View rules. |
-| Antes del corte | Permitir configurar multiplos de 10 para la proxima entrega. | Configure credits. | View ledger. |
-| Despues del corte | Mostrar que cambios aplican al dia siguiente. | Schedule change. | View today's pool. |
-| Sin creditos | Ledger visible; no permitir depositar manualmente si no hay creditos. | View next grant. | Go to Cukie Master. |
-| Ready | Balance, configuracion, pool availability, minimo 0.75 UKI/10 creditos si aplica. | Configure credits. | View pool history. |
-| Error ledger | Mantener configuracion local en solo lectura y permitir retry. | Retry. | Export visible rows. |
-
-## Pool de Cukies
-
-Ruta: `/pools/cukies`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Coming next | Explica BSC-only para nuevas posiciones y separacion Originales/2a gen. | Read rules. | Go to wallet. |
-| Wallet desconectada | Preview de rarezas, partidas y reparto; sin inventario personal. | Connect wallet. | Read rules. |
-| Chain incorrecta | Acciones bloqueadas; inventario Tron solo como lectura/migracion si existe. | Switch network. | View migration note. |
-| Sin Cukies elegibles | Explica si faltan NFTs, estan en Tron, listados, bridge o bloqueados. | View wallet. | Refresh inventory. |
-| Cukie bloqueado | Mostrar razon: listed, bridging, in pool, assigned, soft staked, invalidated. | View details. | Refresh. |
-| Ready | Lista densa de Cukies elegibles con rareza, generacion, partidas y estado. | Add Cukie to pool. | Withdraw Cukie, View rewards. |
-| Retirada pendiente | Si esta asignado a partida, mostrar bloqueo/expiracion. | Request withdrawal. | View assignment. |
-
-## Treasure Hunt Entry
-
-Ruta: `/games/treasure-hunt`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Coming next | Explica coste 10 creditos: 7.5 rendimiento, 2 bote semanal, 0.4 embajadores ordinarios y 0.1 embajadores semanales. | View rules. | Go to wallet. |
-| Wallet desconectada | Reglas publicas y bloqueo de start. | Connect wallet. | View rules. |
-| Sin creditos propios | Intentar asignar pool solo al iniciar, mostrando disponibilidad. | Start with pool credits. | View pool status. |
-| Con creditos propios | Indicar que no computa ranking ni usa rank para settlement. | Start run. | Select Cukie. |
-| Sin Cukie propio disponible | Mostrar asignacion de pool/Seiku al iniciar. | Start with pool Cukie. | View rules. |
-| Cukie propio disponible | Selector o decision automatica pendiente; mostrar impacto de partidas disponibles. | Select Cukie. | Start run. |
-| Recursos reservando | Bloquear doble start hasta session economy id. | Ninguna. | Cancel si backend lo permite. |
-| Session ready | Entrar al juego con token de sesion. | Start run. | View session details. |
-| Score enviado | Resultado en revision antes de ranking/rewards. | View result. | Go to Arena. |
-
-## Arena Ranking
-
-Ruta: `/arena`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Coming next | Explica ranking #1-#9 y minimos sin clasificacion activa. | Read rules. | View Treasure Hunt. |
-| Wallet desconectada | Ranking publico si existe; datos personales ocultos. | Connect wallet. | View rules. |
-| Sin partidas rankeables | Rank inicial #5 o sin periodo; explicar que solo cuentan creditos del pool. | Play Treasure Hunt. | View rules. |
-| Periodo activo | Rank actual, progreso, partidas validas, % conversion sin 2.5 iniciales. | View my rank. | View weekly rules. |
-| Cierre en progreso | Congelar cambios visibles y mostrar periodo en calculo. | Refresh. | View previous period. |
-| Ready cerrado | Rank final, movimiento +2/-2 aplicado y enlace a rewards pendientes. | View rewards. | Open history. |
-
-## Rewards Claim
-
-Ruta: `/rewards`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| Wallet desconectada | Explica pending vs claimable sin datos personales. | Connect wallet. | Read disclaimers. |
-| Chain incorrecta | Claims bloqueados; historial cacheado en solo lectura si es seguro. | Switch network. | View history. |
-| Sin rewards | Empty state con origenes posibles: preventa, Cukie Master, pools, ranking. | Go to wallet. | View rules. |
-| Pending rewards | Mostrar como no claimable hasta batch/proof. | View pending details. | Refresh. |
-| Claimable | Mostrar batch/proof, importe y disclaimer final on-chain. | Claim rewards. | View proof. |
-| Claim pendiente | Hash visible y boton BscScan. | View on BscScan. | Refresh. |
-| Claim confirmado | Estado confirmed solo con evento on-chain indexado. | View history. | Go to wallet. |
-| Error claim | Mantener batch/proof y motivo de fallo. | Retry claim. | View details. |
-
-## Admin / Ops
-
-Ruta: `/admin/ops`
-
-| Estado | UI esperada | Accion principal | Secundarias |
-| --- | --- | --- | --- |
-| No autorizado | Bloqueo total sin datos sensibles. | Return home. | Contact admin. |
-| Loading | Skeleton de jobs, batches, snapshots, inconsistencias. | Ninguna. | Ninguna. |
-| Sin acciones pendientes | Estado limpio con ultimo job y proximo run. | Review schedule. | Export report. |
-| Acciones pendientes | Cola priorizada: jobs fallidos, batch approval, inconsistencias NFT, parametros. | Review pending actions. | Open job monitor. |
-| Error job | Mostrar jobRunId, periodo, input hash y retry seguro. | Retry job. | Export logs. |
-| Accion sensible | Confirmacion con actor, motivo y previsualizacion de impacto. | Confirm action. | Cancel. |
-
-## Reglas de implementacion
-
-- Los componentes deben reservar espacio estable para cada estado y evitar saltos de layout.
-- Los estados `pending`, `claimable`, `confirmed` y `failed` deben tener origen claro: contrato, backend, job o cache.
-- La UI puede mostrar previews, pero debe etiquetarlos como previews y no como saldos finales.
-- La pantalla no decide elegibilidad final; consume APIs de dominio o lectura de contrato.
-- Las acciones economicas necesitan idempotencia por tx, session id o jobRunId.
+La auditoría del 8 de septiembre valida lecturas de 27 rutas, algunos estados
+vacíos/degradados y el comportamiento parcial del menú. **No marca aprobadas
+las filas transaccionales de esta matriz.** Para cada implementación registrar
+ruta, escenario, fecha/SHA, viewport, datos de prueba y resultado en el
+seguimiento existente; las pruebas de economía/contratos mantienen sus gates.

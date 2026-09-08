@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { LaunchInfoPage } from '@/components/launch/info-page';
 
 export const metadata: Metadata = {
@@ -19,8 +20,9 @@ export default function ComoJugarPage() {
       variant="workspace"
       metrics={[
         { label: 'Entrada', value: '10 créditos', helper: 'Por partida' },
-        { label: 'Pool semanal', value: '2.5 créditos', helper: 'Van al bote semanal' },
-        { label: 'En juego', value: '7.5 créditos', helper: 'Convertidos según score' },
+        { label: 'Rendimiento', value: '7,5 UKI', helper: 'Se convierte según tu puntuación' },
+        { label: 'Bote semanal', value: '2 UKI', helper: 'Por partida válida' },
+        { label: 'Reserva', value: '0,5 UKI', helper: 'Programa de embajadores' },
         { label: 'Score máximo', value: '3,000', helper: 'Convierte el 100%' },
       ]}
       sections={[
@@ -38,6 +40,7 @@ export default function ComoJugarPage() {
           bullets: [
             'Las partidas con créditos propios no computan para ranking.',
             'Las partidas con créditos del pool sí computan para ranking.',
+            'El sistema elige automáticamente la primera fuente con saldo suficiente para pagar la partida completa.',
             'En partidas con créditos del pool se usa el ranking del jugador para calcular su parte.',
           ],
         },
@@ -50,19 +53,23 @@ export default function ComoJugarPage() {
           ],
         },
         {
-          title: 'Reparto si se convierten 7.5 UKI',
-          table: {
-            headers: ['Caso', 'Pool créditos', 'Pool Cukies', 'Jugador'],
-            rows: [
-              ['Créditos prestados + Cukie prestado', '3.75 UKI', '1.875 UKI', 'Ranking sobre 1.875 UKI'],
-              ['Créditos prestados + Cukie propio', '3.75 UKI', '0', 'Ranking sobre 3.75 UKI'],
-              ['Créditos propios + Cukie prestado', '0', '3.75 UKI', '3.75 UKI'],
-              ['Créditos propios + Cukie propio', '0', '0', '7.5 UKI'],
-            ],
-          },
+          title: 'Reglas y reparto',
+          bullets: [
+            'El presupuesto de cada partida válida es 7,5 UKI de rendimiento, 2 UKI para el bote semanal y 0,5 UKI de reserva máxima del programa de embajadores.',
+            'La procedencia de los créditos y del Cukie determina cómo se distribuye el rendimiento convertido.',
+          ],
         },
       ]}
-      note="Pendiente de decisión de producto: confirmar si el usuario elige manualmente el Cukie propio o si conviene automatizar la selección antes de crear la sesión."
+      afterSections={(
+        <section className="uki-container relative z-[2] pb-14">
+          <div className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[#0d0914]/82 p-5 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+            Consulta el detalle vigente de porcentajes, clasificación y casos de reparto en{' '}
+            <Link href="/games/treasure-hunt/rules" className="font-black text-[var(--uki-lilac)] hover:text-[var(--uki-cream)]">
+              las reglas de Treasure Hunt
+            </Link>.
+          </div>
+        </section>
+      )}
     />
   );
 }

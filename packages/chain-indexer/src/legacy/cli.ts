@@ -102,8 +102,24 @@ async function runForever() {
         const tron = await ingestTronOnce(store, config);
         const projected = await projectOnce(store, config.projectBatchSize);
         const endedAt = now();
-        await store.recordRun({ type: 'legacy-loop', runtimeScope: 'legacy', startedAt, endedAt, durationMs: endedAt.getTime() - startedAt.getTime(), bsc, tron, projected });
-        log('loop ok', { bsc, tron, projected });
+        if (bsc.outcome === 'incomplete') {
+          await store.recordRun({
+            type: 'legacy-loop-error',
+            runtimeScope: 'legacy',
+            startedAt,
+            endedAt,
+            durationMs: endedAt.getTime() - startedAt.getTime(),
+            error: bsc.errors.map((item) => `${item.cursorId}: ${item.error}`).join(' | '),
+            failedContractAliases: bsc.failedContractAliases,
+            bsc,
+            tron,
+            projected,
+          });
+          log('loop incomplete', { bsc, tron, projected });
+        } else {
+          await store.recordRun({ type: 'legacy-loop', runtimeScope: 'legacy', startedAt, endedAt, durationMs: endedAt.getTime() - startedAt.getTime(), bsc, tron, projected });
+          log('loop ok', { bsc, tron, projected });
+        }
       } catch (error) {
         const message = safeError(error);
         await store.recordRun({ type: 'legacy-loop-error', runtimeScope: 'legacy', startedAt, endedAt: now(), error: message });

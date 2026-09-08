@@ -151,7 +151,7 @@ describe('DashboardOverviewPanel', () => {
 
     render(<DashboardOverviewPanel />);
 
-    expect(screen.getAllByText('Conecta tu wallet').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Firma tu wallet').length).toBeGreaterThanOrEqual(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

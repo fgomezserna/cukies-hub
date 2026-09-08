@@ -10,6 +10,8 @@ export type MyCukieCollectionItem = {
   assetId: string;
   tokenId: string;
   imageUrl: string | null;
+  network?: string | null;
+  origin?: string | null;
   generation: NftAssetGeneration;
   rarity: NftAssetRarity;
   state: NftCanonicalState | 'cukie_master';

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/providers/auth-provider';
 
 const DEFAULT_AUTO_REFRESH_MS = 15_000;
 
@@ -299,6 +300,36 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+const sharedStatusRequests = new Map<string, Promise<TreasureHuntCompetitionStatus>>();
+
+function loadSharedCompetitionStatus(identity: string) {
+  const existing = sharedStatusRequests.get(identity);
+  if (existing) return existing;
+
+  const request = (async () => {
+    const response = await fetch(TREASURE_HUNT_COMPETITION_API, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    const body = await readJson(response);
+    if (!response.ok || !isStatus(body)) {
+      throw new Error('No se pudo consultar el estado de la competición.');
+    }
+    return body;
+  })();
+
+  sharedStatusRequests.set(identity, request);
+  void request.then(
+    () => {
+      if (sharedStatusRequests.get(identity) === request) sharedStatusRequests.delete(identity);
+    },
+    () => {
+      if (sharedStatusRequests.get(identity) === request) sharedStatusRequests.delete(identity);
+    },
+  );
+  return request;
+}
+
 export function formatTreasureHuntPercentage(bps: number) {
   return `${bps / 100}%`;
 }
@@ -332,6 +363,12 @@ export function useTreasureHuntCompetitionOverview(options?: {
   readonly leaderboardMineOnly?: boolean;
   readonly autoRefreshMs?: number;
 }) {
+  const { user, isLoading: authLoading } = useAuth();
+  const identity = user?.walletAddress?.trim()
+    ? `wallet:${user.walletAddress.trim().toLowerCase()}`
+    : user?.id
+      ? `user:${user.id}`
+      : 'anonymous';
   const includeLeaderboard = options?.includeLeaderboard ?? true;
   const leaderboardPage = options?.leaderboardPage ?? 1;
   const leaderboardPageSize = options?.leaderboardPageSize ?? 100;
@@ -345,10 +382,26 @@ export function useTreasureHuntCompetitionOverview(options?: {
   const [refreshToken, setRefreshToken] = useState(0);
   const hasLoadedRef = useRef(false);
   const queryKeyRef = useRef<string | null>(null);
+  const previousIdentityRef = useRef(identity);
 
   useEffect(() => {
     const controller = new AbortController();
+    const identityChanged = previousIdentityRef.current !== identity;
+    if (identityChanged || authLoading) {
+      hasLoadedRef.current = false;
+      queryKeyRef.current = null;
+      setStatus(null);
+      setLeaderboard([]);
+      setLeaderboardMeta(null);
+      setError(null);
+    }
+    previousIdentityRef.current = identity;
+    if (authLoading) {
+      setIsLoading(true);
+      return () => controller.abort();
+    }
     const queryKey = [
+      identity,
       includeLeaderboard,
       leaderboardMineOnly,
       leaderboardPage,
@@ -361,15 +414,7 @@ export function useTreasureHuntCompetitionOverview(options?: {
       if (!isBackgroundRefresh) setIsLoading(true);
       setError(null);
       try {
-        const statusResponse = await fetch(TREASURE_HUNT_COMPETITION_API, {
-          cache: 'no-store',
-          credentials: 'same-origin',
-          signal: controller.signal,
-        });
-        const statusBody = await readJson(statusResponse);
-        if (!statusResponse.ok || !isStatus(statusBody)) {
-          throw new Error('No se pudo consultar el estado de la competición.');
-        }
+        const statusBody = await loadSharedCompetitionStatus(identity);
         if (controller.signal.aborted) return;
         setStatus(statusBody);
 
@@ -432,6 +477,8 @@ export function useTreasureHuntCompetitionOverview(options?: {
     void load();
     return () => controller.abort();
   }, [
+    authLoading,
+    identity,
     includeLeaderboard,
     leaderboardMineOnly,
     leaderboardPage,

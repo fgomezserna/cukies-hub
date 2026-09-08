@@ -657,7 +657,10 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
   }, [isStandaloneRuntime]);
   const multiplayerAuthorityReady =
     hasParentHandshake && Boolean(multiplayerAuthoritySessionId);
-  const singlePlayerEntryState = isStandaloneRuntime
+  const [hubAccessPresentation, setHubAccessPresentation] = useState<boolean | null>(null);
+  const singlePlayerEntryState = hubAccessPresentation === false
+    ? 'blocked' as const
+    : isStandaloneRuntime
     ? 'practice' as const
     : multiplayerAuthorityReady
       ? 'ready' as const
@@ -2421,6 +2424,14 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
         } else if (gameState.status === 'idle') {
           playMusic('background_music');
         }
+        return;
+      }
+
+      if (
+        event.data?.type === 'TREASURE_HUNT_ACCESS_PRESENTATION' &&
+        typeof event.data?.available === 'boolean'
+      ) {
+        setHubAccessPresentation(event.data.available);
         return;
       }
 

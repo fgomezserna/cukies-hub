@@ -101,6 +101,14 @@ export type UkiSwapConfig = {
   sources: readonly UkiSwapSource[];
 };
 
+export function getUkiSwapNetworkLabel(chainId: number) {
+  return chainId === 97
+    ? 'BSC Testnet'
+    : chainId === 56
+      ? 'BNB Smart Chain'
+      : 'Red no configurada';
+}
+
 export function buildUkiSwapConfig({
   chainId,
   asmAddress,

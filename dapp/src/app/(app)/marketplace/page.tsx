@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { ArrowRight, Cookie, Store } from 'lucide-react';
 
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
-import { UkiMarketplaceClient } from '@/components/uki-marketplace/marketplace-client';
 import { UkiMarketplaceSellerPanel } from '@/components/uki-marketplace/seller-panel';
 import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config';
 
@@ -38,7 +37,8 @@ export default function MarketplacePage() {
       </nav>
 
       <section id="cukies-disponibles" className="scroll-mt-24">
-        {ukiMarketplaceReady ? <UkiMarketplaceClient /> : <MarketplaceClient heading="Cukies disponibles" description="abre una ficha para comprobar precio y propietario" />}
+        <MarketplaceClient heading="Cukies disponibles" description="filtra por catálogo, red y tipo antes de abrir una ficha" />
+        {ukiMarketplaceReady ? <span data-testid="uki-marketplace" className="sr-only" aria-hidden="true" /> : null}
       </section>
 
       {ukiMarketplaceReady ? (

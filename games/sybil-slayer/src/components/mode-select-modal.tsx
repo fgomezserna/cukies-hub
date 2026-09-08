@@ -12,12 +12,12 @@ import {
 } from './treasure-hunt-ui';
 
 type GameMode = 'single' | 'multiplayer';
-type SinglePlayerEntryState = 'ready' | 'practice' | 'connecting';
+type SinglePlayerEntryState = 'ready' | 'practice' | 'connecting' | 'blocked';
 type CompetitionBlockReason = 'no_attempts';
 
 interface SinglePlayerEntryPresentation {
   readonly interactive: boolean;
-  readonly actionCopy: 'JUGAR 1P' | 'PRACTICAR 1P' | 'CONECTA WALLET';
+  readonly actionCopy: 'JUGAR 1P' | 'PRACTICAR 1P' | 'CONECTA WALLET' | 'NO DISPONIBLE';
   readonly description: string;
 }
 
@@ -36,6 +36,13 @@ export function resolveTreasureHuntSinglePlayerEntry(
       interactive: true,
       actionCopy: 'PRACTICAR 1P',
       description: 'Práctica local sin ranking ni recompensas.',
+    };
+  }
+  if (state === 'blocked') {
+    return {
+      interactive: false,
+      actionCopy: 'NO DISPONIBLE',
+      description: 'El Hub no ha confirmado el acceso de esta partida. Revisa el aviso del panel superior. No se hará ningún cargo.',
     };
   }
   return {

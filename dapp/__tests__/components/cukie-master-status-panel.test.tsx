@@ -152,6 +152,39 @@ describe('CukieMasterStatusPanel', () => {
     expect(screen.getByRole('link', { name: 'Gestionar créditos' })).toHaveAttribute('href', '/credits');
   });
 
+  it('no convierte una fuente incompleta en un saldo de cero cupos', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    const status = ukiOnlyStatusData(0);
+    status.routes.uki = {
+      ...status.routes.uki,
+      position: null,
+      balanceQualifiedSlots: 0,
+      source: {
+        complete: false,
+        status: 'unavailable',
+        route: 'uki',
+        totalUkiRaw: '0',
+        presaleLockedRaw: '0',
+        stakedUkiRaw: '0',
+      },
+    };
+    status.routes.nft = {
+      ...status.routes.nft,
+      source: { complete: false, status: 'unavailable' },
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', data: status }),
+    });
+
+    render(<CukieMasterStatusPanel overview />);
+
+    expect((await screen.findAllByRole('heading', { name: 'No podemos confirmar tus cupos todavía' })).length).toBe(2);
+    expect(screen.getAllByText('No disponible').length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText('0 de 5')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/No hemos podido actualizar tus cupos/i).length).toBeGreaterThanOrEqual(1);
+  });
+
   it('simplifica la vista a vesting, staking y cinco plazas de la ruta UKI', async () => {
     mockUseAuth.mockReturnValue(authValue(user));
     const onUkiRouteData = jest.fn();
@@ -435,7 +468,7 @@ describe('CukieMasterStatusPanel', () => {
 
     render(<CukieMasterStatusPanel />);
 
-    await waitFor(() => expect(screen.getByText(/No podemos verificar tu estado económico/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No podemos actualizar tus cupos ahora mismo/i)).toBeInTheDocument());
     expect(screen.queryByText('Cupos activos')).not.toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
   });
@@ -493,7 +526,7 @@ describe('CukieMasterStatusPanel', () => {
 
       render(<CukieMasterStatusPanel ukiOnly />);
       await act(async () => { await Promise.resolve(); });
-      expect(screen.getByText(/reintentaremos automáticamente/i)).toBeInTheDocument();
+      expect(screen.getByText(/volveremos a intentarlo automáticamente/i)).toBeInTheDocument();
 
       await act(async () => {
         jest.advanceTimersByTime(750);

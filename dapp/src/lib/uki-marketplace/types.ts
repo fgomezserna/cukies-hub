@@ -68,6 +68,7 @@ export type UkiMarketplaceOrderView = {
   cancelledAt: string | null;
   expiredAt: string | null;
   invalidatedAt: string | null;
+  catalogCursor?: string;
 };
 
 export type UkiMarketplaceOrdersResponse =

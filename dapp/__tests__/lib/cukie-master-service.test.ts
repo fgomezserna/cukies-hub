@@ -16,8 +16,10 @@ import {
 import {
   EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
   EXPECTED_NFT_CURSOR_IDS,
+  EXPECTED_UKI_CURSOR_IDS,
   cukieMasterNftHealthScope,
   expectedBscChainId,
+  expectedBscCursorFilter,
   operationalIndexerHealthWarnings,
   pendingNftEventFilter,
   pendingUkiWalletEventFilter,
@@ -678,6 +680,46 @@ describe('Cukie Master canonical sources', () => {
       cursors,
       ...expectedIdentity,
     })).toEqual([]);
+
+    const cursorFilter = expectedBscCursorFilter(EXPECTED_UKI_CURSOR_IDS);
+    const interleaved = [
+      {
+        chain: 'BSC',
+        contractAlias: 'UKI_STAKING',
+        eventName: 'Approval',
+        updatedAt: now,
+      },
+      ...cursors,
+    ];
+    const selected = interleaved
+      .filter((cursor) => (
+        cursor.chain === cursorFilter.chain
+        && cursorFilter.$or.some((expected) => (
+          expected.contractAlias === cursor.contractAlias
+          && expected.eventName === cursor.eventName
+        ))
+      ))
+      .slice(0, EXPECTED_UKI_CURSOR_IDS.length);
+    expect(selected.map((cursor) => `${cursor.contractAlias}:${cursor.eventName}`))
+      .toEqual(EXPECTED_UKI_CURSOR_IDS);
+    expect(selected).toHaveLength(EXPECTED_UKI_CURSOR_IDS.length);
+
+    const staleAndMissing = selected
+      .filter((cursor) => cursor.eventName !== 'TokensReleased')
+      .map((cursor) => ({ ...cursor }));
+    staleAndMissing[0].updatedAt = new Date(now.getTime() - 16 * 60 * 1000);
+    const warnings = operationalIndexerHealthWarnings({
+      checkedAt: now,
+      latestSuccessEndedAt: now,
+      latestErrorEndedAt: null,
+      checkpoint,
+      cursors: staleAndMissing,
+      ...expectedIdentity,
+    });
+    expect(warnings).toEqual(expect.arrayContaining([
+      'Cursor BSC UKI_STAKING:Staked ausente, stale, sin verificacion o con backlog.',
+      'Cursor BSC VESTING_VAULT:TokensReleased ausente, stale, sin verificacion o con backlog.',
+    ]));
   });
 
   it('marks a brand-new NFT database unhealthy until every verified history cursor exists', () => {

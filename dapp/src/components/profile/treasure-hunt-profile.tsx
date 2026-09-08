@@ -85,15 +85,15 @@ export default function TreasureHuntProfile() {
 
   if (!authLoading && !user) {
     return (
-      <section className="rounded-[16px] border border-emerald-300/20 bg-[#0d1916]/95 p-6 sm:p-8">
-        <Wallet className="h-8 w-8 text-emerald-200" aria-hidden="true" />
+      <section className="rounded-[16px] border border-lilac-300/20 bg-[#100b18]/95 p-6 sm:p-8">
+        <Wallet className="h-8 w-8 text-lilac-200" aria-hidden="true" />
         <h2 className="mt-5 font-headline text-2xl font-black text-white">Conecta tu wallet</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
           Conecta tu wallet para consultar el perfil del torneo y personalizar tu alias.
         </p>
         <Button
           type="button"
-          className="mt-6 bg-emerald-300 font-black text-[#06211b] hover:bg-emerald-200"
+          className="mt-6 bg-lilac-300 font-black text-[#16061f] hover:bg-lilac-200"
           onClick={() => window.dispatchEvent(new Event('cukies:open-wallet-dialog'))}
         >
           Conectar wallet
@@ -103,12 +103,12 @@ export default function TreasureHuntProfile() {
   }
 
   return (
-    <section className="overflow-hidden rounded-[16px] border border-emerald-300/20 bg-[#0d1916]/95">
+    <section className="overflow-hidden rounded-[16px] border border-lilac-300/20 bg-[#100b18]/95">
       <header className="border-b border-white/10 px-5 py-6 sm:px-7">
         <div className="flex items-center gap-3">
-          <UserRound className="h-6 w-6 text-emerald-200" aria-hidden="true" />
+          <UserRound className="h-6 w-6 text-lilac-200" aria-hidden="true" />
           <div>
-            <p className="font-mono text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-300">
+            <p className="font-mono text-[0.65rem] font-black uppercase tracking-[0.18em] text-lilac-300">
               Identidad del torneo
             </p>
             <h2 className="font-headline text-xl font-black text-white">Mi perfil</h2>
@@ -133,7 +133,7 @@ export default function TreasureHuntProfile() {
             autoComplete="off"
             maxLength={20}
             aria-describedby="competition-alias-help"
-            className="border-white/10 bg-black/20 font-mono text-white focus-visible:ring-emerald-300"
+            className="border-white/10 bg-black/20 font-mono text-white focus-visible:ring-lilac-300"
           />
           <p id="competition-alias-help" className={`text-xs ${validationMessage ? 'text-amber-200' : 'text-slate-500'}`}>
             {validationMessage ?? 'El nombre con el que aparecerás en el ranking.'}
@@ -150,7 +150,7 @@ export default function TreasureHuntProfile() {
         {error ? <p role="alert" className="text-sm font-semibold text-red-200">{error}</p> : null}
         {saveError ? <p role="alert" className="text-sm font-semibold text-red-200">{saveError}</p> : null}
         {saved ? (
-          <p role="status" className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
+          <p role="status" className="flex items-center gap-2 text-sm font-semibold text-lilac-200">
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
             Alias actualizado.
           </p>
@@ -165,7 +165,7 @@ export default function TreasureHuntProfile() {
             !status?.participant ||
             alias.trim() === status?.participant?.alias
           }
-          className="min-h-11 bg-emerald-300 font-black text-[#06211b] hover:bg-emerald-200"
+          className="min-h-11 bg-lilac-300 font-black text-[#16061f] hover:bg-lilac-200"
         >
           {isSaving ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />

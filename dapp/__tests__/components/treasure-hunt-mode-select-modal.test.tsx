@@ -18,6 +18,10 @@ describe('Treasure Hunt mode selector', () => {
       interactive: true,
       actionCopy: 'PRACTICAR 1P',
     }));
+    expect(resolveTreasureHuntSinglePlayerEntry('blocked')).toEqual(expect.objectContaining({
+      interactive: false,
+      actionCopy: 'NO DISPONIBLE',
+    }));
   });
   it('turns standalone multiplayer into an explicit Hub entry action', () => {
     const onSelectMode = jest.fn();

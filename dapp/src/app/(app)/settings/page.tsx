@@ -58,7 +58,7 @@ export default function SettingsPage() {
       } else {
         toast({
           title: "Error",
-          description: "Failed to load profile data",
+          description: "No se pudieron cargar los datos del perfil.",
           variant: "destructive",
         });
       }
@@ -66,7 +66,7 @@ export default function SettingsPage() {
       console.error('Error fetching profile:', error);
       toast({
         title: "Error",
-        description: "Failed to load profile data",
+        description: "No se pudieron cargar los datos del perfil.",
         variant: "destructive",
       });
     } finally {
@@ -96,7 +96,7 @@ export default function SettingsPage() {
     if (username.length < 3) {
       setUsernameValidation({
         isValid: false,
-        message: 'Username must be at least 3 characters long',
+        message: 'Usa al menos 3 caracteres.',
         isChecking: false
       });
       return;
@@ -105,7 +105,7 @@ export default function SettingsPage() {
     // Start checking with database
     setUsernameValidation({
       isValid: null,
-      message: 'Checking availability...',
+      message: 'Comprobando disponibilidad…',
       isChecking: true
     });
 
@@ -130,14 +130,14 @@ export default function SettingsPage() {
       } else {
         setUsernameValidation({
           isValid: false,
-          message: data.error || 'Error checking username availability',
+          message: data.error || 'No se pudo comprobar la disponibilidad.',
           isChecking: false
         });
       }
     } catch (error) {
       setUsernameValidation({
         isValid: false,
-        message: 'Error checking username availability',
+        message: 'No se pudo comprobar la disponibilidad.',
         isChecking: false
       });
     }
@@ -180,8 +180,8 @@ export default function SettingsPage() {
           bio: data.bio || '',
         });
         toast({
-          title: "Profile Updated",
-          description: "Your settings have been saved successfully.",
+          title: "Perfil actualizado",
+          description: "Tus ajustes se han guardado correctamente.",
         });
         
         // Refresh user data in AuthProvider to update header
@@ -191,7 +191,7 @@ export default function SettingsPage() {
       } else {
         toast({
           title: "Error",
-          description: data.error || "Failed to update profile",
+          description: data.error || "No se pudo actualizar el perfil.",
           variant: "destructive",
         });
       }
@@ -199,7 +199,7 @@ export default function SettingsPage() {
       console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: "Failed to update profile",
+        description: "No se pudo actualizar el perfil.",
         variant: "destructive",
       });
     } finally {
@@ -215,7 +215,7 @@ export default function SettingsPage() {
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "Error",
-        description: "File size must be less than 5MB",
+        description: "El archivo debe ocupar menos de 5 MB.",
         variant: "destructive",
       });
       return;
@@ -245,8 +245,8 @@ export default function SettingsPage() {
             profilePictureUrl: data.profilePictureUrl || base64String,
           }));
           toast({
-            title: "Avatar Updated",
-            description: "Your profile picture has been updated successfully.",
+            title: "Avatar actualizado",
+            description: "Tu foto de perfil se ha actualizado correctamente.",
           });
           
           // Refresh user data in AuthProvider to update header
@@ -256,7 +256,7 @@ export default function SettingsPage() {
         } else {
           toast({
             title: "Error",
-            description: data.error || "Failed to upload avatar",
+            description: data.error || "No se pudo subir el avatar.",
             variant: "destructive",
           });
         }
@@ -264,7 +264,7 @@ export default function SettingsPage() {
         console.error('Error uploading avatar:', error);
         toast({
           title: "Error",
-          description: "Failed to upload avatar",
+          description: "No se pudo subir el avatar.",
           variant: "destructive",
         });
       }
@@ -305,36 +305,36 @@ export default function SettingsPage() {
     return (
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent mb-4">
-              ⚙️ Settings
+            <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-lilac-300 to-lilac-400 bg-clip-text text-transparent mb-4">
+              Ajustes de perfil
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Manage your account and profile settings
+              Gestiona tu identidad pública, tu alias y tus preferencias.
             </p>
           </div>
           <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
             <CardContent className="p-8 text-center">
               <div className="text-6xl mb-4">🔒</div>
-              <h2 className="text-2xl font-bold font-headline mb-4">Connect Your Wallet</h2>
-              <p className="text-muted-foreground">Please connect your wallet to access settings and customize your profile.</p>
+              <h2 className="text-2xl font-bold font-headline mb-4">Conecta tu wallet</h2>
+              <p className="text-muted-foreground">Conecta tu wallet para acceder a los ajustes y personalizar tu perfil.</p>
             </CardContent>
           </Card>
         </div>
     );
   }
 
-  const displayAvatar = profile.profilePictureUrl || 'https://placehold.co/100x100.png';
-  const avatarFallback = profile.username ? profile.username.charAt(0).toUpperCase() : 'U';
+  const displayAvatar = profile.profilePictureUrl || undefined;
+  const avatarFallback = profile.username ? profile.username.slice(0, 2).toUpperCase() : 'CW';
 
   return (
       <div className="max-w-4xl mx-auto flex flex-col gap-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent mb-4">
-            ⚙️ Settings
+          <h1 className="text-4xl md:text-5xl font-bold font-headline bg-gradient-to-r from-lilac-300 to-lilac-400 bg-clip-text text-transparent mb-4">
+            Ajustes de perfil
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Manage your account and profile settings
+            Gestiona tu identidad pública, tu alias y tus preferencias.
           </p>
         </div>
 
@@ -343,17 +343,17 @@ export default function SettingsPage() {
           <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-pink-600/10 to-pink-600/10 border border-pink-600/20 rounded-2xl p-1">
             <TabsTrigger 
               value="profile" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-lilac-400 data-[state=active]:to-lilac-500 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <User className="h-4 w-4 mr-2" />
-              Profile
+              Perfil público
             </TabsTrigger>
             <TabsTrigger 
               value="preferences" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-600 data-[state=active]:to-pink-700 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-lilac-400 data-[state=active]:to-lilac-500 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
             >
               <SettingsIcon className="h-4 w-4 mr-2" />
-              Preferences
+              Preferencias
             </TabsTrigger>
           </TabsList>
 
@@ -362,11 +362,11 @@ export default function SettingsPage() {
               <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-pink-500" />
-                    Public Profile
+                    <User className="h-5 w-5 text-lilac-300" />
+                    Perfil público
                   </CardTitle>
                   <CardDescription>
-                    This information will be displayed on your public profile and visible to other players.
+                    Estos datos serán visibles para otros jugadores. El alias de Treasure Hunt se configura en Mi cuenta.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -374,7 +374,7 @@ export default function SettingsPage() {
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     <div className="relative group">
                       <Avatar className="h-24 w-24 border-4 border-primary shadow-lg shadow-primary/20 transition-all duration-300 group-hover:scale-105">
-                        <AvatarImage src={displayAvatar} alt={profile.username || 'User'} />
+                        <AvatarImage src={displayAvatar} alt={profile.username || 'Avatar de cuenta'} />
                         <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-pink-500 to-pink-600">
                           {avatarFallback}
                         </AvatarFallback>
@@ -384,7 +384,7 @@ export default function SettingsPage() {
                         className="absolute bottom-0 right-0 bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white p-2 rounded-full shadow-lg shadow-pink-600/20 cursor-pointer transition-all duration-300 hover:scale-110 hover:shadow-xl"
                       >
                         <Camera className="h-4 w-4" />
-                        <span className="sr-only">Change photo</span>
+                        <span className="sr-only">Cambiar foto</span>
                       </label>
                       <input
                         id="avatar-upload"
@@ -402,8 +402,8 @@ export default function SettingsPage() {
                           Nombre de perfil
                           {profile.isUsernameSet && (
                             <div className="flex items-center gap-1 ml-auto">
-                              <Info className="h-4 w-4 text-yellow-500" />
-                              <span className="text-xs text-yellow-500">No se puede modificar</span>
+                          <Info className="h-4 w-4 text-amber-300" />
+                          <span className="text-xs text-amber-300">No se puede modificar</span>
                             </div>
                           )}
                         </Label>
@@ -454,7 +454,7 @@ export default function SettingsPage() {
                           type="email"
                           value={profile.email || ''} 
                           onChange={handleInputChange('email')}
-                          placeholder="Enter your email"
+                          placeholder="Tu email (opcional)"
                           className="border-pink-600/20 focus:border-pink-500 bg-card/50 backdrop-blur-sm"
                         />
                       </div>
@@ -464,18 +464,18 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <Label htmlFor="bio" className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
-                      Bio
+                      Biografía
                     </Label>
                     <Textarea
                       id="bio"
-                      placeholder="Tell us a little bit about yourself..."
+                      placeholder="Cuéntanos algo sobre ti..."
                       value={profile.bio || ''}
                       onChange={handleInputChange('bio')}
                       rows={3}
                       className="border-pink-600/20 focus:border-pink-500 bg-card/50 backdrop-blur-sm resize-none"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Max 200 characters. This will be visible on your public profile.
+                      Máximo 200 caracteres. Será visible en tu perfil público.
                     </p>
                   </div>
 
@@ -488,12 +488,12 @@ export default function SettingsPage() {
                       {saving ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
+                          Guardando…
                         </>
                       ) : (
                         <>
                           <Save className="mr-2 h-4 w-4" />
-                          Save Changes
+                          Guardar cambios
                         </>
                       )}
                     </Button>
@@ -508,18 +508,18 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <SettingsIcon className="h-5 w-5 text-blue-400" />
-                  Preferences
+                  Preferencias
                 </CardTitle>
                 <CardDescription>
-                  Customize your experience and notification preferences.
+                  Personaliza tu experiencia y consulta las preferencias disponibles.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">🚧</div>
-                  <h3 className="text-xl font-bold font-headline mb-2">Coming Soon</h3>
+                  <h3 className="text-xl font-bold font-headline mb-2">En preparación</h3>
                   <p className="text-muted-foreground">
-                    Advanced preferences and notification settings will be available in a future update.
+                    Las preferencias avanzadas y las notificaciones estarán disponibles más adelante.
                   </p>
                 </div>
               </CardContent>
@@ -531,7 +531,7 @@ export default function SettingsPage() {
         <Card className="relative overflow-hidden border border-blue-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-blue-500/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-400">
-              🔗 Connected Wallet
+              🔗 Wallet conectada
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -541,7 +541,7 @@ export default function SettingsPage() {
                   {user.walletAddress}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Your wallet address is used for authentication and game rewards.
+                  Esta dirección se usa para autenticarte y asociar tus recompensas.
                 </p>
               </div>
             </div>
