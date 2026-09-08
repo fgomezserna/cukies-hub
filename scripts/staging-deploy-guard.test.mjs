@@ -33,6 +33,10 @@ function fakeExec(stdout) {
   return async () => ({ stdout });
 }
 
+function cooperativeSleep() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 describe('staging deployment guard', () => {
   it('reads df output and enforces the 10 GiB floor', () => {
     const freeBytes = parseFreeBytes(dfOutput(99));
@@ -87,7 +91,7 @@ describe('staging deployment guard', () => {
             cancelDeployment: async () => { cancelCalls += 1; },
           },
           exec: fakeExec(dfOutput(20_000_000)),
-          sleep: async () => {},
+          sleep: cooperativeSleep,
         });
         assert.equal(result.status, status);
         assert.equal(result.cancelCount, 0);
@@ -109,18 +113,21 @@ describe('staging deployment guard', () => {
         cancelDeployment: async (deploymentUuid) => {
           cancelCalls += 1;
           assert.equal(deploymentUuid, TARGET);
+          assert.equal(diagnostics[0]?.event, 'cancel_requested');
           current = record('cancelled-by-user');
           return { status: 200, payload: { deployment_uuid: TARGET, message: 'Deployment cancelled.' } };
         },
       },
       exec: fakeExec(dfOutput(9_000_000)),
-      sleep: async () => {},
+      sleep: cooperativeSleep,
       diagnosticWriter: async (event) => diagnostics.push(event),
     });
     assert.equal(result.status, 'cancelled-by-user');
     assert.equal(result.cancelCount, 1);
     assert.equal(cancelCalls, 1);
-    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics.length, 2);
+    assert.equal(diagnostics[0].event, 'cancel_requested');
+    assert.equal(diagnostics[1].event, 'cancel_result');
     assert.equal(diagnostics[0].reasonCode, 'low_disk');
     assert.equal(diagnostics[0].phase, 'df');
     assert.equal(diagnostics[0].status, 'building');
@@ -128,7 +135,7 @@ describe('staging deployment guard', () => {
     assert.equal(diagnostics[0].sha, COMMIT);
     assert.equal(diagnostics[0].minimumFreeBytes, STAGING_DEPLOY_GUARD.minimumFreeBytes.toString());
     assert.equal(diagnostics[0].freeBytes, (9_000_000n * 1024n).toString());
-    assert.equal(diagnostics[0].cancellationResult.responseStatus, 200);
+    assert.equal(diagnostics[1].cancellationResult.responseStatus, 200);
     assert.equal(typeof diagnostics[0].operation.durationMs, 'number');
   });
 
@@ -144,17 +151,19 @@ describe('staging deployment guard', () => {
           cancelDeployment: async () => { throw new Error('Coolify API POST /cancel excedió el timeout de 3000 ms.'); },
         },
         exec: fakeExec(dfOutput(9_000_000)),
-        sleep: async () => {},
+        sleep: cooperativeSleep,
         diagnosticWriter: async (event) => diagnostics.push(event),
       }),
       /excedió el timeout/,
     );
-    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics.length, 2);
+    assert.equal(diagnostics[0].event, 'cancel_requested');
+    assert.equal(diagnostics[1].event, 'cancel_result');
     assert.equal(diagnostics[0].reasonCode, 'low_disk');
     assert.equal(diagnostics[0].phase, 'df');
-    assert.equal(diagnostics[0].cancellationResult.ok, false);
-    assert.match(diagnostics[0].cancellationResult.error, /timeout/);
-    assert.equal(diagnostics[0].cancellationOperation.phase, 'cancel');
+    assert.equal(diagnostics[1].cancellationResult.ok, false);
+    assert.match(diagnostics[1].cancellationResult.error, /timeout/);
+    assert.equal(diagnostics[1].cancellationOperation.phase, 'cancel');
     assert.equal(diagnostics[0].cancelCount, 1);
   });
 
@@ -179,7 +188,7 @@ describe('staging deployment guard', () => {
         if (reads === 1) throw new Error('df unavailable');
         return { stdout: dfOutput(20_000_000) };
       },
-      sleep: async () => {},
+      sleep: cooperativeSleep,
     });
     assert.equal(result.status, 'cancelled');
     assert.equal(result.cancelCount, 1);
@@ -203,7 +212,7 @@ describe('staging deployment guard', () => {
         },
       },
       exec: async () => new Promise(() => {}),
-      sleep: async () => {},
+      sleep: cooperativeSleep,
     });
     assert.equal(result.status, 'cancelled');
     assert.equal(result.cancelCount, 1);
@@ -229,7 +238,7 @@ describe('staging deployment guard', () => {
         },
       },
       exec: fakeExec(dfOutput(20_000_000)),
-      sleep: async () => {},
+      sleep: cooperativeSleep,
     });
     assert.equal(result.status, 'cancelled');
     assert.equal(result.cancelCount, 1);
@@ -247,7 +256,7 @@ describe('staging deployment guard', () => {
           listDeployments: async () => [],
           cancelDeployment: async () => { cancelCalls += 1; },
         },
-        sleep: async () => {},
+        sleep: cooperativeSleep,
       }),
       /Coolify unavailable/,
     );
@@ -266,7 +275,7 @@ describe('staging deployment guard', () => {
           cancelDeployment: async () => { cancelCalls += 1; },
         },
         exec: fakeExec(dfOutput(20_000_000)),
-        sleep: async () => {},
+        sleep: cooperativeSleep,
       }),
       /otro build activo/,
     );
@@ -288,7 +297,7 @@ describe('staging deployment guard', () => {
           },
         },
         exec: fakeExec(dfOutput(9_000_000)),
-        sleep: async () => {},
+        sleep: cooperativeSleep,
       }),
       /deployment incorrecto/,
     );

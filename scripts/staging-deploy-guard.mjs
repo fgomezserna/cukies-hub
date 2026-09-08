@@ -12,6 +12,7 @@ export const STAGING_DEPLOY_GUARD = Object.freeze({
   minimumFreeBytes: 10n * 1024n * 1024n * 1024n,
   intervalMs: 2500,
   operationTimeoutMs: 3000,
+  cancelOperationTimeoutMs: 15000,
 });
 
 const TERMINAL_STATUSES = new Set([
@@ -199,6 +200,7 @@ export function createCoolifyClient({
   deployToken = process.env.COOLIFY_API_DEPLOY_TOKEN,
   fetchImpl = globalThis.fetch,
   timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
+  cancelTimeoutMs = STAGING_DEPLOY_GUARD.cancelOperationTimeoutMs,
 } = {}) {
   if (!baseUrl || (!token && !readToken && !deployToken)) {
     throw new Error('Guard de staging: faltan COOLIFY_API_URL y una credencial Coolify.');
@@ -209,14 +211,17 @@ export function createCoolifyClient({
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new Error('Guard de staging: timeout de Coolify inválido.');
   }
+  if (!Number.isFinite(cancelTimeoutMs) || cancelTimeoutMs <= 0) {
+    throw new Error('Guard de staging: timeout de cancelación Coolify inválido.');
+  }
 
   const apiUrl = baseUrl.replace(/\/$/, '');
-  const request = async (method, path, body, requestToken = token) => {
+  const request = async (method, path, body, requestToken = token, requestTimeoutMs = timeoutMs) => {
     if (!requestToken) {
       throw new Error(`Guard de staging: falta credencial Coolify para ${method} ${path}.`);
     }
     const controller = new AbortController();
-    const timeoutError = new Error(`Coolify API ${method} ${path} excedió el timeout de ${timeoutMs} ms.`);
+    const timeoutError = new Error(`Coolify API ${method} ${path} excedió el timeout de ${requestTimeoutMs} ms.`);
     let rejectTimeout;
     const timeoutPromise = new Promise((_, reject) => {
       rejectTimeout = reject;
@@ -224,7 +229,7 @@ export function createCoolifyClient({
     const timeout = setTimeout(() => {
       controller.abort();
       rejectTimeout(timeoutError);
-    }, timeoutMs);
+    }, requestTimeoutMs);
     let response;
     let payload = null;
     try {
@@ -260,15 +265,15 @@ export function createCoolifyClient({
 
   return Object.freeze({
     async getDeployment(deploymentUuid) {
-      const result = await request('GET', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}`, undefined, readToken ?? token);
+      const result = await request('GET', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}`, undefined, readToken ?? token, timeoutMs);
       return result.payload;
     },
     async listDeployments(resourceUuid = STAGING_DEPLOY_GUARD.resourceUuid) {
-      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`, undefined, readToken ?? token);
+      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`, undefined, readToken ?? token, timeoutMs);
       return asDeploymentRecords(result.payload);
     },
     async cancelDeployment(deploymentUuid) {
-      return request('POST', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}/cancel`, undefined, deployToken ?? token);
+      return request('POST', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}/cancel`, undefined, deployToken ?? token, cancelTimeoutMs);
     },
   });
 }
@@ -326,6 +331,8 @@ export async function watchDeployment({
   mountPath = '/srv',
   minimumFreeBytes = STAGING_DEPLOY_GUARD.minimumFreeBytes,
   timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
+  apiIntervalMs = STAGING_DEPLOY_GUARD.intervalMs,
+  diskIntervalMs = STAGING_DEPLOY_GUARD.intervalMs,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   exec = execFileAsync,
   onCancel = () => {},
@@ -344,7 +351,11 @@ export async function watchDeployment({
   let cancellationRequested = false;
   let lastVerifiedRecord;
   let lastOperation;
+  let lastApiOperation;
   let lastFreeBytes;
+  let terminalResult;
+  let finished = false;
+  let cancellationPromise;
   const writeDiagnostic = diagnosticWriter ?? ((event) => persistDiagnostic(event, {
     filePath: diagnosticFile,
     maxBytes: diagnosticMaxBytes,
@@ -362,119 +373,187 @@ export async function watchDeployment({
     lastOperation = operation;
   };
 
-  const cancelOnce = async ({ code, message }) => {
-    if (cancellationRequested) return false;
-    assertDeploymentTarget(lastVerifiedRecord, { deploymentUuid, expectedCommit });
-    const triggeringOperation = lastOperation;
-    const attemptedCancelCount = cancelCount + 1;
-    let cancellationResult;
-    try {
-      const result = await measureOperation(
-        'cancel',
-        () => client.cancelDeployment(deploymentUuid),
-        recordOperation,
-      );
-      cancellationResult = { ok: true, ...assertCancellationAck(result, deploymentUuid) };
-    } catch (error) {
-      await emitDiagnostic({
-        event: 'cancel',
-        at: new Date().toISOString(),
-        phase: triggeringOperation?.phase,
-        operation: triggeringOperation,
-        cancellationOperation: lastOperation,
-        reasonCode: code,
-        reason: safeDiagnosticText(message),
-        deploymentUuid,
-        expectedCommit,
-        status: statusOf(lastVerifiedRecord),
-        sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
-        minimumFreeBytes: minimumFreeBytes.toString(),
-        freeBytes: lastFreeBytes?.toString() ?? null,
-        cancelCount: attemptedCancelCount,
-        cancellationResult: {
-          ok: false,
-          error: safeDiagnosticText(error instanceof Error ? error.message : error),
-        },
-      });
-      throw error;
+  const verifyTarget = async () => {
+    const deployment = await measureOperation(
+      'get',
+      () => client.getDeployment(deploymentUuid),
+      (operation) => {
+        recordOperation(operation);
+        lastApiOperation = operation;
+      },
+    );
+    assertDeploymentTarget(deployment, { deploymentUuid, expectedCommit });
+    const records = await measureOperation(
+      'list',
+      () => client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid),
+      (operation) => {
+        recordOperation(operation);
+        lastApiOperation = operation;
+      },
+    );
+    const listedTarget = records.find((record) => deploymentUuidOf(record) === deploymentUuid);
+    if (!listedTarget) {
+      throw new Error(`Guard de staging: ${deploymentUuid} no está relacionado con la aplicación ${STAGING_DEPLOY_GUARD.resourceUuid}.`);
     }
-    cancellationRequested = true;
-    cancelCount = attemptedCancelCount;
-    const event = {
-      event: 'cancel',
-      at: new Date().toISOString(),
-      phase: triggeringOperation?.phase,
-      operation: triggeringOperation,
-      cancellationOperation: lastOperation,
-      reasonCode: code,
-      reason: safeDiagnosticText(message),
-      deploymentUuid,
-      expectedCommit,
-      status: statusOf(lastVerifiedRecord),
-      sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
-      minimumFreeBytes: minimumFreeBytes.toString(),
-      freeBytes: lastFreeBytes?.toString() ?? null,
-      cancelCount,
-      cancellationResult,
-    };
-    await emitDiagnostic(event);
-    await onCancel(event);
-    return true;
+    assertDeploymentTarget(listedTarget, { deploymentUuid, expectedCommit });
+    assertNoOtherBuild(records, deploymentUuid);
+    lastVerifiedRecord = deployment;
+    targetVerified = true;
+    return deployment;
   };
 
-  while (true) {
-    let deployment;
-    try {
-      deployment = await measureOperation(
-        'get',
-        () => client.getDeployment(deploymentUuid),
-        recordOperation,
-      );
-      assertDeploymentTarget(deployment, { deploymentUuid, expectedCommit });
-      const records = await measureOperation(
-        'list',
-        () => client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid),
-        recordOperation,
-      );
-      const listedTarget = records.find((record) => deploymentUuidOf(record) === deploymentUuid);
-      if (!listedTarget) {
-        throw new Error(`Guard de staging: ${deploymentUuid} no está relacionado con la aplicación ${STAGING_DEPLOY_GUARD.resourceUuid}.`);
+  const cancellationEvent = ({ event, triggerOperation, code, message, cancellationResult }) => ({
+    event,
+    at: new Date().toISOString(),
+    phase: triggerOperation?.phase,
+    operation: triggerOperation,
+    cancellationOperation: lastOperation,
+    reasonCode: code,
+    reason: safeDiagnosticText(message),
+    deploymentUuid,
+    expectedCommit,
+    status: statusOf(lastVerifiedRecord),
+    sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
+    minimumFreeBytes: minimumFreeBytes.toString(),
+    freeBytes: lastFreeBytes?.toString() ?? null,
+    cancelCount,
+    cancellationResult,
+  });
+
+  const cancelOnce = async ({ code, message, operation = lastOperation }) => {
+    if (cancellationPromise) return cancellationPromise;
+    assertDeploymentTarget(lastVerifiedRecord, { deploymentUuid, expectedCommit });
+    cancellationRequested = true;
+    cancelCount += 1;
+    cancellationPromise = (async () => {
+      await emitDiagnostic(cancellationEvent({
+        event: 'cancel_requested',
+        triggerOperation: operation,
+        code,
+        message,
+        cancellationResult: { ok: null, state: 'requested' },
+      }));
+
+      let cancellationResult;
+      let cancellationError;
+      try {
+        const result = await measureOperation(
+          'cancel',
+          () => client.cancelDeployment(deploymentUuid),
+          recordOperation,
+        );
+        cancellationResult = { ok: true, ...assertCancellationAck(result, deploymentUuid) };
+      } catch (error) {
+        cancellationError = error;
+        cancellationResult = {
+          ok: false,
+          error: safeDiagnosticText(error instanceof Error ? error.message : error),
+        };
       }
-      assertDeploymentTarget(listedTarget, { deploymentUuid, expectedCommit });
-      assertNoOtherBuild(records, deploymentUuid);
-      lastVerifiedRecord = deployment;
-      targetVerified = true;
-    } catch (error) {
-      if (!targetVerified) throw error;
-      if (cancellationRequested) {
-        throw new Error(`Guard de staging: no se pudo verificar el estado terminal tras cancelar ${deploymentUuid}: ${error.message}`);
+
+      const resultEvent = cancellationEvent({
+        event: 'cancel_result',
+        triggerOperation: operation,
+        code,
+        message,
+        cancellationResult,
+      });
+      await emitDiagnostic(resultEvent);
+      await onCancel(resultEvent);
+
+      let deployment;
+      try {
+        deployment = await verifyTarget();
+      } catch (error) {
+        if (cancellationError) throw cancellationError;
+        throw error;
       }
-      await cancelOnce({ code: 'coolify_query_error', message: `fallo de consulta: ${error.message}` });
-      await sleep(STAGING_DEPLOY_GUARD.intervalMs);
-      continue;
-    }
+      if (!isTerminal(deployment)) {
+        if (cancellationError) throw cancellationError;
+        throw new Error(`Guard de staging: cancelación de ${deploymentUuid} confirmada sin estado terminal.`);
+      }
+      terminalResult = { deploymentUuid, status: statusOf(deployment), cancelCount };
+      finished = true;
+      return terminalResult;
+    })();
+    return cancellationPromise;
+  };
 
-    if (isTerminal(deployment)) {
-      return { deploymentUuid, status: statusOf(deployment), cancelCount };
-    }
+  const initial = await verifyTarget();
+  if (isTerminal(initial)) return { deploymentUuid, status: statusOf(initial), cancelCount };
 
-    let freeBytes;
-    try {
-      freeBytes = await measureOperation(
-        'df',
-        () => readFreeBytes({ mountPath, exec, timeoutMs }),
-        recordOperation,
-      );
-      lastFreeBytes = freeBytes;
-    } catch (error) {
-      await cancelOnce({ code: 'df_error', message: `fallo de lectura de espacio: ${error.message}` });
+  const diskMonitor = async () => {
+    while (!finished && !cancellationRequested) {
+      let freeBytes;
+      let diskOperation;
+      try {
+        freeBytes = await measureOperation(
+          'df',
+          () => readFreeBytes({ mountPath, exec, timeoutMs }),
+          (operation) => {
+            recordOperation(operation);
+            diskOperation = operation;
+          },
+        );
+        lastFreeBytes = freeBytes;
+      } catch (error) {
+        await cancelOnce({
+          code: 'df_error',
+          message: `fallo de lectura de espacio: ${error.message}`,
+          operation: diskOperation,
+        });
+        return;
+      }
+      if (freeBytes < minimumFreeBytes) {
+        await cancelOnce({
+          code: 'low_disk',
+          message: `espacio libre insuficiente: ${freeBytes} bytes`,
+          operation: diskOperation,
+        });
+        return;
+      }
+      await sleep(diskIntervalMs);
     }
-    if (freeBytes !== undefined && freeBytes < minimumFreeBytes) {
-      await cancelOnce({ code: 'low_disk', message: `espacio libre insuficiente: ${freeBytes} bytes` });
-    }
+  };
 
-    await sleep(STAGING_DEPLOY_GUARD.intervalMs);
+  const apiMonitor = async () => {
+    while (!finished && !cancellationRequested) {
+      let deployment;
+      try {
+        deployment = await verifyTarget();
+      } catch (error) {
+        await cancelOnce({
+          code: 'coolify_query_error',
+          message: `fallo de consulta: ${error.message}`,
+          operation: lastApiOperation,
+        });
+        return;
+      }
+      if (isTerminal(deployment)) {
+        terminalResult = { deploymentUuid, status: statusOf(deployment), cancelCount };
+        finished = true;
+        return;
+      }
+      await sleep(apiIntervalMs);
+    }
+  };
+
+  let diskFailure;
+  const diskTask = diskMonitor().catch((error) => {
+    diskFailure = error;
+    finished = true;
+  });
+  try {
+    await apiMonitor();
+  } finally {
+    finished = true;
+    await diskTask;
   }
+  if (diskFailure) throw diskFailure;
+  if (!terminalResult) {
+    throw new Error(`Guard de staging: vigilancia terminada sin estado terminal para ${deploymentUuid}.`);
+  }
+  return terminalResult;
 }
 
 async function main() {
