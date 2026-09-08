@@ -470,11 +470,11 @@ export function createMongoRewardAccountingRepository(
         {
           $lookup: {
             from: "competition_credit_incidents",
-            localField: "runId",
-            foreignField: "runId",
+            let: { creditRunId: "$runId" },
             pipeline: [
               {
                 $match: {
+                  $expr: { $eq: ["$runId", "$$creditRunId"] },
                   type: "credit_reconciliation_mismatch",
                   status: "open",
                 },

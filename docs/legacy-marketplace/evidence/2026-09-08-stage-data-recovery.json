@@ -358,7 +358,22 @@
         "futureRisk": "open pool positions remain a reward contributor source after lot expiry",
         "proposedContainment": "append two integrity incidents and exclude runs with open credit_reconciliation_mismatch incidents in reward contributor selection; preserve existing financial records",
         "applied": false,
-        "evidence": "/tmp/cukies-pool-rewards-impact-batch-result.json"
+        "evidence": "/tmp/cukies-pool-rewards-impact-batch-result.json",
+        "compatibility": {
+          "serverVersion": "4.4.29",
+          "rejectedSyntax": "lookup pipeline combined with localField/foreignField",
+          "errorCode": 9,
+          "fixedSyntax": "lookup let creditRunId and expr eq on runId, retaining type/status filters",
+          "verifiedAt": "2026-09-08T17:22:27.910Z",
+          "baselineQaPoolUnitsByCutoff": {
+            "13:30": 390,
+            "14:00": 390,
+            "14:30": 390
+          },
+          "writes": 0,
+          "evidence": "/tmp/cukies-pool-live-baseline.json",
+          "afterIncidentVerification": "pending"
+        }
       }
     },
     "repairCandidate": {
