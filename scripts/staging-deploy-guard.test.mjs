@@ -148,6 +148,30 @@ describe('staging deployment guard', () => {
     assert.equal(cancelCalls, 1);
   });
 
+  it('times out a hanging df call and follows the single-cancel path', async () => {
+    let current = record('building');
+    let cancelCalls = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      timeoutMs: 10,
+      client: {
+        getDeployment: async () => current,
+        listDeployments: async () => [current],
+        cancelDeployment: async () => {
+          cancelCalls += 1;
+          current = record('cancelled');
+          return { status: 200, payload: { cancelled: true, deployment_uuid: TARGET } };
+        },
+      },
+      exec: async () => new Promise(() => {}),
+      sleep: async () => {},
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.cancelCount, 1);
+    assert.equal(cancelCalls, 1);
+  });
+
   it('cancels once after a query failure only after the target was verified', async () => {
     let getCalls = 0;
     let cancelCalls = 0;
@@ -253,5 +277,17 @@ describe('staging deployment guard', () => {
     ]);
     assert.equal(calls[2].options.method, 'POST');
     assert.equal(calls[2].options.headers.authorization, 'Bearer token-not-logged');
+  });
+
+  it('aborts a hanging Coolify request at the bounded timeout', async () => {
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      token: 'token-not-logged',
+      timeoutMs: 10,
+      fetchImpl: async (_url, { signal }) => new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('aborted by test')), { once: true });
+      }),
+    });
+    await assert.rejects(client.getDeployment(TARGET), /excedió el timeout de 10 ms/);
   });
 });

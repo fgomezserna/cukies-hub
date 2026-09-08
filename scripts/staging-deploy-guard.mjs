@@ -10,6 +10,7 @@ export const STAGING_DEPLOY_GUARD = Object.freeze({
   applicationId: '28',
   minimumFreeBytes: 10n * 1024n * 1024n * 1024n,
   intervalMs: 2500,
+  operationTimeoutMs: 3000,
 });
 
 const TERMINAL_STATUSES = new Set([
@@ -109,9 +110,22 @@ export function assertNoOtherBuild(records, deploymentUuid = null) {
   return records;
 }
 
-export async function readFreeBytes({ mountPath = '/srv', exec = execFileAsync } = {}) {
-  const { stdout } = await exec('df', ['-Pk', mountPath]);
-  return parseFreeBytes(stdout);
+export async function readFreeBytes({
+  mountPath = '/srv',
+  exec = execFileAsync,
+  timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
+} = {}) {
+  let timeoutHandle;
+  const command = exec('df', ['-Pk', mountPath], { timeout: timeoutMs });
+  const timedOut = new Promise((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error(`df -Pk ${mountPath} excedió el timeout de ${timeoutMs} ms.`)), timeoutMs);
+  });
+  try {
+    const { stdout } = await Promise.race([command, timedOut]);
+    return parseFreeBytes(stdout);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 }
 
 function requireExpectedCommit(expectedCommit) {
@@ -121,25 +135,46 @@ function requireExpectedCommit(expectedCommit) {
   return expectedCommit;
 }
 
-export function createCoolifyClient({ baseUrl = process.env.COOLIFY_API_URL, token = process.env.COOLIFY_API_TOKEN, fetchImpl = globalThis.fetch } = {}) {
+export function createCoolifyClient({
+  baseUrl = process.env.COOLIFY_API_URL,
+  token = process.env.COOLIFY_API_TOKEN,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
+} = {}) {
   if (!baseUrl || !token) {
     throw new Error('Guard de staging: faltan COOLIFY_API_URL o COOLIFY_API_TOKEN.');
   }
   if (typeof fetchImpl !== 'function') {
     throw new Error('Guard de staging: no hay un fetch disponible para Coolify.');
   }
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error('Guard de staging: timeout de Coolify inválido.');
+  }
 
   const apiUrl = baseUrl.replace(/\/$/, '');
   const request = async (method, path, body) => {
-    const response = await fetchImpl(`${apiUrl}${path}`, {
-      method,
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetchImpl(`${apiUrl}${path}`, {
+        method,
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${token}`,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        signal: controller.signal,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new Error(`Coolify API ${method} ${path} excedió el timeout de ${timeoutMs} ms.`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
     let payload = null;
     try {
       payload = await response.json();
@@ -172,13 +207,14 @@ export async function preflightBeforeStart({
   expectedCommit,
   mountPath = '/srv',
   minimumFreeBytes = STAGING_DEPLOY_GUARD.minimumFreeBytes,
+  timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
   exec = execFileAsync,
 } = {}) {
   requireExpectedCommit(expectedCommit);
   if (!client?.listDeployments) throw new Error('Guard de staging: cliente Coolify incompleto.');
   const records = await client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid);
   assertNoOtherBuild(records);
-  const freeBytes = await readFreeBytes({ mountPath, exec });
+  const freeBytes = await readFreeBytes({ mountPath, exec, timeoutMs });
   assertFreeSpace(freeBytes, minimumFreeBytes);
   return {
     resourceUuid: STAGING_DEPLOY_GUARD.resourceUuid,
@@ -211,6 +247,7 @@ export async function watchDeployment({
   expectedCommit,
   mountPath = '/srv',
   minimumFreeBytes = STAGING_DEPLOY_GUARD.minimumFreeBytes,
+  timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   exec = execFileAsync,
   onCancel = () => {},
@@ -267,7 +304,7 @@ export async function watchDeployment({
 
     let freeBytes;
     try {
-      freeBytes = await readFreeBytes({ mountPath, exec });
+      freeBytes = await readFreeBytes({ mountPath, exec, timeoutMs });
     } catch (error) {
       await cancelOnce(`fallo de lectura de espacio: ${error.message}`);
     }
