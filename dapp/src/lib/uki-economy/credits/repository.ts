@@ -28,6 +28,7 @@ import {
   type CreditVerifiedHistoryCoverage,
   type CreditVerifiedSlotVersion,
 } from "./history-coverage";
+import { isBlockingCreditIncident } from "./integrity";
 import {
   CREDIT_RULE_SCOPE,
   CREDIT_SCHEMA_VERSION,
@@ -510,7 +511,28 @@ export function createMongoCompetitionCreditRepository(
           },
           options
         ),
-        collections.incidents.countDocuments({ status: "open", route }, options),
+        collections.incidents
+          .find({ status: "open", route }, {
+            ...options,
+            projection: {
+              _id: 1,
+              incidentId: 1,
+              type: 1,
+              status: 1,
+              runId: 1,
+              route: 1,
+              periodId: 1,
+              reasonCodes: 1,
+              evidenceHash: 1,
+              containment: 1,
+              selectorCutoff: 1,
+              planHash: 1,
+            },
+          })
+          .toArray()
+          .then((incidents) => incidents.filter((incident) =>
+            isBlockingCreditIncident(incident, route, cutoff)
+          ).length),
         db.collection("chain_integrity_incidents").countDocuments(
           {
             status: "open",
