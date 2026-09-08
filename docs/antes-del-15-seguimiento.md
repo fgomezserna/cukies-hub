@@ -75,7 +75,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Catalogo conjunto y UX publicados en PR #322 (8/09); la paridad de datos legacy sigue pendiente. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Reconciliar lista/filtros/acciones ya implementados segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
 | 3 | **EN STAGING, EN PRUEBAS**: Cukie Master, creditos, pools, prestamos y rewards. | Confirmacion de producto; 2026-09-07; smoke 11:44 UTC como evidencia fechada. | Registrar resultados de consumo/caducidad de creditos, stake/unstake, prestamos, cierres, reparto e idempotencia; completar los flujos pendientes segun esas pruebas. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
-| 5 | **PUBLICADO EN STAGING Y VERIFICADO EN EL CASO REPORTADO**: navegacion, cuenta, Master/creditos, juego y catalogo conjunto publicados. Resuelta la contradiccion de cupos y la carga NFT/Pool para la wallet QA. | 2026-09-08, [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322) y [PR #323](https://github.com/fgomezserna/cukies-hub/pull/323); Stage `16e7f07`, deploy `agw4kgccgkk88wko4g8o0g4g` terminado 12:54:18 UTC. Sesion firmada: 0 UKI + 5 NFT, reparto 500 (110 jugar/390 pool); Pool con 9 disponibles y sin aviso; coleccion 12, tres en Master. [Auditoria](uki-dapp-sitemap.md), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Completar variantes y flujos transaccionales de la matriz UX; esta comprobacion no certifica toda la migracion legacy. Main conserva `fb2b190`. |
+| 5 | **PUBLICADO EN STAGING · PRUEBAS DE CONTINUIDAD ABIERTAS**: navegacion, cuenta, Master/creditos, juego y catalogo conjunto. El caso inicial se verifico; el seguimiento del 8/09 detecta que Dashboard conserva un snapshot antiguo tras nuevas retiradas. Se incorpora refresco visible/foco con aislamiento por sesion. | 2026-09-08, [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), [PR #323](https://github.com/fgomezserna/cukies-hub/pull/323), Stage observado `159e1e8`. A las 13:55 UTC el backend pasa correctamente a 0 cupos al quedar 2 puntos NFT; la pestaña anterior mantiene 5. Indexador sin reinicios ni errores RPC observados desde 13:12. [Seguimiento live](https://github.com/fgomezserna/cukies-hub/issues/289#issuecomment-5586447371), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Verificar continuidad y recuperacion del resumen publicado, variantes y flujos transaccionales de la matriz UX. Marketplace UKI no disponible: despliegue operativo sin acreditar y configuracion ausente; Legacy responde. No equivale a caida general ni certifica toda la migracion. Main conserva su despliegue independiente. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
@@ -919,6 +919,42 @@ actualizacion. El inventario se corresponde con los tres NFTs depositados
 en Master y ninguno en Pool. No hubo firmas ni operaciones de staking en
 esta comprobacion. Parche validado: 14 tests focales y gates dapp completos (lint, typecheck, 215 suites /
 1.716 tests y build correctos).
+
+### Seguimiento de continuidad: 8 de septiembre, 14:05 UTC
+
+El usuario comunica una nueva recaida. Se contrasta la pestaña Dashboard ya
+abierta con una nueva lectura de la misma wallet. La primera conserva cinco
+cupos; Dashboard nuevo, Master y Creditos indican cero cupos configurables.
+Las retiradas de los NFT `98000006` y `98000005` se indexan a las 13:53:07 y
+13:54:31 UTC; sus trabajos terminan sin reintentos. Queda `98000002`, con dos
+puntos de rareza: al requerir tres por cupo, cero es correcto. Los creditos
+ya emitidos (110 personales / 390 aportados) mantienen su caducidad.
+
+El defecto reproducido es la ausencia de refresco automatico del resumen:
+`cache: no-store` evita cache HTTP, pero no actualiza el estado de una pestaña
+abierta. El parche incorpora actualizacion al volver a la pestaña y cada
+30 segundos mientras esta visible, sin peticiones solapadas y descartando
+respuestas de una identidad anterior. Las peticiones tienen un plazo de
+20 segundos y la pantalla muestra la hora de su ultima lectura. Una
+actualizacion fallida conserva esa lectura con un aviso explicito; no
+fabrica ceros actuales.
+
+No se observa repeticion del incidente RPC en el intervalo 13:12–14:03 UTC:
+los procesos tienen cero reinicios y los 77 rangos del indexador avanzan.
+Un `DOMAIN_CONFLICT` de creditos a las 14:00:20 UTC queda seguido de ejecuciones
+correctas; no prueba una interrupcion persistente. Esta observacion acotada
+no certifica estabilidad indefinida.
+
+Marketplace tiene un bloqueo separado: faltan las variables de address del
+contrato UKI en app 28 y su runtime no esta listo; el catalogo Legacy responde.
+La address Stage `0x95780d891461e3183562B5D785f2D2c1c72ecE65` se contrasta
+por codigo on-chain: corresponde a `StagingCukiesMarketplaceSource`, fixture
+de eventos, y no a `CukiesMarketplace`. El despliegue UKI operativo no queda
+acreditado; su identidad y configuracion siguen pendientes segun
+`deployment-environments.md`. No se activa usando una address de pruebas.
+No se confunde este aviso con una perdida de cupos ni con latencia RPC.
+La comprobacion publicada del refresco se coordina en [#289](https://github.com/fgomezserna/cukies-hub/issues/289);
+la evidencia historica de 12:54 sigue siendo valida para aquel estado.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 

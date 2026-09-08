@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DashboardOverviewPanel } from '@/components/wallet/dashboard-overview-panel';
 import type { DashboardSummary } from '@/lib/dashboard/summary';
@@ -38,6 +38,11 @@ const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitc
 const fetchMock = jest.fn();
 const switchChain = jest.fn();
 const wallet = '0x1111111111111111111111111111111111111111';
+const otherWallet = '0x2222222222222222222222222222222222222222';
+
+function setVisibilityState(value: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+}
 
 function authValue(user: User | null = { walletAddress: wallet } as User) {
   return {
@@ -59,7 +64,11 @@ function module<T>(data: T, state: 'ready' | 'degraded' = 'ready') {
   };
 }
 
-function summary(overrides: Partial<DashboardSummary['modules']> = {}): DashboardSummary {
+function summary(
+  overrides: Partial<DashboardSummary['modules']> = {},
+  identityWallet = wallet,
+  generatedAt = '2026-08-30T12:00:00.000Z',
+): DashboardSummary {
   const modules: DashboardSummary['modules'] = {
     cukieMaster: module({
       allocatedSlots: 2,
@@ -116,11 +125,11 @@ function summary(overrides: Partial<DashboardSummary['modules']> = {}): Dashboar
   ));
   return {
     schemaVersion: 'dashboard-v1',
-    generatedAt: '2026-08-30T12:00:00.000Z',
+    generatedAt,
     overallState: alerts.length === 0 ? 'ready' : 'partial',
     identity: {
       username: 'tester',
-      walletNormalized: wallet,
+      walletNormalized: identityWallet,
       sessionExpiresAt: '2026-09-30T12:00:00.000Z',
     },
     network: { environment: 'staging', chainId: 97 },
@@ -144,6 +153,12 @@ describe('DashboardOverviewPanel', () => {
     mockUseAccount.mockReturnValue({ chainId: 97, isConnected: true } as ReturnType<typeof useAccount>);
     mockUseSwitchChain.mockReturnValue({ switchChain, isPending: false } as unknown as ReturnType<typeof useSwitchChain>);
     fetchMock.mockResolvedValue(response(summary()));
+    setVisibilityState('visible');
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    setVisibilityState('visible');
   });
 
   it('no consulta datos privados sin sesión EVM firmada', () => {
@@ -167,7 +182,8 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.getByText('0x1111…1111')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.queryByText(/Actualizado/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Actualizado/)).toBeInTheDocument();
+    expect(screen.getByText(/Actualizado/)).toHaveAttribute('dateTime', '2026-08-30T12:00:00.000Z');
     expect(screen.getByRole('link', { name: /Usar o aportar/i })).toHaveAttribute('href', '/credits');
     expect(screen.getByRole('link', { name: /Ver mis premios/i })).toHaveAttribute('href', '/premios');
   });
@@ -235,5 +251,258 @@ describe('DashboardOverviewPanel', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora'));
     expect(screen.queryByText('200')).not.toBeInTheDocument();
+  });
+
+  it('actualiza los datos al recuperar el foco de la pestaña', async () => {
+    const initial = summary({
+      cukieMaster: module({
+        allocatedSlots: 5,
+        desiredSlots: 5,
+        maxPotentialSlots: 10,
+        routes: {
+          uki: { allocatedSlots: 5, desiredSlots: 5, sourceComplete: true, projectionFresh: true, synchronizing: false },
+          nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        },
+      }),
+    });
+    const refreshed = summary({
+      cukieMaster: module({
+        allocatedSlots: 0,
+        desiredSlots: 0,
+        maxPotentialSlots: 10,
+        routes: {
+          uki: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+          nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        },
+      }),
+    }, wallet, '2026-08-30T12:30:00.000Z');
+    fetchMock.mockResolvedValueOnce(response(initial)).mockResolvedValueOnce(response(refreshed));
+
+    render(<DashboardOverviewPanel />);
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
+    expect(await within(masterCard).findByText('5')).toBeInTheDocument();
+
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
+    expect(screen.getByText(/Actualizado/)).toHaveAttribute('dateTime', '2026-08-30T12:30:00.000Z');
+  });
+
+  it('mantiene el polling solo visible, detiene el intervalo oculto y evita solapamientos', async () => {
+    jest.useFakeTimers();
+    let resolveRefresh!: (value: ReturnType<typeof response>) => void;
+    fetchMock
+      .mockResolvedValueOnce(response(summary()))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+
+    render(<DashboardOverviewPanel />);
+    expect(await screen.findByText('tester')).toBeInTheDocument();
+
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await act(async () => { jest.advanceTimersByTime(10_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    setVisibilityState('hidden');
+    fireEvent(document, new Event('visibilitychange'));
+    await act(async () => { jest.advanceTimersByTime(60_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    resolveRefresh(response(summary({ cukieMaster: module({
+      allocatedSlots: 0,
+      desiredSlots: 0,
+      maxPotentialSlots: 10,
+      routes: {
+        uki: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+      },
+    }) })));
+    await act(async () => { await Promise.resolve(); });
+
+    setVisibilityState('visible');
+    fireEvent(document, new Event('visibilitychange'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+  });
+
+  it('ignora una respuesta pendiente cuando cambia la identidad de wallet', async () => {
+    let resolveOld!: (value: ReturnType<typeof response>) => void;
+    const oldSummary = summary({ cukieMaster: module({
+      allocatedSlots: 5,
+      desiredSlots: 5,
+      maxPotentialSlots: 10,
+      routes: {
+        uki: { allocatedSlots: 5, desiredSlots: 5, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+      },
+    }) });
+    const newSummary = summary({ cukieMaster: module({
+      allocatedSlots: 3,
+      desiredSlots: 3,
+      maxPotentialSlots: 10,
+      routes: {
+        uki: { allocatedSlots: 3, desiredSlots: 3, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+      },
+    }) }, otherWallet);
+    fetchMock
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
+      .mockResolvedValueOnce(response(newSummary));
+
+    const view = render(<DashboardOverviewPanel />);
+    mockUseAuth.mockReturnValue(authValue({ walletAddress: otherWallet } as User));
+    view.rerender(<DashboardOverviewPanel />);
+
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
+    await waitFor(() => expect(within(masterCard).getByText('3')).toBeInTheDocument());
+    await act(async () => {
+      resolveOld(response(oldSummary));
+      await Promise.resolve();
+    });
+    expect(within(masterCard).getByText('3')).toBeInTheDocument();
+    expect(within(masterCard).queryByText('5')).not.toBeInTheDocument();
+  });
+
+  it('retira la última lectura mientras cambia la sesión y descarta la respuesta antigua', async () => {
+    let resolveOld!: (value: ReturnType<typeof response>) => void;
+    fetchMock
+      .mockResolvedValueOnce(response(summary()))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
+
+    const view = render(<DashboardOverviewPanel />);
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
+    expect(await within(masterCard).findByText('2')).toBeInTheDocument();
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    mockUseAuth.mockReturnValue({ ...authValue(null), isLoading: true });
+    view.rerender(<DashboardOverviewPanel />);
+    expect(screen.queryByText('tester')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveOld(response(summary({ cukieMaster: module({
+        allocatedSlots: 5,
+        desiredSlots: 5,
+        maxPotentialSlots: 10,
+        routes: {
+          uki: { allocatedSlots: 5, desiredSlots: 5, sourceComplete: true, projectionFresh: true, synchronizing: false },
+          nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        },
+      }) })));
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('tester')).not.toBeInTheDocument();
+  });
+
+  it('conserva la última lectura si falla un refresco y se recupera después', async () => {
+    jest.useFakeTimers();
+    const recovered = summary({ cukieMaster: module({
+      allocatedSlots: 0,
+      desiredSlots: 0,
+      maxPotentialSlots: 10,
+      routes: {
+        uki: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+      },
+    }) });
+    fetchMock
+      .mockResolvedValueOnce(response(summary()))
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce(response(recovered));
+
+    render(<DashboardOverviewPanel />);
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
+    expect(await within(masterCard).findByText('2')).toBeInTheDocument();
+
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(screen.getByText('No hemos podido actualizar tu cuenta')).toBeInTheDocument());
+    expect(within(masterCard).getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getByText(/última lectura disponible/i)).toBeInTheDocument();
+
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
+    expect(screen.queryByText('No hemos podido actualizar tu cuenta')).not.toBeInTheDocument();
+  });
+
+  it('libera una petición bloqueada por timeout para que el siguiente polling se recupere', async () => {
+    jest.useFakeTimers();
+    const recovered = summary({ cukieMaster: module({
+      allocatedSlots: 0,
+      desiredSlots: 0,
+      maxPotentialSlots: 10,
+      routes: {
+        uki: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+      },
+    }) });
+    fetchMock
+      .mockImplementationOnce((_input: string, init: RequestInit) => new Promise((_, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      }))
+      .mockResolvedValueOnce(response(recovered));
+
+    render(<DashboardOverviewPanel />);
+    await act(async () => {
+      jest.advanceTimersByTime(20_000);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora');
+
+    await act(async () => {
+      jest.advanceTimersByTime(10_000);
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const masterCard = screen.getByText('Cukie Master').closest('article') as HTMLElement;
+    await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
+  });
+
+  it('descarta un JSON que llega después del deadline y acepta el siguiente polling', async () => {
+    jest.useFakeTimers();
+    let resolveJson!: (value: unknown) => void;
+    const recovered = summary({ cukieMaster: module({
+      allocatedSlots: 0,
+      desiredSlots: 0,
+      maxPotentialSlots: 10,
+      routes: {
+        uki: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+      },
+    }) });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => new Promise((resolve) => { resolveJson = resolve; }),
+      })
+      .mockResolvedValueOnce(response(recovered));
+
+    render(<DashboardOverviewPanel />);
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { jest.advanceTimersByTime(20_000); });
+    expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora');
+
+    await act(async () => {
+      jest.advanceTimersByTime(10_000);
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const masterCard = screen.getByText('Cukie Master').closest('article') as HTMLElement;
+    await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
+
+    await act(async () => {
+      resolveJson({ status: 'ok', data: summary({ cukieMaster: module({
+        allocatedSlots: 5,
+        desiredSlots: 5,
+        maxPotentialSlots: 10,
+        routes: {
+          uki: { allocatedSlots: 5, desiredSlots: 5, sourceComplete: true, projectionFresh: true, synchronizing: false },
+          nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
+        },
+      }) }) });
+      await Promise.resolve();
+    });
+    expect(within(masterCard).getByText('0')).toBeInTheDocument();
+    expect(screen.queryByText('No podemos cargar tu cuenta ahora')).not.toBeInTheDocument();
   });
 });
