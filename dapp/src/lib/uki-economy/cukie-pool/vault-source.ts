@@ -371,6 +371,7 @@ async function assertCukiePoolVaultOperationalHealth(
       db.collection<Record<string, unknown>>('chain_cursors').find({
         chain: 'BSC',
         contractAlias: 'CUKIE_POOL_NFT_VAULT',
+        eventName: { $in: REQUIRED_POOL_CURSOR_EVENTS },
       }).limit(REQUIRED_POOL_CURSOR_EVENTS.length + 1).toArray(),
       db.collection('chain_events').findOne({
         contractAlias: 'CUKIE_POOL_NFT_VAULT',

@@ -342,6 +342,115 @@ describe('Cukie Pool public source health', () => {
     });
   });
 
+  it('filters required cursors before limiting when administrative cursors are interleaved', async () => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    const administrativeEvents = [
+      'OwnershipTransferStarted',
+      'OwnershipTransferred',
+      'Paused',
+      'Unpaused',
+    ];
+    const cursorRows = [
+      administrativeEvents[0],
+      REQUIRED_POOL_CURSOR_EVENTS[0],
+      administrativeEvents[1],
+      REQUIRED_POOL_CURSOR_EVENTS[1],
+      administrativeEvents[2],
+      REQUIRED_POOL_CURSOR_EVENTS[2],
+      administrativeEvents[3],
+      REQUIRED_POOL_CURSOR_EVENTS[3],
+      REQUIRED_POOL_CURSOR_EVENTS[4],
+      REQUIRED_POOL_CURSOR_EVENTS[5],
+      REQUIRED_POOL_CURSOR_EVENTS[6],
+    ].map((eventName) => ({
+      chain: 'BSC',
+      contractAlias: 'CUKIE_POOL_NFT_VAULT',
+      contractAddress: VAULT,
+      eventName,
+      verifiedChainId: 97,
+      bootstrapStatus: 'verified',
+      bootstrapVerifiedAt: NOW,
+      updatedAt: NOW,
+      safeBlock: 100,
+      nextBlock: 101,
+    }));
+    const findCursors = jest.fn((filter: Record<string, unknown>) => {
+      const eventFilter = filter.eventName as { $in?: string[] } | undefined;
+      const filtered = eventFilter?.$in
+        ? cursorRows.filter((row) => eventFilter.$in!.includes(row.eventName))
+        : cursorRows;
+      const result = {
+        limit: jest.fn((limit: number) => {
+          const limited = filtered.slice(0, limit);
+          return { toArray: async () => limited };
+        }),
+      };
+      return result;
+    });
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        if (name === 'chain_indexer_runs') {
+          return {
+            findOne: async (filter: Record<string, unknown>) => (
+              filter.type === 'loop-error' ? null : { endedAt: NOW }
+            ),
+          };
+        }
+        if (name === 'chain_bsc_checkpoints') {
+          return {
+            findOne: async () => ({
+              checkedAt: NOW,
+              safeBlockNumber: 100,
+              safeBlockHash: `0x${'1'.repeat(64)}`,
+            }),
+          };
+        }
+        if (name === 'chain_cursors') return { find: findCursors };
+        if (
+          name === 'chain_events'
+          || name === 'chain_dead_letters'
+          || name === 'chain_integrity_incidents'
+        ) return { findOne: async () => null };
+        if (name === 'nft_vault_collections') {
+          return { find: () => cursor([allowlistProjection()]) };
+        }
+        if (name === 'cukie_pool_calendar_versions') {
+          return { find: () => cursor([calendarVersion()]) };
+        }
+        if (name === 'cukie_pool_nft_vault_positions') {
+          return { find: () => cursor([]) };
+        }
+        if (name === 'cukies' || name === 'nft_asset_locks') {
+          return { find: () => cursor([]) };
+        }
+        throw new Error(`unexpected collection ${name}`);
+      },
+    });
+
+    await expect(listCukiePoolWalletPositions({
+      walletAddress: OWNER,
+      now: NOW,
+    })).resolves.toMatchObject({
+      sourceHealthy: true,
+      nftCustody: { indexer: { status: 'ready' } },
+    });
+    expect(findCursors).toHaveBeenCalledWith({
+      chain: 'BSC',
+      contractAlias: 'CUKIE_POOL_NFT_VAULT',
+      eventName: { $in: REQUIRED_POOL_CURSOR_EVENTS },
+    });
+
+    cursorRows.pop();
+    await expect(listCukiePoolWalletPositions({
+      walletAddress: OWNER,
+      now: NOW,
+    })).resolves.toMatchObject({
+      sourceHealthy: false,
+      nftCustody: { indexer: { status: 'unavailable' } },
+    });
+  });
+
   it.each([
     ['a mismatched canonical identity', { assetId: `97:${COLLECTION}:another-token` }],
     ['an explicit non-BSC chain', { chain: 'TRON' }],
