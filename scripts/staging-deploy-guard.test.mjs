@@ -291,6 +291,16 @@ describe('staging deployment guard', () => {
     await assert.rejects(client.getDeployment(TARGET), /excedió el timeout de 10 ms/);
   });
 
+  it('keeps the timeout active while reading a hanging response body', async () => {
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      token: 'token-not-logged',
+      timeoutMs: 10,
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => new Promise(() => {}) }),
+    });
+    await assert.rejects(client.getDeployment(TARGET), /excedió el timeout de 10 ms/);
+  });
+
   it('uses separate least-privilege read and deploy tokens', async () => {
     const authorizationHeaders = [];
     const client = createCoolifyClient({

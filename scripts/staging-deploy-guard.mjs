@@ -159,10 +159,19 @@ export function createCoolifyClient({
       throw new Error(`Guard de staging: falta credencial Coolify para ${method} ${path}.`);
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutError = new Error(`Coolify API ${method} ${path} excedió el timeout de ${timeoutMs} ms.`);
+    let rejectTimeout;
+    const timeoutPromise = new Promise((_, reject) => {
+      rejectTimeout = reject;
+    });
+    const timeout = setTimeout(() => {
+      controller.abort();
+      rejectTimeout(timeoutError);
+    }, timeoutMs);
     let response;
+    let payload = null;
     try {
-      response = await fetchImpl(`${apiUrl}${path}`, {
+      response = await Promise.race([fetchImpl(`${apiUrl}${path}`, {
         method,
         headers: {
           accept: 'application/json',
@@ -171,20 +180,20 @@ export function createCoolifyClient({
         },
         signal: controller.signal,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
+      }), timeoutPromise]);
+      try {
+        payload = await Promise.race([response.json(), timeoutPromise]);
+      } catch (error) {
+        if (error === timeoutError) throw error;
+        payload = null;
+      }
     } catch (error) {
-      if (controller.signal.aborted) {
-        throw new Error(`Coolify API ${method} ${path} excedió el timeout de ${timeoutMs} ms.`);
+      if (error === timeoutError || controller.signal.aborted) {
+        throw timeoutError;
       }
       throw error;
     } finally {
       clearTimeout(timeout);
-    }
-    let payload = null;
-    try {
-      payload = await response.json();
-    } catch {
-      payload = null;
     }
     if (!response.ok) {
       throw new Error(`Coolify API ${method} ${path} devolvió HTTP ${response.status}.`);
