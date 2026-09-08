@@ -1186,6 +1186,71 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     ]);
   });
 
+  it("excludes a withdrawal immediately before cutoff while preserving prior credits", async () => {
+    const active = slot({
+      _id: "nft-slot-withdrawn",
+      route: "nft",
+      sourceBlockNumber: 998,
+      sourceBlockHash: `0x${"d".repeat(64)}`,
+      sourceBlockTimestamp: new Date(CUTOFF.getTime() - 2_000),
+    });
+    const repository = new MemoryCompetitionCreditRepository({ slots: [active] });
+    const nftWatermark = testCreditSourceWatermark({
+      _id: "cukie-master-slots:nft",
+      route: "nft",
+      observedThrough: new Date(CUTOFF.getTime() + 30 * 60 * 1_000),
+      updatedAt: new Date(CUTOFF.getTime() + 30 * 60 * 1_000),
+      sourceRuleVersions: { uki: "cukie-master-v1", nft: "cukie-master-v1" },
+      sourceHash: buildCreditSourceSlotsHash([active]),
+      slotCount: 1,
+    });
+    repository.state.watermark = nftWatermark;
+    repository.state.sourceHealth.observedThrough = nftWatermark.observedThrough;
+    repository.state.sourceHealth.sourceRuleVersions = nftWatermark.sourceRuleVersions;
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    const first = await openDailyRun({ repository, service, route: "nft" });
+    expect(first.expectedItemCount).toBe(1);
+    const priorLots = repository.state.ownLots.length + repository.state.poolLots.length;
+
+    const withdrawn = {
+      ...active,
+      status: "inactive" as const,
+      sourceBlockNumber: 999,
+      sourceBlockHash: `0x${"e".repeat(64)}`,
+      sourceBlockTimestamp: new Date(CUTOFF.getTime() - 1_000),
+      inactiveAt: new Date(CUTOFF.getTime() - 1_000),
+      revision: active.revision + 1,
+    };
+    repository.state.slots[0] = withdrawn;
+    repository.state.slotVersions.push({
+      _id: `${withdrawn._id}:${withdrawn.revision}`,
+      slotId: withdrawn._id,
+      route: "nft",
+      effectiveBlockNumber: 999,
+      effectiveBlockHash: withdrawn.sourceBlockHash!,
+      effectiveBlockTimestamp: withdrawn.sourceBlockTimestamp!,
+      observedAt: withdrawn.updatedAt,
+      slot: withdrawn,
+    });
+    const nextCutoff = new Date(CUTOFF.getTime() + 24 * 60 * 60 * 1_000);
+    repository.state.sourceHealth.observedThrough = nextCutoff;
+    await service.refreshSourceWatermark({
+      route: "nft",
+      expectedRuleVersion: "credits-v1",
+      now: nextCutoff,
+    });
+    const second = await service.createDailyRun({
+      route: "nft",
+      cutoff: nextCutoff,
+      expectedRuleVersion: "credits-v1",
+      now: new Date(nextCutoff.getTime() + 1_000),
+    });
+    expect(second.expectedItemCount).toBe(0);
+    expect(repository.state.ownLots.length + repository.state.poolLots.length).toBe(priorLots);
+  });
+
   it("binds pool config to eligibilityEpoch and restarts the 24h maturity gate", async () => {
     const repository = new MemoryCompetitionCreditRepository({
       slots: [slot()],

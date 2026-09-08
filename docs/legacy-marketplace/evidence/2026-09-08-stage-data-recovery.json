@@ -274,6 +274,152 @@
       "focusedPanelTestsPassed": 14,
       "independentReview": "passed after correcting late JSON deadline race",
       "diffCheck": "passed"
+    },
+    "publishedVerification": {
+      "gitSha": "78fb0f85bdc7769e9733dd9c7a3839145540036c",
+      "deploymentUuid": "v400ogwskss4skckckko4ccg",
+      "finishedAt": "2026-09-08T14:37:25Z",
+      "publicHealth": "ok",
+      "authenticatedDashboard": {
+        "firstReadAt": "2026-09-08T14:39:24.786Z",
+        "automaticReadAt": "2026-09-08T14:40:24.781Z",
+        "allocatedSlots": 0,
+        "manualRefreshBetweenReadings": false
+      },
+      "url": "https://github.com/fgomezserna/cukies-hub/pull/325#issuecomment-5586923897"
+    }
+  },
+  "creditCutoffFollowUp": {
+    "observedAt": "2026-09-08T14:44:19Z",
+    "status": "open",
+    "qaNftCutoffs": [
+      {
+        "cutoff": "2026-09-08T14:00:00Z",
+        "cutoffBlock": 129843288,
+        "observedItems": 5,
+        "observedGrant": 500,
+        "expectedItemsAfterWithdrawals": 0
+      },
+      {
+        "cutoff": "2026-09-08T14:30:00Z",
+        "observedItems": 5,
+        "observedGrant": 500,
+        "expectedItemsAfterWithdrawals": 0
+      }
+    ],
+    "finding": "Current slot projection is inactive but cutoff selection still uses prior active NFT slot versions. Historical grants require reconciliation, not classification as legitimate retained balances.",
+    "legitimatePriorNftCuts": [
+      "2026-09-08T13:00:00Z",
+      "2026-09-08T13:30:00Z"
+    ],
+    "ukiInactiveVersionEffectiveBlock": 129802234,
+    "containment": {
+      "container": "competition-credit-scheduler-u4s804o4wwcckowgk0woo4wg-142545477168",
+      "stoppedAt": "2026-09-08T14:44:12.213196274Z",
+      "previousRunning": true,
+      "scope": "Stage app28 competition-credit-scheduler only",
+      "restoreRequired": true,
+      "persistedRuntimeGate": {
+        "id": 1310,
+        "key": "COMPETITION_CREDITS_RUNTIME_ENABLED",
+        "previous": "true",
+        "current": "false",
+        "restoreRequired": true
+      }
+    },
+    "dataMutationsDuringAudit": false,
+    "nextStep": "Guarded event-backed history repair dry-run; fix and deploy, reconcile affected cuts, resume scheduler and verify.",
+    "issue": "https://github.com/fgomezserna/cukies-hub/issues/326",
+    "impactAudit": {
+      "qaAffectedNftRuns": 2,
+      "qaAffectedNftItems": 10,
+      "qaIncorrectCredits": 1000,
+      "personalPerRun": 110,
+      "poolPerRun": 390,
+      "consumptionOrReservationFromAffectedNftCuts": 0,
+      "emissionsAfterContainment": 0,
+      "normalExpiryMinutes": 30,
+      "status": "14:00 expired; 14:30 pending normal expiry while scheduler paused",
+      "ledgerPolicy": "Preserve actual emissions and ledger; append canonical slot history corrections, then verify normal expiry and zero new QA grants.",
+      "recordedAt": "2026-09-08T15:16:05.669233+00:00"
+    },
+    "repairCandidate": {
+      "codeCommit": "0464fd8793c09b663e9e03ed8ad1815f9cde19a0a0",
+      "recordedAt": "2026-09-08T15:30:46.400938+00:00",
+      "approach": "Append canonical slot_transitioned nextSlot snapshots linked through completed outbox jobs to projected withdrawals; preserve original revisions and existing rows.",
+      "dryRun": {
+        "database": "cukieshub-new-staging",
+        "chainId": 97,
+        "plannedCorrections": 5,
+        "mismatches": [],
+        "invalidWithdrawals": 0,
+        "outOfScopeWithdrawals": 7,
+        "planHash": "da5c561d99fdb5d9fd4c87b7392573f402654f1a946b39211b0a0107074f2026",
+        "scriptSha256": "1a06362cab2851a154b8a612ec1172598578de89c3af087dc1d26f02acbf7dff"
+      },
+      "allOriginalVersionsPresent": true,
+      "applied": false,
+      "validation": {
+        "lint": "passed",
+        "typecheck": "passed",
+        "build": "passed",
+        "dappSuites": 215,
+        "dappTests": 1725,
+        "economyFocusedTests": 67,
+        "repairFocusedTests": 4,
+        "review": "passed independent Luna max after removing temporal fallback and verifying existing payload"
+      },
+      "finalScriptCommit": "849a9c1",
+      "finalFrozenPlan": "passed after Mongo recovery: exact five corrections, zero mismatches/invalid withdrawals",
+      "finalDryRun": {
+        "plannedCorrections": 5,
+        "mismatches": [],
+        "invalidWithdrawals": 0,
+        "outOfScopeWithdrawals": 7,
+        "planHash": "da5c561d99fdb5d9fd4c87b7392573f402654f1a946b39211b0a0107074f2026",
+        "scriptSha256": "014a2eb43682415a57e95bd961bb658278b6ab68d5fd88d4c4750bd4a99d4eca",
+        "checkpoint": {
+          "safeBlockNumber": 129858936,
+          "safeBlockHash": "0x747009100bb573545f270b140f55ea455819ca3fa17349ffc5fb3589c011ab44"
+        }
+      }
+    },
+    "infrastructureInterruption": {
+      "recordedAt": "2026-09-08T15:40:08.619231+00:00",
+      "observed": [
+        "Stage indexer could not resolve staging Mongo hostname",
+        "Coolify could not resolve coolify-db",
+        "Stage Mongo container restarting with exit64"
+      ],
+      "repairWrites": 0,
+      "owner": "Parallel assets deployment task investigating infrastructure; root avoids concurrent server changes",
+      "status": "runtime recovered; new build held pending disk peak mitigation",
+      "rootCause": "VM1001 /srv filesystem full: 175G total, zero available; Mongo WiredTiger errno28 / No space left on device with WT_PANIC.",
+      "confirmedBy": "Parallel infrastructure owner 01a0817d-b179-7ba0-aa3e-bbeca0d0dc0a",
+      "updatedAt": "2026-09-08T16:02:14.554982+00:00",
+      "recovery": {
+        "reportedBy": "Parallel infrastructure owner and coordinator",
+        "mongoStage": "healthy",
+        "coolifyDb": "healthy",
+        "chainIndexer": "healthy",
+        "apiHealthStatus": 200,
+        "freeSpaceObserved": "23G",
+        "diskUsePercent": 87,
+        "cancelledDeployment": "p4sso0c00wo8gk0ocgkc4484",
+        "cancelReleasedApproximately": "1G (22G before, 23G after)",
+        "earlierSpaceRecoveryCause": "not established; no cleanup performed by these tasks",
+        "pruneOrDataDeletionPerformed": false
+      }
+    },
+    "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/329",
+    "buildMitigation": {
+      "scope": "Coolify app28 only",
+      "configuration": "COMPOSE_PARALLEL_LIMIT=1 as build-time environment variable",
+      "mechanism": "Coolify build-time.env passed via --env-file; installed Compose consumes MaxConcurrency",
+      "guard": "sample disk every 2-3s; cancel if free space below 10GiB",
+      "status": "approved; awaiting operator preflight before one controlled deployment",
+      "creditsGate": "false until repaired history and correct deployed code verified",
+      "assetsWorker": "contained by deployment operator; backfill not part of this repair"
     }
   }
 }

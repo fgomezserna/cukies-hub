@@ -322,9 +322,10 @@ async function readCukieMasterNftSource(
   walletNormalized: string,
   now: Date,
 ): Promise<CukieMasterNftSource> {
-  const [nft, nftIndexerHealth] = await Promise.all([
+  const [nft, nftIndexerHealth, latestNftChainEvidence] = await Promise.all([
     repository.getNftEntitlement(walletAddress, now),
     repository.getNftIndexerHealth(now, walletNormalized),
+    repository.findLatestNftChainEvidence?.(walletNormalized) ?? Promise.resolve(null),
   ]);
   const nftAssets = await Promise.all(nft.eligibleAssets.map(async (asset) => {
     const lock = asset.activeLocks.find((item) => (
@@ -355,6 +356,21 @@ async function readCukieMasterNftSource(
     };
   }));
   const nftRefs = nftAssets.flatMap((asset) => asset.sourceRefs);
+  // Withdrawn assets disappear from the eligible inventory. Keep the latest
+  // confirmed custodial event as route evidence so a reduction to zero slots
+  // advances the temporal history past the withdrawal block.
+  if (latestNftChainEvidence) {
+    nftRefs.push({
+      source: 'cukie_master_nft_positions',
+      collection: 'chain_events',
+      documentId: latestNftChainEvidence.eventId,
+      observedAt: latestNftChainEvidence.blockTimestamp.toISOString(),
+      eventId: latestNftChainEvidence.eventId,
+      blockNumber: latestNftChainEvidence.blockNumber,
+      blockHash: latestNftChainEvidence.blockHash,
+      blockTimestamp: latestNftChainEvidence.blockTimestamp,
+    });
+  }
   const incompleteNftBlockers = new Set([
     'unknown_owner',
     'unknown_network',
@@ -559,6 +575,17 @@ async function syncPositionSlots(
     const previous = currentSlots.get(ordinal) ?? null;
     const shouldBeAllocated = ordinal <= nextPosition.allocatedSlots;
     if (!shouldBeAllocated && !previous) continue;
+    if (
+      previous
+      && typeof previous.sourceBlockNumber === 'number'
+      && Number.isSafeInteger(previous.sourceBlockNumber)
+      && sourceEvidence
+      && sourceEvidence.blockNumber < previous.sourceBlockNumber
+    ) {
+      throw new DomainConflictError(
+        `La evidencia del slot ${nextPosition.route}:${nextPosition.walletNormalized}:${ordinal} retrocede de bloque.`,
+      );
+    }
     const startsNewEpoch = shouldBeAllocated && (!previous || previous.status === 'inactive');
     const qualifiedSince = startsNewEpoch ? now : previous?.qualifiedSince ?? now;
     const creditEligibleFrom = startsNewEpoch
