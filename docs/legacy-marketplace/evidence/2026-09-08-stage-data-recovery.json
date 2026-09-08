@@ -291,7 +291,7 @@
   },
   "creditCutoffFollowUp": {
     "observedAt": "2026-09-08T14:44:19Z",
-    "status": "history and NFT projection repaired; contained historical incident gate patch validated, deployment and actual NFT runs pending",
+    "status": "history and projection repaired; PR332 deployed and NFT catchup advancing; public-reader and idle watermark refresh patch validated, final deployment pending",
     "qaNftCutoffs": [
       {
         "cutoff": "2026-09-08T14:00:00Z",
@@ -330,7 +330,7 @@
       }
     },
     "dataMutationsDuringAudit": false,
-    "nextStep": "Merge and deploy the validated snapshot gate patch, then verify actual NFT catchup, zero QA grants after withdrawals, reward exclusion and signed UI.",
+    "nextStep": "Deploy the validated public-reader and idle watermark refresh patch, then verify both routes current, zero QA grants, fresh sources across idle ticks and coherent signed UI.",
     "issue": "https://github.com/fgomezserna/cukies-hub/issues/326",
     "impactAudit": {
       "qaAffectedNftRuns": 2,
@@ -586,7 +586,7 @@
       ],
       "repairWrites": 0,
       "owner": "Parallel assets deployment task investigating infrastructure; root avoids concurrent server changes",
-      "status": "infrastructure recovered; credits active since 18:13:05Z; contained historical NFT gate patch still pending deployment",
+      "status": "infrastructure recovered; credits active; PR332 deployed with NFT catchup advancing; final reader/freshness patch pending",
       "rootCause": "VM1001 /srv filesystem full: 175G total, zero available; Mongo WiredTiger errno28 / No space left on device with WT_PANIC.",
       "confirmedBy": "Parallel infrastructure owner 01a0817d-b179-7ba0-aa3e-bbeca0d0dc0a",
       "updatedAt": "2026-09-08T16:02:14.554982+00:00",
@@ -611,7 +611,7 @@
       "configuration": "COMPOSE_PARALLEL_LIMIT=1 as build-time environment variable",
       "mechanism": "Coolify build-time.env passed via --env-file; installed Compose consumes MaxConcurrency",
       "guard": "Independent disk probe every 2.5s, floor 10GiB; API request budget 15s and bounded 45s availability tolerance, immediate invalid-identity/payload/concurrent-build rejection",
-      "status": "code deployment and same-SHA credit activation finished; final gate patch deployment pending",
+      "status": "PR332 deployment finished; final public-reader and idle-refresh patch deployment pending",
       "creditsGate": "restored true and verified effective at 18:13:05Z; do not pause again for the final code deployment",
       "assetsWorker": "contained by deployment operator; backfill not part of this repair",
       "latestAttempt": {
@@ -753,7 +753,7 @@
       "observedAt": "2026-09-08T18:39:10.047Z",
       "masterProjection": "All four existing NFT sources complete and projectionFresh true; only one required rematerialization. QA has zero slots and no pending-materialization UI warning.",
       "masterWorker": "Enabled; one deterministic new full-reconciliation job completed normally, no completed jobs reopened.",
-      "creditRoute": "NFT still blocked in served 2620904 by historical open incidents. Candidate e02d394 scopes the bypass to strictly later snapshots with validated containment metadata.",
+      "creditRoute": "PR332 deployed: NFT catchup advances beyond 14:30 with zero QA grants. Current public reader still counts contained incidents, and waiting ticks do not refresh UKI watermark.",
       "jobWrites": 1,
       "rematerialization": {
         "planHash": "0a040ce4dcef468be7bdc3acba95d3a7bfe5a3d714adb1eca85c8bfe305f25e4",
@@ -797,7 +797,7 @@
     },
     "historicalIncidentGatePatch": {
       "codeCommit": "e02d39492238cd1b496058ae46ffb016a0de99ae",
-      "deployed": false,
+      "deployed": true,
       "scope": "Only strictly later credit snapshots bypass fully validated historical SOURCE_SLOT_HISTORY_CORRECTED containment. Incidents remain open and reward reader exclusion remains unchanged.",
       "checks": {
         "focusedTests": 56,
@@ -856,6 +856,280 @@
           }
         ],
         "bundleSha256": "d7df951e009eda74d03f9572e040e168d4bb5e671f257350b011ec3e4aa28544"
+      },
+      "pullRequest": 332,
+      "deployment": {
+        "deploymentUuid": "sg0sokccg48ggkg8cw0g8w8k",
+        "gitSha": "bd5567f90fb9d47318e96766efc785b322d4b8a3",
+        "finishedAt": "2026-09-08T19:06:47Z",
+        "publicHealth": "ok",
+        "effectiveCreditsEnabled": true,
+        "rewardAccountingEnabled": false,
+        "cardWorkerPresent": false,
+        "diskFreeKiB": 18446892,
+        "guard": {
+          "cancelCount": 0,
+          "apiReadTimeoutSeconds": 15,
+          "recoveredAfterSeconds": 20.8,
+          "availabilityToleranceSeconds": 45,
+          "independentDiskProbeContinued": true
+        }
+      },
+      "semanticVerification": {
+        "verifiedAt": "2026-09-08T19:07:35.210Z",
+        "latestRunsByRoute": [
+          {
+            "route": "nft",
+            "runId": "59e53885f1ac822ad6e723329ead65ea850c80ba83fc48f83ed5db7b871c475e",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T15:30:00.000Z",
+            "cutoff": "2026-09-08T15:30:00.000Z",
+            "nextCutoff": "2026-09-08T16:00:00.000Z",
+            "status": "open",
+            "createdAt": "2026-09-08T19:07:17.605Z",
+            "updatedAt": "2026-09-08T19:07:17.957Z"
+          },
+          {
+            "route": "uki",
+            "runId": "caf0cc5471c0fdec4ef41d444169ab68e5db0712a08dd80157590bd161fd2d80",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T19:00:00.000Z",
+            "cutoff": "2026-09-08T19:00:00.000Z",
+            "nextCutoff": "2026-09-08T19:30:00.000Z",
+            "status": "open",
+            "createdAt": "2026-09-08T19:06:45.606Z",
+            "updatedAt": "2026-09-08T19:06:46.503Z"
+          }
+        ],
+        "qaPostWithdrawalItems": {
+          "cutoff": "2026-09-08T15:00:00.000Z",
+          "itemCount": 0,
+          "grantCredits": 0,
+          "ownCredits": 0,
+          "poolCredits": 0,
+          "statuses": {},
+          "items": []
+        },
+        "status": "NFT catchup advancing; UI reader correction still pending"
+      }
+    },
+    "publicFreshnessFollowUp": {
+      "rootCause": {
+        "publicReader": "Counts all open incidents despite historical containment; dashboard consumes same status.",
+        "idleRuntime": "No pending period returns waiting before refreshSourceWatermark. Fifteen-minute source freshness expires between thirty-minute Stage cuts."
+      },
+      "liveWatermarkEvidence": {
+        "at": "2026-09-08T18:57:47.498Z",
+        "watermarks": [
+          {
+            "_id": "cukie-master-slots:nft",
+            "route": "nft",
+            "status": "healthy",
+            "observedThrough": "2026-09-08T18:57:11.425Z",
+            "sourceHash": "65418cd3a9c270dc806fa3900614b2ca969a8dc723842d9420a98da2034dca04",
+            "slotCount": 5,
+            "updatedAt": "2026-09-08T18:57:37.700Z"
+          },
+          {
+            "_id": "cukie-master-slots:uki",
+            "route": "uki",
+            "status": "healthy",
+            "observedThrough": "2026-09-08T18:30:30.241Z",
+            "sourceHash": "2fd1d769d4f63b048590676ba3e771215c1ea0d65aa31caa0f1978a38003ef9f",
+            "slotCount": 3,
+            "updatedAt": "2026-09-08T18:30:47.398Z"
+          }
+        ],
+        "rules": [
+          {
+            "_id": "competition_credits:credits-staging-cycle-v1",
+            "version": "credits-staging-cycle-v1",
+            "activeFrom": "2026-09-07T11:30:00.000Z",
+            "sourceFreshnessMs": 900000
+          }
+        ]
+      },
+      "consumerMap": [
+        {
+          "consumer": "credits/public.ts",
+          "rule": "wallet/global and route; current period cutoff with shared incident predicate"
+        },
+        {
+          "consumer": "credits/repository.ts",
+          "rule": "route-wide snapshot gate at requested cutoff; shared predicate"
+        },
+        {
+          "consumer": "credits/testing.ts",
+          "rule": "memory snapshot gate mirrors shared predicate"
+        },
+        {
+          "consumer": "dashboard/default-dependencies.ts and credit-panel.tsx",
+          "rule": "consume grants.healthy and balance/pool blocked; no independent incident query"
+        },
+        {
+          "consumer": "rewards/accounting-repository.ts",
+          "rule": "exclude contributions by runId with open incident, intentionally unchanged"
+        }
+      ],
+      "patch": {
+        "files": [
+          "dapp/src/lib/uki-economy/credits/public.ts",
+          "dapp/src/lib/uki-economy/credits/runtime.ts"
+        ],
+        "scope": "Public reader shares strict predicate at current cutoff. Idle route ticks validate and refresh source watermark without creating runs; route failures and common expiry preserved.",
+        "deployed": false,
+        "codeCommit": "d9a6ccf9c3460685d4646e7625d47c6104791863"
+      },
+      "checks": {
+        "focusedTests": 23,
+        "testSuites": 215,
+        "tests": 1746,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "build": "PASS",
+        "finalTestAssertionCorrection": "Product code unchanged after full suite/build; final public query-scope assertion verified with 12 focused tests, lint and typecheck."
+      },
+      "realMongoReadOnlyVerification": {
+        "verifiedAt": "2026-09-08T19:07:35.243Z",
+        "writes": 0,
+        "routes": {
+          "uki": {
+            "balance": {
+              "grantedCredits": 0,
+              "poolDepositedCredits": 0,
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "spentCredits": 0,
+              "expiredCredits": 0,
+              "blocked": false
+            },
+            "pool": {
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "blocked": false
+            },
+            "grants": {
+              "healthy": true,
+              "sourceObservedThrough": "2026-09-08T19:00:25.347Z",
+              "openIncidents": 0
+            }
+          },
+          "nft": {
+            "balance": {
+              "grantedCredits": 0,
+              "poolDepositedCredits": 0,
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "spentCredits": 0,
+              "expiredCredits": 0,
+              "blocked": false
+            },
+            "pool": {
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "blocked": false
+            },
+            "grants": {
+              "healthy": true,
+              "sourceObservedThrough": "2026-09-08T19:06:50.008Z",
+              "openIncidents": 0
+            }
+          }
+        },
+        "configuredSlots": 0,
+        "staleAt": "2026-09-08T19:23:35.243Z",
+        "staleRoutes": {
+          "uki": {
+            "balance": {
+              "grantedCredits": 0,
+              "poolDepositedCredits": 0,
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "spentCredits": 0,
+              "expiredCredits": 0,
+              "blocked": false
+            },
+            "pool": {
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "blocked": false
+            },
+            "grants": {
+              "healthy": false,
+              "sourceObservedThrough": "2026-09-08T19:00:25.347Z",
+              "openIncidents": 0
+            }
+          },
+          "nft": {
+            "balance": {
+              "grantedCredits": 0,
+              "poolDepositedCredits": 0,
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "spentCredits": 0,
+              "expiredCredits": 0,
+              "blocked": false
+            },
+            "pool": {
+              "availableCredits": 0,
+              "reservedCredits": 0,
+              "blocked": false
+            },
+            "grants": {
+              "healthy": false,
+              "sourceObservedThrough": "2026-09-08T19:06:50.008Z",
+              "openIncidents": 0
+            }
+          }
+        },
+        "gateAndRewards": {
+          "verifiedAt": "2026-09-08T19:07:35.437Z",
+          "writes": 0,
+          "gateCode": "current candidate repository and shared incident predicate",
+          "database": "cukieshub-new-staging",
+          "gates": [
+            {
+              "cutoff": "2026-09-08T14:00:00.000Z",
+              "openIntegrityIncidents": 2,
+              "activeRuleMatches": true,
+              "maturedQualifyingSlots": 0
+            },
+            {
+              "cutoff": "2026-09-08T14:30:00.000Z",
+              "openIntegrityIncidents": 1,
+              "activeRuleMatches": true,
+              "maturedQualifyingSlots": 0
+            },
+            {
+              "cutoff": "2026-09-08T15:00:00.000Z",
+              "openIntegrityIncidents": 0,
+              "activeRuleMatches": true,
+              "maturedQualifyingSlots": 0
+            },
+            {
+              "cutoff": "2026-09-08T18:30:00.000Z",
+              "openIntegrityIncidents": 0,
+              "activeRuleMatches": true,
+              "maturedQualifyingSlots": 0
+            }
+          ],
+          "contributions": [
+            {
+              "cutoff": "2026-09-08T13:30:00.000Z",
+              "qaUnits": 390,
+              "contributorCount": 1
+            },
+            {
+              "cutoff": "2026-09-08T14:00:00.000Z",
+              "qaUnits": 0,
+              "contributorCount": 0
+            },
+            {
+              "cutoff": "2026-09-08T14:30:00.000Z",
+              "qaUnits": 0,
+              "contributorCount": 0
+            }
+          ]
+        },
+        "bundleSha256": "d3994f38bdac64e071b8e3f68cc38e5292f8a009f4a2841573b0403d94f28cad"
       }
     }
   }

@@ -2,25 +2,77 @@ jest.mock('@/lib/indexer-db/mongodb', () => ({ getEconomyDb: jest.fn() }));
 
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
 import { getCompetitionCreditWalletStatus } from '@/lib/uki-economy/credits/public';
+import { currentCompetitionCreditPeriod } from '@/lib/uki-economy/credits/rules';
 import { testCompetitionCreditRule } from '@/lib/uki-economy/credits/testing';
+import type { CreditIntegrityIncident } from '@/lib/uki-economy/credits/types';
 
 const wallet = '0x1111111111111111111111111111111111111111';
 const now = new Date('2026-09-07T08:35:37.000Z');
 
+function incident(
+  rule: ReturnType<typeof testCompetitionCreditRule>,
+  overrides: Partial<CreditIntegrityIncident> = {},
+): CreditIntegrityIncident {
+  const period = currentCompetitionCreditPeriod(now, rule);
+  return {
+    _id: 'incident-1',
+    incidentId: 'incident-1',
+    type: 'credit_reconciliation_mismatch',
+    status: 'open',
+    runId: 'a'.repeat(64),
+    route: 'uki',
+    periodId: `${rule.version}:${rule.configHash}:${new Date(period.cutoff.getTime() - 86_400_000).toISOString()}`,
+    walletNormalized: null,
+    reasonCodes: ['SOURCE_SLOT_HISTORY_CORRECTED'],
+    evidenceHash: 'e'.repeat(64),
+    containment: 'pool_positions_excluded_by_reward_contributor_selector',
+    selectorCutoff: 0,
+    planHash: 'c'.repeat(64),
+    detectedAt: new Date('2026-09-07T08:00:00.000Z'),
+    updatedAt: new Date('2026-09-07T08:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function freshWatermarks() {
+  return [
+    {
+      _id: 'cukie-master-slots:uki',
+      route: 'uki',
+      status: 'healthy',
+      observedThrough: new Date('2026-09-07T08:30:00.000Z'),
+    },
+    {
+      _id: 'cukie-master-slots:nft',
+      route: 'nft',
+      status: 'healthy',
+      observedThrough: new Date('2026-09-07T08:30:00.000Z'),
+    },
+  ];
+}
+
 function mockCollections(rows: Record<string, unknown[]>) {
-  (getEconomyDb as jest.Mock).mockResolvedValue({
+  const collections: Record<string, {
+    find: jest.Mock;
+    countDocuments: jest.Mock;
+  }> = {};
+  const db = {
     collection: jest.fn((name: string) => {
+      if (collections[name]) return collections[name];
       const cursor = {
         sort: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         toArray: jest.fn().mockResolvedValue(rows[name] ?? []),
       };
-      return {
+      collections[name] = {
         find: jest.fn().mockReturnValue(cursor),
         countDocuments: jest.fn().mockResolvedValue(0),
       };
+      return collections[name];
     }),
-  });
+  };
+  (getEconomyDb as jest.Mock).mockResolvedValue(db);
+  return { db, collections };
 }
 
 describe('competition credit public status conflicts', () => {
@@ -69,6 +121,105 @@ describe('competition credit public status conflicts', () => {
 
     expect(status.routes.uki.grants).toMatchObject({ healthy: false, openIncidents: 0 });
     expect(status.routes.nft.grants).toMatchObject({ healthy: false, openIncidents: 0 });
+    expect(status.grants.healthy).toBe(false);
+  });
+
+  it('contains a valid historical incident when both source watermarks are fresh', async () => {
+    const rule = testCompetitionCreditRule();
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_source_watermarks: freshWatermarks(),
+      competition_credit_incidents: [incident(rule)],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.grants).toMatchObject({ healthy: true, openIncidents: 0 });
+    expect(status.grants).toMatchObject({ healthy: true, openIncidents: 0 });
+  });
+
+  const blockingIncidentCases: Array<[
+    string,
+    (rule: ReturnType<typeof testCompetitionCreditRule>) => string | undefined,
+  ]> = [
+    ['same cutoff', (rule: ReturnType<typeof testCompetitionCreditRule>) => currentCompetitionCreditPeriod(now, rule).periodId],
+    ['future cutoff', (rule: ReturnType<typeof testCompetitionCreditRule>) => {
+      const period = currentCompetitionCreditPeriod(now, rule);
+      return `${rule.version}:${rule.configHash}:${new Date(period.cutoff.getTime() + 86_400_000).toISOString()}`;
+    }],
+    ['normal reason', () => undefined],
+    ['mixed reasons', () => undefined],
+    ['malformed period', () => 'malformed-period'],
+  ];
+
+  it.each(blockingIncidentCases)('keeps %s incidents blocking grants', async (label, periodId) => {
+    const rule = testCompetitionCreditRule();
+    const overrides: Partial<CreditIntegrityIncident> = {
+      periodId: periodId(rule) ?? incident(rule).periodId,
+      ...(label === 'normal reason' ? { reasonCodes: ['RUNTIME_RUN_INVALID'] } : {}),
+      ...(label === 'mixed reasons' ? { reasonCodes: ['SOURCE_SLOT_HISTORY_CORRECTED', 'RUNTIME_RUN_INVALID'] } : {}),
+    };
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_source_watermarks: freshWatermarks(),
+      competition_credit_incidents: [incident(rule, overrides)],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.grants).toMatchObject({ healthy: false, openIncidents: 1 });
+    expect(status.grants.healthy).toBe(false);
+  });
+
+  it('applies wallet/global route filters while keeping route status independent', async () => {
+    const rule = testCompetitionCreditRule();
+    const { collections } = mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_source_watermarks: freshWatermarks(),
+      competition_credit_incidents: [
+        incident(rule, {
+          _id: 'incident-2',
+          incidentId: 'incident-2',
+          route: 'nft',
+          walletNormalized: wallet,
+          reasonCodes: ['RUNTIME_RUN_INVALID'],
+        }),
+      ],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    const find = collections.competition_credit_incidents.find;
+    expect(find).toHaveBeenCalledTimes(2);
+    expect(find).toHaveBeenCalledWith({
+      status: 'open',
+      route: 'uki',
+      $or: [{ walletNormalized: wallet }, { walletNormalized: null }],
+    }, expect.objectContaining({ projection: expect.any(Object) }));
+    expect(find).toHaveBeenCalledWith({
+      status: 'open',
+      route: 'nft',
+      $or: [{ walletNormalized: wallet }, { walletNormalized: null }],
+    }, expect.objectContaining({ projection: expect.any(Object) }));
+    expect(status.routes.uki.grants).toMatchObject({ healthy: true, openIncidents: 0 });
+    expect(status.routes.nft.grants).toMatchObject({ healthy: false, openIncidents: 1 });
+  });
+
+  it('keeps a contained incident blocked when its source watermark is stale', async () => {
+    const rule = testCompetitionCreditRule();
+    const stale = freshWatermarks().map((watermark) => ({
+      ...watermark,
+      observedThrough: new Date('2026-09-07T08:00:00.000Z'),
+    }));
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_source_watermarks: stale,
+      competition_credit_incidents: [incident(rule)],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.grants).toMatchObject({ healthy: false, openIncidents: 0 });
     expect(status.grants.healthy).toBe(false);
   });
 });

@@ -238,7 +238,7 @@ describe('competition credit runtime', () => {
     expect(runtimeServices.openRun).not.toHaveBeenCalled();
   });
 
-  it('reports a healthy waiting tick before the first eligible settlement', async () => {
+  it('refreshes both source watermarks while waiting without creating credit runs', async () => {
     const coordinator = new MemoryCoordinator();
     const runtimeServices = services({
       findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(null),
@@ -258,10 +258,65 @@ describe('competition credit runtime', () => {
       expect.objectContaining({ route: 'uki', status: 'waiting', creditRunId: '' }),
       expect.objectContaining({ route: 'nft', status: 'waiting', creditRunId: '' }),
     ]);
-    expect(runtimeServices.refreshSourceWatermark).not.toHaveBeenCalled();
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledTimes(2);
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenNthCalledWith(1, {
+      route: 'uki',
+      expectedRuleVersion: rule.version,
+      ruleAt: period.cutoff,
+      now,
+    });
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenNthCalledWith(2, {
+      route: 'nft',
+      expectedRuleVersion: rule.version,
+      ruleAt: period.cutoff,
+      now,
+    });
     expect(runtimeServices.createDailyRun).not.toHaveBeenCalled();
     expect(coordinator.failed).toHaveLength(0);
     expect(coordinator.finished).toHaveLength(1);
+  });
+
+  it('blocks unhealthy waiting sources while still expiring reservations and lots', async () => {
+    const coordinator = new MemoryCoordinator();
+    const repository = new MemoryCompetitionCreditRepository({ rule });
+    repository.state.sourceHealth.healthy = false;
+    repository.state.sourceHealth.warnings = ['CHAIN_EVENTS_NOT_PROJECTED'];
+    const creditService = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    const watermarkBefore = repository.state.watermark;
+    const runtimeServices = services({
+      findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(null),
+      refreshSourceWatermark: jest.fn(creditService.refreshSourceWatermark),
+    });
+
+    await expect(runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    })).rejects.toThrow('No se puede publicar watermark con fuentes no saludables');
+
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledTimes(2);
+    expect(repository.state.watermark).toEqual(watermarkBefore);
+    expect(runtimeServices.createDailyRun).not.toHaveBeenCalled();
+    expect(runtimeServices.openRun).not.toHaveBeenCalled();
+    expect(runtimeServices.expireReservationsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(runtimeServices.expireAvailableLotsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(coordinator.failedRoutes[0]).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'blocked', errorCode: 'DOMAIN_CONFLICT' }),
+      expect.objectContaining({ route: 'nft', status: 'blocked', errorCode: 'DOMAIN_CONFLICT' }),
+    ]);
+    expect(coordinator.finished).toHaveLength(0);
+    expect(coordinator.released).toBe(1);
   });
 
   it('rejects an overlapping tick before mutating the economy', async () => {
