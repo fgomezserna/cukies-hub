@@ -132,9 +132,12 @@ describe("Mongo reward accounting repository", () => {
     expect(pipeline).toEqual(expect.arrayContaining([
       { $match: { status: "open", periodId: { $regex: "2026-08-20T14:00:00\\.000Z$" } } },
       expect.objectContaining({ $lookup: expect.objectContaining({
-        from: "competition_credit_incidents", localField: "runId", foreignField: "runId",
+        from: "competition_credit_incidents", let: { creditRunId: "$runId" },
         as: "openCreditIntegrityIncidents",
-        pipeline: expect.arrayContaining([{ $match: { type: "credit_reconciliation_mismatch", status: "open" } }]),
+        pipeline: expect.arrayContaining([{ $match: {
+          $expr: { $eq: ["$runId", "$$creditRunId"] },
+          type: "credit_reconciliation_mismatch", status: "open",
+        } }]),
       }) }),
       { $match: { openCreditIntegrityIncidents: { $size: 0 } } },
       { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
@@ -143,7 +146,7 @@ describe("Mongo reward accounting repository", () => {
     const exclusionIndex = pipeline.findIndex((stage) => stage.$match && typeof stage.$match === "object" && "openCreditIntegrityIncidents" in stage.$match);
     expect(lookupIndex).toBeLessThan(exclusionIndex);
     expect(exclusionIndex).toBeLessThan(pipeline.findIndex((stage) => "$group" in stage));
-    expect(JSON.stringify(pipeline)).not.toMatch(/cukie.?master|entitlement|"route"/i);
+    expect(JSON.stringify(pipeline)).not.toMatch(/cukie.?master|entitlement|"route"|localField|foreignField/i);
   });
 
   it("conserva snapshots ambassador distintos por partida durante el mismo dia", async () => {

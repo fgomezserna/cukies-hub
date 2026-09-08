@@ -1031,6 +1031,14 @@ runs, lotes y ledger: bloquear solo las posiciones romperia su reconciliacion
 con los runs abiertos. La aplicacion de incidentes y su efecto real quedan
 pendientes de verificacion; no se presenta el helper inicial como operativo.
 
+La consulta real del filtro detecta una incompatibilidad antes de aplicar
+incidentes: Mongo Stage devuelve `buildInfo.version=4.4.29` y rechaza combinar
+`$lookup.pipeline` con `localField/foreignField`. Se sustituye ese join por
+`let/$expr`, conservando run, tipo y estado. La consulta corregida pasa en
+Mongo real a las 17:22:27 UTC: 390 para QA en cada uno de los periodos 13:30,
+14:00 y 14:30, sin incidentes insertados ni otras escrituras. Tras el append,
+debera conservar 13:30 y excluir exclusivamente los dos cortes erroneos.
+
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 
 | Puntos UX | Cambio o comprobacion | Estado / limite |
