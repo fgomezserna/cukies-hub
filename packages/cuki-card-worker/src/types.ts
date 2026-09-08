@@ -13,6 +13,7 @@ export type CukiSkills = {
 export type CukiDocument = {
   _id: string;
   tokenId?: string;
+  network?: string;
   chain?: string;
   chainId?: number;
   collectionAddressNormalized?: string;
@@ -25,11 +26,35 @@ export type CukiDocument = {
   cardImageStatus?: 'pending' | 'processing' | 'generated' | 'failed';
   cardImageAttempts?: number;
   cardImageLockedAt?: Date;
+  cardImageLockId?: string;
+  cardImageLeaseVersion?: number;
+  cardImageLeaseSourceRevision?: Date | null;
   cardImageLastError?: string | null;
   cardImageUrl?: string | null;
   cardGeneratedAt?: Date;
   timeStamp?: number;
+  updatedAt?: Date;
 };
+
+export type CardImageLease = {
+  lockId: string;
+  leaseVersion: number;
+  claimedAt: Date;
+  sourceRevision: Date | null;
+};
+
+export type ClaimedCuki = CukiDocument & { lease: CardImageLease };
+
+export type BackfillCensusCategory =
+  | 'renderable'
+  | 'missing_metadata'
+  | 'unsupported_metadata'
+  | 'missing'
+  | 'locked_or_exhausted'
+  | 'already_valid'
+  | 'generated'
+  | 'failed'
+  | 'interrupted';
 
 export type CardWorkerConfig = {
   mongoUrl: string;
@@ -55,6 +80,8 @@ export type CardWorkerConfig = {
 
 export type RenderResult = {
   tokenId: string;
+  documentId?: string;
+  assetIdentity?: string;
   outputPath: string;
   width: number;
   height: number;

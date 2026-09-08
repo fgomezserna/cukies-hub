@@ -64,7 +64,8 @@ function outputPath(config: CardWorkerConfig, tokenId: string) {
 }
 
 export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfig): Promise<RenderResult> {
-  const tokenId = cuki._id || cuki.tokenId;
+  const documentId = cuki._id;
+  const tokenId = cuki.tokenId ?? cuki._id;
 
   if (!tokenId) {
     throw new Error('El documento de Cuki no tiene _id ni tokenId.');
@@ -137,8 +138,19 @@ export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfi
 
   return {
     tokenId,
+    documentId,
+    assetIdentity: canonicalAssetIdentity(cuki),
     outputPath: renderedOutputPath,
     width: image.bitmap.width,
     height: image.bitmap.height,
   };
+}
+
+function canonicalAssetIdentity(cuki: CukiDocument) {
+  const network = (cuki.network ?? cuki.chain ?? 'unknown').trim().toLowerCase() || 'unknown';
+  const collection = (cuki.collectionAddressNormalized ?? 'unknown').trim().toLowerCase() || 'unknown';
+  const tokenId = cuki.tokenId ?? cuki._id;
+  return network === 'unknown' || collection === 'unknown'
+    ? `document:${cuki._id}`
+    : `${network}:${collection}:${tokenId}`;
 }
