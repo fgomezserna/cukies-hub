@@ -71,8 +71,8 @@ export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfi
   }
 
   const skills = cuki.skills ?? {};
-  const generation = requiredNumber(skills.generation, 'skills.generation');
-  const type = requiredNumber(cuki.type, 'type');
+  const generation = requiredNumber(skills.generation ?? cuki.generation, 'skills.generation/generation');
+  const type = requiredNumber(cuki.type ?? cuki.rarity, 'type/rarity');
   const idFontRelativePath = idFontsByGeneration.get(generation);
 
   if (!idFontRelativePath) {

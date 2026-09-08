@@ -1,0 +1,43 @@
+services:
+  assets-gateway-production:
+    image: ghcr.io/nginx/nginx-s3-gateway/nginx-oss-s3-gateway:unprivileged-oss-20260907@sha256:71231122a24e759491802cc5aa695ab4492e561ba3ca3aa3064db5a39666554e
+    restart: unless-stopped
+    environment:
+      ALLOW_DIRECTORY_LIST: "false"
+      AWS_ACCESS_KEY_ID_FILE: /run/secrets/assets_production_reader_access_key
+      AWS_SECRET_ACCESS_KEY_FILE: /run/secrets/assets_production_reader_secret_key
+      AWS_SIGS_VERSION: "4"
+      CORS_ALLOWED_ORIGIN: https://cukies.world
+      CORS_ENABLED: "true"
+      PREFIX_LEADING_DIRECTORY_PATH: /png/production/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe
+      PROVIDE_INDEX_PAGE: "false"
+      S3_BUCKET_NAME: cukies-cards-production
+      S3_REGION: us-east-1
+      S3_SERVER: 192.168.1.223
+      S3_SERVER_PORT: "9000"
+      S3_SERVER_PROTO: http
+      S3_SERVICE: s3
+      S3_STYLE: path
+    secrets:
+      - assets_production_reader_access_key
+      - assets_production_reader_secret_key
+    networks:
+      - coolify
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.assets-production-https.entrypoints: websecure
+      traefik.http.routers.assets-production-https.rule: Host(`assets.cukies.world`)
+      traefik.http.routers.assets-production-https.service: assets-production-https
+      traefik.http.routers.assets-production-https.tls: "true"
+      traefik.http.routers.assets-production-https.tls.certresolver: letsencrypt
+      traefik.http.services.assets-production-https.loadbalancer.server.port: "8080"
+
+networks:
+  coolify:
+    external: true
+
+secrets:
+  assets_production_reader_access_key:
+    file: ${ASSETS_PRODUCTION_READER_ACCESS_KEY_FILE:?set a mode-0444 reader key file}
+  assets_production_reader_secret_key:
+    file: ${ASSETS_PRODUCTION_READER_SECRET_KEY_FILE:?set a mode-0444 reader secret file}

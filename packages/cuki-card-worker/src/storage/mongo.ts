@@ -1,4 +1,4 @@
-import { Db, MongoClient } from 'mongodb';
+import { Db, MongoClient, type Filter } from 'mongodb';
 
 import type { CardWorkerConfig, CukiDocument, GenerationResult } from '../types.js';
 
@@ -45,20 +45,60 @@ export class CardWorkerStore {
     return this.cukies().findOne({ _id: tokenId });
   }
 
-  async claimNextCuki() {
-    const staleLock = new Date(Date.now() - this.config.staleLockMs);
+  private renderableMetadataFilter(): Filter<CukiDocument> {
+    return {
+      $and: [
+        { $or: [{ type: { $exists: true, $ne: null } }, { rarity: { $exists: true, $ne: null } }] },
+        {
+          $or: [
+            { 'skills.generation': { $exists: true, $ne: null } },
+            { generation: { $exists: true, $ne: null } },
+          ],
+        },
+      ],
+    };
+  }
 
+  private claimFilter(tokenId?: string): Filter<CukiDocument> {
+    const metadataFilter = this.renderableMetadataFilter();
+
+    return {
+      ...(tokenId ? { _id: tokenId } : {}),
+      $and: [
+        ...(metadataFilter.$and ?? []),
+        {
+          $or: [
+            { cardImageAttempts: { $exists: false } },
+            { cardImageAttempts: { $lt: this.config.maxAttempts } },
+          ],
+        },
+        {
+          $or: [
+            { cardImageStatus: { $ne: 'processing' } },
+            {
+              cardImageStatus: 'processing',
+              cardImageLockedAt: { $lt: new Date(Date.now() - this.config.staleLockMs) },
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  async claimNextCuki() {
     return this.cukies().findOneAndUpdate(
       {
         $and: [
-          { type: { $exists: true, $ne: null } },
-          { 'skills.generation': { $exists: true, $ne: null } },
+          this.renderableMetadataFilter(),
           {
             $or: [
               { needsImage: true },
               { cardImageStatus: 'pending' },
               { cardImageStatus: 'failed', cardImageAttempts: { $lt: this.config.maxAttempts } },
-              { cardImageStatus: 'processing', cardImageLockedAt: { $lt: staleLock } },
+              {
+                cardImageStatus: 'processing',
+                cardImageLockedAt: { $lt: new Date(Date.now() - this.config.staleLockMs) },
+              },
               { img: { $exists: false } },
               { img: null },
               { img: '' },
@@ -84,9 +124,44 @@ export class CardWorkerStore {
     );
   }
 
+  async claimCukiById(tokenId: string) {
+    return this.cukies().findOneAndUpdate(
+      this.claimFilter(tokenId),
+      {
+        $set: {
+          cardImageStatus: 'processing',
+          cardImageLockedAt: new Date(),
+          cardImageLastError: null,
+          updatedAt: new Date(),
+        },
+        $inc: { cardImageAttempts: 1 },
+      },
+      { returnDocument: 'after' },
+    );
+  }
+
+  async listBackfillCukies() {
+    return this.cukies()
+      .find(this.renderableMetadataFilter())
+      .project({
+        _id: 1,
+        tokenId: 1,
+        network: 1,
+        chainId: 1,
+        collectionAddressNormalized: 1,
+        img: 1,
+        type: 1,
+        rarity: 1,
+        generation: 1,
+        skills: 1,
+      })
+      .sort({ _id: 1 })
+      .toArray();
+  }
+
   async markGenerated(tokenId: string, result: GenerationResult) {
-    await this.cukies().updateOne(
-      { _id: tokenId },
+    const updated = await this.cukies().updateOne(
+      { _id: tokenId, cardImageStatus: 'processing' },
       {
         $set: {
           img: result.imageUrl,
@@ -102,6 +177,10 @@ export class CardWorkerStore {
         },
       },
     );
+
+    if (updated.matchedCount !== 1) {
+      throw new Error(`No se pudo confirmar la publicación de la card ${tokenId}: el lock ya no es válido.`);
+    }
 
     await this.recordJob(tokenId, 'generated', result);
   }
@@ -136,6 +215,7 @@ export class CardWorkerStore {
   }
 
   async summary() {
+    const metadataFilter = this.renderableMetadataFilter();
     const [cukiCount, statusCounts, missingImageCount, readyMissingImageCount, jobCounts] =
       await Promise.all([
         this.cukies().countDocuments(),
@@ -149,9 +229,10 @@ export class CardWorkerStore {
           $or: [{ img: { $exists: false } }, { img: null }, { img: '' }],
         }),
         this.cukies().countDocuments({
-          type: { $exists: true, $ne: null },
-          'skills.generation': { $exists: true, $ne: null },
-          $or: [{ img: { $exists: false } }, { img: null }, { img: '' }, { needsImage: true }],
+          $and: [
+            ...(metadataFilter.$and ?? []),
+            { $or: [{ img: { $exists: false } }, { img: null }, { img: '' }, { needsImage: true }] },
+          ],
         }),
         this.jobs()
           .aggregate<{ _id: string | null; count: number }>([
